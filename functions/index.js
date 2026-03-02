@@ -24,7 +24,8 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'https://clube-geek-toys.web.app',
   'https://clube-geek-toys.firebaseapp.com',
-  // Add your custom domain here
+  'https://club.geeketoys.com.br',
+  'https://clube-geek-toys.vercel.app',
 ];
 
 const corsOptions = {
