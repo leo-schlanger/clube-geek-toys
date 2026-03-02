@@ -13,6 +13,8 @@ import MemberDashboard from './pages/MemberDashboard'
 import PDV from './pages/PDV'
 import AdminDashboard from './pages/AdminDashboard'
 import PaymentResult from './pages/PaymentResult'
+import TermsOfUse from './pages/TermsOfUse'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 
 const queryClient = new QueryClient()
 
@@ -77,6 +79,8 @@ function AppRoutes() {
       <Route path="/assinar" element={<Subscribe />} />
       <Route path="/cadastro" element={<Register />} />
       <Route path="/recuperar-senha" element={<ForgotPassword />} />
+      <Route path="/termos" element={<TermsOfUse />} />
+      <Route path="/privacidade" element={<PrivacyPolicy />} />
 
       {/* Payment Routes */}
       <Route path="/pagamento/sucesso" element={<PaymentResult type="success" />} />

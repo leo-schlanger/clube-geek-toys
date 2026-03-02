@@ -182,19 +182,17 @@ export default function Register() {
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  step >= s
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= s
                     ? 'bg-primary text-white'
                     : 'bg-white/20 text-white/50'
-                }`}
+                  }`}
               >
                 {step > s ? <Check className="h-4 w-4" /> : s}
               </div>
               {s < 3 && (
                 <div
-                  className={`w-12 h-1 ${
-                    step > s ? 'bg-primary' : 'bg-white/20'
-                  }`}
+                  className={`w-12 h-1 ${step > s ? 'bg-primary' : 'bg-white/20'
+                    }`}
                 />
               )}
             </div>
@@ -417,6 +415,11 @@ export default function Register() {
             Fazer login
           </Link>
         </p>
+
+        <div className="mt-8 text-center text-xs text-muted-foreground/60 space-x-4">
+          <Link to="/termos" className="hover:text-foreground underline">Termos de Uso</Link>
+          <Link to="/privacidade" className="hover:text-foreground underline">Privacidade</Link>
+        </div>
       </div>
 
       {/* Payment Modal */}
