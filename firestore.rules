@@ -1,0 +1,148 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if it's the user themselves
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Get user role from users collection
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserRole() == 'admin';
+    }
+
+    // Check if user is seller or admin
+    function isSellerOrAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserRole() in ['admin', 'seller'];
+    }
+
+    // Check if field is not being modified
+    function fieldNotChanged(field) {
+      return !(field in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // ============================================
+    // COLLECTION: USERS
+    // ============================================
+
+    match /users/{userId} {
+      // Read: own user or admin
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Create: only during registration (user can only create their own doc with member role)
+      allow create: if isOwner(userId) &&
+        request.resource.data.role == 'member' &&
+        request.resource.data.keys().hasAll(['email', 'role', 'createdAt']);
+
+      // Update: admin can change anything, user can update own profile but NOT role
+      allow update: if isAdmin() ||
+        (isOwner(userId) && fieldNotChanged('role'));
+
+      // Delete: only admin
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // COLLECTION: MEMBERS
+    // ============================================
+
+    match /members/{memberId} {
+      // Read: own member (by user_id), seller, or admin
+      allow read: if isAuthenticated() &&
+        (resource.data.user_id == request.auth.uid || isSellerOrAdmin());
+
+      // Create: authenticated user (during registration) or admin
+      // User can only create member for themselves
+      allow create: if isAuthenticated() &&
+        (request.resource.data.user_id == request.auth.uid || isAdmin());
+
+      // Update: admin can change anything
+      // Members can update limited fields (phone, photo)
+      allow update: if isAdmin() ||
+        (isAuthenticated() &&
+         resource.data.user_id == request.auth.uid &&
+         fieldNotChanged('cpf') &&
+         fieldNotChanged('user_id') &&
+         fieldNotChanged('plan') &&
+         fieldNotChanged('status') &&
+         fieldNotChanged('payment_type') &&
+         fieldNotChanged('expiry_date') &&
+         fieldNotChanged('points'));
+
+      // Delete: only admin
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // COLLECTION: PAYMENTS
+    // ============================================
+
+    match /payments/{paymentId} {
+      // Read: admin, seller, or payment owner (member who made the payment)
+      allow read: if isSellerOrAdmin() ||
+        (isAuthenticated() && resource.data.member_id in
+          get(/databases/$(database)/documents/members).where('user_id', '==', request.auth.uid).limit(1));
+
+      // Create: authenticated user or system (Cloud Functions)
+      allow create: if isAuthenticated();
+
+      // Update: only admin or system (Cloud Functions with admin SDK bypass rules)
+      allow update: if isAdmin();
+
+      // Delete: never allowed (audit trail)
+      allow delete: if false;
+    }
+
+    // ============================================
+    // COLLECTION: CONFIG (system settings)
+    // ============================================
+
+    match /config/{configId} {
+      // Read: any authenticated user
+      allow read: if isAuthenticated();
+
+      // Write: only admin
+      allow write: if isAdmin();
+    }
+
+    // ============================================
+    // COLLECTION: AUDIT_LOGS (if needed)
+    // ============================================
+
+    match /audit_logs/{logId} {
+      // Read: only admin
+      allow read: if isAdmin();
+
+      // Write: only system (admin SDK)
+      allow write: if false;
+    }
+
+    // ============================================
+    // DEFAULT: DENY ALL
+    // ============================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
