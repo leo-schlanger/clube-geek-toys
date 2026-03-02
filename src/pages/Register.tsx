@@ -13,7 +13,8 @@ import { Loading } from '../components/ui/loading'
 import { PaymentModal } from '../components/PaymentModal'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency, validateCPF } from '../lib/utils'
-import { createMember } from '../lib/members'
+import { createMember, isCPFRegistered } from '../lib/members'
+import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import {
   User,
@@ -51,6 +52,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [createdMemberId, setCreatedMemberId] = useState<string | null>(null)
+  const [memberEmail, setMemberEmail] = useState<string>('')
 
   // Get plan from URL params
   const planParam = searchParams.get('plano') as PlanType || 'silver'
@@ -66,7 +69,7 @@ export default function Register() {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
+    setValue,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   })
@@ -85,8 +88,16 @@ export default function Register() {
     setLoading(true)
 
     try {
-      // 1. Create account in Firebase Auth
-      const { error: authError } = await signUp(data.email, data.password)
+      // 1. Check if CPF is already registered
+      const isRegistered = await isCPFRegistered(data.cpf)
+      if (isRegistered) {
+        toast.error('Este CPF já está cadastrado')
+        setLoading(false)
+        return
+      }
+
+      // 2. Create account in Firebase Auth
+      const { user: newUser, error: authError } = await signUp(data.email, data.password)
 
       if (authError) {
         if (authError.message.includes('email-already-in-use')) {
@@ -98,8 +109,24 @@ export default function Register() {
         return
       }
 
-      // 2. Move to payment step
-      // Note: User is not immediately available after signUp
+      // 3. Create member record immediately (pending status)
+      if (newUser) {
+        const member = await createMember(newUser.uid, {
+          fullName: data.fullName,
+          email: data.email,
+          cpf: data.cpf,
+          phone: data.phone,
+          plan: selectedPlan,
+          paymentType: paymentType,
+        })
+
+        if (member) {
+          setCreatedMemberId(member.id)
+          setMemberEmail(member.email)
+        }
+      }
+
+      // 4. Move to payment step
       setStep(3)
       toast.success('Conta criada! Agora finalize o pagamento.')
 
@@ -116,19 +143,6 @@ export default function Register() {
    */
   async function handlePaymentSuccess() {
     setShowPaymentModal(false)
-
-    // Create member after payment confirmed
-    if (user) {
-      await createMember(user.uid, {
-        fullName: watch('fullName'),
-        email: watch('email'),
-        cpf: watch('cpf'),
-        phone: watch('phone'),
-        plan: selectedPlan,
-        paymentType: paymentType,
-      })
-    }
-
     toast.success('Pagamento confirmado! Bem-vindo ao clube!')
     navigate('/membro')
   }
@@ -136,32 +150,47 @@ export default function Register() {
   /**
    * Format CPF input with mask
    */
-  function formatCPFInput(value: string) {
-    const numbers = value.replace(/\D/g, '')
-    return numbers
+  function handleCPFChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let value = e.target.value.replace(/\D/g, '')
+    if (value.length > 11) value = value.slice(0, 11)
+
+    const formattedValue = value
       .replace(/(\d{3})(\d)/, '$1.$2')
       .replace(/(\d{3})(\d)/, '$1.$2')
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+
+    setValue('cpf', formattedValue)
   }
 
   /**
    * Format phone input with mask
    */
-  function formatPhoneInput(value: string) {
-    const numbers = value.replace(/\D/g, '')
-    if (numbers.length <= 10) {
-      return numbers
+  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let value = e.target.value.replace(/\D/g, '')
+    if (value.length > 11) value = value.slice(0, 11)
+
+    let formattedValue = ''
+    if (value.length <= 10) {
+      formattedValue = value
         .replace(/(\d{2})(\d)/, '($1) $2')
         .replace(/(\d{4})(\d)/, '$1-$2')
+    } else {
+      formattedValue = value
+        .replace(/(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2')
     }
-    return numbers
-      .replace(/(\d{2})(\d)/, '($1) $2')
-      .replace(/(\d{5})(\d)/, '$1-$2')
+
+    setValue('phone', formattedValue)
   }
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
-      <div className="max-w-lg mx-auto">
+      <motion.div
+        className="max-w-lg mx-auto"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/assinar" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4">
@@ -182,17 +211,14 @@ export default function Register() {
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= s
-                    ? 'bg-primary text-white'
-                    : 'bg-white/20 text-white/50'
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                   }`}
               >
                 {step > s ? <Check className="h-4 w-4" /> : s}
               </div>
               {s < 3 && (
                 <div
-                  className={`w-12 h-1 ${step > s ? 'bg-primary' : 'bg-white/20'
-                    }`}
+                  className={`w-12 h-1 transition-colors ${step > s ? 'bg-primary' : 'bg-muted'}`}
                 />
               )}
             </div>
@@ -200,11 +226,11 @@ export default function Register() {
         </div>
 
         {/* Plan Summary */}
-        <Card className="mb-6">
+        <Card className="mb-6 border-glow-primary bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Badge variant={selectedPlan as 'silver' | 'gold' | 'black'}>
-                {plan.icon} {plan.name}
+                {plan.name}
               </Badge>
               <span className="text-sm text-muted-foreground">
                 {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
@@ -214,219 +240,185 @@ export default function Register() {
           </CardContent>
         </Card>
 
-        {/* Step 1 & 2: Registration Form */}
-        {step < 3 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {step === 1 ? 'Dados Pessoais' : 'Criar Senha'}
-              </CardTitle>
-              <CardDescription>
-                {step === 1
-                  ? 'Preencha seus dados para continuar'
-                  : 'Crie uma senha para acessar sua conta'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                {step === 1 && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="fullName">Nome Completo</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="fullName"
-                          placeholder="Seu nome completo"
-                          className="pl-10"
-                          {...register('fullName')}
-                          error={!!errors.fullName}
-                        />
+        {/* Form Steps */}
+        <AnimatePresence mode="wait">
+          {step < 3 ? (
+            <motion.div
+              key="step-form"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle>{step === 1 ? 'Dados Pessoais' : 'Segurança'}</CardTitle>
+                  <CardDescription>
+                    {step === 1 ? 'Preencha seus dados para começar' : 'Crie uma senha de acesso'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {step === 1 && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="fullName">Nome Completo</Label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="fullName"
+                              placeholder="Como na sua identidade"
+                              className="pl-10"
+                              {...register('fullName')}
+                            />
+                          </div>
+                          {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="email">E-mail</Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="seu@email.com"
+                              className="pl-10"
+                              {...register('email')}
+                            />
+                          </div>
+                          {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="cpf">CPF</Label>
+                            <div className="relative">
+                              <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="cpf"
+                                placeholder="000.000.000-00"
+                                className="pl-10"
+                                {...register('cpf')}
+                                onChange={handleCPFChange}
+                              />
+                            </div>
+                            {errors.cpf && <p className="text-xs text-red-500">{errors.cpf.message}</p>}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="phone">Telefone</Label>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="phone"
+                                placeholder="(21) 99999-9999"
+                                className="pl-10"
+                                {...register('phone')}
+                                onChange={handlePhoneChange}
+                              />
+                            </div>
+                            {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
+                          </div>
+                        </div>
+
+                        <Button type="button" className="w-full" onClick={() => setStep(2)}>
+                          Próximo Passo <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
                       </div>
-                      {errors.fullName && (
-                        <p className="text-xs text-red-500">{errors.fullName.message}</p>
-                      )}
-                    </div>
+                    )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="seu@email.com"
-                          className="pl-10"
-                          {...register('email')}
-                          error={!!errors.email}
-                        />
+                    {step === 2 && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="password">Senha</Label>
+                          <div className="relative">
+                            <Input
+                              id="password"
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="No mínimo 6 caracteres"
+                              {...register('password')}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+                          <Input
+                            id="confirmPassword"
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Repita sua senha"
+                            {...register('confirmPassword')}
+                          />
+                          {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>}
+                        </div>
+
+                        <div className="flex gap-3">
+                          <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(1)}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+                          </Button>
+                          <Button type="submit" className="flex-1" disabled={loading}>
+                            {loading ? <Loading size="sm" /> : 'Criar Conta'}
+                          </Button>
+                        </div>
                       </div>
-                      {errors.email && (
-                        <p className="text-xs text-red-500">{errors.email.message}</p>
-                      )}
-                    </div>
+                    )}
+                  </form>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="step-payment"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="text-center p-6">
+                <CardHeader>
+                  <CardTitle>Quase lá!</CardTitle>
+                  <CardDescription>
+                    Sua conta foi criada. Agora finalize o pagamento para ativar seus benefícios.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-muted-foreground text-sm">
+                    Você será redirecionado para o ambiente seguro do Mercado Pago.
+                  </p>
+                  <Button className="w-full h-12 text-lg" onClick={() => setShowPaymentModal(true)}>
+                    Finalizar Pagamento
+                  </Button>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="cpf">CPF</Label>
-                      <div className="relative">
-                        <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="cpf"
-                          placeholder="000.000.000-00"
-                          className="pl-10"
-                          {...register('cpf')}
-                          onChange={(e) => {
-                            e.target.value = formatCPFInput(e.target.value)
-                          }}
-                          maxLength={14}
-                          error={!!errors.cpf}
-                        />
-                      </div>
-                      {errors.cpf && (
-                        <p className="text-xs text-red-500">{errors.cpf.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Telefone</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="phone"
-                          placeholder="(21) 99999-9999"
-                          className="pl-10"
-                          {...register('phone')}
-                          onChange={(e) => {
-                            e.target.value = formatPhoneInput(e.target.value)
-                          }}
-                          maxLength={15}
-                          error={!!errors.phone}
-                        />
-                      </div>
-                      {errors.phone && (
-                        <p className="text-xs text-red-500">{errors.phone.message}</p>
-                      )}
-                    </div>
-
-                    <Button
-                      type="button"
-                      className="w-full"
-                      onClick={() => setStep(2)}
-                    >
-                      Continuar
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </>
-                )}
-
-                {step === 2 && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="password">Senha</Label>
-                      <div className="relative">
-                        <Input
-                          id="password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Mínimo 6 caracteres"
-                          {...register('password')}
-                          error={!!errors.password}
-                        />
-                        <button
-                          type="button"
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                          onClick={() => setShowPassword(!showPassword)}
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.password && (
-                        <p className="text-xs text-red-500">{errors.password.message}</p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                      <Input
-                        id="confirmPassword"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="Digite a senha novamente"
-                        {...register('confirmPassword')}
-                        error={!!errors.confirmPassword}
-                      />
-                      {errors.confirmPassword && (
-                        <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => setStep(1)}
-                      >
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Voltar
-                      </Button>
-                      <Button type="submit" className="flex-1" disabled={loading}>
-                        {loading ? (
-                          <Loading size="sm" />
-                        ) : (
-                          <>
-                            Criar Conta
-                            <ArrowRight className="h-4 w-4 ml-2" />
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </form>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Step 3: Payment */}
-        {step === 3 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Finalizar Pagamento</CardTitle>
-              <CardDescription>
-                Escolha a forma de pagamento para ativar seu plano
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => setShowPaymentModal(true)}
-              >
-                <CreditCard className="h-5 w-5 mr-2" />
-                Pagar {formatCurrency(price)}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Already have account */}
-        <p className="text-center text-muted-foreground mt-6">
-          Já tem uma conta?{' '}
-          <Link to="/login" className="text-primary hover:underline">
-            Fazer login
-          </Link>
+        <p className="text-center text-muted-foreground mt-8 text-sm">
+          Já tem uma conta? <Link to="/login" className="text-primary hover:underline font-medium">Fazer Login</Link>
         </p>
 
-        <div className="mt-8 text-center text-xs text-muted-foreground/60 space-x-4">
-          <Link to="/termos" className="hover:text-foreground underline">Termos de Uso</Link>
-          <Link to="/privacidade" className="hover:text-foreground underline">Privacidade</Link>
+        <div className="mt-8 flex justify-center gap-4 text-xs text-muted-foreground/60">
+          <Link to="/termos" className="hover:text-foreground hover:underline">Termos de Uso</Link>
+          <span>•</span>
+          <Link to="/privacidade" className="hover:text-foreground hover:underline">Privacidade</Link>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Payment Modal */}
       {showPaymentModal && (
         <PaymentModal
           plan={selectedPlan}
           paymentType={paymentType}
+          memberId={createdMemberId || undefined}
+          memberEmail={memberEmail || undefined}
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
         />

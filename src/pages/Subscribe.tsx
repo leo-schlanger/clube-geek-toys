@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/badge'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { Check, Crown, Star, Sparkles, ArrowRight } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 export default function Subscribe() {
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
@@ -59,32 +60,40 @@ export default function Subscribe() {
 
       {/* Hero */}
       <section className="py-16 px-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4">
+        <motion.h1
+          className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           Faça parte do <span className="gradient-text text-glow-primary">Clube</span>
-        </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
+        </motion.h1>
+        <motion.p
+          className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
           Descontos exclusivos, brindes mensais, acesso antecipado e muito mais!
-        </p>
+        </motion.p>
 
         {/* Payment Type Toggle */}
         <div className="inline-flex items-center gap-2 glass border border-border p-1 rounded-lg">
           <button
             onClick={() => setPaymentType('monthly')}
-            className={`px-6 py-2 rounded-md font-medium transition-all ${
-              paymentType === 'monthly'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-6 py-2 rounded-md font-medium transition-all ${paymentType === 'monthly'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Mensal
           </button>
           <button
             onClick={() => setPaymentType('annual')}
-            className={`px-6 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
-              paymentType === 'annual'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-6 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${paymentType === 'annual'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Anual
             <Badge variant="success" className="text-xs">Economize!</Badge>
@@ -94,88 +103,112 @@ export default function Subscribe() {
 
       {/* Plans */}
       <section className="py-8 px-6">
-        <div className="container grid md:grid-cols-3 gap-6">
+        <motion.div
+          className="container grid md:grid-cols-3 gap-6"
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true }}
+          variants={{
+            hidden: { opacity: 0 },
+            show: {
+              opacity: 1,
+              transition: {
+                staggerChildren: 0.1
+              }
+            }
+          }}
+        >
           {(Object.keys(PLANS) as PlanType[]).map((planId) => {
             const plan = PLANS[planId]
             const isSelected = selectedPlan === planId
             const isPopular = planId === 'gold'
 
             return (
-              <Card
+              <motion.div
                 key={planId}
-                className={`relative overflow-hidden transition-all cursor-pointer hover-glow-primary ${
-                  isSelected ? 'ring-2 ring-primary border-glow-primary' : ''
-                } ${isPopular ? 'md:-mt-4 md:mb-4' : ''}`}
-                onClick={() => setSelectedPlan(planId)}
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  show: { opacity: 1, y: 0 }
+                }}
               >
-                {isPopular && (
-                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-bl-lg">
-                    Mais Popular
-                  </div>
-                )}
-
-                {/* Plan Header */}
-                <div className={`p-6 bg-gradient-to-br ${planColors[planId]} text-white`}>
-                  <div className="flex items-center gap-3 mb-3">
-                    {planIcons[planId]}
-                    <h3 className="text-2xl font-heading font-bold">{plan.name}</h3>
-                  </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold">{formatCurrency(getPrice(planId))}</span>
-                    <span className="text-sm opacity-80">
-                      /{paymentType === 'monthly' ? 'mês' : 'ano'}
-                    </span>
-                  </div>
-                  {paymentType === 'annual' && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-sm opacity-80">
-                        = {formatCurrency(getMonthlyEquivalent(planId))}/mês
-                      </p>
-                      <Badge variant="success" className="text-xs">
-                        Economia de {formatCurrency(getSavings(planId))}
-                      </Badge>
+                <Card
+                  className={`relative overflow-hidden transition-all cursor-pointer hover-glow-primary flex flex-col h-full ${isSelected ? 'ring-2 ring-primary border-glow-primary' : ''
+                    } ${isPopular ? 'md:-mt-4 md:mb-4' : ''}`}
+                  onClick={() => setSelectedPlan(planId)}
+                >
+                  {isPopular && (
+                    <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-bl-lg z-10">
+                      Mais Popular
                     </div>
                   )}
-                </div>
 
-                {/* Benefits */}
-                <CardContent className="p-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-lg font-semibold">
-                      <span className="text-green-500">{plan.discountProducts}%</span>
-                      <span>em produtos</span>
+                  {/* Plan Header */}
+                  <div className={`p-6 bg-gradient-to-br ${planColors[planId]} text-white`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      {planIcons[planId]}
+                      <h3 className="text-2xl font-heading font-bold">{plan.name}</h3>
                     </div>
-                    <div className="flex items-center gap-2 text-lg font-semibold">
-                      <span className="text-green-500">{plan.discountServices}%</span>
-                      <span>em serviços</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold">{formatCurrency(getPrice(planId))}</span>
+                      <span className="text-sm opacity-80">
+                        /{paymentType === 'monthly' ? 'mês' : 'ano'}
+                      </span>
                     </div>
-                    <hr className="my-4 border-border" />
-                    <ul className="space-y-2">
-                      {plan.benefits.slice(2).map((benefit, index) => (
-                        <li key={index} className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          <span>{benefit}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {paymentType === 'annual' && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-sm opacity-80">
+                          = {formatCurrency(getMonthlyEquivalent(planId))}/mês
+                        </p>
+                        <Badge variant="success" className="text-xs">
+                          Economia de {formatCurrency(getSavings(planId))}
+                        </Badge>
+                      </div>
+                    )}
                   </div>
-                </CardContent>
 
-                <CardFooter className="p-6 pt-0">
-                  <Button className="w-full" size="lg" variant={isSelected ? 'default' : 'outline'}>
-                    {isSelected ? 'Selecionado' : 'Selecionar'}
-                  </Button>
-                </CardFooter>
-              </Card>
+                  {/* Benefits */}
+                  <CardContent className="p-6 flex-grow">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-lg font-semibold">
+                        <span className="text-green-500">{plan.discountProducts}%</span>
+                        <span>em produtos</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-lg font-semibold">
+                        <span className="text-green-500">{plan.discountServices}%</span>
+                        <span>em serviços</span>
+                      </div>
+                      <hr className="my-4 border-border" />
+                      <ul className="space-y-2">
+                        {plan.benefits.slice(2).map((benefit, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm">
+                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                            <span>{benefit}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+
+                  <CardFooter className="p-6 pt-0">
+                    <Button className="w-full" size="lg" variant={isSelected ? 'default' : 'outline'}>
+                      {isSelected ? 'Selecionado' : 'Selecionar'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </motion.div>
             )
           })}
-        </div>
+        </motion.div>
       </section>
 
       {/* CTA */}
       {selectedPlan && (
-        <section className="py-8 px-6 animate-fade-in">
-          <div className="max-w-md mx-auto">
+        <section className="py-8 px-6">
+          <motion.div
+            className="max-w-md mx-auto"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
             <Card className="bg-primary text-primary-foreground border-glow-primary">
               <CardHeader>
                 <CardTitle className="font-heading">Plano {PLANS[selectedPlan].name} selecionado</CardTitle>
@@ -199,7 +232,7 @@ export default function Subscribe() {
                 </Link>
               </CardFooter>
             </Card>
-          </div>
+          </motion.div>
         </section>
       )}
 

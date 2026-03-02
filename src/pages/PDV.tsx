@@ -8,7 +8,8 @@ import { Loading } from '../components/ui/loading'
 import { QRScanner } from '../components/QRScanner'
 import { PLANS, type Member, type PlanType } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
-import { getMemberByCPF, isMemberActive } from '../lib/members'
+import { getMemberByCPF, isMemberActive, addMemberPoints } from '../lib/members'
+import { toast } from 'sonner'
 import {
   Camera,
   Search,
@@ -18,6 +19,7 @@ import {
   User,
   RefreshCw,
   LogOut,
+  Gift,
 } from 'lucide-react'
 
 interface VerificationResult {
@@ -33,6 +35,40 @@ export default function PDV() {
   const [cpfSearch, setCpfSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<VerificationResult | null>(null)
+  const [pointsToAdd, setPointsToAdd] = useState('')
+  const [addingPoints, setAddingPoints] = useState(false)
+
+  /**
+   * Handle adding points
+   */
+  async function handleAddPoints() {
+    if (!result?.member || !pointsToAdd) return
+
+    const points = parseInt(pointsToAdd)
+    if (isNaN(points) || points <= 0) {
+      toast.error('Valor de pontos inválido')
+      return
+    }
+
+    setAddingPoints(true)
+    const success = await addMemberPoints(result.member.id, points)
+
+    if (success) {
+      toast.success(`${points} pontos adicionados com sucesso!`)
+      setPointsToAdd('')
+      // Update local member data
+      setResult({
+        ...result,
+        member: {
+          ...result.member,
+          points: (result.member.points || 0) + points,
+        },
+      })
+    } else {
+      toast.error('Erro ao adicionar pontos')
+    }
+    setAddingPoints(false)
+  }
 
   /**
    * Handle QR Code scan
@@ -105,8 +141,8 @@ export default function PDV() {
         message: isActive
           ? 'Membro ativo - pode aplicar desconto!'
           : isExpired
-          ? 'Assinatura expirada - desconto não disponível'
-          : 'Assinatura pendente - desconto não disponível',
+            ? 'Assinatura expirada - desconto não disponível'
+            : 'Assinatura pendente - desconto não disponível',
       })
     } catch (error) {
       console.error('Error verifying member:', error)
@@ -124,6 +160,7 @@ export default function PDV() {
   function resetVerification() {
     setResult(null)
     setCpfSearch('')
+    setPointsToAdd('')
   }
 
   return (
@@ -212,11 +249,10 @@ export default function PDV() {
         {/* Result */}
         {result && !loading && (
           <Card
-            className={`mb-6 border-2 ${
-              result.isValid
-                ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                : 'border-red-500 bg-red-50 dark:bg-red-900/20'
-            }`}
+            className={`mb-6 border-2 ${result.isValid
+              ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+              : 'border-red-500 bg-red-50 dark:bg-red-900/20'
+              }`}
           >
             <CardContent className="py-8">
               {/* Status Icon */}
@@ -234,9 +270,8 @@ export default function PDV() {
 
               {/* Message */}
               <p
-                className={`text-center text-xl font-bold mb-6 ${
-                  result.isValid ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
-                }`}
+                className={`text-center text-xl font-bold mb-6 ${result.isValid ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
+                  }`}
               >
                 {result.message}
               </p>
@@ -257,8 +292,8 @@ export default function PDV() {
                         result.member.plan === 'silver'
                           ? 'silver'
                           : result.member.plan === 'gold'
-                          ? 'gold'
-                          : 'black'
+                            ? 'gold'
+                            : 'black'
                       }
                       className="ml-auto"
                     >
@@ -304,6 +339,34 @@ export default function PDV() {
                             Desconto em Serviços
                           </p>
                         </div>
+                      </div>
+
+                      <hr />
+                      {/* Point Management */}
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Gift className="h-5 w-5 text-primary" />
+                          <h4 className="font-semibold">Adicionar Pontos de Fidelidade</h4>
+                        </div>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Quantidade de pontos..."
+                            value={pointsToAdd}
+                            onChange={(e) => setPointsToAdd(e.target.value)}
+                            disabled={addingPoints}
+                          />
+                          <Button
+                            onClick={handleAddPoints}
+                            disabled={addingPoints || !pointsToAdd}
+                            className="whitespace-nowrap"
+                          >
+                            {addingPoints ? <Loading size="sm" /> : 'Adicionar'}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">
+                          Saldo atual: {result.member.points} pontos
+                        </p>
                       </div>
                     </>
                   )}

@@ -86,6 +86,14 @@ export async function getMemberByCPF(cpf: string): Promise<Member | null> {
 }
 
 /**
+ * Check if CPF is already registered
+ */
+export async function isCPFRegistered(cpf: string): Promise<boolean> {
+  const member = await getMemberByCPF(cpf)
+  return member !== null
+}
+
+/**
  * Get member by user ID
  */
 export async function getMemberByUserId(userId: string): Promise<Member | null> {
@@ -207,6 +215,22 @@ export async function updateMember(
     return true
   } catch (error) {
     console.error('Error updating member:', error)
+    return false
+  }
+}
+
+/**
+ * Add points to a member
+ */
+export async function addMemberPoints(id: string, points: number): Promise<boolean> {
+  try {
+    const member = await getMemberById(id)
+    if (!member) return false
+
+    const newPoints = (member.points || 0) + points
+    return updateMember(id, { points: newPoints })
+  } catch (error) {
+    console.error('Error adding points:', error)
     return false
   }
 }

@@ -9,6 +9,7 @@ import { MemberModal } from '../components/MemberModal'
 import { PLANS, type Member, type PlanType, type DashboardStats } from '../types'
 import { formatCurrency, formatCPF, getStatusLabel } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
+import { getRecentLogs, type AuditLog } from '../lib/logs'
 import { toast } from 'sonner'
 import {
   Users,
@@ -29,15 +30,19 @@ import {
   Download,
   MoreVertical,
   CheckCircle,
+  FileText,
+  Clock,
 } from 'lucide-react'
 
 type ModalMode = 'create' | 'edit' | 'view' | null
 type FilterStatus = 'all' | 'active' | 'pending' | 'inactive' | 'expired'
+type DashboardTab = 'members' | 'logs'
 
 export default function AdminDashboard() {
   const { signOut } = useAuth()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [activeTab, setActiveTab] = useState<DashboardTab>('members')
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
   const [filterPlan, setFilterPlan] = useState<PlanType | 'all'>('all')
@@ -49,6 +54,7 @@ export default function AdminDashboard() {
     membersByPlan: { silver: 0, gold: 0, black: 0 },
   })
   const [members, setMembers] = useState<Member[]>([])
+  const [logs, setLogs] = useState<AuditLog[]>([])
 
   // Modal state
   const [modalMode, setModalMode] = useState<ModalMode>(null)
@@ -69,7 +75,10 @@ export default function AdminDashboard() {
     }
 
     try {
-      const membersData = await getAllMembers()
+      const [membersData, logsData] = await Promise.all([
+        getAllMembers(),
+        getRecentLogs()
+      ])
 
       if (membersData && membersData.length > 0) {
         setMembers(membersData)
@@ -84,6 +93,8 @@ export default function AdminDashboard() {
           membersByPlan: { silver: 0, gold: 0, black: 0 },
         })
       }
+
+      setLogs(logsData)
     } catch (error) {
       console.error('Error fetching data:', error)
       toast.error('Erro ao carregar dados')
@@ -336,198 +347,260 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6">
+          <Button
+            variant={activeTab === 'members' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('members')}
+            className="flex-1 sm:flex-none"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Membros
+          </Button>
+          <Button
+            variant={activeTab === 'logs' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('logs')}
+            className="flex-1 sm:flex-none"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Logs de Atividade
+          </Button>
+        </div>
+
         {/* Members Table */}
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <CardTitle>Membros</CardTitle>
-                <CardDescription>Gerencie os membros do clube</CardDescription>
+        {activeTab === 'members' ? (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Membros</CardTitle>
+                  <CardDescription>Gerencie os membros do clube</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={exportCSV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Exportar
+                  </Button>
+                  <Button onClick={() => openModal('create')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Novo Membro
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={exportCSV}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
-                <Button onClick={() => openModal('create')}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Membro
-                </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome, CPF ou email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+                    className="px-3 py-2 rounded-md border bg-background text-sm"
+                  >
+                    <option value="all">Todos os status</option>
+                    <option value="active">Ativos</option>
+                    <option value="pending">Pendentes</option>
+                    <option value="inactive">Inativos</option>
+                    <option value="expired">Expirados</option>
+                  </select>
+                  <select
+                    value={filterPlan}
+                    onChange={(e) => setFilterPlan(e.target.value as PlanType | 'all')}
+                    className="px-3 py-2 rounded-md border bg-background text-sm"
+                  >
+                    <option value="all">Todos os planos</option>
+                    <option value="silver">Silver</option>
+                    <option value="gold">Gold</option>
+                    <option value="black">Black</option>
+                  </select>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, CPF ou email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-                  className="px-3 py-2 rounded-md border bg-background text-sm"
-                >
-                  <option value="all">Todos os status</option>
-                  <option value="active">Ativos</option>
-                  <option value="pending">Pendentes</option>
-                  <option value="inactive">Inativos</option>
-                  <option value="expired">Expirados</option>
-                </select>
-                <select
-                  value={filterPlan}
-                  onChange={(e) => setFilterPlan(e.target.value as PlanType | 'all')}
-                  className="px-3 py-2 rounded-md border bg-background text-sm"
-                >
-                  <option value="all">Todos os planos</option>
-                  <option value="silver">Silver</option>
-                  <option value="gold">Gold</option>
-                  <option value="black">Black</option>
-                </select>
-              </div>
-            </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left py-3 px-4 font-medium text-sm">Membro</th>
-                    <th className="text-left py-3 px-4 font-medium text-sm">Plano</th>
-                    <th className="text-left py-3 px-4 font-medium text-sm">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-sm">Validade</th>
-                    <th className="text-left py-3 px-4 font-medium text-sm">Pontos</th>
-                    <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMembers.map((member) => (
-                    <tr key={member.id} className="border-b hover:bg-muted/50 transition-colors">
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="font-medium">{member.fullName}</p>
-                          <p className="text-sm text-muted-foreground">{formatCPF(member.cpf)}</p>
-                          <p className="text-xs text-muted-foreground">{member.email}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
-                          {planIcons[member.plan as PlanType]}
-                          {PLANS[member.plan as PlanType].name}
-                        </Badge>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              member.status === 'active'
-                                ? 'success'
-                                : member.status === 'pending'
-                                ? 'warning'
-                                : 'destructive'
-                            }
-                          >
-                            {getStatusLabel(member.status)}
-                          </Badge>
-                          {member.status === 'pending' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => handleQuickActivate(member)}
-                              title="Ativar membro"
-                            >
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className={new Date(member.expiryDate) < new Date() ? 'text-red-500' : ''}>
-                          {new Date(member.expiryDate).toLocaleDateString('pt-BR')}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span className="font-medium">{member.points}</span>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <div className="relative inline-block">
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openModal('view', member)} title="Ver detalhes">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openModal('edit', member)} title="Editar">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setOpenDropdown(openDropdown === member.id ? null : member.id)}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </div>
-
-                          {/* Dropdown menu */}
-                          {openDropdown === member.id && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card ring-1 ring-border z-50">
-                              <div className="py-1">
-                                <button
-                                  onClick={() => openModal('view', member)}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-muted"
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  Ver detalhes
-                                </button>
-                                <button
-                                  onClick={() => openModal('edit', member)}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-muted"
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Editar
-                                </button>
-                                <hr className="my-1" />
-                                <button
-                                  onClick={() => handleDeleteMember(member)}
-                                  className="flex items-center w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Desativar
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </td>
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left py-3 px-4 font-medium text-sm">Membro</th>
+                      <th className="text-left py-3 px-4 font-medium text-sm">Plano</th>
+                      <th className="text-left py-3 px-4 font-medium text-sm">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-sm">Validade</th>
+                      <th className="text-left py-3 px-4 font-medium text-sm">Pontos</th>
+                      <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {filteredMembers.map((member) => (
+                      <tr key={member.id} className="border-b hover:bg-muted/50 transition-colors">
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="font-medium">{member.fullName}</p>
+                            <p className="text-sm text-muted-foreground">{formatCPF(member.cpf)}</p>
+                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
+                            {planIcons[member.plan as PlanType]}
+                            {PLANS[member.plan as PlanType].name}
+                          </Badge>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={
+                                member.status === 'active'
+                                  ? 'success'
+                                  : member.status === 'pending'
+                                    ? 'warning'
+                                    : 'destructive'
+                              }
+                            >
+                              {getStatusLabel(member.status)}
+                            </Badge>
+                            {member.status === 'pending' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => handleQuickActivate(member)}
+                                title="Ativar membro"
+                              >
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={new Date(member.expiryDate) < new Date() ? 'text-red-500' : ''}>
+                            {new Date(member.expiryDate).toLocaleDateString('pt-BR')}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="font-medium">{member.points}</span>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="relative inline-block">
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => openModal('view', member)} title="Ver detalhes">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => openModal('edit', member)} title="Editar">
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => setOpenDropdown(openDropdown === member.id ? null : member.id)}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </div>
 
-              {filteredMembers.length === 0 && (
-                <div className="text-center py-12">
-                  <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Nenhum membro encontrado</p>
-                  {members.length === 0 && (
-                    <Button className="mt-4" onClick={() => openModal('create')}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Cadastrar primeiro membro
-                    </Button>
-                  )}
+                            {/* Dropdown menu */}
+                            {openDropdown === member.id && (
+                              <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card ring-1 ring-border z-50">
+                                <div className="py-1">
+                                  <button
+                                    onClick={() => openModal('view', member)}
+                                    className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-muted"
+                                  >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Ver detalhes
+                                  </button>
+                                  <button
+                                    onClick={() => openModal('edit', member)}
+                                    className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-muted"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </button>
+                                  <hr className="my-1" />
+                                  <button
+                                    onClick={() => handleDeleteMember(member)}
+                                    className="flex items-center w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Desativar
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {filteredMembers.length === 0 && (
+                  <div className="text-center py-12">
+                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Nenhum membro encontrado</p>
+                    {members.length === 0 && (
+                      <Button className="mt-4" onClick={() => openModal('create')}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Cadastrar primeiro membro
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Pagination info */}
+              {filteredMembers.length > 0 && (
+                <div className="mt-4 text-sm text-muted-foreground">
+                  Exibindo {filteredMembers.length} de {members.length} membros
                 </div>
               )}
-            </div>
-
-            {/* Pagination info */}
-            {filteredMembers.length > 0 && (
-              <div className="mt-4 text-sm text-muted-foreground">
-                Exibindo {filteredMembers.length} de {members.length} membros
+            </CardContent>
+          </Card>
+        ) : (
+          /* Logs View */
+          <Card>
+            <CardHeader>
+              <CardTitle>Histórico de Atividade</CardTitle>
+              <CardDescription>Acompanhe as últimas ações registradas no sistema</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {logs.length > 0 ? (
+                  logs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-4 p-4 rounded-lg bg-muted/30 border border-border/50">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Clock className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium">
+                            {log.action === 'member_activated' ? 'Membro Ativado' : log.action}
+                          </p>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(log.timestamp).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {log.member_id && `ID do Membro: ${log.member_id}`}
+                          {log.payment_id && ` | ID do Pagamento: ${log.payment_id}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Nenhum log de atividade encontrado</p>
+                  </div>
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </main>
 
       {/* Modal */}
