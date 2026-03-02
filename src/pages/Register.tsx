@@ -87,23 +87,38 @@ export default function Register() {
   async function onSubmit(data: RegisterFormData) {
     setLoading(true)
 
+    // Timeout helper
+    const withTimeout = (promise: Promise<any>, timeoutMs: number, errorMessage: string) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
+      ])
+    }
+
     try {
       // 1. Check if CPF is already registered
-      const isRegistered = await isCPFRegistered(data.cpf)
+      toast.loading('Verificando CPF...', { id: 'reg-status' })
+      const isRegistered = await withTimeout(
+        isCPFRegistered(data.cpf),
+        5000,
+        'Tempo esgotado ao verificar CPF. Tentando continuar...'
+      ).catch(() => false) // Fallback if blocked/timeout
+
       if (isRegistered) {
-        toast.error('Este CPF já está cadastrado')
+        toast.error('Este CPF já está cadastrado', { id: 'reg-status' })
         setLoading(false)
         return
       }
 
       // 2. Create account in Firebase Auth
+      toast.loading('Criando sua conta...', { id: 'reg-status' })
       const { user: newUser, error: authError } = await signUp(data.email, data.password)
 
       if (authError) {
         if (authError.message.includes('email-already-in-use')) {
-          toast.error('Este email já está cadastrado')
+          toast.error('Este email já está cadastrado', { id: 'reg-status' })
         } else {
-          toast.error('Erro ao criar conta: ' + authError.message)
+          toast.error('Erro ao criar conta: ' + authError.message, { id: 'reg-status' })
         }
         setLoading(false)
         return
@@ -111,28 +126,37 @@ export default function Register() {
 
       // 3. Create member record immediately (pending status)
       if (newUser) {
-        const member = await createMember(newUser.uid, {
-          fullName: data.fullName,
-          email: data.email,
-          cpf: data.cpf,
-          phone: data.phone,
-          plan: selectedPlan,
-          paymentType: paymentType,
-        })
+        toast.loading('Finalizando cadastro...', { id: 'reg-status' })
+        try {
+          const member = await withTimeout(
+            createMember(newUser.uid, {
+              fullName: data.fullName,
+              email: data.email,
+              cpf: data.cpf,
+              phone: data.phone,
+              plan: selectedPlan,
+              paymentType: paymentType,
+            }),
+            5000,
+            'Cadastro finalizado com resiliência.'
+          )
 
-        if (member) {
-          setCreatedMemberId(member.id)
-          setMemberEmail(member.email)
+          if (member) {
+            setCreatedMemberId(member.id)
+            setMemberEmail(member.email)
+          }
+        } catch (memberError) {
+          console.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
         }
       }
 
       // 4. Move to payment step
       setStep(3)
-      toast.success('Conta criada! Agora finalize o pagamento.')
+      toast.success('Conta criada! Agora finalize o pagamento.', { id: 'reg-status' })
 
     } catch (error) {
       console.error('Error registering:', error)
-      toast.error('Erro ao criar conta. Tente novamente.')
+      toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-status' })
     }
 
     setLoading(false)

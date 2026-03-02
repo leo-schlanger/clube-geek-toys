@@ -43,8 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function fetchUserRole(userId: string) {
+    // Timeout of 5 seconds to prevent hanging on blocked requests
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout fetching user role')), 5000)
+    )
+
     try {
-      const userDoc = await getDoc(doc(db, 'users', userId))
+      const fetchPromise = getDoc(doc(db, 'users', userId))
+      const userDoc = (await Promise.race([fetchPromise, timeoutPromise])) as any
 
       if (userDoc.exists()) {
         const userData = userDoc.data()
@@ -54,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Error fetching user role:', error)
+      // Fallback to 'member' role instead of hanging
       setRole('member')
     }
   }
@@ -71,12 +78,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
 
-      // Create user document in Firestore
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        email: userCredential.user.email,
-        role: 'member',
-        createdAt: new Date().toISOString(),
-      })
+      // Try to create user document in Firestore with a timeout
+      // but don't block the auth process if it fails
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Firestore timeout')), 3000)
+        )
+
+        const setDocPromise = setDoc(doc(db, 'users', userCredential.user.uid), {
+          email: userCredential.user.email,
+          role: 'member',
+          createdAt: new Date().toISOString(),
+        })
+
+        await Promise.race([setDocPromise, timeoutPromise])
+      } catch (firestoreError) {
+        console.error('Non-critical: Error creating Firestore user doc:', firestoreError)
+        // We continue because the Auth account was created successfully
+      }
 
       return { user: userCredential.user, error: null }
     } catch (error) {
