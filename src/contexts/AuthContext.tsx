@@ -14,8 +14,8 @@ interface AuthContextType {
   user: User | null
   role: UserRole | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>
-  signUp: (email: string, password: string) => Promise<{ error: Error | null }>
+  signIn: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
+  signUp: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
   signOut: () => Promise<void>
 }
 
@@ -60,10 +60,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     try {
-      await signInWithEmailAndPassword(auth, email, password)
-      return { error: null }
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      return { user: userCredential.user, error: null }
     } catch (error) {
-      return { error: error as Error }
+      return { user: null, error: error as Error }
     }
   }
 
@@ -78,9 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
       })
 
-      return { error: null }
+      return { user: userCredential.user, error: null }
     } catch (error) {
-      return { error: error as Error }
+      return { user: null, error: error as Error }
     }
   }
 
