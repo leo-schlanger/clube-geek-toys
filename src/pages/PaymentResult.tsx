@@ -51,7 +51,7 @@ export default function PaymentResult({ type }: PaymentResultProps) {
   const { icon, title, description, color, borderColor } = resultConfig[type]
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className={`w-full max-w-md border-2 ${borderColor}`}>
         <CardHeader className={`text-center ${color} rounded-t-lg`}>
           <div className="flex justify-center mb-4">

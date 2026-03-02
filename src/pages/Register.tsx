@@ -160,16 +160,19 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900 py-8 px-4">
+    <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-lg mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link to="/assinar" className="inline-flex items-center text-white/70 hover:text-white mb-4">
+          <Link to="/assinar" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para planos
           </Link>
-          <h1 className="text-3xl font-bold text-white">Criar Conta</h1>
-          <p className="text-white/70 mt-2">
+          <div className="mb-4">
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-14 rounded mx-auto" />
+          </div>
+          <h1 className="text-3xl font-heading font-bold text-foreground">Criar Conta</h1>
+          <p className="text-muted-foreground mt-2">
             Complete seu cadastro para ativar o plano {plan.name}
           </p>
         </div>
@@ -408,7 +411,7 @@ export default function Register() {
         )}
 
         {/* Already have account */}
-        <p className="text-center text-white/70 mt-6">
+        <p className="text-center text-muted-foreground mt-6">
           Já tem uma conta?{' '}
           <Link to="/login" className="text-primary hover:underline">
             Fazer login

@@ -212,14 +212,14 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow sticky top-0 z-40">
+      <header className="glass border-b border-border sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🎮</span>
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
             <div>
-              <h1 className="font-bold text-lg">Clube Geek & Toys</h1>
+              <h1 className="font-heading font-bold text-lg">Clube Geek & Toys</h1>
               <p className="text-xs text-muted-foreground">Painel Administrativo</p>
             </div>
           </div>
@@ -472,7 +472,7 @@ export default function AdminDashboard() {
 
                           {/* Dropdown menu */}
                           {openDropdown === member.id && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50">
+                            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card ring-1 ring-border z-50">
                               <div className="py-1">
                                 <button
                                   onClick={() => openModal('view', member)}

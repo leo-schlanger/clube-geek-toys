@@ -43,7 +43,7 @@ export default function ForgotPassword() {
   // Success state - email sent
   if (sent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-4 bg-green-500/20 rounded-full w-fit">
@@ -72,11 +72,13 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 text-4xl">🔐</div>
-          <CardTitle className="text-2xl">Recuperar Senha</CardTitle>
+          <div className="mx-auto mb-4">
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-14 rounded mx-auto" />
+          </div>
+          <CardTitle className="text-2xl font-heading">Recuperar Senha</CardTitle>
           <CardDescription>
             Digite seu email para receber um link de redefinição
           </CardDescription>

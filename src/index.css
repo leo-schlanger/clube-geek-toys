@@ -4,48 +4,43 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 270 91% 65%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 270 91% 65%;
-    --radius: 0.5rem;
-  }
+    /* Dark theme matching main Geek & Toys site */
+    --background: 0 0% 5.1%;
+    --foreground: 0 0% 96.1%;
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 270 91% 65%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 270 91% 65%;
+    --card: 240 33% 11.4%;
+    --card-foreground: 0 0% 96.1%;
+
+    --popover: 240 33% 11.4%;
+    --popover-foreground: 0 0% 96.1%;
+
+    /* Gold primary - matching main site */
+    --primary: 45 85% 55%;
+    --primary-foreground: 0 0% 5%;
+
+    --secondary: 240 33% 11.4%;
+    --secondary-foreground: 0 0% 96.1%;
+
+    --muted: 240 10% 20%;
+    --muted-foreground: 240 10% 69%;
+
+    --accent: 45 100% 65%;
+    --accent-foreground: 0 0% 5%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 45 30% 25%;
+    --input: 45 20% 15%;
+    --ring: 45 85% 55%;
+
+    --radius: 0.75rem;
+
+    /* Custom colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 5%;
   }
 }
 
@@ -53,9 +48,17 @@
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
   }
 }
 
@@ -77,37 +80,43 @@
   @apply bg-primary;
 }
 
-/* Status badges */
-.status-active {
-  @apply bg-green-500 text-white;
+/* Utility classes matching main site */
+@layer utilities {
+  .text-glow-primary {
+    text-shadow: 0 0 20px hsl(45 85% 55% / 0.6), 0 0 40px hsl(45 85% 55% / 0.3);
+  }
+
+  .border-glow-primary {
+    box-shadow: 0 0 15px hsl(45 85% 55% / 0.3), inset 0 0 15px hsl(45 85% 55% / 0.05);
+  }
+
+  .hover-glow-primary {
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  .hover-glow-primary:hover {
+    box-shadow: 0 0 25px hsl(45 85% 55% / 0.5), 0 0 50px hsl(45 85% 55% / 0.2);
+    transform: translateY(-2px);
+  }
+
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: hsl(0 0% 5.1% / 0.8);
+  }
 }
 
-.status-pending {
-  @apply bg-yellow-500 text-white;
-}
-
-.status-inactive {
-  @apply bg-red-500 text-white;
+/* Gradient text - gold theme */
+.gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-amber-500;
 }
 
 /* Card glow effect */
 .card-glow {
-  @apply relative overflow-hidden;
+  @apply relative overflow-hidden transition-all duration-300;
 }
 
-.card-glow::before {
-  content: '';
-  @apply absolute inset-0 opacity-0 transition-opacity duration-300;
-  background: linear-gradient(135deg, rgba(147, 51, 234, 0.1), rgba(236, 72, 153, 0.1));
-}
-
-.card-glow:hover::before {
-  @apply opacity-100;
-}
-
-/* Gradient text */
-.gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-500;
+.card-glow:hover {
+  box-shadow: 0 0 30px hsl(45 85% 55% / 0.2);
 }
 
 /* QR Code container */
@@ -136,10 +145,41 @@
 
 /* Modal overlay */
 .modal-overlay {
-  @apply fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4;
+  @apply fixed inset-0 z-50 flex items-center justify-center p-4;
+  background: hsl(0 0% 0% / 0.7);
+  backdrop-filter: blur(4px);
+}
+
+/* Plan card styles */
+.plan-silver {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+}
+
+.plan-gold {
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+}
+
+.plan-black {
+  background: linear-gradient(135deg, #374151, #111827);
 }
 
 /* Toast customization */
 [data-sonner-toast] {
   @apply rounded-lg;
+}
+
+/* Animation for fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
 }

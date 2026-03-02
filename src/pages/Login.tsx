@@ -38,11 +38,13 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 text-4xl">🎮</div>
-          <CardTitle className="text-2xl gradient-text">Clube Geek & Toys</CardTitle>
+          <div className="mx-auto mb-4">
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-16 rounded mx-auto" />
+          </div>
+          <CardTitle className="text-2xl font-heading gradient-text">Clube Geek & Toys</CardTitle>
           <CardDescription>
             Acesse sua área de membro
           </CardDescription>

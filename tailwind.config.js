@@ -6,7 +6,18 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    container: {
+      center: true,
+      padding: "1.5rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
+      fontFamily: {
+        heading: ['"Space Grotesk"', 'sans-serif'],
+        body: ['"Inter"', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -41,25 +52,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Cores do tema Geek & Toys
-        geek: {
-          purple: "#9333ea",
-          pink: "#ec4899",
-          blue: "#3b82f6",
-          cyan: "#06b6d4",
-        },
-        // Status colors
         success: {
-          DEFAULT: "#22c55e",
-          foreground: "#ffffff",
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
         },
         warning: {
-          DEFAULT: "#f59e0b",
-          foreground: "#ffffff",
-        },
-        danger: {
-          DEFAULT: "#ef4444",
-          foreground: "#ffffff",
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
         },
       },
       borderRadius: {
@@ -67,8 +66,29 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(30px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "glow-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-up": "fade-up 0.6s ease-out forwards",
+        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
       },
     },
   },

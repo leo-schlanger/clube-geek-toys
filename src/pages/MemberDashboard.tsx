@@ -95,13 +95,16 @@ export default function MemberDashboard() {
 
   if (!member) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md text-center">
           <CardHeader>
-            <div className="mx-auto mb-4 p-4 bg-yellow-500/20 rounded-full w-fit">
-              <AlertTriangle className="h-12 w-12 text-yellow-500" />
+            <div className="mx-auto mb-4">
+              <img src="/logo.jpg" alt="Geek & Toys" className="h-14 rounded mx-auto" />
             </div>
-            <CardTitle>Nenhuma assinatura encontrada</CardTitle>
+            <div className="mx-auto mb-4 p-4 bg-warning/20 rounded-full w-fit">
+              <AlertTriangle className="h-12 w-12 text-warning" />
+            </div>
+            <CardTitle className="font-heading">Nenhuma assinatura encontrada</CardTitle>
             <CardDescription>
               Você ainda não possui uma assinatura ativa. Assine agora e comece a aproveitar os benefícios!
             </CardDescription>
@@ -155,22 +158,21 @@ export default function MemberDashboard() {
   } as const
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-black/30 backdrop-blur-sm border-b border-white/10 sticky top-0 z-40">
+      <header className="glass border-b border-border sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🎮</span>
-            <span className="text-lg font-bold text-white">Clube Geek & Toys</span>
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
+            <span className="text-lg font-heading font-bold text-foreground">Clube Geek & Toys</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+            <Button variant="ghost" size="icon">
               <Settings className="h-5 w-5" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-white/10"
               onClick={signOut}
             >
               <LogOut className="h-5 w-5" />
@@ -221,7 +223,7 @@ export default function MemberDashboard() {
               {/* Card header */}
               <div className={`p-6 text-white bg-gradient-to-br ${planColors[member.plan as PlanType]}`}>
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-2xl">🎮</span>
+                  <img src="/logo.jpg" alt="Geek & Toys" className="h-8 rounded" />
                   <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
                     {planIcons[member.plan as PlanType]}
                     {plan.name}

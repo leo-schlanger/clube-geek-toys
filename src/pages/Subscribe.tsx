@@ -40,58 +40,61 @@ export default function Subscribe() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-gray-900 to-pink-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="p-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="text-3xl">🎮</span>
-            <span className="text-xl font-bold text-white">Clube Geek & Toys</span>
+      <header className="glass border-b border-border sticky top-0 z-50">
+        <div className="container flex items-center justify-between h-16 md:h-20">
+          <Link to="/" className="flex items-center">
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-12 md:h-14 rounded" />
           </Link>
-          <Link to="/login">
-            <Button variant="outline">Já sou membro</Button>
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/login">
+              <Button variant="outline" className="border-primary/50 hover:border-primary">
+                Já sou membro
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="py-12 px-6 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-          Faça parte do <span className="gradient-text">Clube Geek & Toys</span>
+      <section className="py-16 px-6 text-center">
+        <h1 className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4">
+          Faça parte do <span className="gradient-text text-glow-primary">Clube</span>
         </h1>
-        <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-8">
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
           Descontos exclusivos, brindes mensais, acesso antecipado e muito mais!
         </p>
 
         {/* Payment Type Toggle */}
-        <div className="inline-flex items-center gap-2 bg-white/10 p-1 rounded-lg">
+        <div className="inline-flex items-center gap-2 glass border border-border p-1 rounded-lg">
           <button
             onClick={() => setPaymentType('monthly')}
-            className={`px-4 py-2 rounded-md transition-all ${
+            className={`px-6 py-2 rounded-md font-medium transition-all ${
               paymentType === 'monthly'
-                ? 'bg-primary text-white'
-                : 'text-gray-300 hover:text-white'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Mensal
           </button>
           <button
             onClick={() => setPaymentType('annual')}
-            className={`px-4 py-2 rounded-md transition-all ${
+            className={`px-6 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${
               paymentType === 'annual'
-                ? 'bg-primary text-white'
-                : 'text-gray-300 hover:text-white'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Anual
-            <Badge variant="success" className="ml-2 text-xs">Economize!</Badge>
+            <Badge variant="success" className="text-xs">Economize!</Badge>
           </button>
         </div>
       </section>
 
       {/* Plans */}
       <section className="py-8 px-6">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
+        <div className="container grid md:grid-cols-3 gap-6">
           {(Object.keys(PLANS) as PlanType[]).map((planId) => {
             const plan = PLANS[planId]
             const isSelected = selectedPlan === planId
@@ -100,13 +103,13 @@ export default function Subscribe() {
             return (
               <Card
                 key={planId}
-                className={`relative overflow-hidden transition-all cursor-pointer hover:scale-105 ${
-                  isSelected ? 'ring-2 ring-primary' : ''
+                className={`relative overflow-hidden transition-all cursor-pointer hover-glow-primary ${
+                  isSelected ? 'ring-2 ring-primary border-glow-primary' : ''
                 } ${isPopular ? 'md:-mt-4 md:mb-4' : ''}`}
                 onClick={() => setSelectedPlan(planId)}
               >
                 {isPopular && (
-                  <div className="absolute top-0 right-0 bg-primary text-white text-xs px-3 py-1 rounded-bl-lg">
+                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-bl-lg">
                     Mais Popular
                   </div>
                 )}
@@ -115,7 +118,7 @@ export default function Subscribe() {
                 <div className={`p-6 bg-gradient-to-br ${planColors[planId]} text-white`}>
                   <div className="flex items-center gap-3 mb-3">
                     {planIcons[planId]}
-                    <h3 className="text-2xl font-bold">{plan.name}</h3>
+                    <h3 className="text-2xl font-heading font-bold">{plan.name}</h3>
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-4xl font-bold">{formatCurrency(getPrice(planId))}</span>
@@ -146,7 +149,7 @@ export default function Subscribe() {
                       <span className="text-green-500">{plan.discountServices}%</span>
                       <span>em serviços</span>
                     </div>
-                    <hr className="my-4" />
+                    <hr className="my-4 border-border" />
                     <ul className="space-y-2">
                       {plan.benefits.slice(2).map((benefit, index) => (
                         <li key={index} className="flex items-start gap-2 text-sm">
@@ -171,11 +174,11 @@ export default function Subscribe() {
 
       {/* CTA */}
       {selectedPlan && (
-        <section className="py-8 px-6">
+        <section className="py-8 px-6 animate-fade-in">
           <div className="max-w-md mx-auto">
-            <Card className="bg-primary text-primary-foreground">
+            <Card className="bg-primary text-primary-foreground border-glow-primary">
               <CardHeader>
-                <CardTitle>Plano {PLANS[selectedPlan].name} selecionado</CardTitle>
+                <CardTitle className="font-heading">Plano {PLANS[selectedPlan].name} selecionado</CardTitle>
                 <CardDescription className="text-primary-foreground/80">
                   {paymentType === 'monthly' ? 'Cobrança mensal' : 'Cobrança anual única'}
                 </CardDescription>
@@ -190,7 +193,7 @@ export default function Subscribe() {
               </CardContent>
               <CardFooter>
                 <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`} className="w-full">
-                  <Button variant="secondary" size="xl" className="w-full">
+                  <Button variant="secondary" size="lg" className="w-full font-semibold">
                     Continuar <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
@@ -201,12 +204,19 @@ export default function Subscribe() {
       )}
 
       {/* Footer */}
-      <footer className="py-8 px-6 text-center text-gray-400 text-sm">
-        <p>© 2024 Geek & Toys Home. Todos os direitos reservados.</p>
-        <p className="mt-2">
-          <Link to="/termos" className="hover:text-white">Termos de Uso</Link>
+      <footer className="py-8 px-6 text-center border-t border-border mt-12">
+        <div className="flex justify-center mb-4">
+          <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
+        </div>
+        <p className="text-muted-foreground text-sm">© 2024 Geek & Toys. Todos os direitos reservados.</p>
+        <p className="mt-2 text-sm">
+          <a href="https://geeketoys.com.br" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            Visite nossa loja
+          </a>
           {' · '}
-          <Link to="/privacidade" className="hover:text-white">Política de Privacidade</Link>
+          <Link to="/termos" className="text-muted-foreground hover:text-foreground">Termos de Uso</Link>
+          {' · '}
+          <Link to="/privacidade" className="text-muted-foreground hover:text-foreground">Privacidade</Link>
         </p>
       </footer>
     </div>

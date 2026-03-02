@@ -127,14 +127,14 @@ export default function PDV() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow">
+      <header className="glass border-b border-border">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🎮</span>
+          <div className="flex items-center gap-3">
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
             <div>
-              <h1 className="font-bold">PDV - Clube Geek & Toys</h1>
+              <h1 className="font-heading font-bold">PDV - Clube Geek & Toys</h1>
               <p className="text-xs text-muted-foreground">Verificação de membros</p>
             </div>
           </div>
@@ -243,7 +243,7 @@ export default function PDV() {
 
               {/* Member Info */}
               {result.member && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 space-y-4">
+                <div className="bg-card rounded-lg p-6 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="p-3 rounded-full bg-primary/10">
                       <User className="h-8 w-8 text-primary" />
