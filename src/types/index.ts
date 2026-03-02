@@ -115,7 +115,7 @@ export const PLANS: Record<PlanType, Plan> = {
     id: 'black',
     name: 'Black',
     priceMonthly: 49.90,
-    priceAnnual: 349.90,
+    priceAnnual: 499.90,
     discountProducts: 20,
     discountServices: 50,
     benefits: [
