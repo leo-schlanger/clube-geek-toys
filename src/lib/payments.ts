@@ -1,5 +1,5 @@
-import { collection, doc, setDoc, updateDoc, query, where, getDocs, orderBy } from 'firebase/firestore'
-import { db } from './firebase'
+import { where, orderBy, type DocumentData } from 'firebase/firestore'
+import { FirestoreManager, MapperUtils } from './db-utils'
 import type { Payment, PaymentMethod, PaymentStatus, PlanType, PaymentType } from '../types'
 import { PLANS } from '../types'
 
@@ -36,6 +36,23 @@ export function calculatePlanPrice(plan: PlanType, paymentType: PaymentType): nu
 // ============================================
 
 /**
+ * Convert Firestore document to Payment type
+ */
+function toPayment(id: string, data: DocumentData): Payment {
+  const mapped = MapperUtils.toCamel(data)
+  return {
+    id,
+    memberId: mapped.memberId,
+    amount: mapped.amount,
+    method: mapped.method,
+    status: mapped.status,
+    reference: mapped.reference,
+    paidAt: mapped.paidAt,
+    createdAt: mapped.createdAt,
+  }
+}
+
+/**
  * Create payment record
  */
 export async function createPayment(
@@ -44,34 +61,18 @@ export async function createPayment(
   method: PaymentMethod,
   reference?: string
 ): Promise<Payment | null> {
-  try {
-    const paymentData = {
-      member_id: memberId,
-      amount,
-      method,
-      status: 'pending' as PaymentStatus,
-      reference: reference || undefined,
-      paid_at: undefined,
-      created_at: new Date().toISOString(),
-    }
+  const paymentData = MapperUtils.toSnake({
+    memberId,
+    amount,
+    method,
+    status: 'pending',
+    reference: reference || undefined,
+  })
 
-    const docRef = doc(collection(db, PAYMENTS_COLLECTION))
-    await setDoc(docRef, paymentData)
+  const id = await FirestoreManager.save(PAYMENTS_COLLECTION, null, paymentData)
+  if (!id) return null
 
-    return {
-      id: docRef.id,
-      memberId: paymentData.member_id,
-      amount: paymentData.amount,
-      method: paymentData.method,
-      status: paymentData.status,
-      reference: paymentData.reference,
-      paidAt: paymentData.paid_at,
-      createdAt: paymentData.created_at,
-    }
-  } catch (error) {
-    console.error('Error creating payment:', error)
-    return null
-  }
+  return toPayment(id, paymentData)
 }
 
 /**
@@ -82,49 +83,22 @@ export async function updatePaymentStatus(
   status: PaymentStatus,
   reference?: string
 ): Promise<boolean> {
-  try {
-    const docRef = doc(db, PAYMENTS_COLLECTION, paymentId)
-    await updateDoc(docRef, {
-      status,
-      reference: reference || null,
-      paid_at: status === 'paid' ? new Date().toISOString() : null,
-    })
-    return true
-  } catch (error) {
-    console.error('Error updating payment:', error)
-    return false
-  }
+  const data: any = { status }
+  if (reference) data.reference = reference
+  if (status === 'paid') data.paid_at = new Date().toISOString()
+
+  return FirestoreManager.update(PAYMENTS_COLLECTION, paymentId, data)
 }
 
 /**
  * Get member payments
  */
 export async function getMemberPayments(memberId: string): Promise<Payment[]> {
-  try {
-    const q = query(
-      collection(db, PAYMENTS_COLLECTION),
-      where('member_id', '==', memberId),
-      orderBy('created_at', 'desc')
-    )
-    const snapshot = await getDocs(q)
-
-    return snapshot.docs.map((docSnap) => {
-      const data = docSnap.data()
-      return {
-        id: docSnap.id,
-        memberId: data.member_id,
-        amount: data.amount,
-        method: data.method,
-        status: data.status,
-        reference: data.reference,
-        paidAt: data.paid_at,
-        createdAt: data.created_at,
-      }
-    })
-  } catch (error) {
-    console.error('Error getting payments:', error)
-    return []
-  }
+  return FirestoreManager.findMany(
+    PAYMENTS_COLLECTION,
+    [where('member_id', '==', memberId), orderBy('created_at', 'desc')],
+    toPayment
+  )
 }
 
 // ============================================
@@ -149,7 +123,6 @@ export async function generatePixPayment(
   payerEmail: string,
   memberId: string
 ): Promise<PixPaymentData | null> {
-  // If API is not configured, use simulation mode
   if (!PAYMENT_API_URL) {
     console.warn('⚠️ Payment API not configured. Using simulation mode.')
     return generatePixPaymentSimulation(amount, description, memberId)
@@ -158,9 +131,7 @@ export async function generatePixPayment(
   try {
     const response = await fetch(`${PAYMENT_API_URL}/pix/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount,
         description,
@@ -169,10 +140,7 @@ export async function generatePixPayment(
       }),
     })
 
-    if (!response.ok) {
-      throw new Error('Failed to create PIX payment')
-    }
-
+    if (!response.ok) throw new Error('Failed to create PIX payment')
     const data = await response.json()
 
     return {
@@ -198,8 +166,6 @@ function generatePixPaymentSimulation(
   memberId: string
 ): PixPaymentData {
   const pixKey = import.meta.env.VITE_PIX_KEY || 'your-pix-key@email.com'
-
-  // Generate simulated EMV code
   const emvCode = generateEMVCode({
     pixKey,
     merchantName: 'GEEK AND TOYS',
@@ -232,118 +198,65 @@ function generateEMVCode(params: {
   txid: string
 }): string {
   const { pixKey, merchantName, merchantCity, amount, txid } = params
-
   const formattedAmount = amount.toFixed(2)
+  let payload = '000201'
 
-  let payload = ''
-
-  // Payload Format Indicator
-  payload += '000201'
-
-  // Merchant Account Information (PIX)
   const gui = '0014br.gov.bcb.pix'
   const key = `01${pixKey.length.toString().padStart(2, '0')}${pixKey}`
   const merchantAccount = `${gui}${key}`
   payload += `26${merchantAccount.length.toString().padStart(2, '0')}${merchantAccount}`
-
-  // Merchant Category Code
   payload += '52040000'
-
-  // Transaction Currency (986 = BRL)
   payload += '5303986'
-
-  // Transaction Amount
   payload += `54${formattedAmount.length.toString().padStart(2, '0')}${formattedAmount}`
-
-  // Country Code
   payload += '5802BR'
 
-  // Merchant Name
   const cleanName = merchantName.substring(0, 25).toUpperCase()
   payload += `59${cleanName.length.toString().padStart(2, '0')}${cleanName}`
 
-  // Merchant City
   const cleanCity = merchantCity.substring(0, 15).toUpperCase()
   payload += `60${cleanCity.length.toString().padStart(2, '0')}${cleanCity}`
 
-  // Additional Data Field (TxID)
   const txidField = `05${txid.length.toString().padStart(2, '0')}${txid}`
   payload += `62${txidField.length.toString().padStart(2, '0')}${txidField}`
-
-  // CRC16 placeholder
   payload += '6304'
 
-  // Calculate CRC16
-  const crc = calculateCRC16(payload)
-  payload = payload.slice(0, -4) + '6304' + crc
-
-  return payload
-}
-
-/**
- * Calculate CRC16 CCITT
- */
-function calculateCRC16(str: string): string {
-  let crc = 0xFFFF
-
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8
-    for (let j = 0; j < 8; j++) {
-      if (crc & 0x8000) {
-        crc = (crc << 1) ^ 0x1021
-      } else {
-        crc <<= 1
+  const crc = (function calculateCRC16(str: string): string {
+    let crc = 0xFFFF
+    for (let i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8
+      for (let j = 0; j < 8; j++) {
+        crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1
       }
     }
-  }
+    return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')
+  })(payload)
 
-  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0')
+  return payload.slice(0, -4) + '6304' + crc
 }
 
 /**
  * Check PIX payment status
  */
 export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
-  if (!PAYMENT_API_URL) {
-    console.warn('Payment API not configured')
-    return null
-  }
+  if (!PAYMENT_API_URL) return null
 
   try {
     const response = await fetch(`${PAYMENT_API_URL}/pix/status/${paymentId}`)
-
-    if (!response.ok) {
-      throw new Error('Failed to check payment status')
-    }
-
+    if (!response.ok) throw new Error('Failed to check payment status')
     const data = await response.json()
 
     switch (data.status) {
-      case 'approved':
-        return 'paid'
+      case 'approved': return 'paid'
       case 'pending':
-      case 'in_process':
-        return 'pending'
+      case 'in_process': return 'pending'
       case 'rejected':
-      case 'cancelled':
-        return 'failed'
-      default:
-        return 'pending'
+      case 'cancelled': return 'failed'
+      default: return 'pending'
     }
   } catch (error) {
     console.error('Error checking payment status:', error)
     return null
   }
-}
-
-// ============================================
-// MERCADO PAGO - CHECKOUT PRO (CARD)
-// ============================================
-
-export interface CheckoutPreference {
-  id: string
-  initPoint: string
-  sandboxInitPoint: string
 }
 
 /**
@@ -354,34 +267,25 @@ export async function createCheckoutPreference(
   paymentType: PaymentType,
   memberEmail: string,
   memberId: string
-): Promise<CheckoutPreference | null> {
-  const amount = calculatePlanPrice(plan, paymentType)
-  const planData = PLANS[plan]
-
-  if (!PAYMENT_API_URL) {
-    console.warn('⚠️ Payment API not configured')
-    return null
-  }
+): Promise<{ id: string, initPoint: string, sandboxInitPoint: string } | null> {
+  if (!PAYMENT_API_URL) return null
 
   try {
+    const amount = calculatePlanPrice(plan, paymentType)
+    const planData = PLANS[plan]
+
     const response = await fetch(`${PAYMENT_API_URL}/checkout/create`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [
-          {
-            title: `Clube Geek & Toys - Plano ${planData.name}`,
-            description: `Assinatura ${paymentType === 'monthly' ? 'Mensal' : 'Anual'}`,
-            quantity: 1,
-            currency_id: 'BRL',
-            unit_price: amount,
-          },
-        ],
-        payer: {
-          email: memberEmail,
-        },
+        items: [{
+          title: `Clube Geek & Toys - Plano ${planData.name}`,
+          description: `Assinatura ${paymentType === 'monthly' ? 'Mensal' : 'Anual'}`,
+          quantity: 1,
+          currency_id: 'BRL',
+          unit_price: amount,
+        }],
+        payer: { email: memberEmail },
         external_reference: memberId,
         back_urls: {
           success: `${window.location.origin}/pagamento/sucesso`,
@@ -393,10 +297,7 @@ export async function createCheckoutPreference(
       }),
     })
 
-    if (!response.ok) {
-      throw new Error('Failed to create checkout preference')
-    }
-
+    if (!response.ok) throw new Error('Failed to create checkout preference')
     const data = await response.json()
 
     return {
@@ -410,42 +311,28 @@ export async function createCheckoutPreference(
   }
 }
 
-// ============================================
-// UTILITIES
-// ============================================
-
 /**
  * Get payment status label in Portuguese
  */
 export function getPaymentStatusLabel(status: PaymentStatus): string {
-  switch (status) {
-    case 'paid':
-      return 'Pago'
-    case 'pending':
-      return 'Pendente'
-    case 'failed':
-      return 'Falhou'
-    case 'refunded':
-      return 'Reembolsado'
-    default:
-      return status
+  const labels: Record<string, string> = {
+    paid: 'Pago',
+    pending: 'Pendente',
+    failed: 'Falhou',
+    refunded: 'Reembolsado'
   }
+  return labels[status] || status
 }
 
 /**
  * Get payment status color class
  */
 export function getPaymentStatusColor(status: PaymentStatus): string {
-  switch (status) {
-    case 'paid':
-      return 'text-green-500'
-    case 'pending':
-      return 'text-yellow-500'
-    case 'failed':
-      return 'text-red-500'
-    case 'refunded':
-      return 'text-blue-500'
-    default:
-      return 'text-gray-500'
+  const colors: Record<string, string> = {
+    paid: 'text-green-500',
+    pending: 'text-yellow-500',
+    failed: 'text-red-500',
+    refunded: 'text-blue-500'
   }
+  return colors[status] || 'text-gray-500'
 }

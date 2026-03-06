@@ -1,16 +1,5 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  type DocumentData,
-} from 'firebase/firestore'
-import { db } from './firebase'
+import { where, orderBy, type DocumentData } from 'firebase/firestore'
+import { FirestoreManager, MapperUtils } from './db-utils'
 import type { Member, MemberFormData, PlanType } from '../types'
 
 const MEMBERS_COLLECTION = 'members'
@@ -19,70 +8,36 @@ const MEMBERS_COLLECTION = 'members'
  * Convert Firestore document to Member type
  */
 function toMember(id: string, data: DocumentData): Member {
+  const mapped = MapperUtils.toCamel(data)
   return {
     id,
-    userId: data.user_id || data.userId,
-    cpf: data.cpf,
-    fullName: data.full_name || data.fullName,
-    email: data.email,
-    phone: data.phone,
-    photoUrl: data.photo_url || data.photoUrl,
-    plan: data.plan,
-    status: data.status,
-    paymentType: data.payment_type || data.paymentType,
-    startDate: data.start_date || data.startDate,
-    expiryDate: data.expiry_date || data.expiryDate,
-    points: data.points || 0,
-    createdAt: data.created_at || data.createdAt,
-    updatedAt: data.updated_at || data.updatedAt,
+    userId: mapped.userId || mapped.userId, // handle both cases if needed
+    cpf: mapped.cpf,
+    fullName: mapped.fullName,
+    email: mapped.email,
+    phone: mapped.phone,
+    photoUrl: mapped.photoUrl,
+    plan: mapped.plan,
+    status: mapped.status,
+    paymentType: mapped.paymentType,
+    startDate: mapped.startDate,
+    expiryDate: mapped.expiryDate,
+    points: mapped.points || 0,
+    createdAt: mapped.createdAt,
+    updatedAt: mapped.updatedAt,
   }
-}
-
-/**
- * Convert Member to Firestore format (snake_case for compatibility)
- */
-function toFirestore(member: Partial<Member>): Record<string, unknown> {
-  const data: Record<string, unknown> = {}
-
-  if (member.userId !== undefined) data.user_id = member.userId
-  if (member.cpf !== undefined) data.cpf = member.cpf
-  if (member.fullName !== undefined) data.full_name = member.fullName
-  if (member.email !== undefined) data.email = member.email
-  if (member.phone !== undefined) data.phone = member.phone
-  if (member.photoUrl !== undefined) data.photo_url = member.photoUrl
-  if (member.plan !== undefined) data.plan = member.plan
-  if (member.status !== undefined) data.status = member.status
-  if (member.paymentType !== undefined) data.payment_type = member.paymentType
-  if (member.startDate !== undefined) data.start_date = member.startDate
-  if (member.expiryDate !== undefined) data.expiry_date = member.expiryDate
-  if (member.points !== undefined) data.points = member.points
-  if (member.createdAt !== undefined) data.created_at = member.createdAt
-  if (member.updatedAt !== undefined) data.updated_at = member.updatedAt
-
-  return data
 }
 
 /**
  * Get member by CPF
  */
 export async function getMemberByCPF(cpf: string): Promise<Member | null> {
-  try {
-    const q = query(
-      collection(db, MEMBERS_COLLECTION),
-      where('cpf', '==', cpf.replace(/\D/g, ''))
-    )
-    const snapshot = await getDocs(q)
-
-    if (snapshot.empty) {
-      return null
-    }
-
-    const docSnap = snapshot.docs[0]
-    return toMember(docSnap.id, docSnap.data())
-  } catch (error) {
-    console.error('Error getting member by CPF:', error)
-    return null
-  }
+  const results = await FirestoreManager.findMany(
+    MEMBERS_COLLECTION,
+    [where('cpf', '==', cpf.replace(/\D/g, ''))],
+    toMember
+  )
+  return results.length > 0 ? results[0] : null
 }
 
 /**
@@ -97,60 +52,30 @@ export async function isCPFRegistered(cpf: string): Promise<boolean> {
  * Get member by user ID
  */
 export async function getMemberByUserId(userId: string): Promise<Member | null> {
-  try {
-    const q = query(
-      collection(db, MEMBERS_COLLECTION),
-      where('user_id', '==', userId)
-    )
-    const snapshot = await getDocs(q)
-
-    if (snapshot.empty) {
-      return null
-    }
-
-    const docSnap = snapshot.docs[0]
-    return toMember(docSnap.id, docSnap.data())
-  } catch (error) {
-    console.error('Error getting member by user ID:', error)
-    return null
-  }
+  const results = await FirestoreManager.findMany(
+    MEMBERS_COLLECTION,
+    [where('user_id', '==', userId)],
+    toMember
+  )
+  return results.length > 0 ? results[0] : null
 }
 
 /**
  * Get member by ID
  */
 export async function getMemberById(id: string): Promise<Member | null> {
-  try {
-    const docRef = doc(db, MEMBERS_COLLECTION, id)
-    const docSnap = await getDoc(docRef)
-
-    if (!docSnap.exists()) {
-      return null
-    }
-
-    return toMember(docSnap.id, docSnap.data())
-  } catch (error) {
-    console.error('Error getting member by ID:', error)
-    return null
-  }
+  return FirestoreManager.getById(MEMBERS_COLLECTION, id, toMember)
 }
 
 /**
  * Get all members
  */
 export async function getAllMembers(): Promise<Member[]> {
-  try {
-    const q = query(
-      collection(db, MEMBERS_COLLECTION),
-      orderBy('created_at', 'desc')
-    )
-    const snapshot = await getDocs(q)
-
-    return snapshot.docs.map((docSnap) => toMember(docSnap.id, docSnap.data()))
-  } catch (error) {
-    console.error('Error getting all members:', error)
-    return []
-  }
+  return FirestoreManager.findMany(
+    MEMBERS_COLLECTION,
+    [orderBy('created_at', 'desc')],
+    toMember
+  )
 }
 
 /**
@@ -160,43 +85,37 @@ export async function createMember(
   userId: string,
   data: MemberFormData
 ): Promise<Member | null> {
-  try {
-    const now = new Date().toISOString()
-    const startDate = now.split('T')[0]
+  const now = new Date().toISOString()
+  const startDate = now.split('T')[0]
 
-    // Calculate expiry date
-    const expiryDate = new Date()
-    if (data.paymentType === 'annual') {
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-    } else {
-      expiryDate.setMonth(expiryDate.getMonth() + 1)
-    }
-
-    const memberData = {
-      user_id: userId,
-      cpf: data.cpf.replace(/\D/g, ''),
-      full_name: data.fullName,
-      email: data.email,
-      phone: data.phone,
-      photo_url: null,
-      plan: data.plan,
-      status: 'pending' as const,
-      payment_type: data.paymentType,
-      start_date: startDate,
-      expiry_date: expiryDate.toISOString().split('T')[0],
-      points: 0,
-      created_at: now,
-      updated_at: now,
-    }
-
-    const docRef = doc(collection(db, MEMBERS_COLLECTION))
-    await setDoc(docRef, memberData)
-
-    return toMember(docRef.id, memberData)
-  } catch (error) {
-    console.error('Error creating member:', error)
-    return null
+  // Calculate expiry date
+  const expiryDate = new Date()
+  if (data.paymentType === 'annual') {
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1)
+  } else {
+    expiryDate.setMonth(expiryDate.getMonth() + 1)
   }
+
+  const memberData = MapperUtils.toSnake({
+    userId,
+    cpf: data.cpf.replace(/\D/g, ''),
+    fullName: data.fullName,
+    email: data.email,
+    phone: data.phone,
+    photoUrl: null,
+    plan: data.plan,
+    status: 'pending',
+    paymentType: data.paymentType,
+    startDate,
+    expiryDate: expiryDate.toISOString().split('T')[0],
+    points: 0,
+    createdAt: now,
+  })
+
+  const id = await FirestoreManager.save(MEMBERS_COLLECTION, null, memberData)
+  if (!id) return null
+
+  return toMember(id, memberData)
 }
 
 /**
@@ -206,33 +125,22 @@ export async function updateMember(
   id: string,
   data: Partial<Member>
 ): Promise<boolean> {
-  try {
-    const docRef = doc(db, MEMBERS_COLLECTION, id)
-    const firestoreData = toFirestore(data)
-    firestoreData.updated_at = new Date().toISOString()
-
-    await updateDoc(docRef, firestoreData)
-    return true
-  } catch (error) {
-    console.error('Error updating member:', error)
-    return false
-  }
+  const firestoreData = MapperUtils.toSnake(data)
+  return FirestoreManager.update(MEMBERS_COLLECTION, id, firestoreData)
 }
 
 /**
- * Add points to a member
+ * Add points to a member (DEPRECATED - use addPoints from points.ts instead)
+ * This function is kept for backward compatibility but should not be used
+ * @deprecated Use addPoints from './points' instead for proper transaction tracking
  */
 export async function addMemberPoints(id: string, points: number): Promise<boolean> {
-  try {
-    const member = await getMemberById(id)
-    if (!member) return false
+  console.warn('addMemberPoints is deprecated. Use addPoints from ./points instead.')
+  const member = await getMemberById(id)
+  if (!member) return false
 
-    const newPoints = (member.points || 0) + points
-    return updateMember(id, { points: newPoints })
-  } catch (error) {
-    console.error('Error adding points:', error)
-    return false
-  }
+  const newPoints = (member.points || 0) + points
+  return updateMember(id, { points: newPoints })
 }
 
 /**

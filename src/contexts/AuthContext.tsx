@@ -6,8 +6,9 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
+import { FirestoreManager } from '../lib/db-utils'
 import type { UserRole } from '../types'
 
 interface AuthContextType {
@@ -43,24 +44,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function fetchUserRole(userId: string) {
-    // Timeout of 5 seconds to prevent hanging on blocked requests
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout fetching user role')), 5000)
-    )
-
     try {
-      const fetchPromise = getDoc(doc(db, 'users', userId))
-      const userDoc = (await Promise.race([fetchPromise, timeoutPromise])) as any
+      const userData = await FirestoreManager.getById('users', userId, (id, data) => ({
+        id,
+        ...data
+      }))
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        setRole((userData.role as UserRole) || 'member')
+      if (userData && (userData as any).role) {
+        setRole((userData as any).role as UserRole)
       } else {
         setRole('member')
       }
     } catch (error) {
       console.error('Error fetching user role:', error)
-      // Fallback to 'member' role instead of hanging
       setRole('member')
     }
   }

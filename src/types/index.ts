@@ -183,3 +183,54 @@ export interface MemberVerification {
   discountProducts: number
   discountServices: number
 }
+
+// ============================================
+// POINTS SYSTEM TYPES
+// ============================================
+
+// Point transaction type
+export type PointTransactionType = 'earn' | 'redeem' | 'expire'
+
+export interface PointTransaction {
+  id: string
+  memberId: string
+  type: PointTransactionType
+  points: number // positive for earn, negative for redeem/expire
+  balance: number // balance after transaction
+  description: string
+  purchaseValue?: number // purchase value in BRL (for earn)
+  expiresAt?: string // expiration date (only for earn)
+  isPromotion?: boolean // if it was a promotional purchase (no points)
+  createdAt: string
+  createdBy?: string // seller ID who added points
+}
+
+export interface RedemptionRule {
+  points: number
+  value: number // in BRL
+  description: string
+}
+
+export interface PointsConfig {
+  pointsPerReal: number // 1 point per real
+  expirationMonths: number // 6 months
+  redemptionRules: RedemptionRule[]
+}
+
+// Default points configuration
+export const POINTS_CONFIG: PointsConfig = {
+  pointsPerReal: 1,
+  expirationMonths: 6,
+  redemptionRules: [
+    { points: 500, value: 25, description: 'R$ 25 de desconto' },
+    { points: 800, value: 50, description: 'R$ 50 de desconto' },
+    { points: 1500, value: 100, description: 'R$ 100 de desconto' },
+  ],
+}
+
+// Points multiplier by plan
+export const POINTS_MULTIPLIER: Record<PlanType, number> = {
+  silver: 1,
+  gold: 2,
+  black: 3,
+}

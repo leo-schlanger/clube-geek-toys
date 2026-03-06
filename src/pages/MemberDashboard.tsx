@@ -4,12 +4,18 @@ import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
-import { LoadingPage } from '../components/ui/loading'
+import { LoadingPage, Loading } from '../components/ui/loading'
 import { RenewModal } from '../components/RenewModal'
 import { UpgradeModal } from '../components/UpgradeModal'
-import { PLANS, type Member, type PlanType } from '../types'
+import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction } from '../types'
 import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
+import {
+  getPointsHistory,
+  getExpiringPoints,
+  getRedemptionRules,
+  formatPoints,
+} from '../lib/points'
 import { toast } from 'sonner'
 import {
   CreditCard,
@@ -30,6 +36,11 @@ import {
   Mail,
   Phone,
   Copy,
+  Coins,
+  TrendingUp,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 type ModalType = 'renew' | 'upgrade' | null
@@ -40,6 +51,11 @@ export default function MemberDashboard() {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalType>(null)
   const [copied, setCopied] = useState(false)
+  const [pointsHistory, setPointsHistory] = useState<PointTransaction[]>([])
+  const [expiringPoints, setExpiringPoints] = useState<PointTransaction[]>([])
+  const [loadingPoints, setLoadingPoints] = useState(false)
+  const [showAllHistory, setShowAllHistory] = useState(false)
+  const [showRedemptionRules, setShowRedemptionRules] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -53,6 +69,17 @@ export default function MemberDashboard() {
     try {
       const memberData = await getMemberByUserId(user.uid)
       setMember(memberData)
+
+      if (memberData) {
+        setLoadingPoints(true)
+        const [history, expiring] = await Promise.all([
+          getPointsHistory(memberData.id, 20),
+          getExpiringPoints(memberData.id),
+        ])
+        setPointsHistory(history)
+        setExpiringPoints(expiring)
+        setLoadingPoints(false)
+      }
     } catch (error) {
       console.error('Error fetching member data:', error)
       toast.error('Erro ao carregar dados')
@@ -86,6 +113,32 @@ export default function MemberDashboard() {
       })
     } else {
       copyMemberId()
+    }
+  }
+
+  function getTransactionIcon(type: string) {
+    switch (type) {
+      case 'earn':
+        return <TrendingUp className="h-4 w-4 text-green-500" />
+      case 'redeem':
+        return <Gift className="h-4 w-4 text-blue-500" />
+      case 'expire':
+        return <Clock className="h-4 w-4 text-red-500" />
+      default:
+        return <Coins className="h-4 w-4 text-muted-foreground" />
+    }
+  }
+
+  function getTransactionColor(type: string) {
+    switch (type) {
+      case 'earn':
+        return 'text-green-600'
+      case 'redeem':
+        return 'text-blue-600'
+      case 'expire':
+        return 'text-red-600'
+      default:
+        return 'text-muted-foreground'
     }
   }
 
@@ -124,9 +177,13 @@ export default function MemberDashboard() {
   }
 
   const plan = PLANS[member.plan as PlanType]
+  const multiplier = POINTS_MULTIPLIER[member.plan as PlanType]
   const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
   const isExpired = daysUntilExpiry <= 0
+  const expiringPointsTotal = expiringPoints.reduce((sum, t) => sum + t.points, 0)
+  const redemptionRules = getRedemptionRules()
+  const displayedHistory = showAllHistory ? pointsHistory : pointsHistory.slice(0, 5)
 
   // QR Code data
   const qrData = JSON.stringify({
@@ -296,11 +353,11 @@ export default function MemberDashboard() {
               <Card className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="p-3 rounded-full bg-primary/10">
-                    <Star className="h-6 w-6 text-primary" />
+                    <Coins className="h-6 w-6 text-primary" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{member.points}</p>
-                    <p className="text-sm text-muted-foreground">Pontos</p>
+                    <p className="text-2xl font-bold">{formatPoints(member.points || 0)}</p>
+                    <p className="text-sm text-muted-foreground">Pontos ({multiplier}x)</p>
                   </div>
                 </CardContent>
               </Card>
@@ -337,6 +394,168 @@ export default function MemberDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Points Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Coins className="h-5 w-5" />
+                    Programa de Pontos
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowRedemptionRules(!showRedemptionRules)}
+                  >
+                    <Gift className="h-4 w-4 mr-1" />
+                    Resgates
+                    {showRedemptionRules ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+                  </Button>
+                </div>
+                <CardDescription>
+                  Acumule pontos a cada compra e troque por descontos
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Points Info */}
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Coins className="h-5 w-5 text-primary" />
+                      <span className="font-semibold">Saldo Atual</span>
+                    </div>
+                    <p className="text-3xl font-bold text-primary">{formatPoints(member.points || 0)}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Você ganha {multiplier}x pontos por real gasto
+                    </p>
+                  </div>
+
+                  {expiringPointsTotal > 0 && (
+                    <div className="flex-1 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="h-5 w-5 text-yellow-600" />
+                        <span className="font-semibold text-yellow-700 dark:text-yellow-400">Expirando em Breve</span>
+                      </div>
+                      <p className="text-3xl font-bold text-yellow-600">{formatPoints(expiringPointsTotal)}</p>
+                      <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                        Nos próximos 30 dias
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Redemption Rules */}
+                {showRedemptionRules && (
+                  <div className="p-4 bg-muted rounded-lg space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Gift className="h-4 w-4" />
+                      Opções de Resgate
+                    </h4>
+                    <div className="grid sm:grid-cols-3 gap-3">
+                      {redemptionRules.map((rule, index) => {
+                        const isAvailable = (member.points || 0) >= rule.points
+                        return (
+                          <div
+                            key={index}
+                            className={`p-3 rounded-lg border text-center ${
+                              isAvailable
+                                ? 'bg-card border-green-200 dark:border-green-800'
+                                : 'bg-muted/50 border-border opacity-60'
+                            }`}
+                          >
+                            <p className="text-lg font-bold">{rule.description}</p>
+                            <p className="text-sm text-muted-foreground">{formatPoints(rule.points)} pontos</p>
+                            {isAvailable && (
+                              <Badge variant="success" className="mt-2">Disponível</Badge>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Para resgatar seus pontos, apresente sua carteirinha na loja
+                    </p>
+                  </div>
+                )}
+
+                {/* Points History */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <History className="h-4 w-4" />
+                      Extrato de Pontos
+                    </h4>
+                  </div>
+
+                  {loadingPoints ? (
+                    <div className="py-8">
+                      <Loading size="md" text="Carregando histórico..." />
+                    </div>
+                  ) : pointsHistory.length === 0 ? (
+                    <div className="py-8 text-center text-muted-foreground">
+                      <Coins className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                      <p>Nenhuma movimentação de pontos ainda</p>
+                      <p className="text-sm">Faça compras na loja para acumular pontos!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        {displayedHistory.map((transaction) => (
+                          <div
+                            key={transaction.id}
+                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              {getTransactionIcon(transaction.type)}
+                              <div>
+                                <p className="text-sm font-medium">{transaction.description}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(transaction.createdAt).toLocaleDateString('pt-BR', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                  {transaction.expiresAt && transaction.type === 'earn' && (
+                                    <> · Expira em {new Date(transaction.expiresAt).toLocaleDateString('pt-BR')}</>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`font-bold ${getTransactionColor(transaction.type)}`}>
+                              {transaction.points > 0 ? '+' : ''}{formatPoints(transaction.points)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {pointsHistory.length > 5 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowAllHistory(!showAllHistory)}
+                        >
+                          {showAllHistory ? (
+                            <>
+                              <ChevronUp className="h-4 w-4 mr-1" />
+                              Ver menos
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-1" />
+                              Ver mais ({pointsHistory.length - 5} transações)
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Personal data */}
             <Card>

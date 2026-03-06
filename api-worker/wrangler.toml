@@ -1,0 +1,11 @@
+name = "api-worker"
+main = "src/index.ts"
+compatibility_date = "2026-03-02"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = "clube-geek-toys"
+FRONTEND_URL = "https://clube-geek-toys.web.app"
+WORKER_URL = "https://api-worker.leoschlanger.workers.dev"
+
+# Note: Sensitive secrets are managed via 'wrangler secret put'

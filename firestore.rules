@@ -41,6 +41,11 @@ service cloud.firestore {
       return !(field in request.resource.data.diff(resource.data).affectedKeys());
     }
 
+    // Check if ONLY specific fields are being modified
+    function onlyFieldsChanged(allowedFields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
+
     // ============================================
     // COLLECTION: USERS
     // ============================================
@@ -76,9 +81,14 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         (request.resource.data.user_id == request.auth.uid || isAdmin());
 
-      // Update: admin can change anything
-      // Members can update limited fields (phone, photo)
+      // Update rules:
+      // - Admin can change anything
+      // - Seller can ONLY update points and updated_at (for PDV)
+      // - Member can update limited fields (phone, photo)
       allow update: if isAdmin() ||
+        // Seller can only update points
+        (isSellerOrAdmin() && onlyFieldsChanged(['points', 'updated_at'])) ||
+        // Member can update own profile (except protected fields)
         (isAuthenticated() &&
          resource.data.user_id == request.auth.uid &&
          fieldNotChanged('cpf') &&
@@ -100,8 +110,9 @@ service cloud.firestore {
     match /payments/{paymentId} {
       // Read: admin, seller, or payment owner (member who made the payment)
       allow read: if isSellerOrAdmin() ||
-        (isAuthenticated() && resource.data.member_id in
-          get(/databases/$(database)/documents/members).where('user_id', '==', request.auth.uid).limit(1));
+        (isAuthenticated() &&
+         exists(/databases/$(database)/documents/members/$(resource.data.member_id)) &&
+         get(/databases/$(database)/documents/members/$(resource.data.member_id)).data.user_id == request.auth.uid);
 
       // Create: authenticated user or system (Cloud Functions)
       allow create: if isAuthenticated();
@@ -126,15 +137,42 @@ service cloud.firestore {
     }
 
     // ============================================
-    // COLLECTION: AUDIT_LOGS (if needed)
+    // COLLECTION: POINT_TRANSACTIONS
+    // ============================================
+
+    match /point_transactions/{transactionId} {
+      // Read: own transactions (by member_id), seller, or admin
+      allow read: if isAuthenticated() &&
+        (exists(/databases/$(database)/documents/members/$(resource.data.member_id)) &&
+         get(/databases/$(database)/documents/members/$(resource.data.member_id)).data.user_id == request.auth.uid ||
+         isSellerOrAdmin());
+
+      // Create: seller or admin (points are added at POS)
+      allow create: if isSellerOrAdmin();
+
+      // Update: never (immutable transactions)
+      allow update: if false;
+
+      // Delete: never (audit trail)
+      allow delete: if false;
+    }
+
+    // ============================================
+    // COLLECTION: AUDIT_LOGS
     // ============================================
 
     match /audit_logs/{logId} {
       // Read: only admin
       allow read: if isAdmin();
 
-      // Write: only system (admin SDK)
-      allow write: if false;
+      // Create: seller or admin can create logs (for point operations, etc.)
+      allow create: if isSellerOrAdmin();
+
+      // Update: never (immutable logs)
+      allow update: if false;
+
+      // Delete: never (audit trail)
+      allow delete: if false;
     }
 
     // ============================================
