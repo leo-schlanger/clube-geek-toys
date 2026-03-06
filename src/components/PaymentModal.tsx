@@ -212,15 +212,28 @@ export function PaymentModal({
   }
 
   /**
-   * Simulate payment confirmation (for testing)
+   * Simulate payment confirmation (ONLY for development/testing)
+   * SECURITY: This function only works when VITE_ENVIRONMENT is explicitly 'development'
    */
   function simulatePaymentConfirmation() {
+    const env = import.meta.env.VITE_ENVIRONMENT
+
+    // CRITICAL: Only allow simulation in development mode
+    if (env !== 'development') {
+      toast.error('Simulação não disponível em produção')
+      console.error('Payment simulation blocked: Not in development mode')
+      return
+    }
+
     setLoading(true)
     setTimeout(() => {
-      toast.success('Pagamento confirmado!')
+      toast.success('Pagamento confirmado (SIMULAÇÃO)')
       onSuccess()
     }, 1500)
   }
+
+  // Check if simulation is allowed (development mode only)
+  const isSimulationAllowed = import.meta.env.VITE_ENVIRONMENT === 'development'
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -394,7 +407,7 @@ export function PaymentModal({
                           </>
                         )}
                       </Button>
-                    ) : (
+                    ) : isSimulationAllowed ? (
                       <>
                         <Button
                           className="w-full"
@@ -404,9 +417,19 @@ export function PaymentModal({
                           {loading ? <Loading size="sm" /> : 'Confirmar Pagamento (Teste)'}
                         </Button>
                         <p className="text-xs text-center text-muted-foreground">
-                          Em produção, o pagamento será confirmado automaticamente
+                          Modo desenvolvimento - Em produção, configure VITE_PAYMENT_API_URL
                         </p>
                       </>
+                    ) : (
+                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
+                        <AlertCircle className="h-6 w-6 mx-auto text-red-500 mb-2" />
+                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                          Pagamento não configurado
+                        </p>
+                        <p className="text-xs text-red-500/80 mt-1">
+                          Entre em contato com o suporte
+                        </p>
+                      </div>
                     )}
                   </div>
                 </>

@@ -11,7 +11,7 @@ function toMember(id: string, data: DocumentData): Member {
   const mapped = MapperUtils.toCamel(data)
   return {
     id,
-    userId: mapped.userId || mapped.userId, // handle both cases if needed
+    userId: mapped.userId || '',
     cpf: mapped.cpf,
     fullName: mapped.fullName,
     email: mapped.email,

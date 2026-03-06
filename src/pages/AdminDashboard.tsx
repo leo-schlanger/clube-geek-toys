@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/badge'
 import { LoadingPage } from '../components/ui/loading'
 import { MemberModal } from '../components/MemberModal'
+import { UserModal } from '../components/UserModal'
 import { PLANS, type Member, type PlanType, type DashboardStats } from '../types'
 import { formatCurrency, formatCPF, getStatusLabel } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
@@ -64,6 +65,7 @@ export default function AdminDashboard() {
   // Modal state
   const [modalMode, setModalMode] = useState<ModalMode>(null)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [showUserModal, setShowUserModal] = useState(false)
 
   // Dropdown state
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
@@ -675,8 +677,16 @@ export default function AdminDashboard() {
           /* Users View */
           <Card>
             <CardHeader>
-              <CardTitle>Usuários do Sistema</CardTitle>
-              <CardDescription>Gerencie o acesso e cargos dos usuários cadastrados</CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle>Usuários do Sistema</CardTitle>
+                  <CardDescription>Gerencie o acesso e cargos dos usuários cadastrados</CardDescription>
+                </div>
+                <Button onClick={() => setShowUserModal(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Usuário
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -858,9 +868,20 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* Modal */}
+      {/* Member Modal */}
       {modalMode && (
         <MemberModal mode={modalMode as any} member={selectedMember} onClose={closeModal} onSuccess={handleModalSuccess} />
+      )}
+
+      {/* User Modal */}
+      {showUserModal && (
+        <UserModal
+          onClose={() => setShowUserModal(false)}
+          onSuccess={() => {
+            setShowUserModal(false)
+            fetchData(true)
+          }}
+        />
       )}
 
       {/* Click outside to close dropdown */}

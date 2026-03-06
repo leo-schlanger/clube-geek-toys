@@ -11,6 +11,14 @@ import { auth, db } from '../lib/firebase'
 import { FirestoreManager } from '../lib/db-utils'
 import type { UserRole } from '../types'
 
+// Type for user document from Firestore
+interface UserDocument {
+  id: string
+  email?: string
+  role?: UserRole
+  createdAt?: string
+}
+
 interface AuthContextType {
   user: User | null
   role: UserRole | null
@@ -45,13 +53,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function fetchUserRole(userId: string) {
     try {
-      const userData = await FirestoreManager.getById('users', userId, (id, data) => ({
-        id,
-        ...data
-      }))
+      const userData = await FirestoreManager.getById<UserDocument>(
+        'users',
+        userId,
+        (id, data): UserDocument => ({
+          id,
+          email: data.email,
+          role: data.role,
+          createdAt: data.createdAt,
+        })
+      )
 
-      if (userData && (userData as any).role) {
-        setRole((userData as any).role as UserRole)
+      if (userData?.role) {
+        setRole(userData.role)
       } else {
         setRole('member')
       }

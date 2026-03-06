@@ -8,9 +8,11 @@ import { Label } from './ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { PLANS, type Member, type PlanType, type MemberStatus } from '../types'
+import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type MemberStatus, type RedemptionRule } from '../types'
 import { createMember, updateMember, activateMember } from '../lib/members'
 import { formatCurrency, formatCPF, validateCPF, getStatusLabel } from '../lib/utils'
+import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
+import { addPoints, redeemPoints, getRedemptionRules, formatPoints } from '../lib/points'
 import { toast } from 'sonner'
 import {
   X,
@@ -24,6 +26,13 @@ import {
   Sparkles,
   Check,
   AlertTriangle,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
+  Loader2,
+  Coins,
+  Plus,
+  Gift,
 } from 'lucide-react'
 
 // Validation schema
@@ -48,6 +57,14 @@ interface MemberModalProps {
 
 export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalProps) {
   const [loading, setLoading] = useState(false)
+  const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
+  const [validatingCpf, setValidatingCpf] = useState(false)
+  const [showPointsManager, setShowPointsManager] = useState(false)
+  const [pointsAction, setPointsAction] = useState<'add' | 'redeem'>('add')
+  const [purchaseValue, setPurchaseValue] = useState('')
+  const [isPromotion, setIsPromotion] = useState(false)
+  const [processingPoints, setProcessingPoints] = useState(false)
+  const [localMember, setLocalMember] = useState<Member | null>(member || null)
   const isViewMode = mode === 'view'
   const isEditMode = mode === 'edit'
   const isCreateMode = mode === 'create'
@@ -87,8 +104,66 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
         paymentType: member.paymentType,
         status: member.status,
       })
+      setLocalMember(member)
     }
   }, [member, reset])
+
+  // Points calculations
+  const multiplier = localMember ? POINTS_MULTIPLIER[localMember.plan as PlanType] : 1
+  const previewPoints = purchaseValue && !isPromotion
+    ? Math.floor(parseFloat(purchaseValue.replace(',', '.') || '0') * multiplier)
+    : 0
+  const redemptionRules = getRedemptionRules()
+
+  /**
+   * Handle adding points
+   */
+  async function handleAddPoints() {
+    if (!localMember || !purchaseValue) return
+
+    const value = parseFloat(purchaseValue.replace(',', '.'))
+    if (isNaN(value) || value <= 0) {
+      toast.error('Valor de compra inválido')
+      return
+    }
+
+    setProcessingPoints(true)
+    const response = await addPoints(localMember.id, value, isPromotion, 'admin')
+
+    if (response.success) {
+      toast.success(response.message)
+      setLocalMember({
+        ...localMember,
+        points: (localMember.points || 0) + response.pointsAdded,
+      })
+      setPurchaseValue('')
+      setIsPromotion(false)
+    } else {
+      toast.error(response.message)
+    }
+    setProcessingPoints(false)
+  }
+
+  /**
+   * Handle redeeming points
+   */
+  async function handleRedeemPoints(rule: RedemptionRule) {
+    if (!localMember) return
+
+    setProcessingPoints(true)
+    const response = await redeemPoints(localMember.id, rule, 'admin')
+
+    if (response.success) {
+      toast.success(response.message)
+      setLocalMember({
+        ...localMember,
+        points: (localMember.points || 0) - rule.points,
+      })
+    } else {
+      toast.error(response.message)
+    }
+    setProcessingPoints(false)
+  }
 
   const planIcons = {
     silver: <Star className="h-4 w-4" />,
@@ -178,6 +253,24 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
     return numbers
       .replace(/(\d{2})(\d)/, '($1) $2')
       .replace(/(\d{5})(\d)/, '$1-$2')
+  }
+
+  /**
+   * Validate CPF via Brasil API
+   */
+  async function handleValidateCPF(cpf: string) {
+    const cleaned = cpf.replace(/\D/g, '')
+    if (cleaned.length !== 11) {
+      setCpfValidation(null)
+      return
+    }
+
+    setValidatingCpf(true)
+    setCpfValidation(null)
+
+    const result = await fullCPFValidation(cleaned)
+    setCpfValidation(result)
+    setValidatingCpf(false)
   }
 
   return (
@@ -275,18 +368,61 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                   <Input
                     id="cpf"
                     placeholder="000.000.000-00"
-                    className="pl-10"
+                    className={`pl-10 pr-10 ${
+                      cpfValidation
+                        ? cpfValidation.valid
+                          ? 'border-green-500 focus-visible:ring-green-500'
+                          : 'border-red-500 focus-visible:ring-red-500'
+                        : ''
+                    }`}
                     disabled={isViewMode}
                     maxLength={14}
                     {...register('cpf')}
                     onChange={(e) => {
                       e.target.value = formatCPFInput(e.target.value)
                       setValue('cpf', e.target.value)
+                      setCpfValidation(null)
+                    }}
+                    onBlur={(e) => {
+                      if (!isViewMode && e.target.value.replace(/\D/g, '').length === 11) {
+                        handleValidateCPF(e.target.value)
+                      }
                     }}
                   />
+                  {/* Validation indicator */}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2" title={cpfValidation?.message}>
+                    {validatingCpf && (
+                      <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+                    )}
+                    {!validatingCpf && cpfValidation && (
+                      cpfValidation.valid ? (
+                        cpfValidation.exists === true ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : cpfValidation.exists === null ? (
+                          <HelpCircle className="h-4 w-4 text-yellow-500" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-red-500" />
+                        )
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )
+                    )}
+                  </div>
                 </div>
                 {errors.cpf && (
                   <p className="text-xs text-red-500">{errors.cpf.message}</p>
+                )}
+                {cpfValidation && !errors.cpf && (
+                  <p className={`text-xs ${
+                    cpfValidation.valid
+                      ? cpfValidation.exists === true
+                        ? 'text-green-600'
+                        : 'text-yellow-600'
+                      : 'text-red-500'
+                  }`}>
+                    {cpfValidation.message}
+                    {cpfValidation.name && ` - ${cpfValidation.name}`}
+                  </p>
                 )}
               </div>
 
@@ -415,31 +551,176 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
             )}
 
             {/* Additional info (view only) */}
-            {isViewMode && member && (
+            {isViewMode && localMember && (
               <div className="space-y-4 p-4 bg-muted rounded-lg">
                 <h4 className="font-semibold">Informações Adicionais</h4>
                 <div className="grid sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-muted-foreground">Pontos:</span>
-                    <span className="ml-2 font-medium">{member.points}</span>
+                    <span className="ml-2 font-bold text-primary">{formatPoints(localMember.points || 0)}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Membro desde:</span>
                     <span className="ml-2 font-medium">
-                      {new Date(member.startDate).toLocaleDateString('pt-BR')}
+                      {new Date(localMember.startDate).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Última atualização:</span>
                     <span className="ml-2 font-medium">
-                      {new Date(member.updatedAt).toLocaleDateString('pt-BR')}
+                      {new Date(localMember.updatedAt).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">ID:</span>
-                    <span className="ml-2 font-medium font-mono text-xs">{member.id}</span>
+                    <span className="ml-2 font-medium font-mono text-xs">{localMember.id}</span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Points Management (view mode only) */}
+            {isViewMode && localMember && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Coins className="h-5 w-5 text-primary" />
+                    Gestão de Pontos
+                  </h4>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPointsManager(!showPointsManager)}
+                  >
+                    {showPointsManager ? 'Fechar' : 'Gerenciar'}
+                  </Button>
+                </div>
+
+                {showPointsManager && (
+                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 space-y-4">
+                    {/* Action Tabs */}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant={pointsAction === 'add' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setPointsAction('add')}
+                        className="flex-1"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={pointsAction === 'redeem' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setPointsAction('redeem')}
+                        className="flex-1"
+                      >
+                        <Gift className="h-4 w-4 mr-1" />
+                        Resgatar
+                      </Button>
+                    </div>
+
+                    {/* Add Points */}
+                    {pointsAction === 'add' && (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Multiplicador do plano {PLANS[localMember.plan as PlanType].name}: <strong>{multiplier}x</strong>
+                        </p>
+
+                        {/* Promotion Checkbox */}
+                        <label className="flex items-center gap-2 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isPromotion}
+                            onChange={(e) => setIsPromotion(e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          <span>Compra em promoção (sem pontos)</span>
+                        </label>
+
+                        {/* Value Input */}
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                              R$
+                            </span>
+                            <Input
+                              type="text"
+                              placeholder="0,00"
+                              value={purchaseValue}
+                              onChange={(e) => setPurchaseValue(e.target.value)}
+                              disabled={processingPoints}
+                              className="pl-10"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            onClick={handleAddPoints}
+                            disabled={processingPoints || !purchaseValue}
+                          >
+                            {processingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Adicionar'}
+                          </Button>
+                        </div>
+
+                        {/* Preview */}
+                        {purchaseValue && parseFloat(purchaseValue.replace(',', '.')) > 0 && (
+                          <div className={`text-sm p-2 rounded ${isPromotion ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                            {isPromotion ? (
+                              <span className="text-yellow-700 dark:text-yellow-300">Compra promocional: 0 pontos</span>
+                            ) : (
+                              <span className="text-green-700 dark:text-green-300">
+                                Será adicionado: <strong>+{formatPoints(previewPoints)} pontos</strong>
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Redeem Points */}
+                    {pointsAction === 'redeem' && (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Saldo atual: <strong>{formatPoints(localMember.points || 0)} pontos</strong>
+                        </p>
+
+                        <div className="grid gap-2">
+                          {redemptionRules.map((rule, index) => {
+                            const canRedeem = (localMember.points || 0) >= rule.points
+                            return (
+                              <div
+                                key={index}
+                                className={`flex items-center justify-between p-3 rounded-lg border ${
+                                  canRedeem
+                                    ? 'bg-card border-primary/30'
+                                    : 'bg-muted/50 border-border opacity-50'
+                                }`}
+                              >
+                                <div>
+                                  <p className="font-medium">{rule.description}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {formatPoints(rule.points)} pontos
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={!canRedeem || processingPoints}
+                                  onClick={() => handleRedeemPoints(rule)}
+                                >
+                                  {processingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Resgatar'}
+                                </Button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

@@ -14,6 +14,7 @@ import { PaymentModal } from '../components/PaymentModal'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency, validateCPF } from '../lib/utils'
 import { createMember, isCPFRegistered } from '../lib/members'
+import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import {
@@ -26,6 +27,10 @@ import {
   Check,
   Eye,
   EyeOff,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  HelpCircle,
 } from 'lucide-react'
 
 // Form validation schema
@@ -54,6 +59,8 @@ export default function Register() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [createdMemberId, setCreatedMemberId] = useState<string | null>(null)
   const [memberEmail, setMemberEmail] = useState<string>('')
+  const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
+  const [validatingCpf, setValidatingCpf] = useState(false)
 
   // Get plan from URL params
   const planParam = searchParams.get('plano') as PlanType || 'silver'
@@ -96,13 +103,22 @@ export default function Register() {
     }
 
     try {
-      // 1. Check if CPF is already registered
+      // 1. Check if CPF is already registered (MUST succeed - no silent failures)
       toast.loading('Verificando CPF...', { id: 'reg-status' })
-      const isRegistered = await withTimeout(
-        isCPFRegistered(data.cpf),
-        5000,
-        'Tempo esgotado ao verificar CPF. Tentando continuar...'
-      ).catch(() => false) // Fallback if blocked/timeout
+      let isRegistered: boolean
+      try {
+        isRegistered = await withTimeout(
+          isCPFRegistered(data.cpf),
+          5000,
+          'Tempo esgotado ao verificar CPF.'
+        )
+      } catch (cpfError) {
+        // CRITICAL: Do NOT allow registration if CPF check fails
+        // This prevents duplicate accounts when Firestore is slow
+        toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-status' })
+        setLoading(false)
+        return
+      }
 
       if (isRegistered) {
         toast.error('Este CPF já está cadastrado', { id: 'reg-status' })
@@ -205,6 +221,24 @@ export default function Register() {
     }
 
     setValue('phone', formattedValue)
+  }
+
+  /**
+   * Validate CPF via Brasil API
+   */
+  async function handleValidateCPF(cpf: string) {
+    const cleaned = cpf.replace(/\D/g, '')
+    if (cleaned.length !== 11) {
+      setCpfValidation(null)
+      return
+    }
+
+    setValidatingCpf(true)
+    setCpfValidation(null)
+
+    const result = await fullCPFValidation(cleaned)
+    setCpfValidation(result)
+    setValidatingCpf(false)
   }
 
   return (
@@ -322,12 +356,56 @@ export default function Register() {
                               <Input
                                 id="cpf"
                                 placeholder="000.000.000-00"
-                                className="pl-10"
+                                className={`pl-10 pr-10 ${
+                                  cpfValidation
+                                    ? cpfValidation.valid
+                                      ? 'border-green-500 focus-visible:ring-green-500'
+                                      : 'border-red-500 focus-visible:ring-red-500'
+                                    : ''
+                                }`}
                                 {...register('cpf')}
-                                onChange={handleCPFChange}
+                                onChange={(e) => {
+                                  handleCPFChange(e)
+                                  setCpfValidation(null)
+                                }}
+                                onBlur={(e) => {
+                                  if (e.target.value.replace(/\D/g, '').length === 11) {
+                                    handleValidateCPF(e.target.value)
+                                  }
+                                }}
                               />
+                              {/* Validation indicator */}
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                {validatingCpf && (
+                                  <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+                                )}
+                                {!validatingCpf && cpfValidation && (
+                                  cpfValidation.valid ? (
+                                    cpfValidation.exists === true ? (
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                    ) : cpfValidation.exists === null ? (
+                                      <HelpCircle className="h-4 w-4 text-yellow-500" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4 text-red-500" />
+                                    )
+                                  ) : (
+                                    <XCircle className="h-4 w-4 text-red-500" />
+                                  )
+                                )}
+                              </div>
                             </div>
                             {errors.cpf && <p className="text-xs text-red-500">{errors.cpf.message}</p>}
+                            {cpfValidation && !errors.cpf && (
+                              <p className={`text-xs ${
+                                cpfValidation.valid
+                                  ? cpfValidation.exists === true
+                                    ? 'text-green-600'
+                                    : 'text-yellow-600'
+                                  : 'text-red-500'
+                              }`}>
+                                {cpfValidation.message}
+                              </p>
+                            )}
                           </div>
 
                           <div className="space-y-2">

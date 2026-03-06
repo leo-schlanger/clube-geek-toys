@@ -159,13 +159,20 @@ export async function generatePixPayment(
 
 /**
  * PIX simulation for development
+ * SECURITY: Only works if VITE_PIX_KEY is properly configured
  */
 function generatePixPaymentSimulation(
   amount: number,
   _description: string,
   memberId: string
-): PixPaymentData {
-  const pixKey = import.meta.env.VITE_PIX_KEY || 'your-pix-key@email.com'
+): PixPaymentData | null {
+  const pixKey = import.meta.env.VITE_PIX_KEY
+
+  // CRITICAL: Do not use placeholder PIX key
+  if (!pixKey || pixKey === 'your-pix-key@email.com') {
+    console.error('VITE_PIX_KEY not configured. Cannot generate PIX simulation.')
+    return null
+  }
   const emvCode = generateEMVCode({
     pixKey,
     merchantName: 'GEEK AND TOYS',

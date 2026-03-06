@@ -1,4 +1,5 @@
-import { where, orderBy, type DocumentData } from 'firebase/firestore'
+import { where, orderBy, limit, addDoc, collection, serverTimestamp, type DocumentData } from 'firebase/firestore'
+import { db } from './firebase'
 import { FirestoreManager, MapperUtils } from './db-utils'
 import { getMemberById, updateMember } from './members'
 import type { PointTransaction, PlanType, RedemptionRule } from '../types'
@@ -60,7 +61,6 @@ function calculateExpirationDate(): string {
  * Get member's point transactions history
  */
 export async function getPointsHistory(memberId: string, limitCount = 50): Promise<PointTransaction[]> {
-  const { limit } = await import('firebase/firestore')
   return FirestoreManager.findMany(
     POINTS_COLLECTION,
     [
@@ -187,11 +187,9 @@ export async function addPoints(
   // Update member's total points
   await updateMember(memberId, { points: newBalance })
 
-  // Log audit
+  // Log audit (non-critical, don't block on failure)
   try {
-    const { addDoc, collection: col, serverTimestamp } = await import('firebase/firestore')
-    const { db } = await import('./firebase')
-    await addDoc(col(db, 'audit_logs'), {
+    await addDoc(collection(db, 'audit_logs'), {
       action: 'points_added',
       member_id: memberId,
       transaction_id: id,
@@ -203,7 +201,7 @@ export async function addPoints(
       timestamp: serverTimestamp(),
     })
   } catch {
-    // Non-critical
+    // Non-critical - silently ignore audit failures
   }
 
   return {
@@ -258,11 +256,9 @@ export async function redeemPoints(
   // Update member's total points
   await updateMember(memberId, { points: newBalance })
 
-  // Log audit
+  // Log audit (non-critical, don't block on failure)
   try {
-    const { addDoc, collection: col, serverTimestamp } = await import('firebase/firestore')
-    const { db } = await import('./firebase')
-    await addDoc(col(db, 'audit_logs'), {
+    await addDoc(collection(db, 'audit_logs'), {
       action: 'points_redeemed',
       member_id: memberId,
       transaction_id: id,
@@ -273,7 +269,7 @@ export async function redeemPoints(
       timestamp: serverTimestamp(),
     })
   } catch {
-    // Non-critical
+    // Non-critical - silently ignore audit failures
   }
 
   return {
