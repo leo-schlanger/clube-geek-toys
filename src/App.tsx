@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
@@ -5,20 +6,20 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LoadingPage } from './components/ui/loading'
 import { getAppMode, getLoginRedirectPath } from './lib/subdomain'
 
-// Pages - Member Area
-import Login from './pages/Login'
-import ForgotPassword from './pages/ForgotPassword'
-import Subscribe from './pages/Subscribe'
-import Register from './pages/Register'
-import MemberDashboard from './pages/MemberDashboard'
-import PaymentResult from './pages/PaymentResult'
-import TermsOfUse from './pages/TermsOfUse'
-import PrivacyPolicy from './pages/PrivacyPolicy'
+// Lazy loaded pages - Member Area
+const Login = lazy(() => import('./pages/Login'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const Subscribe = lazy(() => import('./pages/Subscribe'))
+const Register = lazy(() => import('./pages/Register'))
+const MemberDashboard = lazy(() => import('./pages/MemberDashboard'))
+const PaymentResult = lazy(() => import('./pages/PaymentResult'))
+const TermsOfUse = lazy(() => import('./pages/TermsOfUse'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 
-// Pages - Admin Area
-import AdminLogin from './pages/AdminLogin'
-import AdminDashboard from './pages/AdminDashboard'
-import PDV from './pages/PDV'
+// Lazy loaded pages - Admin Area
+const AdminLogin = lazy(() => import('./pages/AdminLogin'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const PDV = lazy(() => import('./pages/PDV'))
 
 const queryClient = new QueryClient()
 
@@ -228,7 +229,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <Suspense fallback={<LoadingPage />}>
+            <AppRoutes />
+          </Suspense>
           <Toaster position="top-right" richColors />
         </AuthProvider>
       </BrowserRouter>

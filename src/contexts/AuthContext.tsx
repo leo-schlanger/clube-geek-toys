@@ -23,6 +23,8 @@ interface AuthContextType {
   user: User | null
   role: UserRole | null
   loading: boolean
+  roleError: string | null
+  refreshRole: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
   signOut: () => Promise<void>
@@ -34,15 +36,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
+  const [roleError, setRoleError] = useState<string | null>(null)
+
+  // Fetch role with retry logic
+  async function fetchUserRole(userId: string, retries = 3): Promise<UserRole> {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const userData = await FirestoreManager.getById<UserDocument>(
+          'users',
+          userId,
+          (id, data): UserDocument => ({
+            id,
+            email: data.email,
+            role: data.role,
+            createdAt: data.createdAt,
+          })
+        )
+
+        if (userData?.role) {
+          console.log(`[Auth] Role fetched successfully: ${userData.role}`)
+          setRoleError(null)
+          return userData.role
+        }
+
+        // Document exists but no role - default to member
+        console.warn('[Auth] User document found but no role set, defaulting to member')
+        setRoleError(null)
+        return 'member'
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        console.warn(`[Auth] Attempt ${attempt}/${retries} failed to fetch role: ${errorMessage}`)
+
+        if (attempt < retries) {
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+        } else {
+          // All retries failed
+          console.error('[Auth] All retries failed to fetch user role')
+          setRoleError(`Erro ao carregar permissões: ${errorMessage}. Verifique sua conexão.`)
+          return 'member' // Safe default, but with error flag
+        }
+      }
+    }
+    return 'member'
+  }
+
+  // Allow manual refresh of role (useful after network recovery)
+  async function refreshRole() {
+    if (user) {
+      setLoading(true)
+      const fetchedRole = await fetchUserRole(user.uid)
+      setRole(fetchedRole)
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser)
 
       if (firebaseUser) {
-        await fetchUserRole(firebaseUser.uid)
+        const fetchedRole = await fetchUserRole(firebaseUser.uid)
+        setRole(fetchedRole)
       } else {
         setRole(null)
+        setRoleError(null)
       }
 
       setLoading(false)
@@ -50,30 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => unsubscribe()
   }, [])
-
-  async function fetchUserRole(userId: string) {
-    try {
-      const userData = await FirestoreManager.getById<UserDocument>(
-        'users',
-        userId,
-        (id, data): UserDocument => ({
-          id,
-          email: data.email,
-          role: data.role,
-          createdAt: data.createdAt,
-        })
-      )
-
-      if (userData?.role) {
-        setRole(userData.role)
-      } else {
-        setRole('member')
-      }
-    } catch (error) {
-      console.error('Error fetching user role:', error)
-      setRole('member')
-    }
-  }
 
   async function signIn(email: string, password: string) {
     try {
@@ -123,6 +157,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     role,
     loading,
+    roleError,
+    refreshRole,
     signIn,
     signUp,
     signOut,
