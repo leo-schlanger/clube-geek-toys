@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
 import { Loading } from '../components/ui/loading'
-import { Eye, EyeOff, Shield, AlertTriangle } from 'lucide-react'
+import { Eye, EyeOff, Shield, AlertTriangle, RefreshCw, UserX } from 'lucide-react'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -15,24 +15,56 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const { signIn } = useAuth()
+  const { signIn, role, roleError, userNotFound, refreshRole, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const [waitingForRole, setWaitingForRole] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setLoading(true)
+    setWaitingForRole(true)
 
     const { error } = await signIn(email, password)
 
     if (error) {
       setError('Credenciais inválidas')
       setLoading(false)
+      setWaitingForRole(false)
       return
     }
 
-    // AuthContext will handle role checking and redirect
-    navigate('/admin')
+    // Wait a bit for role to be fetched by AuthContext
+    // The useEffect below will handle the redirect once role is loaded
+    setLoading(false)
+  }
+
+  // Handle redirect after role is loaded
+  React.useEffect(() => {
+    if (!waitingForRole || authLoading) return
+
+    // If there's an error fetching role, stop waiting and show error
+    if (roleError || userNotFound) {
+      setWaitingForRole(false)
+      return
+    }
+
+    // Only redirect if role was actually loaded (not null)
+    if (role) {
+      setWaitingForRole(false)
+      navigate('/admin')
+    }
+
+    // If role is still null after loading completed (edge case), reset waiting state
+    // This prevents infinite waiting if something unexpected happens
+    if (role === null && !authLoading && !roleError && !userNotFound) {
+      setWaitingForRole(false)
+    }
+  }, [waitingForRole, authLoading, role, roleError, userNotFound, navigate])
+
+  async function handleRetry() {
+    setError('')
+    await refreshRole()
   }
 
   return (
@@ -55,6 +87,46 @@ export default function AdminLogin() {
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
                 {error}
+              </div>
+            )}
+
+            {userNotFound && (
+              <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-400 text-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <UserX className="h-4 w-4" />
+                  <span className="font-medium">Usuário não cadastrado</span>
+                </div>
+                <p className="text-xs opacity-80">
+                  Seu login existe mas você não está cadastrado como admin/vendedor no sistema.
+                  Contate o administrador para obter acesso.
+                </p>
+              </div>
+            )}
+
+            {roleError && !userNotFound && (
+              <div className="p-3 rounded-md bg-yellow-500/10 border border-yellow-500/50 text-yellow-400 text-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">Erro ao carregar permissões</span>
+                </div>
+                <p className="text-xs opacity-80 mb-2">{roleError}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRetry}
+                  disabled={authLoading}
+                  className="w-full"
+                >
+                  {authLoading ? (
+                    <Loading size="sm" />
+                  ) : (
+                    <>
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Tentar novamente
+                    </>
+                  )}
+                </Button>
               </div>
             )}
 

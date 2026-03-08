@@ -46,15 +46,26 @@ export function getAppMode(): AppMode {
 
 /**
  * Get the appropriate redirect path after login based on role and app mode
+ *
+ * Role System:
+ * - 'admin': Can access /admin on any subdomain
+ * - 'seller': Can access /pdv on any subdomain
+ * - 'member': Can only access /membro on member subdomain
+ *
+ * Note: admin/seller do NOT need membership (plan). member needs active subscription.
  */
 export function getLoginRedirectPath(role: string | null, appMode: AppMode): string {
+  // No role (error or user not found) - send to access denied
+  if (!role) {
+    return '/acesso-negado'
+  }
+
   if (appMode === 'admin') {
-    // On admin subdomain, always go to admin dashboard
+    // On admin subdomain
     if (role === 'admin') return '/admin'
     if (role === 'seller') return '/pdv'
-    // Members shouldn't be on admin subdomain, but redirect to admin anyway
-    // They'll see an access denied message
-    return '/admin'
+    // Members shouldn't be on admin subdomain - show access denied
+    return '/acesso-negado'
   }
 
   // On member subdomain

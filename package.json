@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "setup:firestore": "npx tsx scripts/setup-firestore.ts",
     "setup:admin": "npx tsx scripts/setup-admin.ts",
+    "setup:seller": "npx tsx scripts/setup-seller.ts",
     "deploy:firestore": "firebase deploy --only firestore",
     "emulators": "firebase emulators:start"
   },

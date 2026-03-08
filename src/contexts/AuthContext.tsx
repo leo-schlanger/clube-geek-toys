@@ -24,6 +24,7 @@ interface AuthContextType {
   role: UserRole | null
   loading: boolean
   roleError: string | null
+  userNotFound: boolean // User exists in Auth but not in Firestore users collection
   refreshRole: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
@@ -37,9 +38,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
   const [roleError, setRoleError] = useState<string | null>(null)
+  const [userNotFound, setUserNotFound] = useState(false)
 
   // Fetch role with retry logic
-  async function fetchUserRole(userId: string, retries = 3): Promise<UserRole> {
+  // Returns: UserRole if found, null if user document doesn't exist or error
+  async function fetchUserRole(userId: string, retries = 3): Promise<UserRole | null> {
+    setUserNotFound(false)
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const userData = await FirestoreManager.getById<UserDocument>(
@@ -53,15 +58,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
         )
 
-        if (userData?.role) {
+        // Document doesn't exist - user not registered in system
+        if (!userData) {
+          console.warn('[Auth] User document not found in Firestore')
+          setUserNotFound(true)
+          setRoleError('Usuário não cadastrado no sistema. Contate o administrador.')
+          return null
+        }
+
+        // Document exists with role
+        if (userData.role) {
           console.log(`[Auth] Role fetched successfully: ${userData.role}`)
           setRoleError(null)
+          setUserNotFound(false)
           return userData.role
         }
 
-        // Document exists but no role - default to member
+        // Document exists but no role - default to member (normal registration flow)
         console.warn('[Auth] User document found but no role set, defaulting to member')
         setRoleError(null)
+        setUserNotFound(false)
         return 'member'
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -71,22 +87,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Wait before retry (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
         } else {
-          // All retries failed
+          // All retries failed - connection error
           console.error('[Auth] All retries failed to fetch user role')
           setRoleError(`Erro ao carregar permissões: ${errorMessage}. Verifique sua conexão.`)
-          return 'member' // Safe default, but with error flag
+          return null // Don't default to member on error - show error instead
         }
       }
     }
-    return 'member'
+    return null
   }
 
   // Allow manual refresh of role (useful after network recovery)
   async function refreshRole() {
-    if (user) {
+    // Capture current user to avoid race conditions if user changes during fetch
+    const currentUser = user
+    if (currentUser) {
       setLoading(true)
-      const fetchedRole = await fetchUserRole(user.uid)
-      setRole(fetchedRole)
+      // Clear previous error states before retry
+      setRoleError(null)
+      setUserNotFound(false)
+
+      const fetchedRole = await fetchUserRole(currentUser.uid)
+
+      // Only update state if user hasn't changed during the fetch
+      if (user?.uid === currentUser.uid) {
+        setRole(fetchedRole)
+      }
       setLoading(false)
     }
   }
@@ -101,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setRole(null)
         setRoleError(null)
+        setUserNotFound(false)
       }
 
       setLoading(false)
@@ -151,6 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth)
     setUser(null)
     setRole(null)
+    setRoleError(null)
+    setUserNotFound(false)
   }
 
   const value = {
@@ -158,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     role,
     loading,
     roleError,
+    userNotFound,
     refreshRole,
     signIn,
     signUp,
