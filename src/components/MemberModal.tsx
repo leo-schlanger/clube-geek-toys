@@ -636,7 +636,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                             type="checkbox"
                             checked={isPromotion}
                             onChange={(e) => setIsPromotion(e.target.checked)}
-                            className="rounded border-gray-300"
+                            className="rounded border-border"
                           />
                           <span>Compra em promoção (sem pontos)</span>
                         </label>

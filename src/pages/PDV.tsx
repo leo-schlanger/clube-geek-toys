@@ -494,7 +494,7 @@ export default function PDV() {
                             type="checkbox"
                             checked={isPromotion}
                             onChange={(e) => setIsPromotion(e.target.checked)}
-                            className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                            className="w-5 h-5 rounded border-border text-primary focus:ring-primary"
                           />
                           <div className="flex items-center gap-2">
                             <Tag className="h-5 w-5 text-orange-500" />
