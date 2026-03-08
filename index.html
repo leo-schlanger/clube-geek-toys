@@ -19,13 +19,37 @@
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:url" content="https://club.geeketoys.com.br" />
 
+    <!-- DNS Prefetch for faster Firebase connection -->
+    <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
+    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+    <link rel="dns-prefetch" href="https://securetoken.googleapis.com" />
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+
     <!-- Fonts - Same as main project -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Inline loading state - shows immediately while JS loads -->
+      <div id="initial-loader" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0d0d0d;font-family:Inter,sans-serif;">
+        <div style="text-align:center;">
+          <img src="/logo.jpg" alt="Geek & Toys" style="height:64px;border-radius:8px;margin-bottom:16px;" />
+          <div style="color:#d4a520;font-size:14px;">Carregando...</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove loader when React mounts
+      window.addEventListener('DOMContentLoaded', function() {
+        var loader = document.getElementById('initial-loader');
+        if (loader) {
+          setTimeout(function() { loader.style.display = 'none'; }, 100);
+        }
+      });
+    </script>
   </body>
 </html>
