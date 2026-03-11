@@ -176,6 +176,25 @@ service cloud.firestore {
     }
 
     // ============================================
+    // COLLECTION: EMAIL_LOGS
+    // ============================================
+
+    match /email_logs/{logId} {
+      // Read: only admin
+      allow read: if isAdmin();
+
+      // Create: system only (via Cloud Functions/Workers - bypasses rules)
+      // Frontend cannot create email logs directly
+      allow create: if false;
+
+      // Update: never (immutable logs)
+      allow update: if false;
+
+      // Delete: never (audit trail)
+      allow delete: if false;
+    }
+
+    // ============================================
     // DEFAULT: DENY ALL
     // ============================================
 

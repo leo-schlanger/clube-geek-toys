@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge'
 import { LoadingPage, Loading } from '../components/ui/loading'
 import { RenewModal } from '../components/RenewModal'
 import { UpgradeModal } from '../components/UpgradeModal'
+import { ProfileEditModal } from '../components/ProfileEditModal'
 import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction } from '../types'
 import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
@@ -41,9 +42,10 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Edit,
 } from 'lucide-react'
 
-type ModalType = 'renew' | 'upgrade' | null
+type ModalType = 'renew' | 'upgrade' | 'profile' | null
 
 export default function MemberDashboard() {
   const { user, signOut } = useAuth()
@@ -224,7 +226,7 @@ export default function MemberDashboard() {
             <span className="text-lg font-heading font-bold text-foreground">Clube Geek & Toys</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={() => setModal('profile')} title="Editar Perfil">
               <Settings className="h-5 w-5" />
             </Button>
             <Button
@@ -560,10 +562,16 @@ export default function MemberDashboard() {
             {/* Personal data */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Meus Dados
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Meus Dados
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setModal('profile')}>
+                    <Edit className="h-4 w-4 mr-1" />
+                    Editar
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -648,6 +656,10 @@ export default function MemberDashboard() {
 
       {modal === 'upgrade' && (
         <UpgradeModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
+      )}
+
+      {modal === 'profile' && (
+        <ProfileEditModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
       )}
     </div>
   )

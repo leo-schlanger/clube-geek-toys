@@ -8,10 +8,27 @@ import { Badge } from '../components/ui/badge'
 import { LoadingPage } from '../components/ui/loading'
 import { MemberModal } from '../components/MemberModal'
 import { UserModal } from '../components/UserModal'
+import {
+  RevenueChart,
+  MembersChart,
+  PointsChart,
+  ChurnMetrics,
+  ReportFilters,
+} from '../components/reports'
 import { PLANS, type Member, type PlanType, type DashboardStats } from '../types'
 import { formatCurrency, formatCPF, getStatusLabel } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
 import { getRecentLogs, type AuditLog } from '../lib/logs'
+import {
+  getMonthlyReport,
+  getRevenueByPlan,
+  getChurnRate,
+  getPointsOverview,
+  type MonthlyReportData,
+  type PlanDistribution,
+  type ChurnData,
+  type PointsOverview,
+} from '../lib/reports'
 import { FirestoreManager } from '../lib/db-utils'
 import { toast } from 'sonner'
 import {
@@ -37,11 +54,12 @@ import {
   FileText,
   Clock,
   UserCog,
+  BarChart3,
 } from 'lucide-react'
 
 type ModalMode = 'create' | 'edit' | 'view' | 'role' | null
 type FilterStatus = 'all' | 'active' | 'pending' | 'inactive' | 'expired'
-type DashboardTab = 'members' | 'logs' | 'users' | 'points'
+type DashboardTab = 'members' | 'logs' | 'users' | 'points' | 'reports'
 
 // Action labels moved outside component to avoid recreation on each render
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
@@ -79,6 +97,14 @@ export default function AdminDashboard() {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [systemUsers, setSystemUsers] = useState<any[]>([])
 
+  // Report states
+  const [reportPeriod, setReportPeriod] = useState(6)
+  const [monthlyReportData, setMonthlyReportData] = useState<MonthlyReportData[]>([])
+  const [planDistribution, setPlanDistribution] = useState<PlanDistribution[]>([])
+  const [churnData, setChurnData] = useState<ChurnData[]>([])
+  const [pointsOverviewData, setPointsOverviewData] = useState<PointsOverview[]>([])
+  const [loadingReports, setLoadingReports] = useState(false)
+
   // Modal state
   const [modalMode, setModalMode] = useState<ModalMode>(null)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
@@ -98,6 +124,35 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Fetch reports when tab changes to reports or period changes
+  useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchReports()
+    }
+  }, [activeTab, reportPeriod])
+
+  const fetchReports = useCallback(async () => {
+    setLoadingReports(true)
+    try {
+      const [monthly, plans, churn, points] = await Promise.all([
+        getMonthlyReport(reportPeriod),
+        getRevenueByPlan(),
+        getChurnRate(reportPeriod),
+        getPointsOverview(Math.min(reportPeriod, 6)),
+      ])
+
+      setMonthlyReportData(monthly)
+      setPlanDistribution(plans)
+      setChurnData(churn)
+      setPointsOverviewData(points)
+    } catch (error) {
+      console.error('Error fetching reports:', error)
+      toast.error('Erro ao carregar relatórios')
+    } finally {
+      setLoadingReports(false)
+    }
+  }, [reportPeriod])
 
   // Memoized calculateStats function
   const calculateStats = useCallback((membersData: Member[]) => {
@@ -467,6 +522,14 @@ export default function AdminDashboard() {
             <Star className="h-4 w-4 mr-2" />
             Relatório de Pontos
           </Button>
+          <Button
+            variant={activeTab === 'reports' ? 'default' : 'outline'}
+            onClick={() => setActiveTab('reports')}
+            className="flex-1 sm:flex-none"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Relatórios
+          </Button>
         </div>
 
         {/* Members Table */}
@@ -824,6 +887,32 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
+        ) : activeTab === 'reports' ? (
+          /* Reports View */
+          <div className="space-y-6">
+            <ReportFilters
+              selectedPeriod={reportPeriod}
+              onPeriodChange={setReportPeriod}
+              onRefresh={fetchReports}
+              refreshing={loadingReports}
+            />
+
+            {/* Revenue Chart */}
+            <RevenueChart data={monthlyReportData} loading={loadingReports} />
+
+            {/* Members Charts */}
+            <MembersChart
+              data={monthlyReportData}
+              planDistribution={planDistribution}
+              loading={loadingReports}
+            />
+
+            {/* Points and Churn */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              <PointsChart data={pointsOverviewData} loading={loadingReports} />
+              <ChurnMetrics data={churnData} loading={loadingReports} />
+            </div>
+          </div>
         ) : (
           /* Points Report View */
           <Card>
