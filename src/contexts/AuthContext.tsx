@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -40,9 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Fetch role with retry logic
+  // Memoized fetch role function with retry logic
   // Returns: UserRole if found, null if user document doesn't exist or error
-  async function fetchUserRole(userId: string, retries = 3): Promise<UserRole | null> {
+  const fetchUserRole = useCallback(async (userId: string, retries = 3): Promise<UserRole | null> => {
     setUserNotFound(false)
 
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -95,10 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     return null
-  }
+  }, [])
 
-  // Allow manual refresh of role (useful after network recovery)
-  async function refreshRole() {
+  // Memoized refresh role function (useful after network recovery)
+  const refreshRole = useCallback(async () => {
     // Capture current user to avoid race conditions if user changes during fetch
     const currentUser = user
     if (currentUser) {
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false)
     }
-  }
+  }, [user, fetchUserRole])
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -136,16 +136,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [])
 
-  async function signIn(email: string, password: string) {
+  const signIn = useCallback(async (email: string, password: string) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       return { user: userCredential.user, error: null }
     } catch (error) {
       return { user: null, error: error as Error }
     }
-  }
+  }, [])
 
-  async function signUp(email: string, password: string) {
+  const signUp = useCallback(async (email: string, password: string) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
 
@@ -172,17 +172,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       return { user: null, error: error as Error }
     }
-  }
+  }, [])
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     await firebaseSignOut(auth)
     setUser(null)
     setRole(null)
     setRoleError(null)
     setUserNotFound(false)
-  }
+  }, [])
 
-  const value = {
+  // Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(() => ({
     user,
     role,
     loading,
@@ -192,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signUp,
     signOut,
-  }
+  }), [user, role, loading, roleError, userNotFound, refreshRole, signIn, signUp, signOut])
 
   return (
     <AuthContext.Provider value={value}>

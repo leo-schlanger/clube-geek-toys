@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { orderBy } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
@@ -43,6 +43,23 @@ type ModalMode = 'create' | 'edit' | 'view' | 'role' | null
 type FilterStatus = 'all' | 'active' | 'pending' | 'inactive' | 'expired'
 type DashboardTab = 'members' | 'logs' | 'users' | 'points'
 
+// Action labels moved outside component to avoid recreation on each render
+const ACTION_LABELS: Record<string, { label: string; color: string }> = {
+  member_activated: { label: 'Membro Ativado', color: 'text-green-500' },
+  member_created: { label: 'Membro Cadastrado', color: 'text-blue-500' },
+  member_updated: { label: 'Membro Atualizado', color: 'text-yellow-500' },
+  member_deactivated: { label: 'Membro Desativado', color: 'text-red-500' },
+  payment_created: { label: 'Pagamento Registrado', color: 'text-blue-500' },
+  payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-500' },
+  payment_failed: { label: 'Pagamento Falhou', color: 'text-red-500' },
+  points_added: { label: 'Pontos Adicionados', color: 'text-purple-500' },
+  role_updated: { label: 'Cargo Atualizado', color: 'text-orange-500' },
+}
+
+function getActionLabel(action: string): { label: string; color: string } {
+  return ACTION_LABELS[action] ?? { label: action.replace(/_/g, ' '), color: 'text-muted-foreground' }
+}
+
 export default function AdminDashboard() {
   const { signOut } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -82,7 +99,36 @@ export default function AdminDashboard() {
     fetchData()
   }, [])
 
-  async function fetchData(showRefreshing = false) {
+  // Memoized calculateStats function
+  const calculateStats = useCallback((membersData: Member[]) => {
+    const activeMembers = membersData.filter((m) => m.status === 'active')
+    const pendingMembers = membersData.filter((m) => m.status === 'pending')
+
+    let monthlyRevenue = 0
+    activeMembers.forEach((m) => {
+      const plan = PLANS[m.plan as PlanType]
+      if (m.paymentType === 'monthly') {
+        monthlyRevenue += plan.priceMonthly
+      } else {
+        monthlyRevenue += plan.priceAnnual / 12
+      }
+    })
+
+    setStats({
+      totalMembers: membersData.length,
+      activeMembers: activeMembers.length,
+      pendingPayments: pendingMembers.length,
+      monthlyRevenue,
+      membersByPlan: {
+        silver: membersData.filter((m) => m.plan === 'silver').length,
+        gold: membersData.filter((m) => m.plan === 'gold').length,
+        black: membersData.filter((m) => m.plan === 'black').length,
+      },
+    })
+  }, [])
+
+  // Memoized fetchData function
+  const fetchData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) {
       setRefreshing(true)
     } else {
@@ -119,9 +165,10 @@ export default function AdminDashboard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }
+  }, [calculateStats])
 
-  async function handleUpdateRole(userId: string, newRole: string) {
+  // Memoized handleUpdateRole function
+  const handleUpdateRole = useCallback(async (userId: string, newRole: string) => {
     try {
       await FirestoreManager.update('users', userId, { role: newRole })
       toast.success('Cargo atualizado com sucesso')
@@ -130,110 +177,76 @@ export default function AdminDashboard() {
       console.error('Error updating role:', error)
       toast.error('Erro ao atualizar cargo')
     }
-  }
+  }, [fetchData])
 
-  function calculateStats(membersData: Member[]) {
-    const activeMembers = membersData.filter((m) => m.status === 'active')
-    const pendingMembers = membersData.filter((m) => m.status === 'pending')
+  // Memoized filtered members - only recalculates when dependencies change
+  const filteredMembers = useMemo(() => {
+    return members.filter((m) => {
+      const matchesSearch =
+        m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.cpf.includes(searchTerm.replace(/\D/g, '')) ||
+        m.email.toLowerCase().includes(searchTerm.toLowerCase())
 
-    let monthlyRevenue = 0
-    activeMembers.forEach((m) => {
-      const plan = PLANS[m.plan as PlanType]
-      if (m.paymentType === 'monthly') {
-        monthlyRevenue += plan.priceMonthly
-      } else {
-        monthlyRevenue += plan.priceAnnual / 12
-      }
+      const matchesStatus = filterStatus === 'all' || m.status === filterStatus
+      const matchesPlan = filterPlan === 'all' || m.plan === filterPlan
+
+      return matchesSearch && matchesStatus && matchesPlan
     })
+  }, [members, searchTerm, filterStatus, filterPlan])
 
-    setStats({
-      totalMembers: membersData.length,
-      activeMembers: activeMembers.length,
-      pendingPayments: pendingMembers.length,
-      monthlyRevenue,
-      membersByPlan: {
-        silver: membersData.filter((m) => m.plan === 'silver').length,
-        gold: membersData.filter((m) => m.plan === 'gold').length,
-        black: membersData.filter((m) => m.plan === 'black').length,
-      },
-    })
-  }
-
-  const filteredMembers = members.filter((m) => {
-    const matchesSearch =
-      m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.cpf.includes(searchTerm.replace(/\D/g, '')) ||
-      m.email.toLowerCase().includes(searchTerm.toLowerCase())
-
-    const matchesStatus = filterStatus === 'all' || m.status === filterStatus
-    const matchesPlan = filterPlan === 'all' || m.plan === filterPlan
-
-    return matchesSearch && matchesStatus && matchesPlan
-  })
-
-  // Pagination derived values
-  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE))
-  const paginatedMembers = filteredMembers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  // Memoized pagination derived values
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers.length])
+  const paginatedMembers = useMemo(() => filteredMembers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filteredMembers, currentPage])
 
   // Reset to page 1 whenever filters change
-  function applyFilter() { setCurrentPage(1) }
+  const applyFilter = useCallback(() => setCurrentPage(1), [])
 
-  // Filtered logs
-  const filteredLogs = logs.filter((log) => {
-    if (!logDateFrom && !logDateTo) return true
-    const ts = new Date(log.timestamp)
-    if (logDateFrom && ts < new Date(logDateFrom)) return false
-    if (logDateTo) {
-      const to = new Date(logDateTo)
-      to.setHours(23, 59, 59, 999)
-      if (ts > to) return false
-    }
-    return true
-  })
+  // Memoized filtered logs
+  const filteredLogs = useMemo(() => {
+    return logs.filter((log) => {
+      if (!logDateFrom && !logDateTo) return true
+      const ts = new Date(log.timestamp)
+      if (logDateFrom && ts < new Date(logDateFrom)) return false
+      if (logDateTo) {
+        const to = new Date(logDateTo)
+        to.setHours(23, 59, 59, 999)
+        if (ts > to) return false
+      }
+      return true
+    })
+  }, [logs, logDateFrom, logDateTo])
 
-  // Points summary per member
-  const pointsReport = [...members]
-    .filter((m) => m.points > 0)
-    .sort((a, b) => b.points - a.points)
+  // Memoized points summary per member
+  const pointsReport = useMemo(() => {
+    return [...members]
+      .filter((m) => m.points > 0)
+      .sort((a, b) => b.points - a.points)
+  }, [members])
 
-  const planIcons = {
+  // Memoized plan icons to avoid re-creating JSX on every render
+  const planIcons = useMemo(() => ({
     silver: <Star className="h-4 w-4" />,
     gold: <Crown className="h-4 w-4" />,
     black: <Sparkles className="h-4 w-4" />,
-  }
+  }), [])
 
-  function getActionLabel(action: string): { label: string; color: string } {
-    const actions: Record<string, { label: string; color: string }> = {
-      member_activated: { label: 'Membro Ativado', color: 'text-green-500' },
-      member_created: { label: 'Membro Cadastrado', color: 'text-blue-500' },
-      member_updated: { label: 'Membro Atualizado', color: 'text-yellow-500' },
-      member_deactivated: { label: 'Membro Desativado', color: 'text-red-500' },
-      payment_created: { label: 'Pagamento Registrado', color: 'text-blue-500' },
-      payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-500' },
-      payment_failed: { label: 'Pagamento Falhou', color: 'text-red-500' },
-      points_added: { label: 'Pontos Adicionados', color: 'text-purple-500' },
-      role_updated: { label: 'Cargo Atualizado', color: 'text-orange-500' },
-    }
-    return actions[action] ?? { label: action.replace(/_/g, ' '), color: 'text-muted-foreground' }
-  }
-
-  function openModal(mode: ModalMode, member?: Member) {
+  const openModal = useCallback((mode: ModalMode, member?: Member) => {
     setModalMode(mode)
     setSelectedMember(member || null)
     setOpenDropdown(null)
-  }
+  }, [])
 
-  function closeModal() {
+  const closeModal = useCallback(() => {
     setModalMode(null)
     setSelectedMember(null)
-  }
+  }, [])
 
-  function handleModalSuccess() {
+  const handleModalSuccess = useCallback(() => {
     closeModal()
     fetchData(true)
-  }
+  }, [closeModal, fetchData])
 
-  async function handleDeleteMember(member: Member) {
+  const handleDeleteMember = useCallback(async (member: Member) => {
     if (!confirm(`Tem certeza que deseja desativar o membro ${member.fullName}?`)) {
       return
     }
@@ -248,9 +261,9 @@ export default function AdminDashboard() {
     }
 
     setOpenDropdown(null)
-  }
+  }, [fetchData])
 
-  async function handleQuickActivate(member: Member) {
+  const handleQuickActivate = useCallback(async (member: Member) => {
     try {
       await updateMember(member.id, { status: 'active' })
       toast.success('Membro ativado com sucesso')
@@ -259,9 +272,9 @@ export default function AdminDashboard() {
       console.error('Error activating member:', error)
       toast.error('Erro ao ativar membro')
     }
-  }
+  }, [fetchData])
 
-  function exportCSV() {
+  const exportCSV = useCallback(() => {
     const headers = ['Nome', 'Email', 'CPF', 'Telefone', 'Plano', 'Status', 'Validade', 'Pontos']
     const rows = filteredMembers.map((m) => [
       m.fullName,
@@ -284,7 +297,7 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url)
 
     toast.success('Exportação concluída')
-  }
+  }, [filteredMembers])
 
   if (loading) {
     return <LoadingPage />

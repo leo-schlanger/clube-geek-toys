@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LoadingPage } from './components/ui/loading'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { getAppMode, getLoginRedirectPath } from './lib/subdomain'
 
 // Lazy loaded pages - Member Area
@@ -346,16 +347,18 @@ function AppRoutes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthProvider>
-          <Suspense fallback={<LoadingPage />}>
-            <AppRoutes />
-          </Suspense>
-          <Toaster position="top-right" richColors />
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <Suspense fallback={<LoadingPage />}>
+              <AppRoutes />
+            </Suspense>
+            <Toaster position="top-right" richColors />
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ErrorBoundary>
   )
 }
 
