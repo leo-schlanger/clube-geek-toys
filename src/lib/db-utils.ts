@@ -43,7 +43,8 @@ export class FirestoreManager {
             if (error?.code === 'permission-denied') {
                 console.error(`[Firestore] PERMISSION DENIED - Check Firestore rules for collection: ${collectionName}`)
             }
-            return null
+            // Re-throw the error so callers can distinguish between "not found" and "error"
+            throw error
         }
     }
 

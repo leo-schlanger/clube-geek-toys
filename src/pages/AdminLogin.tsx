@@ -25,40 +25,54 @@ export default function AdminLogin() {
     setLoading(true)
     setWaitingForRole(true)
 
+    console.log('[AdminLogin] Starting sign in...')
     const { error } = await signIn(email, password)
 
     if (error) {
+      console.log('[AdminLogin] Sign in error:', error)
       setError('Credenciais inválidas')
       setLoading(false)
       setWaitingForRole(false)
       return
     }
 
-    // Wait a bit for role to be fetched by AuthContext
-    // The useEffect below will handle the redirect once role is loaded
-    setLoading(false)
+    console.log('[AdminLogin] Sign in successful, waiting for role...')
+    // Keep loading=true until role is fetched
+    // The useEffect below will handle setting loading=false
   }
 
   // Handle redirect after role is loaded
   React.useEffect(() => {
-    if (!waitingForRole || authLoading) return
+    if (!waitingForRole) return
+
+    console.log('[AdminLogin] useEffect - authLoading:', authLoading, 'role:', role, 'roleError:', roleError, 'userNotFound:', userNotFound)
+
+    // Still loading auth state
+    if (authLoading) return
 
     // If there's an error fetching role, stop waiting and show error
     if (roleError || userNotFound) {
+      console.log('[AdminLogin] Error or user not found, stopping')
       setWaitingForRole(false)
+      setLoading(false)
       return
     }
 
     // Only redirect if role was actually loaded (not null)
     if (role) {
+      console.log('[AdminLogin] Role loaded:', role, '- redirecting...')
       setWaitingForRole(false)
+      setLoading(false)
       navigate('/admin')
+      return
     }
 
     // If role is still null after loading completed (edge case), reset waiting state
     // This prevents infinite waiting if something unexpected happens
     if (role === null && !authLoading && !roleError && !userNotFound) {
+      console.log('[AdminLogin] Role is null with no error - edge case, resetting')
       setWaitingForRole(false)
+      setLoading(false)
     }
   }, [waitingForRole, authLoading, role, roleError, userNotFound, navigate])
 
