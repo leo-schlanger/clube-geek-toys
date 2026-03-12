@@ -49,8 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null
       }
 
-      const data = userSnap.data()
-      return (data.role as UserRole) || 'member'
+      const data = userSnap.data() as { role?: UserRole } | undefined
+      return data?.role || 'member'
     } catch (error: any) {
       console.error('[Auth] Erro ao buscar role:', error)
       setRoleError(error.message || 'Erro ao carregar permissões')
