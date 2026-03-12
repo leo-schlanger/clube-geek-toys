@@ -6,25 +6,16 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
-import { FirestoreManager } from '../lib/db-utils'
 import type { UserRole } from '../types'
-
-// Type for user document from Firestore
-interface UserDocument {
-  id: string
-  email?: string
-  role?: UserRole
-  createdAt?: string
-}
 
 interface AuthContextType {
   user: User | null
   role: UserRole | null
   loading: boolean
   roleError: string | null
-  userNotFound: boolean // User exists in Auth but not in Firestore users collection
+  userNotFound: boolean
   refreshRole: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ user: User | null; error: Error | null }>
@@ -40,173 +31,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Memoized fetch role function with retry logic
-  // Returns: UserRole if found, null if user document doesn't exist or error
-  const fetchUserRole = useCallback(async (userId: string, retries = 3): Promise<UserRole | null> => {
-    console.log('[Auth] fetchUserRole called for userId:', userId)
-    console.log('[Auth] auth.currentUser at fetchUserRole:', auth.currentUser?.uid)
+  // Fetch user role from Firestore
+  const fetchUserRole = useCallback(async (userId: string): Promise<UserRole | null> => {
+    console.log('[Auth] Fetching role for user:', userId)
+
     setUserNotFound(false)
+    setRoleError(null)
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      console.log(`[Auth] Attempt ${attempt}/${retries} to fetch user role`)
-      try {
-        const userData = await FirestoreManager.getById<UserDocument>(
-          'users',
-          userId,
-          (id, data): UserDocument => ({
-            id,
-            email: data.email,
-            role: data.role,
-            createdAt: data.createdAt,
-          })
-        )
-        console.log('[Auth] FirestoreManager.getById returned:', userData)
+    try {
+      const userRef = doc(db, 'users', userId)
+      const userSnap = await getDoc(userRef)
 
-        // Document doesn't exist - user not registered in system
-        if (!userData) {
-          console.warn('[Auth] User document not found in Firestore')
-          setUserNotFound(true)
-          setRoleError('Usuário não cadastrado no sistema. Contate o administrador.')
-          return null
-        }
-
-        // Document exists with role
-        if (userData.role) {
-          console.log(`[Auth] Role fetched successfully: ${userData.role}`)
-          setRoleError(null)
-          setUserNotFound(false)
-          return userData.role
-        }
-
-        // Document exists but no role - default to member (normal registration flow)
-        console.warn('[Auth] User document found but no role set, defaulting to member')
-        setRoleError(null)
-        setUserNotFound(false)
-        return 'member'
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        console.warn(`[Auth] Attempt ${attempt}/${retries} failed to fetch role: ${errorMessage}`)
-
-        if (attempt < retries) {
-          // Wait before retry (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-        } else {
-          // All retries failed - connection error
-          console.error('[Auth] All retries failed to fetch user role')
-          setRoleError(`Erro ao carregar permissões: ${errorMessage}. Verifique sua conexão.`)
-          return null // Don't default to member on error - show error instead
-        }
+      if (!userSnap.exists()) {
+        console.log('[Auth] User document not found')
+        setUserNotFound(true)
+        setRoleError('Usuário não cadastrado no sistema.')
+        return null
       }
+
+      const userData = userSnap.data()
+      console.log('[Auth] User data:', userData)
+
+      if (userData.role) {
+        console.log('[Auth] Role found:', userData.role)
+        return userData.role as UserRole
+      }
+
+      // No role set, default to member
+      console.log('[Auth] No role set, defaulting to member')
+      return 'member'
+    } catch (error: any) {
+      console.error('[Auth] Error fetching role:', error)
+      setRoleError(`Erro ao carregar permissões: ${error.message || 'Erro desconhecido'}`)
+      return null
     }
-    return null
   }, [])
 
-  // Memoized refresh role function (useful after network recovery)
-  const refreshRole = useCallback(async () => {
-    // Capture current user to avoid race conditions if user changes during fetch
-    const currentUser = user
-    if (currentUser) {
-      setLoading(true)
-      // Clear previous error states before retry
-      setRoleError(null)
-      setUserNotFound(false)
+  // Listen to auth state changes
+  useEffect(() => {
+    console.log('[Auth] Setting up auth listener')
 
-      const fetchedRole = await fetchUserRole(currentUser.uid)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('[Auth] Auth state changed:', firebaseUser?.uid || 'null')
 
-      // Only update state if user hasn't changed during the fetch
-      if (user?.uid === currentUser.uid) {
-        setRole(fetchedRole)
+      setUser(firebaseUser)
+
+      if (firebaseUser) {
+        const userRole = await fetchUserRole(firebaseUser.uid)
+        setRole(userRole)
+      } else {
+        setRole(null)
+        setRoleError(null)
+        setUserNotFound(false)
       }
+
+      setLoading(false)
+    })
+
+    return () => {
+      console.log('[Auth] Cleaning up auth listener')
+      unsubscribe()
+    }
+  }, [fetchUserRole])
+
+  // Refresh role manually
+  const refreshRole = useCallback(async () => {
+    if (user) {
+      setLoading(true)
+      const userRole = await fetchUserRole(user.uid)
+      setRole(userRole)
       setLoading(false)
     }
   }, [user, fetchUserRole])
 
-  useEffect(() => {
-    console.log('[Auth] Setting up auth state listener...')
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('[Auth] Auth state changed:', firebaseUser ? `User: ${firebaseUser.uid}` : 'No user')
-
-      try {
-        setUser(firebaseUser)
-
-        if (firebaseUser) {
-          // Ensure auth token is available for Firestore
-          try {
-            const token = await firebaseUser.getIdToken(true) // Force refresh token
-            console.log('[Auth] Token refreshed, length:', token.length)
-          } catch (tokenError) {
-            console.error('[Auth] Failed to refresh token:', tokenError)
-            // Continue anyway - the token might still work
-          }
-
-          console.log('[Auth] Fetching user role for:', firebaseUser.uid)
-          const fetchedRole = await fetchUserRole(firebaseUser.uid)
-          console.log('[Auth] Role result:', fetchedRole)
-          setRole(fetchedRole)
-        } else {
-          setRole(null)
-          setRoleError(null)
-          setUserNotFound(false)
-        }
-      } catch (error) {
-        console.error('[Auth] Error in auth state handler:', error)
-        setRoleError('Erro inesperado ao carregar autenticação')
-        setRole(null)
-      } finally {
-        // ALWAYS set loading to false
-        setLoading(false)
-      }
-    })
-
-    return () => unsubscribe()
-  }, [])
-
+  // Sign in
   const signIn = useCallback(async (email: string, password: string) => {
+    console.log('[Auth] Signing in:', email)
     try {
-      console.log('[Auth] Starting sign in for:', email)
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      console.log('[Auth] Sign in successful, user:', userCredential.user.uid)
-      // Force token refresh to ensure Firestore has auth context
-      await userCredential.user.getIdToken(true)
-      console.log('[Auth] Token refreshed after sign in')
-      return { user: userCredential.user, error: null }
+      const result = await signInWithEmailAndPassword(auth, email, password)
+      console.log('[Auth] Sign in successful')
+      return { user: result.user, error: null }
     } catch (error) {
       console.error('[Auth] Sign in error:', error)
       return { user: null, error: error as Error }
     }
   }, [])
 
+  // Sign up
   const signUp = useCallback(async (email: string, password: string) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const result = await createUserWithEmailAndPassword(auth, email, password)
 
-      // Try to create user document in Firestore with a timeout
-      // but don't block the auth process if it fails
+      // Create user document
       try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Firestore timeout')), 3000)
-        )
-
-        const setDocPromise = setDoc(doc(db, 'users', userCredential.user.uid), {
-          email: userCredential.user.email,
+        await setDoc(doc(db, 'users', result.user.uid), {
+          email: result.user.email,
           role: 'member',
           createdAt: new Date().toISOString(),
         })
-
-        await Promise.race([setDocPromise, timeoutPromise])
-      } catch (firestoreError) {
-        console.error('Non-critical: Error creating Firestore user doc:', firestoreError)
-        // We continue because the Auth account was created successfully
+      } catch (e) {
+        console.error('[Auth] Error creating user doc:', e)
       }
 
-      return { user: userCredential.user, error: null }
+      return { user: result.user, error: null }
     } catch (error) {
       return { user: null, error: error as Error }
     }
   }, [])
 
+  // Sign out
   const signOut = useCallback(async () => {
+    console.log('[Auth] Signing out')
     await firebaseSignOut(auth)
     setUser(null)
     setRole(null)
@@ -214,7 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserNotFound(false)
   }, [])
 
-  // Memoize context value to prevent unnecessary re-renders
   const value = useMemo(() => ({
     user,
     role,
