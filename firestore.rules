@@ -54,10 +54,19 @@ service cloud.firestore {
       // Read: own user or admin
       allow read: if isOwner(userId) || isAdmin();
 
-      // Create: only during registration (user can only create their own doc with member role)
-      allow create: if isOwner(userId) &&
-        request.resource.data.role == 'member' &&
-        request.resource.data.keys().hasAll(['email', 'role', 'createdAt']);
+      // Create:
+      // - User can only create their own doc with 'member' role (registration)
+      // - Admin can create any user with any role (admin panel)
+      allow create: if
+        // Self-registration: must be own document with member role
+        (isOwner(userId) &&
+         request.resource.data.role == 'member' &&
+         request.resource.data.keys().hasAll(['email', 'role', 'createdAt']))
+        ||
+        // Admin creation: admin can create any user document with any role
+        (isAdmin() &&
+         request.resource.data.role in ['admin', 'seller', 'member'] &&
+         request.resource.data.keys().hasAll(['email', 'role', 'createdAt']));
 
       // Update: admin can change anything, user can update own profile but NOT role
       allow update: if isAdmin() ||

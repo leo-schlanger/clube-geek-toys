@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { initializeApp, deleteApp } from 'firebase/app'
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
-import { auth, db } from '../lib/firebase'
+import { app, db } from '../lib/firebase'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -87,21 +88,34 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
   async function onSubmit(data: UserFormData) {
     setLoading(true)
 
+    // Create a secondary Firebase app to avoid signing out the current admin
+    // createUserWithEmailAndPassword automatically signs in the new user,
+    // so we use a separate auth instance
+    let secondaryApp = null
+
     try {
-      // Create user in Firebase Auth
+      // Initialize secondary app with same config
+      secondaryApp = initializeApp(app.options, 'SecondaryApp')
+      const secondaryAuth = getAuth(secondaryApp)
+
+      // Create user in Firebase Auth using secondary auth (won't affect main session)
       const userCredential = await createUserWithEmailAndPassword(
-        auth,
+        secondaryAuth,
         data.email,
         data.password
       )
 
       // Create user document in Firestore with role
+      // This uses the main db instance with the admin's auth context
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         email: data.email,
         role: data.role,
         createdAt: new Date().toISOString(),
         createdBy: 'admin',
       })
+
+      // Sign out from secondary auth and clean up
+      await secondaryAuth.signOut()
 
       toast.success(`Usuário ${data.role} criado com sucesso!`)
       onSuccess()
@@ -116,6 +130,11 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
         toast.error('Senha muito fraca')
       } else {
         toast.error('Erro ao criar usuário: ' + error.message)
+      }
+    } finally {
+      // Always clean up the secondary app
+      if (secondaryApp) {
+        await deleteApp(secondaryApp)
       }
     }
 
