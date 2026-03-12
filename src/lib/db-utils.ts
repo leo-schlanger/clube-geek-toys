@@ -3,13 +3,17 @@ import {
     doc,
     getDoc,
     getDocs,
+    getCountFromServer,
     setDoc,
     updateDoc,
     query,
+    limit,
+    startAfter,
     type DocumentData,
     type QueryConstraint,
     type UpdateData,
-    type WithFieldValue
+    type WithFieldValue,
+    type DocumentSnapshot
 } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -81,6 +85,56 @@ export class FirestoreManager {
             const err = error as FirestoreError
             console.error(`[Firestore] Query error in ${collectionName}:`, err?.message)
             return []
+        }
+    }
+
+    /**
+     * Query documents with pagination
+     */
+    static async findManyPaginated<T>(
+        collectionName: string,
+        constraints: QueryConstraint[],
+        mapper: (id: string, data: DocumentData) => T,
+        pageSize: number,
+        lastDoc?: DocumentSnapshot
+    ): Promise<{ data: T[]; lastDoc: DocumentSnapshot | null; hasMore: boolean }> {
+        try {
+            const paginatedConstraints = [...constraints, limit(pageSize + 1)]
+            if (lastDoc) {
+                paginatedConstraints.push(startAfter(lastDoc))
+            }
+
+            const q = query(collection(db, collectionName), ...paginatedConstraints)
+            const snapshot = await getDocs(q)
+
+            const hasMore = snapshot.docs.length > pageSize
+            const docs = hasMore ? snapshot.docs.slice(0, pageSize) : snapshot.docs
+            const data = docs.map(d => mapper(d.id, d.data()))
+            const newLastDoc = docs.length > 0 ? docs[docs.length - 1] : null
+
+            return { data, lastDoc: newLastDoc, hasMore }
+        } catch (error: unknown) {
+            const err = error as FirestoreError
+            console.error(`[Firestore] Paginated query error in ${collectionName}:`, err?.message)
+            return { data: [], lastDoc: null, hasMore: false }
+        }
+    }
+
+    /**
+     * Get total count of documents matching query
+     */
+    static async getCount(
+        collectionName: string,
+        constraints: QueryConstraint[]
+    ): Promise<number> {
+        try {
+            const q = query(collection(db, collectionName), ...constraints)
+            const snapshot = await getCountFromServer(q)
+            return snapshot.data().count
+        } catch (error: unknown) {
+            const err = error as FirestoreError
+            console.error(`[Firestore] Count error in ${collectionName}:`, err?.message)
+            return 0
         }
     }
 

@@ -21,15 +21,16 @@
 ## 🟠 ALTO
 
 ### Performance
-- [ ] **Code-split AdminDashboard** (494kb)
-  - Separar abas em componentes lazy
-  - Usar React.lazy() para MembersChart, RevenueChart, etc.
-  - Meta: < 200kb por chunk
+- [x] **Code-split AdminDashboard** ~~(494kb)~~ → 37kb ✅
+  - Separar abas em componentes lazy (MembersTab, UsersTab, LogsTab, ReportsTab, PointsTab)
+  - Charts em vendor-charts separado (421kb, lazy loaded)
+  - Redução de 92% no bundle principal
 
-- [ ] **Implementar paginação no Firestore**
-  - `getAllMembers()` carrega tudo em memória
-  - Usar `limit()` e `startAfter()` para cursor pagination
-  - Adicionar infinite scroll ou pagination component
+- [x] **Implementar paginação no Firestore** ✅
+  - Adicionado `getMembersPaginated()` com cursor pagination
+  - Adicionado `getMembersCount()` para contagem total
+  - `FirestoreManager.findManyPaginated()` disponível para outras collections
+  - DataTable já tem paginação client-side integrada
 
 - [ ] **Virtual scrolling para tabelas grandes**
   - Usar `@tanstack/react-virtual` para MembersTable
@@ -40,10 +41,11 @@
   - Monitorar Core Web Vitals
   - Tracking de erros em produção
 
-- [ ] **Implementar error tracking**
-  - Integrar Sentry ou LogRocket
-  - Substituir console.error por error service
-  - Capturar erros de usuário em produção
+- [x] **Implementar error tracking** ✅ (parcial)
+  - Criado `ErrorTracker` service em `src/lib/error-tracking.ts`
+  - Preparado para integração com Sentry
+  - Helper `withErrorTracking()` para operações async
+  - Pendente: instalar @sentry/react e configurar DSN
 
 ### Código
 - [ ] **Criar custom hooks**
@@ -212,7 +214,7 @@
 ## Cronograma Sugerido
 
 ### Sprint 1 (Semana 1-2)
-- [ ] Code-split AdminDashboard
+- [x] Code-split AdminDashboard ✅
 - [ ] Paginação no Firestore
 - [ ] Rate limiting no login
 
@@ -241,7 +243,8 @@
 | LCP (Largest Contentful Paint) | ? | < 2.5s |
 | FID (First Input Delay) | ? | < 100ms |
 | CLS (Cumulative Layout Shift) | ? | < 0.1 |
-| Bundle size (main) | ~500kb | < 200kb |
+| Bundle size (AdminDashboard) | 37kb ✅ | < 200kb |
+| Bundle size (vendor-charts) | 421kb | lazy loaded |
 | Time to Interactive | ? | < 3s |
 
 ### Qualidade
@@ -271,7 +274,7 @@
 
 ### Débitos Técnicos Conhecidos
 1. MapperUtils usa `any` (necessário para flexibilidade)
-2. AdminDashboard muito grande (precisa split)
+2. ~~AdminDashboard muito grande~~ ✅ Resolvido com code-splitting
 3. Sem paginação (não escala para milhares de membros)
 4. Console.error ainda em produção (Terser remove console.log apenas)
 

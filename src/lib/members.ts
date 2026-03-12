@@ -1,6 +1,13 @@
-import { where, orderBy, type DocumentData } from 'firebase/firestore'
+import { where, orderBy, type DocumentData, type DocumentSnapshot } from 'firebase/firestore'
 import { FirestoreManager, MapperUtils } from './db-utils'
 import type { Member, MemberFormData, PlanType } from '../types'
+
+export interface PaginatedResult<T> {
+  data: T[]
+  lastDoc: DocumentSnapshot | null
+  hasMore: boolean
+  totalCount?: number
+}
 
 const MEMBERS_COLLECTION = 'members'
 
@@ -68,7 +75,7 @@ export async function getMemberById(id: string): Promise<Member | null> {
 }
 
 /**
- * Get all members
+ * Get all members (no pagination - use for small datasets or reports)
  */
 export async function getAllMembers(): Promise<Member[]> {
   return FirestoreManager.findMany(
@@ -76,6 +83,30 @@ export async function getAllMembers(): Promise<Member[]> {
     [orderBy('created_at', 'desc')],
     toMember
   )
+}
+
+/**
+ * Get members with pagination
+ */
+export async function getMembersPaginated(
+  pageSize: number = 20,
+  lastDoc?: DocumentSnapshot
+): Promise<PaginatedResult<Member>> {
+  const result = await FirestoreManager.findManyPaginated(
+    MEMBERS_COLLECTION,
+    [orderBy('created_at', 'desc')],
+    toMember,
+    pageSize,
+    lastDoc
+  )
+  return result
+}
+
+/**
+ * Get total count of members
+ */
+export async function getMembersCount(): Promise<number> {
+  return FirestoreManager.getCount(MEMBERS_COLLECTION, [])
 }
 
 /**

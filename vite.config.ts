@@ -54,6 +54,10 @@ export default defineConfig({
             if (id.includes('@tanstack')) {
               return 'vendor-query'
             }
+            // Charts - lazy loaded with reports
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts'
+            }
           }
         },
       },

@@ -41,3 +41,7 @@ export function LoadingOverlay() {
     </div>
   )
 }
+
+export function LoadingSpinner() {
+  return <Loading size="md" />
+}

@@ -108,17 +108,29 @@ clube-geek-toys/
 │   │   │   ├── loading.tsx
 │   │   │   └── pagination.tsx
 │   │   │
+│   │   ├── admin/              # Componentes do AdminDashboard (lazy loaded)
+│   │   │   ├── index.ts        # Barrel exports
+│   │   │   ├── MembersTab.tsx  # Aba de membros
+│   │   │   ├── UsersTab.tsx    # Aba de usuários do sistema
+│   │   │   ├── LogsTab.tsx     # Aba de logs de atividade
+│   │   │   ├── ReportsTab.tsx  # Aba de relatórios e gráficos
+│   │   │   └── PointsTab.tsx   # Aba de ranking de pontos
+│   │   │
+│   │   ├── reports/            # Componentes de gráficos (lazy loaded)
+│   │   │   ├── index.ts
+│   │   │   ├── MembersChart.tsx
+│   │   │   ├── RevenueChart.tsx
+│   │   │   ├── PointsChart.tsx
+│   │   │   ├── ChurnMetrics.tsx
+│   │   │   └── ReportFilters.tsx
+│   │   │
 │   │   ├── ErrorBoundary.tsx   # Tratamento de erros
 │   │   ├── MemberModal.tsx     # Modal de membro
 │   │   ├── UserModal.tsx       # Modal de usuário do sistema
 │   │   ├── PaymentModal.tsx    # Modal de pagamento
 │   │   ├── PointsModal.tsx     # Modal de pontos
 │   │   ├── MembersTable.tsx    # Tabela de membros
-│   │   ├── QRScanner.tsx       # Scanner QR para PDV
-│   │   ├── MembersChart.tsx    # Gráfico de membros
-│   │   ├── RevenueChart.tsx    # Gráfico de receita
-│   │   ├── PointsChart.tsx     # Gráfico de pontos
-│   │   └── ChurnMetrics.tsx    # Métricas de churn
+│   │   └── QRScanner.tsx       # Scanner QR para PDV
 │   │
 │   ├── lib/                    # Utilitários e serviços
 │   │   ├── firebase.ts         # Configuração Firebase

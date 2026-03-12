@@ -302,29 +302,37 @@ audit_logs/{logId}
 ### Bundle Analysis
 
 ```
-Total Build Size: ~1.2MB (uncompressed)
-Gzipped: ~450KB
+Total Build Size: ~1.3MB (uncompressed)
+Gzipped: ~500KB
 
-Breakdown:
-├── vendor-firebase-firestore: 260KB (76KB gzip)
+Breakdown (após code-splitting):
+├── vendor-firebase-firestore: 261KB (76KB gzip)
+├── vendor-charts: 421KB (108KB gzip) - lazy loaded
 ├── vendor-react-core: 190KB (60KB gzip)
 ├── vendor-qr: 146KB (51KB gzip)
 ├── vendor-framer: 122KB (39KB gzip)
 ├── vendor-forms: 83KB (24KB gzip)
 ├── vendor-firebase-core: 82KB (28KB gzip)
 ├── vendor-firebase-auth: 77KB (22KB gzip)
-├── AdminDashboard: 494KB (125KB gzip) ⚠️ PRECISA SPLIT
+├── AdminDashboard: 37KB (10KB gzip) ✅ OTIMIZADO
+├── MembersTab: 19KB (6KB gzip)
+├── ReportsTab: 15KB (4KB gzip)
+├── PointsTab: 2.5KB (1KB gzip)
+├── UsersTab: 3.4KB (1.3KB gzip)
+├── LogsTab: 4KB (1.6KB gzip)
 └── outros: ~200KB
 ```
 
 ### Otimizações Implementadas
 
-1. **Code Splitting** - Lazy load por rota
-2. **Vendor Chunks** - Separação de bibliotecas
-3. **Tree Shaking** - Vite + ESM modules
-4. **Minification** - Terser com drop_console
-5. **Cache Headers** - 1 ano para assets imutáveis
-6. **Firestore Long Polling** - Evita WebSocket issues
+1. **Code Splitting** - Lazy load por rota e por componente
+2. **Tab Components Splitting** - AdminDashboard dividido em 5 componentes lazy
+3. **Vendor Chunks** - Separação de bibliotecas (charts, forms, firebase, etc.)
+4. **Tree Shaking** - Vite + ESM modules
+5. **Minification** - Terser com drop_console
+6. **Cache Headers** - 1 ano para assets imutáveis
+7. **Firestore Long Polling** - Evita WebSocket issues
+8. **Suspense Fallbacks** - Loading states durante lazy load
 
 ### Otimizações Pendentes
 
