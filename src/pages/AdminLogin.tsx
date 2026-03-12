@@ -6,14 +6,15 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
 import { Loading } from '../components/ui/loading'
-import { Eye, EyeOff, AlertTriangle, RefreshCw, UserX } from 'lucide-react'
+import { Eye, EyeOff, AlertTriangle, RefreshCw, UserX, Loader2 } from 'lucide-react'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
 
   const { signIn, role, roleError, userNotFound, refreshRole, loading: authLoading } = useAuth()
   const navigate = useNavigate()
@@ -22,23 +23,31 @@ export default function AdminLogin() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    setLoading(true)
-    setWaitingForRole(true)
+    setIsSubmitting(true)
+    setStatusMessage('Verificando credenciais...')
 
     console.log('[AdminLogin] Starting sign in...')
-    const { error } = await signIn(email, password)
 
-    if (error) {
-      console.log('[AdminLogin] Sign in error:', error)
-      setError('Credenciais inválidas')
-      setLoading(false)
-      setWaitingForRole(false)
-      return
+    try {
+      const { error } = await signIn(email, password)
+
+      if (error) {
+        console.log('[AdminLogin] Sign in error:', error)
+        setError('Credenciais inválidas')
+        setIsSubmitting(false)
+        setStatusMessage('')
+        return
+      }
+
+      console.log('[AdminLogin] Sign in successful, waiting for role...')
+      setStatusMessage('Carregando permissões...')
+      setWaitingForRole(true)
+    } catch (err) {
+      console.error('[AdminLogin] Unexpected error:', err)
+      setError('Erro ao fazer login. Tente novamente.')
+      setIsSubmitting(false)
+      setStatusMessage('')
     }
-
-    console.log('[AdminLogin] Sign in successful, waiting for role...')
-    // Keep loading=true until role is fetched
-    // The useEffect below will handle setting loading=false
   }
 
   // Handle redirect after role is loaded
@@ -54,7 +63,8 @@ export default function AdminLogin() {
     if (roleError || userNotFound) {
       console.log('[AdminLogin] Error or user not found, stopping')
       setWaitingForRole(false)
-      setLoading(false)
+      setIsSubmitting(false)
+      setStatusMessage('')
       return
     }
 
@@ -62,7 +72,8 @@ export default function AdminLogin() {
     if (role) {
       console.log('[AdminLogin] Role loaded:', role, '- redirecting...')
       setWaitingForRole(false)
-      setLoading(false)
+      setIsSubmitting(false)
+      setStatusMessage('')
       navigate('/admin')
       return
     }
@@ -72,7 +83,8 @@ export default function AdminLogin() {
     if (role === null && !authLoading && !roleError && !userNotFound) {
       console.log('[AdminLogin] Role is null with no error - edge case, resetting')
       setWaitingForRole(false)
-      setLoading(false)
+      setIsSubmitting(false)
+      setStatusMessage('')
     }
   }, [waitingForRole, authLoading, role, roleError, userNotFound, navigate])
 
@@ -153,7 +165,7 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={loading}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -167,12 +179,13 @@ export default function AdminLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={loading}
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  disabled={isSubmitting}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -180,19 +193,27 @@ export default function AdminLogin() {
             </div>
           </CardContent>
 
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-3">
             <Button
               type="submit"
               className="w-full"
               size="lg"
-              disabled={loading}
+              disabled={isSubmitting}
             >
-              {loading ? (
-                <Loading size="sm" />
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Entrando...
+                </span>
               ) : (
                 'Acessar Painel'
               )}
             </Button>
+            {statusMessage && (
+              <p className="text-sm text-muted-foreground text-center animate-pulse">
+                {statusMessage}
+              </p>
+            )}
           </CardFooter>
         </form>
 

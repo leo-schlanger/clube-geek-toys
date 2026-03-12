@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, enableNetwork } from 'firebase/firestore'
 
 // Validar configuração antes de inicializar
 const requiredEnvVars = [
@@ -35,6 +35,11 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Force Firestore to use network (avoid offline mode issues)
+enableNetwork(db).catch((error) => {
+  console.warn('[Firebase] Could not enable network:', error)
+})
 
 // Set persistence to local (IndexedDB) to avoid third-party cookie issues
 setPersistence(auth, browserLocalPersistence).catch((error) => {

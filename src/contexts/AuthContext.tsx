@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, enableNetwork } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserRole } from '../types'
 
@@ -32,13 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userNotFound, setUserNotFound] = useState(false)
 
   // Fetch user role from Firestore
-  const fetchUserRole = useCallback(async (userId: string): Promise<UserRole | null> => {
-    console.log('[Auth] Fetching role for user:', userId)
+  const fetchUserRole = useCallback(async (userId: string, retryCount = 0): Promise<UserRole | null> => {
+    console.log('[Auth] Fetching role for user:', userId, 'retry:', retryCount)
 
     setUserNotFound(false)
     setRoleError(null)
 
     try {
+      // Ensure Firestore is online
+      await enableNetwork(db)
+
       const userRef = doc(db, 'users', userId)
       const userSnap = await getDoc(userRef)
 
@@ -62,6 +65,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return 'member'
     } catch (error: any) {
       console.error('[Auth] Error fetching role:', error)
+
+      // If offline error, try to enable network and retry once
+      if (error.message?.includes('offline') && retryCount < 1) {
+        console.log('[Auth] Offline error, enabling network and retrying...')
+        try {
+          await enableNetwork(db)
+          return fetchUserRole(userId, retryCount + 1)
+        } catch (networkError) {
+          console.error('[Auth] Could not enable network:', networkError)
+        }
+      }
+
       setRoleError(`Erro ao carregar permissões: ${error.message || 'Erro desconhecido'}`)
       return null
     }
