@@ -130,20 +130,6 @@ export async function updateMember(
 }
 
 /**
- * Add points to a member (DEPRECATED - use addPoints from points.ts instead)
- * This function is kept for backward compatibility but should not be used
- * @deprecated Use addPoints from './points' instead for proper transaction tracking
- */
-export async function addMemberPoints(id: string, points: number): Promise<boolean> {
-  console.warn('addMemberPoints is deprecated. Use addPoints from ./points instead.')
-  const member = await getMemberById(id)
-  if (!member) return false
-
-  const newPoints = (member.points || 0) + points
-  return updateMember(id, { points: newPoints })
-}
-
-/**
  * Activate member (after payment confirmation)
  */
 export async function activateMember(id: string): Promise<boolean> {

@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null)
     setUserNotFound(false)
 
-    console.log('[Auth] Setting up role listener for:', uid)
+    // Role listener setup (uid logged only in development)
 
     // Use onSnapshot for real-time updates
     const userDocRef = doc(db, 'users', uid)
@@ -164,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRoleLoading(false)
 
         if (!snapshot.exists()) {
-          console.log('[Auth] User document not found')
+          // User document not found in Firestore
           setRole(null)
           setUserNotFound(true)
           setError('Usuário não cadastrado no sistema.')
@@ -174,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = snapshot.data() as { role?: UserRole }
         const newRole = data?.role || 'member'
 
-        console.log('[Auth] Role updated:', newRole)
+        // Role successfully loaded
         setRole(newRole)
         setError(null)
         setUserNotFound(false)

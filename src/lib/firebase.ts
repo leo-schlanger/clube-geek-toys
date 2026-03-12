@@ -31,4 +31,4 @@ setPersistence(auth, browserLocalPersistence).catch((error) => {
   console.warn('[Firebase] Could not set persistence:', error.message)
 })
 
-console.log('[Firebase] Initialized with project:', firebaseConfig.projectId)
+// Firebase initialized

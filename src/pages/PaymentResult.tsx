@@ -1,5 +1,4 @@
-import { useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { CheckCircle, XCircle, Clock, Home, RefreshCw } from 'lucide-react'
@@ -37,16 +36,8 @@ const resultConfig = {
 
 export default function PaymentResult({ type }: PaymentResultProps) {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-
-  const paymentId = searchParams.get('payment_id')
-  const status = searchParams.get('status')
-
-  // Log payment info for debugging
-  useEffect(() => {
-    console.log('Payment ID:', paymentId)
-    console.log('Status:', status)
-  }, [paymentId, status])
+  // Payment info available via useSearchParams() for analytics if needed
+  // e.g., searchParams.get('payment_id') and searchParams.get('status')
 
   const { icon, title, description, color, borderColor } = resultConfig[type]
 

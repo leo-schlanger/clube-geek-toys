@@ -8,42 +8,59 @@ import {
     query,
     type DocumentData,
     type QueryConstraint,
-    type UpdateData
+    type UpdateData,
+    type WithFieldValue
 } from 'firebase/firestore'
 import { db } from './firebase'
 
+// =============================================================================
+// Types
+// =============================================================================
+
+interface FirestoreError {
+    code?: string
+    message?: string
+    name?: string
+}
+
+type RecordData = Record<string, unknown>
+
+// =============================================================================
+// Firestore Manager
+// =============================================================================
+
 /**
- * Generic Firestore Manager
+ * Generic Firestore Manager for CRUD operations
  */
 export class FirestoreManager {
     /**
      * Get a single document by ID
      */
-    static async getById<T>(collectionName: string, id: string, mapper: (id: string, data: DocumentData) => T): Promise<T | null> {
-        console.log(`[Firestore] Getting document: ${collectionName}/${id}`)
+    static async getById<T>(
+        collectionName: string,
+        id: string,
+        mapper: (id: string, data: DocumentData) => T
+    ): Promise<T | null> {
         try {
             const docRef = doc(db, collectionName, id)
             const docSnap = await getDoc(docRef)
 
             if (!docSnap.exists()) {
-                console.log(`[Firestore] Document not found: ${collectionName}/${id}`)
                 return null
             }
-            console.log(`[Firestore] Document found: ${collectionName}/${id}`, docSnap.data())
+
             return mapper(docSnap.id, docSnap.data())
-        } catch (error: any) {
-            // Log detailed error info for debugging
+        } catch (error: unknown) {
+            const err = error as FirestoreError
             console.error(`[Firestore] Error getting ${collectionName}/${id}:`, {
-                code: error?.code,
-                message: error?.message,
-                name: error?.name
+                code: err?.code,
+                message: err?.message,
             })
-            // Check if it's a permission error
-            if (error?.code === 'permission-denied') {
-                console.error(`[Firestore] PERMISSION DENIED - Check Firestore rules for collection: ${collectionName}`)
+
+            if (err?.code === 'permission-denied') {
+                console.error(`[Firestore] PERMISSION DENIED for: ${collectionName}`)
             }
-            // Return null but let caller know it was an error via the error being logged
-            // The retry logic in AuthContext will handle this
+
             return null
         }
     }
@@ -59,9 +76,10 @@ export class FirestoreManager {
         try {
             const q = query(collection(db, collectionName), ...constraints)
             const snapshot = await getDocs(q)
-            return snapshot.docs.map(doc => mapper(doc.id, doc.data()))
-        } catch (error) {
-            console.error(`Firestore [${collectionName}]: Error in query:`, error)
+            return snapshot.docs.map(d => mapper(d.id, d.data()))
+        } catch (error: unknown) {
+            const err = error as FirestoreError
+            console.error(`[Firestore] Query error in ${collectionName}:`, err?.message)
             return []
         }
     }
@@ -69,17 +87,27 @@ export class FirestoreManager {
     /**
      * Create or overwrite a document
      */
-    static async save(collectionName: string, id: string | null, data: any): Promise<string | null> {
+    static async save<T extends RecordData>(
+        collectionName: string,
+        id: string | null,
+        data: T
+    ): Promise<string | null> {
         try {
-            const docRef = id ? doc(db, collectionName, id) : doc(collection(db, collectionName))
-            await setDoc(docRef, {
+            const docRef = id
+                ? doc(db, collectionName, id)
+                : doc(collection(db, collectionName))
+
+            const docData = {
                 ...data,
                 updated_at: new Date().toISOString(),
-                created_at: data.created_at || new Date().toISOString()
-            }, { merge: true })
+                created_at: (data.created_at as string) || new Date().toISOString()
+            } as WithFieldValue<DocumentData>
+
+            await setDoc(docRef, docData, { merge: true })
             return docRef.id
-        } catch (error) {
-            console.error(`Firestore [${collectionName}]: Error saving document:`, error)
+        } catch (error: unknown) {
+            const err = error as FirestoreError
+            console.error(`[Firestore] Save error in ${collectionName}:`, err?.message)
             return null
         }
     }
@@ -87,39 +115,63 @@ export class FirestoreManager {
     /**
      * Update specific fields of a document
      */
-    static async update(collectionName: string, id: string, data: UpdateData<any>): Promise<boolean> {
+    static async update<T extends RecordData>(
+        collectionName: string,
+        id: string,
+        data: T
+    ): Promise<boolean> {
         try {
             const docRef = doc(db, collectionName, id)
-            await updateDoc(docRef, {
+            const updateData = {
                 ...data,
                 updated_at: new Date().toISOString()
-            })
+            } as UpdateData<DocumentData>
+
+            await updateDoc(docRef, updateData)
             return true
-        } catch (error) {
-            console.error(`Firestore [${collectionName}]: Error updating document ${id}:`, error)
+        } catch (error: unknown) {
+            const err = error as FirestoreError
+            console.error(`[Firestore] Update error for ${collectionName}/${id}:`, err?.message)
             return false
         }
     }
 }
 
+// =============================================================================
+// Mapper Utilities
+// =============================================================================
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Common field mapping helpers
+ * Common field mapping helpers for snake_case <-> camelCase conversion
+ * Note: Uses 'any' intentionally for flexibility with DocumentData mapping
  */
 export const MapperUtils = {
-    toCamel: (data: DocumentData) => {
-        const newData: any = {}
+    /**
+     * Convert snake_case keys to camelCase
+     */
+    toCamel: (data: DocumentData): any => {
+        const result: any = {}
         for (const key in data) {
-            const camelKey = key.replace(/([-_][a-z])/ig, ($1) => $1.toUpperCase().replace('-', '').replace('_', ''))
-            newData[camelKey] = data[key]
+            const camelKey = key.replace(
+                /([-_][a-z])/gi,
+                ($1) => $1.toUpperCase().replace('-', '').replace('_', '')
+            )
+            result[camelKey] = data[key]
         }
-        return newData
+        return result
     },
-    toSnake: (data: any) => {
-        const newData: any = {}
+
+    /**
+     * Convert camelCase keys to snake_case
+     */
+    toSnake: (data: any): any => {
+        const result: any = {}
         for (const key in data) {
-            const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
-            newData[snakeKey] = data[key]
+            const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+            result[snakeKey] = data[key]
         }
-        return newData
+        return result
     }
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
