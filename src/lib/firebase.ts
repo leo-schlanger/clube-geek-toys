@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 
 // Validar configuração antes de inicializar
@@ -35,6 +35,11 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
+
+// Set persistence to local (IndexedDB) to avoid third-party cookie issues
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.warn('[Firebase] Could not set persistence:', error)
+})
 
 // Log de confirmação em desenvolvimento
 if (import.meta.env.DEV) {

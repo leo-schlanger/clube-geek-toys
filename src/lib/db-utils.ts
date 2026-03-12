@@ -20,14 +20,29 @@ export class FirestoreManager {
      * Get a single document by ID
      */
     static async getById<T>(collectionName: string, id: string, mapper: (id: string, data: DocumentData) => T): Promise<T | null> {
+        console.log(`[Firestore] Getting document: ${collectionName}/${id}`)
         try {
             const docRef = doc(db, collectionName, id)
             const docSnap = await getDoc(docRef)
 
-            if (!docSnap.exists()) return null
+            if (!docSnap.exists()) {
+                console.log(`[Firestore] Document not found: ${collectionName}/${id}`)
+                return null
+            }
+            console.log(`[Firestore] Document found: ${collectionName}/${id}`, docSnap.data())
             return mapper(docSnap.id, docSnap.data())
-        } catch (error) {
-            console.error(`Firestore [${collectionName}]: Error getting by ID ${id}:`, error)
+        } catch (error: any) {
+            // Log detailed error info for debugging
+            console.error(`[Firestore] Error getting ${collectionName}/${id}:`, {
+                code: error?.code,
+                message: error?.message,
+                name: error?.name,
+                fullError: error
+            })
+            // Check if it's a permission error
+            if (error?.code === 'permission-denied') {
+                console.error(`[Firestore] PERMISSION DENIED - Check Firestore rules for collection: ${collectionName}`)
+            }
             return null
         }
     }

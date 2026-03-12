@@ -5,10 +5,7 @@ import { Badge } from './ui/badge'
 import { Pagination } from './ui/pagination'
 import {
   Search,
-  Filter,
   X,
-  ChevronDown,
-  ChevronUp,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,

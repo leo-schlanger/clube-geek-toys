@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { orderBy } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
@@ -69,6 +69,13 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
 
 function getActionLabel(action: string): { label: string; color: string } {
   return ACTION_LABELS[action] ?? { label: action.replace(/_/g, ' '), color: 'text-muted-foreground' }
+}
+
+// Plan icons (memoized outside component)
+const planIcons: Record<PlanType, React.ReactNode> = {
+  silver: <Star className="h-4 w-4" />,
+  gold: <Crown className="h-4 w-4" />,
+  black: <Sparkles className="h-4 w-4" />,
 }
 
 export default function AdminDashboard() {

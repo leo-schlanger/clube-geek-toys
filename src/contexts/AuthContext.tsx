@@ -43,9 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Memoized fetch role function with retry logic
   // Returns: UserRole if found, null if user document doesn't exist or error
   const fetchUserRole = useCallback(async (userId: string, retries = 3): Promise<UserRole | null> => {
+    console.log('[Auth] fetchUserRole called for userId:', userId)
+    console.log('[Auth] auth.currentUser at fetchUserRole:', auth.currentUser?.uid)
     setUserNotFound(false)
 
     for (let attempt = 1; attempt <= retries; attempt++) {
+      console.log(`[Auth] Attempt ${attempt}/${retries} to fetch user role`)
       try {
         const userData = await FirestoreManager.getById<UserDocument>(
           'users',
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             createdAt: data.createdAt,
           })
         )
+        console.log('[Auth] FirestoreManager.getById returned:', userData)
 
         // Document doesn't exist - user not registered in system
         if (!userData) {
@@ -118,11 +122,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, fetchUserRole])
 
   useEffect(() => {
+    console.log('[Auth] Setting up auth state listener...')
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log('[Auth] Auth state changed:', firebaseUser ? `User: ${firebaseUser.uid}` : 'No user')
       setUser(firebaseUser)
 
       if (firebaseUser) {
+        // Ensure auth token is available for Firestore
+        try {
+          const token = await firebaseUser.getIdToken(true) // Force refresh token
+          console.log('[Auth] Token refreshed, length:', token.length)
+          // Small delay to ensure Firestore SDK has auth context
+          await new Promise(resolve => setTimeout(resolve, 100))
+        } catch (tokenError) {
+          console.error('[Auth] Failed to refresh token:', tokenError)
+        }
+
+        console.log('[Auth] Fetching user role for:', firebaseUser.uid)
+        console.log('[Auth] Current auth user:', auth.currentUser?.uid)
         const fetchedRole = await fetchUserRole(firebaseUser.uid)
+        console.log('[Auth] Role result:', fetchedRole)
         setRole(fetchedRole)
       } else {
         setRole(null)
@@ -138,9 +158,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
+      console.log('[Auth] Starting sign in for:', email)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      console.log('[Auth] Sign in successful, user:', userCredential.user.uid)
+      // Force token refresh to ensure Firestore has auth context
+      await userCredential.user.getIdToken(true)
+      console.log('[Auth] Token refreshed after sign in')
       return { user: userCredential.user, error: null }
     } catch (error) {
+      console.error('[Auth] Sign in error:', error)
       return { user: null, error: error as Error }
     }
   }, [])
