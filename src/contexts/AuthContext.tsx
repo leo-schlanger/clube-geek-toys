@@ -143,8 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       roleUnsubscribeRef.current = null
     }
 
-    // Don't re-setup if same user and role already loaded
-    if (currentUidRef.current === uid && role !== null) {
+    // Don't re-setup if same user
+    if (currentUidRef.current === uid) {
       return
     }
 
@@ -152,8 +152,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoleLoading(true)
     setError(null)
     setUserNotFound(false)
-
-    // Role listener setup (uid logged only in development)
 
     // Use onSnapshot for real-time updates
     const userDocRef = doc(db, 'users', uid)
@@ -186,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null)
       }
     )
-  }, [role])
+  }, [])
 
   const cleanupRoleListener = useCallback(() => {
     if (roleUnsubscribeRef.current) {
