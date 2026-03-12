@@ -31,13 +31,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Fetch role from Firestore
+  // Fetch role from Firestore with timeout
   const fetchRole = useCallback(async (uid: string) => {
     try {
       const userRef = doc(db, 'users', uid)
-      const userSnap = await getDoc(userRef)
 
-      if (!userSnap.exists()) {
+      // Add timeout to prevent infinite loading
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout ao conectar com o banco de dados')), 10000)
+      )
+
+      const userSnap = await Promise.race([getDoc(userRef), timeoutPromise]) as Awaited<ReturnType<typeof getDoc>>
+
+      if (!userSnap || !userSnap.exists()) {
         setUserNotFound(true)
         setRoleError('Usuário não cadastrado no sistema.')
         return null

@@ -30,11 +30,10 @@ export default function AdminLogin() {
 
     if (signInError) {
       setError('Credenciais inválidas')
-      setIsSubmitting(false)
-      return
     }
 
-    // Auth state change will handle the rest
+    // Always reset submitting - auth state listener handles the rest
+    setIsSubmitting(false)
   }
 
   async function handleRetry() {
