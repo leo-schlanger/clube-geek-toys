@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, enableNetwork } from 'firebase/firestore'
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserRole } from '../types'
 
@@ -31,78 +31,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Fetch user role from Firestore
-  const fetchUserRole = useCallback(async (userId: string, retryCount = 0): Promise<UserRole | null> => {
-    console.log('[Auth] Fetching role for user:', userId, 'retry:', retryCount)
+  // Fetch user role from Firestore - simple version
+  const fetchUserRole = useCallback(async (userId: string): Promise<UserRole | null> => {
+    console.log('[Auth] fetchUserRole called for:', userId)
 
     setUserNotFound(false)
     setRoleError(null)
 
     try {
-      // Ensure Firestore is online
-      await enableNetwork(db)
-
       const userRef = doc(db, 'users', userId)
+      console.log('[Auth] Getting document from Firestore...')
+
       const userSnap = await getDoc(userRef)
+      console.log('[Auth] Document exists:', userSnap.exists())
 
       if (!userSnap.exists()) {
-        console.log('[Auth] User document not found')
+        console.log('[Auth] User document not found in Firestore')
         setUserNotFound(true)
         setRoleError('Usuário não cadastrado no sistema.')
         return null
       }
 
       const userData = userSnap.data()
-      console.log('[Auth] User data:', userData)
+      console.log('[Auth] User data from Firestore:', JSON.stringify(userData))
 
-      if (userData.role) {
-        console.log('[Auth] Role found:', userData.role)
-        return userData.role as UserRole
-      }
-
-      // No role set, default to member
-      console.log('[Auth] No role set, defaulting to member')
-      return 'member'
+      const userRole = userData.role as UserRole || 'member'
+      console.log('[Auth] Returning role:', userRole)
+      return userRole
     } catch (error: any) {
-      console.error('[Auth] Error fetching role:', error)
-
-      // If offline error, try to enable network and retry once
-      if (error.message?.includes('offline') && retryCount < 1) {
-        console.log('[Auth] Offline error, enabling network and retrying...')
-        try {
-          await enableNetwork(db)
-          return fetchUserRole(userId, retryCount + 1)
-        } catch (networkError) {
-          console.error('[Auth] Could not enable network:', networkError)
-        }
-      }
-
-      setRoleError(`Erro ao carregar permissões: ${error.message || 'Erro desconhecido'}`)
+      console.error('[Auth] Error fetching role:', error.code, error.message)
+      setRoleError(`Erro: ${error.message}`)
       return null
     }
   }, [])
 
-  // Listen to auth state changes
+  // Auth state listener
   useEffect(() => {
-    console.log('[Auth] Setting up auth listener')
+    console.log('[Auth] Setting up onAuthStateChanged listener')
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('[Auth] Auth state changed:', firebaseUser?.uid || 'null', firebaseUser?.email || '')
+      console.log('[Auth] onAuthStateChanged fired:', firebaseUser ? firebaseUser.email : 'no user')
 
       if (firebaseUser) {
+        console.log('[Auth] User is authenticated, UID:', firebaseUser.uid)
         setUser(firebaseUser)
-        console.log('[Auth] User set, fetching role...')
 
-        try {
-          const userRole = await fetchUserRole(firebaseUser.uid)
-          console.log('[Auth] Role fetch complete:', userRole)
-          setRole(userRole)
-        } catch (error) {
-          console.error('[Auth] Error in role fetch:', error)
-          setRole(null)
-        }
+        const userRole = await fetchUserRole(firebaseUser.uid)
+        console.log('[Auth] Role fetched:', userRole)
+        setRole(userRole)
       } else {
-        console.log('[Auth] No user, clearing state')
+        console.log('[Auth] No user authenticated')
         setUser(null)
         setRole(null)
         setRoleError(null)
@@ -114,59 +92,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     return () => {
-      console.log('[Auth] Cleaning up auth listener')
+      console.log('[Auth] Cleaning up listener')
       unsubscribe()
     }
   }, [fetchUserRole])
 
-  // Refresh role manually
+  // Refresh role
   const refreshRole = useCallback(async () => {
-    if (user) {
-      setLoading(true)
-      const userRole = await fetchUserRole(user.uid)
-      setRole(userRole)
-      setLoading(false)
-    }
+    if (!user) return
+    console.log('[Auth] refreshRole called')
+    setLoading(true)
+    const userRole = await fetchUserRole(user.uid)
+    setRole(userRole)
+    setLoading(false)
   }, [user, fetchUserRole])
 
   // Sign in
   const signIn = useCallback(async (email: string, password: string) => {
-    console.log('[Auth] Signing in:', email)
+    console.log('[Auth] signIn called for:', email)
     try {
       const result = await signInWithEmailAndPassword(auth, email, password)
-      console.log('[Auth] Sign in successful')
+      console.log('[Auth] signIn successful')
       return { user: result.user, error: null }
-    } catch (error) {
-      console.error('[Auth] Sign in error:', error)
+    } catch (error: any) {
+      console.error('[Auth] signIn error:', error.code, error.message)
       return { user: null, error: error as Error }
     }
   }, [])
 
   // Sign up
   const signUp = useCallback(async (email: string, password: string) => {
+    console.log('[Auth] signUp called for:', email)
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password)
 
       // Create user document
-      try {
-        await setDoc(doc(db, 'users', result.user.uid), {
-          email: result.user.email,
-          role: 'member',
-          createdAt: new Date().toISOString(),
-        })
-      } catch (e) {
-        console.error('[Auth] Error creating user doc:', e)
-      }
+      await setDoc(doc(db, 'users', result.user.uid), {
+        email: result.user.email,
+        role: 'member',
+        createdAt: new Date().toISOString(),
+      })
 
       return { user: result.user, error: null }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Auth] signUp error:', error.code, error.message)
       return { user: null, error: error as Error }
     }
   }, [])
 
   // Sign out
   const signOut = useCallback(async () => {
-    console.log('[Auth] Signing out')
+    console.log('[Auth] signOut called')
     await firebaseSignOut(auth)
     setUser(null)
     setRole(null)
@@ -185,6 +161,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signOut,
   }), [user, role, loading, roleError, userNotFound, refreshRole, signIn, signUp, signOut])
+
+  // Debug log on every render
+  console.log('[Auth] Current state:', {
+    hasUser: !!user,
+    role,
+    loading,
+    roleError,
+    userNotFound
+  })
 
   return (
     <AuthContext.Provider value={value}>

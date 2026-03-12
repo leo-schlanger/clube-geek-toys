@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -15,60 +16,38 @@ export default function AdminLogin() {
 
   const { user, role, signIn, roleError, userNotFound, refreshRole, loading } = useAuth()
 
-  // Redirect when authenticated with role
-  useEffect(() => {
-    console.log('[AdminLogin] State:', { user: !!user, role, loading, roleError, userNotFound })
-
-    if (loading) {
-      console.log('[AdminLogin] Still loading, waiting...')
-      return
-    }
-
-    if (user && role) {
-      console.log('[AdminLogin] User authenticated with role:', role, '- redirecting to /admin')
-      // Force navigation
-      window.location.href = '/admin'
-    }
-  }, [user, role, loading])
+  // If already authenticated with role, redirect
+  if (!loading && user && role) {
+    console.log('[AdminLogin] User has role, redirecting to /admin')
+    return <Navigate to="/admin" replace />
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setIsSubmitting(true)
 
-    console.log('[AdminLogin] Submitting login...')
+    console.log('[AdminLogin] Submitting login for:', email)
 
     const { error: signInError } = await signIn(email, password)
 
     if (signInError) {
-      console.log('[AdminLogin] Sign in error:', signInError)
+      console.log('[AdminLogin] Login failed:', signInError.message)
       setError('Credenciais inválidas')
       setIsSubmitting(false)
       return
     }
 
-    console.log('[AdminLogin] Sign in successful, auth state will update...')
-    // Don't set isSubmitting to false here - let the redirect happen
-    // or let it reset when role error occurs
+    console.log('[AdminLogin] Login successful, waiting for auth state...')
+    // Don't set isSubmitting to false - auth state change will trigger re-render
   }
-
-  // Reset submitting state when role loading completes
-  useEffect(() => {
-    if (!loading && isSubmitting) {
-      if (roleError || userNotFound || !role) {
-        setIsSubmitting(false)
-      }
-    }
-  }, [loading, isSubmitting, roleError, userNotFound, role])
 
   async function handleRetry() {
     setError('')
-    setIsSubmitting(true)
     await refreshRole()
-    setIsSubmitting(false)
   }
 
-  const showLoading = loading || isSubmitting
+  const isLoading = loading || isSubmitting
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -84,29 +63,30 @@ export default function AdminLogin() {
             Geek & Toys - Acesso Restrito
           </CardDescription>
         </CardHeader>
+
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                 {error}
               </div>
             )}
 
-            {userNotFound && !showLoading && (
+            {!isLoading && userNotFound && (
               <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-400 text-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <UserX className="h-4 w-4" />
                   <span className="font-medium">Usuário não cadastrado</span>
                 </div>
                 <p className="text-xs opacity-80">
-                  Seu login existe mas você não está cadastrado como admin/vendedor no sistema.
-                  Contate o administrador para obter acesso.
+                  Seu login existe mas você não está cadastrado como admin/vendedor.
+                  Contate o administrador.
                 </p>
               </div>
             )}
 
-            {roleError && !userNotFound && !showLoading && (
+            {!isLoading && roleError && !userNotFound && (
               <div className="p-3 rounded-md bg-yellow-500/10 border border-yellow-500/50 text-yellow-400 text-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="h-4 w-4" />
@@ -118,7 +98,6 @@ export default function AdminLogin() {
                   variant="outline"
                   size="sm"
                   onClick={handleRetry}
-                  disabled={showLoading}
                   className="w-full"
                 >
                   <RefreshCw className="h-3 w-3 mr-1" />
@@ -136,7 +115,7 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={showLoading}
+                disabled={isLoading}
               />
             </div>
 
@@ -150,13 +129,13 @@ export default function AdminLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={showLoading}
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  disabled={showLoading}
+                  disabled={isLoading}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -164,17 +143,17 @@ export default function AdminLogin() {
             </div>
           </CardContent>
 
-          <CardFooter className="flex flex-col gap-3">
+          <CardFooter>
             <Button
               type="submit"
               className="w-full"
               size="lg"
-              disabled={showLoading}
+              disabled={isLoading}
             >
-              {showLoading ? (
+              {isLoading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {isSubmitting ? 'Entrando...' : 'Carregando...'}
+                  {loading ? 'Carregando...' : 'Entrando...'}
                 </span>
               ) : (
                 'Acessar Painel'
@@ -185,14 +164,13 @@ export default function AdminLogin() {
 
         <div className="px-6 pb-6">
           <p className="text-xs text-center text-muted-foreground">
-            Acesso exclusivo para administradores e vendedores autorizados.
+            Acesso exclusivo para administradores e vendedores.
           </p>
         </div>
 
-        {/* Debug info - remove after fixing */}
-        <div className="px-6 pb-6 text-xs text-muted-foreground border-t pt-4 mt-4">
-          <p>Debug: user={user ? 'yes' : 'no'}, role={role || 'null'}, loading={String(loading)}</p>
-          {roleError && <p className="text-red-400">Error: {roleError}</p>}
+        {/* Debug - remover depois */}
+        <div className="px-6 pb-4 text-[10px] text-muted-foreground/50 font-mono">
+          user:{user ? 'yes' : 'no'} | role:{role || 'null'} | loading:{String(loading)}
         </div>
       </Card>
     </div>
