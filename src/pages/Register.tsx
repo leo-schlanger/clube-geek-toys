@@ -128,19 +128,19 @@ export default function Register() {
 
       // 2. Create account in Firebase Auth
       toast.loading('Criando sua conta...', { id: 'reg-status' })
-      const { user: newUser, error: authError } = await signUp(data.email, data.password)
+      const result = await signUp(data.email, data.password)
 
-      if (authError) {
-        if (authError.message.includes('email-already-in-use')) {
-          toast.error('Este email já está cadastrado', { id: 'reg-status' })
-        } else {
-          toast.error('Erro ao criar conta: ' + authError.message, { id: 'reg-status' })
-        }
+      if (!result.success) {
+        toast.error(result.error || 'Erro ao criar conta', { id: 'reg-status' })
         setLoading(false)
         return
       }
 
       // 3. Create member record immediately (pending status)
+      // After signUp, user is automatically signed in and available via auth.currentUser
+      const { auth } = await import('../lib/firebase')
+      const newUser = auth.currentUser
+
       if (newUser) {
         toast.loading('Finalizando cadastro...', { id: 'reg-status' })
         try {

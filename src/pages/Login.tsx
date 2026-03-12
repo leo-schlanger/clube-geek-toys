@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
@@ -13,63 +13,40 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { signIn, role, roleError, userNotFound, refreshRole, loading: authLoading } = useAuth()
+  const { signIn, role, error: authError, userNotFound, refreshRole, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-  const [waitingForRole, setWaitingForRole] = useState(false)
 
-  /**
-   * Handle login form submission
-   */
+  // Redirect when role is loaded
+  useEffect(() => {
+    if (!authLoading && role) {
+      const redirectPath = getLoginRedirectPath(role, getAppMode())
+      navigate(redirectPath, { replace: true })
+    }
+  }, [authLoading, role, navigate])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
-    setLoading(true)
-    setWaitingForRole(true)
+    setFormError('')
+    setIsSubmitting(true)
 
-    const { error } = await signIn(email, password)
+    const result = await signIn(email, password)
 
-    if (error) {
-      setError('Email ou senha incorretos')
-      setLoading(false)
-      setWaitingForRole(false)
-      return
+    if (!result.success) {
+      setFormError(result.error || 'Erro ao fazer login')
     }
 
-    // Wait for role to be fetched by AuthContext
-    setLoading(false)
+    setIsSubmitting(false)
   }
-
-  // Handle redirect after role is loaded
-  React.useEffect(() => {
-    if (!waitingForRole || authLoading) return
-
-    // If there's an error fetching role, stop waiting and show error
-    if (roleError || userNotFound) {
-      setWaitingForRole(false)
-      return
-    }
-
-    // Only redirect if role was actually loaded (not null)
-    if (role) {
-      setWaitingForRole(false)
-      const redirectPath = getLoginRedirectPath(role, getAppMode())
-      navigate(redirectPath)
-    }
-
-    // If role is still null after loading completed (edge case), reset waiting state
-    // This prevents infinite waiting if something unexpected happens
-    if (role === null && !authLoading && !roleError && !userNotFound) {
-      setWaitingForRole(false)
-    }
-  }, [waitingForRole, authLoading, role, roleError, userNotFound, navigate])
 
   async function handleRetry() {
-    setError('')
+    setFormError('')
     await refreshRole()
   }
+
+  const isLoading = isSubmitting || authLoading
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -85,9 +62,9 @@ export default function Login() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {error && (
+            {formError && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-500 text-sm">
-                {error}
+                {formError}
               </div>
             )}
 
@@ -113,13 +90,13 @@ export default function Login() {
               </div>
             )}
 
-            {roleError && !userNotFound && (
+            {authError && !userNotFound && (
               <div className="p-3 rounded-md bg-yellow-500/10 border border-yellow-500/50 text-yellow-600 text-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="h-4 w-4" />
                   <span className="font-medium">Erro ao carregar dados</span>
                 </div>
-                <p className="text-xs opacity-80 mb-2">{roleError}</p>
+                <p className="text-xs opacity-80 mb-2">{authError}</p>
                 <Button
                   type="button"
                   variant="outline"
@@ -149,7 +126,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={loading}
+                disabled={isLoading}
               />
             </div>
 
@@ -163,7 +140,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={loading}
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -190,9 +167,9 @@ export default function Login() {
               type="submit"
               className="w-full"
               size="lg"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading ? (
+              {isLoading ? (
                 <Loading size="sm" />
               ) : (
                 <>

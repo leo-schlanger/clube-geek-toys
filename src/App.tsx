@@ -40,7 +40,7 @@ const APP_MODE = getAppMode()
  * Role Error Component
  * Shown when user is authenticated but role couldn't be determined
  */
-function RoleError({ userNotFound, roleError }: { userNotFound: boolean; roleError: string | null }) {
+function RoleError({ userNotFound, error }: { userNotFound: boolean; error: string | null }) {
   const { signOut, refreshRole, loading } = useAuth()
 
   return (
@@ -61,7 +61,7 @@ function RoleError({ userNotFound, roleError }: { userNotFound: boolean; roleErr
         <p className="text-muted-foreground mb-6">
           {userNotFound
             ? 'Seu login existe, mas você não está cadastrado no sistema. Contate o administrador para obter acesso.'
-            : roleError || 'Não foi possível verificar suas permissões. Tente novamente.'}
+            : error || 'Não foi possível verificar suas permissões. Tente novamente.'}
         </p>
         <div className="flex gap-3 justify-center">
           {!userNotFound && (
@@ -96,7 +96,7 @@ function ProtectedRoute({
   children: React.ReactNode
   allowedRoles?: string[]
 }) {
-  const { user, role, loading, roleError, userNotFound } = useAuth()
+  const { user, role, loading, error, userNotFound } = useAuth()
 
   if (loading) {
     return <LoadingPage />
@@ -109,7 +109,7 @@ function ProtectedRoute({
 
   // User is authenticated but role couldn't be fetched (error or not found)
   if (role === null) {
-    return <RoleError userNotFound={userNotFound} roleError={roleError} />
+    return <RoleError userNotFound={userNotFound} error={error} />
   }
 
   // Check if role is allowed
@@ -126,7 +126,7 @@ function ProtectedRoute({
  * Only redirects if role is successfully loaded (not null)
  */
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, role, loading, roleError, userNotFound } = useAuth()
+  const { user, role, loading, error, userNotFound } = useAuth()
 
   if (loading) {
     return <LoadingPage />
@@ -140,7 +140,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
   // User is logged in but role couldn't be fetched - let them stay on login
   // to see error messages and retry button (handled by login components)
-  if (user && role === null && (roleError || userNotFound)) {
+  if (user && role === null && (error || userNotFound)) {
     return <>{children}</>
   }
 

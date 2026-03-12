@@ -12,10 +12,10 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { user, role, signIn, roleError, userNotFound, refreshRole, loading } = useAuth()
+  const { user, role, signIn, error: authError, userNotFound, refreshRole, loading } = useAuth()
 
   // Redirect if authenticated with role - use proper role-based redirect
   if (!loading && user && role) {
@@ -25,21 +25,20 @@ export default function AdminLogin() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
+    setFormError('')
     setIsSubmitting(true)
 
-    const { error: signInError } = await signIn(email, password)
+    const result = await signIn(email, password)
 
-    if (signInError) {
-      setError('Credenciais inválidas')
+    if (!result.success) {
+      setFormError(result.error || 'Credenciais inválidas')
     }
 
-    // Always reset submitting - auth state listener handles the rest
     setIsSubmitting(false)
   }
 
   async function handleRetry() {
-    setError('')
+    setFormError('')
     await refreshRole()
   }
 
@@ -62,10 +61,10 @@ export default function AdminLogin() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {error && (
+            {formError && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                {error}
+                {formError}
               </div>
             )}
 
@@ -82,13 +81,13 @@ export default function AdminLogin() {
               </div>
             )}
 
-            {!isLoading && roleError && !userNotFound && (
+            {!isLoading && authError && !userNotFound && (
               <div className="p-3 rounded-md bg-yellow-500/10 border border-yellow-500/50 text-yellow-400 text-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <AlertTriangle className="h-4 w-4" />
                   <span className="font-medium">Erro ao carregar permissões</span>
                 </div>
-                <p className="text-xs opacity-80 mb-2">{roleError}</p>
+                <p className="text-xs opacity-80 mb-2">{authError}</p>
                 <Button
                   type="button"
                   variant="outline"
