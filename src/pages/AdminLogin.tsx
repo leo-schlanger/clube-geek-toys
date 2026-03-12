@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -15,19 +14,22 @@ export default function AdminLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { user, role, signIn, roleError, userNotFound, refreshRole, loading } = useAuth()
-  const navigate = useNavigate()
 
   // Redirect when authenticated with role
   useEffect(() => {
     console.log('[AdminLogin] State:', { user: !!user, role, loading, roleError, userNotFound })
 
-    if (loading) return
+    if (loading) {
+      console.log('[AdminLogin] Still loading, waiting...')
+      return
+    }
 
     if (user && role) {
       console.log('[AdminLogin] User authenticated with role:', role, '- redirecting to /admin')
-      navigate('/admin', { replace: true })
+      // Force navigation
+      window.location.href = '/admin'
     }
-  }, [user, role, loading, navigate])
+  }, [user, role, loading])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -185,6 +187,12 @@ export default function AdminLogin() {
           <p className="text-xs text-center text-muted-foreground">
             Acesso exclusivo para administradores e vendedores autorizados.
           </p>
+        </div>
+
+        {/* Debug info - remove after fixing */}
+        <div className="px-6 pb-6 text-xs text-muted-foreground border-t pt-4 mt-4">
+          <p>Debug: user={user ? 'yes' : 'no'}, role={role || 'null'}, loading={String(loading)}</p>
+          {roleError && <p className="text-red-400">Error: {roleError}</p>}
         </div>
       </Card>
     </div>
