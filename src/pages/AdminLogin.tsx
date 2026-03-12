@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
 import { Eye, EyeOff, AlertTriangle, RefreshCw, UserX, Loader2 } from 'lucide-react'
+import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -16,9 +17,10 @@ export default function AdminLogin() {
 
   const { user, role, signIn, roleError, userNotFound, refreshRole, loading } = useAuth()
 
-  // Redirect if authenticated with role
+  // Redirect if authenticated with role - use proper role-based redirect
   if (!loading && user && role) {
-    return <Navigate to="/admin" replace />
+    const redirectPath = getLoginRedirectPath(role, getAppMode())
+    return <Navigate to={redirectPath} replace />
   }
 
   async function handleSubmit(e: React.FormEvent) {

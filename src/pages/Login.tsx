@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
 import { Loading } from '../components/ui/loading'
 import { Eye, EyeOff, LogIn, AlertTriangle, RefreshCw, UserX } from 'lucide-react'
+import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -54,7 +55,8 @@ export default function Login() {
     // Only redirect if role was actually loaded (not null)
     if (role) {
       setWaitingForRole(false)
-      navigate('/')
+      const redirectPath = getLoginRedirectPath(role, getAppMode())
+      navigate(redirectPath)
     }
 
     // If role is still null after loading completed (edge case), reset waiting state
