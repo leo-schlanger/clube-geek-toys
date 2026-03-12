@@ -87,19 +87,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('[Auth] Setting up auth listener')
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('[Auth] Auth state changed:', firebaseUser?.uid || 'null')
-
-      setUser(firebaseUser)
+      console.log('[Auth] Auth state changed:', firebaseUser?.uid || 'null', firebaseUser?.email || '')
 
       if (firebaseUser) {
-        const userRole = await fetchUserRole(firebaseUser.uid)
-        setRole(userRole)
+        setUser(firebaseUser)
+        console.log('[Auth] User set, fetching role...')
+
+        try {
+          const userRole = await fetchUserRole(firebaseUser.uid)
+          console.log('[Auth] Role fetch complete:', userRole)
+          setRole(userRole)
+        } catch (error) {
+          console.error('[Auth] Error in role fetch:', error)
+          setRole(null)
+        }
       } else {
+        console.log('[Auth] No user, clearing state')
+        setUser(null)
         setRole(null)
         setRoleError(null)
         setUserNotFound(false)
       }
 
+      console.log('[Auth] Setting loading to false')
       setLoading(false)
     })
 
