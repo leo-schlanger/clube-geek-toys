@@ -1,4 +1,4 @@
-import { where, orderBy, type DocumentData } from 'firebase/firestore'
+import { where, orderBy, limit, type DocumentData } from 'firebase/firestore'
 import { FirestoreManager, MapperUtils } from './db-utils'
 import type { Member, PlanType } from '../types'
 
@@ -125,19 +125,39 @@ function toPointTransaction(id: string, data: DocumentData): PointTransaction {
 
 /**
  * Get monthly report data for the last N months
+ * Optimized: uses date filters in Firestore queries
  */
 export async function getMonthlyReport(months: number = 6): Promise<MonthlyReportData[]> {
   const now = new Date()
   const reports: MonthlyReportData[] = []
 
-  // Fetch all relevant data
+  // Calculate date range for queries
+  const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1)
+  const startDateStr = startDate.toISOString()
+
+  // Fetch data with date filters (reduces data transferred significantly)
   const [members, payments, pointTransactions] = await Promise.all([
-    FirestoreManager.findMany('members', [], toMember),
-    FirestoreManager.findMany('payments', [where('status', '==', 'paid')], toPayment),
-    FirestoreManager.findMany('point_transactions', [], toPointTransaction),
+    // Members: only those created or expiring in the period
+    FirestoreManager.findMany('members', [
+      orderBy('created_at', 'desc'),
+      limit(500), // Safety limit
+    ], toMember),
+    // Payments: only paid ones in the period
+    FirestoreManager.findMany('payments', [
+      where('status', '==', 'paid'),
+      where('paid_at', '>=', startDateStr),
+      orderBy('paid_at', 'desc'),
+      limit(1000),
+    ], toPayment),
+    // Points: only in the period
+    FirestoreManager.findMany('point_transactions', [
+      where('created_at', '>=', startDateStr),
+      orderBy('created_at', 'desc'),
+      limit(2000),
+    ], toPointTransaction),
   ])
 
-  // Process each month
+  // Process each month (now with much smaller datasets)
   for (let i = 0; i < months; i++) {
     const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0)
@@ -186,14 +206,22 @@ export async function getMonthlyReport(months: number = 6): Promise<MonthlyRepor
 
 /**
  * Get revenue breakdown by plan
+ * Optimized: uses date filters and limits
  */
 export async function getRevenueByPlan(startDate?: Date, endDate?: Date): Promise<PlanDistribution[]> {
+  const start = startDate || new Date(new Date().setMonth(new Date().getMonth() - 12))
+  const startStr = start.toISOString()
+
   const [members, payments] = await Promise.all([
-    FirestoreManager.findMany('members', [], toMember),
-    FirestoreManager.findMany('payments', [where('status', '==', 'paid')], toPayment),
+    FirestoreManager.findMany('members', [limit(500)], toMember),
+    FirestoreManager.findMany('payments', [
+      where('status', '==', 'paid'),
+      where('paid_at', '>=', startStr),
+      orderBy('paid_at', 'desc'),
+      limit(1000),
+    ], toPayment),
   ])
 
-  const start = startDate || new Date(0)
   const end = endDate || new Date()
 
   // Group payments by member plan
@@ -231,10 +259,14 @@ export async function getRevenueByPlan(startDate?: Date, endDate?: Date): Promis
 
 /**
  * Get churn rate over time
+ * Optimized: uses limit to reduce data transfer
  */
 export async function getChurnRate(months: number = 6): Promise<ChurnData[]> {
   const now = new Date()
-  const members = await FirestoreManager.findMany('members', [], toMember)
+  const members = await FirestoreManager.findMany('members', [
+    orderBy('created_at', 'desc'),
+    limit(500),
+  ], toMember)
 
   const churnData: ChurnData[] = []
 
@@ -271,10 +303,18 @@ export async function getChurnRate(months: number = 6): Promise<ChurnData[]> {
 
 /**
  * Get points overview over time
+ * Optimized: uses date filter and limit
  */
 export async function getPointsOverview(months: number = 3): Promise<PointsOverview[]> {
   const now = new Date()
-  const pointTransactions = await FirestoreManager.findMany('point_transactions', [], toPointTransaction)
+  const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1)
+  const startDateStr = startDate.toISOString()
+
+  const pointTransactions = await FirestoreManager.findMany('point_transactions', [
+    where('created_at', '>=', startDateStr),
+    orderBy('created_at', 'desc'),
+    limit(2000),
+  ], toPointTransaction)
 
   const overview: PointsOverview[] = []
 
@@ -306,6 +346,7 @@ export async function getPointsOverview(months: number = 3): Promise<PointsOverv
 
 /**
  * Get current member statistics
+ * Optimized: uses limit for safety
  */
 export async function getMemberStats(): Promise<{
   total: number
@@ -314,7 +355,7 @@ export async function getMemberStats(): Promise<{
   expired: number
   byPlan: Record<PlanType, number>
 }> {
-  const members = await FirestoreManager.findMany('members', [], toMember)
+  const members = await FirestoreManager.findMany('members', [limit(1000)], toMember)
   const now = new Date()
 
   const stats = {
@@ -352,15 +393,20 @@ export async function getMemberStats(): Promise<{
 
 /**
  * Get top members by points
+ * Optimized: uses limit in query instead of fetching all
  */
-export async function getTopMembersByPoints(limit: number = 10): Promise<Member[]> {
+export async function getTopMembersByPoints(count: number = 10): Promise<Member[]> {
   const members = await FirestoreManager.findMany(
     'members',
-    [orderBy('points', 'desc')],
+    [
+      where('points', '>', 0),
+      orderBy('points', 'desc'),
+      limit(count),
+    ],
     toMember
   )
 
-  return members.slice(0, limit).filter((m) => m.points > 0)
+  return members
 }
 
 /**

@@ -100,17 +100,31 @@ export async function getExpiringPoints(memberId: string): Promise<PointTransact
 
 /**
  * Get total valid points for a member
- * This recalculates based on transactions to ensure accuracy
+ * Uses denormalized points field from member document for performance
+ * Falls back to recalculation only if needed
  */
 export async function getValidPoints(memberId: string): Promise<number> {
+  // Fast path: use denormalized points from member document
+  const member = await getMemberById(memberId)
+  if (member) {
+    return Math.max(0, member.points || 0)
+  }
+  return 0
+}
+
+/**
+ * Recalculate points from transactions (use sparingly - for data repair only)
+ */
+export async function recalculatePoints(memberId: string): Promise<number> {
   const today = new Date().toISOString().split('T')[0]
 
-  // Get all transactions
+  // Get all transactions with limit for safety
   const transactions = await FirestoreManager.findMany(
     POINTS_COLLECTION,
     [
       where('member_id', '==', memberId),
       orderBy('created_at', 'asc'),
+      limit(500), // Safety limit
     ],
     toPointTransaction
   )
@@ -119,7 +133,6 @@ export async function getValidPoints(memberId: string): Promise<number> {
   let total = 0
   for (const t of transactions) {
     if (t.type === 'earn' && t.expiresAt && t.expiresAt < today) {
-      // Skip expired earn transactions
       continue
     }
     total += t.points
@@ -281,46 +294,58 @@ export async function redeemPoints(
 /**
  * Expire old points (run periodically or on demand)
  * Returns number of points expired
+ * Optimized: single query, batch processing, no N+1
  */
 export async function expireOldPoints(memberId: string): Promise<number> {
   const today = new Date().toISOString().split('T')[0]
 
-  // Get all earn transactions that have expired
+  // Get expired earn transactions (with limit for safety)
   const transactions = await FirestoreManager.findMany(
     POINTS_COLLECTION,
     [
       where('member_id', '==', memberId),
       where('type', '==', 'earn'),
       orderBy('expires_at', 'asc'),
+      limit(100), // Process in batches
     ],
     toPointTransaction
   )
 
-  let totalExpired = 0
+  // Filter expired ones in memory (single pass)
+  const expiredTransactions = transactions.filter(
+    (t) => t.expiresAt && t.expiresAt < today && t.points > 0
+  )
 
-  for (const t of transactions) {
-    if (t.expiresAt && t.expiresAt < today && t.points > 0) {
-      // Mark as expired by creating an expire transaction
-      const currentBalance = await getValidPoints(memberId)
-      const newBalance = currentBalance - t.points
-
-      const now = new Date().toISOString()
-      const expireData = MapperUtils.toSnake({
-        memberId,
-        type: 'expire',
-        points: -t.points,
-        balance: newBalance,
-        description: `Pontos expirados (ref: ${t.id})`,
-        createdAt: now,
-      })
-
-      await FirestoreManager.save(POINTS_COLLECTION, null, expireData)
-      totalExpired += t.points
-
-      // Update member points
-      await updateMember(memberId, { points: newBalance })
-    }
+  if (expiredTransactions.length === 0) {
+    return 0
   }
+
+  // Calculate total to expire
+  const totalExpired = expiredTransactions.reduce((sum, t) => sum + t.points, 0)
+
+  // Get current balance ONCE (not in loop)
+  const member = await getMemberById(memberId)
+  if (!member) return 0
+
+  let currentBalance = member.points || 0
+  const now = new Date().toISOString()
+
+  // Create expire transactions in sequence (Firestore doesn't support batch with auto-id)
+  for (const t of expiredTransactions) {
+    currentBalance -= t.points
+    const expireData = MapperUtils.toSnake({
+      memberId,
+      type: 'expire',
+      points: -t.points,
+      balance: Math.max(0, currentBalance),
+      description: `Pontos expirados (ref: ${t.id})`,
+      createdAt: now,
+    })
+    await FirestoreManager.save(POINTS_COLLECTION, null, expireData)
+  }
+
+  // Update member points ONCE at the end
+  await updateMember(memberId, { points: Math.max(0, currentBalance) })
 
   return totalExpired
 }

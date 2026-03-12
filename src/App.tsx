@@ -22,7 +22,16 @@ const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const PDV = lazy(() => import('./pages/PDV'))
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh
+      gcTime: 1000 * 60 * 30, // 30 minutes - cache retention
+      retry: 2,
+      refetchOnWindowFocus: false, // Avoid unnecessary refetches
+    },
+  },
+})
 
 // Get app mode once at startup
 const APP_MODE = getAppMode()

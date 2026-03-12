@@ -165,6 +165,7 @@ export default function PDV() {
 
   /**
    * Verify member by CPF
+   * Optimized: non-blocking expiring points check
    */
   async function verifyMember(cpf: string) {
     try {
@@ -182,11 +183,7 @@ export default function PDV() {
       const isActive = isMemberActive(member)
       const isExpired = new Date(member.expiryDate) < new Date()
 
-      // Check expiring points
-      const expiring = await getExpiringPoints(member.id)
-      const expiringTotal = expiring.reduce((sum, t) => sum + t.points, 0)
-      setExpiringPointsCount(expiringTotal)
-
+      // Set result immediately (fast path)
       setResult({
         member,
         isValid: isActive,
@@ -196,6 +193,19 @@ export default function PDV() {
             ? 'Assinatura expirada - desconto não disponível'
             : 'Assinatura pendente - desconto não disponível',
       })
+
+      // Check expiring points in background (non-blocking)
+      if (isActive && member.points > 0) {
+        getExpiringPoints(member.id).then((expiring) => {
+          const expiringTotal = expiring.reduce((sum, t) => sum + t.points, 0)
+          setExpiringPointsCount(expiringTotal)
+        }).catch(() => {
+          // Ignore errors for non-critical data
+          setExpiringPointsCount(0)
+        })
+      } else {
+        setExpiringPointsCount(0)
+      }
     } catch (error) {
       console.error('Error verifying member:', error)
       setResult({

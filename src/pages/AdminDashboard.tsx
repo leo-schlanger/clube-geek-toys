@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/badge'
 import { LoadingPage } from '../components/ui/loading'
 import { MemberModal } from '../components/MemberModal'
 import { UserModal } from '../components/UserModal'
+import { MembersTable } from '../components/MembersTable'
 import {
   RevenueChart,
   MembersChart,
@@ -16,7 +17,7 @@ import {
   ReportFilters,
 } from '../components/reports'
 import { PLANS, type Member, type PlanType, type DashboardStats } from '../types'
-import { formatCurrency, formatCPF, getStatusLabel } from '../lib/utils'
+import { formatCurrency, formatCPF } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
 import { getRecentLogs, type AuditLog } from '../lib/logs'
 import {
@@ -37,20 +38,13 @@ import {
   CreditCard,
   TrendingUp,
   AlertTriangle,
-  Search,
   Plus,
   LogOut,
   Settings,
-  Eye,
-  Edit,
-  Trash2,
   Crown,
   Star,
   Sparkles,
   RefreshCw,
-  Download,
-  MoreVertical,
-  CheckCircle,
   FileText,
   Clock,
   UserCog,
@@ -58,7 +52,6 @@ import {
 } from 'lucide-react'
 
 type ModalMode = 'create' | 'edit' | 'view' | 'role' | null
-type FilterStatus = 'all' | 'active' | 'pending' | 'inactive' | 'expired'
 type DashboardTab = 'members' | 'logs' | 'users' | 'points' | 'reports'
 
 // Action labels moved outside component to avoid recreation on each render
@@ -83,9 +76,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState<DashboardTab>('members')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all')
-  const [filterPlan, setFilterPlan] = useState<PlanType | 'all'>('all')
   const [stats, setStats] = useState<DashboardStats>({
     totalMembers: 0,
     activeMembers: 0,
@@ -109,13 +99,6 @@ export default function AdminDashboard() {
   const [modalMode, setModalMode] = useState<ModalMode>(null)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
   const [showUserModal, setShowUserModal] = useState(false)
-
-  // Dropdown state
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-
-  // Pagination state
-  const PAGE_SIZE = 10
-  const [currentPage, setCurrentPage] = useState(1)
 
   // Log filter state
   const [logDateFrom, setLogDateFrom] = useState('')
@@ -234,28 +217,6 @@ export default function AdminDashboard() {
     }
   }, [fetchData])
 
-  // Memoized filtered members - only recalculates when dependencies change
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
-      const matchesSearch =
-        m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.cpf.includes(searchTerm.replace(/\D/g, '')) ||
-        m.email.toLowerCase().includes(searchTerm.toLowerCase())
-
-      const matchesStatus = filterStatus === 'all' || m.status === filterStatus
-      const matchesPlan = filterPlan === 'all' || m.plan === filterPlan
-
-      return matchesSearch && matchesStatus && matchesPlan
-    })
-  }, [members, searchTerm, filterStatus, filterPlan])
-
-  // Memoized pagination derived values
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredMembers.length / PAGE_SIZE)), [filteredMembers.length])
-  const paginatedMembers = useMemo(() => filteredMembers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filteredMembers, currentPage])
-
-  // Reset to page 1 whenever filters change
-  const applyFilter = useCallback(() => setCurrentPage(1), [])
-
   // Memoized filtered logs
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
@@ -278,17 +239,9 @@ export default function AdminDashboard() {
       .sort((a, b) => b.points - a.points)
   }, [members])
 
-  // Memoized plan icons to avoid re-creating JSX on every render
-  const planIcons = useMemo(() => ({
-    silver: <Star className="h-4 w-4" />,
-    gold: <Crown className="h-4 w-4" />,
-    black: <Sparkles className="h-4 w-4" />,
-  }), [])
-
   const openModal = useCallback((mode: ModalMode, member?: Member) => {
     setModalMode(mode)
     setSelectedMember(member || null)
-    setOpenDropdown(null)
   }, [])
 
   const closeModal = useCallback(() => {
@@ -314,8 +267,6 @@ export default function AdminDashboard() {
       console.error('Error deleting member:', error)
       toast.error('Erro ao desativar membro')
     }
-
-    setOpenDropdown(null)
   }, [fetchData])
 
   const handleQuickActivate = useCallback(async (member: Member) => {
@@ -329,30 +280,6 @@ export default function AdminDashboard() {
     }
   }, [fetchData])
 
-  const exportCSV = useCallback(() => {
-    const headers = ['Nome', 'Email', 'CPF', 'Telefone', 'Plano', 'Status', 'Validade', 'Pontos']
-    const rows = filteredMembers.map((m) => [
-      m.fullName,
-      m.email,
-      formatCPF(m.cpf),
-      m.phone,
-      PLANS[m.plan as PlanType].name,
-      getStatusLabel(m.status),
-      new Date(m.expiryDate).toLocaleDateString('pt-BR'),
-      m.points.toString(),
-    ])
-
-    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `membros_${new Date().toISOString().split('T')[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-
-    toast.success('Exportação concluída')
-  }, [filteredMembers])
 
   if (loading) {
     return <LoadingPage />
@@ -536,217 +463,16 @@ export default function AdminDashboard() {
         {/* Main Content Area */}
         {activeTab === 'members' ? (
           <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <CardTitle>Membros</CardTitle>
-                  <CardDescription>Gerencie os membros do clube</CardDescription>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={exportCSV}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Exportar
-                  </Button>
-                  <Button onClick={() => openModal('create')}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Membro
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar por nome, CPF ou email..."
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); applyFilter() }}
-                    className="pl-10"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => { setFilterStatus(e.target.value as FilterStatus); applyFilter() }}
-                    className="px-3 py-2 rounded-md border bg-background text-sm"
-                  >
-                    <option value="all">Todos os status</option>
-                    <option value="active">Ativos</option>
-                    <option value="pending">Pendentes</option>
-                    <option value="inactive">Inativos</option>
-                    <option value="expired">Expirados</option>
-                  </select>
-                  <select
-                    value={filterPlan}
-                    onChange={(e) => { setFilterPlan(e.target.value as PlanType | 'all'); applyFilter() }}
-                    className="px-3 py-2 rounded-md border bg-background text-sm"
-                  >
-                    <option value="all">Todos os planos</option>
-                    <option value="silver">Silver</option>
-                    <option value="gold">Gold</option>
-                    <option value="black">Black</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-3 px-4 font-medium text-sm">Membro</th>
-                      <th className="text-left py-3 px-4 font-medium text-sm">Plano</th>
-                      <th className="text-left py-3 px-4 font-medium text-sm">Status</th>
-                      <th className="text-left py-3 px-4 font-medium text-sm">Validade</th>
-                      <th className="text-left py-3 px-4 font-medium text-sm">Pontos</th>
-                      <th className="text-right py-3 px-4 font-medium text-sm">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedMembers.map((member) => (
-                      <tr key={member.id} className="border-b hover:bg-muted/50 transition-colors">
-                        <td className="py-4 px-4">
-                          <div>
-                            <p className="font-medium">{member.fullName}</p>
-                            <p className="text-sm text-muted-foreground">{formatCPF(member.cpf)}</p>
-                            <p className="text-xs text-muted-foreground">{member.email}</p>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
-                            {planIcons[member.plan as PlanType]}
-                            {PLANS[member.plan as PlanType].name}
-                          </Badge>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                member.status === 'active'
-                                  ? 'success'
-                                  : member.status === 'pending'
-                                    ? 'warning'
-                                    : 'destructive'
-                              }
-                            >
-                              {getStatusLabel(member.status)}
-                            </Badge>
-                            {member.status === 'pending' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => handleQuickActivate(member)}
-                                title="Ativar membro"
-                              >
-                                <CheckCircle className="h-4 w-4 text-green-500" />
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={new Date(member.expiryDate) < new Date() ? 'text-red-500' : ''}>
-                            {new Date(member.expiryDate).toLocaleDateString('pt-BR')}
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="font-medium">{member.points}</span>
-                        </td>
-                        <td className="py-4 px-4 text-right">
-                          <div className="relative inline-block">
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openModal('view', member)} title="Ver detalhes">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => openModal('edit', member)} title="Editar">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => setOpenDropdown(openDropdown === member.id ? null : member.id)}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </div>
-
-                            {/* Dropdown menu */}
-                            {openDropdown === member.id && (
-                              <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-card ring-1 ring-border z-50">
-                                <div className="py-1">
-                                  <button
-                                    onClick={() => openModal('view', member)}
-                                    className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-muted"
-                                  >
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Ver detalhes
-                                  </button>
-                                  <button
-                                    onClick={() => openModal('edit', member)}
-                                    className="flex items-center w-full px-4 py-2 text-sm text-left hover:bg-muted"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Editar
-                                  </button>
-                                  <hr className="my-1" />
-                                  <button
-                                    onClick={() => handleDeleteMember(member)}
-                                    className="flex items-center w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Desativar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                {filteredMembers.length === 0 && (
-                  <div className="text-center py-12">
-                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">Nenhum membro encontrado</p>
-                    {members.length === 0 && (
-                      <Button className="mt-4" onClick={() => openModal('create')}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Cadastrar primeiro membro
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Pagination info */}
-              {filteredMembers.length > 0 && (
-                <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground border-t pt-4">
-                  <div>
-                    Exibindo {(currentPage - 1) * PAGE_SIZE + 1} a {Math.min(currentPage * PAGE_SIZE, filteredMembers.length)} de {filteredMembers.length} membros filtrados (Total: {members.length})
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      Anterior
-                    </Button>
-                    <span className="font-medium text-foreground">
-                      Página {currentPage} de {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      Próxima
-                    </Button>
-                  </div>
-                </div>
-              )}
+            <CardContent className="pt-6">
+              <MembersTable
+                members={members}
+                loading={refreshing}
+                onView={(member) => openModal('view', member)}
+                onEdit={(member) => openModal('edit', member)}
+                onDelete={handleDeleteMember}
+                onActivate={handleQuickActivate}
+                onCreate={() => openModal('create')}
+              />
             </CardContent>
           </Card>
         ) : activeTab === 'users' ? (
@@ -986,8 +712,6 @@ export default function AdminDashboard() {
         />
       )}
 
-      {/* Click outside to close dropdown */}
-      {openDropdown && <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)} />}
     </div>
   )
 }

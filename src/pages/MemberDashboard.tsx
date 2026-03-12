@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
@@ -90,21 +90,21 @@ export default function MemberDashboard() {
     }
   }
 
-  function handleModalSuccess() {
+  const handleModalSuccess = useCallback(() => {
     setModal(null)
     fetchMemberData()
-  }
+  }, [])
 
-  function copyMemberId() {
+  const copyMemberId = useCallback(() => {
     if (member) {
       navigator.clipboard.writeText(member.id)
       setCopied(true)
       toast.success('ID copiado!')
       setTimeout(() => setCopied(false), 2000)
     }
-  }
+  }, [member])
 
-  function shareCard() {
+  const shareCard = useCallback(() => {
     if (navigator.share && member) {
       navigator.share({
         title: 'Minha Carteirinha Clube Geek & Toys',
@@ -116,7 +116,7 @@ export default function MemberDashboard() {
     } else {
       copyMemberId()
     }
-  }
+  }, [member, copyMemberId])
 
   function getTransactionIcon(type: string) {
     switch (type) {
@@ -183,9 +183,17 @@ export default function MemberDashboard() {
   const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
   const isExpired = daysUntilExpiry <= 0
-  const expiringPointsTotal = expiringPoints.reduce((sum, t) => sum + t.points, 0)
-  const redemptionRules = getRedemptionRules()
-  const displayedHistory = showAllHistory ? pointsHistory : pointsHistory.slice(0, 5)
+
+  // Memoized computed values to avoid recalculation on every render
+  const expiringPointsTotal = useMemo(
+    () => expiringPoints.reduce((sum, t) => sum + t.points, 0),
+    [expiringPoints]
+  )
+  const redemptionRules = useMemo(() => getRedemptionRules(), [])
+  const displayedHistory = useMemo(
+    () => showAllHistory ? pointsHistory : pointsHistory.slice(0, 5),
+    [showAllHistory, pointsHistory]
+  )
 
   // QR Code data
   const qrData = JSON.stringify({
