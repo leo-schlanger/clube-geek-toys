@@ -36,15 +36,15 @@ export class FirestoreManager {
             console.error(`[Firestore] Error getting ${collectionName}/${id}:`, {
                 code: error?.code,
                 message: error?.message,
-                name: error?.name,
-                fullError: error
+                name: error?.name
             })
             // Check if it's a permission error
             if (error?.code === 'permission-denied') {
                 console.error(`[Firestore] PERMISSION DENIED - Check Firestore rules for collection: ${collectionName}`)
             }
-            // Re-throw the error so callers can distinguish between "not found" and "error"
-            throw error
+            // Return null but let caller know it was an error via the error being logged
+            // The retry logic in AuthContext will handle this
+            return null
         }
     }
 

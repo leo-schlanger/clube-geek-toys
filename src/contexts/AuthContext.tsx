@@ -126,31 +126,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('[Auth] Auth state changed:', firebaseUser ? `User: ${firebaseUser.uid}` : 'No user')
-      setUser(firebaseUser)
 
-      if (firebaseUser) {
-        // Ensure auth token is available for Firestore
-        try {
-          const token = await firebaseUser.getIdToken(true) // Force refresh token
-          console.log('[Auth] Token refreshed, length:', token.length)
-          // Small delay to ensure Firestore SDK has auth context
-          await new Promise(resolve => setTimeout(resolve, 100))
-        } catch (tokenError) {
-          console.error('[Auth] Failed to refresh token:', tokenError)
+      try {
+        setUser(firebaseUser)
+
+        if (firebaseUser) {
+          // Ensure auth token is available for Firestore
+          try {
+            const token = await firebaseUser.getIdToken(true) // Force refresh token
+            console.log('[Auth] Token refreshed, length:', token.length)
+          } catch (tokenError) {
+            console.error('[Auth] Failed to refresh token:', tokenError)
+            // Continue anyway - the token might still work
+          }
+
+          console.log('[Auth] Fetching user role for:', firebaseUser.uid)
+          const fetchedRole = await fetchUserRole(firebaseUser.uid)
+          console.log('[Auth] Role result:', fetchedRole)
+          setRole(fetchedRole)
+        } else {
+          setRole(null)
+          setRoleError(null)
+          setUserNotFound(false)
         }
-
-        console.log('[Auth] Fetching user role for:', firebaseUser.uid)
-        console.log('[Auth] Current auth user:', auth.currentUser?.uid)
-        const fetchedRole = await fetchUserRole(firebaseUser.uid)
-        console.log('[Auth] Role result:', fetchedRole)
-        setRole(fetchedRole)
-      } else {
+      } catch (error) {
+        console.error('[Auth] Error in auth state handler:', error)
+        setRoleError('Erro inesperado ao carregar autenticação')
         setRole(null)
-        setRoleError(null)
-        setUserNotFound(false)
+      } finally {
+        // ALWAYS set loading to false
+        setLoading(false)
       }
-
-      setLoading(false)
     })
 
     return () => unsubscribe()
