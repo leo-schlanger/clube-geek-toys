@@ -6,7 +6,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, enableNetwork } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserRole } from '../types'
 
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Fetch user role from Firestore - simple version
+  // Fetch user role from Firestore with timeout
   const fetchUserRole = useCallback(async (userId: string): Promise<UserRole | null> => {
     console.log('[Auth] fetchUserRole called for:', userId)
 
@@ -39,11 +39,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoleError(null)
 
     try {
+      // Force Firestore to connect to network
+      console.log('[Auth] Enabling Firestore network...')
+      await enableNetwork(db).catch(e => console.warn('[Auth] enableNetwork failed:', e))
+
       const userRef = doc(db, 'users', userId)
       console.log('[Auth] Getting document from Firestore...')
 
-      const userSnap = await getDoc(userRef)
-      console.log('[Auth] Document exists:', userSnap.exists())
+      // Create timeout promise - 8 seconds
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout: Firestore demorou demais')), 8000)
+      })
+
+      // Race between getDoc and timeout
+      const userSnap = await Promise.race([
+        getDoc(userRef),
+        timeoutPromise
+      ])
+
+      console.log('[Auth] Document received, exists:', userSnap.exists())
 
       if (!userSnap.exists()) {
         console.log('[Auth] User document not found in Firestore')
@@ -53,14 +67,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const userData = userSnap.data()
-      console.log('[Auth] User data from Firestore:', JSON.stringify(userData))
+      console.log('[Auth] User data:', JSON.stringify(userData))
 
       const userRole = userData.role as UserRole || 'member'
-      console.log('[Auth] Returning role:', userRole)
+      console.log('[Auth] Role:', userRole)
       return userRole
     } catch (error: any) {
-      console.error('[Auth] Error fetching role:', error.code, error.message)
-      setRoleError(`Erro: ${error.message}`)
+      console.error('[Auth] Error fetching role:', error)
+
+      // Check for specific error types
+      if (error.message?.includes('offline')) {
+        setRoleError('Sem conexão com o servidor. Verifique sua internet.')
+      } else if (error.message?.includes('Timeout')) {
+        setRoleError('Servidor demorou demais. Tente novamente.')
+      } else if (error.code === 'permission-denied') {
+        setRoleError('Sem permissão para acessar dados.')
+      } else {
+        setRoleError(`Erro: ${error.message || 'Desconhecido'}`)
+      }
       return null
     }
   }, [])
