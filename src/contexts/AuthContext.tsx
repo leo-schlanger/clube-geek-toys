@@ -31,28 +31,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Fetch role from Firestore with timeout
-  const fetchRole = useCallback(async (uid: string) => {
+  // Fetch role from Firestore with retry
+  const fetchRole = useCallback(async (uid: string, retryCount = 0): Promise<UserRole | null> => {
+    const MAX_RETRIES = 3
+    const RETRY_DELAY = 1000
+
     try {
+      console.log(`[Auth] Fetching role for ${uid} (attempt ${retryCount + 1})`)
+
+      // Force token refresh to ensure Firestore has valid auth
+      const currentUser = auth.currentUser
+      if (currentUser) {
+        await currentUser.getIdToken(true)
+        console.log('[Auth] Token refreshed')
+      }
+
       const userRef = doc(db, 'users', uid)
+      const userSnap = await getDoc(userRef)
 
-      // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout ao conectar com o banco de dados')), 10000)
-      )
-
-      const userSnap = await Promise.race([getDoc(userRef), timeoutPromise]) as Awaited<ReturnType<typeof getDoc>>
-
-      if (!userSnap || !userSnap.exists()) {
+      if (!userSnap.exists()) {
+        console.log('[Auth] User document not found')
         setUserNotFound(true)
         setRoleError('Usuário não cadastrado no sistema.')
         return null
       }
 
       const data = userSnap.data() as { role?: UserRole } | undefined
+      console.log('[Auth] Role fetched:', data?.role)
       return data?.role || 'member'
     } catch (error: any) {
       console.error('[Auth] Erro ao buscar role:', error)
+
+      // Retry on failure
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[Auth] Retrying in ${RETRY_DELAY}ms...`)
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        return fetchRole(uid, retryCount + 1)
+      }
+
       setRoleError(error.message || 'Erro ao carregar permissões')
       return null
     }
