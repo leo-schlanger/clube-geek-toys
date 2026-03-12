@@ -17,7 +17,7 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from 'firebase/auth'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { doc, setDoc, getDoc, enableNetwork } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserRole } from '../types'
 
@@ -162,12 +162,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Auth methods
   const signIn = useCallback(async (email: string, password: string) => {
     try {
-      setLoading(true)
       setError(null)
       await signInWithEmailAndPassword(auth, email, password)
+      // onAuthStateChanged will handle the rest
       return { success: true }
     } catch (err: unknown) {
-      setLoading(false)
       const firebaseError = err as { code?: string }
 
       const errorMap: Record<string, string> = {

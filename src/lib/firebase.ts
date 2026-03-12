@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth'
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,16 +19,4 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
 // Initialize Firebase
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
-
-// Initialize Firestore with long polling (avoids WebSocket issues)
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-})
-
-// Set persistence
-setPersistence(auth, browserLocalPersistence).catch((error) => {
-  console.warn('[Firebase] Could not set persistence:', error.message)
-})
-
-// Firebase initialized
+export const db = getFirestore(app)
