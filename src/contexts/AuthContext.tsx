@@ -1,22 +1,13 @@
 /**
- * AuthContext - Modern Firebase Authentication for React 19
- *
- * Uses useSyncExternalStore for proper React 19 concurrent mode support
- * with Firebase's onAuthStateChanged listener.
- *
- * @see https://react.dev/reference/react/useSyncExternalStore
- * @see https://firebase.google.com/docs/auth/web/start
+ * AuthContext - Firebase Authentication with localStorage cache
  */
 
 import {
   createContext,
   useContext,
   useCallback,
-  useMemo,
-  useSyncExternalStore,
   useState,
   useEffect,
-  useRef,
   type ReactNode,
 } from 'react'
 import {
@@ -25,9 +16,8 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   type User,
-  type Auth,
 } from 'firebase/auth'
-import { doc, setDoc, onSnapshot, type Unsubscribe } from 'firebase/firestore'
+import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import type { UserRole } from '../types'
 
@@ -48,64 +38,50 @@ interface AuthContextType {
 }
 
 // =============================================================================
-// Firebase Auth Store (External Store for useSyncExternalStore)
+// LocalStorage helpers
 // =============================================================================
 
-/**
- * Creates an external store for Firebase Auth state
- * This allows React 19's concurrent mode to work properly with Firebase
- */
-function createAuthStore(firebaseAuth: Auth) {
-  let currentUser: User | null = null
-  let isInitialized = false
-  const listeners = new Set<() => void>()
+const ROLE_CACHE_KEY = 'auth_role_cache'
 
-  // Subscribe to Firebase auth state changes
-  const unsubscribeAuth = onAuthStateChanged(firebaseAuth, (user) => {
-    currentUser = user
-    isInitialized = true
-    // Notify all subscribers
-    listeners.forEach((listener) => listener())
-  })
+interface RoleCache {
+  uid: string
+  role: UserRole
+  timestamp: number
+}
 
-  return {
-    subscribe(listener: () => void) {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    getSnapshot() {
-      return { user: currentUser, isInitialized }
-    },
-    getServerSnapshot() {
-      return { user: null, isInitialized: false }
-    },
-    cleanup() {
-      unsubscribeAuth()
-      listeners.clear()
-    },
+function getCachedRole(uid: string): UserRole | null {
+  try {
+    const cached = localStorage.getItem(ROLE_CACHE_KEY)
+    if (!cached) return null
+
+    const data: RoleCache = JSON.parse(cached)
+
+    // Check if cache is for this user and not expired (1 hour)
+    const ONE_HOUR = 60 * 60 * 1000
+    if (data.uid === uid && Date.now() - data.timestamp < ONE_HOUR) {
+      return data.role
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null
+}
+
+function setCachedRole(uid: string, role: UserRole): void {
+  try {
+    const data: RoleCache = { uid, role, timestamp: Date.now() }
+    localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify(data))
+  } catch {
+    // Ignore storage errors
   }
 }
 
-// Create singleton store
-const authStore = createAuthStore(auth)
-
-// =============================================================================
-// Custom Hook: useFirebaseAuth
-// =============================================================================
-
-/**
- * Hook that uses useSyncExternalStore for Firebase auth state
- * This is the React 19 recommended way to subscribe to external stores
- */
-function useFirebaseAuth() {
-  const snapshot = useSyncExternalStore(
-    authStore.subscribe,
-    authStore.getSnapshot,
-    authStore.getServerSnapshot
-  )
-  return snapshot
+function clearCachedRole(): void {
+  try {
+    localStorage.removeItem(ROLE_CACHE_KEY)
+  } catch {
+    // Ignore
+  }
 }
 
 // =============================================================================
@@ -119,122 +95,81 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 // =============================================================================
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Use the external store for auth state
-  const { user, isInitialized } = useFirebaseAuth()
-
-  // Role state (fetched from Firestore)
+  const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<UserRole | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
-  const [roleLoading, setRoleLoading] = useState(false)
 
-  // Firestore listener cleanup ref
-  const roleUnsubscribeRef = useRef<Unsubscribe | null>(null)
-  const currentUidRef = useRef<string | null>(null)
-
-  // =============================================================================
-  // Role Fetching with Real-time Listener
-  // =============================================================================
-
-  const setupRoleListener = useCallback((uid: string) => {
-    // Cleanup previous listener
-    if (roleUnsubscribeRef.current) {
-      roleUnsubscribeRef.current()
-      roleUnsubscribeRef.current = null
+  // Fetch role from Firestore or cache
+  const fetchRole = useCallback(async (uid: string): Promise<UserRole | null> => {
+    // Try cache first
+    const cached = getCachedRole(uid)
+    if (cached) {
+      setRole(cached)
+      setError(null)
+      setUserNotFound(false)
+      return cached
     }
 
-    // Don't re-setup if same user
-    if (currentUidRef.current === uid) {
-      return
+    // Fetch from Firestore
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid))
+
+      if (!userDoc.exists()) {
+        setRole(null)
+        setUserNotFound(true)
+        setError('Usuário não cadastrado no sistema.')
+        return null
+      }
+
+      const data = userDoc.data() as { role?: UserRole }
+      const fetchedRole = data?.role || 'member'
+
+      // Cache the role
+      setCachedRole(uid, fetchedRole)
+      setRole(fetchedRole)
+      setError(null)
+      setUserNotFound(false)
+      return fetchedRole
+    } catch (err) {
+      console.error('[Auth] Error fetching role:', err)
+      setError('Erro ao carregar permissões')
+      setRole(null)
+      return null
     }
+  }, [])
 
-    currentUidRef.current = uid
-    setRoleLoading(true)
-    setError(null)
-    setUserNotFound(false)
-
-    // Use onSnapshot for real-time updates
-    const userDocRef = doc(db, 'users', uid)
-
-    roleUnsubscribeRef.current = onSnapshot(
-      userDocRef,
-      (snapshot) => {
-        setRoleLoading(false)
-
-        if (!snapshot.exists()) {
-          // User document not found in Firestore
-          setRole(null)
-          setUserNotFound(true)
-          setError('Usuário não cadastrado no sistema.')
-          return
-        }
-
-        const data = snapshot.data() as { role?: UserRole }
-        const newRole = data?.role || 'member'
-
-        // Role successfully loaded
-        setRole(newRole)
+  // Listen to auth state changes - runs once on mount
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser)
+        await fetchRole(firebaseUser.uid)
+      } else {
+        setUser(null)
+        setRole(null)
         setError(null)
         setUserNotFound(false)
-      },
-      (err) => {
-        console.error('[Auth] Error fetching role:', err)
-        setRoleLoading(false)
-        setError(err.message || 'Erro ao carregar permissões')
-        setRole(null)
+        clearCachedRole()
       }
-    )
-  }, [])
+      setLoading(false)
+    })
 
-  const cleanupRoleListener = useCallback(() => {
-    if (roleUnsubscribeRef.current) {
-      roleUnsubscribeRef.current()
-      roleUnsubscribeRef.current = null
-    }
-    currentUidRef.current = null
-    setRole(null)
-    setError(null)
-    setUserNotFound(false)
-    setRoleLoading(false)
-  }, [])
+    return () => unsubscribe()
+  }, [fetchRole])
 
-  // =============================================================================
-  // Effect: Setup/Cleanup Role Listener on User Change
-  // =============================================================================
-
-  useEffect(() => {
-    if (user) {
-      setupRoleListener(user.uid)
-    } else if (isInitialized) {
-      // Only cleanup when user logs out (not on initial load)
-      cleanupRoleListener()
-    }
-
-    return () => {
-      // Cleanup listener on unmount
-      if (roleUnsubscribeRef.current) {
-        roleUnsubscribeRef.current()
-        roleUnsubscribeRef.current = null
-      }
-    }
-  }, [user, isInitialized, setupRoleListener, cleanupRoleListener])
-
-  // =============================================================================
-  // Auth Methods
-  // =============================================================================
-
+  // Auth methods
   const signIn = useCallback(async (email: string, password: string) => {
     try {
-      setRoleLoading(true)
+      setLoading(true)
+      setError(null)
       await signInWithEmailAndPassword(auth, email, password)
       return { success: true }
     } catch (err: unknown) {
-      console.error('[Auth] Sign in error:', err)
-      setRoleLoading(false)
-
+      setLoading(false)
       const firebaseError = err as { code?: string }
 
-      // Map Firebase errors to user-friendly messages
       const errorMap: Record<string, string> = {
         'auth/invalid-credential': 'Email ou senha incorretos',
         'auth/user-not-found': 'Usuário não encontrado',
@@ -255,17 +190,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password)
 
-      // Create user document with member role
       await setDoc(doc(db, 'users', result.user.uid), {
         email: result.user.email,
         role: 'member' as UserRole,
         createdAt: new Date().toISOString(),
       })
 
+      // Cache the new role
+      setCachedRole(result.user.uid, 'member')
+
       return { success: true }
     } catch (err: unknown) {
-      console.error('[Auth] Sign up error:', err)
-
       const firebaseError = err as { code?: string }
 
       const errorMap: Record<string, string> = {
@@ -283,47 +218,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    cleanupRoleListener()
+    clearCachedRole()
+    setRole(null)
+    setError(null)
+    setUserNotFound(false)
     await firebaseSignOut(auth)
-  }, [cleanupRoleListener])
+  }, [])
 
   const refreshRole = useCallback(async () => {
     if (!user) return
-
-    // Force refetch by cleaning up and re-setting up the listener
-    if (roleUnsubscribeRef.current) {
-      roleUnsubscribeRef.current()
-      roleUnsubscribeRef.current = null
-    }
-    currentUidRef.current = null
-    setRole(null)
-
-    // Small delay to ensure cleanup is complete
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    setupRoleListener(user.uid)
-  }, [user, setupRoleListener])
-
-  // =============================================================================
-  // Computed State
-  // =============================================================================
-
-  const loading = !isInitialized || (user !== null && roleLoading)
-
-  const value = useMemo<AuthContextType>(() => ({
-    user,
-    role,
-    loading,
-    error,
-    userNotFound,
-    signIn,
-    signUp,
-    signOut,
-    refreshRole,
-  }), [user, role, loading, error, userNotFound, signIn, signUp, signOut, refreshRole])
+    clearCachedRole()
+    await fetchRole(user.uid)
+  }, [user, fetchRole])
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      role,
+      loading,
+      error,
+      userNotFound,
+      signIn,
+      signUp,
+      signOut,
+      refreshRole,
+    }}>
       {children}
     </AuthContext.Provider>
   )
@@ -339,14 +258,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
-}
-
-// =============================================================================
-// Cleanup (for hot module replacement)
-// =============================================================================
-
-if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
-    authStore.cleanup()
-  })
 }
