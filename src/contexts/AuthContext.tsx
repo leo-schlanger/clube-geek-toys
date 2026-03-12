@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, type ReactNode } from 'react'
-import { useAuthState } from 'react-firebase-hooks/auth'
 import {
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -11,7 +11,7 @@ import { auth, db } from '../lib/firebase'
 import type { UserRole } from '../types'
 
 interface AuthContextType {
-  user: User | null | undefined
+  user: User | null
   role: UserRole | null
   loading: boolean
   roleError: string | null
@@ -25,96 +25,72 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Use react-firebase-hooks for auth state
-  const [user, authLoading, authError] = useAuthState(auth)
-
+  const [user, setUser] = useState<User | null>(null)
   const [role, setRole] = useState<UserRole | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [roleError, setRoleError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
 
-  // Fetch role when user changes
-  useEffect(() => {
-    if (authLoading) return
+  // Fetch role from Firestore
+  const fetchRole = useCallback(async (uid: string) => {
+    try {
+      const userRef = doc(db, 'users', uid)
+      const userSnap = await getDoc(userRef)
 
-    if (!user) {
-      setRole(null)
-      setRoleError(null)
-      setUserNotFound(false)
-      return
-    }
-
-    // Fetch role from Firestore
-    const fetchRole = async () => {
-      setRoleLoading(true)
-      setRoleError(null)
-      setUserNotFound(false)
-
-      try {
-        console.log('[Auth] Fetching role for:', user.uid)
-        const userRef = doc(db, 'users', user.uid)
-        const userSnap = await getDoc(userRef)
-
-        if (!userSnap.exists()) {
-          console.log('[Auth] User not found in Firestore')
-          setUserNotFound(true)
-          setRoleError('Usuário não cadastrado no sistema.')
-          setRole(null)
-        } else {
-          const data = userSnap.data()
-          console.log('[Auth] User data:', data)
-          setRole((data.role as UserRole) || 'member')
-        }
-      } catch (error: any) {
-        console.error('[Auth] Error fetching role:', error)
-        setRoleError(error.message || 'Erro ao carregar permissões')
-        setRole(null)
-      } finally {
-        setRoleLoading(false)
+      if (!userSnap.exists()) {
+        setUserNotFound(true)
+        setRoleError('Usuário não cadastrado no sistema.')
+        return null
       }
+
+      const data = userSnap.data()
+      return (data.role as UserRole) || 'member'
+    } catch (error: any) {
+      console.error('[Auth] Erro ao buscar role:', error)
+      setRoleError(error.message || 'Erro ao carregar permissões')
+      return null
     }
+  }, [])
 
-    fetchRole()
-  }, [user, authLoading])
-
-  // Log auth errors
+  // Auth state listener
   useEffect(() => {
-    if (authError) {
-      console.error('[Auth] Auth error:', authError)
-    }
-  }, [authError])
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser)
 
-  // Combined loading state
-  const loading = authLoading || roleLoading
+      if (firebaseUser) {
+        setUserNotFound(false)
+        setRoleError(null)
+        const userRole = await fetchRole(firebaseUser.uid)
+        setRole(userRole)
+      } else {
+        setRole(null)
+        setRoleError(null)
+        setUserNotFound(false)
+      }
+
+      setLoading(false)
+    })
+
+    return unsubscribe
+  }, [fetchRole])
 
   // Refresh role
   const refreshRole = useCallback(async () => {
     if (!user) return
-
-    setRoleLoading(true)
-    try {
-      const userRef = doc(db, 'users', user.uid)
-      const userSnap = await getDoc(userRef)
-
-      if (userSnap.exists()) {
-        setRole((userSnap.data().role as UserRole) || 'member')
-        setRoleError(null)
-        setUserNotFound(false)
-      }
-    } catch (error: any) {
-      setRoleError(error.message)
-    } finally {
-      setRoleLoading(false)
-    }
-  }, [user])
+    setLoading(true)
+    setRoleError(null)
+    setUserNotFound(false)
+    const userRole = await fetchRole(user.uid)
+    setRole(userRole)
+    setLoading(false)
+  }, [user, fetchRole])
 
   // Sign in
   const signIn = useCallback(async (email: string, password: string) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password)
       return { user: result.user, error: null }
-    } catch (error: any) {
-      console.error('[Auth] Sign in error:', error.code)
+    } catch (error) {
       return { user: null, error: error as Error }
     }
   }, [])
@@ -131,8 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       return { user: result.user, error: null }
-    } catch (error: any) {
-      console.error('[Auth] Sign up error:', error.code)
+    } catch (error) {
       return { user: null, error: error as Error }
     }
   }, [])
@@ -140,13 +115,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sign out
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth)
+    setUser(null)
     setRole(null)
     setRoleError(null)
     setUserNotFound(false)
   }, [])
 
   const value = useMemo(() => ({
-    user: user ?? null,
+    user,
     role,
     loading,
     roleError,

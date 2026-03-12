@@ -16,9 +16,8 @@ export default function AdminLogin() {
 
   const { user, role, signIn, roleError, userNotFound, refreshRole, loading } = useAuth()
 
-  // If already authenticated with role, redirect
+  // Redirect if authenticated with role
   if (!loading && user && role) {
-    console.log('[AdminLogin] User has role, redirecting to /admin')
     return <Navigate to="/admin" replace />
   }
 
@@ -27,19 +26,15 @@ export default function AdminLogin() {
     setError('')
     setIsSubmitting(true)
 
-    console.log('[AdminLogin] Submitting login for:', email)
-
     const { error: signInError } = await signIn(email, password)
 
     if (signInError) {
-      console.log('[AdminLogin] Login failed:', signInError.message)
       setError('Credenciais inválidas')
       setIsSubmitting(false)
       return
     }
 
-    console.log('[AdminLogin] Login successful, waiting for auth state...')
-    // Don't set isSubmitting to false - auth state change will trigger re-render
+    // Auth state change will handle the rest
   }
 
   async function handleRetry() {
@@ -144,12 +139,7 @@ export default function AdminLogin() {
           </CardContent>
 
           <CardFooter>
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={isLoading}
-            >
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -166,11 +156,6 @@ export default function AdminLogin() {
           <p className="text-xs text-center text-muted-foreground">
             Acesso exclusivo para administradores e vendedores.
           </p>
-        </div>
-
-        {/* Debug - remover depois */}
-        <div className="px-6 pb-4 text-[10px] text-muted-foreground/50 font-mono">
-          user:{user ? 'yes' : 'no'} | role:{role || 'null'} | loading:{String(loading)}
         </div>
       </Card>
     </div>
