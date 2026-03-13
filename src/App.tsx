@@ -12,6 +12,7 @@ const Login = lazy(() => import('./pages/Login'))
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const Subscribe = lazy(() => import('./pages/Subscribe'))
 const Register = lazy(() => import('./pages/Register'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
 const MemberDashboard = lazy(() => import('./pages/MemberDashboard'))
 const PaymentResult = lazy(() => import('./pages/PaymentResult'))
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'))
@@ -41,11 +42,13 @@ const APP_MODE = getAppMode()
 function ProtectedRoute({
   children,
   allowedRoles,
+  requireEmailVerification = true,
 }: {
   children: React.ReactNode
   allowedRoles?: string[]
+  requireEmailVerification?: boolean
 }) {
-  const { user, role, loading } = useAuth()
+  const { user, role, loading, emailVerified } = useAuth()
 
   if (loading) {
     return <LoadingPage />
@@ -61,6 +64,11 @@ function ProtectedRoute({
 
   if (allowedRoles && !allowedRoles.includes(role)) {
     return <Navigate to="/acesso-negado" replace />
+  }
+
+  // Verificar email para membros (admin/seller não precisa)
+  if (requireEmailVerification && role === 'member' && !emailVerified) {
+    return <Navigate to="/verificar-email" replace />
   }
 
   return <>{children}</>
@@ -189,6 +197,7 @@ function MemberRoutes() {
       <Route path="/assinar" element={<Subscribe />} />
       <Route path="/cadastro" element={<Register />} />
       <Route path="/recuperar-senha" element={<ForgotPassword />} />
+      <Route path="/verificar-email" element={<VerifyEmail />} />
       <Route path="/termos" element={<TermsOfUse />} />
       <Route path="/privacidade" element={<PrivacyPolicy />} />
 

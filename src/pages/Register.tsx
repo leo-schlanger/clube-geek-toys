@@ -168,7 +168,7 @@ export default function Register() {
 
       // 4. Move to payment step
       setStep(3)
-      toast.success('Conta criada! Agora finalize o pagamento.', { id: 'reg-status' })
+      toast.success('Conta criada! Verifique seu email e finalize o pagamento.', { id: 'reg-status' })
 
     } catch (error) {
       console.error('Error registering:', error)

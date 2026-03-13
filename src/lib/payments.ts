@@ -12,11 +12,83 @@ const PAYMENTS_COLLECTION = 'payments'
 const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || ''
 const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL || ''
 
+// Request configuration
+const DEFAULT_TIMEOUT = 15000 // 15 seconds
+const MAX_RETRIES = 3
+const INITIAL_RETRY_DELAY = 1000 // 1 second
+
 /**
  * Check if Mercado Pago is configured
  */
 export function isMercadoPagoConfigured(): boolean {
   return Boolean(MERCADOPAGO_PUBLIC_KEY && PAYMENT_API_URL)
+}
+
+// ============================================
+// FETCH HELPERS WITH TIMEOUT AND RETRY
+// ============================================
+
+/**
+ * Fetch with timeout support
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout: number = DEFAULT_TIMEOUT
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    })
+    return response
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+/**
+ * Fetch with exponential backoff retry
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  maxRetries: number = MAX_RETRIES,
+  timeout: number = DEFAULT_TIMEOUT
+): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options, timeout)
+
+      // Don't retry on client errors (4xx), only on server errors (5xx) or network issues
+      if (response.ok || (response.status >= 400 && response.status < 500)) {
+        return response
+      }
+
+      // Server error - will retry
+      lastError = new Error(`Server error: ${response.status}`)
+    } catch (error) {
+      lastError = error as Error
+
+      // Don't retry if aborted intentionally
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeout}ms`)
+      }
+    }
+
+    // Wait before retry with exponential backoff
+    if (attempt < maxRetries - 1) {
+      const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError || new Error('Request failed after retries')
 }
 
 // ============================================
@@ -129,7 +201,7 @@ export async function generatePixPayment(
   }
 
   try {
-    const response = await fetch(`${PAYMENT_API_URL}/pix/create`, {
+    const response = await fetchWithRetry(`${PAYMENT_API_URL}/pix/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -248,7 +320,7 @@ export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentS
   if (!PAYMENT_API_URL) return null
 
   try {
-    const response = await fetch(`${PAYMENT_API_URL}/pix/status/${paymentId}`)
+    const response = await fetchWithRetry(`${PAYMENT_API_URL}/pix/status/${paymentId}`)
     if (!response.ok) throw new Error('Failed to check payment status')
     const data = await response.json()
 
@@ -262,6 +334,39 @@ export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentS
     }
   } catch (error) {
     console.error('Error checking payment status:', error)
+    return null
+  }
+}
+
+/**
+ * Check payment status by Mercado Pago payment ID (for checkout redirect validation)
+ */
+export async function checkPaymentById(paymentId: string): Promise<{
+  status: PaymentStatus
+  externalReference?: string
+} | null> {
+  if (!PAYMENT_API_URL || !paymentId) return null
+
+  try {
+    const response = await fetchWithRetry(`${PAYMENT_API_URL}/payment/status/${paymentId}`)
+    if (!response.ok) return null
+    const data = await response.json()
+
+    let status: PaymentStatus = 'pending'
+    switch (data.status) {
+      case 'approved': status = 'paid'; break
+      case 'rejected':
+      case 'cancelled': status = 'failed'; break
+      case 'refunded': status = 'refunded'; break
+      default: status = 'pending'
+    }
+
+    return {
+      status,
+      externalReference: data.external_reference,
+    }
+  } catch (error) {
+    console.error('Error checking payment by ID:', error)
     return null
   }
 }
@@ -281,7 +386,7 @@ export async function createCheckoutPreference(
     const amount = calculatePlanPrice(plan, paymentType)
     const planData = PLANS[plan]
 
-    const response = await fetch(`${PAYMENT_API_URL}/checkout/create`, {
+    const response = await fetchWithRetry(`${PAYMENT_API_URL}/checkout/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

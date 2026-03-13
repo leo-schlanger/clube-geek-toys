@@ -12,13 +12,19 @@
 ## 🔴 CRÍTICO
 
 ### Segurança
-- [ ] **Rotacionar credenciais se expostas** - Verificar histórico git para credentials
+- [x] **Rotacionar credenciais se expostas** ✅ - Verificado histórico git, nenhuma credencial exposta
+  - .gitignore configurado corretamente
+  - Secrets gerenciados via Vercel/Wrangler
 - [x] **Implementar rate limiting** ✅ - Proteção contra brute force no login
   - Máximo 5 tentativas por email
   - Bloqueio de 5 minutos após exceder
   - Contador visual de tentativas restantes
   - Implementado em `src/lib/rate-limit.ts`
-- [ ] **Adicionar verificação de email** - Firebase Auth suporta, não está implementado
+- [x] **Adicionar verificação de email** ✅ - Firebase Auth email verification
+  - Email enviado automaticamente após cadastro
+  - Página `/verificar-email` para reenvio
+  - Membros redirecionados até verificar email
+  - Cooldown de 60s entre reenvios
 
 ---
 
@@ -58,9 +64,11 @@
   - `usePoints()` - hook para sistema de pontos
   - Diretório `src/hooks/` está vazio
 
-- [ ] **Adicionar retry com exponential backoff**
-  - Transações de pontos podem falhar silenciosamente
-  - Implementar retry em `addPoints()` e `redeemPoints()`
+- [x] **Adicionar retry com exponential backoff** ✅ (pagamentos)
+  - Implementado em `src/lib/payments.ts`
+  - `fetchWithRetry()` com backoff exponencial
+  - Timeout de 15s por request
+  - Pendente: aplicar em `addPoints()` e `redeemPoints()`
 
 ---
 

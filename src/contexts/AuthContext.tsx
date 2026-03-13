@@ -14,6 +14,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
+  sendEmailVerification,
   type User,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
@@ -29,9 +30,12 @@ interface AuthContextType {
   role: UserRole | null
   loading: boolean
   error: string | null
+  emailVerified: boolean
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signOut: () => Promise<void>
+  sendVerificationEmail: () => Promise<{ success: boolean; error?: string }>
+  refreshUser: () => Promise<void>
 }
 
 // =============================================================================
@@ -131,6 +135,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
       })
 
+      // Enviar email de verificação
+      try {
+        await sendEmailVerification(result.user, {
+          url: `${window.location.origin}/login`,
+          handleCodeInApp: false,
+        })
+      } catch (verificationError) {
+        console.error('[Auth] Erro ao enviar email de verificação:', verificationError)
+        // Não falha o cadastro se o email de verificação falhar
+      }
+
       return { success: true }
     } catch (err) {
       const firebaseError = err as { code?: string }
@@ -145,6 +160,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         success: false,
         error: errorMessages[firebaseError.code || ''] || 'Erro ao criar conta',
       }
+    }
+  }
+
+  // Reenviar email de verificação
+  async function sendVerificationEmailFn() {
+    if (!user) {
+      return { success: false, error: 'Usuário não autenticado' }
+    }
+
+    if (user.emailVerified) {
+      return { success: false, error: 'Email já verificado' }
+    }
+
+    try {
+      await sendEmailVerification(user, {
+        url: `${window.location.origin}/login`,
+        handleCodeInApp: false,
+      })
+      return { success: true }
+    } catch (err) {
+      const firebaseError = err as { code?: string }
+
+      if (firebaseError.code === 'auth/too-many-requests') {
+        return { success: false, error: 'Aguarde alguns minutos antes de reenviar' }
+      }
+
+      return { success: false, error: 'Erro ao enviar email de verificação' }
+    }
+  }
+
+  // Atualizar dados do usuário (para verificar emailVerified)
+  async function refreshUser() {
+    if (auth.currentUser) {
+      await auth.currentUser.reload()
+      setUser({ ...auth.currentUser })
     }
   }
 
@@ -164,9 +214,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         loading,
         error,
+        emailVerified: user?.emailVerified ?? false,
         signIn,
         signUp,
         signOut,
+        sendVerificationEmail: sendVerificationEmailFn,
+        refreshUser,
       }}
     >
       {children}

@@ -380,16 +380,25 @@ async function firestoreRequest(projectId: string, path: string, method = 'GET',
 	return response.json();
 }
 
-function verifyWebhookSignature(
+async function verifyWebhookSignature(
 	xSignature: string | null,
 	xRequestId: string | null,
 	dataId: string | null,
 	secret: string
-): boolean {
-	if (!secret) return true;
-	if (!xSignature || !xRequestId) return false;
+): Promise<boolean> {
+	// If no secret configured, skip verification (development mode)
+	if (!secret) {
+		console.warn('Webhook secret not configured - skipping verification');
+		return true;
+	}
+
+	if (!xSignature || !xRequestId) {
+		console.error('Missing x-signature or x-request-id headers');
+		return false;
+	}
 
 	try {
+		// Parse signature header: ts=xxx,v1=xxx
 		const signatureParts: Record<string, string> = {};
 		xSignature.split(',').forEach((part: string) => {
 			const [key, value] = part.split('=');
@@ -399,11 +408,45 @@ function verifyWebhookSignature(
 		const ts = signatureParts['ts'];
 		const v1 = signatureParts['v1'];
 
-		if (!ts || !v1) return false;
+		if (!ts || !v1) {
+			console.error('Invalid signature format');
+			return false;
+		}
 
-		// For now, skip full HMAC verification (complex with Web Crypto)
-		// In production, implement proper verification
-		return true;
+		// Check timestamp is not too old (5 minutes)
+		const timestampAge = Date.now() - parseInt(ts, 10) * 1000;
+		if (timestampAge > 5 * 60 * 1000) {
+			console.error('Webhook timestamp too old');
+			return false;
+		}
+
+		// Build manifest string for HMAC
+		const manifest = `id:${dataId || ''};request-id:${xRequestId};ts:${ts};`;
+
+		// Calculate HMAC-SHA256 using Web Crypto API
+		const encoder = new TextEncoder();
+		const keyData = encoder.encode(secret);
+		const messageData = encoder.encode(manifest);
+
+		const cryptoKey = await crypto.subtle.importKey(
+			'raw',
+			keyData,
+			{ name: 'HMAC', hash: 'SHA-256' },
+			false,
+			['sign']
+		);
+
+		const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+		const calculatedHash = Array.from(new Uint8Array(signature))
+			.map(b => b.toString(16).padStart(2, '0'))
+			.join('');
+
+		const isValid = calculatedHash === v1;
+		if (!isValid) {
+			console.error('Webhook signature mismatch');
+		}
+
+		return isValid;
 	} catch (error) {
 		console.error('Signature verification error:', error);
 		return false;
@@ -524,6 +567,38 @@ export default {
 					init_point: result.init_point,
 					sandbox_init_point: result.sandbox_init_point,
 				}, 200, origin);
+			}
+
+			// Payment Status Check (for validating redirects)
+			if (path.startsWith('/payment/status/') && method === 'GET') {
+				const paymentId = path.split('/').pop();
+
+				if (!paymentId) {
+					return jsonResponse({ error: 'Payment ID required' }, 400, origin);
+				}
+
+				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				try {
+					const paymentInfo: any = await mpRequest(
+						env.MERCADOPAGO_ACCESS_TOKEN,
+						`/v1/payments/${paymentId}`
+					);
+
+					return jsonResponse({
+						id: paymentInfo.id,
+						status: paymentInfo.status,
+						status_detail: paymentInfo.status_detail,
+						external_reference: paymentInfo.external_reference,
+						transaction_amount: paymentInfo.transaction_amount,
+						date_approved: paymentInfo.date_approved,
+					}, 200, origin);
+				} catch (e) {
+					console.error('Payment status check error:', e);
+					return jsonResponse({ error: 'Failed to check payment status' }, 500, origin);
+				}
 			}
 
 			// Webhook

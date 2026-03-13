@@ -1,7 +1,9 @@
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { CheckCircle, XCircle, Clock, Home, RefreshCw } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Home, RefreshCw, Loader2 } from 'lucide-react'
+import { checkPaymentById } from '../lib/payments'
 
 type ResultType = 'success' | 'error' | 'pending'
 
@@ -34,11 +36,77 @@ const resultConfig = {
   },
 }
 
-export default function PaymentResult({ type }: PaymentResultProps) {
+export default function PaymentResult({ type: initialType }: PaymentResultProps) {
   const navigate = useNavigate()
-  // Payment info available via useSearchParams() for analytics if needed
-  // e.g., searchParams.get('payment_id') and searchParams.get('status')
+  const [searchParams] = useSearchParams()
+  const [isValidating, setIsValidating] = useState(false)
+  const [validatedType, setValidatedType] = useState<ResultType | null>(null)
 
+  // Get payment_id from URL (Mercado Pago redirect includes this)
+  const paymentId = searchParams.get('payment_id')
+
+  // Validate payment status on mount
+  useEffect(() => {
+    async function validatePayment() {
+      if (!paymentId) {
+        // No payment_id, trust the URL route type
+        setValidatedType(initialType)
+        return
+      }
+
+      setIsValidating(true)
+
+      try {
+        const result = await checkPaymentById(paymentId)
+
+        if (result) {
+          // Map actual status to result type
+          switch (result.status) {
+            case 'paid':
+              setValidatedType('success')
+              break
+            case 'failed':
+            case 'refunded':
+              setValidatedType('error')
+              break
+            default:
+              setValidatedType('pending')
+          }
+        } else {
+          // API call failed, fall back to URL type
+          setValidatedType(initialType)
+        }
+      } catch {
+        // Error checking, fall back to URL type
+        setValidatedType(initialType)
+      } finally {
+        setIsValidating(false)
+      }
+    }
+
+    validatePayment()
+  }, [paymentId, initialType])
+
+  // Show loading while validating
+  if (isValidating || validatedType === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <Loader2 className="h-20 w-20 text-primary animate-spin" />
+            </div>
+            <CardTitle className="text-2xl">Verificando Pagamento...</CardTitle>
+            <CardDescription className="text-base">
+              Aguarde enquanto confirmamos o status do seu pagamento.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  const type = validatedType
   const { icon, title, description, color, borderColor } = resultConfig[type]
 
   return (

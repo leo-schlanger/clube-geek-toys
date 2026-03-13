@@ -18,7 +18,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lockoutTime, setLockoutTime] = useState(0)
 
-  const { user, role, loading, error, signIn } = useAuth()
+  const { user, role, loading, error, emailVerified, signIn } = useAuth()
   const navigate = useNavigate()
 
   // Countdown do lockout
@@ -51,10 +51,15 @@ export default function Login() {
   // Redirecionar quando autenticado com role
   useEffect(() => {
     if (!loading && user && role) {
+      // Membros com email não verificado vão para página de verificação
+      if (role === 'member' && !emailVerified) {
+        navigate('/verificar-email', { replace: true })
+        return
+      }
       const path = getLoginRedirectPath(role, getAppMode())
       navigate(path, { replace: true })
     }
-  }, [loading, user, role, navigate])
+  }, [loading, user, role, emailVerified, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
