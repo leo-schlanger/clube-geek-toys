@@ -2,6 +2,7 @@ import { where, orderBy, limit, addDoc, collection, serverTimestamp, type Docume
 import { db } from './firebase'
 import { FirestoreManager, MapperUtils } from './db-utils'
 import { getMemberById, updateMember } from './members'
+import { withRetry } from './retry'
 import type { PointTransaction, PlanType, RedemptionRule } from '../types'
 import { POINTS_CONFIG, POINTS_MULTIPLIER } from '../types'
 
@@ -192,13 +193,20 @@ export async function addPoints(
     createdBy: sellerId || null,
   })
 
-  const id = await FirestoreManager.save(POINTS_COLLECTION, null, transactionData)
+  // Save transaction with retry
+  const id = await withRetry(
+    () => FirestoreManager.save(POINTS_COLLECTION, null, transactionData),
+    { maxRetries: 3 }
+  )
   if (!id) {
     return { success: false, pointsAdded: 0, message: 'Erro ao registrar pontos' }
   }
 
-  // Update member's total points
-  await updateMember(memberId, { points: newBalance })
+  // Update member's total points with retry
+  await withRetry(
+    () => updateMember(memberId, { points: newBalance }),
+    { maxRetries: 3 }
+  )
 
   // Log audit (non-critical, don't block on failure)
   try {
@@ -221,6 +229,80 @@ export async function addPoints(
     success: true,
     pointsAdded: totalPoints,
     message: `${totalPoints} pontos adicionados (${basePoints} x ${multiplier})`,
+  }
+}
+
+/**
+ * Add manual/bonus points to a member (admin only)
+ */
+export async function addBonusPoints(
+  memberId: string,
+  points: number,
+  reason: string,
+  adminId?: string
+): Promise<{ success: boolean; pointsAdded: number; message: string }> {
+  if (points <= 0) {
+    return { success: false, pointsAdded: 0, message: 'Quantidade de pontos inválida' }
+  }
+
+  const member = await getMemberById(memberId)
+  if (!member) {
+    return { success: false, pointsAdded: 0, message: 'Membro não encontrado' }
+  }
+
+  // Get current balance
+  const currentBalance = await getValidPoints(memberId)
+  const newBalance = currentBalance + points
+
+  // Create transaction record
+  const now = new Date().toISOString()
+  const transactionData = MapperUtils.toSnake({
+    memberId,
+    type: 'bonus',
+    points: points,
+    balance: newBalance,
+    description: `Bônus: ${reason}`,
+    expiresAt: calculateExpirationDate(),
+    isPromotion: false,
+    createdAt: now,
+    createdBy: adminId || null,
+  })
+
+  // Save transaction with retry
+  const id = await withRetry(
+    () => FirestoreManager.save(POINTS_COLLECTION, null, transactionData),
+    { maxRetries: 3 }
+  )
+  if (!id) {
+    return { success: false, pointsAdded: 0, message: 'Erro ao registrar pontos bônus' }
+  }
+
+  // Update member's total points with retry
+  await withRetry(
+    () => updateMember(memberId, { points: newBalance }),
+    { maxRetries: 3 }
+  )
+
+  // Log audit
+  try {
+    await addDoc(collection(db, 'audit_logs'), {
+      action: 'bonus_points_added',
+      member_id: memberId,
+      transaction_id: id,
+      points_added: points,
+      reason,
+      total_points: newBalance,
+      admin_id: adminId || null,
+      timestamp: serverTimestamp(),
+    })
+  } catch {
+    // Non-critical
+  }
+
+  return {
+    success: true,
+    pointsAdded: points,
+    message: `${points} pontos bônus adicionados. Novo saldo: ${newBalance} pontos`,
   }
 }
 
@@ -261,13 +343,20 @@ export async function redeemPoints(
     createdBy: sellerId || null,
   })
 
-  const id = await FirestoreManager.save(POINTS_COLLECTION, null, transactionData)
+  // Save transaction with retry
+  const id = await withRetry(
+    () => FirestoreManager.save(POINTS_COLLECTION, null, transactionData),
+    { maxRetries: 3 }
+  )
   if (!id) {
     return { success: false, message: 'Erro ao registrar resgate' }
   }
 
-  // Update member's total points
-  await updateMember(memberId, { points: newBalance })
+  // Update member's total points with retry
+  await withRetry(
+    () => updateMember(memberId, { points: newBalance }),
+    { maxRetries: 3 }
+  )
 
   // Log audit (non-critical, don't block on failure)
   try {

@@ -16,6 +16,7 @@ import {
   signOut as firebaseSignOut,
   sendEmailVerification,
   type User,
+  type ActionCodeSettings,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
@@ -43,6 +44,19 @@ interface AuthContextType {
 // =============================================================================
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// Configuração do action code para emails de verificação
+function getActionCodeSettings(): ActionCodeSettings {
+  // Em produção, usa o domínio real; em dev, usa localhost
+  const baseUrl = typeof window !== 'undefined'
+    ? window.location.origin
+    : 'http://localhost:5173'
+
+  return {
+    url: `${baseUrl}/verificar-email`,
+    handleCodeInApp: false, // Abre no navegador, não no app
+  }
+}
 
 // =============================================================================
 // Provider
@@ -140,10 +154,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Enviar email de verificação
       try {
-        await sendEmailVerification(result.user)
+        const actionCodeSettings = getActionCodeSettings()
+        await sendEmailVerification(result.user, actionCodeSettings)
         console.log('[Auth] Email de verificação enviado para:', result.user.email)
-      } catch (verificationError: any) {
-        console.error('[Auth] Erro ao enviar email de verificação:', verificationError?.code, verificationError?.message)
+      } catch (verificationError: unknown) {
+        const err = verificationError as { code?: string; message?: string }
+        console.error('[Auth] Erro ao enviar email de verificação:', err?.code, err?.message)
         // Não falha o cadastro se o email de verificação falhar
       }
 
@@ -175,17 +191,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await sendEmailVerification(user)
+      const actionCodeSettings = getActionCodeSettings()
+      await sendEmailVerification(user, actionCodeSettings)
       console.log('[Auth] Email de verificação reenviado para:', user.email)
       return { success: true }
-    } catch (err: any) {
-      console.error('[Auth] Erro ao reenviar verificação:', err?.code, err?.message)
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string }
+      console.error('[Auth] Erro ao reenviar verificação:', error?.code, error?.message)
 
-      if (err?.code === 'auth/too-many-requests') {
+      if (error?.code === 'auth/too-many-requests') {
         return { success: false, error: 'Aguarde alguns minutos antes de reenviar' }
       }
 
-      return { success: false, error: `Erro ao enviar email: ${err?.code || 'desconhecido'}` }
+      return { success: false, error: `Erro ao enviar email: ${error?.code || 'desconhecido'}` }
     }
   }
 

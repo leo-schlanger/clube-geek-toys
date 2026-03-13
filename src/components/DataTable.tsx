@@ -3,6 +3,7 @@ import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Badge } from './ui/badge'
 import { Pagination } from './ui/pagination'
+import { Skeleton } from './ui/skeleton'
 import {
   Search,
   X,
@@ -569,17 +570,24 @@ export function DataTable<T extends Record<string, any>>({
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td
-                    colSpan={displayColumns.length + (actions ? 1 : 0)}
-                    className="py-12 text-center"
-                  >
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                      <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      Carregando...
-                    </div>
-                  </td>
-                </tr>
+                // Skeleton rows for loading state
+                Array.from({ length: 5 }).map((_, rowIndex) => (
+                  <tr key={`skeleton-${rowIndex}`} className="border-b">
+                    {displayColumns.map((_, colIndex) => (
+                      <td key={`skeleton-${rowIndex}-${colIndex}`} className="py-4 px-4">
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-3/4" />
+                          {colIndex === 0 && <Skeleton className="h-3 w-1/2" />}
+                        </div>
+                      </td>
+                    ))}
+                    {actions && (
+                      <td className="py-4 px-4">
+                        <Skeleton className="h-8 w-20 ml-auto" />
+                      </td>
+                    )}
+                  </tr>
+                ))
               ) : paginatedData.length === 0 ? (
                 <tr>
                   <td

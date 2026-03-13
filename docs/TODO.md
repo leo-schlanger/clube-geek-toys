@@ -42,14 +42,16 @@
   - `FirestoreManager.findManyPaginated()` disponível para outras collections
   - DataTable já tem paginação client-side integrada
 
-- [ ] **Virtual scrolling para tabelas grandes**
-  - Usar `@tanstack/react-virtual` para MembersTable
-  - Renderizar apenas items visíveis
+- [x] **Virtual scrolling para tabelas grandes** ✅
+  - Criado `VirtualTable` component usando `@tanstack/react-virtual`
+  - Renderiza apenas items visíveis
+  - Disponível para uso quando necessário
 
 ### Infraestrutura
-- [ ] **Configurar Vercel Analytics**
-  - Monitorar Core Web Vitals
-  - Tracking de erros em produção
+- [x] **Configurar Vercel Analytics** ✅
+  - Instalado `@vercel/analytics` e `@vercel/speed-insights`
+  - Configurado em `src/main.tsx`
+  - Monitora Core Web Vitals automaticamente
 
 - [x] **Implementar error tracking** ✅ (parcial)
   - Criado `ErrorTracker` service em `src/lib/error-tracking.ts`
@@ -58,42 +60,42 @@
   - Pendente: instalar @sentry/react e configurar DSN
 
 ### Código
-- [ ] **Criar custom hooks**
+- [x] **Criar custom hooks** ✅
   - `useMembers()` - hook para operações de membros
-  - `usePayments()` - hook para operações de pagamento
+  - `useMember()` - hook para membro individual
   - `usePoints()` - hook para sistema de pontos
-  - Diretório `src/hooks/` está vazio
+  - `useMemberPoints()` - hook para pontos do membro
+  - Implementado em `src/hooks/`
 
-- [x] **Adicionar retry com exponential backoff** ✅ (pagamentos)
+- [x] **Adicionar retry com exponential backoff** ✅
   - Implementado em `src/lib/payments.ts`
   - `fetchWithRetry()` com backoff exponencial
   - Timeout de 15s por request
-  - Pendente: aplicar em `addPoints()` e `redeemPoints()`
+  - Aplicado em `addPoints()`, `addBonusPoints()` e `redeemPoints()` via `src/lib/retry.ts`
 
 ---
 
 ## 🟡 MÉDIO
 
 ### UX/UI
-- [ ] **Implementar skeleton loading**
-  - Usar shadcn/ui Skeleton component
-  - Aplicar em MembersTable, Dashboard cards
-  - Melhorar perceived performance
+- [x] **Implementar skeleton loading** ✅
+  - Criado `src/components/ui/skeleton.tsx` com variantes
+  - Aplicado no AdminDashboard durante carregamento inicial
+  - Aplicado no DataTable durante refresh
+  - Skeleton rows animados na tabela
 
-- [ ] **Adicionar dark/light mode toggle**
-  - TailwindCSS já suporta dark mode
-  - Adicionar botão de toggle
-  - Persistir preferência no localStorage
+- [x] **Dark mode** ✅ (Apenas dark mode - decisão de design)
 
-- [ ] **PWA (Progressive Web App)**
-  - Adicionar manifest.json
-  - Service worker para cache offline
-  - Push notifications para lembretes
+- [x] **PWA (Progressive Web App)** ✅
+  - Configurado `vite-plugin-pwa` com manifest
+  - Service worker com workbox para cache offline
+  - Instalável como app no celular
 
-- [ ] **Melhorar feedback de formulários**
-  - Animações de sucesso/erro
-  - Confetti em cadastro concluído
-  - Progress indicators em processos longos
+- [x] **Melhorar feedback de formulários** ✅
+  - Criado `src/components/ui/progress.tsx` (Progress, ProgressCircle)
+  - Criado `src/components/ui/success-animation.tsx` (SuccessAnimation, ErrorAnimation, LoadingDots)
+  - Criado `src/components/ui/form-feedback.tsx` (FormFeedback, FormFieldFeedback)
+  - Animações CSS: checkmark, scale-in, shake
 
 ### Funcionalidades
 - [ ] **Dashboard de métricas em tempo real**
@@ -106,10 +108,10 @@
   - Lembretes de vencimento de assinatura
   - Alertas de pontos expirando
 
-- [ ] **Exportação de relatórios**
-  - Exportar membros para CSV/Excel
-  - Exportar transações de pontos
-  - Relatório financeiro em PDF
+- [x] **Exportação de relatórios** ✅ (CSV)
+  - Exportar membros para CSV no MembersTable
+  - Exportar ranking de pontos no PointsTab
+  - DataTable tem suporte genérico para exportação CSV
 
 - [ ] **Histórico de ações do usuário**
   - Timeline de atividades no dashboard do membro
