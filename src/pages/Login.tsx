@@ -19,8 +19,8 @@ export default function Login() {
   const { user, role, loading, error, signIn } = useAuth()
   const navigate = useNavigate()
 
-  // Log para debug
-  console.log('[Login] Estado:', { user: user?.email, role, loading, error })
+  // Debug visível na tela (remover depois)
+  const debugInfo = `user: ${user?.email || 'null'} | role: ${role || 'null'} | loading: ${loading} | error: ${error || 'null'}`
 
   // Redirecionar quando autenticado com role
   useEffect(() => {
@@ -63,6 +63,10 @@ export default function Login() {
           </div>
           <CardTitle className="text-2xl font-heading gradient-text">Clube Geek & Toys</CardTitle>
           <CardDescription>Acesse sua área de membro</CardDescription>
+          {/* DEBUG - REMOVER DEPOIS */}
+          <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400 font-mono">
+            {debugInfo}
+          </div>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
