@@ -118,6 +118,66 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 </Suspense>
 ```
 
+### 6. Custom Hooks Pattern
+
+Hooks encapsulam lógica de negócio:
+
+```typescript
+// src/hooks/useMembers.ts
+export function useMembers(options = {}) {
+  const [members, setMembers] = useState<Member[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const fetchMembers = useCallback(async () => {
+    setLoading(true)
+    const data = await getAllMembers()
+    setMembers(data)
+    setLoading(false)
+  }, [])
+
+  return { members, loading, refetch: fetchMembers }
+}
+
+// src/hooks/usePoints.ts
+export function usePoints() {
+  const addPoints = useCallback(async (memberId, value) => {
+    return withRetry(() => addPointsApi(memberId, value))
+  }, [])
+
+  return { addPoints, redeemPoints, getBalance }
+}
+```
+
+**Benefícios:**
+- Separa lógica de estado dos componentes
+- Reutilizável entre diferentes views
+- Facilita testes unitários
+
+### 7. Retry Pattern com Exponential Backoff
+
+```typescript
+// src/lib/retry.ts
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxRetries?: number, initialDelay?: number } = {}
+): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (!shouldRetry(error) || attempt === maxRetries - 1) throw error
+      await sleep(initialDelay * Math.pow(2, attempt))
+    }
+  }
+}
+
+// Uso
+const id = await withRetry(
+  () => FirestoreManager.save(COLLECTION, null, data),
+  { maxRetries: 3 }
+)
+```
+
 ## Fluxo de Dados
 
 ### Autenticação
@@ -326,22 +386,47 @@ Breakdown (após code-splitting):
 ### Otimizações Implementadas
 
 1. **Code Splitting** - Lazy load por rota e por componente
-2. **Tab Components Splitting** - AdminDashboard dividido em 5 componentes lazy
+2. **Tab Components Splitting** - AdminDashboard dividido em 7 componentes lazy
 3. **Vendor Chunks** - Separação de bibliotecas (charts, forms, firebase, etc.)
 4. **Tree Shaking** - Vite + ESM modules
 5. **Minification** - Terser com drop_console
 6. **Cache Headers** - 1 ano para assets imutáveis
 7. **Firestore Long Polling** - Evita WebSocket issues
 8. **Suspense Fallbacks** - Loading states durante lazy load
+9. **Skeleton Loading** - Perceived performance durante carregamento
+10. **Virtual Scrolling** - `VirtualTable` com @tanstack/react-virtual
+11. **PWA** - Service worker com workbox, instalável como app
+12. **Vercel Analytics** - Monitoramento de Core Web Vitals
 
 ### Otimizações Pendentes
 
-1. **Paginação** - Queries sem limit()
-2. **Virtual Scrolling** - Tabelas grandes
-3. **Image Optimization** - Sem next/image
-4. **Service Worker** - PWA não implementado
+1. **Image Optimization** - Sem next/image
+2. **Sentry Integration** - Error tracking em produção
 
 ## Monitoramento
+
+### Vercel Analytics (Implementado)
+
+```typescript
+// src/main.tsx
+import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+    <Analytics />
+    <SpeedInsights />
+  </StrictMode>,
+)
+```
+
+**Métricas monitoradas:**
+- LCP (Largest Contentful Paint)
+- FID (First Input Delay)
+- CLS (Cumulative Layout Shift)
+- TTFB (Time to First Byte)
+- Page views e navegação
 
 ### Logs Atuais
 
@@ -412,3 +497,89 @@ export const db = {
   doc: vi.fn(),
 }
 ```
+
+## Componentes UI
+
+### shadcn/ui Components
+
+Componentes baseados em Radix UI com Tailwind CSS:
+
+```
+src/components/ui/
+├── badge.tsx          # Badges de status e planos
+├── button.tsx         # Botões com variantes
+├── card.tsx           # Cards para conteúdo
+├── dialog.tsx         # Modais acessíveis
+├── input.tsx          # Inputs de formulário
+├── label.tsx          # Labels de formulário
+├── loading.tsx        # Spinners e loading states
+├── pagination.tsx     # Paginação de tabelas
+├── progress.tsx       # Barras de progresso
+├── sheet.tsx          # Drawer/sidebar mobile
+├── skeleton.tsx       # Skeleton loading
+├── success-animation.tsx  # Animações de sucesso/erro
+└── form-feedback.tsx  # Feedback de formulários
+```
+
+### Componentes de Negócio
+
+```
+src/components/
+├── admin/
+│   ├── AdminSidebar.tsx   # Navegação lateral admin
+│   ├── MembersTab.tsx     # Gestão de membros
+│   ├── PointsTab.tsx      # Ranking e dar pontos
+│   ├── UsersTab.tsx       # Gestão de usuários
+│   ├── LogsTab.tsx        # Logs de auditoria
+│   ├── ReportsTab.tsx     # Relatórios e métricas
+│   └── SettingsTab.tsx    # Configurações do sistema
+├── DataTable.tsx          # Tabela genérica com filtros
+├── VirtualTable.tsx       # Tabela virtualizada para grandes datasets
+├── MembersTable.tsx       # Tabela de membros
+├── MemberModal.tsx        # Modal de membro (CRUD)
+└── PaymentModal.tsx       # Modal de pagamento
+```
+
+### Hooks Personalizados
+
+```
+src/hooks/
+├── index.ts           # Exports centralizados
+├── useMembers.ts      # Hook para operações de membros
+│   ├── useMembers()   # Lista de membros
+│   └── useMember()    # Membro individual
+└── usePoints.ts       # Hook para sistema de pontos
+    ├── usePoints()    # Operações de pontos
+    └── useMemberPoints()  # Pontos de um membro
+```
+
+## PWA (Progressive Web App)
+
+### Configuração
+
+```typescript
+// vite.config.ts
+import { VitePWA } from 'vite-plugin-pwa'
+
+VitePWA({
+  registerType: 'autoUpdate',
+  manifest: {
+    name: 'Clube Geek & Toys',
+    short_name: 'Geek Club',
+    theme_color: '#7c3aed',
+    background_color: '#09090b',
+    display: 'standalone',
+    icons: [/* ... */],
+  },
+  workbox: {
+    globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff2}'],
+    runtimeCaching: [/* Google Fonts cache */],
+  },
+})
+```
+
+### Funcionalidades
+
+- **Instalável** - Adicionar à tela inicial no celular
+- **Offline** - Cache de assets estáticos
+- **Auto-update** - Service worker atualiza automaticamente
