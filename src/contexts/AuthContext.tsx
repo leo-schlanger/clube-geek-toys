@@ -53,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [emailVerified, setEmailVerified] = useState(false)
 
   // Buscar role do Firestore
   async function fetchUserRole(uid: string): Promise<UserRole | null> {
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser)
+        setEmailVerified(firebaseUser.emailVerified)
         const userRole = await fetchUserRole(firebaseUser.uid)
         setRole(userRole)
         if (userRole) setError(null)
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setRole(null)
         setError(null)
+        setEmailVerified(false)
       }
       setLoading(false)
     })
@@ -188,9 +191,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Atualizar dados do usuário (para verificar emailVerified)
   async function refreshUser() {
-    if (auth.currentUser) {
-      await auth.currentUser.reload()
-      setUser({ ...auth.currentUser })
+    const currentUser = auth.currentUser
+    if (currentUser) {
+      await currentUser.reload()
+      // Atualizar estado de emailVerified após reload
+      setEmailVerified(currentUser.emailVerified)
     }
   }
 
@@ -210,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         loading,
         error,
-        emailVerified: user?.emailVerified ?? false,
+        emailVerified,
         signIn,
         signUp,
         signOut,
