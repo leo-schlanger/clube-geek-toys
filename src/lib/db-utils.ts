@@ -6,6 +6,7 @@ import {
     getCountFromServer,
     setDoc,
     updateDoc,
+    deleteDoc,
     query,
     limit,
     startAfter,
@@ -186,6 +187,24 @@ export class FirestoreManager {
         } catch (error: unknown) {
             const err = error as FirestoreError
             console.error(`[Firestore] Update error for ${collectionName}/${id}:`, err?.message)
+            return false
+        }
+    }
+
+    /**
+     * Delete a document by ID
+     */
+    static async delete(
+        collectionName: string,
+        id: string
+    ): Promise<boolean> {
+        try {
+            const docRef = doc(db, collectionName, id)
+            await deleteDoc(docRef)
+            return true
+        } catch (error: unknown) {
+            const err = error as FirestoreError
+            console.error(`[Firestore] Delete error for ${collectionName}/${id}:`, err?.message)
             return false
         }
     }

@@ -201,6 +201,21 @@ export default function AdminDashboard() {
     }
   }, [fetchData])
 
+  const handleDeleteUser = useCallback(async (userId: string, userEmail: string) => {
+    if (!confirm(`Tem certeza que deseja remover o usuário "${userEmail}"?\n\nIsso removerá o acesso ao sistema, mas não apaga a conta do Firebase Auth.`)) {
+      return
+    }
+
+    try {
+      await FirestoreManager.delete('users', userId)
+      toast.success('Usuário removido com sucesso')
+      fetchData(true)
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      toast.error('Erro ao remover usuário')
+    }
+  }, [fetchData])
+
   const openModal = useCallback((mode: ModalMode, member?: Member) => {
     setModalMode(mode)
     setSelectedMember(member || null)
@@ -439,6 +454,7 @@ export default function AdminDashboard() {
               users={systemUsers}
               onCreateUser={() => setShowUserModal(true)}
               onUpdateRole={handleUpdateRole}
+              onDeleteUser={handleDeleteUser}
             />
           )}
           {activeTab === 'logs' && (

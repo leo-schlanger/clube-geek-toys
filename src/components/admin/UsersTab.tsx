@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Plus, Shield, UserCog } from 'lucide-react'
+import { Plus, Shield, UserCog, Trash2 } from 'lucide-react'
 
 interface SystemUser {
   id: string
@@ -14,9 +14,10 @@ interface UsersTabProps {
   users: SystemUser[]
   onCreateUser: () => void
   onUpdateRole: (userId: string, newRole: string) => void
+  onDeleteUser: (userId: string, userEmail: string) => void
 }
 
-export function UsersTab({ users, onCreateUser, onUpdateRole }: UsersTabProps) {
+export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: UsersTabProps) {
   return (
     <Card>
       <CardHeader>
@@ -61,15 +62,26 @@ export function UsersTab({ users, onCreateUser, onUpdateRole }: UsersTabProps) {
                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
                   </td>
                   <td className="py-4 px-4 text-right">
-                    <select
-                      value={user.role}
-                      onChange={(e) => onUpdateRole(user.id, e.target.value)}
-                      className="bg-muted text-xs p-1 rounded border border-border"
-                    >
-                      <option value="member">Membro</option>
-                      <option value="seller">Vendedor</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                    <div className="flex items-center justify-end gap-2">
+                      <select
+                        value={user.role}
+                        onChange={(e) => onUpdateRole(user.id, e.target.value)}
+                        className="bg-muted text-xs p-1 rounded border border-border"
+                      >
+                        <option value="member">Membro</option>
+                        <option value="seller">Vendedor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDeleteUser(user.id, user.email)}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8 p-0"
+                        title="Remover usuário"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
