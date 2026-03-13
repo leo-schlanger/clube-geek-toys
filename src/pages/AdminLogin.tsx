@@ -19,14 +19,10 @@ export default function AdminLogin() {
   const { user, role, loading, error, signIn } = useAuth()
   const navigate = useNavigate()
 
-  // Log para debug
-  console.log('[AdminLogin] Estado:', { user: user?.email, role, loading, error })
-
   // Redirecionar quando autenticado com role
   useEffect(() => {
     if (!loading && user && role) {
       const path = getLoginRedirectPath(role, getAppMode())
-      console.log('[AdminLogin] Redirecionando para:', path)
       navigate(path, { replace: true })
     }
   }, [loading, user, role, navigate])
@@ -45,7 +41,6 @@ export default function AdminLogin() {
     setIsSubmitting(false)
   }
 
-  // Loading inicial
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -69,14 +64,12 @@ export default function AdminLogin() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {/* Erro do formulário */}
             {formError && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
                 {formError}
               </div>
             )}
 
-            {/* Erro de autenticação */}
             {error && !formError && (
               <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-400 text-sm">
                 <p className="font-medium mb-1">Usuário não cadastrado</p>

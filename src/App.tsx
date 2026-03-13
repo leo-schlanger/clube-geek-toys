@@ -47,27 +47,19 @@ function ProtectedRoute({
 }) {
   const { user, role, loading } = useAuth()
 
-  console.log('[ProtectedRoute] Check:', { user: user?.email, role, loading, allowedRoles })
-
   if (loading) {
     return <LoadingPage />
   }
 
-  // Não autenticado
   if (!user) {
-    console.log('[ProtectedRoute] Sem usuário, redirecionando para login')
     return <Navigate to="/login" replace />
   }
 
-  // Autenticado mas sem role (usuário não cadastrado no sistema)
   if (!role) {
-    console.log('[ProtectedRoute] Sem role, mostrando erro')
     return <RoleError />
   }
 
-  // Verificar se role é permitida
   if (allowedRoles && !allowedRoles.includes(role)) {
-    console.log('[ProtectedRoute] Role não permitida:', role, 'esperado:', allowedRoles)
     return <Navigate to="/acesso-negado" replace />
   }
 

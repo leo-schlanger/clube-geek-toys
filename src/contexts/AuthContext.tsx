@@ -1,5 +1,5 @@
 /**
- * AuthContext - Autenticação Firebase simplificada
+ * AuthContext - Firebase Authentication
  */
 
 import {
@@ -53,65 +53,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Buscar role do Firestore
   async function fetchUserRole(uid: string): Promise<UserRole | null> {
     try {
-      console.log('[Auth] Buscando role para:', uid)
-      const docRef = doc(db, 'users', uid)
-      console.log('[Auth] Path:', docRef.path)
-
-      const userDoc = await getDoc(docRef)
-      console.log('[Auth] getDoc retornou, exists:', userDoc.exists())
+      const userDoc = await getDoc(doc(db, 'users', uid))
 
       if (!userDoc.exists()) {
-        console.log('[Auth] ERRO: Documento NÃO existe em users/' + uid)
-        setError('Documento users/' + uid + ' não existe no Firestore')
+        setError('Usuário não cadastrado no sistema')
         return null
       }
 
       const data = userDoc.data()
-      console.log('[Auth] Dados completos:', JSON.stringify(data))
+      const userRole = data?.role as UserRole
 
-      const role = data?.role as UserRole
-      if (!role) {
-        console.log('[Auth] ERRO: Campo role não existe no documento')
-        setError('Campo "role" não existe no documento')
+      if (!userRole) {
+        setError('Permissão não definida')
         return null
       }
 
-      console.log('[Auth] Role encontrada:', role)
-      return role
+      return userRole
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      console.error('[Auth] ERRO Firestore:', errorMsg)
-      setError('Firestore erro: ' + errorMsg)
+      console.error('[Auth] Erro ao buscar role:', err)
+      setError('Erro ao carregar permissões')
       return null
     }
   }
 
   // Listener de autenticação
   useEffect(() => {
-    console.log('[Auth] Iniciando listener de autenticação')
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log('[Auth] Estado mudou:', firebaseUser?.email || 'sem usuário')
-
       if (firebaseUser) {
         setUser(firebaseUser)
         const userRole = await fetchUserRole(firebaseUser.uid)
-        console.log('[Auth] Role obtida:', userRole)
         setRole(userRole)
-
-        if (!userRole) {
-          setError('Usuário não cadastrado no sistema')
-        } else {
-          setError(null)
-        }
+        if (userRole) setError(null)
       } else {
         setUser(null)
         setRole(null)
         setError(null)
       }
-
       setLoading(false)
-      console.log('[Auth] Loading = false')
     })
 
     return () => unsubscribe()
@@ -121,11 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signIn(email: string, password: string) {
     try {
       setError(null)
-      console.log('[Auth] Fazendo login:', email)
       await signInWithEmailAndPassword(auth, email, password)
       return { success: true }
     } catch (err) {
-      console.error('[Auth] Erro no login:', err)
       const firebaseError = err as { code?: string }
 
       const errorMessages: Record<string, string> = {
@@ -147,11 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signUp(email: string, password: string) {
     try {
       setError(null)
-      console.log('[Auth] Criando conta:', email)
-
       const result = await createUserWithEmailAndPassword(auth, email, password)
 
-      // Criar documento do usuário
       await setDoc(doc(db, 'users', result.user.uid), {
         email: result.user.email,
         role: 'member' as UserRole,
@@ -160,7 +133,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { success: true }
     } catch (err) {
-      console.error('[Auth] Erro no cadastro:', err)
       const firebaseError = err as { code?: string }
 
       const errorMessages: Record<string, string> = {
@@ -180,8 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     try {
       await firebaseSignOut(auth)
-    } catch (err) {
-      console.error('[Auth] Erro no logout:', err)
+    } catch {
+      // Silently fail
     }
   }
 

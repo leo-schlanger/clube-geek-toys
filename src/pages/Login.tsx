@@ -19,14 +19,10 @@ export default function Login() {
   const { user, role, loading, error, signIn } = useAuth()
   const navigate = useNavigate()
 
-  // Debug visível na tela (remover depois)
-  const debugInfo = `user: ${user?.email || 'null'} | role: ${role || 'null'} | loading: ${loading} | error: ${error || 'null'}`
-
   // Redirecionar quando autenticado com role
   useEffect(() => {
     if (!loading && user && role) {
       const path = getLoginRedirectPath(role, getAppMode())
-      console.log('[Login] Redirecionando para:', path)
       navigate(path, { replace: true })
     }
   }, [loading, user, role, navigate])
@@ -45,7 +41,6 @@ export default function Login() {
     setIsSubmitting(false)
   }
 
-  // Loading inicial
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -63,22 +58,16 @@ export default function Login() {
           </div>
           <CardTitle className="text-2xl font-heading gradient-text">Clube Geek & Toys</CardTitle>
           <CardDescription>Acesse sua área de membro</CardDescription>
-          {/* DEBUG - REMOVER DEPOIS */}
-          <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400 font-mono">
-            {debugInfo}
-          </div>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {/* Erro do formulário */}
             {formError && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-500 text-sm">
                 {formError}
               </div>
             )}
 
-            {/* Erro de autenticação (usuário não cadastrado no sistema) */}
             {error && !formError && (
               <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-600 text-sm">
                 <p className="font-medium mb-1">Usuário não cadastrado</p>
