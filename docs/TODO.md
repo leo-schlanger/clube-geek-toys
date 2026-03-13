@@ -13,7 +13,11 @@
 
 ### Segurança
 - [ ] **Rotacionar credenciais se expostas** - Verificar histórico git para credentials
-- [ ] **Implementar rate limiting** - Adicionar proteção contra brute force no login
+- [x] **Implementar rate limiting** ✅ - Proteção contra brute force no login
+  - Máximo 5 tentativas por email
+  - Bloqueio de 5 minutos após exceder
+  - Contador visual de tentativas restantes
+  - Implementado em `src/lib/rate-limit.ts`
 - [ ] **Adicionar verificação de email** - Firebase Auth suporta, não está implementado
 
 ---
@@ -215,8 +219,8 @@
 
 ### Sprint 1 (Semana 1-2)
 - [x] Code-split AdminDashboard ✅
-- [ ] Paginação no Firestore
-- [ ] Rate limiting no login
+- [x] Paginação no Firestore ✅
+- [x] Rate limiting no login ✅
 
 ### Sprint 2 (Semana 3-4)
 - [ ] Custom hooks (useMembers, usePayments, usePoints)
