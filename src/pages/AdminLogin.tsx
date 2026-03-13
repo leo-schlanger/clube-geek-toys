@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
-import { Eye, EyeOff, AlertTriangle, RefreshCw, UserX, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, AlertTriangle, RefreshCw, UserX, Loader2, WifiOff } from 'lucide-react'
 import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 
 export default function AdminLogin() {
@@ -42,6 +42,13 @@ export default function AdminLogin() {
     await refreshRole()
   }
 
+  // Check if error is network related
+  const isNetworkError = authError?.toLowerCase().includes('conexão') ||
+    authError?.toLowerCase().includes('internet') ||
+    authError?.toLowerCase().includes('servidor') ||
+    formError?.toLowerCase().includes('conexão') ||
+    formError?.toLowerCase().includes('internet')
+
   const isLoading = loading || isSubmitting
 
   return (
@@ -62,8 +69,16 @@ export default function AdminLogin() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {formError && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <div className={`p-3 rounded-md text-sm flex items-center gap-2 ${
+                isNetworkError
+                  ? 'bg-orange-500/10 border border-orange-500/50 text-orange-400'
+                  : 'bg-red-500/10 border border-red-500/50 text-red-400'
+              }`}>
+                {isNetworkError ? (
+                  <WifiOff className="h-4 w-4 flex-shrink-0" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                )}
                 {formError}
               </div>
             )}
@@ -82,10 +97,20 @@ export default function AdminLogin() {
             )}
 
             {!isLoading && authError && !userNotFound && (
-              <div className="p-3 rounded-md bg-yellow-500/10 border border-yellow-500/50 text-yellow-400 text-sm">
+              <div className={`p-3 rounded-md text-sm ${
+                isNetworkError
+                  ? 'bg-orange-500/10 border border-orange-500/50 text-orange-400'
+                  : 'bg-yellow-500/10 border border-yellow-500/50 text-yellow-400'
+              }`}>
                 <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span className="font-medium">Erro ao carregar permissões</span>
+                  {isNetworkError ? (
+                    <WifiOff className="h-4 w-4" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4" />
+                  )}
+                  <span className="font-medium">
+                    {isNetworkError ? 'Problema de conexão' : 'Erro ao carregar permissões'}
+                  </span>
                 </div>
                 <p className="text-xs opacity-80 mb-2">{authError}</p>
                 <Button
@@ -111,6 +136,7 @@ export default function AdminLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                autoComplete="email"
               />
             </div>
 
@@ -125,6 +151,7 @@ export default function AdminLogin() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"

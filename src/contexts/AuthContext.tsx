@@ -1,5 +1,11 @@
 /**
- * AuthContext - Firebase Authentication with localStorage cache
+ * AuthContext - Firebase Authentication with proper error handling
+ *
+ * Features:
+ * - localStorage cache for role (1 hour TTL)
+ * - Timeout handling for Firebase operations
+ * - Network error detection
+ * - Retry mechanism
  */
 
 import {
@@ -8,6 +14,7 @@ import {
   useCallback,
   useState,
   useEffect,
+  useRef,
   type ReactNode,
 } from 'react'
 import {
@@ -38,10 +45,17 @@ interface AuthContextType {
 }
 
 // =============================================================================
-// LocalStorage helpers
+// Constants
 // =============================================================================
 
 const ROLE_CACHE_KEY = 'auth_role_cache'
+const CACHE_TTL = 60 * 60 * 1000 // 1 hour
+const AUTH_TIMEOUT = 15000 // 15 seconds timeout for auth initialization
+const FIRESTORE_TIMEOUT = 10000 // 10 seconds timeout for Firestore
+
+// =============================================================================
+// LocalStorage helpers
+// =============================================================================
 
 interface RoleCache {
   uid: string
@@ -56,9 +70,8 @@ function getCachedRole(uid: string): UserRole | null {
 
     const data: RoleCache = JSON.parse(cached)
 
-    // Check if cache is for this user and not expired (1 hour)
-    const ONE_HOUR = 60 * 60 * 1000
-    if (data.uid === uid && Date.now() - data.timestamp < ONE_HOUR) {
+    // Check if cache is for this user and not expired
+    if (data.uid === uid && Date.now() - data.timestamp < CACHE_TTL) {
       return data.role
     }
   } catch {
@@ -85,6 +98,67 @@ function clearCachedRole(): void {
 }
 
 // =============================================================================
+// Error helpers
+// =============================================================================
+
+function isNetworkError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return (
+      message.includes('network') ||
+      message.includes('offline') ||
+      message.includes('failed to fetch') ||
+      message.includes('fetch failed') ||
+      message.includes('err_name_not_resolved') ||
+      message.includes('err_internet_disconnected') ||
+      message.includes('err_network') ||
+      message.includes('unavailable') ||
+      message.includes('timeout')
+    )
+  }
+  return false
+}
+
+function getFirebaseAuthError(code: string): string {
+  const errorMap: Record<string, string> = {
+    'auth/invalid-credential': 'Email ou senha incorretos',
+    'auth/user-not-found': 'Usuário não encontrado',
+    'auth/wrong-password': 'Senha incorreta',
+    'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
+    'auth/user-disabled': 'Esta conta foi desativada',
+    'auth/invalid-email': 'Email inválido',
+    'auth/network-request-failed': 'Erro de conexão. Verifique sua internet.',
+    'auth/internal-error': 'Erro interno. Tente novamente.',
+    'auth/email-already-in-use': 'Este email já está em uso',
+    'auth/weak-password': 'Senha muito fraca (mínimo 6 caracteres)',
+    'auth/operation-not-allowed': 'Cadastro desabilitado temporariamente',
+  }
+  return errorMap[code] || 'Erro ao fazer login. Tente novamente.'
+}
+
+// =============================================================================
+// Timeout helper
+// =============================================================================
+
+function withTimeout<T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(errorMessage))
+    }, ms)
+
+    promise
+      .then((result) => {
+        clearTimeout(timeoutId)
+        resolve(result)
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId)
+        reject(error)
+      })
+  })
+}
+
+// =============================================================================
 // Context
 // =============================================================================
 
@@ -100,21 +174,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userNotFound, setUserNotFound] = useState(false)
+  const mountedRef = useRef(true)
 
-  // Fetch role from Firestore or cache
+  // Track if component is mounted
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  // Fetch role from Firestore with timeout
   const fetchRole = useCallback(async (uid: string): Promise<UserRole | null> => {
     // Try cache first
     const cached = getCachedRole(uid)
     if (cached) {
-      setRole(cached)
-      setError(null)
-      setUserNotFound(false)
+      if (mountedRef.current) {
+        setRole(cached)
+        setError(null)
+        setUserNotFound(false)
+      }
       return cached
     }
 
-    // Fetch from Firestore
+    // Fetch from Firestore with timeout
     try {
-      const userDoc = await getDoc(doc(db, 'users', uid))
+      const userDocPromise = getDoc(doc(db, 'users', uid))
+      const userDoc = await withTimeout(
+        userDocPromise,
+        FIRESTORE_TIMEOUT,
+        'Timeout ao carregar dados. Verifique sua conexão.'
+      )
+
+      if (!mountedRef.current) return null
 
       if (!userDoc.exists()) {
         setRole(null)
@@ -134,15 +226,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return fetchedRole
     } catch (err) {
       console.error('[Auth] Error fetching role:', err)
-      setError('Erro ao carregar permissões')
+
+      if (!mountedRef.current) return null
+
+      if (isNetworkError(err)) {
+        setError('Erro de conexão. Verifique sua internet e tente novamente.')
+      } else {
+        setError('Erro ao carregar permissões. Tente novamente.')
+      }
       setRole(null)
       return null
     }
   }, [])
 
-  // Listen to auth state changes - runs once on mount
+  // Listen to auth state changes with timeout
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribe: (() => void) | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let authResolved = false
+
+    const handleAuthStateChange = async (firebaseUser: User | null) => {
+      authResolved = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        timeoutId = null
+      }
+
+      if (!mountedRef.current) return
+
       if (firebaseUser) {
         setUser(firebaseUser)
         await fetchRole(firebaseUser.uid)
@@ -154,79 +265,155 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearCachedRole()
       }
       setLoading(false)
-    })
+    }
 
-    return () => unsubscribe()
+    // Set timeout for auth initialization
+    timeoutId = setTimeout(() => {
+      if (!authResolved && mountedRef.current) {
+        console.error('[Auth] Auth state timeout - Firebase may be unreachable')
+        setLoading(false)
+        setError('Não foi possível conectar ao servidor. Verifique sua internet.')
+      }
+    }, AUTH_TIMEOUT)
+
+    try {
+      unsubscribe = onAuthStateChanged(auth, handleAuthStateChange, (authError) => {
+        // Auth error callback
+        console.error('[Auth] Auth state error:', authError)
+        if (mountedRef.current) {
+          setLoading(false)
+          if (isNetworkError(authError)) {
+            setError('Erro de conexão. Verifique sua internet.')
+          } else {
+            setError('Erro ao verificar autenticação.')
+          }
+        }
+      })
+    } catch (err) {
+      console.error('[Auth] Failed to setup auth listener:', err)
+      if (mountedRef.current) {
+        setLoading(false)
+        setError('Erro ao inicializar autenticação.')
+      }
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      if (unsubscribe) unsubscribe()
+    }
   }, [fetchRole])
 
-  // Auth methods
+  // Sign in
   const signIn = useCallback(async (email: string, password: string) => {
     try {
       setError(null)
-      await signInWithEmailAndPassword(auth, email, password)
+      setUserNotFound(false)
+
+      await withTimeout(
+        signInWithEmailAndPassword(auth, email, password),
+        FIRESTORE_TIMEOUT,
+        'Timeout ao fazer login. Verifique sua conexão.'
+      )
+
       // onAuthStateChanged will handle the rest
       return { success: true }
     } catch (err: unknown) {
-      const firebaseError = err as { code?: string }
+      console.error('[Auth] Sign in error:', err)
 
-      const errorMap: Record<string, string> = {
-        'auth/invalid-credential': 'Email ou senha incorretos',
-        'auth/user-not-found': 'Usuário não encontrado',
-        'auth/wrong-password': 'Senha incorreta',
-        'auth/too-many-requests': 'Muitas tentativas. Tente novamente mais tarde.',
-        'auth/user-disabled': 'Esta conta foi desativada',
-        'auth/invalid-email': 'Email inválido',
+      const firebaseError = err as { code?: string; message?: string }
+
+      if (isNetworkError(err)) {
+        return {
+          success: false,
+          error: 'Erro de conexão. Verifique sua internet e tente novamente.'
+        }
+      }
+
+      if (firebaseError.code) {
+        return {
+          success: false,
+          error: getFirebaseAuthError(firebaseError.code)
+        }
       }
 
       return {
         success: false,
-        error: errorMap[firebaseError.code || ''] || 'Erro ao fazer login'
+        error: firebaseError.message || 'Erro ao fazer login'
       }
     }
   }, [])
 
+  // Sign up
   const signUp = useCallback(async (email: string, password: string) => {
     try {
-      const result = await createUserWithEmailAndPassword(auth, email, password)
+      setError(null)
 
-      await setDoc(doc(db, 'users', result.user.uid), {
-        email: result.user.email,
-        role: 'member' as UserRole,
-        createdAt: new Date().toISOString(),
-      })
+      const result = await withTimeout(
+        createUserWithEmailAndPassword(auth, email, password),
+        FIRESTORE_TIMEOUT,
+        'Timeout ao criar conta. Verifique sua conexão.'
+      )
+
+      await withTimeout(
+        setDoc(doc(db, 'users', result.user.uid), {
+          email: result.user.email,
+          role: 'member' as UserRole,
+          createdAt: new Date().toISOString(),
+        }),
+        FIRESTORE_TIMEOUT,
+        'Timeout ao salvar dados. Tente novamente.'
+      )
 
       // Cache the new role
       setCachedRole(result.user.uid, 'member')
 
       return { success: true }
     } catch (err: unknown) {
-      const firebaseError = err as { code?: string }
+      console.error('[Auth] Sign up error:', err)
 
-      const errorMap: Record<string, string> = {
-        'auth/email-already-in-use': 'Este email já está em uso',
-        'auth/invalid-email': 'Email inválido',
-        'auth/weak-password': 'Senha muito fraca (mínimo 6 caracteres)',
-        'auth/operation-not-allowed': 'Cadastro desabilitado temporariamente',
+      const firebaseError = err as { code?: string; message?: string }
+
+      if (isNetworkError(err)) {
+        return {
+          success: false,
+          error: 'Erro de conexão. Verifique sua internet e tente novamente.'
+        }
+      }
+
+      if (firebaseError.code) {
+        return {
+          success: false,
+          error: getFirebaseAuthError(firebaseError.code)
+        }
       }
 
       return {
         success: false,
-        error: errorMap[firebaseError.code || ''] || 'Erro ao criar conta'
+        error: firebaseError.message || 'Erro ao criar conta'
       }
     }
   }, [])
 
+  // Sign out
   const signOut = useCallback(async () => {
     clearCachedRole()
     setRole(null)
     setError(null)
     setUserNotFound(false)
-    await firebaseSignOut(auth)
+    try {
+      await firebaseSignOut(auth)
+    } catch (err) {
+      console.error('[Auth] Sign out error:', err)
+      // Still clear local state even if Firebase signout fails
+    }
   }, [])
 
+  // Refresh role
   const refreshRole = useCallback(async () => {
     if (!user) return
     clearCachedRole()
+    setError(null)
+    setUserNotFound(false)
     await fetchRole(user.uid)
   }, [user, fetchRole])
 
