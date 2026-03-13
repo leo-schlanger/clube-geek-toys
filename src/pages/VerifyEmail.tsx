@@ -51,13 +51,18 @@ export default function VerifyEmail() {
     setSending(true)
     setMessage(null)
 
-    const result = await sendVerificationEmail()
+    try {
+      const result = await sendVerificationEmail()
 
-    if (result.success) {
-      setMessage({ type: 'success', text: 'Email de verificação enviado!' })
-      setCooldown(60) // 60 segundos de cooldown
-    } else {
-      setMessage({ type: 'error', text: result.error || 'Erro ao enviar email' })
+      if (result.success) {
+        setMessage({ type: 'success', text: 'Email de verificação enviado! Verifique sua caixa de entrada e spam.' })
+        setCooldown(60) // 60 segundos de cooldown
+      } else {
+        setMessage({ type: 'error', text: result.error || 'Erro ao enviar email' })
+      }
+    } catch (err: any) {
+      console.error('Erro ao reenviar:', err)
+      setMessage({ type: 'error', text: `Erro: ${err?.message || 'desconhecido'}` })
     }
 
     setSending(false)

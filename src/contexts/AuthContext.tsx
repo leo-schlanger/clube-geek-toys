@@ -137,12 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Enviar email de verificação
       try {
-        await sendEmailVerification(result.user, {
-          url: `${window.location.origin}/login`,
-          handleCodeInApp: false,
-        })
-      } catch (verificationError) {
-        console.error('[Auth] Erro ao enviar email de verificação:', verificationError)
+        await sendEmailVerification(result.user)
+        console.log('[Auth] Email de verificação enviado para:', result.user.email)
+      } catch (verificationError: any) {
+        console.error('[Auth] Erro ao enviar email de verificação:', verificationError?.code, verificationError?.message)
         // Não falha o cadastro se o email de verificação falhar
       }
 
@@ -174,19 +172,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      await sendEmailVerification(user, {
-        url: `${window.location.origin}/login`,
-        handleCodeInApp: false,
-      })
+      await sendEmailVerification(user)
+      console.log('[Auth] Email de verificação reenviado para:', user.email)
       return { success: true }
-    } catch (err) {
-      const firebaseError = err as { code?: string }
+    } catch (err: any) {
+      console.error('[Auth] Erro ao reenviar verificação:', err?.code, err?.message)
 
-      if (firebaseError.code === 'auth/too-many-requests') {
+      if (err?.code === 'auth/too-many-requests') {
         return { success: false, error: 'Aguarde alguns minutos antes de reenviar' }
       }
 
-      return { success: false, error: 'Erro ao enviar email de verificação' }
+      return { success: false, error: `Erro ao enviar email: ${err?.code || 'desconhecido'}` }
     }
   }
 
