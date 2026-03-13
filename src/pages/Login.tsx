@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
 import { Loading } from '../components/ui/loading'
-import { Eye, EyeOff, LogIn, AlertTriangle, RefreshCw, UserX, WifiOff } from 'lucide-react'
+import { Eye, EyeOff, LogIn } from 'lucide-react'
 import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 
 export default function Login() {
@@ -16,16 +16,20 @@ export default function Login() {
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { signIn, role, error: authError, userNotFound, refreshRole, loading: authLoading } = useAuth()
+  const { user, role, loading, error, signIn } = useAuth()
   const navigate = useNavigate()
 
-  // Redirect when role is loaded
+  // Log para debug
+  console.log('[Login] Estado:', { user: user?.email, role, loading, error })
+
+  // Redirecionar quando autenticado com role
   useEffect(() => {
-    if (!authLoading && role) {
-      const redirectPath = getLoginRedirectPath(role, getAppMode())
-      navigate(redirectPath, { replace: true })
+    if (!loading && user && role) {
+      const path = getLoginRedirectPath(role, getAppMode())
+      console.log('[Login] Redirecionando para:', path)
+      navigate(path, { replace: true })
     }
-  }, [authLoading, role, navigate])
+  }, [loading, user, role, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -41,19 +45,14 @@ export default function Login() {
     setIsSubmitting(false)
   }
 
-  async function handleRetry() {
-    setFormError('')
-    await refreshRole()
+  // Loading inicial
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loading size="lg" />
+      </div>
+    )
   }
-
-  // Check if error is network related
-  const isNetworkError = authError?.toLowerCase().includes('conexão') ||
-    authError?.toLowerCase().includes('internet') ||
-    authError?.toLowerCase().includes('servidor') ||
-    formError?.toLowerCase().includes('conexão') ||
-    formError?.toLowerCase().includes('internet')
-
-  const isLoading = isSubmitting || authLoading
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -63,38 +62,24 @@ export default function Login() {
             <img src="/logo.jpg" alt="Geek & Toys" className="h-16 rounded mx-auto" />
           </div>
           <CardTitle className="text-2xl font-heading gradient-text">Clube Geek & Toys</CardTitle>
-          <CardDescription>
-            Acesse sua área de membro
-          </CardDescription>
+          <CardDescription>Acesse sua área de membro</CardDescription>
         </CardHeader>
+
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {/* Erro do formulário */}
             {formError && (
-              <div className={`p-3 rounded-md text-sm ${
-                isNetworkError
-                  ? 'bg-orange-500/10 border border-orange-500/50 text-orange-600'
-                  : 'bg-red-500/10 border border-red-500/50 text-red-500'
-              }`}>
-                <div className="flex items-center gap-2">
-                  {isNetworkError ? (
-                    <WifiOff className="h-4 w-4 flex-shrink-0" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  )}
-                  <span>{formError}</span>
-                </div>
+              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-500 text-sm">
+                {formError}
               </div>
             )}
 
-            {userNotFound && (
+            {/* Erro de autenticação (usuário não cadastrado no sistema) */}
+            {error && !formError && (
               <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-600 text-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserX className="h-4 w-4" />
-                  <span className="font-medium">Usuário não cadastrado</span>
-                </div>
+                <p className="font-medium mb-1">Usuário não cadastrado</p>
                 <p className="text-xs opacity-80">
-                  Seu login existe mas você não está cadastrado no sistema.
-                  Complete seu cadastro para acessar.
+                  Seu login existe mas você não está no sistema. Complete seu cadastro.
                 </p>
                 <Button
                   type="button"
@@ -108,43 +93,6 @@ export default function Login() {
               </div>
             )}
 
-            {authError && !userNotFound && (
-              <div className={`p-3 rounded-md text-sm ${
-                isNetworkError
-                  ? 'bg-orange-500/10 border border-orange-500/50 text-orange-600'
-                  : 'bg-yellow-500/10 border border-yellow-500/50 text-yellow-600'
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {isNetworkError ? (
-                    <WifiOff className="h-4 w-4" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4" />
-                  )}
-                  <span className="font-medium">
-                    {isNetworkError ? 'Problema de conexão' : 'Erro ao carregar dados'}
-                  </span>
-                </div>
-                <p className="text-xs opacity-80 mb-2">{authError}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRetry}
-                  disabled={authLoading}
-                  className="w-full"
-                >
-                  {authLoading ? (
-                    <Loading size="sm" />
-                  ) : (
-                    <>
-                      <RefreshCw className="h-3 w-3 mr-1" />
-                      Tentar novamente
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -154,8 +102,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
-                autoComplete="email"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -169,8 +116,7 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
-                  autoComplete="current-password"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
@@ -183,23 +129,15 @@ export default function Login() {
             </div>
 
             <div className="text-right">
-              <Link
-                to="/recuperar-senha"
-                className="text-sm text-primary hover:underline"
-              >
+              <Link to="/recuperar-senha" className="text-sm text-primary hover:underline">
                 Esqueceu a senha?
               </Link>
             </div>
           </CardContent>
 
           <CardFooter className="flex-col gap-4">
-            <Button
-              type="submit"
-              className="w-full"
-              size="lg"
-              disabled={isLoading}
-            >
-              {isLoading ? (
+            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? (
                 <Loading size="sm" />
               ) : (
                 <>

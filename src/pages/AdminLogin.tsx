@@ -1,12 +1,13 @@
-import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
-import { Eye, EyeOff, AlertTriangle, RefreshCw, UserX, Loader2, WifiOff } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
+import { Loading } from '../components/ui/loading'
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('')
@@ -15,13 +16,20 @@ export default function AdminLogin() {
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { user, role, signIn, error: authError, userNotFound, refreshRole, loading } = useAuth()
+  const { user, role, loading, error, signIn } = useAuth()
+  const navigate = useNavigate()
 
-  // Redirect if authenticated with role - use proper role-based redirect
-  if (!loading && user && role) {
-    const redirectPath = getLoginRedirectPath(role, getAppMode())
-    return <Navigate to={redirectPath} replace />
-  }
+  // Log para debug
+  console.log('[AdminLogin] Estado:', { user: user?.email, role, loading, error })
+
+  // Redirecionar quando autenticado com role
+  useEffect(() => {
+    if (!loading && user && role) {
+      const path = getLoginRedirectPath(role, getAppMode())
+      console.log('[AdminLogin] Redirecionando para:', path)
+      navigate(path, { replace: true })
+    }
+  }, [loading, user, role, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -37,19 +45,14 @@ export default function AdminLogin() {
     setIsSubmitting(false)
   }
 
-  async function handleRetry() {
-    setFormError('')
-    await refreshRole()
+  // Loading inicial
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loading size="lg" />
+      </div>
+    )
   }
-
-  // Check if error is network related
-  const isNetworkError = authError?.toLowerCase().includes('conexão') ||
-    authError?.toLowerCase().includes('internet') ||
-    authError?.toLowerCase().includes('servidor') ||
-    formError?.toLowerCase().includes('conexão') ||
-    formError?.toLowerCase().includes('internet')
-
-  const isLoading = loading || isSubmitting
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -58,9 +61,7 @@ export default function AdminLogin() {
           <div className="mx-auto mb-4">
             <img src="/logo.jpg" alt="Geek & Toys" className="h-16 rounded mx-auto" />
           </div>
-          <CardTitle className="text-2xl font-heading gradient-text">
-            Painel Administrativo
-          </CardTitle>
+          <CardTitle className="text-2xl font-heading gradient-text">Painel Administrativo</CardTitle>
           <CardDescription className="text-muted-foreground">
             Geek & Toys - Acesso Restrito
           </CardDescription>
@@ -68,61 +69,20 @@ export default function AdminLogin() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {/* Erro do formulário */}
             {formError && (
-              <div className={`p-3 rounded-md text-sm flex items-center gap-2 ${
-                isNetworkError
-                  ? 'bg-orange-500/10 border border-orange-500/50 text-orange-400'
-                  : 'bg-red-500/10 border border-red-500/50 text-red-400'
-              }`}>
-                {isNetworkError ? (
-                  <WifiOff className="h-4 w-4 flex-shrink-0" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                )}
+              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
                 {formError}
               </div>
             )}
 
-            {!isLoading && userNotFound && (
+            {/* Erro de autenticação */}
+            {error && !formError && (
               <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-400 text-sm">
-                <div className="flex items-center gap-2 mb-2">
-                  <UserX className="h-4 w-4" />
-                  <span className="font-medium">Usuário não cadastrado</span>
-                </div>
+                <p className="font-medium mb-1">Usuário não cadastrado</p>
                 <p className="text-xs opacity-80">
-                  Seu login existe mas você não está cadastrado como admin/vendedor.
-                  Contate o administrador.
+                  Seu login não está cadastrado como admin/vendedor. Contate o administrador.
                 </p>
-              </div>
-            )}
-
-            {!isLoading && authError && !userNotFound && (
-              <div className={`p-3 rounded-md text-sm ${
-                isNetworkError
-                  ? 'bg-orange-500/10 border border-orange-500/50 text-orange-400'
-                  : 'bg-yellow-500/10 border border-yellow-500/50 text-yellow-400'
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {isNetworkError ? (
-                    <WifiOff className="h-4 w-4" />
-                  ) : (
-                    <AlertTriangle className="h-4 w-4" />
-                  )}
-                  <span className="font-medium">
-                    {isNetworkError ? 'Problema de conexão' : 'Erro ao carregar permissões'}
-                  </span>
-                </div>
-                <p className="text-xs opacity-80 mb-2">{authError}</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRetry}
-                  className="w-full"
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Tentar novamente
-                </Button>
               </div>
             )}
 
@@ -135,8 +95,7 @@ export default function AdminLogin() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
-                autoComplete="email"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -150,14 +109,13 @@ export default function AdminLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
-                  autoComplete="current-password"
+                  disabled={isSubmitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -166,11 +124,11 @@ export default function AdminLogin() {
           </CardContent>
 
           <CardFooter>
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+              {isSubmitting ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {loading ? 'Carregando...' : 'Entrando...'}
+                  Entrando...
                 </span>
               ) : (
                 'Acessar Painel'
