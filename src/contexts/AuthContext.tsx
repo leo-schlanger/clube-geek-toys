@@ -80,14 +80,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const data = userDoc.data()
-      const userRole = data?.role as UserRole
+      const userRole = data?.role as UserRole | 'disabled'
 
       if (!userRole) {
         setError('Permissão não definida')
         return null
       }
 
-      return userRole
+      // Bloquear acesso para usuários desativados
+      if (userRole === 'disabled') {
+        setError('Sua conta foi desativada. Entre em contato com o administrador.')
+        return null
+      }
+
+      return userRole as UserRole
     } catch (err) {
       console.error('[Auth] Erro ao buscar role:', err)
       setError('Erro ao carregar permissões')

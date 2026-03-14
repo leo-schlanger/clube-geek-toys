@@ -7,7 +7,7 @@ import { formatCPF, getStatusLabel } from '../lib/utils'
 import {
   Eye,
   Edit,
-  Trash2,
+  UserX,
   CheckCircle,
   Star,
   Crown,
@@ -201,9 +201,9 @@ export function MembersTable({
             e.stopPropagation()
             onDelete(member)
           }}
-          title="Desativar"
+          title="Desativar membro"
         >
-          <Trash2 className="h-4 w-4" />
+          <UserX className="h-4 w-4" />
         </Button>
       </div>
     ),

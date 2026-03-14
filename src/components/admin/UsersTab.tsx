@@ -1,13 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
-import { Plus, Shield, UserCog, Trash2 } from 'lucide-react'
+import { Plus, Shield, UserCog, UserX, Ban } from 'lucide-react'
 
 interface SystemUser {
   id: string
   email: string
   role: string
   createdAt?: string
+  disabledAt?: string
 }
 
 interface UsersTabProps {
@@ -45,7 +46,7 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-muted/50 transition-colors">
+                <tr key={user.id} className={`border-b hover:bg-muted/50 transition-colors ${user.role === 'disabled' ? 'opacity-50' : ''}`}>
                   <td className="py-4 px-4">
                     <div>
                       <p className="font-medium">{user.email}</p>
@@ -53,10 +54,17 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
                     </div>
                   </td>
                   <td className="py-4 px-4">
-                    <Badge variant={user.role === 'admin' ? 'black' : user.role === 'seller' ? 'gold' : 'silver'}>
-                      {user.role === 'admin' && <Shield className="h-3 w-3 mr-1 inline" />}
-                      {user.role}
-                    </Badge>
+                    {user.role === 'disabled' ? (
+                      <Badge variant="destructive" className="gap-1">
+                        <Ban className="h-3 w-3" />
+                        Desativado
+                      </Badge>
+                    ) : (
+                      <Badge variant={user.role === 'admin' ? 'black' : user.role === 'seller' ? 'gold' : 'silver'}>
+                        {user.role === 'admin' && <Shield className="h-3 w-3 mr-1 inline" />}
+                        {user.role}
+                      </Badge>
+                    )}
                   </td>
                   <td className="py-4 px-4 text-sm text-muted-foreground">
                     {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
@@ -71,16 +79,19 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
                         <option value="member">Membro</option>
                         <option value="seller">Vendedor</option>
                         <option value="admin">Admin</option>
+                        {user.role === 'disabled' && <option value="disabled">Desativado</option>}
                       </select>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDeleteUser(user.id, user.email)}
-                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8 p-0"
-                        title="Remover usuário"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {user.role !== 'disabled' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDeleteUser(user.id, user.email)}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8 p-0"
+                          title="Desativar usuário"
+                        >
+                          <UserX className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>

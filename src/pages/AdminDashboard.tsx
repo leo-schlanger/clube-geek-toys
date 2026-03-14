@@ -202,17 +202,22 @@ export default function AdminDashboard() {
   }, [fetchData])
 
   const handleDeleteUser = useCallback(async (userId: string, userEmail: string) => {
-    if (!confirm(`Tem certeza que deseja remover o usuário "${userEmail}"?\n\nIsso removerá o acesso ao sistema, mas não apaga a conta do Firebase Auth.`)) {
+    if (!confirm(`Tem certeza que deseja desativar o usuário "${userEmail}"?\n\nO usuário perderá acesso ao sistema. Para reativar, altere o status para um cargo válido.`)) {
       return
     }
 
     try {
-      await FirestoreManager.delete('users', userId)
-      toast.success('Usuário removido com sucesso')
+      // Soft-delete: marca como 'disabled' em vez de deletar
+      // Isso impede acesso ao sistema sem afetar o Firebase Auth
+      await FirestoreManager.update('users', userId, {
+        role: 'disabled',
+        disabledAt: new Date().toISOString()
+      })
+      toast.success('Usuário desativado com sucesso')
       fetchData(true)
     } catch (error) {
-      console.error('Error deleting user:', error)
-      toast.error('Erro ao remover usuário')
+      console.error('Error disabling user:', error)
+      toast.error('Erro ao desativar usuário')
     }
   }, [fetchData])
 
