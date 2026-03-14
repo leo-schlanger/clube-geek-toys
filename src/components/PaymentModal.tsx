@@ -104,26 +104,31 @@ export function PaymentModal({
   async function handlePixPayment() {
     setLoading(true)
 
-    const pix = await generatePixPayment(
-      amount,
-      `Clube Geek & Toys - Plano ${planData.name}`,
-      memberEmail,
-      memberId
-    )
+    try {
+      const pix = await generatePixPayment(
+        amount,
+        `Clube Geek & Toys - Plano ${planData.name}`,
+        memberEmail,
+        memberId
+      )
 
-    if (pix) {
-      setPixData(pix)
-      setTimeLeft(30 * 60)
+      if (pix) {
+        setPixData(pix)
+        setTimeLeft(30 * 60)
 
-      // Start polling if API is configured
-      if (isConfigured) {
-        startPaymentPolling(pix.paymentId)
+        // Start polling if API is configured
+        if (isConfigured) {
+          startPaymentPolling(pix.paymentId)
+        }
+      } else {
+        toast.error('Erro ao gerar QR Code PIX')
       }
-    } else {
-      toast.error('Erro ao gerar QR Code PIX')
+    } catch (error) {
+      console.error('Error generating PIX:', error)
+      toast.error('Erro ao gerar pagamento. Tente novamente.')
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   /**

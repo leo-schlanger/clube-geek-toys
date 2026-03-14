@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -18,6 +19,16 @@ import {
   formatPoints,
 } from '../lib/points'
 import { toast } from 'sonner'
+
+// Schema de validação para QR Code do membro
+const qrCodeSchema = z.object({
+  cpf: z.string().min(11).max(14),
+  id: z.string().optional(),
+  plan: z.string().optional(),
+  status: z.string().optional(),
+  expiry: z.string().optional(),
+  v: z.number().optional(),
+})
 import {
   Camera,
   Search,
@@ -67,28 +78,34 @@ export default function PDV() {
     }
 
     setAddingPoints(true)
-    const response = await addPoints(result.member.id, value, isPromotion, user?.uid)
+    try {
+      const response = await addPoints(result.member.id, value, isPromotion, user?.uid)
 
-    if (response.success) {
-      if (isPromotion) {
-        toast.info(response.message)
+      if (response.success) {
+        if (isPromotion) {
+          toast.info(response.message)
+        } else {
+          toast.success(response.message)
+          // Update local member data
+          setResult({
+            ...result,
+            member: {
+              ...result.member,
+              points: (result.member.points || 0) + response.pointsAdded,
+            },
+          })
+        }
+        setPurchaseValue('')
+        setIsPromotion(false)
       } else {
-        toast.success(response.message)
-        // Update local member data
-        setResult({
-          ...result,
-          member: {
-            ...result.member,
-            points: (result.member.points || 0) + response.pointsAdded,
-          },
-        })
+        toast.error(response.message)
       }
-      setPurchaseValue('')
-      setIsPromotion(false)
-    } else {
-      toast.error(response.message)
+    } catch (error) {
+      console.error('Error adding points:', error)
+      toast.error('Erro ao adicionar pontos. Tente novamente.')
+    } finally {
+      setAddingPoints(false)
     }
-    setAddingPoints(false)
   }
 
   /**
@@ -98,27 +115,34 @@ export default function PDV() {
     if (!result?.member) return
 
     setRedeemingPoints(true)
-    const response = await redeemPoints(result.member.id, rule, user?.uid)
+    try {
+      const response = await redeemPoints(result.member.id, rule, user?.uid)
 
-    if (response.success) {
-      toast.success(response.message)
-      // Update local member data
-      setResult({
-        ...result,
-        member: {
-          ...result.member,
-          points: (result.member.points || 0) - rule.points,
-        },
-      })
-      setShowRedemption(false)
-    } else {
-      toast.error(response.message)
+      if (response.success) {
+        toast.success(response.message)
+        // Update local member data
+        setResult({
+          ...result,
+          member: {
+            ...result.member,
+            points: (result.member.points || 0) - rule.points,
+          },
+        })
+        setShowRedemption(false)
+      } else {
+        toast.error(response.message)
+      }
+    } catch (error) {
+      console.error('Error redeeming points:', error)
+      toast.error('Erro ao resgatar pontos. Tente novamente.')
+    } finally {
+      setRedeemingPoints(false)
     }
-    setRedeemingPoints(false)
   }
 
   /**
    * Handle QR Code scan
+   * Validates QR data with Zod schema before processing
    */
   async function handleQRScan(data: string) {
     setShowScanner(false)
@@ -126,25 +150,35 @@ export default function PDV() {
     setResult(null)
 
     try {
-      const qrData = JSON.parse(data)
-      if (qrData.cpf) {
-        await verifyMember(qrData.cpf)
+      // Parse e valida com Zod
+      const parsed = JSON.parse(data)
+      const qrData = qrCodeSchema.parse(parsed)
+
+      await verifyMember(qrData.cpf)
+    } catch (error) {
+      // Diferencia erros de validação de outros erros
+      if (error instanceof z.ZodError) {
+        setResult({
+          member: null,
+          isValid: false,
+          message: 'QR Code com formato inválido',
+        })
+      } else if (error instanceof SyntaxError) {
+        setResult({
+          member: null,
+          isValid: false,
+          message: 'QR Code não reconhecido',
+        })
       } else {
         setResult({
           member: null,
           isValid: false,
-          message: 'QR Code inválido',
+          message: 'Erro ao processar QR Code',
         })
       }
-    } catch {
-      setResult({
-        member: null,
-        isValid: false,
-        message: 'Erro ao ler QR Code',
-      })
+    } finally {
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   /**
@@ -157,10 +191,19 @@ export default function PDV() {
     setLoading(true)
     setResult(null)
 
-    const cleanCPF = cpfSearch.replace(/\D/g, '')
-    await verifyMember(cleanCPF)
-
-    setLoading(false)
+    try {
+      const cleanCPF = cpfSearch.replace(/\D/g, '')
+      await verifyMember(cleanCPF)
+    } catch (error) {
+      console.error('Error searching CPF:', error)
+      setResult({
+        member: null,
+        isValid: false,
+        message: 'Erro ao buscar membro',
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   /**

@@ -1,298 +1,235 @@
 # TODO - Plano de Melhorias do Projeto
 
+> **Última atualização:** Março 2026
+> **Política de custos:** Apenas recursos gratuitos. Itens pagos estão separados para implementação futura.
+
 ## Legenda de Prioridade
+
 - 🔴 **CRÍTICO** - Deve ser feito imediatamente
 - 🟠 **ALTO** - Deve ser feito antes do próximo deploy
 - 🟡 **MÉDIO** - Deve ser planejado para o próximo sprint
 - 🟢 **BAIXO** - Nice to have, quando houver tempo
 - 🔵 **FUTURO** - Backlog para versões futuras
 
+## Legenda de Custo
+
+- 🆓 **GRATUITO** - Sem custo adicional
+- 💰 **PAGO** - Requer serviço pago (separado para o futuro)
+
 ---
 
-## 🔴 CRÍTICO
+# SEÇÃO 1: TAREFAS GRATUITAS (Implementar Agora)
+
+## 🔴 CRÍTICO - Concluído ✅
 
 ### Segurança
-- [x] **Rotacionar credenciais se expostas** ✅ - Verificado histórico git, nenhuma credencial exposta
-  - .gitignore configurado corretamente
-  - Secrets gerenciados via Vercel/Wrangler
-- [x] **Implementar rate limiting** ✅ - Proteção contra brute force no login
-  - Máximo 5 tentativas por email
-  - Bloqueio de 5 minutos após exceder
-  - Contador visual de tentativas restantes
-  - Implementado em `src/lib/rate-limit.ts`
-- [x] **Adicionar verificação de email** ✅ - Firebase Auth email verification
-  - Email enviado automaticamente após cadastro
-  - Página `/verificar-email` para reenvio
-  - Membros redirecionados até verificar email
-  - Cooldown de 60s entre reenvios
+
+- [x] 🆓 **Rotacionar credenciais se expostas** ✅
+- [x] 🆓 **Implementar rate limiting** ✅
+- [x] 🆓 **Adicionar verificação de email** ✅
 
 ---
 
-## 🟠 ALTO
+## 🟠 ALTO - Concluído ✅
 
 ### Performance
-- [x] **Code-split AdminDashboard** ~~(494kb)~~ → 37kb ✅
-  - Separar abas em componentes lazy (MembersTab, UsersTab, LogsTab, ReportsTab, PointsTab)
-  - Charts em vendor-charts separado (421kb, lazy loaded)
-  - Redução de 92% no bundle principal
 
-- [x] **Implementar paginação no Firestore** ✅
-  - Adicionado `getMembersPaginated()` com cursor pagination
-  - Adicionado `getMembersCount()` para contagem total
-  - `FirestoreManager.findManyPaginated()` disponível para outras collections
-  - DataTable já tem paginação client-side integrada
-
-- [x] **Virtual scrolling para tabelas grandes** ✅
-  - Criado `VirtualTable` component usando `@tanstack/react-virtual`
-  - Renderiza apenas items visíveis
-  - Disponível para uso quando necessário
+- [x] 🆓 **Code-split AdminDashboard** ✅
+- [x] 🆓 **Implementar paginação no Firestore** ✅
+- [x] 🆓 **Virtual scrolling para tabelas grandes** ✅
 
 ### Infraestrutura
-- [x] **Configurar Vercel Analytics** ✅
-  - Instalado `@vercel/analytics` e `@vercel/speed-insights`
-  - Configurado em `src/main.tsx`
-  - Monitora Core Web Vitals automaticamente
 
-- [x] **Implementar error tracking** ✅ (parcial)
-  - Criado `ErrorTracker` service em `src/lib/error-tracking.ts`
-  - Preparado para integração com Sentry
-  - Helper `withErrorTracking()` para operações async
-  - Pendente: instalar @sentry/react e configurar DSN
-
-### Código
-- [x] **Criar custom hooks** ✅
-  - `useMembers()` - hook para operações de membros
-  - `useMember()` - hook para membro individual
-  - `usePoints()` - hook para sistema de pontos
-  - `useMemberPoints()` - hook para pontos do membro
-  - Implementado em `src/hooks/`
-
-- [x] **Adicionar retry com exponential backoff** ✅
-  - Implementado em `src/lib/payments.ts`
-  - `fetchWithRetry()` com backoff exponencial
-  - Timeout de 15s por request
-  - Aplicado em `addPoints()`, `addBonusPoints()` e `redeemPoints()` via `src/lib/retry.ts`
+- [x] 🆓 **Configurar Vercel Analytics** ✅ (plano gratuito)
+- [x] 🆓 **Criar custom hooks** ✅
+- [x] 🆓 **Adicionar retry com exponential backoff** ✅
 
 ---
 
-## 🟡 MÉDIO
+## 🟡 MÉDIO - Pendente
 
-### UX/UI
-- [x] **Implementar skeleton loading** ✅
-  - Criado `src/components/ui/skeleton.tsx` com variantes
-  - Aplicado no AdminDashboard durante carregamento inicial
-  - Aplicado no DataTable durante refresh
-  - Skeleton rows animados na tabela
+### UX/UI (Concluído)
 
-- [x] **Dark mode** ✅ (Apenas dark mode - decisão de design)
+- [x] 🆓 **Skeleton loading** ✅
+- [x] 🆓 **Dark mode** ✅
+- [x] 🆓 **PWA** ✅
+- [x] 🆓 **Feedback de formulários** ✅
+- [x] 🆓 **Exportação CSV** ✅
 
-- [x] **PWA (Progressive Web App)** ✅
-  - Configurado `vite-plugin-pwa` com manifest
-  - Service worker com workbox para cache offline
-  - Instalável como app no celular
+### Funcionalidades Pendentes
 
-- [x] **Melhorar feedback de formulários** ✅
-  - Criado `src/components/ui/progress.tsx` (Progress, ProgressCircle)
-  - Criado `src/components/ui/success-animation.tsx` (SuccessAnimation, ErrorAnimation, LoadingDots)
-  - Criado `src/components/ui/form-feedback.tsx` (FormFeedback, FormFieldFeedback)
-  - Animações CSS: checkmark, scale-in, shake
-
-### Funcionalidades
-- [ ] **Dashboard de métricas em tempo real**
-  - Usar onSnapshot para updates live
+- [ ] 🆓 **Dashboard de métricas em tempo real**
+  - Usar `onSnapshot` do Firestore (gratuito)
   - Gráficos com atualização automática
   - Indicadores de tendência
+  - **Complexidade:** Média
 
-- [ ] **Sistema de notificações**
-  - Notificações push via Firebase Cloud Messaging
-  - Lembretes de vencimento de assinatura
-  - Alertas de pontos expirando
-
-- [x] **Exportação de relatórios** ✅ (CSV)
-  - Exportar membros para CSV no MembersTable
-  - Exportar ranking de pontos no PointsTab
-  - DataTable tem suporte genérico para exportação CSV
-
-- [ ] **Histórico de ações do usuário**
-  - Timeline de atividades no dashboard do membro
-  - Compras, pontos ganhos, resgates
+- [ ] 🆓 **Histórico de ações do membro**
+  - Timeline de atividades no dashboard
+  - Já temos audit_logs, só exibir no frontend
+  - **Complexidade:** Baixa
 
 ### Testes
-- [ ] **Adicionar testes unitários**
-  - Vitest para unit tests
-  - React Testing Library para components
-  - Cobertura mínima: 70%
 
-- [ ] **Adicionar testes E2E**
-  - Playwright ou Cypress
-  - Fluxo de cadastro
-  - Fluxo de login
-  - Fluxo de pagamento (mock)
+- [ ] 🆓 **Testes unitários**
+  - Vitest (gratuito, já no ecossistema Vite)
+  - React Testing Library
+  - Meta: 70% cobertura
+  - **Complexidade:** Alta (muito código)
+
+- [ ] 🆓 **Testes E2E**
+  - Playwright (gratuito)
+  - Fluxos críticos: cadastro, login, pagamento
+  - **Complexidade:** Média
 
 ---
 
-## 🟢 BAIXO
+## 🟢 BAIXO - Pendente
 
 ### Code Quality
-- [ ] **Remover diretório hooks/ vazio**
-  - Ou implementar custom hooks conforme item acima
 
-- [ ] **Adicionar Storybook**
-  - Documentar componentes UI
-  - Facilitar desenvolvimento isolado
+- [x] 🆓 **Husky + lint-staged** ✅
+- [ ] 🆓 **Commitlint** - Conventional commits
+- [ ] 🆓 **Storybook** - Documentar componentes (gratuito)
 
-- [ ] **Configurar Husky + lint-staged**
-  - Pre-commit hooks
-  - Lint e format automático
+### Documentação
 
-- [ ] **Adicionar commitlint**
-  - Conventional commits
-  - Changelog automático
+- [x] 🆓 **README atualizado** ✅
+- [ ] 🆓 **JSDoc em funções críticas**
 
-### Performance Avançada
-- [ ] **Implementar React Server Components**
-  - Avaliar migração para Next.js ou Remix
-  - RSC para páginas estáticas (Terms, Privacy)
+### Performance
 
-- [ ] **Otimizar bundle Firebase**
+- [ ] 🆓 **Otimizar bundle Firebase**
   - Tree-shaking mais agressivo
   - Lazy load Firestore em rotas que não usam
 
-- [ ] **Implementar cache de segundo nível**
-  - Redis ou similar para cache de sessão
-  - Reduzir leituras no Firestore
+---
 
-### Documentação
-- [ ] **JSDoc em funções críticas**
-  - lib/payments.ts
-  - lib/points.ts
-  - lib/members.ts
+# SEÇÃO 2: TAREFAS PAGAS (Futuro - Quando Houver Orçamento)
 
-- [ ] **README atualizado**
-  - Screenshots
-  - Setup passo a passo
-  - Troubleshooting comum
+> ⚠️ **ATENÇÃO:** As tarefas abaixo requerem serviços pagos.
+> Manter aqui para referência futura quando houver budget disponível.
 
 ---
 
-## 🔵 FUTURO (v2.0+)
+## 💰 Error Tracking - Sentry
 
-### Novos Recursos
-- [ ] **App Mobile (React Native)**
-  - Compartilhar lógica com web
-  - Carteirinha digital
-  - QR code do membro no celular
+**Custo estimado:** ~$26/mês (plano Team) ou gratuito com limites
 
-- [ ] **Multi-tenancy**
-  - Suportar múltiplas lojas
-  - Dashboard centralizado para franquias
+- [ ] 💰 **Integração completa com Sentry**
+  - Base já criada em `src/lib/error-tracking.ts`
+  - Precisa: instalar @sentry/react e configurar DSN
+  - **Alternativa gratuita:** Console logs + Vercel logs (já temos)
 
-- [ ] **Gamificação avançada**
-  - Níveis de membro
-  - Badges e conquistas
-  - Desafios semanais
+---
 
-- [ ] **Integração com e-commerce**
-  - Webhook para registrar compras automaticamente
-  - Integração com sistemas de PDV
+## 💰 Notificações Push - Firebase Cloud Messaging
 
-- [ ] **Sistema de indicação**
-  - Link de referral
-  - Bônus para quem indica
-  - Tracking de conversões
+**Custo:** Gratuito até 10k mensagens/mês, depois pago
 
-- [ ] **Marketplace de recompensas**
-  - Catálogo de produtos para resgate
-  - Gestão de estoque de brindes
-  - Parcerias com outras lojas
+- [ ] 💰 **Sistema de notificações push**
+  - Lembretes de vencimento de assinatura
+  - Alertas de pontos expirando
+  - **Alternativa gratuita:** Email via Firebase Auth (limitado)
 
-### Infraestrutura
-- [ ] **Migrar para monorepo**
-  - Turborepo ou Nx
-  - Pacotes compartilhados
-  - Deploy independente
+---
 
-- [ ] **Implementar BFF (Backend for Frontend)**
-  - Cloudflare Workers expandido
-  - GraphQL ou tRPC
-  - Autenticação centralizada
+## 💰 Backend Completo - Cloud Functions
 
-- [ ] **CI/CD completo**
-  - GitHub Actions
-  - Testes automáticos
-  - Deploy preview por PR
+**Custo:** Gratuito até 2M invocações/mês, depois pago
+
+- [ ] 💰 **Deletar usuário do Firebase Auth**
+  - Requer Admin SDK em Cloud Function
+  - Atualmente usando soft-delete (gratuito)
+
+- [ ] 💰 **Webhooks de pagamento**
+  - Processamento automático do Mercado Pago
+  - Atualmente manual
+
+---
+
+## 💰 Infraestrutura Avançada
+
+### Redis/Cache
+
+**Custo:** ~$5-15/mês (Upstash, Redis Cloud)
+
+- [ ] 💰 **Cache de segundo nível**
+  - Reduzir leituras no Firestore
+
+### CI/CD
+
+**Custo:** GitHub Actions gratuito para repos públicos, limitado para privados
+
+- [ ] 💰 **CI/CD completo**
+  - Testes automáticos em PR
+  - Deploy preview
   - Rollback automático
 
 ---
 
-## Cronograma Sugerido
+## 🔵 FUTURO v2.0+ (Requer Investimento)
 
-### Sprint 1 (Semana 1-2)
-- [x] Code-split AdminDashboard ✅
-- [x] Paginação no Firestore ✅
-- [x] Rate limiting no login ✅
+### Novos Produtos
 
-### Sprint 2 (Semana 3-4)
-- [ ] Custom hooks (useMembers, usePayments, usePoints)
-- [ ] Error tracking (Sentry)
-- [ ] Skeleton loading
+- [ ] 💰 **App Mobile (React Native)** - Custo de desenvolvimento + stores
+- [ ] 💰 **Multi-tenancy** - Infraestrutura escalável
+- [ ] 💰 **Integração e-commerce** - APIs de terceiros
+- [ ] 💰 **Sistema de indicação** - Tracking + rewards
 
-### Sprint 3 (Semana 5-6)
-- [ ] Testes unitários (70% coverage)
-- [ ] PWA básico
-- [ ] Dark mode toggle
+### Arquitetura
 
-### Sprint 4 (Semana 7-8)
-- [ ] Sistema de notificações
-- [ ] Exportação de relatórios
-- [ ] Testes E2E
+- [ ] 💰 **Monorepo (Turborepo)** - Complexidade de infra
+- [ ] 💰 **BFF com Cloudflare Workers** - Custo por requests
 
 ---
 
-## Métricas de Sucesso
+# SEÇÃO 3: DECISÕES TÉCNICAS
 
-### Performance
-| Métrica | Atual | Meta |
-|---------|-------|------|
-| LCP (Largest Contentful Paint) | ? | < 2.5s |
-| FID (First Input Delay) | ? | < 100ms |
-| CLS (Cumulative Layout Shift) | ? | < 0.1 |
-| Bundle size (AdminDashboard) | 37kb ✅ | < 200kb |
-| Bundle size (vendor-charts) | 421kb | lazy loaded |
-| Time to Interactive | ? | < 3s |
+## Stack Atual (Gratuita)
+
+| Serviço          | Plano | Limite Gratuito                    |
+| ---------------- | ----- | ---------------------------------- |
+| Firebase Auth    | Spark | Ilimitado                          |
+| Firestore        | Spark | 50k leituras/dia, 20k escritas/dia |
+| Vercel Hosting   | Hobby | 100GB bandwidth/mês                |
+| Vercel Analytics | Hobby | 2.5k eventos/mês                   |
+| GitHub           | Free  | Repos privados ilimitados          |
+
+## Débitos Técnicos
+
+1. MapperUtils usa `any` (necessário para flexibilidade)
+2. ~~AdminDashboard muito grande~~ ✅ Resolvido
+3. Console.error ainda em produção
+4. Soft-delete de usuários (não remove do Auth)
+
+## Dependências para Monitorar
+
+- `firebase` - Atualizações frequentes
+- `@mercadopago/sdk-react` - Breaking changes
+- `react` - React 19 estável
+
+---
+
+# SEÇÃO 4: MÉTRICAS
+
+### Performance (Verificar com Lighthouse)
+
+| Métrica          | Meta    |
+| ---------------- | ------- |
+| LCP              | < 2.5s  |
+| FID              | < 100ms |
+| CLS              | < 0.1   |
+| Lighthouse Score | > 90    |
 
 ### Qualidade
-| Métrica | Atual | Meta |
-|---------|-------|------|
-| Test coverage | 0% | 70% |
-| TypeScript strict | ✅ | ✅ |
-| ESLint errors | 0 | 0 |
-| Lighthouse score | ? | > 90 |
 
-### Negócio
-| Métrica | Atual | Meta |
-|---------|-------|------|
-| Taxa de conversão cadastro | ? | > 60% |
-| Taxa de churn mensal | ? | < 5% |
-| NPS | ? | > 50 |
+| Métrica           | Atual | Meta |
+| ----------------- | ----- | ---- |
+| Test coverage     | 0%    | 70%  |
+| TypeScript strict | ✅    | ✅   |
+| ESLint errors     | 0     | 0    |
 
 ---
 
-## Notas
-
-### Decisões Técnicas
-1. **React 19** - Já usando useSyncExternalStore para auth
-2. **Firestore** - Escolhido por real-time e offline support
-3. **Vercel** - Hosting por simplicidade e performance
-4. **Mercado Pago** - Payment gateway por ser brasileiro
-
-### Débitos Técnicos Conhecidos
-1. MapperUtils usa `any` (necessário para flexibilidade)
-2. ~~AdminDashboard muito grande~~ ✅ Resolvido com code-splitting
-3. Sem paginação (não escala para milhares de membros)
-4. Console.error ainda em produção (Terser remove console.log apenas)
-
-### Dependências para Monitorar
-- `firebase` - Atualizações frequentes
-- `@mercadopago/sdk-react` - Verificar breaking changes
-- `react` - React 19 ainda recente, possíveis patches
+_Documento atualizado em Março 2026_

@@ -101,25 +101,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Listener de autenticação
+  // Listener de autenticação com proteção contra race condition
   useEffect(() => {
+    let isCurrent = true // Flag para evitar race condition
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser)
         setEmailVerified(firebaseUser.emailVerified)
+
         const userRole = await fetchUserRole(firebaseUser.uid)
-        setRole(userRole)
-        if (userRole) setError(null)
+
+        // Só atualiza se ainda for o usuário atual (evita race condition)
+        if (isCurrent && auth.currentUser?.uid === firebaseUser.uid) {
+          setRole(userRole)
+          if (userRole) setError(null)
+        }
       } else {
-        setUser(null)
-        setRole(null)
-        setError(null)
-        setEmailVerified(false)
+        if (isCurrent) {
+          setUser(null)
+          setRole(null)
+          setError(null)
+          setEmailVerified(false)
+        }
       }
-      setLoading(false)
+
+      if (isCurrent) {
+        setLoading(false)
+      }
     })
 
-    return () => unsubscribe()
+    return () => {
+      isCurrent = false // Marca como stale quando desmonta
+      unsubscribe()
+    }
   }, [])
 
   // Login
