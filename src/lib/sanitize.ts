@@ -7,6 +7,10 @@
 
 /**
  * Sanitiza string removendo caracteres perigosos e normalizando espaços
+ * @param input - String a sanitizar
+ * @returns String limpa e normalizada
+ * @example
+ * sanitizeString('  Hello   World  ') // 'Hello World'
  */
 export function sanitizeString(input: string): string {
   if (!input) return ''
@@ -22,6 +26,10 @@ export function sanitizeString(input: string): string {
 
 /**
  * Normaliza email: trim, lowercase, remove espaços internos
+ * @param email - Email a normalizar
+ * @returns Email normalizado em lowercase
+ * @example
+ * normalizeEmail(' User@Email.COM ') // 'user@email.com'
  */
 export function normalizeEmail(email: string): string {
   if (!email) return ''
@@ -35,6 +43,10 @@ export function normalizeEmail(email: string): string {
 
 /**
  * Sanitiza nome: trim, capitaliza primeira letra de cada palavra
+ * @param name - Nome a sanitizar
+ * @returns Nome capitalizado
+ * @example
+ * sanitizeName('joão da silva') // 'João Da Silva'
  */
 export function sanitizeName(name: string): string {
   if (!name) return ''
@@ -45,7 +57,12 @@ export function sanitizeName(name: string): string {
 }
 
 /**
- * Normaliza telefone: remove caracteres não numéricos, mantém apenas dígitos
+ * Normaliza telefone: remove caracteres não numéricos e formata
+ * @param phone - Telefone em qualquer formato
+ * @returns Telefone formatado (XX) XXXXX-XXXX ou dígitos se inválido
+ * @example
+ * normalizePhone('11999998888') // '(11) 99999-8888'
+ * normalizePhone('(11) 9999-8888') // '(11) 9999-8888'
  */
 export function normalizePhone(phone: string): string {
   if (!phone) return ''
@@ -69,6 +86,10 @@ export function normalizePhone(phone: string): string {
 
 /**
  * Normaliza CPF: remove caracteres não numéricos
+ * @param cpf - CPF em qualquer formato
+ * @returns Apenas os 11 dígitos do CPF
+ * @example
+ * normalizeCPF('123.456.789-00') // '12345678900'
  */
 export function normalizeCPF(cpf: string): string {
   if (!cpf) return ''

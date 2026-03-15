@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, type ReactNode } from 'react'
+import { useState, useMemo, useCallback, useEffect, type ReactNode } from 'react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Badge } from './ui/badge'
@@ -44,6 +44,14 @@ export interface FilterConfig {
   placeholder?: string
 }
 
+export interface TableState {
+  search: string
+  filters: Record<string, unknown>
+  sortKey: string | null
+  sortOrder: 'asc' | 'desc'
+  page: number
+}
+
 export interface DataTableProps<T> {
   data: T[]
   columns: Column<T>[]
@@ -57,6 +65,10 @@ export interface DataTableProps<T> {
   loading?: boolean
   exportFilename?: string
   exportData?: (items: T[]) => string[][]
+  /** Estado inicial da tabela (para sincronizar com URL) */
+  initialState?: Partial<TableState>
+  /** Callback quando o estado muda (para sincronizar com URL) */
+  onStateChange?: (state: TableState) => void
 }
 
 // ============================================
@@ -90,6 +102,7 @@ function FilterChip({
 // MAIN COMPONENT
 // ============================================
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function DataTable<T extends Record<string, any>>({
   data,
   columns,
@@ -103,16 +116,32 @@ export function DataTable<T extends Record<string, any>>({
   loading = false,
   exportFilename = 'export',
   exportData,
+  initialState,
+  onStateChange,
 }: DataTableProps<T>) {
-  // State
-  const [search, setSearch] = useState('')
-  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({})
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
-  const [currentPage, setCurrentPage] = useState(1)
+  // State (initialized from initialState if provided)
+  const [search, setSearch] = useState(initialState?.search ?? '')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [activeFilters, setActiveFilters] = useState<Record<string, any>>(initialState?.filters ?? {})
+  const [sortKey, setSortKey] = useState<string | null>(initialState?.sortKey ?? null)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(initialState?.sortOrder ?? 'asc')
+  const [currentPage, setCurrentPage] = useState(initialState?.page ?? 1)
   const [pageSize, setPageSize] = useState(10)
   const [showFilters, setShowFilters] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(columns.map((c) => c.key))
+
+  // Sync state changes to URL (via callback)
+  useEffect(() => {
+    if (onStateChange) {
+      onStateChange({
+        search,
+        filters: activeFilters,
+        sortKey,
+        sortOrder,
+        page: currentPage,
+      })
+    }
+  }, [search, activeFilters, sortKey, sortOrder, currentPage, onStateChange])
   const [showColumnPicker, setShowColumnPicker] = useState(false)
 
   // Filter data
@@ -207,6 +236,7 @@ export function DataTable<T extends Record<string, any>>({
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize))
 
   // Reset page when filters change
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleFilterChange = useCallback((key: string, value: any) => {
     setActiveFilters((prev) => ({ ...prev, [key]: value }))
     setCurrentPage(1)

@@ -104,7 +104,13 @@
 ### Documentação
 
 - [x] 🆓 **README atualizado** ✅
-- [ ] 🆓 **JSDoc em funções críticas**
+- [x] 🆓 **JSDoc em funções críticas** ✅ - members.ts, payments.ts, points.ts, sanitize.ts
+
+### UX/Navegação (Concluído)
+
+- [x] 🆓 **Filtros persistentes na URL** ✅ - `src/hooks/useUrlFilters.ts`
+- [x] 🆓 **Atalhos de teclado** ✅ - `src/hooks/useKeyboardShortcuts.ts` (Ctrl+S, Esc)
+- [x] 🆓 **Lazy load de imagens** ✅ - `src/components/ui/lazy-image.tsx`
 
 ### Performance
 

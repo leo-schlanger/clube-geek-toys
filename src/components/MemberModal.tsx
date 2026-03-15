@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useForm } from 'react-hook-form'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { logger } from '../lib/logger'
@@ -109,6 +110,26 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       setLocalMember(member)
     }
   }, [member, reset])
+
+  // Keyboard shortcuts
+  const handleSaveShortcut = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isViewMode && !loading) {
+        e.preventDefault()
+        // Trigger form submit via handleSubmit
+        handleSubmit(() => {
+          const form = document.querySelector('form')
+          if (form) form.requestSubmit()
+        })()
+      }
+    },
+    [isViewMode, loading, handleSubmit]
+  )
+
+  useKeyboardShortcuts({
+    esc: onClose,
+    'ctrl+s': handleSaveShortcut,
+  })
 
   // Points calculations
   const multiplier = localMember ? POINTS_MULTIPLIER[localMember.plan as PlanType] : 1

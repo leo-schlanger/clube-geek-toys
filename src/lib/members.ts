@@ -13,7 +13,11 @@ export interface PaginatedResult<T> {
 const MEMBERS_COLLECTION = COLLECTIONS.MEMBERS
 
 /**
- * Convert Firestore document to Member type
+ * Converte documento Firestore para tipo Member
+ * @param id - ID do documento Firestore
+ * @param data - Dados brutos do documento
+ * @returns Objeto Member tipado
+ * @internal
  */
 function toMember(id: string, data: DocumentData): Member {
   const mapped = MapperUtils.toCamel(data)
@@ -37,7 +41,12 @@ function toMember(id: string, data: DocumentData): Member {
 }
 
 /**
- * Get member by CPF
+ * Busca membro pelo CPF
+ * @param cpf - CPF do membro (com ou sem formatação)
+ * @returns Membro encontrado ou null se não existir
+ * @example
+ * const member = await getMemberByCPF('123.456.789-00')
+ * if (member) console.log(member.fullName)
  */
 export async function getMemberByCPF(cpf: string): Promise<Member | null> {
   const results = await FirestoreManager.findMany(
@@ -49,7 +58,13 @@ export async function getMemberByCPF(cpf: string): Promise<Member | null> {
 }
 
 /**
- * Check if CPF is already registered
+ * Verifica se CPF já está cadastrado no sistema
+ * @param cpf - CPF a verificar (com ou sem formatação)
+ * @returns true se já existe membro com este CPF
+ * @example
+ * if (await isCPFRegistered('12345678900')) {
+ *   toast.error('CPF já cadastrado')
+ * }
  */
 export async function isCPFRegistered(cpf: string): Promise<boolean> {
   const member = await getMemberByCPF(cpf)
@@ -111,7 +126,19 @@ export async function getMembersCount(): Promise<number> {
 }
 
 /**
- * Create new member
+ * Cria novo membro no sistema
+ * @param userId - UID do Firebase Auth
+ * @param data - Dados do formulário de cadastro
+ * @returns Membro criado ou null em caso de erro
+ * @example
+ * const member = await createMember(user.uid, {
+ *   cpf: '12345678900',
+ *   fullName: 'João Silva',
+ *   email: 'joao@email.com',
+ *   phone: '11999999999',
+ *   plan: 'gold',
+ *   paymentType: 'monthly'
+ * })
  */
 export async function createMember(
   userId: string,
@@ -151,7 +178,12 @@ export async function createMember(
 }
 
 /**
- * Update member
+ * Atualiza dados de um membro
+ * @param id - ID do membro no Firestore
+ * @param data - Campos a atualizar (parcial)
+ * @returns true se atualizado com sucesso
+ * @example
+ * await updateMember(member.id, { status: 'active', points: 100 })
  */
 export async function updateMember(
   id: string,
@@ -162,14 +194,22 @@ export async function updateMember(
 }
 
 /**
- * Activate member (after payment confirmation)
+ * Ativa membro após confirmação de pagamento
+ * @param id - ID do membro
+ * @returns true se ativado com sucesso
  */
 export async function activateMember(id: string): Promise<boolean> {
   return updateMember(id, { status: 'active' })
 }
 
 /**
- * Check if member is active
+ * Verifica se membro está ativo (status + data de expiração)
+ * @param member - Objeto membro
+ * @returns true se status é 'active' E não expirou
+ * @example
+ * if (!isMemberActive(member)) {
+ *   toast.warning('Assinatura expirada')
+ * }
  */
 export function isMemberActive(member: Member): boolean {
   if (member.status !== 'active') return false
@@ -179,7 +219,12 @@ export function isMemberActive(member: Member): boolean {
 }
 
 /**
- * Get discount percentages based on plan
+ * Retorna percentuais de desconto baseado no plano
+ * @param plan - Tipo do plano (silver, gold, black)
+ * @returns Objeto com percentuais de desconto para produtos e serviços
+ * @example
+ * const { products, services } = getMemberDiscount('gold')
+ * // products = 15, services = 35
  */
 export function getMemberDiscount(plan: PlanType): { products: number; services: number } {
   switch (plan) {

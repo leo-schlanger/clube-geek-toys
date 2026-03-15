@@ -98,7 +98,13 @@ async function fetchWithRetry(
 // ============================================
 
 /**
- * Calculate plan price based on payment type
+ * Calcula preço do plano baseado no tipo de pagamento
+ * @param plan - Tipo do plano (silver, gold, black)
+ * @param paymentType - Tipo de pagamento (monthly, annual)
+ * @returns Valor em reais
+ * @example
+ * const price = calculatePlanPrice('gold', 'annual')
+ * // Retorna o valor anual do plano Gold
  */
 export function calculatePlanPrice(plan: PlanType, paymentType: PaymentType): number {
   const planData = PLANS[plan]
@@ -127,7 +133,12 @@ function toPayment(id: string, data: DocumentData): Payment {
 }
 
 /**
- * Create payment record
+ * Cria registro de pagamento no Firestore
+ * @param memberId - ID do membro
+ * @param amount - Valor em reais
+ * @param method - Método de pagamento (pix, card, cash)
+ * @param reference - Referência externa opcional (ID do Mercado Pago)
+ * @returns Pagamento criado ou null em caso de erro
  */
 export async function createPayment(
   memberId: string,
@@ -189,7 +200,17 @@ export interface PixPaymentData {
 }
 
 /**
- * Generate PIX payment via Mercado Pago API
+ * Gera pagamento PIX via API do Mercado Pago
+ * @param amount - Valor em reais
+ * @param description - Descrição do pagamento
+ * @param payerEmail - Email do pagador
+ * @param memberId - ID do membro (usado como referência externa)
+ * @returns Dados do PIX (QR Code, chave) ou null em caso de erro
+ * @example
+ * const pix = await generatePixPayment(99.90, 'Plano Gold', 'email@test.com', 'member123')
+ * if (pix) {
+ *   showQRCode(pix.qrCode)
+ * }
  */
 export async function generatePixPayment(
   amount: number,

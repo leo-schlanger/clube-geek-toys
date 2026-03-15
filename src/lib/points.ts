@@ -144,7 +144,17 @@ export async function recalculatePoints(memberId: string): Promise<number> {
 }
 
 /**
- * Add points to a member (with expiration)
+ * Adiciona pontos ao membro baseado em compra
+ * @param memberId - ID do membro
+ * @param purchaseValue - Valor da compra em reais
+ * @param isPromotion - Se é compra promocional (não ganha pontos)
+ * @param sellerId - ID do vendedor (opcional, para auditoria)
+ * @returns Objeto com sucesso, pontos adicionados e mensagem
+ * @example
+ * const result = await addPoints('member123', 150.00, false, 'seller456')
+ * if (result.success) {
+ *   toast.success(result.message) // "45 pontos adicionados (15 x 3)"
+ * }
  */
 export async function addPoints(
   memberId: string,
@@ -308,7 +318,14 @@ export async function addBonusPoints(
 }
 
 /**
- * Redeem points for a discount
+ * Resgata pontos por desconto
+ * @param memberId - ID do membro
+ * @param rule - Regra de resgate selecionada
+ * @param sellerId - ID do vendedor (opcional, para auditoria)
+ * @returns Objeto com sucesso e mensagem
+ * @example
+ * const rule = { points: 100, value: 10, description: 'R$ 10 de desconto' }
+ * const result = await redeemPoints('member123', rule, 'seller456')
  */
 export async function redeemPoints(
   memberId: string,
