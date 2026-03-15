@@ -55,6 +55,15 @@
 - [x] 🆓 **PWA** ✅
 - [x] 🆓 **Feedback de formulários** ✅
 - [x] 🆓 **Exportação CSV** ✅
+- [x] 🆓 **Detecção offline** ✅ - Banner de reconexão automático
+- [x] 🆓 **Acessibilidade (A11y)** ✅ - Skip link, ARIA attributes
+
+### Code Quality (Concluído)
+
+- [x] 🆓 **Logger centralizado** ✅ - `src/lib/logger.ts` (só loga em dev)
+- [x] 🆓 **Sanitização de inputs** ✅ - `src/lib/sanitize.ts` (email, nome, telefone, CPF)
+- [x] 🆓 **Debounce em validações** ✅ - `src/hooks/useDebounce.ts` (evita chamadas excessivas)
+- [x] 🆓 **Constantes centralizadas** ✅ - `src/lib/constants.ts` (collections, timeouts, limites)
 
 ### Funcionalidades Pendentes
 
@@ -200,7 +209,7 @@
 
 1. MapperUtils usa `any` (necessário para flexibilidade)
 2. ~~AdminDashboard muito grande~~ ✅ Resolvido
-3. Console.error ainda em produção
+3. ~~Console.error ainda em produção~~ ✅ Resolvido - Logger centralizado só loga em dev
 4. Soft-delete de usuários (não remove do Auth)
 5. **Rate-limit é client-side** - Implementado em `src/lib/rate-limit.ts`, usa localStorage. Pode ser bypassado limpando o navegador. Firebase Auth já tem proteção própria (`auth/too-many-requests`). Rate-limit server-side requer Cloud Functions (pago)
 
