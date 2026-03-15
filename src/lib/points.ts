@@ -1,12 +1,13 @@
 import { where, orderBy, limit, addDoc, collection, serverTimestamp, type DocumentData } from 'firebase/firestore'
 import { db } from './firebase'
 import { FirestoreManager, MapperUtils } from './db-utils'
+import { COLLECTIONS } from './constants'
 import { getMemberById, updateMember } from './members'
 import { withRetry } from './retry'
 import type { PointTransaction, PlanType, RedemptionRule } from '../types'
 import { POINTS_CONFIG, POINTS_MULTIPLIER } from '../types'
 
-const POINTS_COLLECTION = 'point_transactions'
+const POINTS_COLLECTION = COLLECTIONS.POINTS
 
 /**
  * Convert Firestore document to PointTransaction type

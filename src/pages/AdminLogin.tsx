@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { normalizeEmail } from '../lib/sanitize'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -38,12 +39,13 @@ export default function AdminLogin() {
     return () => clearInterval(timer)
   }, [lockoutTime])
 
-  // Verificar bloqueio quando email muda
+  // Verificar bloqueio quando email muda (usando callback para evitar cascading renders)
   useEffect(() => {
     if (email) {
       const { blocked, remainingTime } = isBlocked(email)
       if (blocked) {
-        setLockoutTime(remainingTime)
+        // Schedule state update to avoid synchronous setState in effect
+        queueMicrotask(() => setLockoutTime(remainingTime))
       }
     }
   }, [email])
@@ -60,8 +62,11 @@ export default function AdminLogin() {
     e.preventDefault()
     setFormError('')
 
+    // Normalizar email
+    const normalizedEmail = normalizeEmail(email)
+
     // Verificar rate limit
-    const { blocked, remainingTime } = isBlocked(email)
+    const { blocked, remainingTime } = isBlocked(normalizedEmail)
     if (blocked) {
       setLockoutTime(remainingTime)
       setFormError('Muitas tentativas. Aguarde antes de tentar novamente.')
@@ -70,11 +75,11 @@ export default function AdminLogin() {
 
     setIsSubmitting(true)
 
-    const result = await signIn(email, password)
+    const result = await signIn(normalizedEmail, password)
 
     if (!result.success) {
       // Registrar tentativa falha
-      const { blocked: nowBlocked, attemptsRemaining, lockoutSeconds } = recordFailedAttempt(email)
+      const { blocked: nowBlocked, attemptsRemaining, lockoutSeconds } = recordFailedAttempt(normalizedEmail)
 
       if (nowBlocked) {
         setLockoutTime(lockoutSeconds)
@@ -86,7 +91,7 @@ export default function AdminLogin() {
       }
     } else {
       // Limpar tentativas após sucesso
-      clearAttempts(email)
+      clearAttempts(normalizedEmail)
     }
 
     setIsSubmitting(false)

@@ -1,15 +1,34 @@
 /**
  * Rate Limiting para proteção contra brute force
  *
+ * IMPORTANTE: Esta é uma implementação CLIENT-SIDE apenas.
+ *
+ * Limitações conhecidas:
+ * - Pode ser bypassada limpando localStorage
+ * - Protege apenas o navegador do usuário atual
+ * - Atacantes podem usar múltiplos dispositivos/navegadores
+ * - NÃO substitui rate limiting server-side
+ *
+ * Para rate limiting real, seria necessário:
+ * - Firebase Cloud Functions (requer plano Blaze - pago)
+ * - Middleware em backend próprio
+ *
+ * O Firebase Auth já possui proteção própria:
+ * - Retorna 'auth/too-many-requests' após muitas tentativas
+ * - Esta camada adicional melhora UX mostrando feedback imediato
+ *
+ * Comportamento:
  * - Rastreia tentativas falhas por email
- * - Bloqueia temporariamente após muitas tentativas
- * - Usa localStorage para persistência
+ * - Bloqueia temporariamente após MAX_ATTEMPTS tentativas
+ * - Usa localStorage para persistência entre reloads
  */
 
-const STORAGE_KEY = 'login_attempts'
-const MAX_ATTEMPTS = 5
-const LOCKOUT_DURATION = 5 * 60 * 1000 // 5 minutos
-const ATTEMPT_WINDOW = 15 * 60 * 1000 // 15 minutos
+import { STORAGE_KEYS, TIMEOUTS, LIMITS } from './constants'
+
+const STORAGE_KEY = STORAGE_KEYS.LOGIN_ATTEMPTS
+const MAX_ATTEMPTS = LIMITS.MAX_LOGIN_ATTEMPTS
+const LOCKOUT_DURATION = TIMEOUTS.LOCKOUT_DURATION
+const ATTEMPT_WINDOW = TIMEOUTS.ATTEMPT_WINDOW
 
 interface AttemptRecord {
   attempts: number
@@ -94,7 +113,7 @@ export function recordFailedAttempt(email: string): {
   lockoutSeconds: number
 } {
   const normalizedEmail = email.toLowerCase()
-  let store = cleanOldAttempts(getStore())
+  const store = cleanOldAttempts(getStore())
   const now = Date.now()
 
   let record = store[normalizedEmail]

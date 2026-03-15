@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { logger } from '../../lib/logger'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -82,7 +83,7 @@ export function PointsTab({ members, onRefresh }: PointsTabProps) {
       }
     } catch (error) {
       toast.error('Erro ao adicionar pontos')
-      console.error(error)
+      logger.error('Error adding bonus points:', error)
     } finally {
       setLoading(false)
     }

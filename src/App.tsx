@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LoadingPage } from './components/ui/loading'
+import { SkipLink } from './components/ui/skip-link'
+import { OfflineBanner } from './components/ui/offline-banner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { getAppMode } from './lib/subdomain'
 
@@ -256,8 +258,12 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
+            <SkipLink />
+            <OfflineBanner />
             <Suspense fallback={<LoadingPage />}>
-              <AppRoutes />
+              <main id="main-content">
+                <AppRoutes />
+              </main>
             </Suspense>
             <Toaster position="top-right" richColors />
           </AuthProvider>

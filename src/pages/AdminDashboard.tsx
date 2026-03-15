@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react'
 import { orderBy } from 'firebase/firestore'
 import { useAuth } from '../contexts/AuthContext'
+import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { LoadingSpinner } from '../components/ui/loading'
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
       setChurnData(churn)
       setPointsOverviewData(points)
     } catch (error) {
-      console.error('Error fetching reports:', error)
+      logger.error('Error fetching reports:', error)
       toast.error('Erro ao carregar relatórios')
     } finally {
       setLoadingReports(false)
@@ -182,7 +183,7 @@ export default function AdminDashboard() {
       setLogs(logsData)
       setSystemUsers(usersData as { id: string; email: string; role: string; createdAt?: string }[])
     } catch (error) {
-      console.error('Error fetching data:', error)
+      logger.error('Error fetching data:', error)
       toast.error('Erro ao carregar dados')
     } finally {
       setLoading(false)
@@ -196,7 +197,7 @@ export default function AdminDashboard() {
       toast.success('Cargo atualizado com sucesso')
       fetchData(true)
     } catch (error) {
-      console.error('Error updating role:', error)
+      logger.error('Error updating role:', error)
       toast.error('Erro ao atualizar cargo')
     }
   }, [fetchData])
@@ -216,7 +217,7 @@ export default function AdminDashboard() {
       toast.success('Usuário desativado com sucesso')
       fetchData(true)
     } catch (error) {
-      console.error('Error disabling user:', error)
+      logger.error('Error disabling user:', error)
       toast.error('Erro ao desativar usuário')
     }
   }, [fetchData])
@@ -246,18 +247,36 @@ export default function AdminDashboard() {
       toast.success('Membro desativado com sucesso')
       fetchData(true)
     } catch (error) {
-      console.error('Error deleting member:', error)
+      logger.error('Error deleting member:', error)
       toast.error('Erro ao desativar membro')
     }
   }, [fetchData])
 
   const handleQuickActivate = useCallback(async (member: Member) => {
+    // Calcular valor esperado do pagamento
+    const plan = PLANS[member.plan as PlanType]
+    const expectedAmount = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
+
+    // Confirmação com verificação de pagamento obrigatória
+    const confirmed = confirm(
+      `⚠️ VERIFICAÇÃO DE PAGAMENTO OBRIGATÓRIA\n\n` +
+      `Antes de ativar, confirme que o pagamento foi recebido:\n\n` +
+      `Membro: ${member.fullName}\n` +
+      `CPF: ${member.cpf}\n` +
+      `Plano: ${plan.name}\n` +
+      `Tipo: ${member.paymentType === 'monthly' ? 'Mensal' : 'Anual'}\n` +
+      `Valor esperado: ${formatCurrency(expectedAmount)}\n\n` +
+      `Clique em OK apenas se você VERIFICOU o pagamento.`
+    )
+
+    if (!confirmed) return
+
     try {
       await updateMember(member.id, { status: 'active' })
       toast.success('Membro ativado com sucesso')
       fetchData(true)
     } catch (error) {
-      console.error('Error activating member:', error)
+      logger.error('Error activating member:', error)
       toast.error('Erro ao ativar membro')
     }
   }, [fetchData])

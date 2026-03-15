@@ -14,12 +14,18 @@ export function Loading({ size = 'md', className, text }: LoadingProps) {
   }
 
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-3", className)}>
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={text || "Carregando"}
+      className={cn("flex flex-col items-center justify-center gap-3", className)}
+    >
       <div
         className={cn(
           "animate-spin rounded-full border-primary border-t-transparent",
           sizeClasses[size]
         )}
+        aria-hidden="true"
       />
       {text && <p className="text-sm text-muted-foreground">{text}</p>}
     </div>

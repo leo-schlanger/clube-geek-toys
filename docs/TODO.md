@@ -202,6 +202,7 @@
 2. ~~AdminDashboard muito grande~~ ✅ Resolvido
 3. Console.error ainda em produção
 4. Soft-delete de usuários (não remove do Auth)
+5. **Rate-limit é client-side** - Implementado em `src/lib/rate-limit.ts`, usa localStorage. Pode ser bypassado limpando o navegador. Firebase Auth já tem proteção própria (`auth/too-many-requests`). Rate-limit server-side requer Cloud Functions (pago)
 
 ## Dependências para Monitorar
 

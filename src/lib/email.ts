@@ -2,6 +2,8 @@
  * Email client for sending transactional emails via the API Worker
  */
 
+import { logger } from './logger'
+
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-worker.leoschlanger.workers.dev'
 
 export type EmailTemplate =
@@ -75,11 +77,12 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResponse>
       message: data.message,
       id: data.id,
     }
-  } catch (error: any) {
-    console.error('Email send error:', error)
+  } catch (error: unknown) {
+    logger.error('Email send error:', error)
+    const err = error as { message?: string }
     return {
       success: false,
-      error: error.message || 'Network error',
+      error: err.message || 'Network error',
     }
   }
 }
@@ -97,8 +100,8 @@ export async function getEmailTemplates(): Promise<EmailTemplateInfo[]> {
     }
 
     return data.templates
-  } catch (error: any) {
-    console.error('Email templates fetch error:', error)
+  } catch (error: unknown) {
+    logger.error('Email templates fetch error:', error)
     return []
   }
 }

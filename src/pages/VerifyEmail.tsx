@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Loading } from '../components/ui/loading'
@@ -60,9 +61,10 @@ export default function VerifyEmail() {
       } else {
         setMessage({ type: 'error', text: result.error || 'Erro ao enviar email' })
       }
-    } catch (err: any) {
-      console.error('Erro ao reenviar:', err)
-      setMessage({ type: 'error', text: `Erro: ${err?.message || 'desconhecido'}` })
+    } catch (err: unknown) {
+      logger.error('Erro ao reenviar:', err)
+      const error = err as { message?: string }
+      setMessage({ type: 'error', text: `Erro: ${error?.message || 'desconhecido'}` })
     }
 
     setSending(false)

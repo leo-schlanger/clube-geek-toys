@@ -1,5 +1,6 @@
 import { where, orderBy, type DocumentData, type DocumentSnapshot } from 'firebase/firestore'
 import { FirestoreManager, MapperUtils } from './db-utils'
+import { COLLECTIONS } from './constants'
 import type { Member, MemberFormData, PlanType } from '../types'
 
 export interface PaginatedResult<T> {
@@ -9,7 +10,7 @@ export interface PaginatedResult<T> {
   totalCount?: number
 }
 
-const MEMBERS_COLLECTION = 'members'
+const MEMBERS_COLLECTION = COLLECTIONS.MEMBERS
 
 /**
  * Convert Firestore document to Member type

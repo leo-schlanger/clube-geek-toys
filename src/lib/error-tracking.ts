@@ -14,6 +14,8 @@
  * ErrorTracker.captureMessage('Payment failed', 'warning', { paymentId })
  */
 
+import { logger } from './logger'
+
 type Severity = 'debug' | 'info' | 'warning' | 'error' | 'fatal'
 
 interface ErrorContext {
@@ -92,9 +94,7 @@ class ErrorTrackingService {
   setUser(userId: string, email?: string): void {
     // TODO: Send to Sentry
     // Sentry.setUser({ id: userId, email })
-    if (!this.isProduction) {
-      console.debug('[ErrorTracker] User set:', { userId, email })
-    }
+    logger.debug('User set:', { userId, email })
   }
 
   /**
@@ -140,14 +140,14 @@ class ErrorTrackingService {
     switch (severity) {
       case 'fatal':
       case 'error':
-        console.error(`[${severity.toUpperCase()}] ${message}${contextStr}`)
-        if (stack) console.error(stack)
+        logger.error(`[${severity.toUpperCase()}] ${message}${contextStr}`)
+        if (stack) logger.error(stack)
         break
       case 'warning':
-        console.warn(`[${severity.toUpperCase()}] ${message}${contextStr}`)
+        logger.warn(`[${severity.toUpperCase()}] ${message}${contextStr}`)
         break
       default:
-        console.log(`[${severity.toUpperCase()}] ${message}${contextStr}`)
+        logger.info(`[${severity.toUpperCase()}] ${message}${contextStr}`)
     }
   }
 }

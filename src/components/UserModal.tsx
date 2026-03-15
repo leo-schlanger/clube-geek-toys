@@ -6,6 +6,7 @@ import { initializeApp, deleteApp } from 'firebase/app'
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import { doc, setDoc } from 'firebase/firestore'
 import { app, db } from '../lib/firebase'
+import { logger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -119,17 +120,18 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
 
       toast.success(`Usuário ${data.role} criado com sucesso!`)
       onSuccess()
-    } catch (error: any) {
-      console.error('Error creating user:', error)
+    } catch (error: unknown) {
+      logger.error('Error creating user:', error)
+      const err = error as { code?: string; message?: string }
 
-      if (error.code === 'auth/email-already-in-use') {
+      if (err.code === 'auth/email-already-in-use') {
         toast.error('Este email já está em uso')
-      } else if (error.code === 'auth/invalid-email') {
+      } else if (err.code === 'auth/invalid-email') {
         toast.error('Email inválido')
-      } else if (error.code === 'auth/weak-password') {
+      } else if (err.code === 'auth/weak-password') {
         toast.error('Senha muito fraca')
       } else {
-        toast.error('Erro ao criar usuário: ' + error.message)
+        toast.error('Erro ao criar usuário: ' + (err.message || 'desconhecido'))
       }
     } finally {
       // Always clean up the secondary app

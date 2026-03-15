@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../contexts/AuthContext'
+import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -83,7 +84,7 @@ export default function MemberDashboard() {
         setLoadingPoints(false)
       }
     } catch (error) {
-      console.error('Error fetching member data:', error)
+      logger.error('Error fetching member data:', error)
       toast.error('Erro ao carregar dados')
     } finally {
       setLoading(false)
@@ -117,6 +118,17 @@ export default function MemberDashboard() {
       copyMemberId()
     }
   }, [member, copyMemberId])
+
+  // Memoized computed values - must be called before any early returns
+  const expiringPointsTotal = useMemo(
+    () => expiringPoints.reduce((sum, t) => sum + t.points, 0),
+    [expiringPoints]
+  )
+  const redemptionRules = useMemo(() => getRedemptionRules(), [])
+  const displayedHistory = useMemo(
+    () => showAllHistory ? pointsHistory : pointsHistory.slice(0, 5),
+    [showAllHistory, pointsHistory]
+  )
 
   function getTransactionIcon(type: string) {
     switch (type) {
@@ -183,17 +195,6 @@ export default function MemberDashboard() {
   const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
   const isExpired = daysUntilExpiry <= 0
-
-  // Memoized computed values to avoid recalculation on every render
-  const expiringPointsTotal = useMemo(
-    () => expiringPoints.reduce((sum, t) => sum + t.points, 0),
-    [expiringPoints]
-  )
-  const redemptionRules = useMemo(() => getRedemptionRules(), [])
-  const displayedHistory = useMemo(
-    () => showAllHistory ? pointsHistory : pointsHistory.slice(0, 5),
-    [showAllHistory, pointsHistory]
-  )
 
   // QR Code data
   const qrData = JSON.stringify({

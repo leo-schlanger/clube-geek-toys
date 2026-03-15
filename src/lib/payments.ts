@@ -1,9 +1,11 @@
 import { where, orderBy, type DocumentData } from 'firebase/firestore'
 import { FirestoreManager, MapperUtils } from './db-utils'
+import { paymentLogger } from './logger'
+import { COLLECTIONS } from './constants'
 import type { Payment, PaymentMethod, PaymentStatus, PlanType, PaymentType } from '../types'
 import { PLANS } from '../types'
 
-const PAYMENTS_COLLECTION = 'payments'
+const PAYMENTS_COLLECTION = COLLECTIONS.PAYMENTS
 
 // ============================================
 // CONFIGURATION
@@ -155,7 +157,7 @@ export async function updatePaymentStatus(
   status: PaymentStatus,
   reference?: string
 ): Promise<boolean> {
-  const data: any = { status }
+  const data: Record<string, string> = { status }
   if (reference) data.reference = reference
   if (status === 'paid') data.paid_at = new Date().toISOString()
 
@@ -196,7 +198,7 @@ export async function generatePixPayment(
   memberId: string
 ): Promise<PixPaymentData | null> {
   if (!PAYMENT_API_URL) {
-    console.warn('⚠️ Payment API not configured. Using simulation mode.')
+    paymentLogger.warn('Payment API not configured. Using simulation mode.')
     return generatePixPaymentSimulation(amount, description, memberId)
   }
 
@@ -224,7 +226,7 @@ export async function generatePixPayment(
       amount: data.transaction_amount,
     }
   } catch (error) {
-    console.error('Error creating PIX payment:', error)
+    paymentLogger.error('Error creating PIX payment:', error)
     return null
   }
 }
@@ -242,7 +244,7 @@ function generatePixPaymentSimulation(
 
   // CRITICAL: Do not use placeholder PIX key
   if (!pixKey || pixKey === 'your-pix-key@email.com') {
-    console.error('VITE_PIX_KEY not configured. Cannot generate PIX simulation.')
+    paymentLogger.error('VITE_PIX_KEY not configured. Cannot generate PIX simulation.')
     return null
   }
   const emvCode = generateEMVCode({
@@ -333,7 +335,7 @@ export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentS
       default: return 'pending'
     }
   } catch (error) {
-    console.error('Error checking payment status:', error)
+    paymentLogger.error('Error checking payment status:', error)
     return null
   }
 }
@@ -366,7 +368,7 @@ export async function checkPaymentById(paymentId: string): Promise<{
       externalReference: data.external_reference,
     }
   } catch (error) {
-    console.error('Error checking payment by ID:', error)
+    paymentLogger.error('Error checking payment by ID:', error)
     return null
   }
 }
@@ -418,7 +420,7 @@ export async function createCheckoutPreference(
       sandboxInitPoint: data.sandbox_init_point,
     }
   } catch (error) {
-    console.error('Error creating checkout preference:', error)
+    paymentLogger.error('Error creating checkout preference:', error)
     return null
   }
 }

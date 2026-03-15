@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { paymentLogger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -124,7 +125,7 @@ export function PaymentModal({
         toast.error('Erro ao gerar QR Code PIX')
       }
     } catch (error) {
-      console.error('Error generating PIX:', error)
+      paymentLogger.error('Error generating PIX:', error)
       toast.error('Erro ao gerar pagamento. Tente novamente.')
     } finally {
       setLoading(false)
@@ -226,7 +227,7 @@ export function PaymentModal({
     // CRITICAL: Only allow simulation in development mode
     if (env !== 'development') {
       toast.error('Simulação não disponível em produção')
-      console.error('Payment simulation blocked: Not in development mode')
+      paymentLogger.error('Payment simulation blocked: Not in development mode')
       return
     }
 

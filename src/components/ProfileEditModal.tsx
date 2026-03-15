@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { updateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
 import { auth } from '../lib/firebase'
 import { updateMember } from '../lib/members'
+import { logger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -153,17 +154,18 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
 
       toast.success('Perfil atualizado com sucesso!')
       onSuccess()
-    } catch (error: any) {
-      console.error('Profile update error:', error)
+    } catch (error: unknown) {
+      logger.error('Profile update error:', error)
+      const err = error as { code?: string; message?: string }
 
-      if (error.code === 'auth/requires-recent-login') {
+      if (err.code === 'auth/requires-recent-login') {
         toast.error('Sessão expirada. Por favor, faça login novamente.')
-      } else if (error.code === 'auth/email-already-in-use') {
+      } else if (err.code === 'auth/email-already-in-use') {
         toast.error('Este email já está em uso')
-      } else if (error.code === 'auth/weak-password') {
+      } else if (err.code === 'auth/weak-password') {
         toast.error('Senha muito fraca')
       } else {
-        toast.error(error.message || 'Erro ao atualizar perfil')
+        toast.error(err.message || 'Erro ao atualizar perfil')
       }
     } finally {
       setSaving(false)

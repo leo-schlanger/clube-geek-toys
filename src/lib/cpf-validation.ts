@@ -3,6 +3,8 @@
  * Uses Brasil API (free) to validate CPF existence
  */
 
+import { logger } from './logger'
+
 export interface CPFValidationResult {
   valid: boolean
   exists: boolean | null // null if API unavailable
@@ -104,7 +106,7 @@ export async function validateCPFExistence(cpf: string): Promise<CPFValidationRe
     }
   } catch (error) {
     // Network error or timeout - don't block registration
-    console.warn('CPF validation API unavailable:', error)
+    logger.warn('CPF validation API unavailable:', error)
     return {
       valid: true,
       exists: null,

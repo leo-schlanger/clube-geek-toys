@@ -3,6 +3,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { logger } from '../lib/logger'
 import {
   addPoints as addPointsApi,
   addBonusPoints as addBonusPointsApi,
@@ -99,7 +100,7 @@ export function usePoints(): UsePointsReturn {
     try {
       return await getPointsHistory(memberId, limit)
     } catch (err) {
-      console.error('[usePoints] Error getting history:', err)
+      logger.error('[usePoints] Error getting history:', err)
       return []
     }
   }, [])
@@ -108,7 +109,7 @@ export function usePoints(): UsePointsReturn {
     try {
       return await getValidPoints(memberId)
     } catch (err) {
-      console.error('[usePoints] Error getting balance:', err)
+      logger.error('[usePoints] Error getting balance:', err)
       return 0
     }
   }, [])

@@ -4,6 +4,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { getAllMembers, getMemberById, updateMember as updateMemberApi } from '../lib/members'
+import { membersLogger } from '../lib/logger'
 import type { Member } from '../types'
 
 interface UseMembersOptions {
@@ -35,7 +36,7 @@ export function useMembers(options: UseMembersOptions = {}): UseMembersReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar membros'
       setError(message)
-      console.error('[useMembers] Error:', err)
+      membersLogger.error('Error fetching members:', err)
     } finally {
       setLoading(false)
     }
@@ -45,7 +46,7 @@ export function useMembers(options: UseMembersOptions = {}): UseMembersReturn {
     try {
       return await getMemberById(id)
     } catch (err) {
-      console.error('[useMembers] Error getting member:', err)
+      membersLogger.error('Error getting member:', err)
       return null
     }
   }, [])
@@ -59,7 +60,7 @@ export function useMembers(options: UseMembersOptions = {}): UseMembersReturn {
       }
       return success
     } catch (err) {
-      console.error('[useMembers] Error updating member:', err)
+      membersLogger.error('Error updating member:', err)
       return false
     }
   }, [])

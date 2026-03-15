@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { logger } from '../lib/logger'
+import { sanitizeName, normalizeEmail, normalizePhone, normalizeCPF } from '../lib/sanitize'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -174,16 +176,27 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
   async function onSubmit(data: MemberFormData) {
     setLoading(true)
 
+    // Sanitizar inputs
+    const sanitizedData = {
+      fullName: sanitizeName(data.fullName),
+      email: normalizeEmail(data.email),
+      phone: normalizePhone(data.phone),
+      cpf: normalizeCPF(data.cpf),
+      plan: data.plan,
+      paymentType: data.paymentType,
+      status: data.status,
+    }
+
     try {
       if (isCreateMode) {
         // Create new member (without user_id since it's created by admin)
         const result = await createMember('admin-created', {
-          fullName: data.fullName,
-          email: data.email,
-          cpf: data.cpf,
-          phone: data.phone,
-          plan: data.plan,
-          paymentType: data.paymentType,
+          fullName: sanitizedData.fullName,
+          email: sanitizedData.email,
+          cpf: sanitizedData.cpf,
+          phone: sanitizedData.phone,
+          plan: sanitizedData.plan,
+          paymentType: sanitizedData.paymentType,
         })
 
         if (result) {
@@ -195,13 +208,13 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       } else if (isEditMode && member) {
         // Update existing member
         const success = await updateMember(member.id, {
-          fullName: data.fullName,
-          email: data.email,
-          cpf: data.cpf.replace(/\D/g, ''),
-          phone: data.phone,
-          plan: data.plan,
-          paymentType: data.paymentType,
-          status: data.status as MemberStatus,
+          fullName: sanitizedData.fullName,
+          email: sanitizedData.email,
+          cpf: sanitizedData.cpf,
+          phone: sanitizedData.phone,
+          plan: sanitizedData.plan,
+          paymentType: sanitizedData.paymentType,
+          status: sanitizedData.status as MemberStatus,
         })
 
         if (success) {
@@ -212,7 +225,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
         }
       }
     } catch (error) {
-      console.error('Error saving member:', error)
+      logger.error('Error saving member:', error)
       toast.error('Erro ao salvar membro')
     }
 

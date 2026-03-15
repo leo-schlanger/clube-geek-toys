@@ -20,6 +20,7 @@ import {
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
+import { authLogger } from '../lib/logger'
 import type { UserRole } from '../types'
 
 // =============================================================================
@@ -34,7 +35,7 @@ interface AuthContextType {
   emailVerified: boolean
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signOut: () => Promise<void>
+  signOut: () => Promise<{ success: boolean; error?: string }>
   sendVerificationEmail: () => Promise<{ success: boolean; error?: string }>
   refreshUser: () => Promise<void>
 }
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return userRole as UserRole
     } catch (err) {
-      console.error('[Auth] Erro ao buscar role:', err)
+      authLogger.error('Erro ao buscar role:', err)
       setError('Erro ao carregar permissões')
       return null
     }
@@ -146,12 +147,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const firebaseError = err as { code?: string }
 
+      // Mensagens padronizadas para evitar email enumeration
+      // Não revelar se email existe ou não
       const errorMessages: Record<string, string> = {
         'auth/invalid-credential': 'Email ou senha incorretos',
-        'auth/user-not-found': 'Usuário não encontrado',
-        'auth/wrong-password': 'Senha incorreta',
-        'auth/too-many-requests': 'Muitas tentativas. Aguarde.',
-        'auth/network-request-failed': 'Erro de conexão',
+        'auth/user-not-found': 'Email ou senha incorretos', // Mesmo msg para não revelar
+        'auth/wrong-password': 'Email ou senha incorretos', // Mesmo msg para não revelar
+        'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
+        'auth/network-request-failed': 'Erro de conexão. Verifique sua internet.',
       }
 
       return {
@@ -177,10 +180,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const actionCodeSettings = getActionCodeSettings()
         await sendEmailVerification(result.user, actionCodeSettings)
-        console.log('[Auth] Email de verificação enviado para:', result.user.email)
+        authLogger.info('Email de verificação enviado para:', result.user.email)
       } catch (verificationError: unknown) {
         const err = verificationError as { code?: string; message?: string }
-        console.error('[Auth] Erro ao enviar email de verificação:', err?.code, err?.message)
+        authLogger.error('Erro ao enviar email de verificação:', err?.code, err?.message)
         // Não falha o cadastro se o email de verificação falhar
       }
 
@@ -214,11 +217,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const actionCodeSettings = getActionCodeSettings()
       await sendEmailVerification(user, actionCodeSettings)
-      console.log('[Auth] Email de verificação reenviado para:', user.email)
+      authLogger.info('Email de verificação reenviado para:', user.email)
       return { success: true }
     } catch (err: unknown) {
       const error = err as { code?: string; message?: string }
-      console.error('[Auth] Erro ao reenviar verificação:', error?.code, error?.message)
+      authLogger.error('Erro ao reenviar verificação:', error?.code, error?.message)
 
       if (error?.code === 'auth/too-many-requests') {
         return { success: false, error: 'Aguarde alguns minutos antes de reenviar' }
@@ -239,11 +242,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Logout
-  async function signOut() {
+  async function signOut(): Promise<{ success: boolean; error?: string }> {
     try {
       await firebaseSignOut(auth)
-    } catch {
-      // Silently fail
+      return { success: true }
+    } catch (err) {
+      authLogger.error('Erro no logout:', err)
+      // Força limpeza do estado local mesmo com erro
+      setUser(null)
+      setRole(null)
+      setEmailVerified(false)
+      return { success: false, error: 'Erro ao sair. Sessão encerrada localmente.' }
     }
   }
 

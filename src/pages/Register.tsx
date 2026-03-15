@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext'
+import { logger } from '../lib/logger'
+import { sanitizeName, normalizeEmail, normalizePhone, normalizeCPF } from '../lib/sanitize'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -94,8 +96,17 @@ export default function Register() {
   async function onSubmit(data: RegisterFormData) {
     setLoading(true)
 
+    // Sanitizar inputs
+    const sanitizedData = {
+      fullName: sanitizeName(data.fullName),
+      email: normalizeEmail(data.email),
+      phone: normalizePhone(data.phone),
+      cpf: normalizeCPF(data.cpf),
+      password: data.password, // Senha não deve ser modificada
+    }
+
     // Timeout helper
-    const withTimeout = (promise: Promise<any>, timeoutMs: number, errorMessage: string) => {
+    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
       return Promise.race([
         promise,
         new Promise((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
@@ -108,11 +119,11 @@ export default function Register() {
       let isRegistered: boolean
       try {
         isRegistered = await withTimeout(
-          isCPFRegistered(data.cpf),
+          isCPFRegistered(sanitizedData.cpf),
           5000,
           'Tempo esgotado ao verificar CPF.'
         )
-      } catch (cpfError) {
+      } catch {
         // CRITICAL: Do NOT allow registration if CPF check fails
         // This prevents duplicate accounts when Firestore is slow
         toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-status' })
@@ -128,7 +139,7 @@ export default function Register() {
 
       // 2. Create account in Firebase Auth
       toast.loading('Criando sua conta...', { id: 'reg-status' })
-      const result = await signUp(data.email, data.password)
+      const result = await signUp(sanitizedData.email, sanitizedData.password)
 
       if (!result.success) {
         toast.error(result.error || 'Erro ao criar conta', { id: 'reg-status' })
@@ -146,10 +157,10 @@ export default function Register() {
         try {
           const member = await withTimeout(
             createMember(newUser.uid, {
-              fullName: data.fullName,
-              email: data.email,
-              cpf: data.cpf,
-              phone: data.phone,
+              fullName: sanitizedData.fullName,
+              email: sanitizedData.email,
+              cpf: sanitizedData.cpf,
+              phone: sanitizedData.phone,
               plan: selectedPlan,
               paymentType: paymentType,
             }),
@@ -162,7 +173,7 @@ export default function Register() {
             setMemberEmail(member.email)
           }
         } catch (memberError) {
-          console.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
+          logger.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
         }
       }
 
@@ -171,7 +182,7 @@ export default function Register() {
       toast.success('Conta criada! Verifique seu email e finalize o pagamento.', { id: 'reg-status' })
 
     } catch (error) {
-      console.error('Error registering:', error)
+      logger.error('Error registering:', error)
       toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-status' })
     }
 
@@ -224,22 +235,42 @@ export default function Register() {
   }
 
   /**
-   * Validate CPF via Brasil API
+   * Validate CPF via Brasil API (com debounce para evitar chamadas excessivas)
    */
-  async function handleValidateCPF(cpf: string) {
+  const cpfValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleValidateCPF = useCallback((cpf: string) => {
     const cleaned = cpf.replace(/\D/g, '')
+
+    // Limpa timeout anterior
+    if (cpfValidationTimeoutRef.current) {
+      clearTimeout(cpfValidationTimeoutRef.current)
+    }
+
     if (cleaned.length !== 11) {
       setCpfValidation(null)
       return
     }
 
-    setValidatingCpf(true)
-    setCpfValidation(null)
+    // Debounce de 500ms para evitar chamadas excessivas à API
+    cpfValidationTimeoutRef.current = setTimeout(async () => {
+      setValidatingCpf(true)
+      setCpfValidation(null)
 
-    const result = await fullCPFValidation(cleaned)
-    setCpfValidation(result)
-    setValidatingCpf(false)
-  }
+      const result = await fullCPFValidation(cleaned)
+      setCpfValidation(result)
+      setValidatingCpf(false)
+    }, 500)
+  }, [])
+
+  // Cleanup do timeout no unmount
+  useEffect(() => {
+    return () => {
+      if (cpfValidationTimeoutRef.current) {
+        clearTimeout(cpfValidationTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext'
+import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -101,7 +102,7 @@ export default function PDV() {
         toast.error(response.message)
       }
     } catch (error) {
-      console.error('Error adding points:', error)
+      logger.error('Error adding points:', error)
       toast.error('Erro ao adicionar pontos. Tente novamente.')
     } finally {
       setAddingPoints(false)
@@ -133,7 +134,7 @@ export default function PDV() {
         toast.error(response.message)
       }
     } catch (error) {
-      console.error('Error redeeming points:', error)
+      logger.error('Error redeeming points:', error)
       toast.error('Erro ao resgatar pontos. Tente novamente.')
     } finally {
       setRedeemingPoints(false)
@@ -195,7 +196,7 @@ export default function PDV() {
       const cleanCPF = cpfSearch.replace(/\D/g, '')
       await verifyMember(cleanCPF)
     } catch (error) {
-      console.error('Error searching CPF:', error)
+      logger.error('Error searching CPF:', error)
       setResult({
         member: null,
         isValid: false,
@@ -250,7 +251,7 @@ export default function PDV() {
         setExpiringPointsCount(0)
       }
     } catch (error) {
-      console.error('Error verifying member:', error)
+      logger.error('Error verifying member:', error)
       setResult({
         member: null,
         isValid: false,

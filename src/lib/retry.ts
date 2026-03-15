@@ -2,6 +2,8 @@
  * Generic retry utility with exponential backoff
  */
 
+import { logger } from './logger'
+
 const MAX_RETRIES = 3
 const INITIAL_DELAY = 500 // 500ms
 
@@ -66,7 +68,7 @@ export async function withRetry<T>(
 
       // Wait with exponential backoff before retrying
       const delay = initialDelay * Math.pow(2, attempt)
-      console.log(`[Retry] Attempt ${attempt + 1} failed, retrying in ${delay}ms...`)
+      logger.debug(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`)
       await sleep(delay)
     }
   }

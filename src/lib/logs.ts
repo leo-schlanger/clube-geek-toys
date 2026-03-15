@@ -7,8 +7,10 @@ import {
     Timestamp
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { firestoreLogger } from './logger'
+import { COLLECTIONS } from './constants'
 
-const LOGS_COLLECTION = 'audit_logs'
+const LOGS_COLLECTION = COLLECTIONS.AUDIT_LOGS
 
 export interface AuditLog {
     id: string
@@ -40,7 +42,7 @@ export async function getRecentLogs(maxLogs = 50): Promise<AuditLog[]> {
             }
         })
     } catch (error) {
-        console.error('Error fetching audit logs:', error)
+        firestoreLogger.error('Error fetching audit logs:', error)
         return []
     }
 }

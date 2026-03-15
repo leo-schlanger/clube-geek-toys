@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import jsQR from 'jsqr'
+import { logger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Camera, CameraOff, RefreshCw, Flashlight } from 'lucide-react'
@@ -134,7 +135,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
 
       setHasCamera(true)
     } catch (err) {
-      console.error('Error accessing camera:', err)
+      logger.error('Error accessing camera:', err)
       setHasCamera(false)
 
       if (err instanceof Error) {
@@ -151,9 +152,9 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
     }
   }, [facingMode, startScanning, stopCamera])
 
-  // Start camera on mount
+  // Start camera on mount (using queueMicrotask to avoid synchronous setState)
   useEffect(() => {
-    startCamera()
+    queueMicrotask(() => startCamera())
 
     return () => {
       stopCamera()
@@ -167,10 +168,10 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))
   }
 
-  // Restart camera when facingMode changes
+  // Restart camera when facingMode changes (using queueMicrotask to avoid synchronous setState)
   useEffect(() => {
     if (hasCamera) {
-      startCamera()
+      queueMicrotask(() => startCamera())
     }
   }, [facingMode, hasCamera, startCamera])
 

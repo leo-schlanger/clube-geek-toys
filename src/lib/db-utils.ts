@@ -17,6 +17,7 @@ import {
     type DocumentSnapshot
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { firestoreLogger } from './logger'
 
 // =============================================================================
 // Types
@@ -57,13 +58,13 @@ export class FirestoreManager {
             return mapper(docSnap.id, docSnap.data())
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Error getting ${collectionName}/${id}:`, {
+            firestoreLogger.error(` Error getting ${collectionName}/${id}:`, {
                 code: err?.code,
                 message: err?.message,
             })
 
             if (err?.code === 'permission-denied') {
-                console.error(`[Firestore] PERMISSION DENIED for: ${collectionName}`)
+                firestoreLogger.error(` PERMISSION DENIED for: ${collectionName}`)
             }
 
             return null
@@ -84,7 +85,7 @@ export class FirestoreManager {
             return snapshot.docs.map(d => mapper(d.id, d.data()))
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Query error in ${collectionName}:`, err?.message)
+            firestoreLogger.error(` Query error in ${collectionName}:`, err?.message)
             return []
         }
     }
@@ -116,7 +117,7 @@ export class FirestoreManager {
             return { data, lastDoc: newLastDoc, hasMore }
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Paginated query error in ${collectionName}:`, err?.message)
+            firestoreLogger.error(` Paginated query error in ${collectionName}:`, err?.message)
             return { data: [], lastDoc: null, hasMore: false }
         }
     }
@@ -134,7 +135,7 @@ export class FirestoreManager {
             return snapshot.data().count
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Count error in ${collectionName}:`, err?.message)
+            firestoreLogger.error(` Count error in ${collectionName}:`, err?.message)
             return 0
         }
     }
@@ -162,7 +163,7 @@ export class FirestoreManager {
             return docRef.id
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Save error in ${collectionName}:`, err?.message)
+            firestoreLogger.error(` Save error in ${collectionName}:`, err?.message)
             return null
         }
     }
@@ -186,7 +187,7 @@ export class FirestoreManager {
             return true
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Update error for ${collectionName}/${id}:`, err?.message)
+            firestoreLogger.error(` Update error for ${collectionName}/${id}:`, err?.message)
             return false
         }
     }
@@ -204,7 +205,7 @@ export class FirestoreManager {
             return true
         } catch (error: unknown) {
             const err = error as FirestoreError
-            console.error(`[Firestore] Delete error for ${collectionName}/${id}:`, err?.message)
+            firestoreLogger.error(` Delete error for ${collectionName}/${id}:`, err?.message)
             return false
         }
     }
