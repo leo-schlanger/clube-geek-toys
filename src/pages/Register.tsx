@@ -109,7 +109,7 @@ export default function Register() {
     const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
       return Promise.race([
         promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
       ])
     }
 
