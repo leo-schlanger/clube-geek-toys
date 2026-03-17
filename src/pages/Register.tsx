@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { sanitizeName, normalizeEmail, normalizePhone, normalizeCPF } from '../lib/sanitize'
+import { validateEmail, type EmailValidationResult } from '../lib/email-validation'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -63,6 +64,8 @@ export default function Register() {
   const [memberEmail, setMemberEmail] = useState<string>('')
   const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
   const [validatingCpf, setValidatingCpf] = useState(false)
+  const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
+  const [validatingEmail, setValidatingEmail] = useState(false)
 
   // Get plan from URL params
   const planParam = searchParams.get('plano') as PlanType || 'silver'
@@ -114,7 +117,18 @@ export default function Register() {
     }
 
     try {
-      // 1. Check if CPF is already registered (MUST succeed - no silent failures)
+      // 1. Validate email (format, disposable, domain)
+      toast.loading('Validando email...', { id: 'reg-status' })
+      const emailResult = await validateEmail(sanitizedData.email)
+
+      if (!emailResult.valid) {
+        toast.error(emailResult.error || 'Email inválido', { id: 'reg-status' })
+        setEmailValidation(emailResult)
+        setLoading(false)
+        return
+      }
+
+      // 2. Check if CPF is already registered (MUST succeed - no silent failures)
       toast.loading('Verificando CPF...', { id: 'reg-status' })
       let isRegistered: boolean
       try {
@@ -137,7 +151,7 @@ export default function Register() {
         return
       }
 
-      // 2. Create account in Firebase Auth
+      // 3. Create account in Firebase Auth
       toast.loading('Criando sua conta...', { id: 'reg-status' })
       const result = await signUp(sanitizedData.email, sanitizedData.password)
 
@@ -147,7 +161,7 @@ export default function Register() {
         return
       }
 
-      // 3. Create member record immediately (pending status)
+      // 4. Create member record immediately (pending status)
       // After signUp, user is automatically signed in and available via auth.currentUser
       const { auth } = await import('../lib/firebase')
       const newUser = auth.currentUser
@@ -177,7 +191,7 @@ export default function Register() {
         }
       }
 
-      // 4. Move to payment step
+      // 5. Move to payment step
       setStep(3)
       toast.success('Conta criada! Verifique seu email e finalize o pagamento.', { id: 'reg-status' })
 
@@ -289,11 +303,44 @@ export default function Register() {
     }, 500)
   }, [])
 
-  // Cleanup do timeout no unmount
+  /**
+   * Validate Email (formato, domínio e temporário)
+   */
+  const emailValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleValidateEmail = useCallback((email: string) => {
+    const trimmed = email.trim()
+
+    // Limpa timeout anterior
+    if (emailValidationTimeoutRef.current) {
+      clearTimeout(emailValidationTimeoutRef.current)
+    }
+
+    // Validação básica de formato antes de chamar API
+    if (!trimmed || !trimmed.includes('@') || trimmed.length < 5) {
+      setEmailValidation(null)
+      return
+    }
+
+    // Debounce de 500ms para evitar chamadas excessivas
+    emailValidationTimeoutRef.current = setTimeout(async () => {
+      setValidatingEmail(true)
+      setEmailValidation(null)
+
+      const result = await validateEmail(trimmed)
+      setEmailValidation(result)
+      setValidatingEmail(false)
+    }, 500)
+  }, [])
+
+  // Cleanup dos timeouts no unmount
   useEffect(() => {
     return () => {
       if (cpfValidationTimeoutRef.current) {
         clearTimeout(cpfValidationTimeoutRef.current)
+      }
+      if (emailValidationTimeoutRef.current) {
+        clearTimeout(emailValidationTimeoutRef.current)
       }
     }
   }, [])
@@ -398,11 +445,47 @@ export default function Register() {
                               id="email"
                               type="email"
                               placeholder="seu@email.com"
-                              className="pl-10"
+                              className={`pl-10 pr-10 ${
+                                emailValidation
+                                  ? emailValidation.valid
+                                    ? 'border-green-500 focus-visible:ring-green-500'
+                                    : 'border-red-500 focus-visible:ring-red-500'
+                                  : ''
+                              }`}
                               {...register('email')}
+                              onChange={(e) => {
+                                register('email').onChange(e)
+                                setEmailValidation(null)
+                              }}
+                              onBlur={(e) => {
+                                register('email').onBlur(e)
+                                if (e.target.value.trim().length >= 5) {
+                                  handleValidateEmail(e.target.value)
+                                }
+                              }}
                             />
+                            {/* Validation indicator */}
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                              {validatingEmail && (
+                                <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
+                              )}
+                              {!validatingEmail && emailValidation && (
+                                emailValidation.valid ? (
+                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <XCircle className="h-4 w-4 text-red-500" />
+                                )
+                              )}
+                            </div>
                           </div>
                           {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+                          {emailValidation && !errors.email && (
+                            <p className={`text-xs ${emailValidation.valid ? 'text-green-600' : 'text-red-500'}`}>
+                              {emailValidation.valid
+                                ? (emailValidation.warnings?.length ? emailValidation.warnings[0] : 'Email válido')
+                                : emailValidation.error}
+                            </p>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

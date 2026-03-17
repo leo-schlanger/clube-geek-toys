@@ -21,6 +21,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import { authLogger } from '../lib/logger'
+import { toast } from 'sonner'
 import type { UserRole } from '../types'
 
 // =============================================================================
@@ -184,7 +185,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (verificationError: unknown) {
         const err = verificationError as { code?: string; message?: string }
         authLogger.error('Erro ao enviar email de verificação:', err?.code, err?.message)
-        // Não falha o cadastro se o email de verificação falhar
+
+        // Feedback visual para o usuário
+        const errorMessages: Record<string, string> = {
+          'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos para reenviar o email.',
+          'auth/invalid-email': 'Email inválido. Verifique o endereço informado.',
+          'auth/user-not-found': 'Erro interno. Tente fazer login novamente.',
+        }
+
+        const userMessage = errorMessages[err?.code || ''] ||
+          `Não foi possível enviar o email de verificação (${err?.code || 'erro desconhecido'}). Você pode reenviar após o login.`
+
+        toast.warning('Atenção: Email de verificação', {
+          description: userMessage,
+          duration: 8000,
+        })
       }
 
       return { success: true }
@@ -223,11 +238,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const error = err as { code?: string; message?: string }
       authLogger.error('Erro ao reenviar verificação:', error?.code, error?.message)
 
-      if (error?.code === 'auth/too-many-requests') {
-        return { success: false, error: 'Aguarde alguns minutos antes de reenviar' }
+      const errorMessages: Record<string, string> = {
+        'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos antes de reenviar.',
+        'auth/invalid-email': 'Email inválido. Verifique o endereço informado.',
+        'auth/user-not-found': 'Usuário não encontrado. Faça login novamente.',
+        'auth/network-request-failed': 'Erro de conexão. Verifique sua internet.',
+        'auth/internal-error': 'Erro interno do Firebase. Tente novamente mais tarde.',
       }
 
-      return { success: false, error: `Erro ao enviar email: ${error?.code || 'desconhecido'}` }
+      const userMessage = errorMessages[error?.code || ''] ||
+        `Erro ao enviar email (${error?.code || 'desconhecido'}). Verifique se o domínio está autorizado no Firebase Console.`
+
+      return { success: false, error: userMessage }
     }
   }
 
