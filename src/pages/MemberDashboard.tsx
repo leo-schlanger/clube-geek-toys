@@ -9,6 +9,7 @@ import { LoadingPage, Loading } from '../components/ui/loading'
 import { RenewModal } from '../components/RenewModal'
 import { UpgradeModal } from '../components/UpgradeModal'
 import { ProfileEditModal } from '../components/ProfileEditModal'
+import { MemberActivityHistory } from '../components/MemberActivityHistory'
 import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction } from '../types'
 import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
@@ -644,6 +645,9 @@ export default function MemberDashboard() {
                 </ul>
               </CardContent>
             </Card>
+
+            {/* Activity History */}
+            <MemberActivityHistory memberId={member.id} />
 
             {/* Actions */}
             <div className="grid sm:grid-cols-2 gap-4">

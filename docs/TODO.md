@@ -73,10 +73,9 @@
   - Indicadores de tendência
   - **Complexidade:** Média
 
-- [ ] 🆓 **Histórico de ações do membro**
-  - Timeline de atividades no dashboard
-  - Já temos audit_logs, só exibir no frontend
-  - **Complexidade:** Baixa
+- [x] 🆓 **Histórico de ações do membro** ✅
+  - Timeline de atividades no MemberDashboard
+  - Componente `MemberActivityHistory` usando `getMemberLogs`
 
 ### Testes
 
@@ -103,7 +102,7 @@
 ### Code Quality
 
 - [x] 🆓 **Husky + lint-staged** ✅
-- [ ] 🆓 **Commitlint** - Conventional commits
+- [x] 🆓 **Commitlint** ✅ - Conventional commits configurado
 - [ ] 🆓 **Storybook** - Documentar componentes (gratuito)
 
 ### Documentação
