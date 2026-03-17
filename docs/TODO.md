@@ -80,10 +80,15 @@
 
 ### Testes
 
-- [ ] 🆓 **Testes unitários**
-  - Vitest (gratuito, já no ecossistema Vite)
-  - React Testing Library
+- [x] 🆓 **Infraestrutura de testes** ✅
+  - Vitest + React Testing Library configurados
+  - 217 testes unitários passando
+  - Cobertura: ~11% (utilitários e hooks com ~100%)
+  - `npm run test` / `npm run test:coverage`
+
+- [ ] 🆓 **Aumentar cobertura de testes**
   - Meta: 70% cobertura
+  - Requer mocking extensivo de Firebase
   - **Complexidade:** Alta (muito código)
 
 - [ ] 🆓 **Testes E2E**
@@ -220,7 +225,7 @@
 5. **Rate-limit é client-side** - Implementado em `src/lib/rate-limit.ts`, usa localStorage. Pode ser bypassado limpando o navegador. Firebase Auth já tem proteção própria (`auth/too-many-requests`). Rate-limit server-side requer Cloud Functions (pago)
 6. ~~exhaustive-deps warnings~~ ✅ Resolvido - AdminDashboard e MemberDashboard
 7. **vendor-charts bundle (421KB)** - Já está lazy loaded via ReportsTab, carrega apenas ao acessar relatórios
-8. **api-worker tem erros de lint** - Código separado do frontend, não afeta a aplicação principal
+8. ~~api-worker tem erros de lint~~ ✅ Resolvido - Adicionadas interfaces TypeScript, removido uso de `any`
 
 ## Dependências para Monitorar
 

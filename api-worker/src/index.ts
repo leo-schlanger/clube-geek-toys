@@ -11,6 +11,105 @@ interface Env {
 	RESEND_API_KEY?: string;
 }
 
+// Resend API Response
+interface ResendResponse {
+	id?: string;
+	message?: string;
+}
+
+// Mercado Pago Types
+interface MpPaymentResponse {
+	id: number;
+	status: string;
+	status_detail?: string;
+	external_reference?: string;
+	transaction_amount?: number;
+	date_approved?: string;
+	date_of_expiration?: string;
+	point_of_interaction?: {
+		transaction_data?: {
+			qr_code?: string;
+			qr_code_base64?: string;
+			ticket_url?: string;
+		};
+	};
+	message?: string;
+}
+
+interface MpPreferenceResponse {
+	id: string;
+	init_point: string;
+	sandbox_init_point: string;
+	message?: string;
+}
+
+// Firestore Types
+interface FirestoreValue {
+	stringValue?: string;
+	integerValue?: string;
+	doubleValue?: number;
+	booleanValue?: boolean;
+	timestampValue?: string;
+}
+
+interface FirestoreFields {
+	[key: string]: FirestoreValue;
+}
+
+interface FirestoreDocument {
+	name: string;
+	fields?: FirestoreFields;
+}
+
+interface FirestoreQueryResult {
+	document?: FirestoreDocument;
+}
+
+// Request Body Types
+interface PixCreateBody {
+	amount: number;
+	description?: string;
+	payer_email: string;
+	external_reference?: string;
+}
+
+interface CheckoutCreateBody {
+	items: Array<{
+		title: string;
+		quantity: number;
+		unit_price: number;
+	}>;
+	payer?: {
+		email?: string;
+		name?: string;
+	};
+	external_reference?: string;
+}
+
+interface WebhookBody {
+	type?: string;
+	data?: {
+		id?: string;
+	};
+}
+
+interface EmailSendBody {
+	template: string;
+	to: string;
+	variables?: Record<string, string>;
+	member_id?: string;
+}
+
+// Report Types
+interface MonthlyReport {
+	period: string;
+	month: string;
+	revenue: number;
+	newMembers: number;
+	pointsEarned: number;
+	pointsRedeemed: number;
+}
+
 // ============================================
 // EMAIL TEMPLATES
 // ============================================
@@ -280,15 +379,16 @@ async function sendEmail(
 			}),
 		});
 
-		const data = await response.json() as any;
+		const data = await response.json() as ResendResponse;
 
 		if (!response.ok) {
 			return { success: false, error: data.message || 'Failed to send email' };
 		}
 
 		return { success: true, id: data.id };
-	} catch (error: any) {
-		return { success: false, error: error.message || 'Email sending error' };
+	} catch (error: unknown) {
+		const err = error as { message?: string };
+		return { success: false, error: err.message || 'Email sending error' };
 	}
 }
 
@@ -327,7 +427,7 @@ function corsHeaders(origin: string | null): HeadersInit {
 	return headers;
 }
 
-function jsonResponse(data: any, status = 200, origin: string | null = null): Response {
+function jsonResponse(data: unknown, status = 200, origin: string | null = null): Response {
 	return new Response(JSON.stringify(data), {
 		status,
 		headers: {
@@ -337,7 +437,13 @@ function jsonResponse(data: any, status = 200, origin: string | null = null): Re
 	});
 }
 
-async function mpRequest(accessToken: string, endpoint: string, method = 'GET', body?: any, idempotencyKey?: string) {
+async function mpRequest<T = MpPaymentResponse>(
+	accessToken: string,
+	endpoint: string,
+	method = 'GET',
+	body?: Record<string, unknown>,
+	idempotencyKey?: string
+): Promise<T> {
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 		'Authorization': `Bearer ${accessToken}`,
@@ -353,7 +459,7 @@ async function mpRequest(accessToken: string, endpoint: string, method = 'GET', 
 		body: body ? JSON.stringify(body) : undefined,
 	});
 
-	const data = await response.json() as any;
+	const data = await response.json() as T & { message?: string };
 
 	if (!response.ok) {
 		console.error(`Mercado Pago error (${endpoint}):`, JSON.stringify(data));
@@ -363,7 +469,12 @@ async function mpRequest(accessToken: string, endpoint: string, method = 'GET', 
 	return data;
 }
 
-async function firestoreRequest(projectId: string, path: string, method = 'GET', body?: any) {
+async function firestoreRequest<T = FirestoreDocument>(
+	projectId: string,
+	path: string,
+	method = 'GET',
+	body?: Record<string, unknown>
+): Promise<T> {
 	const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${path}`;
 	const response = await fetch(url, {
 		method,
@@ -377,7 +488,7 @@ async function firestoreRequest(projectId: string, path: string, method = 'GET',
 		throw new Error(`Firestore request failed: ${response.status}`);
 	}
 
-	return response.json();
+	return response.json() as Promise<T>;
 }
 
 async function verifyWebhookSignature(
@@ -489,7 +600,7 @@ export default {
 
 			// PIX Create
 			if (path === '/pix/create' && method === 'POST') {
-				const body = await request.json() as any;
+				const body = await request.json() as PixCreateBody;
 				const { amount, description, payer_email, external_reference } = body;
 
 				if (!amount || !payer_email) {
@@ -503,7 +614,7 @@ export default {
 				// Generate idempotency key
 				const idempotencyKey = `pix-${external_reference || Date.now()}-${crypto.randomUUID()}`;
 
-				const result: any = await mpRequest(env.MERCADOPAGO_ACCESS_TOKEN, '/v1/payments', 'POST', {
+				const result = await mpRequest<MpPaymentResponse>(env.MERCADOPAGO_ACCESS_TOKEN, '/v1/payments', 'POST', {
 					transaction_amount: amount,
 					description: description || 'Assinatura Clube Geek & Toys',
 					payment_method_id: 'pix',
@@ -539,7 +650,7 @@ export default {
 
 			// Checkout Create (Card payment via Preference)
 			if (path === '/checkout/create' && method === 'POST') {
-				const body = await request.json() as any;
+				const body = await request.json() as CheckoutCreateBody;
 				const { items, payer, external_reference } = body;
 
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
@@ -549,7 +660,7 @@ export default {
 				// Generate idempotency key
 				const idempotencyKey = `checkout-${external_reference || Date.now()}-${crypto.randomUUID()}`;
 
-				const result: any = await mpRequest(env.MERCADOPAGO_ACCESS_TOKEN, '/checkout/preferences', 'POST', {
+				const result = await mpRequest<MpPreferenceResponse>(env.MERCADOPAGO_ACCESS_TOKEN, '/checkout/preferences', 'POST', {
 					items: items,
 					payer: payer,
 					external_reference: external_reference,
@@ -582,7 +693,7 @@ export default {
 				}
 
 				try {
-					const paymentInfo: any = await mpRequest(
+					const paymentInfo = await mpRequest<MpPaymentResponse>(
 						env.MERCADOPAGO_ACCESS_TOKEN,
 						`/v1/payments/${paymentId}`
 					);
@@ -595,8 +706,8 @@ export default {
 						transaction_amount: paymentInfo.transaction_amount,
 						date_approved: paymentInfo.date_approved,
 					}, 200, origin);
-				} catch (e) {
-					console.error('Payment status check error:', e);
+				} catch (err) {
+					console.error('Payment status check error:', err);
 					return jsonResponse({ error: 'Failed to check payment status' }, 500, origin);
 				}
 			}
@@ -605,18 +716,18 @@ export default {
 			if (path === '/webhook/mercadopago' && method === 'POST') {
 				const xSignature = request.headers.get('x-signature');
 				const xRequestId = request.headers.get('x-request-id');
-				const body = await request.json() as any;
+				const body = await request.json() as WebhookBody;
 
 				const dataId = url.searchParams.get('data.id') || body?.data?.id;
 
-				if (!verifyWebhookSignature(xSignature, xRequestId, dataId, env.MERCADOPAGO_WEBHOOK_SECRET || '')) {
+				if (!verifyWebhookSignature(xSignature, xRequestId, dataId ?? null, env.MERCADOPAGO_WEBHOOK_SECRET || '')) {
 					return new Response('Unauthorized', { status: 401 });
 				}
 
 				const { type, data } = body;
 
 				if (type === 'payment' && data?.id) {
-					const paymentInfo: any = await mpRequest(env.MERCADOPAGO_ACCESS_TOKEN, `/v1/payments/${data.id}`);
+					const paymentInfo = await mpRequest<MpPaymentResponse>(env.MERCADOPAGO_ACCESS_TOKEN, `/v1/payments/${data.id}`);
 
 					const memberId = paymentInfo.external_reference;
 					const status = paymentInfo.status;
@@ -639,7 +750,7 @@ export default {
 					// If approved, activate member
 					if (status === 'approved' && memberId) {
 						try {
-							const memberData: any = await firestoreRequest(env.FIREBASE_PROJECT_ID, `members/${memberId}`);
+							const memberData = await firestoreRequest<FirestoreDocument>(env.FIREBASE_PROJECT_ID, `members/${memberId}`);
 							const expiryDate = new Date();
 							const paymentType = memberData.fields?.payment_type?.stringValue || 'monthly';
 
@@ -679,7 +790,7 @@ export default {
 					return jsonResponse({ error: 'Email service not configured' }, 500, origin);
 				}
 
-				const body = await request.json() as any;
+				const body = await request.json() as EmailSendBody;
 				const { template, to, variables, member_id } = body;
 
 				if (!template || !to) {
@@ -773,14 +884,14 @@ export default {
 						}
 					);
 
-					const paymentsData = await paymentsQuery.json() as any[];
+					const paymentsData = await paymentsQuery.json() as FirestoreQueryResult[];
 
 					// Parse payments and filter by date
 					let todayRevenue = 0;
 					let todayPayments = 0;
 
 					if (Array.isArray(paymentsData)) {
-						paymentsData.forEach((doc: any) => {
+						paymentsData.forEach((doc: FirestoreQueryResult) => {
 							if (doc.document) {
 								const paidAt = doc.document.fields?.paid_at?.timestampValue;
 								if (paidAt && paidAt >= startOfDay && paidAt < endOfDay) {
@@ -807,7 +918,7 @@ export default {
 						}
 					);
 
-					const membersData = await membersQuery.json() as any[];
+					const membersData = await membersQuery.json() as FirestoreQueryResult[];
 
 					let totalMembers = 0;
 					let activeMembers = 0;
@@ -815,7 +926,7 @@ export default {
 					const byPlan: Record<string, number> = { silver: 0, gold: 0, black: 0 };
 
 					if (Array.isArray(membersData)) {
-						membersData.forEach((doc: any) => {
+						membersData.forEach((doc: FirestoreQueryResult) => {
 							if (doc.document) {
 								totalMembers++;
 								const status = doc.document.fields?.status?.stringValue;
@@ -839,7 +950,7 @@ export default {
 							byPlan,
 						},
 					}, 200, origin);
-				} catch (error: any) {
+				} catch (error: unknown) {
 					console.error('Daily report error:', error);
 					return jsonResponse({ error: 'Failed to generate daily report' }, 500, origin);
 				}
@@ -852,7 +963,7 @@ export default {
 					const months = Math.min(12, Math.max(1, parseInt(monthsParam, 10)));
 
 					const now = new Date();
-					const reports: any[] = [];
+					const reports: MonthlyReport[] = [];
 
 					// Fetch all payments
 					const paymentsQuery = await fetch(
@@ -875,7 +986,7 @@ export default {
 						}
 					);
 
-					const paymentsData = await paymentsQuery.json() as any[];
+					const paymentsData = await paymentsQuery.json() as FirestoreQueryResult[];
 
 					// Fetch all point transactions
 					const pointsQuery = await fetch(
@@ -891,7 +1002,7 @@ export default {
 						}
 					);
 
-					const pointsData = await pointsQuery.json() as any[];
+					const pointsData = await pointsQuery.json() as FirestoreQueryResult[];
 
 					// Group data by month
 					for (let i = 0; i < months; i++) {
@@ -907,7 +1018,7 @@ export default {
 
 						// Calculate revenue
 						if (Array.isArray(paymentsData)) {
-							paymentsData.forEach((doc: any) => {
+							paymentsData.forEach((doc: FirestoreQueryResult) => {
 								if (doc.document) {
 									const paidAt = doc.document.fields?.paid_at?.timestampValue;
 									if (paidAt && paidAt >= monthStart && paidAt < monthEnd) {
@@ -920,12 +1031,12 @@ export default {
 
 						// Calculate points
 						if (Array.isArray(pointsData)) {
-							pointsData.forEach((doc: any) => {
+							pointsData.forEach((doc: FirestoreQueryResult) => {
 								if (doc.document) {
 									const createdAt = doc.document.fields?.created_at?.timestampValue;
 									if (createdAt && createdAt >= monthStart && createdAt < monthEnd) {
 										const type = doc.document.fields?.type?.stringValue;
-										const points = doc.document.fields?.points?.integerValue || 0;
+										const points = doc.document.fields?.points?.integerValue || '0';
 
 										if (type === 'earn') pointsEarned += parseInt(points, 10);
 										if (type === 'redeem') pointsRedeemed += Math.abs(parseInt(points, 10));
@@ -945,7 +1056,7 @@ export default {
 					}
 
 					return jsonResponse({ months: reports }, 200, origin);
-				} catch (error: any) {
+				} catch (error: unknown) {
 					console.error('Monthly report error:', error);
 					return jsonResponse({ error: 'Failed to generate monthly report' }, 500, origin);
 				}
@@ -995,7 +1106,7 @@ export default {
 						}
 					);
 
-					const data = await query.json() as any[];
+					const data = await query.json() as FirestoreQueryResult[];
 					let expiredCount = 0;
 					let totalPointsExpired = 0;
 					const memberPointsToDeduct: Record<string, number> = {};
@@ -1035,7 +1146,7 @@ export default {
 					// Deduct points from members
 					for (const [memberId, pointsToDeduct] of Object.entries(memberPointsToDeduct)) {
 						try {
-							const memberDoc: any = await firestoreRequest(
+							const memberDoc = await firestoreRequest<FirestoreDocument>(
 								env.FIREBASE_PROJECT_ID,
 								`members/${memberId}`
 							);
@@ -1081,7 +1192,7 @@ export default {
 						total_points_expired: totalPointsExpired,
 						members_affected: Object.keys(memberPointsToDeduct).length,
 					}, 200, origin);
-				} catch (error: any) {
+				} catch (error: unknown) {
 					console.error('Expire points error:', error);
 					return jsonResponse({ error: 'Failed to expire points' }, 500, origin);
 				}
@@ -1133,7 +1244,7 @@ export default {
 						}
 					);
 
-					const data = await query.json() as any[];
+					const data = await query.json() as FirestoreQueryResult[];
 					let remindersSent = 0;
 					const errors: string[] = [];
 
@@ -1193,7 +1304,7 @@ export default {
 						reminders_sent: remindersSent,
 						errors: errors.length > 0 ? errors : undefined,
 					}, 200, origin);
-				} catch (error: any) {
+				} catch (error: unknown) {
 					console.error('Renewal reminders error:', error);
 					return jsonResponse({ error: 'Failed to send renewal reminders' }, 500, origin);
 				}
@@ -1202,9 +1313,10 @@ export default {
 			// 404
 			return jsonResponse({ error: 'Not found' }, 404, origin);
 
-		} catch (error: any) {
+		} catch (error: unknown) {
 			console.error('Handler error:', error);
-			return jsonResponse({ error: error.message || 'Internal server error' }, 500, origin);
+			const err = error as { message?: string };
+			return jsonResponse({ error: err.message || 'Internal server error' }, 500, origin);
 		}
 	},
 
@@ -1212,7 +1324,8 @@ export default {
 	// SCHEDULED HANDLER (Cron Triggers)
 	// ============================================
 
-	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	async scheduled(event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
 		const triggerTime = new Date(event.scheduledTime);
 		console.log(`Cron trigger at ${triggerTime.toISOString()}`);
 

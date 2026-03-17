@@ -45,7 +45,7 @@ async function getUidByEmail(email: string) {
     console.log('')
 
     return userRecord.uid
-  } catch (error) {
+  } catch {
     console.error('❌ Usuário não encontrado no Firebase Auth')
     console.error('   Certifique-se que o email está correto.')
     process.exit(1)
