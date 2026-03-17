@@ -105,22 +105,25 @@ describe('email-validation', () => {
   })
 
   describe('verifyEmailDomain', () => {
+    const originalFetch = globalThis.fetch
+
     beforeEach(() => {
       vi.resetAllMocks()
     })
 
     afterEach(() => {
+      globalThis.fetch = originalFetch
       vi.restoreAllMocks()
     })
 
     it('should return valid for domains with MX records', async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
           Status: 0,
           Answer: [{ type: 15, data: 'mail.example.com' }]
         })
-      })
+      }) as typeof fetch
 
       const result = await verifyEmailDomain('user@example.com')
       expect(result.valid).toBe(true)
@@ -128,10 +131,10 @@ describe('email-validation', () => {
     })
 
     it('should return invalid for non-existent domains', async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ Status: 3 }) // NXDOMAIN
-      })
+      }) as typeof fetch
 
       const result = await verifyEmailDomain('user@nonexistent-domain-12345.com')
       expect(result.valid).toBe(false)
@@ -139,7 +142,7 @@ describe('email-validation', () => {
     })
 
     it('should handle network errors gracefully', async () => {
-      global.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error'))
+      globalThis.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error')) as typeof fetch
 
       const result = await verifyEmailDomain('user@example.com')
       // Should not block user on network error
@@ -154,22 +157,25 @@ describe('email-validation', () => {
   })
 
   describe('validateEmail (async)', () => {
+    const originalFetch = globalThis.fetch
+
     beforeEach(() => {
       vi.resetAllMocks()
     })
 
     afterEach(() => {
+      globalThis.fetch = originalFetch
       vi.restoreAllMocks()
     })
 
     it('should perform full validation', async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({
           Status: 0,
           Answer: [{ type: 15, data: 'mail.gmail.com' }]
         })
-      })
+      }) as typeof fetch
 
       const result = await validateEmail('user@gmail.com')
       expect(result.valid).toBe(true)
@@ -182,23 +188,29 @@ describe('email-validation', () => {
     })
 
     it('should reject invalid format before API call', async () => {
+      const fetchMock = vi.fn()
+      globalThis.fetch = fetchMock as typeof fetch
+
       const result = await validateEmail('invalid-email')
       expect(result.valid).toBe(false)
       expect(result.error).toBe('Formato de email inválido')
-      expect(global.fetch).not.toHaveBeenCalled()
+      expect(fetchMock).not.toHaveBeenCalled()
     })
 
     it('should skip domain check when option is false', async () => {
+      const fetchMock = vi.fn()
+      globalThis.fetch = fetchMock as typeof fetch
+
       const result = await validateEmail('user@example.com', { checkDomain: false })
       expect(result.valid).toBe(true)
-      expect(global.fetch).not.toHaveBeenCalled()
+      expect(fetchMock).not.toHaveBeenCalled()
     })
 
     it('should skip disposable check when option is false', async () => {
-      global.fetch = vi.fn().mockResolvedValueOnce({
+      globalThis.fetch = vi.fn().mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ Status: 0, Answer: [{ type: 15 }] })
-      })
+      }) as typeof fetch
 
       const result = await validateEmail('user@mailinator.com', { checkDisposable: false })
       expect(result.valid).toBe(true)
