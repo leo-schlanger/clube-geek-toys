@@ -67,11 +67,11 @@
 
 ### Funcionalidades Pendentes
 
-- [ ] 🆓 **Dashboard de métricas em tempo real**
-  - Usar `onSnapshot` do Firestore (gratuito)
-  - Gráficos com atualização automática
-  - Indicadores de tendência
-  - **Complexidade:** Média
+- [x] 🆓 **Dashboard de métricas em tempo real** ✅
+  - Hook `useRealtimeStats` com `onSnapshot` do Firestore
+  - Componente `RealtimeMetrics` com cards animados
+  - Indicadores de tendência (up/down/stable)
+  - Estatísticas: membros, receita, pontos, planos
 
 - [x] 🆓 **Histórico de ações do membro** ✅
   - Timeline de atividades no MemberDashboard

@@ -9,7 +9,7 @@ import { Skeleton, SkeletonStats } from '../components/ui/skeleton'
 import { MemberModal } from '../components/MemberModal'
 import { UserModal } from '../components/UserModal'
 import { AdminSidebar, type AdminTab } from '../components/admin/AdminSidebar'
-import { PLANS, type Member, type PlanType, type DashboardStats } from '../types'
+import { PLANS, type Member, type PlanType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
 import { getRecentLogs, type AuditLog } from '../lib/logs'
@@ -29,10 +29,7 @@ import {
   Users,
   CreditCard,
   TrendingUp,
-  AlertTriangle,
-  Crown,
   Star,
-  Sparkles,
   RefreshCw,
   ShoppingCart,
 } from 'lucide-react'
@@ -45,6 +42,7 @@ const LogsTab = lazy(() => import('../components/admin/LogsTab').then(m => ({ de
 const ReportsTab = lazy(() => import('../components/admin/ReportsTab').then(m => ({ default: m.ReportsTab })))
 const PointsTab = lazy(() => import('../components/admin/PointsTab').then(m => ({ default: m.PointsTab })))
 const SettingsTab = lazy(() => import('../components/admin/SettingsTab').then(m => ({ default: m.SettingsTab })))
+const RealtimeMetrics = lazy(() => import('../components/admin/RealtimeMetrics').then(m => ({ default: m.RealtimeMetrics })))
 
 type ModalMode = 'create' | 'edit' | 'view' | 'role' | null
 
@@ -64,13 +62,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
-  const [stats, setStats] = useState<DashboardStats>({
-    totalMembers: 0,
-    activeMembers: 0,
-    pendingPayments: 0,
-    monthlyRevenue: 0,
-    membersByPlan: { silver: 0, gold: 0, black: 0 },
-  })
   const [members, setMembers] = useState<Member[]>([])
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [systemUsers, setSystemUsers] = useState<{ id: string; email: string; role: string; createdAt?: string }[]>([])
@@ -127,33 +118,6 @@ export default function AdminDashboard() {
     }
   }, [reportPeriod])
 
-  const calculateStats = useCallback((membersData: Member[]) => {
-    const activeMembers = membersData.filter((m) => m.status === 'active')
-    const pendingMembers = membersData.filter((m) => m.status === 'pending')
-
-    let monthlyRevenue = 0
-    activeMembers.forEach((m) => {
-      const plan = PLANS[m.plan as PlanType]
-      if (m.paymentType === 'monthly') {
-        monthlyRevenue += plan.priceMonthly
-      } else {
-        monthlyRevenue += plan.priceAnnual / 12
-      }
-    })
-
-    setStats({
-      totalMembers: membersData.length,
-      activeMembers: activeMembers.length,
-      pendingPayments: pendingMembers.length,
-      monthlyRevenue,
-      membersByPlan: {
-        silver: membersData.filter((m) => m.plan === 'silver').length,
-        gold: membersData.filter((m) => m.plan === 'gold').length,
-        black: membersData.filter((m) => m.plan === 'black').length,
-      },
-    })
-  }, [])
-
   const fetchData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) {
       setRefreshing(true)
@@ -168,19 +132,7 @@ export default function AdminDashboard() {
         FirestoreManager.findMany('users', [orderBy('createdAt', 'desc')], (id, data) => ({ id, ...data }))
       ])
 
-      if (membersData && membersData.length > 0) {
-        setMembers(membersData)
-        calculateStats(membersData)
-      } else {
-        setMembers([])
-        setStats({
-          totalMembers: 0,
-          activeMembers: 0,
-          pendingPayments: 0,
-          monthlyRevenue: 0,
-          membersByPlan: { silver: 0, gold: 0, black: 0 },
-        })
-      }
+      setMembers(membersData || [])
 
       setLogs(logsData)
       setSystemUsers(usersData as { id: string; email: string; role: string; createdAt?: string }[])
@@ -191,7 +143,7 @@ export default function AdminDashboard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [calculateStats])
+  }, [])
 
   const handleUpdateRole = useCallback(async (userId: string, newRole: string) => {
     try {
@@ -411,103 +363,10 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Stats Cards */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-                <Card>
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs lg:text-sm text-muted-foreground">Total Membros</p>
-                        <p className="text-2xl lg:text-3xl font-bold">{stats.totalMembers}</p>
-                      </div>
-                      <div className="p-2 lg:p-3 rounded-full bg-primary/10 hidden sm:block">
-                        <Users className="h-5 w-5 lg:h-6 lg:w-6 text-primary" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs lg:text-sm text-muted-foreground">Ativos</p>
-                        <p className="text-2xl lg:text-3xl font-bold text-green-500">{stats.activeMembers}</p>
-                      </div>
-                      <div className="p-2 lg:p-3 rounded-full bg-green-500/10 hidden sm:block">
-                        <TrendingUp className="h-5 w-5 lg:h-6 lg:w-6 text-green-500" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs lg:text-sm text-muted-foreground">Pendentes</p>
-                        <p className="text-2xl lg:text-3xl font-bold text-yellow-500">{stats.pendingPayments}</p>
-                      </div>
-                      <div className="p-2 lg:p-3 rounded-full bg-yellow-500/10 hidden sm:block">
-                        <AlertTriangle className="h-5 w-5 lg:h-6 lg:w-6 text-yellow-500" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs lg:text-sm text-muted-foreground">Receita/Mês</p>
-                        <p className="text-xl lg:text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</p>
-                      </div>
-                      <div className="p-2 lg:p-3 rounded-full bg-blue-500/10 hidden sm:block">
-                        <CreditCard className="h-5 w-5 lg:h-6 lg:w-6 text-blue-500" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Plan Distribution */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
-                <Card className="bg-gradient-to-br from-slate-400 to-slate-600 text-white">
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm opacity-80">Silver</p>
-                        <p className="text-2xl lg:text-3xl font-bold">{stats.membersByPlan.silver}</p>
-                      </div>
-                      <Star className="h-8 w-8 lg:h-10 lg:w-10 opacity-50" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-yellow-400 to-amber-600 text-white">
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm opacity-80">Gold</p>
-                        <p className="text-2xl lg:text-3xl font-bold">{stats.membersByPlan.gold}</p>
-                      </div>
-                      <Crown className="h-8 w-8 lg:h-10 lg:w-10 opacity-50" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-gradient-to-br from-violet-600 to-purple-800 text-white">
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm opacity-80">Black</p>
-                        <p className="text-2xl lg:text-3xl font-bold">{stats.membersByPlan.black}</p>
-                      </div>
-                      <Sparkles className="h-8 w-8 lg:h-10 lg:w-10 opacity-50" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              {/* Real-time Metrics */}
+              <Suspense fallback={<TabLoadingFallback />}>
+                <RealtimeMetrics />
+              </Suspense>
 
               {/* Quick Links */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
