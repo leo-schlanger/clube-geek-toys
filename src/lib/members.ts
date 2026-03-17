@@ -1,7 +1,7 @@
 import { where, orderBy, type DocumentData, type DocumentSnapshot } from 'firebase/firestore'
 import { FirestoreManager, MapperUtils } from './db-utils'
 import { COLLECTIONS } from './constants'
-import type { Member, MemberFormData, PlanType } from '../types'
+import type { Member, MemberFormData, PlanType, PendingPaymentInfo } from '../types'
 
 export interface PaginatedResult<T> {
   data: T[]
@@ -35,6 +35,7 @@ function toMember(id: string, data: DocumentData): Member {
     startDate: mapped.startDate,
     expiryDate: mapped.expiryDate,
     points: mapped.points || 0,
+    pendingPayment: mapped.pendingPayment,
     createdAt: mapped.createdAt,
     updatedAt: mapped.updatedAt,
   }
@@ -237,4 +238,30 @@ export function getMemberDiscount(plan: PlanType): { products: number; services:
     default:
       return { products: 0, services: 0 }
   }
+}
+
+/**
+ * Salva informações do pagamento PIX pendente no registro do membro
+ * @param memberId - ID do membro
+ * @param paymentInfo - Dados do pagamento PIX gerado
+ * @returns true se salvo com sucesso
+ */
+export async function savePendingPayment(
+  memberId: string,
+  paymentInfo: PendingPaymentInfo
+): Promise<boolean> {
+  return FirestoreManager.update(MEMBERS_COLLECTION, memberId, {
+    pending_payment: MapperUtils.toSnake(paymentInfo),
+  })
+}
+
+/**
+ * Remove informações do pagamento pendente (após confirmação ou expiração)
+ * @param memberId - ID do membro
+ * @returns true se removido com sucesso
+ */
+export async function clearPendingPayment(memberId: string): Promise<boolean> {
+  return FirestoreManager.update(MEMBERS_COLLECTION, memberId, {
+    pending_payment: null,
+  })
 }

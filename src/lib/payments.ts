@@ -343,7 +343,8 @@ export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentS
   if (!PAYMENT_API_URL) return null
 
   try {
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/pix/status/${paymentId}`)
+    // Use the same endpoint as checkPaymentById
+    const response = await fetchWithRetry(`${PAYMENT_API_URL}/payment/status/${paymentId}`)
     if (!response.ok) throw new Error('Failed to check payment status')
     const data = await response.json()
 

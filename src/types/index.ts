@@ -24,6 +24,15 @@ export type UserRole = 'member' | 'seller' | 'admin'
 // MAIN INTERFACES
 // ============================================
 
+// Pending payment info (saved when PIX is generated)
+export interface PendingPaymentInfo {
+  paymentId: string
+  qrCode: string
+  amount: number
+  expiresAt: string
+  createdAt: string
+}
+
 export interface Member {
   id: string
   userId: string
@@ -38,6 +47,7 @@ export interface Member {
   startDate: string
   expiryDate: string
   points: number
+  pendingPayment?: PendingPaymentInfo // PIX payment waiting for confirmation
   createdAt: string
   updatedAt: string
 }

@@ -5,7 +5,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { PLANS, type PlanType, type PaymentType } from '../types'
+import { PLANS, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
 import { formatCurrency } from '../lib/utils'
 import {
   generatePixPayment,
@@ -14,6 +14,7 @@ import {
   isMercadoPagoConfigured,
   type PixPaymentData,
 } from '../lib/payments'
+import { savePendingPayment, clearPendingPayment } from '../lib/members'
 import { toast } from 'sonner'
 import {
   X,
@@ -31,6 +32,7 @@ interface PaymentModalProps {
   paymentType: PaymentType
   memberEmail?: string
   memberId?: string
+  initialPendingPayment?: PendingPaymentInfo // Previous pending payment to resume
   onClose: () => void
   onSuccess: () => void
 }
@@ -42,6 +44,7 @@ export function PaymentModal({
   paymentType,
   memberEmail = 'cliente@email.com',
   memberId = 'temp_member',
+  initialPendingPayment,
   onClose,
   onSuccess,
 }: PaymentModalProps) {
@@ -51,6 +54,7 @@ export function PaymentModal({
   const [copied, setCopied] = useState(false)
   const [checkingPayment, setCheckingPayment] = useState(false)
   const [timeLeft, setTimeLeft] = useState(30 * 60) // 30 minutes in seconds
+  const [checkingPreviousPayment, setCheckingPreviousPayment] = useState(false)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -69,6 +73,71 @@ export function PaymentModal({
       }
     }
   }, [])
+
+  // Check for previous pending payment on mount
+  useEffect(() => {
+    if (initialPendingPayment && isConfigured) {
+      checkPreviousPayment(initialPendingPayment)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPendingPayment])
+
+  /**
+   * Check if a previous payment was completed
+   */
+  async function checkPreviousPayment(pendingPayment: PendingPaymentInfo) {
+    // Check if payment has expired
+    const expiresAt = new Date(pendingPayment.expiresAt)
+    if (expiresAt < new Date()) {
+      // Payment expired, clear it
+      if (memberId !== 'temp_member') {
+        await clearPendingPayment(memberId)
+      }
+      return
+    }
+
+    setCheckingPreviousPayment(true)
+    toast.loading('Verificando pagamento anterior...', { id: 'check-prev' })
+
+    const status = await checkPixPaymentStatus(pendingPayment.paymentId)
+
+    if (status === 'paid') {
+      toast.success('Pagamento anterior confirmado!', { id: 'check-prev' })
+      if (memberId !== 'temp_member') {
+        await clearPendingPayment(memberId)
+      }
+      onSuccess()
+    } else if (status === 'failed') {
+      toast.error('Pagamento anterior não foi aprovado. Gere um novo.', { id: 'check-prev' })
+      if (memberId !== 'temp_member') {
+        await clearPendingPayment(memberId)
+      }
+    } else {
+      // Still pending - restore the QR code
+      toast.dismiss('check-prev')
+      toast.info('Pagamento ainda pendente. Continue de onde parou.')
+
+      // Calculate remaining time
+      const remaining = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+      setTimeLeft(remaining > 0 ? remaining : 0)
+
+      // Restore PIX data
+      setPixData({
+        paymentId: pendingPayment.paymentId,
+        qrCode: pendingPayment.qrCode,
+        qrCodeBase64: '',
+        pixKey: pendingPayment.qrCode,
+        expiresAt: pendingPayment.expiresAt,
+        amount: pendingPayment.amount,
+      })
+      setMethod('pix')
+
+      // Start polling
+      startPaymentPolling(pendingPayment.paymentId)
+    }
+
+    setCheckingPreviousPayment(false)
+  }
 
   // Expiration timer
   useEffect(() => {
@@ -117,6 +186,19 @@ export function PaymentModal({
         setPixData(pix)
         setTimeLeft(30 * 60)
 
+        // Save pending payment to member record for resumption
+        if (memberId !== 'temp_member') {
+          const pendingPaymentInfo: PendingPaymentInfo = {
+            paymentId: pix.paymentId,
+            qrCode: pix.qrCode,
+            amount: pix.amount,
+            expiresAt: pix.expiresAt,
+            createdAt: new Date().toISOString(),
+          }
+          await savePendingPayment(memberId, pendingPaymentInfo)
+          paymentLogger.info('Pending payment saved for member:', memberId)
+        }
+
         // Start polling if API is configured
         if (isConfigured) {
           startPaymentPolling(pix.paymentId)
@@ -141,10 +223,18 @@ export function PaymentModal({
 
       if (status === 'paid') {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+        // Clear pending payment from member record
+        if (memberId !== 'temp_member') {
+          await clearPendingPayment(memberId)
+        }
         toast.success('Pagamento confirmado!')
         onSuccess()
       } else if (status === 'failed') {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+        // Clear failed payment from member record
+        if (memberId !== 'temp_member') {
+          await clearPendingPayment(memberId)
+        }
         toast.error('Pagamento não aprovado')
       }
     }, 5000) // Check every 5 seconds
@@ -160,9 +250,17 @@ export function PaymentModal({
     const status = await checkPixPaymentStatus(pixData.paymentId)
 
     if (status === 'paid') {
+      // Clear pending payment from member record
+      if (memberId !== 'temp_member') {
+        await clearPendingPayment(memberId)
+      }
       toast.success('Pagamento confirmado!')
       onSuccess()
     } else if (status === 'failed') {
+      // Clear failed payment from member record
+      if (memberId !== 'temp_member') {
+        await clearPendingPayment(memberId)
+      }
       toast.error('Pagamento não aprovado')
     } else {
       toast.info('Aguardando pagamento...')
@@ -221,7 +319,7 @@ export function PaymentModal({
    * Simulate payment confirmation (ONLY for development/testing)
    * SECURITY: This function only works when VITE_ENVIRONMENT is explicitly 'development'
    */
-  function simulatePaymentConfirmation() {
+  async function simulatePaymentConfirmation() {
     const env = import.meta.env.VITE_ENVIRONMENT
 
     // CRITICAL: Only allow simulation in development mode
@@ -232,6 +330,12 @@ export function PaymentModal({
     }
 
     setLoading(true)
+
+    // Clear pending payment from member record
+    if (memberId !== 'temp_member') {
+      await clearPendingPayment(memberId)
+    }
+
     setTimeout(() => {
       toast.success('Pagamento confirmado (SIMULAÇÃO)')
       onSuccess()
@@ -261,6 +365,15 @@ export function PaymentModal({
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Checking previous payment */}
+          {checkingPreviousPayment && (
+            <div className="py-8 text-center">
+              <Loading size="lg" text="Verificando pagamento anterior..." />
+            </div>
+          )}
+
+          {!checkingPreviousPayment && (
+            <>
           {/* Summary */}
           <div className="p-4 bg-muted rounded-lg">
             <div className="flex items-center justify-between mb-2">
@@ -474,6 +587,8 @@ export function PaymentModal({
                 Você será redirecionado para o checkout seguro
               </p>
             </div>
+          )}
+            </>
           )}
         </CardContent>
       </Card>

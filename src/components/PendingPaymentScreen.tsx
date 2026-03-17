@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
+import { Loading } from './ui/loading'
 import { PaymentModal } from './PaymentModal'
-import { updateMember } from '../lib/members'
+import { updateMember, clearPendingPayment } from '../lib/members'
+import { checkPixPaymentStatus, isMercadoPagoConfigured } from '../lib/payments'
 import { useAuth } from '../contexts/AuthContext'
 import { PLANS, type Member, type PlanType } from '../types'
 import { formatCurrency } from '../lib/utils'
@@ -32,9 +34,53 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   const { signOut } = useAuth()
   const [showPayment, setShowPayment] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [checkingPrevious, setCheckingPrevious] = useState(false)
+  const [hasPendingPayment, setHasPendingPayment] = useState(!!member.pendingPayment)
 
   const plan = PLANS[member.plan as PlanType]
   const price = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
+  const isConfigured = isMercadoPagoConfigured()
+
+  // Check for previous pending payment on mount
+  useEffect(() => {
+    if (member.pendingPayment && isConfigured) {
+      checkPreviousPayment()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function checkPreviousPayment() {
+    if (!member.pendingPayment) return
+
+    // Check if payment has expired
+    const expiresAt = new Date(member.pendingPayment.expiresAt)
+    if (expiresAt < new Date()) {
+      // Payment expired, clear it
+      await clearPendingPayment(member.id)
+      setHasPendingPayment(false)
+      return
+    }
+
+    setCheckingPrevious(true)
+    toast.loading('Verificando pagamento anterior...', { id: 'check-prev' })
+
+    const status = await checkPixPaymentStatus(member.pendingPayment.paymentId)
+
+    if (status === 'paid') {
+      toast.success('Pagamento anterior confirmado!', { id: 'check-prev' })
+      await clearPendingPayment(member.id)
+      handlePaymentSuccess()
+    } else if (status === 'failed') {
+      toast.error('Pagamento anterior falhou. Gere um novo.', { id: 'check-prev' })
+      await clearPendingPayment(member.id)
+      setHasPendingPayment(false)
+    } else {
+      toast.dismiss('check-prev')
+      // Still pending - show option to continue
+    }
+
+    setCheckingPrevious(false)
+  }
 
   const planIcons = {
     silver: <Star className="h-6 w-6" />,
@@ -205,14 +251,48 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={() => setShowPayment(true)}
-                >
-                  <CreditCard className="h-5 w-5 mr-2" />
-                  Pagar Agora
-                </Button>
+                {checkingPrevious ? (
+                  <div className="py-4">
+                    <Loading size="md" text="Verificando pagamento anterior..." />
+                  </div>
+                ) : (
+                  <>
+                    {/* Previous payment info */}
+                    {hasPendingPayment && member.pendingPayment && (
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-sm">
+                        <p className="font-medium text-blue-400 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          PIX pendente encontrado
+                        </p>
+                        <p className="text-blue-300/80 mt-1">
+                          Valor: {formatCurrency(member.pendingPayment.amount)} -
+                          Expira: {new Date(member.pendingPayment.expiresAt).toLocaleTimeString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
+
+                    <Button
+                      size="lg"
+                      className="w-full"
+                      onClick={() => setShowPayment(true)}
+                    >
+                      <CreditCard className="h-5 w-5 mr-2" />
+                      {hasPendingPayment ? 'Continuar Pagamento' : 'Pagar Agora'}
+                    </Button>
+
+                    {hasPendingPayment && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={checkPreviousPayment}
+                        disabled={checkingPrevious}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Verificar se já paguei
+                      </Button>
+                    )}
+                  </>
+                )}
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <RefreshCw className="h-4 w-4" />
@@ -264,6 +344,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
           paymentType={member.paymentType as 'monthly' | 'annual'}
           memberEmail={member.email}
           memberId={member.id}
+          initialPendingPayment={hasPendingPayment ? member.pendingPayment : undefined}
           onClose={() => setShowPayment(false)}
           onSuccess={handlePaymentSuccess}
         />
