@@ -85,5 +85,10 @@
     "*.{json,md,css}": [
       "prettier --write"
     ]
+  },
+  "overrides": {
+    "serialize-javascript": ">=7.0.3",
+    "@tootallnate/once": ">=3.0.1",
+    "http-proxy-agent": ">=7.0.0"
   }
 }
