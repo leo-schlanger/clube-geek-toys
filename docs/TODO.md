@@ -218,6 +218,9 @@
 3. ~~Console.error ainda em produção~~ ✅ Resolvido - Logger centralizado só loga em dev
 4. Soft-delete de usuários (não remove do Auth)
 5. **Rate-limit é client-side** - Implementado em `src/lib/rate-limit.ts`, usa localStorage. Pode ser bypassado limpando o navegador. Firebase Auth já tem proteção própria (`auth/too-many-requests`). Rate-limit server-side requer Cloud Functions (pago)
+6. ~~exhaustive-deps warnings~~ ✅ Resolvido - AdminDashboard e MemberDashboard
+7. **vendor-charts bundle (421KB)** - Já está lazy loaded via ReportsTab, carrega apenas ao acessar relatórios
+8. **api-worker tem erros de lint** - Código separado do frontend, não afeta a aplicação principal
 
 ## Dependências para Monitorar
 

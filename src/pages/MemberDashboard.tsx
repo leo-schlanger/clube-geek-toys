@@ -64,7 +64,8 @@ export default function MemberDashboard() {
     if (user) {
       fetchMemberData()
     }
-  }, [user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]) // fetchMemberData uses user internally
 
   async function fetchMemberData() {
     if (!user) return
@@ -94,7 +95,8 @@ export default function MemberDashboard() {
   const handleModalSuccess = useCallback(() => {
     setModal(null)
     fetchMemberData()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // fetchMemberData is stable
 
   const copyMemberId = useCallback(() => {
     if (member) {

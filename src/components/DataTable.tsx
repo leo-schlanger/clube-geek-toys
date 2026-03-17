@@ -298,19 +298,21 @@ export function DataTable<T extends Record<string, any>>({
       <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
         {/* Search */}
         <div className="relative w-full lg:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-10 pr-10"
+            aria-label="Buscar na tabela"
           />
           {search && (
             <button
               onClick={() => handleSearchChange('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Limpar busca"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -561,9 +563,9 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-hidden" role="region" aria-label="Tabela de dados">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full" role="table" aria-describedby="table-description">
             <thead>
               <tr className="bg-muted/50 border-b">
                 {displayColumns.map((col) => (
@@ -576,6 +578,8 @@ export function DataTable<T extends Record<string, any>>({
                       <button
                         onClick={() => handleSort(col.key)}
                         className="inline-flex items-center gap-1 hover:text-foreground text-muted-foreground"
+                        aria-label={`Ordenar por ${col.header}`}
+                        aria-sort={sortKey === col.key ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
                         {col.header}
                         {sortKey === col.key ? (

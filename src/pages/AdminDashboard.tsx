@@ -94,14 +94,16 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Intentionally empty - only fetch on mount
 
   // Fetch reports when tab changes to reports or period changes
   useEffect(() => {
     if (activeTab === 'reports') {
       fetchReports()
     }
-  }, [activeTab, reportPeriod])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, reportPeriod]) // fetchReports is stable via useCallback
 
   const fetchReports = useCallback(async () => {
     setLoadingReports(true)

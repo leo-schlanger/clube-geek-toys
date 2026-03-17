@@ -197,6 +197,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
                 className="w-full h-full object-cover"
                 playsInline
                 muted
+                aria-label="Câmera para leitura de QR Code"
               />
               <canvas
                 ref={canvasRef}
@@ -225,8 +226,9 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
               <button
                 onClick={toggleCamera}
                 className="absolute top-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+                aria-label="Alternar câmera frontal/traseira"
               >
-                <Flashlight className="h-5 w-5" />
+                <Flashlight className="h-5 w-5" aria-hidden="true" />
               </button>
 
               {/* Status */}

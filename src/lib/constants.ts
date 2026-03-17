@@ -90,3 +90,41 @@ export const VALIDATION = {
   /** Tamanho do telefone com DDD (apenas dígitos) */
   PHONE_LENGTH: 11,
 } as const
+
+// =============================================================================
+// UI e Media
+// =============================================================================
+
+export const CAMERA = {
+  /** Resolução ideal da câmera (largura) */
+  IDEAL_WIDTH: 1280,
+  /** Resolução ideal da câmera (altura) */
+  IDEAL_HEIGHT: 720,
+} as const
+
+export const UI = {
+  /** Tempo para copiar feedback (ms) */
+  COPY_FEEDBACK_DURATION: 2000,
+  /** Tempo de exibição do banner de reconexão (ms) */
+  RECONNECT_BANNER_DURATION: 3000,
+  /** Intervalo de atualização do countdown (ms) */
+  COUNTDOWN_INTERVAL: 1000,
+} as const
+
+// =============================================================================
+// Mensagens padrão
+// =============================================================================
+
+export const MESSAGES = {
+  ERROR: {
+    GENERIC: 'Ocorreu um erro. Tente novamente.',
+    NETWORK: 'Erro de conexão. Verifique sua internet.',
+    UNAUTHORIZED: 'Sessão expirada. Faça login novamente.',
+    NOT_FOUND: 'Registro não encontrado.',
+  },
+  SUCCESS: {
+    SAVED: 'Salvo com sucesso!',
+    DELETED: 'Removido com sucesso!',
+    COPIED: 'Copiado!',
+  },
+} as const
