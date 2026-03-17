@@ -51,8 +51,8 @@ describe('Progress', () => {
   })
 
   it('should forward ref', () => {
-    const ref = { current: null }
-    render(<Progress ref={ref as React.RefObject<HTMLDivElement>} />)
+    const ref = { current: null } as React.MutableRefObject<HTMLDivElement | null>
+    render(<Progress ref={ref} />)
     expect(ref.current).toBeInstanceOf(HTMLDivElement)
   })
 })
@@ -109,8 +109,8 @@ describe('ProgressCircle', () => {
   })
 
   it('should forward ref', () => {
-    const ref = { current: null }
-    render(<ProgressCircle ref={ref as React.RefObject<SVGSVGElement>} />)
+    const ref = { current: null } as React.MutableRefObject<SVGSVGElement | null>
+    render(<ProgressCircle ref={ref} />)
     expect(ref.current).toBeInstanceOf(SVGSVGElement)
   })
 })

@@ -274,7 +274,7 @@ export function useRealtimeStats(): RealtimeStatsResult {
       unsubscribers.push(unsubPayments)
 
       // Listen to point transactions from today
-      const pointsRef = collection(db, COLLECTIONS.POINT_TRANSACTIONS)
+      const pointsRef = collection(db, COLLECTIONS.POINTS)
       const startOfDay = getStartOfDay()
       const pointsQuery = query(
         pointsRef,

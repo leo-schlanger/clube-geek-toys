@@ -10,6 +10,7 @@ import { RenewModal } from '../components/RenewModal'
 import { UpgradeModal } from '../components/UpgradeModal'
 import { ProfileEditModal } from '../components/ProfileEditModal'
 import { MemberActivityHistory } from '../components/MemberActivityHistory'
+import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
 import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction } from '../types'
 import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
@@ -190,6 +191,16 @@ export default function MemberDashboard() {
           </CardContent>
         </Card>
       </div>
+    )
+  }
+
+  // Show pending payment screen for members who haven't completed payment
+  if (member.status === 'pending') {
+    return (
+      <PendingPaymentScreen
+        member={member}
+        onPaymentSuccess={fetchMemberData}
+      />
     )
   }
 

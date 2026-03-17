@@ -52,8 +52,8 @@ describe('Input', () => {
   })
 
   it('should forward ref', () => {
-    const ref = { current: null }
-    render(<Input ref={ref as React.RefObject<HTMLInputElement>} />)
+    const ref = { current: null } as React.MutableRefObject<HTMLInputElement | null>
+    render(<Input ref={ref} />)
     expect(ref.current).toBeInstanceOf(HTMLInputElement)
   })
 

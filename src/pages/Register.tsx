@@ -15,7 +15,7 @@ import { Loading } from '../components/ui/loading'
 import { PaymentModal } from '../components/PaymentModal'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency, validateCPF } from '../lib/utils'
-import { createMember, isCPFRegistered } from '../lib/members'
+import { createMember, isCPFRegistered, updateMember } from '../lib/members'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -190,11 +190,37 @@ export default function Register() {
   }
 
   /**
-   * Handle successful payment
+   * Handle successful payment - updates member status to active
    */
   async function handlePaymentSuccess() {
     setShowPaymentModal(false)
-    toast.success('Pagamento confirmado! Bem-vindo ao clube!')
+
+    if (createdMemberId) {
+      // Calculate expiry date based on payment type
+      const now = new Date()
+      const expiryDate = new Date(now)
+      if (paymentType === 'monthly') {
+        expiryDate.setMonth(expiryDate.getMonth() + 1)
+      } else {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1)
+      }
+
+      // Update member status to active
+      const success = await updateMember(createdMemberId, {
+        status: 'active',
+        startDate: now.toISOString().split('T')[0],
+        expiryDate: expiryDate.toISOString().split('T')[0],
+      })
+
+      if (success) {
+        toast.success('Pagamento confirmado! Bem-vindo ao Clube Geek & Toys!')
+      } else {
+        toast.warning('Pagamento recebido, mas houve um erro ao ativar. Entre em contato com o suporte.')
+      }
+    } else {
+      toast.success('Pagamento confirmado! Bem-vindo ao clube!')
+    }
+
     navigate('/membro')
   }
 
