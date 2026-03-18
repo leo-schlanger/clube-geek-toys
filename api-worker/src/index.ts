@@ -9,6 +9,7 @@ interface Env {
 	FRONTEND_URL: string;
 	WORKER_URL: string;
 	RESEND_API_KEY?: string;
+	FROM_EMAIL?: string;
 }
 
 // Resend API Response
@@ -121,231 +122,312 @@ interface EmailTemplateConfig {
 	html: (variables: Record<string, string>) => string;
 }
 
+// ============================================
+// EMAIL TEMPLATES - Modern Design 2026
+// Following best practices: dark mode support, minimalist design, brand consistency
+// Reference: https://www.enchantagency.com/blog/dark-mode-email-design-best-practices-css-guide-2026
+// ============================================
+
+const BRAND = {
+	logoUrl: 'https://clube-geek-toys.web.app/logo.jpg',
+	primaryGold: '#E9B84A',
+	primaryGoldDark: '#D4A73A',
+	successGreen: '#22C55E',
+	warningAmber: '#F59E0B',
+	errorRed: '#EF4444',
+	darkBg: '#0a0a0a',
+	darkCard: '#141414',
+	darkBorder: '#262626',
+	textPrimary: '#FAFAFA',
+	textSecondary: '#A1A1AA',
+	textMuted: '#71717A',
+	siteUrl: 'https://geeketoys.com.br',
+	clubUrl: 'https://clube-geek-toys.web.app',
+	siteName: 'Clube Geek & Toys',
+	social: {
+		facebook: 'https://www.facebook.com/geeketoyscolection/',
+		instagram: 'https://www.instagram.com/geeketoys/',
+		tiktok: 'https://www.tiktok.com/@geeketoys',
+	},
+	// Social icons from CDN (email-safe)
+	icons: {
+		facebook: 'https://cdn.simpleicons.org/facebook/E9B84A',
+		instagram: 'https://cdn.simpleicons.org/instagram/E9B84A',
+		tiktok: 'https://cdn.simpleicons.org/tiktok/E9B84A',
+	},
+};
+
+// Reusable email base with dark mode support
+const createEmailBase = (title: string, content: string) => `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="dark">
+	<meta name="supported-color-schemes" content="dark">
+	<title>${title}</title>
+	<!--[if mso]>
+	<noscript>
+		<xml>
+			<o:OfficeDocumentSettings>
+				<o:PixelsPerInch>96</o:PixelsPerInch>
+			</o:OfficeDocumentSettings>
+		</xml>
+	</noscript>
+	<![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: ${BRAND.darkBg}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+	<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: ${BRAND.darkBg};">
+		<tr>
+			<td align="center" style="padding: 40px 16px;">
+				<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 560px; background-color: ${BRAND.darkCard}; border-radius: 16px; overflow: hidden; border: 1px solid ${BRAND.darkBorder};">
+					${content}
+				</table>
+				<!-- Footer -->
+				<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 560px; margin-top: 24px;">
+					<tr>
+						<td align="center" style="padding: 0 16px;">
+							<!-- Social Icons -->
+							<table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 16px auto;">
+								<tr>
+									<td style="padding: 0 8px;">
+										<a href="${BRAND.social.facebook}" style="text-decoration: none;">
+											<img src="${BRAND.icons.facebook}" alt="Facebook" width="24" height="24" style="display: block;">
+										</a>
+									</td>
+									<td style="padding: 0 8px;">
+										<a href="${BRAND.social.instagram}" style="text-decoration: none;">
+											<img src="${BRAND.icons.instagram}" alt="Instagram" width="24" height="24" style="display: block;">
+										</a>
+									</td>
+									<td style="padding: 0 8px;">
+										<a href="${BRAND.social.tiktok}" style="text-decoration: none;">
+											<img src="${BRAND.icons.tiktok}" alt="TikTok" width="24" height="24" style="display: block;">
+										</a>
+									</td>
+								</tr>
+							</table>
+							<p style="color: ${BRAND.textMuted}; font-size: 12px; line-height: 1.5; margin: 0;">
+								© ${new Date().getFullYear()} ${BRAND.siteName}. Todos os direitos reservados.
+							</p>
+							<p style="margin: 8px 0 0 0;">
+								<a href="${BRAND.siteUrl}" style="color: ${BRAND.primaryGold}; font-size: 12px; text-decoration: none;">geeketoys.com.br</a>
+							</p>
+						</td>
+					</tr>
+				</table>
+			</td>
+		</tr>
+	</table>
+</body>
+</html>`;
+
+// Header component with logo
+const emailHeaderWithLogo = `
+<tr>
+	<td style="padding: 32px 32px 24px 32px; text-align: center; border-bottom: 1px solid ${BRAND.darkBorder};">
+		<img src="${BRAND.logoUrl}" alt="${BRAND.siteName}" width="140" style="display: block; margin: 0 auto 12px auto; max-width: 140px; height: auto;">
+		<p style="color: ${BRAND.primaryGold}; font-size: 11px; text-transform: uppercase; letter-spacing: 3px; margin: 0; font-weight: 600;">Clube de Vantagens</p>
+	</td>
+</tr>`;
+
+// Status header component (for payment confirmations, etc.)
+const createStatusHeader = (icon: string, title: string, bgColor: string) => `
+<tr>
+	<td style="padding: 32px 32px 24px 32px; text-align: center; border-bottom: 1px solid ${BRAND.darkBorder};">
+		<img src="${BRAND.logoUrl}" alt="${BRAND.siteName}" width="100" style="display: block; margin: 0 auto 20px auto; max-width: 100px; height: auto; opacity: 0.9;">
+		<div style="display: inline-block; background-color: ${bgColor}; border-radius: 50%; width: 56px; height: 56px; line-height: 56px; text-align: center; margin-bottom: 16px;">
+			<span style="font-size: 28px;">${icon}</span>
+		</div>
+		<h1 style="color: ${BRAND.textPrimary}; font-size: 22px; font-weight: 600; margin: 0;">${title}</h1>
+	</td>
+</tr>`;
+
+// CTA Button component
+const createButton = (text: string, url: string, color: string = BRAND.primaryGold) => `
+<table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
+	<tr>
+		<td style="background-color: ${color}; border-radius: 8px;">
+			<a href="${url}" style="display: inline-block; padding: 14px 32px; color: ${BRAND.darkBg}; font-size: 14px; font-weight: 700; text-decoration: none; text-transform: uppercase; letter-spacing: 0.5px;">${text}</a>
+		</td>
+	</tr>
+</table>`;
+
+// Info card component
+const createInfoCard = (items: string[], accentColor: string = BRAND.primaryGold) => `
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: ${BRAND.darkBg}; border-radius: 12px; border-left: 4px solid ${accentColor}; margin: 24px 0;">
+	<tr>
+		<td style="padding: 20px 24px;">
+			${items.join('')}
+		</td>
+	</tr>
+</table>`;
+
+const createInfoItem = (label: string, value: string, isLast: boolean = false) => `
+<p style="color: ${BRAND.textSecondary}; font-size: 13px; margin: 0 0 ${isLast ? '0' : '12px'} 0;">
+	<span style="color: ${BRAND.textMuted}; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; display: block; margin-bottom: 4px;">${label}</span>
+	<strong style="color: ${BRAND.textPrimary}; font-size: 16px; font-weight: 600;">${value}</strong>
+</p>`;
+
 const EMAIL_TEMPLATES: Record<EmailTemplate, EmailTemplateConfig> = {
 	'welcome': {
-		subject: 'Bem-vindo ao Clube Geek & Toys! 🎮',
-		html: (vars) => `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Bem-vindo ao Clube Geek & Toys</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-	<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-		<div style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 40px 20px; text-align: center;">
-			<h1 style="color: #ffffff; margin: 0; font-size: 28px;">🎮 Clube Geek & Toys</h1>
-		</div>
-		<div style="padding: 40px 30px;">
-			<h2 style="color: #1f2937; margin-top: 0;">Olá, ${vars.nome}! 👋</h2>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Bem-vindo ao <strong>Clube Geek & Toys</strong>! Estamos muito felizes em ter você como membro do nosso clube.
-			</p>
-			<div style="background-color: #f3f4f6; border-radius: 12px; padding: 20px; margin: 24px 0;">
-				<p style="color: #374151; margin: 0; font-size: 14px;"><strong>Seu Plano:</strong> ${vars.plano}</p>
-			</div>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Agora você tem acesso a descontos exclusivos, programa de pontos e muito mais! Não esqueça de apresentar sua carteirinha digital sempre que visitar nossa loja.
-			</p>
-			<div style="text-align: center; margin: 32px 0;">
-				<a href="${vars.dashboard_url || 'https://club.geeketoys.com.br/minha-conta'}"
-				   style="background-color: #8b5cf6; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-					Acessar Minha Conta
-				</a>
-			</div>
-		</div>
-		<div style="background-color: #1f2937; padding: 24px; text-align: center;">
-			<p style="color: #9ca3af; margin: 0; font-size: 12px;">
-				© ${new Date().getFullYear()} Geek & Toys. Todos os direitos reservados.
-			</p>
-		</div>
-	</div>
-</body>
-</html>`,
+		subject: 'Bem-vindo ao Clube Geek & Toys!',
+		html: (vars) => createEmailBase('Bem-vindo ao Clube Geek & Toys', `
+			${emailHeaderWithLogo}
+			<tr>
+				<td style="padding: 32px;">
+					<h2 style="color: ${BRAND.primaryGold}; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Olá, ${vars.nome}!</h2>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Seja bem-vindo ao <strong style="color: ${BRAND.textPrimary};">${BRAND.siteName}</strong>! Estamos muito felizes em ter você como membro do nosso clube exclusivo.
+					</p>
+
+					${createInfoCard([createInfoItem('Seu Plano', vars.plano || 'Membro', true)], BRAND.primaryGold)}
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Agora você tem acesso a descontos exclusivos, programa de pontos e muito mais! Apresente sua carteirinha digital sempre que visitar nossa loja.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Acessar Minha Conta', vars.dashboard_url || BRAND.clubUrl + '/minha-conta')}
+					</div>
+				</td>
+			</tr>
+		`),
 	},
 	'payment-confirmed': {
-		subject: 'Pagamento Confirmado! ✅',
-		html: (vars) => `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Pagamento Confirmado</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-	<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-		<div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 20px; text-align: center;">
-			<h1 style="color: #ffffff; margin: 0; font-size: 28px;">✅ Pagamento Confirmado</h1>
-		</div>
-		<div style="padding: 40px 30px;">
-			<h2 style="color: #1f2937; margin-top: 0;">Olá, ${vars.nome}!</h2>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Seu pagamento foi confirmado com sucesso! Sua assinatura está ativa.
-			</p>
-			<div style="background-color: #ecfdf5; border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 24px 0;">
-				<p style="color: #065f46; margin: 0 0 8px 0; font-size: 14px;"><strong>Valor:</strong> R$ ${vars.valor}</p>
-				<p style="color: #065f46; margin: 0 0 8px 0; font-size: 14px;"><strong>Plano:</strong> ${vars.plano}</p>
-				<p style="color: #065f46; margin: 0; font-size: 14px;"><strong>Válido até:</strong> ${vars.validade}</p>
-			</div>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Aproveite todos os benefícios do seu plano! Acesse sua conta para ver sua carteirinha digital e acompanhar seus pontos.
-			</p>
-			<div style="text-align: center; margin: 32px 0;">
-				<a href="${vars.dashboard_url || 'https://club.geeketoys.com.br/minha-conta'}"
-				   style="background-color: #10b981; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-					Ver Minha Carteirinha
-				</a>
-			</div>
-		</div>
-		<div style="background-color: #1f2937; padding: 24px; text-align: center;">
-			<p style="color: #9ca3af; margin: 0; font-size: 12px;">
-				© ${new Date().getFullYear()} Geek & Toys. Todos os direitos reservados.
-			</p>
-		</div>
-	</div>
-</body>
-</html>`,
+		subject: 'Pagamento Confirmado!',
+		html: (vars) => createEmailBase('Pagamento Confirmado', `
+			${createStatusHeader('✓', 'Pagamento Confirmado', '#166534')}
+			<tr>
+				<td style="padding: 32px;">
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Seu pagamento foi confirmado com sucesso. Sua assinatura está ativa!
+					</p>
+
+					${createInfoCard([
+						createInfoItem('Valor Pago', 'R$ ' + vars.valor),
+						createInfoItem('Plano', vars.plano || 'Clube'),
+						createInfoItem('Válido até', vars.validade, true),
+					], BRAND.successGreen)}
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Aproveite todos os benefícios do seu plano! Acesse sua conta para ver sua carteirinha digital.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Ver Minha Carteirinha', vars.dashboard_url || BRAND.clubUrl + '/minha-conta', BRAND.successGreen)}
+					</div>
+				</td>
+			</tr>
+		`),
 	},
 	'payment-failed': {
-		subject: 'Problema com seu pagamento ⚠️',
-		html: (vars) => `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Problema com Pagamento</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-	<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-		<div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 20px; text-align: center;">
-			<h1 style="color: #ffffff; margin: 0; font-size: 28px;">⚠️ Problema com Pagamento</h1>
-		</div>
-		<div style="padding: 40px 30px;">
-			<h2 style="color: #1f2937; margin-top: 0;">Olá, ${vars.nome}!</h2>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Infelizmente houve um problema com seu pagamento. Por favor, tente novamente.
-			</p>
-			<div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 24px 0;">
-				<p style="color: #92400e; margin: 0 0 8px 0; font-size: 14px;"><strong>Valor:</strong> R$ ${vars.valor}</p>
-				<p style="color: #92400e; margin: 0; font-size: 14px;"><strong>Motivo:</strong> ${vars.motivo || 'Pagamento não aprovado'}</p>
-			</div>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Verifique os dados do seu cartão ou tente outro método de pagamento. Se o problema persistir, entre em contato conosco.
-			</p>
-			<div style="text-align: center; margin: 32px 0;">
-				<a href="${vars.retry_url || 'https://club.geeketoys.com.br/assinar'}"
-				   style="background-color: #f59e0b; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-					Tentar Novamente
-				</a>
-			</div>
-		</div>
-		<div style="background-color: #1f2937; padding: 24px; text-align: center;">
-			<p style="color: #9ca3af; margin: 0; font-size: 12px;">
-				© ${new Date().getFullYear()} Geek & Toys. Todos os direitos reservados.
-			</p>
-		</div>
-	</div>
-</body>
-</html>`,
+		subject: 'Problema com seu pagamento',
+		html: (vars) => createEmailBase('Problema com Pagamento', `
+			${createStatusHeader('!', 'Problema com Pagamento', '#B45309')}
+			<tr>
+				<td style="padding: 32px;">
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Infelizmente houve um problema com seu pagamento. Por favor, tente novamente.
+					</p>
+
+					${createInfoCard([
+						createInfoItem('Valor', 'R$ ' + vars.valor),
+						createInfoItem('Motivo', vars.motivo || 'Pagamento não aprovado', true),
+					], BRAND.warningAmber)}
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Verifique os dados do seu cartão ou tente outro método de pagamento. Se o problema persistir, entre em contato conosco.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Tentar Novamente', vars.retry_url || BRAND.clubUrl + '/assinar', BRAND.warningAmber)}
+					</div>
+				</td>
+			</tr>
+		`),
 	},
 	'renewal-reminder': {
-		subject: 'Sua assinatura está expirando! ⏰',
-		html: (vars) => `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Lembrete de Renovação</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-	<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-		<div style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 40px 20px; text-align: center;">
-			<h1 style="color: #ffffff; margin: 0; font-size: 28px;">⏰ Hora de Renovar!</h1>
-		</div>
-		<div style="padding: 40px 30px;">
-			<h2 style="color: #1f2937; margin-top: 0;">Olá, ${vars.nome}!</h2>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Sua assinatura do Clube Geek & Toys está prestes a expirar. Não perca seus benefícios!
-			</p>
-			<div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
-				<p style="color: #92400e; margin: 0; font-size: 18px; font-weight: bold;">
-					Expira em: ${vars.validade}
-				</p>
-			</div>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Renove agora e continue aproveitando:
-			</p>
-			<ul style="color: #4b5563; font-size: 14px; line-height: 1.8;">
-				<li>Descontos exclusivos em produtos e serviços</li>
-				<li>Programa de pontos com multiplicador especial</li>
-				<li>Acesso a promoções exclusivas para membros</li>
-			</ul>
-			<div style="text-align: center; margin: 32px 0;">
-				<a href="${vars.renew_url || 'https://club.geeketoys.com.br/minha-conta'}"
-				   style="background-color: #8b5cf6; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-					Renovar Agora
-				</a>
-			</div>
-		</div>
-		<div style="background-color: #1f2937; padding: 24px; text-align: center;">
-			<p style="color: #9ca3af; margin: 0; font-size: 12px;">
-				© ${new Date().getFullYear()} Geek & Toys. Todos os direitos reservados.
-			</p>
-		</div>
-	</div>
-</body>
-</html>`,
+		subject: 'Sua assinatura está expirando',
+		html: (vars) => createEmailBase('Lembrete de Renovação', `
+			${emailHeaderWithLogo}
+			<tr>
+				<td style="padding: 32px;">
+					<h2 style="color: ${BRAND.primaryGold}; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Hora de Renovar!</h2>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Sua assinatura do ${BRAND.siteName} está prestes a expirar. Não perca seus benefícios!
+					</p>
+
+					<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #451A03; border-radius: 12px; margin: 24px 0;">
+						<tr>
+							<td style="padding: 24px; text-align: center;">
+								<p style="color: ${BRAND.warningAmber}; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Expira em</p>
+								<p style="color: ${BRAND.textPrimary}; font-size: 28px; font-weight: 700; margin: 0;">${vars.validade}</p>
+							</td>
+						</tr>
+					</table>
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 16px 0;">
+						Renove agora e continue aproveitando:
+					</p>
+					<ul style="color: ${BRAND.textSecondary}; font-size: 14px; line-height: 2; margin: 0 0 24px 0; padding-left: 20px;">
+						<li>Descontos exclusivos em produtos</li>
+						<li>Programa de pontos com multiplicador</li>
+						<li>Promoções exclusivas para membros</li>
+					</ul>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Renovar Agora', vars.renew_url || BRAND.clubUrl + '/minha-conta')}
+					</div>
+				</td>
+			</tr>
+		`),
 	},
 	'points-expiring': {
-		subject: 'Seus pontos estão expirando! 🎁',
-		html: (vars) => `
-<!DOCTYPE html>
-<html>
-<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Pontos Expirando</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f5;">
-	<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
-		<div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 20px; text-align: center;">
-			<h1 style="color: #ffffff; margin: 0; font-size: 28px;">🎁 Seus Pontos Vão Expirar!</h1>
-		</div>
-		<div style="padding: 40px 30px;">
-			<h2 style="color: #1f2937; margin-top: 0;">Olá, ${vars.nome}!</h2>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Você tem pontos que estão prestes a expirar. Não deixe eles irem embora!
-			</p>
-			<div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
-				<p style="color: #92400e; margin: 0 0 8px 0; font-size: 32px; font-weight: bold;">
-					${vars.pontos} pontos
-				</p>
-				<p style="color: #92400e; margin: 0; font-size: 14px;">
-					Expiram em: ${vars.data_expiracao}
-				</p>
-			</div>
-			<p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-				Visite nossa loja e use seus pontos para ganhar descontos nas suas compras!
-			</p>
-			<div style="text-align: center; margin: 32px 0;">
-				<a href="${vars.dashboard_url || 'https://club.geeketoys.com.br/minha-conta'}"
-				   style="background-color: #f59e0b; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-					Ver Meus Pontos
-				</a>
-			</div>
-		</div>
-		<div style="background-color: #1f2937; padding: 24px; text-align: center;">
-			<p style="color: #9ca3af; margin: 0; font-size: 12px;">
-				© ${new Date().getFullYear()} Geek & Toys. Todos os direitos reservados.
-			</p>
-		</div>
-	</div>
-</body>
-</html>`,
+		subject: 'Seus pontos estão expirando',
+		html: (vars) => createEmailBase('Pontos Expirando', `
+			${emailHeaderWithLogo}
+			<tr>
+				<td style="padding: 32px;">
+					<h2 style="color: ${BRAND.primaryGold}; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Use seus pontos!</h2>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Você tem pontos que estão prestes a expirar. Não deixe eles irem embora!
+					</p>
+
+					<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: ${BRAND.darkBg}; border-radius: 12px; border: 1px solid ${BRAND.warningAmber}; margin: 24px 0;">
+						<tr>
+							<td style="padding: 32px; text-align: center;">
+								<p style="color: ${BRAND.primaryGold}; font-size: 48px; font-weight: 700; margin: 0; line-height: 1;">${vars.pontos}</p>
+								<p style="color: ${BRAND.textSecondary}; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin: 8px 0 0 0;">pontos</p>
+								<div style="width: 40px; height: 1px; background-color: ${BRAND.darkBorder}; margin: 16px auto;"></div>
+								<p style="color: ${BRAND.warningAmber}; font-size: 13px; margin: 0;">Expiram em ${vars.data_expiracao}</p>
+							</td>
+						</tr>
+					</table>
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Visite nossa loja e use seus pontos para ganhar descontos nas suas compras!
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Ver Meus Pontos', vars.dashboard_url || BRAND.clubUrl + '/minha-conta')}
+					</div>
+				</td>
+			</tr>
+		`),
 	},
 };
 
@@ -353,11 +435,14 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, EmailTemplateConfig> = {
 // EMAIL HELPER
 // ============================================
 
+const DEFAULT_FROM_EMAIL = 'Clube Geek & Toys <onboarding@resend.dev>';
+
 async function sendEmail(
 	apiKey: string,
 	to: string,
 	template: EmailTemplate,
-	variables: Record<string, string>
+	variables: Record<string, string>,
+	fromEmail?: string
 ): Promise<{ success: boolean; id?: string; error?: string }> {
 	const templateConfig = EMAIL_TEMPLATES[template];
 	if (!templateConfig) {
@@ -372,7 +457,7 @@ async function sendEmail(
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				from: 'Clube Geek & Toys <noreply@geeketoys.com.br>',
+				from: fromEmail || DEFAULT_FROM_EMAIL,
 				to: [to],
 				subject: templateConfig.subject,
 				html: templateConfig.html(variables),
@@ -887,7 +972,8 @@ export default {
 												valor: amount?.toFixed(2).replace('.', ',') || '0,00',
 												plano: plan || 'Clube',
 												validade: expiryDateStr,
-											}
+											},
+											env.FROM_EMAIL
 										).catch(err => console.error('[WEBHOOK] Email send error:', err));
 									}
 								}
@@ -928,7 +1014,7 @@ export default {
 					}, 400, origin);
 				}
 
-				const result = await sendEmail(env.RESEND_API_KEY, to, template as EmailTemplate, variables || {});
+				const result = await sendEmail(env.RESEND_API_KEY, to, template as EmailTemplate, variables || {}, env.FROM_EMAIL);
 
 				// Log email in Firestore
 				try {
@@ -1389,7 +1475,8 @@ export default {
 										{
 											nome: fullName,
 											validade: new Date(expiryDate).toLocaleDateString('pt-BR'),
-										}
+										},
+										env.FROM_EMAIL
 									);
 
 									if (result.success) {

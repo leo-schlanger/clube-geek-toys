@@ -7,6 +7,9 @@ compatibility_flags = ["nodejs_compat"]
 FIREBASE_PROJECT_ID = "clube-geek-toys"
 FRONTEND_URL = "https://clube-geek-toys.web.app"
 WORKER_URL = "https://api-worker.leoschlanger.workers.dev"
+# Email sender - change to your verified domain when available
+# Format: "Name <email@domain.com>"
+FROM_EMAIL = "Clube Geek & Toys <onboarding@resend.dev>"
 
 # Note: Sensitive secrets are managed via 'wrangler secret put'
 # Required secrets:
