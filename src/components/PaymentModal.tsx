@@ -5,7 +5,8 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { PLANS, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
+import { CardTokenizationForm, type CardInfo } from './CardTokenizationForm'
+import { PLANS, type PlanType, type PaymentType, type PendingPaymentInfo, type SubscriptionFrequencyType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import {
   generatePixPayment,
@@ -14,6 +15,7 @@ import {
   isMercadoPagoConfigured,
   type PixPaymentData,
 } from '../lib/payments'
+import { createSubscription } from '../lib/subscriptions'
 import { savePendingPayment, clearPendingPayment } from '../lib/members'
 import { toast } from 'sonner'
 import {
@@ -25,19 +27,31 @@ import {
   Clock,
   AlertCircle,
   RefreshCw,
+  Repeat,
+  Zap,
+  Shield,
+  CheckCircle,
+  Sparkles,
 } from 'lucide-react'
+
+// Payment mode: subscription (recurring) or one-time
+type PaymentMode = 'subscription' | 'one-time'
+
+// Payment method within each mode
+type PaymentMethodType = 'pix' | 'card' | 'subscription-card'
 
 interface PaymentModalProps {
   plan: PlanType
   paymentType: PaymentType
   memberEmail?: string
   memberId?: string
-  initialPendingPayment?: PendingPaymentInfo // Previous pending payment to resume
+  initialPendingPayment?: PendingPaymentInfo
   onClose: () => void
   onSuccess: () => void
+  // New props for subscription support
+  defaultMode?: PaymentMode
+  allowModeSwitch?: boolean
 }
-
-type PaymentMethodType = 'pix' | 'card'
 
 export function PaymentModal({
   plan,
@@ -47,13 +61,16 @@ export function PaymentModal({
   initialPendingPayment,
   onClose,
   onSuccess,
+  defaultMode = 'subscription',
+  allowModeSwitch = true,
 }: PaymentModalProps) {
+  const [mode, setMode] = useState<PaymentMode>(defaultMode)
   const [method, setMethod] = useState<PaymentMethodType | null>(null)
   const [loading, setLoading] = useState(false)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
   const [copied, setCopied] = useState(false)
   const [checkingPayment, setCheckingPayment] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(30 * 60) // 30 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(30 * 60)
   const [checkingPreviousPayment, setCheckingPreviousPayment] = useState(false)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -61,16 +78,13 @@ export function PaymentModal({
   const planData = PLANS[plan]
   const amount = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
   const isConfigured = isMercadoPagoConfigured()
+  const frequencyType: SubscriptionFrequencyType = paymentType === 'monthly' ? 'months' : 'years'
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-      }
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+      if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [])
 
@@ -82,14 +96,9 @@ export function PaymentModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPendingPayment])
 
-  /**
-   * Check if a previous payment was completed
-   */
   async function checkPreviousPayment(pendingPayment: PendingPaymentInfo) {
-    // Check if payment has expired
     const expiresAt = new Date(pendingPayment.expiresAt)
     if (expiresAt < new Date()) {
-      // Payment expired, clear it
       if (memberId !== 'temp_member') {
         await clearPendingPayment(memberId)
       }
@@ -113,15 +122,12 @@ export function PaymentModal({
         await clearPendingPayment(memberId)
       }
     } else {
-      // Still pending - restore the QR code
       toast.dismiss('check-prev')
       toast.info('Pagamento ainda pendente. Continue de onde parou.')
 
-      // Calculate remaining time
       const remaining = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
       setTimeLeft(remaining > 0 ? remaining : 0)
 
-      // Restore PIX data
       setPixData({
         paymentId: pendingPayment.paymentId,
         qrCode: pendingPayment.qrCode,
@@ -131,15 +137,15 @@ export function PaymentModal({
         amount: pendingPayment.amount,
       })
       setMethod('pix')
+      setMode('one-time')
 
-      // Start polling
       startPaymentPolling(pendingPayment.paymentId)
     }
 
     setCheckingPreviousPayment(false)
   }
 
-  // Expiration timer
+  // Expiration timer for PIX
   useEffect(() => {
     if (pixData && method === 'pix') {
       timerRef.current = setInterval(() => {
@@ -159,18 +165,12 @@ export function PaymentModal({
     }
   }, [pixData, method])
 
-  /**
-   * Format remaining time as MM:SS
-   */
   function formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  /**
-   * Generate PIX payment
-   */
   async function handlePixPayment() {
     setLoading(true)
 
@@ -186,7 +186,6 @@ export function PaymentModal({
         setPixData(pix)
         setTimeLeft(30 * 60)
 
-        // Save pending payment to member record for resumption
         if (memberId !== 'temp_member') {
           const pendingPaymentInfo: PendingPaymentInfo = {
             paymentId: pix.paymentId,
@@ -199,7 +198,6 @@ export function PaymentModal({
           paymentLogger.info('Pending payment saved for member:', memberId)
         }
 
-        // Start polling if API is configured
         if (isConfigured) {
           startPaymentPolling(pix.paymentId)
         }
@@ -214,16 +212,12 @@ export function PaymentModal({
     }
   }
 
-  /**
-   * Poll for payment status
-   */
   function startPaymentPolling(paymentId: string) {
     pollIntervalRef.current = setInterval(async () => {
       const status = await checkPixPaymentStatus(paymentId)
 
       if (status === 'paid') {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-        // Clear pending payment from member record
         if (memberId !== 'temp_member') {
           await clearPendingPayment(memberId)
         }
@@ -231,18 +225,14 @@ export function PaymentModal({
         onSuccess()
       } else if (status === 'failed') {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-        // Clear failed payment from member record
         if (memberId !== 'temp_member') {
           await clearPendingPayment(memberId)
         }
         toast.error('Pagamento não aprovado')
       }
-    }, 5000) // Check every 5 seconds
+    }, 5000)
   }
 
-  /**
-   * Manual payment check
-   */
   async function checkPaymentManually() {
     if (!pixData) return
 
@@ -250,14 +240,12 @@ export function PaymentModal({
     const status = await checkPixPaymentStatus(pixData.paymentId)
 
     if (status === 'paid') {
-      // Clear pending payment from member record
       if (memberId !== 'temp_member') {
         await clearPendingPayment(memberId)
       }
       toast.success('Pagamento confirmado!')
       onSuccess()
     } else if (status === 'failed') {
-      // Clear failed payment from member record
       if (memberId !== 'temp_member') {
         await clearPendingPayment(memberId)
       }
@@ -269,9 +257,6 @@ export function PaymentModal({
     setCheckingPayment(false)
   }
 
-  /**
-   * Handle card checkout
-   */
   async function handleCardPayment() {
     setLoading(true)
 
@@ -283,7 +268,6 @@ export function PaymentModal({
     )
 
     if (preference) {
-      // Redirect to Mercado Pago checkout
       window.location.href = preference.initPoint
     } else {
       toast.error('Erro ao iniciar pagamento com cartão')
@@ -291,9 +275,36 @@ export function PaymentModal({
     }
   }
 
-  /**
-   * Handle payment method selection
-   */
+  // Handle subscription card token
+  async function handleSubscriptionCardToken(token: string, cardInfo: CardInfo) {
+    setLoading(true)
+
+    try {
+      paymentLogger.info('Creating subscription with card:', cardInfo.brand, '**** ' + cardInfo.lastFourDigits)
+
+      const result = await createSubscription({
+        memberId,
+        plan,
+        frequencyType,
+        payerEmail: memberEmail,
+        cardToken: token,
+      })
+
+      if (result) {
+        toast.success('Assinatura criada com sucesso!')
+        paymentLogger.info('Subscription created:', result.id)
+        onSuccess()
+      } else {
+        toast.error('Erro ao criar assinatura. Tente novamente.')
+      }
+    } catch (error) {
+      paymentLogger.error('Subscription creation error:', error)
+      toast.error('Erro ao processar assinatura')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   function handleSelectMethod(selectedMethod: PaymentMethodType) {
     setMethod(selectedMethod)
     if (selectedMethod === 'pix') {
@@ -301,11 +312,9 @@ export function PaymentModal({
     } else if (selectedMethod === 'card') {
       handleCardPayment()
     }
+    // subscription-card is handled by CardTokenizationForm
   }
 
-  /**
-   * Copy PIX code to clipboard
-   */
   function copyPixCode() {
     if (pixData) {
       navigator.clipboard.writeText(pixData.qrCode)
@@ -315,14 +324,9 @@ export function PaymentModal({
     }
   }
 
-  /**
-   * Simulate payment confirmation (ONLY for development/testing)
-   * SECURITY: This function only works when VITE_ENVIRONMENT is explicitly 'development'
-   */
   async function simulatePaymentConfirmation() {
     const env = import.meta.env.VITE_ENVIRONMENT
 
-    // CRITICAL: Only allow simulation in development mode
     if (env !== 'development') {
       toast.error('Simulação não disponível em produção')
       paymentLogger.error('Payment simulation blocked: Not in development mode')
@@ -331,7 +335,6 @@ export function PaymentModal({
 
     setLoading(true)
 
-    // Clear pending payment from member record
     if (memberId !== 'temp_member') {
       await clearPendingPayment(memberId)
     }
@@ -342,25 +345,55 @@ export function PaymentModal({
     }, 1500)
   }
 
-  // Check if simulation is allowed (development mode only)
   const isSimulationAllowed = import.meta.env.VITE_ENVIRONMENT === 'development'
+
+  // Get plan-specific gradient colors
+  const getPlanGradient = () => {
+    switch (plan) {
+      case 'black':
+        return 'from-zinc-800 to-zinc-900'
+      case 'gold':
+        return 'from-yellow-600 to-amber-700'
+      case 'silver':
+      default:
+        return 'from-slate-400 to-slate-500'
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <Card
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-md max-h-[90vh] overflow-y-auto overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <CardHeader className="relative">
+        {/* Plan Header Banner */}
+        <div className={`bg-gradient-to-r ${getPlanGradient()} p-5 text-white relative`}>
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+            className="absolute right-4 top-4 text-white/70 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
-          <CardTitle>Finalizar Pagamento</CardTitle>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+              <span className="text-2xl">{planData.icon}</span>
+            </div>
+            <div>
+              <h2 className="font-bold text-xl">Plano {planData.name}</h2>
+              <p className="text-white/80 text-sm">
+                {paymentType === 'monthly' ? 'Mensal' : 'Anual'} • {formatCurrency(amount)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="h-5 w-5 text-green-500" />
+            Pagamento Seguro
+          </CardTitle>
           <CardDescription>
-            Plano {planData.name} - {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
+            Seus dados são protegidos e criptografados
           </CardDescription>
         </CardHeader>
 
@@ -374,220 +407,388 @@ export function PaymentModal({
 
           {!checkingPreviousPayment && (
             <>
-          {/* Summary */}
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Plano</span>
-              <Badge variant={plan as 'silver' | 'gold' | 'black'}>
-                {planData.icon} {planData.name}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Total</span>
-              <span className="text-2xl font-bold">{formatCurrency(amount)}</span>
-            </div>
-          </div>
-
-          {/* Simulation mode warning */}
-          {!isConfigured && !method && (
-            <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-yellow-600 dark:text-yellow-400">
-                  Modo de Teste
-                </p>
-                <p className="text-yellow-600/80 dark:text-yellow-400/80">
-                  O pagamento está em modo simulação. Configure as variáveis VITE_PAYMENT_API_URL e VITE_MERCADOPAGO_PUBLIC_KEY para usar pagamentos reais.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Method selection */}
-          {!method && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Escolha a forma de pagamento:</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="h-28 flex-col gap-2 hover:border-green-500 hover:bg-green-500/5"
-                  onClick={() => handleSelectMethod('pix')}
-                >
-                  <QrCode className="h-8 w-8 text-green-500" />
-                  <span className="font-semibold">PIX</span>
-                  <span className="text-xs text-muted-foreground">Aprovação imediata</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-28 flex-col gap-2 hover:border-blue-500 hover:bg-blue-500/5"
-                  onClick={() => handleSelectMethod('card')}
-                  disabled={!isConfigured}
-                >
-                  <CreditCard className="h-8 w-8 text-blue-500" />
-                  <span className="font-semibold">Cartão</span>
-                  <span className="text-xs text-muted-foreground">
-                    {isConfigured ? 'Crédito ou débito' : 'Indisponível'}
-                  </span>
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* PIX Payment */}
-          {method === 'pix' && (
-            <div className="space-y-4">
-              {loading ? (
-                <div className="py-8">
-                  <Loading size="lg" text="Gerando QR Code PIX..." />
+              {/* Mode selector */}
+              {!method && allowModeSwitch && (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-center">Escolha o tipo de pagamento:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMode('subscription')}
+                      className={`
+                        relative p-4 rounded-xl border-2 transition-all text-left
+                        ${mode === 'subscription'
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                        }
+                      `}
+                    >
+                      {mode === 'subscription' && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-4 w-4 text-primary-foreground" />
+                        </div>
+                      )}
+                      <Repeat className={`h-6 w-6 mb-2 ${mode === 'subscription' ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <p className="font-semibold text-sm">Assinatura</p>
+                      <p className="text-xs text-muted-foreground">Renovação automática</p>
+                      <Badge variant="success" className="mt-2 text-[10px]">Recomendado</Badge>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode('one-time')}
+                      className={`
+                        relative p-4 rounded-xl border-2 transition-all text-left
+                        ${mode === 'one-time'
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                        }
+                      `}
+                    >
+                      {mode === 'one-time' && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="h-4 w-4 text-primary-foreground" />
+                        </div>
+                      )}
+                      <Zap className={`h-6 w-6 mb-2 ${mode === 'one-time' ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <p className="font-semibold text-sm">Avulso</p>
+                      <p className="text-xs text-muted-foreground">Renovação manual</p>
+                    </button>
+                  </div>
                 </div>
-              ) : pixData ? (
-                <>
-                  {/* Timer */}
-                  <div className="flex items-center justify-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className={timeLeft < 300 ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
-                      Expira em {formatTime(timeLeft)}
-                    </span>
-                  </div>
+              )}
 
-                  {/* QR Code */}
-                  <div className="flex justify-center">
-                    <div className="bg-white p-4 rounded-xl shadow-lg">
-                      <QRCodeSVG
-                        value={pixData.qrCode}
-                        size={200}
-                        level="H"
-                        includeMargin
-                      />
+              {/* Subscription info */}
+              {!method && mode === 'subscription' && (
+                <div className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/5 border border-green-500/20 rounded-xl space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-green-500" />
+                    Benefícios da Assinatura
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                      <span>Cobrança automática</span>
                     </div>
-                  </div>
-
-                  {/* Instructions */}
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                        1
-                      </div>
-                      <span>Abra o app do seu banco</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                      <span>Cancele quando quiser</span>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                        2
-                      </div>
-                      <span>Escolha pagar com PIX e escaneie o QR Code</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                      <span>Sem taxas ocultas</span>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                        3
-                      </div>
-                      <span>Confirme as informações e finalize o pagamento</span>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                      <span>Pause facilmente</span>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {/* Copy code */}
+              {/* One-time info */}
+              {!method && mode === 'one-time' && (
+                <div className="p-4 bg-muted/50 border border-border rounded-xl space-y-3">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    Pagamento Avulso
+                  </p>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">PIX Copia e Cola:</p>
-                    <div className="flex gap-2">
-                      <div className="flex-1 p-2 bg-muted rounded text-xs font-mono overflow-hidden">
-                        <span className="truncate block">{pixData.qrCode.substring(0, 40)}...</span>
-                      </div>
-                      <Button variant="outline" size="icon" onClick={copyPixCode}>
-                        {copied ? (
-                          <Check className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <QrCode className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                      <span>Pague via PIX (instantâneo) ou cartão</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />
+                      <span>Renove manualmente quando expirar</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Shield className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                      <span>Controle total sobre cobranças</span>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {/* Amount */}
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-center">
-                    <p className="text-sm text-green-700 dark:text-green-300">
-                      Valor: <strong>{formatCurrency(amount)}</strong>
+              {/* Simulation mode warning */}
+              {!isConfigured && !method && (
+                <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-yellow-600 dark:text-yellow-400">
+                      Modo de Teste
+                    </p>
+                    <p className="text-yellow-600/80 dark:text-yellow-400/80">
+                      O pagamento está em modo simulação.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Method selection - Subscription mode */}
+              {!method && mode === 'subscription' && (
+                <div className="space-y-4">
+                  <button
+                    type="button"
+                    onClick={() => setMethod('subscription-card')}
+                    className="w-full p-5 rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-all flex items-center gap-4 text-left"
+                  >
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+                      <CreditCard className="h-7 w-7 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-base">Cartão de Crédito</p>
+                      <p className="text-sm text-muted-foreground">
+                        Cobrança automática {paymentType === 'monthly' ? 'mensal' : 'anual'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs bg-green-500/20 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full">
+                          Visa
+                        </span>
+                        <span className="text-xs bg-orange-500/20 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full">
+                          Mastercard
+                        </span>
+                        <span className="text-xs bg-blue-500/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
+                          Elo
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                  <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    PIX não está disponível para assinaturas recorrentes
+                  </p>
+                </div>
+              )}
+
+              {/* Method selection - One-time mode */}
+              {!method && mode === 'one-time' && (
+                <div className="space-y-4">
+                  <p className="text-sm font-medium text-center">Escolha a forma de pagamento:</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectMethod('pix')}
+                      className="p-4 rounded-xl border-2 border-border hover:border-green-500 hover:bg-green-500/5 transition-all flex flex-col items-center gap-3"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg">
+                        <QrCode className="h-7 w-7 text-white" />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold">PIX</p>
+                        <p className="text-xs text-muted-foreground">Aprovação imediata</p>
+                      </div>
+                      <Badge variant="success" className="text-[10px]">Recomendado</Badge>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectMethod('card')}
+                      disabled={!isConfigured}
+                      className="p-4 rounded-xl border-2 border-border hover:border-blue-500 hover:bg-blue-500/5 transition-all flex flex-col items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center shadow-lg ${isConfigured ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-muted'}`}>
+                        <CreditCard className={`h-7 w-7 ${isConfigured ? 'text-white' : 'text-muted-foreground'}`} />
+                      </div>
+                      <div className="text-center">
+                        <p className="font-bold">Cartão</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isConfigured ? 'Crédito ou débito' : 'Indisponível'}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Subscription Card Form */}
+              {method === 'subscription-card' && (
+                <div className="space-y-4">
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <p className="text-sm text-center">
+                      Valor: <strong>{formatCurrency(amount)}</strong>/{paymentType === 'monthly' ? 'mês' : 'ano'}
+                    </p>
+                    <p className="text-xs text-center text-muted-foreground mt-1">
+                      Primeira cobrança imediatamente após confirmação
                     </p>
                   </div>
 
-                  {/* Check payment / Simulate */}
-                  <div className="pt-4 border-t space-y-2">
-                    {isConfigured ? (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={checkPaymentManually}
-                        disabled={checkingPayment}
-                      >
-                        {checkingPayment ? (
-                          <Loading size="sm" />
-                        ) : (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Verificar Pagamento
-                          </>
-                        )}
-                      </Button>
-                    ) : isSimulationAllowed ? (
-                      <>
-                        <Button
-                          className="w-full"
-                          onClick={simulatePaymentConfirmation}
-                          disabled={loading}
-                        >
-                          {loading ? <Loading size="sm" /> : 'Confirmar Pagamento (Teste)'}
-                        </Button>
-                        <p className="text-xs text-center text-muted-foreground">
-                          Modo desenvolvimento - Em produção, configure VITE_PAYMENT_API_URL
-                        </p>
-                      </>
-                    ) : (
-                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
-                        <AlertCircle className="h-6 w-6 mx-auto text-red-500 mb-2" />
-                        <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                          Pagamento não configurado
-                        </p>
-                        <p className="text-xs text-red-500/80 mt-1">
-                          Entre em contato com o suporte
-                        </p>
+                  <CardTokenizationForm
+                    amount={amount}
+                    onTokenGenerated={handleSubscriptionCardToken}
+                    onCancel={() => setMethod(null)}
+                    disabled={loading}
+                  />
+
+                  {loading && (
+                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center rounded-lg">
+                      <Loading size="lg" text="Criando assinatura..." />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PIX Payment */}
+              {method === 'pix' && (
+                <div className="space-y-5">
+                  {loading ? (
+                    <div className="py-12">
+                      <Loading size="lg" text="Gerando QR Code PIX..." />
+                    </div>
+                  ) : pixData ? (
+                    <>
+                      {/* Timer and Amount Banner */}
+                      <div className="p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${timeLeft < 300 ? 'bg-red-500/20' : 'bg-green-500/20'}`}>
+                              <Clock className={`h-5 w-5 ${timeLeft < 300 ? 'text-red-500' : 'text-green-500'}`} />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Expira em</p>
+                              <p className={`font-bold ${timeLeft < 300 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                                {formatTime(timeLeft)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Total</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-400">
+                              {formatCurrency(amount)}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
-                  <p className="text-muted-foreground mb-4">
-                    Erro ao gerar QR Code. Tente novamente.
-                  </p>
-                  <Button onClick={handlePixPayment}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Tentar Novamente
+
+                      {/* QR Code */}
+                      <div className="flex justify-center">
+                        <div className="relative">
+                          <div className="bg-white p-5 rounded-2xl shadow-xl border-4 border-green-500/20">
+                            <QRCodeSVG
+                              value={pixData.qrCode}
+                              size={180}
+                              level="H"
+                              includeMargin
+                            />
+                          </div>
+                          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+                            Escaneie com seu banco
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Instructions */}
+                      <div className="grid grid-cols-3 gap-2 text-center pt-4">
+                        <div className="space-y-1">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold mx-auto">1</div>
+                          <p className="text-xs text-muted-foreground">Abra seu app de banco</p>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold mx-auto">2</div>
+                          <p className="text-xs text-muted-foreground">Escaneie o QR Code</p>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold mx-auto">3</div>
+                          <p className="text-xs text-muted-foreground">Confirme o pagamento</p>
+                        </div>
+                      </div>
+
+                      {/* Copy code */}
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium flex items-center gap-2">
+                          <Copy className="h-4 w-4 text-muted-foreground" />
+                          PIX Copia e Cola
+                        </p>
+                        <div className="flex gap-2">
+                          <div className="flex-1 p-3 bg-muted rounded-lg text-xs font-mono overflow-hidden border">
+                            <span className="truncate block">{pixData.qrCode.substring(0, 35)}...</span>
+                          </div>
+                          <Button
+                            variant={copied ? 'default' : 'outline'}
+                            size="icon"
+                            onClick={copyPixCode}
+                            className={copied ? 'bg-green-500 hover:bg-green-600' : ''}
+                          >
+                            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Check payment / Simulate */}
+                      <div className="pt-4 border-t space-y-2">
+                        {isConfigured ? (
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={checkPaymentManually}
+                            disabled={checkingPayment}
+                          >
+                            {checkingPayment ? (
+                              <Loading size="sm" />
+                            ) : (
+                              <>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Verificar Pagamento
+                              </>
+                            )}
+                          </Button>
+                        ) : isSimulationAllowed ? (
+                          <>
+                            <Button
+                              className="w-full"
+                              onClick={simulatePaymentConfirmation}
+                              disabled={loading}
+                            >
+                              {loading ? <Loading size="sm" /> : 'Confirmar Pagamento (Teste)'}
+                            </Button>
+                            <p className="text-xs text-center text-muted-foreground">
+                              Modo desenvolvimento - Em produção, configure VITE_PAYMENT_API_URL
+                            </p>
+                          </>
+                        ) : (
+                          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
+                            <AlertCircle className="h-6 w-6 mx-auto text-red-500 mb-2" />
+                            <p className="text-sm text-red-600 dark:text-red-400 font-medium">
+                              Pagamento não configurado
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-8">
+                      <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
+                      <p className="text-muted-foreground mb-4">
+                        Erro ao gerar QR Code. Tente novamente.
+                      </p>
+                      <Button onClick={handlePixPayment}>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Tentar Novamente
+                      </Button>
+                    </div>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      setMethod(null)
+                      setPixData(null)
+                      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+                    }}
+                  >
+                    Voltar
                   </Button>
                 </div>
               )}
 
-              <Button
-                variant="ghost"
-                className="w-full"
-                onClick={() => {
-                  setMethod(null)
-                  setPixData(null)
-                  if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-                }}
-              >
-                Voltar
-              </Button>
-            </div>
-          )}
-
-          {/* Card (loading while redirecting) */}
-          {method === 'card' && (
-            <div className="py-8 text-center">
-              <Loading size="lg" text="Redirecionando para pagamento..." />
-              <p className="text-sm text-muted-foreground mt-4">
-                Você será redirecionado para o checkout seguro
-              </p>
-            </div>
-          )}
+              {/* Card (loading while redirecting) */}
+              {method === 'card' && (
+                <div className="py-8 text-center">
+                  <Loading size="lg" text="Redirecionando para pagamento..." />
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Você será redirecionado para o checkout seguro
+                  </p>
+                </div>
+              )}
             </>
           )}
         </CardContent>

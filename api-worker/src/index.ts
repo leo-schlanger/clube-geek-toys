@@ -89,9 +89,59 @@ interface CheckoutCreateBody {
 
 interface WebhookBody {
 	type?: string;
+	action?: string;
 	data?: {
 		id?: string;
 	};
+}
+
+// Subscription Types
+interface SubscriptionCreateBody {
+	member_id: string;
+	plan: 'silver' | 'gold' | 'black';
+	frequency_type: 'months' | 'years';
+	payer_email: string;
+	card_token: string;
+	transaction_amount: number;
+	reason: string;
+}
+
+interface MpPreapprovalResponse {
+	id: string;
+	status: string;
+	payer_id?: number;
+	payer_email?: string;
+	back_url?: string;
+	init_point?: string;
+	auto_recurring?: {
+		frequency: number;
+		frequency_type: string;
+		transaction_amount: number;
+		currency_id: string;
+	};
+	next_payment_date?: string;
+	payment_method_id?: string;
+	card?: {
+		last_four_digits?: string;
+		expiration_month?: number;
+		expiration_year?: number;
+	};
+	message?: string;
+}
+
+interface MpAuthorizedPaymentResponse {
+	id: number;
+	status: string;
+	status_detail?: string;
+	preapproval_id: string;
+	payment?: {
+		id: number;
+		status: string;
+		status_detail?: string;
+	};
+	transaction_amount?: number;
+	currency_id?: string;
+	date_created?: string;
 }
 
 interface EmailSendBody {
@@ -115,7 +165,7 @@ interface MonthlyReport {
 // EMAIL TEMPLATES
 // ============================================
 
-type EmailTemplate = 'welcome' | 'payment-confirmed' | 'payment-failed' | 'renewal-reminder' | 'points-expiring';
+type EmailTemplate = 'welcome' | 'payment-confirmed' | 'payment-failed' | 'renewal-reminder' | 'points-expiring' | 'subscription-created' | 'subscription-payment' | 'subscription-paused' | 'subscription-cancelled' | 'subscription-payment-failed';
 
 interface EmailTemplateConfig {
 	subject: string;
@@ -429,6 +479,144 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, EmailTemplateConfig> = {
 			</tr>
 		`),
 	},
+	'subscription-created': {
+		subject: 'Assinatura criada com sucesso!',
+		html: (vars) => createEmailBase('Assinatura Criada', `
+			${createStatusHeader('✓', 'Assinatura Ativada', '#166534')}
+			<tr>
+				<td style="padding: 32px;">
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Sua assinatura recorrente foi criada com sucesso! Agora você é membro do Clube Geek & Toys.
+					</p>
+
+					${createInfoCard([
+						createInfoItem('Plano', vars.plano),
+						createInfoItem('Valor', 'R$ ' + vars.valor + '/' + (vars.frequencia === 'months' ? 'mês' : 'ano')),
+						createInfoItem('Cartão', vars.cartao),
+						createInfoItem('Próxima cobrança', vars.proxima_cobranca, true),
+					], BRAND.successGreen)}
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Sua assinatura será renovada automaticamente. Você pode gerenciá-la a qualquer momento em sua conta.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Gerenciar Assinatura', vars.dashboard_url || BRAND.clubUrl + '/minha-conta', BRAND.primaryGold)}
+					</div>
+				</td>
+			</tr>
+		`),
+	},
+	'subscription-payment': {
+		subject: 'Cobrança processada - Clube Geek & Toys',
+		html: (vars) => createEmailBase('Cobrança Processada', `
+			${createStatusHeader('✓', 'Cobrança Realizada', '#166534')}
+			<tr>
+				<td style="padding: 32px;">
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						A cobrança da sua assinatura foi processada com sucesso.
+					</p>
+
+					${createInfoCard([
+						createInfoItem('Valor cobrado', 'R$ ' + vars.valor),
+						createInfoItem('Plano', vars.plano),
+						createInfoItem('Cartão', vars.cartao),
+						createInfoItem('Próxima cobrança', vars.proxima_cobranca, true),
+					], BRAND.successGreen)}
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Ver Histórico', vars.dashboard_url || BRAND.clubUrl + '/minha-conta', BRAND.primaryGold)}
+					</div>
+				</td>
+			</tr>
+		`),
+	},
+	'subscription-paused': {
+		subject: 'Assinatura pausada - Clube Geek & Toys',
+		html: (vars) => createEmailBase('Assinatura Pausada', `
+			${emailHeaderWithLogo}
+			<tr>
+				<td style="padding: 32px;">
+					<h2 style="color: ${BRAND.warningAmber}; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Assinatura Pausada</h2>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Sua assinatura do plano ${vars.plano} foi pausada. Enquanto pausada, você não receberá cobranças e seus benefícios ficam suspensos.
+					</p>
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Você pode reativar sua assinatura a qualquer momento para voltar a aproveitar os benefícios do clube.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Reativar Assinatura', vars.dashboard_url || BRAND.clubUrl + '/minha-conta', BRAND.warningAmber)}
+					</div>
+				</td>
+			</tr>
+		`),
+	},
+	'subscription-cancelled': {
+		subject: 'Assinatura cancelada - Clube Geek & Toys',
+		html: (vars) => createEmailBase('Assinatura Cancelada', `
+			${emailHeaderWithLogo}
+			<tr>
+				<td style="padding: 32px;">
+					<h2 style="color: ${BRAND.errorRed}; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Assinatura Cancelada</h2>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Sua assinatura do plano ${vars.plano} foi cancelada. Sentiremos sua falta!
+					</p>
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Você pode criar uma nova assinatura a qualquer momento e voltar a fazer parte do Clube Geek & Toys.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Assinar Novamente', BRAND.clubUrl + '/assinar', BRAND.primaryGold)}
+					</div>
+				</td>
+			</tr>
+		`),
+	},
+	'subscription-payment-failed': {
+		subject: 'Problema com cobrança - Clube Geek & Toys',
+		html: (vars) => createEmailBase('Falha na Cobrança', `
+			${createStatusHeader('!', 'Problema na Cobrança', '#B45309')}
+			<tr>
+				<td style="padding: 32px;">
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Houve um problema ao processar a cobrança da sua assinatura. Por favor, verifique seu cartão.
+					</p>
+
+					${createInfoCard([
+						createInfoItem('Valor', 'R$ ' + vars.valor),
+						createInfoItem('Motivo', vars.motivo || 'Pagamento não aprovado'),
+						createInfoItem('Tentativas restantes', vars.tentativas_restantes, true),
+					], BRAND.warningAmber)}
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Atualize seu cartão para evitar a suspensão da sua assinatura. Após 3 tentativas sem sucesso, sua assinatura será cancelada automaticamente.
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Atualizar Cartão', vars.dashboard_url || BRAND.clubUrl + '/minha-conta', BRAND.warningAmber)}
+					</div>
+				</td>
+			</tr>
+		`),
+	},
 };
 
 // ============================================
@@ -500,7 +688,7 @@ const MP_API_BASE = 'https://api.mercadopago.com';
 
 function corsHeaders(origin: string | null): HeadersInit {
 	const headers: HeadersInit = {
-		'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+		'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 		'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Signature, X-Request-Id',
 		'Access-Control-Allow-Credentials': 'true',
 	};
@@ -814,6 +1002,376 @@ export default {
 				}
 			}
 
+			// ============================================
+			// SUBSCRIPTION ROUTES
+			// ============================================
+
+			// Create Subscription
+			if (path === '/subscription/create' && method === 'POST') {
+				const body = await request.json() as SubscriptionCreateBody;
+				const { member_id, plan, frequency_type, payer_email, card_token, transaction_amount, reason } = body;
+
+				if (!member_id || !plan || !frequency_type || !payer_email || !card_token) {
+					return jsonResponse({ error: 'Missing required fields' }, 400, origin);
+				}
+
+				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				try {
+					// Generate idempotency key
+					const idempotencyKey = `subscription-${member_id}-${crypto.randomUUID()}`;
+
+					// Create preapproval (subscription) in Mercado Pago
+					const result = await mpRequest<MpPreapprovalResponse>(
+						env.MERCADOPAGO_ACCESS_TOKEN,
+						'/preapproval',
+						'POST',
+						{
+							reason: reason || `Clube Geek & Toys - Plano ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+							auto_recurring: {
+								frequency: 1,
+								frequency_type: frequency_type,
+								transaction_amount: transaction_amount,
+								currency_id: 'BRL',
+							},
+							back_url: `${env.FRONTEND_URL}/assinatura/callback`,
+							payer_email: payer_email,
+							card_token_id: card_token,
+							external_reference: member_id,
+							status: 'authorized',
+						},
+						idempotencyKey
+					);
+
+					// Save subscription to Firestore
+					const subscriptionData = {
+						member_id: member_id,
+						mercado_pago_id: result.id,
+						status: result.status || 'pending',
+						plan: plan,
+						frequency_type: frequency_type,
+						transaction_amount: transaction_amount,
+						payer_email: payer_email,
+						next_payment_date: result.next_payment_date || null,
+						card_last_four: result.card?.last_four_digits || null,
+						failed_payments: 0,
+						created_at: new Date().toISOString(),
+					};
+
+					await firestoreRequest(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${result.id}`,
+						'PATCH',
+						{ fields: Object.fromEntries(
+							Object.entries(subscriptionData).map(([k, v]) => [
+								k,
+								v === null ? { nullValue: null } :
+								typeof v === 'number' ? { doubleValue: v } :
+								{ stringValue: String(v) }
+							])
+						)}
+					);
+
+					// Update member with subscription reference
+					await firestoreRequest(
+						env.FIREBASE_PROJECT_ID,
+						`members/${member_id}?updateMask.fieldPaths=subscription_id&updateMask.fieldPaths=subscription_status&updateMask.fieldPaths=auto_renewal`,
+						'PATCH',
+						{
+							fields: {
+								subscription_id: { stringValue: result.id },
+								subscription_status: { stringValue: result.status || 'pending' },
+								auto_renewal: { booleanValue: true },
+							},
+						}
+					);
+
+					console.log(`[SUBSCRIPTION] Created subscription ${result.id} for member ${member_id}`);
+
+					return jsonResponse({
+						id: result.id,
+						status: result.status,
+						init_point: result.init_point,
+						next_payment_date: result.next_payment_date,
+					}, 200, origin);
+				} catch (error: unknown) {
+					const err = error as { message?: string };
+					console.error('[SUBSCRIPTION] Create error:', err);
+					return jsonResponse({ error: err.message || 'Failed to create subscription' }, 500, origin);
+				}
+			}
+
+			// Get Subscription
+			if (path.match(/^\/subscription\/[^/]+$/) && method === 'GET') {
+				const subscriptionId = path.split('/').pop();
+
+				if (!subscriptionId) {
+					return jsonResponse({ error: 'Subscription ID required' }, 400, origin);
+				}
+
+				try {
+					// Get from Firestore
+					const subscriptionDoc = await firestoreRequest<FirestoreDocument>(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}`
+					);
+
+					if (!subscriptionDoc.fields) {
+						return jsonResponse({ error: 'Subscription not found' }, 404, origin);
+					}
+
+					const fields = subscriptionDoc.fields;
+					return jsonResponse({
+						id: subscriptionId,
+						member_id: fields.member_id?.stringValue,
+						mercado_pago_id: fields.mercado_pago_id?.stringValue,
+						status: fields.status?.stringValue,
+						plan: fields.plan?.stringValue,
+						frequency_type: fields.frequency_type?.stringValue,
+						transaction_amount: fields.transaction_amount?.doubleValue,
+						next_payment_date: fields.next_payment_date?.stringValue,
+						last_payment_date: fields.last_payment_date?.stringValue,
+						failed_payments: parseInt(fields.failed_payments?.integerValue || '0', 10),
+						card_last_four: fields.card_last_four?.stringValue,
+						card_brand: fields.card_brand?.stringValue,
+						payer_email: fields.payer_email?.stringValue,
+						created_at: fields.created_at?.stringValue,
+						cancelled_at: fields.cancelled_at?.stringValue,
+						paused_at: fields.paused_at?.stringValue,
+					}, 200, origin);
+				} catch (error) {
+					console.error('[SUBSCRIPTION] Get error:', error);
+					return jsonResponse({ error: 'Subscription not found' }, 404, origin);
+				}
+			}
+
+			// Pause Subscription
+			if (path.match(/^\/subscription\/[^/]+\/pause$/) && method === 'PUT') {
+				const subscriptionId = path.split('/')[2];
+
+				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				try {
+					// Update in Mercado Pago
+					await mpRequest<MpPreapprovalResponse>(
+						env.MERCADOPAGO_ACCESS_TOKEN,
+						`/preapproval/${subscriptionId}`,
+						'PUT',
+						{ status: 'paused' }
+					);
+
+					const now = new Date().toISOString();
+
+					// Update in Firestore
+					await firestoreRequest(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}?updateMask.fieldPaths=status&updateMask.fieldPaths=paused_at`,
+						'PATCH',
+						{
+							fields: {
+								status: { stringValue: 'paused' },
+								paused_at: { timestampValue: now },
+							},
+						}
+					);
+
+					// Get member ID and update member status
+					const subscriptionDoc = await firestoreRequest<FirestoreDocument>(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}`
+					);
+					const memberId = subscriptionDoc.fields?.member_id?.stringValue;
+
+					if (memberId) {
+						await firestoreRequest(
+							env.FIREBASE_PROJECT_ID,
+							`members/${memberId}?updateMask.fieldPaths=subscription_status`,
+							'PATCH',
+							{ fields: { subscription_status: { stringValue: 'paused' } } }
+						);
+					}
+
+					console.log(`[SUBSCRIPTION] Paused subscription ${subscriptionId}`);
+					return jsonResponse({ success: true, status: 'paused' }, 200, origin);
+				} catch (error: unknown) {
+					const err = error as { message?: string };
+					console.error('[SUBSCRIPTION] Pause error:', err);
+					return jsonResponse({ error: err.message || 'Failed to pause subscription' }, 500, origin);
+				}
+			}
+
+			// Resume Subscription
+			if (path.match(/^\/subscription\/[^/]+\/resume$/) && method === 'PUT') {
+				const subscriptionId = path.split('/')[2];
+
+				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				try {
+					// Update in Mercado Pago
+					await mpRequest<MpPreapprovalResponse>(
+						env.MERCADOPAGO_ACCESS_TOKEN,
+						`/preapproval/${subscriptionId}`,
+						'PUT',
+						{ status: 'authorized' }
+					);
+
+					// Update in Firestore
+					await firestoreRequest(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}?updateMask.fieldPaths=status&updateMask.fieldPaths=paused_at`,
+						'PATCH',
+						{
+							fields: {
+								status: { stringValue: 'authorized' },
+								paused_at: { nullValue: null },
+							},
+						}
+					);
+
+					// Get member ID and update member status
+					const subscriptionDoc = await firestoreRequest<FirestoreDocument>(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}`
+					);
+					const memberId = subscriptionDoc.fields?.member_id?.stringValue;
+
+					if (memberId) {
+						await firestoreRequest(
+							env.FIREBASE_PROJECT_ID,
+							`members/${memberId}?updateMask.fieldPaths=subscription_status`,
+							'PATCH',
+							{ fields: { subscription_status: { stringValue: 'authorized' } } }
+						);
+					}
+
+					console.log(`[SUBSCRIPTION] Resumed subscription ${subscriptionId}`);
+					return jsonResponse({ success: true, status: 'authorized' }, 200, origin);
+				} catch (error: unknown) {
+					const err = error as { message?: string };
+					console.error('[SUBSCRIPTION] Resume error:', err);
+					return jsonResponse({ error: err.message || 'Failed to resume subscription' }, 500, origin);
+				}
+			}
+
+			// Cancel Subscription
+			if (path.match(/^\/subscription\/[^/]+\/cancel$/) && method === 'PUT') {
+				const subscriptionId = path.split('/')[2];
+
+				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				try {
+					// Update in Mercado Pago
+					await mpRequest<MpPreapprovalResponse>(
+						env.MERCADOPAGO_ACCESS_TOKEN,
+						`/preapproval/${subscriptionId}`,
+						'PUT',
+						{ status: 'cancelled' }
+					);
+
+					const now = new Date().toISOString();
+
+					// Update in Firestore
+					await firestoreRequest(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}?updateMask.fieldPaths=status&updateMask.fieldPaths=cancelled_at`,
+						'PATCH',
+						{
+							fields: {
+								status: { stringValue: 'cancelled' },
+								cancelled_at: { timestampValue: now },
+							},
+						}
+					);
+
+					// Get member ID and update member
+					const subscriptionDoc = await firestoreRequest<FirestoreDocument>(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}`
+					);
+					const memberId = subscriptionDoc.fields?.member_id?.stringValue;
+
+					if (memberId) {
+						await firestoreRequest(
+							env.FIREBASE_PROJECT_ID,
+							`members/${memberId}?updateMask.fieldPaths=subscription_status&updateMask.fieldPaths=auto_renewal`,
+							'PATCH',
+							{
+								fields: {
+									subscription_status: { stringValue: 'cancelled' },
+									auto_renewal: { booleanValue: false },
+								},
+							}
+						);
+					}
+
+					console.log(`[SUBSCRIPTION] Cancelled subscription ${subscriptionId}`);
+					return jsonResponse({ success: true, status: 'cancelled' }, 200, origin);
+				} catch (error: unknown) {
+					const err = error as { message?: string };
+					console.error('[SUBSCRIPTION] Cancel error:', err);
+					return jsonResponse({ error: err.message || 'Failed to cancel subscription' }, 500, origin);
+				}
+			}
+
+			// Update Subscription Card
+			if (path.match(/^\/subscription\/[^/]+\/update-card$/) && method === 'PUT') {
+				const subscriptionId = path.split('/')[2];
+				const body = await request.json() as { card_token: string };
+
+				if (!body.card_token) {
+					return jsonResponse({ error: 'Card token required' }, 400, origin);
+				}
+
+				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
+					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				try {
+					// Update card in Mercado Pago
+					const result = await mpRequest<MpPreapprovalResponse>(
+						env.MERCADOPAGO_ACCESS_TOKEN,
+						`/preapproval/${subscriptionId}`,
+						'PUT',
+						{ card_token_id: body.card_token }
+					);
+
+					// Update card info in Firestore
+					await firestoreRequest(
+						env.FIREBASE_PROJECT_ID,
+						`subscriptions/${subscriptionId}?updateMask.fieldPaths=card_last_four&updateMask.fieldPaths=failed_payments`,
+						'PATCH',
+						{
+							fields: {
+								card_last_four: { stringValue: result.card?.last_four_digits || '' },
+								failed_payments: { integerValue: '0' },
+							},
+						}
+					);
+
+					console.log(`[SUBSCRIPTION] Updated card for subscription ${subscriptionId}`);
+					return jsonResponse({
+						success: true,
+						card_last_four: result.card?.last_four_digits,
+					}, 200, origin);
+				} catch (error: unknown) {
+					const err = error as { message?: string };
+					console.error('[SUBSCRIPTION] Update card error:', err);
+					return jsonResponse({ error: err.message || 'Failed to update card' }, 500, origin);
+				}
+			}
+
+			// ============================================
+			// WEBHOOK ROUTES
+			// ============================================
+
 			// Webhook
 			if (path === '/webhook/mercadopago' && method === 'POST') {
 				const xSignature = request.headers.get('x-signature');
@@ -840,8 +1398,324 @@ export default {
 					return new Response('Unauthorized', { status: 401 });
 				}
 
-				const { type, data } = body;
+				const { type, action, data } = body;
 
+				// Handle subscription preapproval events
+				if (type === 'subscription_preapproval' && data?.id) {
+					const preapprovalId = data.id;
+					console.log(`[WEBHOOK] Processing subscription_preapproval ${preapprovalId}, action: ${action}`);
+
+					try {
+						// Fetch preapproval details from Mercado Pago
+						const preapprovalInfo = await mpRequest<MpPreapprovalResponse>(
+							env.MERCADOPAGO_ACCESS_TOKEN,
+							`/preapproval/${preapprovalId}`
+						);
+
+						const status = preapprovalInfo.status;
+
+						// Update subscription in Firestore
+						await firestoreRequest(
+							env.FIREBASE_PROJECT_ID,
+							`subscriptions/${preapprovalId}?updateMask.fieldPaths=status&updateMask.fieldPaths=next_payment_date`,
+							'PATCH',
+							{
+								fields: {
+									status: { stringValue: status },
+									next_payment_date: { stringValue: preapprovalInfo.next_payment_date || '' },
+								},
+							}
+						);
+
+						// Get member ID from subscription
+						const subscriptionDoc = await firestoreRequest<FirestoreDocument>(
+							env.FIREBASE_PROJECT_ID,
+							`subscriptions/${preapprovalId}`
+						);
+						const memberId = subscriptionDoc.fields?.member_id?.stringValue;
+						const plan = subscriptionDoc.fields?.plan?.stringValue;
+
+						if (memberId) {
+							// Update member subscription status
+							await firestoreRequest(
+								env.FIREBASE_PROJECT_ID,
+								`members/${memberId}?updateMask.fieldPaths=subscription_status`,
+								'PATCH',
+								{ fields: { subscription_status: { stringValue: status } } }
+							);
+
+							// Handle status-specific actions
+							if (status === 'authorized') {
+								// Activate member
+								const expiryDate = new Date();
+								const frequencyType = subscriptionDoc.fields?.frequency_type?.stringValue;
+								if (frequencyType === 'years') {
+									expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+								} else {
+									expiryDate.setMonth(expiryDate.getMonth() + 1);
+								}
+
+								await firestoreRequest(
+									env.FIREBASE_PROJECT_ID,
+									`members/${memberId}?updateMask.fieldPaths=status&updateMask.fieldPaths=expiry_date`,
+									'PATCH',
+									{
+										fields: {
+											status: { stringValue: 'active' },
+											expiry_date: { stringValue: expiryDate.toISOString().split('T')[0] },
+										},
+									}
+								);
+							} else if (status === 'cancelled') {
+								await firestoreRequest(
+									env.FIREBASE_PROJECT_ID,
+									`members/${memberId}?updateMask.fieldPaths=auto_renewal`,
+									'PATCH',
+									{ fields: { auto_renewal: { booleanValue: false } } }
+								);
+
+								// Send cancellation email
+								if (env.RESEND_API_KEY) {
+									const memberDoc = await firestoreRequest<FirestoreDocument>(
+										env.FIREBASE_PROJECT_ID,
+										`members/${memberId}`
+									);
+									const email = memberDoc.fields?.email?.stringValue;
+									const name = memberDoc.fields?.full_name?.stringValue;
+
+									if (email && name) {
+										sendEmail(
+											env.RESEND_API_KEY,
+											email,
+											'subscription-cancelled',
+											{ nome: name, plano: plan || 'Clube' },
+											env.FROM_EMAIL
+										).catch(err => console.error('[WEBHOOK] Email error:', err));
+									}
+								}
+							}
+						}
+
+						console.log(`[WEBHOOK] Updated subscription ${preapprovalId} to status: ${status}`);
+					} catch (error) {
+						console.error(`[WEBHOOK] Subscription preapproval error:`, error);
+						return jsonResponse({ error: 'Subscription update failed' }, 500, origin);
+					}
+
+					return new Response('OK', { status: 200 });
+				}
+
+				// Handle subscription authorized payment events
+				if (type === 'subscription_authorized_payment' && data?.id) {
+					const authorizedPaymentId = data.id;
+					console.log(`[WEBHOOK] Processing subscription_authorized_payment ${authorizedPaymentId}`);
+
+					try {
+						// Fetch authorized payment details
+						const paymentInfo = await mpRequest<MpAuthorizedPaymentResponse>(
+							env.MERCADOPAGO_ACCESS_TOKEN,
+							`/authorized_payments/${authorizedPaymentId}`
+						);
+
+						const preapprovalId = paymentInfo.preapproval_id;
+						const paymentStatus = paymentInfo.payment?.status || paymentInfo.status;
+						const amount = paymentInfo.transaction_amount;
+						const now = new Date().toISOString();
+
+						// Get subscription info
+						const subscriptionDoc = await firestoreRequest<FirestoreDocument>(
+							env.FIREBASE_PROJECT_ID,
+							`subscriptions/${preapprovalId}`
+						);
+
+						if (!subscriptionDoc.fields) {
+							console.error(`[WEBHOOK] Subscription ${preapprovalId} not found`);
+							return new Response('OK', { status: 200 });
+						}
+
+						const memberId = subscriptionDoc.fields.member_id?.stringValue;
+						const plan = subscriptionDoc.fields.plan?.stringValue;
+						const cardLastFour = subscriptionDoc.fields.card_last_four?.stringValue;
+						const frequencyType = subscriptionDoc.fields.frequency_type?.stringValue;
+						const currentFailedPayments = parseInt(subscriptionDoc.fields.failed_payments?.integerValue || '0', 10);
+
+						// Save payment record
+						const paymentRecordId = `sp_${authorizedPaymentId}`;
+						await firestoreRequest(
+							env.FIREBASE_PROJECT_ID,
+							`subscription_payments/${paymentRecordId}`,
+							'PATCH',
+							{
+								fields: {
+									subscription_id: { stringValue: preapprovalId },
+									member_id: { stringValue: memberId || '' },
+									amount: { doubleValue: amount || 0 },
+									status: { stringValue: paymentStatus },
+									payment_date: { timestampValue: now },
+									mercado_pago_payment_id: { stringValue: String(paymentInfo.payment?.id || authorizedPaymentId) },
+								},
+							}
+						);
+
+						if (paymentStatus === 'approved') {
+							// Calculate next expiry date
+							const expiryDate = new Date();
+							if (frequencyType === 'years') {
+								expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+							} else {
+								expiryDate.setMonth(expiryDate.getMonth() + 1);
+							}
+
+							// Update subscription
+							await firestoreRequest(
+								env.FIREBASE_PROJECT_ID,
+								`subscriptions/${preapprovalId}?updateMask.fieldPaths=last_payment_date&updateMask.fieldPaths=failed_payments`,
+								'PATCH',
+								{
+									fields: {
+										last_payment_date: { timestampValue: now },
+										failed_payments: { integerValue: '0' },
+									},
+								}
+							);
+
+							// Update member
+							if (memberId) {
+								await firestoreRequest(
+									env.FIREBASE_PROJECT_ID,
+									`members/${memberId}?updateMask.fieldPaths=status&updateMask.fieldPaths=expiry_date`,
+									'PATCH',
+									{
+										fields: {
+											status: { stringValue: 'active' },
+											expiry_date: { stringValue: expiryDate.toISOString().split('T')[0] },
+										},
+									}
+								);
+
+								// Send payment confirmation email
+								if (env.RESEND_API_KEY) {
+									const memberDoc = await firestoreRequest<FirestoreDocument>(
+										env.FIREBASE_PROJECT_ID,
+										`members/${memberId}`
+									);
+									const email = memberDoc.fields?.email?.stringValue;
+									const name = memberDoc.fields?.full_name?.stringValue;
+
+									// Get next payment date
+									const preapprovalInfo = await mpRequest<MpPreapprovalResponse>(
+										env.MERCADOPAGO_ACCESS_TOKEN,
+										`/preapproval/${preapprovalId}`
+									);
+
+									if (email && name) {
+										sendEmail(
+											env.RESEND_API_KEY,
+											email,
+											'subscription-payment',
+											{
+												nome: name,
+												valor: amount?.toFixed(2).replace('.', ',') || '0,00',
+												plano: plan || 'Clube',
+												cartao: cardLastFour ? `**** ${cardLastFour}` : 'N/A',
+												proxima_cobranca: preapprovalInfo.next_payment_date
+													? new Date(preapprovalInfo.next_payment_date).toLocaleDateString('pt-BR')
+													: 'N/A',
+											},
+											env.FROM_EMAIL
+										).catch(err => console.error('[WEBHOOK] Email error:', err));
+									}
+								}
+							}
+
+							console.log(`[WEBHOOK] Subscription payment approved for ${preapprovalId}`);
+						} else if (paymentStatus === 'rejected') {
+							const newFailedPayments = currentFailedPayments + 1;
+
+							// Update failed payments counter
+							await firestoreRequest(
+								env.FIREBASE_PROJECT_ID,
+								`subscriptions/${preapprovalId}?updateMask.fieldPaths=failed_payments`,
+								'PATCH',
+								{ fields: { failed_payments: { integerValue: String(newFailedPayments) } } }
+							);
+
+							// After 3 failed attempts, cancel subscription
+							if (newFailedPayments >= 3) {
+								// Cancel in Mercado Pago
+								await mpRequest<MpPreapprovalResponse>(
+									env.MERCADOPAGO_ACCESS_TOKEN,
+									`/preapproval/${preapprovalId}`,
+									'PUT',
+									{ status: 'cancelled' }
+								);
+
+								await firestoreRequest(
+									env.FIREBASE_PROJECT_ID,
+									`subscriptions/${preapprovalId}?updateMask.fieldPaths=status&updateMask.fieldPaths=cancelled_at`,
+									'PATCH',
+									{
+										fields: {
+											status: { stringValue: 'cancelled' },
+											cancelled_at: { timestampValue: now },
+										},
+									}
+								);
+
+								if (memberId) {
+									await firestoreRequest(
+										env.FIREBASE_PROJECT_ID,
+										`members/${memberId}?updateMask.fieldPaths=status&updateMask.fieldPaths=subscription_status&updateMask.fieldPaths=auto_renewal`,
+										'PATCH',
+										{
+											fields: {
+												status: { stringValue: 'expired' },
+												subscription_status: { stringValue: 'cancelled' },
+												auto_renewal: { booleanValue: false },
+											},
+										}
+									);
+								}
+
+								console.log(`[WEBHOOK] Subscription ${preapprovalId} cancelled after 3 failed payments`);
+							} else {
+								// Send payment failed email
+								if (env.RESEND_API_KEY && memberId) {
+									const memberDoc = await firestoreRequest<FirestoreDocument>(
+										env.FIREBASE_PROJECT_ID,
+										`members/${memberId}`
+									);
+									const email = memberDoc.fields?.email?.stringValue;
+									const name = memberDoc.fields?.full_name?.stringValue;
+
+									if (email && name) {
+										sendEmail(
+											env.RESEND_API_KEY,
+											email,
+											'subscription-payment-failed',
+											{
+												nome: name,
+												valor: amount?.toFixed(2).replace('.', ',') || '0,00',
+												motivo: paymentInfo.status_detail || 'Pagamento recusado',
+												tentativas_restantes: String(3 - newFailedPayments),
+											},
+											env.FROM_EMAIL
+										).catch(err => console.error('[WEBHOOK] Email error:', err));
+									}
+								}
+
+								console.log(`[WEBHOOK] Subscription payment failed for ${preapprovalId} (${newFailedPayments}/3)`);
+							}
+						}
+					} catch (error) {
+						console.error(`[WEBHOOK] Subscription payment error:`, error);
+						return jsonResponse({ error: 'Payment processing failed' }, 500, origin);
+					}
+
+					return new Response('OK', { status: 200 });
+				}
+
+				// Handle regular payment events (PIX, one-time payments)
 				if (type === 'payment' && data?.id) {
 					const paymentId = data.id;
 					console.log(`[WEBHOOK] Processing payment ${paymentId}`);

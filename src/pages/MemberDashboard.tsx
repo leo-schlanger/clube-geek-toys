@@ -11,7 +11,8 @@ import { UpgradeModal } from '../components/UpgradeModal'
 import { ProfileEditModal } from '../components/ProfileEditModal'
 import { MemberActivityHistory } from '../components/MemberActivityHistory'
 import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
-import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction } from '../types'
+import { SubscriptionManagement } from '../components/SubscriptionManagement'
+import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction, type Subscription } from '../types'
 import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
 import {
@@ -20,6 +21,11 @@ import {
   getRedemptionRules,
   formatPoints,
 } from '../lib/points'
+import {
+  getActiveSubscriptionByMemberId,
+  getSubscriptionStatusLabel,
+  formatNextPaymentDate,
+} from '../lib/subscriptions'
 import { toast } from 'sonner'
 import {
   CreditCard,
@@ -46,6 +52,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Repeat,
 } from 'lucide-react'
 
 type ModalType = 'renew' | 'upgrade' | 'profile' | null
@@ -61,6 +68,8 @@ export default function MemberDashboard() {
   const [loadingPoints, setLoadingPoints] = useState(false)
   const [showAllHistory, setShowAllHistory] = useState(false)
   const [showRedemptionRules, setShowRedemptionRules] = useState(false)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [showSubscription, setShowSubscription] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -78,12 +87,14 @@ export default function MemberDashboard() {
 
       if (memberData) {
         setLoadingPoints(true)
-        const [history, expiring] = await Promise.all([
+        const [history, expiring, sub] = await Promise.all([
           getPointsHistory(memberData.id, 20),
           getExpiringPoints(memberData.id),
+          getActiveSubscriptionByMemberId(memberData.id),
         ])
         setPointsHistory(history)
         setExpiringPoints(expiring)
+        setSubscription(sub)
         setLoadingPoints(false)
       }
     } catch (error) {
@@ -419,6 +430,63 @@ export default function MemberDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Subscription Status Card */}
+            {subscription && (
+              <Card className="hover:shadow-lg transition-shadow border-primary/20">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Repeat className="h-5 w-5 text-primary" />
+                      Assinatura Recorrente
+                    </CardTitle>
+                    <Badge variant={subscription.status === 'authorized' ? 'success' : subscription.status === 'paused' ? 'warning' : 'destructive'}>
+                      {getSubscriptionStatusLabel(subscription.status)}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Próxima cobrança</p>
+                      <p className="font-semibold">
+                        {subscription.status === 'authorized'
+                          ? formatNextPaymentDate(subscription)
+                          : subscription.status === 'paused'
+                          ? 'Pausada'
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowSubscription(!showSubscription)}
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Gerenciar
+                      {showSubscription ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+                    </Button>
+                  </div>
+
+                  {subscription.failedPayments > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                      <span className="text-sm text-yellow-600 dark:text-yellow-400">
+                        {subscription.failedPayments} tentativa(s) de cobrança falharam
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Subscription Management (expandable) */}
+            {showSubscription && subscription && (
+              <SubscriptionManagement
+                memberId={member.id}
+                onSubscriptionChange={fetchMemberData}
+              />
+            )}
 
             {/* Points Section */}
             <Card>

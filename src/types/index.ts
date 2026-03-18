@@ -244,3 +244,64 @@ export const POINTS_MULTIPLIER: Record<PlanType, number> = {
   gold: 2,
   black: 3,
 }
+
+// ============================================
+// SUBSCRIPTION TYPES
+// ============================================
+
+// Subscription status (from Mercado Pago)
+export type SubscriptionStatus = 'pending' | 'authorized' | 'paused' | 'cancelled'
+
+// Subscription frequency
+export type SubscriptionFrequencyType = 'months' | 'years'
+
+// Subscription interface (stored in Firestore 'subscriptions' collection)
+export interface Subscription {
+  id: string                           // = Mercado Pago preapproval_id
+  memberId: string
+  mercadoPagoId: string
+  status: SubscriptionStatus
+  plan: PlanType
+  frequencyType: SubscriptionFrequencyType
+  transactionAmount: number
+  nextPaymentDate?: string             // Next charge date
+  lastPaymentDate?: string             // Last successful payment
+  failedPayments: number               // Counter of consecutive failures (max 3)
+  cardLastFour?: string                // Last 4 digits of card
+  cardBrand?: string                   // Visa, Mastercard, etc
+  payerEmail: string
+  createdAt: string
+  cancelledAt?: string
+  pausedAt?: string
+}
+
+// Subscription payment record (for payment history)
+export interface SubscriptionPayment {
+  id: string
+  subscriptionId: string
+  memberId: string
+  amount: number
+  status: 'approved' | 'rejected' | 'pending'
+  paymentDate: string
+  mercadoPagoPaymentId: string
+  failureReason?: string
+}
+
+// Create subscription request
+export interface CreateSubscriptionRequest {
+  memberId: string
+  plan: PlanType
+  frequencyType: SubscriptionFrequencyType
+  payerEmail: string
+  cardToken: string
+}
+
+// Subscription management actions
+export type SubscriptionAction = 'pause' | 'resume' | 'cancel' | 'update-card'
+
+// Extended Member interface with subscription fields
+export interface MemberWithSubscription extends Member {
+  subscriptionId?: string
+  subscriptionStatus?: SubscriptionStatus
+  autoRenewal?: boolean
+}

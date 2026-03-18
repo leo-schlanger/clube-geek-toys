@@ -17,6 +17,8 @@ export const COLLECTIONS = {
   PAYMENTS: 'payments',
   POINTS: 'point_transactions',
   AUDIT_LOGS: 'audit_logs',
+  SUBSCRIPTIONS: 'subscriptions',
+  SUBSCRIPTION_PAYMENTS: 'subscription_payments',
 } as const
 
 // =============================================================================
