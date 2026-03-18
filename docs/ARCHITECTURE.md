@@ -9,20 +9,22 @@ O AuthContext utiliza `useSyncExternalStore` para sincronização com Firebase A
 ```typescript
 // Padrão: External Store
 function createAuthStore(firebaseAuth: Auth) {
-  let currentUser: User | null = null
-  const listeners = new Set<() => void>()
+  let currentUser: User | null = null;
+  const listeners = new Set<() => void>();
 
   // Subscribe ao Firebase
   onAuthStateChanged(firebaseAuth, (user) => {
-    currentUser = user
-    listeners.forEach((listener) => listener())
-  })
+    currentUser = user;
+    listeners.forEach((listener) => listener());
+  });
 
   return {
-    subscribe: (listener) => { /* ... */ },
+    subscribe: (listener) => {
+      /* ... */
+    },
     getSnapshot: () => ({ user: currentUser, isInitialized }),
     getServerSnapshot: () => ({ user: null, isInitialized: false }),
-  }
+  };
 }
 
 // Uso no componente
@@ -30,12 +32,13 @@ function useFirebaseAuth() {
   return useSyncExternalStore(
     authStore.subscribe,
     authStore.getSnapshot,
-    authStore.getServerSnapshot
-  )
+    authStore.getServerSnapshot,
+  );
 }
 ```
 
 **Por que este padrão?**
+
 - React 19 concurrent mode compatibility
 - Evita tearing (inconsistência de estado)
 - Performance otimizada para re-renders
@@ -47,20 +50,21 @@ Abstração de acesso a dados via `FirestoreManager`:
 ```typescript
 // src/lib/db-utils.ts
 class FirestoreManager {
-  static async getById<T>(collection, id, mapper): Promise<T | null>
-  static async findMany<T>(collection, constraints, mapper): Promise<T[]>
-  static async save<T>(collection, id, data): Promise<string | null>
-  static async update<T>(collection, id, data): Promise<boolean>
+  static async getById<T>(collection, id, mapper): Promise<T | null>;
+  static async findMany<T>(collection, constraints, mapper): Promise<T[]>;
+  static async save<T>(collection, id, data): Promise<string | null>;
+  static async update<T>(collection, id, data): Promise<boolean>;
 }
 
 // Uso específico
 // src/lib/members.ts
 export async function getMemberById(id: string): Promise<Member | null> {
-  return FirestoreManager.getById(COLLECTION, id, memberMapper)
+  return FirestoreManager.getById(COLLECTION, id, memberMapper);
 }
 ```
 
 **Benefícios:**
+
 - Centraliza lógica de acesso a dados
 - Facilita testes com mocks
 - Padroniza tratamento de erros
@@ -73,11 +77,11 @@ Conversão entre formatos de dados:
 // snake_case (Firestore) <-> camelCase (TypeScript)
 const memberMapper = (id: string, data: DocumentData): Member => ({
   id,
-  ...MapperUtils.toCamel(data)
-})
+  ...MapperUtils.toCamel(data),
+});
 
 // Inverso para escrita
-const firestoreData = MapperUtils.toSnake(memberData)
+const firestoreData = MapperUtils.toSnake(memberData);
 ```
 
 ### 4. Protected Route Pattern
@@ -125,30 +129,31 @@ Hooks encapsulam lógica de negócio:
 ```typescript
 // src/hooks/useMembers.ts
 export function useMembers(options = {}) {
-  const [members, setMembers] = useState<Member[]>([])
-  const [loading, setLoading] = useState(false)
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const fetchMembers = useCallback(async () => {
-    setLoading(true)
-    const data = await getAllMembers()
-    setMembers(data)
-    setLoading(false)
-  }, [])
+    setLoading(true);
+    const data = await getAllMembers();
+    setMembers(data);
+    setLoading(false);
+  }, []);
 
-  return { members, loading, refetch: fetchMembers }
+  return { members, loading, refetch: fetchMembers };
 }
 
 // src/hooks/usePoints.ts
 export function usePoints() {
   const addPoints = useCallback(async (memberId, value) => {
-    return withRetry(() => addPointsApi(memberId, value))
-  }, [])
+    return withRetry(() => addPointsApi(memberId, value));
+  }, []);
 
-  return { addPoints, redeemPoints, getBalance }
+  return { addPoints, redeemPoints, getBalance };
 }
 ```
 
 **Benefícios:**
+
 - Separa lógica de estado dos componentes
 - Reutilizável entre diferentes views
 - Facilita testes unitários
@@ -159,14 +164,14 @@ export function usePoints() {
 // src/lib/retry.ts
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  options: { maxRetries?: number, initialDelay?: number } = {}
+  options: { maxRetries?: number; initialDelay?: number } = {},
 ): Promise<T> {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await fn()
+      return await fn();
     } catch (error) {
-      if (!shouldRetry(error) || attempt === maxRetries - 1) throw error
-      await sleep(initialDelay * Math.pow(2, attempt))
+      if (!shouldRetry(error) || attempt === maxRetries - 1) throw error;
+      await sleep(initialDelay * Math.pow(2, attempt));
     }
   }
 }
@@ -174,8 +179,8 @@ export async function withRetry<T>(
 // Uso
 const id = await withRetry(
   () => FirestoreManager.save(COLLECTION, null, data),
-  { maxRetries: 3 }
-)
+  { maxRetries: 3 },
+);
 ```
 
 ## Fluxo de Dados
@@ -250,19 +255,90 @@ const id = await withRetry(
                 └──────────────┘    └─────────────┘
 ```
 
+### Assinatura Recorrente (Mercado Pago)
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    FLUXO DE CRIAÇÃO                         │
+└────────────────────────────────────────────────────────────┘
+
+┌──────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Payment  │───▶│ CardTokenization │───▶│  MercadoPago    │
+│  Modal   │    │  Form (MP SDK)   │    │  createToken()  │
+└──────────┘    └──────────────────┘    └────────┬────────┘
+                                                  │
+                         ┌────────────────────────┘
+                         ▼
+              ┌──────────────────┐    ┌─────────────────────┐
+              │  API Worker      │───▶│  Mercado Pago API   │
+              │ /subscription/   │    │  POST /preapproval  │
+              │    create        │    └──────────┬──────────┘
+              └──────────────────┘               │
+                                                 │
+                         ┌───────────────────────┘
+                         ▼
+              ┌──────────────────┐    ┌─────────────────────┐
+              │   Firestore      │    │   Member Updated    │
+              │  subscriptions/  │    │  subscription_id    │
+              │  {preapproval_id}│    │  subscription_status│
+              └──────────────────┘    └─────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│                  FLUXO DE COBRANÇA AUTOMÁTICA               │
+└────────────────────────────────────────────────────────────┘
+
+┌──────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│ Mercado Pago │───▶│  Webhook POST    │───▶│   API Worker    │
+│ (scheduler)  │    │  /webhook/mp     │    │  signature      │
+└──────────────┘    └──────────────────┘    │  validation     │
+                                            └────────┬────────┘
+                                                     │
+          ┌──────────────────────────────────────────┘
+          │
+          ▼ (subscription_authorized_payment)
+┌──────────────────┐    ┌─────────────────────────────────┐
+│ approved?        │    │                                 │
+│ ├── YES ─────────┼───▶│  Save to subscription_payments  │
+│ │                │    │  Reset failed_payments = 0      │
+│ │                │    │  Update member expiry_date      │
+│ │                │    │  Send subscription-payment email│
+│ │                │    └─────────────────────────────────┘
+│ │                │
+│ └── NO (rejected)│    ┌─────────────────────────────────┐
+│      │           │───▶│  Increment failed_payments      │
+│      │           │    │  If failed >= 3: auto-cancel    │
+│      │           │    │  Send payment-failed email      │
+└──────┴───────────┘    └─────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│                    GESTÃO DE ASSINATURA                     │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────┐
+│ SubscriptionMgmt   │
+│    Component       │
+├────────────────────┤
+│ [Pausar]    ──────▶│ PUT /subscription/:id/pause
+│ [Reativar]  ──────▶│ PUT /subscription/:id/resume
+│ [Cancelar]  ──────▶│ PUT /subscription/:id/cancel
+│ [Atualizar] ──────▶│ PUT /subscription/:id/update-card
+│ [Histórico] ──────▶│ GET subscription_payments (Firestore)
+└────────────────────┘
+```
+
 ## Decisões de Arquitetura
 
 ### Por que Firebase + Vercel?
 
-| Aspecto | Firebase | Vercel |
-|---------|----------|--------|
-| Auth | ✅ Suporte nativo | ❌ Precisa integrar |
-| Database | ✅ Firestore (real-time) | ❌ Não tem |
-| Hosting | ✅ Funciona mas limitado | ✅ Melhor para SPA |
-| Functions | ✅ Cloud Functions | ✅ Edge Functions |
-| Deploy | 😐 Manual | ✅ Auto via Git |
-| CDN | ✅ Global | ✅ Global (melhor) |
-| SSL | ✅ Automático | ✅ Automático |
+| Aspecto   | Firebase                 | Vercel              |
+| --------- | ------------------------ | ------------------- |
+| Auth      | ✅ Suporte nativo        | ❌ Precisa integrar |
+| Database  | ✅ Firestore (real-time) | ❌ Não tem          |
+| Hosting   | ✅ Funciona mas limitado | ✅ Melhor para SPA  |
+| Functions | ✅ Cloud Functions       | ✅ Edge Functions   |
+| Deploy    | 😐 Manual                | ✅ Auto via Git     |
+| CDN       | ✅ Global                | ✅ Global (melhor)  |
+| SSL       | ✅ Automático            | ✅ Automático       |
 
 **Conclusão:** Firebase para backend (auth + db), Vercel para frontend (melhor DX e CDN).
 
@@ -422,6 +498,7 @@ createRoot(document.getElementById('root')!).render(
 ```
 
 **Métricas monitoradas:**
+
 - LCP (Largest Contentful Paint)
 - FID (First Input Delay)
 - CLS (Cumulative Layout Shift)
@@ -432,27 +509,24 @@ createRoot(document.getElementById('root')!).render(
 
 ```typescript
 // Erros são logados no console
-console.error('[Firestore] Error:', error)
-console.error('[Auth] Sign in error:', error)
+console.error("[Firestore] Error:", error);
+console.error("[Auth] Sign in error:", error);
 ```
 
 ### Recomendação: Sentry
 
 ```typescript
 // Proposta de implementação
-import * as Sentry from '@sentry/react'
+import * as Sentry from "@sentry/react";
 
 Sentry.init({
   dsn: process.env.VITE_SENTRY_DSN,
   environment: process.env.VITE_ENVIRONMENT,
-  integrations: [
-    new Sentry.BrowserTracing(),
-    new Sentry.Replay(),
-  ],
-})
+  integrations: [new Sentry.BrowserTracing(), new Sentry.Replay()],
+});
 
 // Substituir console.error por:
-Sentry.captureException(error)
+Sentry.captureException(error);
 ```
 
 ## Testes
@@ -490,12 +564,12 @@ export const auth = {
   currentUser: null,
   onAuthStateChanged: vi.fn(),
   signInWithEmailAndPassword: vi.fn(),
-}
+};
 
 export const db = {
   collection: vi.fn(),
   doc: vi.fn(),
-}
+};
 ```
 
 ## Componentes UI
@@ -537,7 +611,30 @@ src/components/
 ├── VirtualTable.tsx       # Tabela virtualizada para grandes datasets
 ├── MembersTable.tsx       # Tabela de membros
 ├── MemberModal.tsx        # Modal de membro (CRUD)
-└── PaymentModal.tsx       # Modal de pagamento
+├── PaymentModal.tsx       # Modal de pagamento (PIX + Assinatura)
+├── CardTokenizationForm.tsx    # Tokenização de cartão (Mercado Pago SDK)
+└── SubscriptionManagement.tsx  # Gestão de assinatura recorrente
+```
+
+### Componentes de Assinatura
+
+```
+CardTokenizationForm.tsx
+├── Carrega MercadoPago.js SDK dinamicamente
+├── Visualização do cartão em tempo real
+├── Detecção de bandeira (Visa, Mastercard, Elo, etc)
+├── Validação de campos (número, validade, CVV, CPF)
+├── Tokenização via mp.createCardToken()
+└── Fallback mock para desenvolvimento
+
+SubscriptionManagement.tsx
+├── Banner do plano com gradiente personalizado
+├── Grid de informações (cartão, próxima cobrança, membro desde)
+├── Alertas de pagamentos falhados
+├── Botões de ação (pausar, reativar, cancelar)
+├── Histórico de cobranças com status
+├── Dialog de confirmação com ícones
+└── Dialog de atualização de cartão
 ```
 
 ### Hooks Personalizados
@@ -559,23 +656,27 @@ src/hooks/
 
 ```typescript
 // vite.config.ts
-import { VitePWA } from 'vite-plugin-pwa'
+import { VitePWA } from "vite-plugin-pwa";
 
 VitePWA({
-  registerType: 'autoUpdate',
+  registerType: "autoUpdate",
   manifest: {
-    name: 'Clube Geek & Toys',
-    short_name: 'Geek Club',
-    theme_color: '#7c3aed',
-    background_color: '#09090b',
-    display: 'standalone',
-    icons: [/* ... */],
+    name: "Clube Geek & Toys",
+    short_name: "Geek Club",
+    theme_color: "#7c3aed",
+    background_color: "#09090b",
+    display: "standalone",
+    icons: [
+      /* ... */
+    ],
   },
   workbox: {
-    globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff2}'],
-    runtimeCaching: [/* Google Fonts cache */],
+    globPatterns: ["**/*.{js,css,html,ico,png,jpg,svg,woff2}"],
+    runtimeCaching: [
+      /* Google Fonts cache */
+    ],
   },
-})
+});
 ```
 
 ### Funcionalidades

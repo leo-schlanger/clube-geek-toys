@@ -28,6 +28,16 @@
 - [x] 🆓 **Implementar rate limiting** ✅
 - [x] 🆓 **Adicionar verificação de email** ✅
 
+### Pagamentos
+
+- [x] 🆓 **Assinaturas recorrentes Mercado Pago** ✅ (Março 2026)
+  - Tokenização de cartão via MercadoPago.js SDK
+  - API de Preapproval para cobranças automáticas
+  - Webhook handlers para confirmação de pagamentos
+  - Gestão completa: pausar, reativar, cancelar, trocar cartão
+  - 10 templates de email para ciclo de vida da assinatura
+  - Cancelamento automático após 3 falhas consecutivas
+
 ---
 
 ## 🟠 ALTO - Concluído ✅
@@ -161,9 +171,10 @@
   - Requer Admin SDK em Cloud Function
   - Atualmente usando soft-delete (gratuito)
 
-- [ ] 💰 **Webhooks de pagamento**
-  - Processamento automático do Mercado Pago
-  - Atualmente manual
+- [x] 🆓 **Webhooks de pagamento** ✅
+  - Implementado via Cloudflare Workers (gratuito)
+  - Processa: payment, subscription_preapproval, subscription_authorized_payment
+  - Signature verification com HMAC-SHA256
 
 ---
 
@@ -225,6 +236,7 @@
 6. ~~exhaustive-deps warnings~~ ✅ Resolvido - AdminDashboard e MemberDashboard
 7. **vendor-charts bundle (421KB)** - Já está lazy loaded via ReportsTab, carrega apenas ao acessar relatórios
 8. ~~api-worker tem erros de lint~~ ✅ Resolvido - Adicionadas interfaces TypeScript, removido uso de `any`
+9. ~~Assinaturas recorrentes~~ ✅ Resolvido - Implementado com Mercado Pago Preapproval API
 
 ## Dependências para Monitorar
 

@@ -7,29 +7,31 @@ Sistema de gestão de clube de assinaturas para a loja Geek & Toys. Permite gere
 ## Stack Tecnológica
 
 ### Frontend
-| Tecnologia | Versão | Uso |
-|------------|--------|-----|
-| React | 19.2.0 | UI Framework |
-| TypeScript | 5.8.3 | Tipagem estática |
-| Vite | 7.3.1 | Build tool |
-| TailwindCSS | 4.1.3 | Estilização |
-| React Router | 7.13.1 | Roteamento SPA |
-| TanStack Query | 5.90.21 | Cache e estado servidor |
-| React Hook Form | 7.71.2 | Formulários |
-| Zod | 3.25.2 | Validação de schemas |
-| Framer Motion | 12.11.4 | Animações |
-| Lucide React | 0.575.0 | Ícones |
-| Sonner | 2.0.5 | Notificações toast |
+
+| Tecnologia      | Versão  | Uso                     |
+| --------------- | ------- | ----------------------- |
+| React           | 19.2.0  | UI Framework            |
+| TypeScript      | 5.8.3   | Tipagem estática        |
+| Vite            | 7.3.1   | Build tool              |
+| TailwindCSS     | 4.1.3   | Estilização             |
+| React Router    | 7.13.1  | Roteamento SPA          |
+| TanStack Query  | 5.90.21 | Cache e estado servidor |
+| React Hook Form | 7.71.2  | Formulários             |
+| Zod             | 3.25.2  | Validação de schemas    |
+| Framer Motion   | 12.11.4 | Animações               |
+| Lucide React    | 0.575.0 | Ícones                  |
+| Sonner          | 2.0.5   | Notificações toast      |
 
 ### Backend/Serviços
-| Serviço | Uso |
-|---------|-----|
-| Firebase Auth | Autenticação de usuários |
-| Firebase Firestore | Banco de dados NoSQL |
-| Vercel | Hosting do frontend |
-| Cloudflare Workers | API para emails e webhooks |
-| Mercado Pago | Processamento de pagamentos |
-| Brasil API | Validação de CPF |
+
+| Serviço            | Uso                         |
+| ------------------ | --------------------------- |
+| Firebase Auth      | Autenticação de usuários    |
+| Firebase Firestore | Banco de dados NoSQL        |
+| Vercel             | Hosting do frontend         |
+| Cloudflare Workers | API para emails e webhooks  |
+| Mercado Pago       | Processamento de pagamentos |
+| Brasil API         | Validação de CPF            |
 
 ## Arquitetura
 
@@ -127,17 +129,20 @@ clube-geek-toys/
 │   │   ├── ErrorBoundary.tsx   # Tratamento de erros
 │   │   ├── MemberModal.tsx     # Modal de membro
 │   │   ├── UserModal.tsx       # Modal de usuário do sistema
-│   │   ├── PaymentModal.tsx    # Modal de pagamento
+│   │   ├── PaymentModal.tsx    # Modal de pagamento (PIX + Assinatura)
 │   │   ├── PointsModal.tsx     # Modal de pontos
 │   │   ├── MembersTable.tsx    # Tabela de membros
-│   │   └── QRScanner.tsx       # Scanner QR para PDV
+│   │   ├── QRScanner.tsx       # Scanner QR para PDV
+│   │   ├── CardTokenizationForm.tsx  # Tokenização de cartão (MP SDK)
+│   │   └── SubscriptionManagement.tsx # Gestão de assinatura
 │   │
 │   ├── lib/                    # Utilitários e serviços
 │   │   ├── firebase.ts         # Configuração Firebase
 │   │   ├── db-utils.ts         # CRUD genérico Firestore
 │   │   ├── members.ts          # Operações de membros
 │   │   ├── points.ts           # Sistema de pontos
-│   │   ├── payments.ts         # Processamento de pagamentos
+│   │   ├── payments.ts         # Processamento de pagamentos (PIX, checkout)
+│   │   ├── subscriptions.ts    # Assinaturas recorrentes (Mercado Pago)
 │   │   ├── reports.ts          # Relatórios e analytics
 │   │   ├── email.ts            # Envio de emails
 │   │   ├── logs.ts             # Audit logs
@@ -172,11 +177,11 @@ clube-geek-toys/
 
 ### Tipos de Usuário
 
-| Role | Acesso | Descrição |
-|------|--------|-----------|
-| `admin` | Total | Administrador do sistema |
-| `seller` | PDV | Vendedor - acesso ao ponto de venda |
-| `member` | Área do membro | Assinante do clube |
+| Role     | Acesso         | Descrição                           |
+| -------- | -------------- | ----------------------------------- |
+| `admin`  | Total          | Administrador do sistema            |
+| `seller` | PDV            | Vendedor - acesso ao ponto de venda |
+| `member` | Área do membro | Assinante do clube                  |
 
 ### Fluxo de Autenticação
 
@@ -216,6 +221,7 @@ clube-geek-toys/
 ## Modelos de Dados (Firestore)
 
 ### Collection: `users`
+
 ```typescript
 {
   email: string
@@ -226,6 +232,7 @@ clube-geek-toys/
 ```
 
 ### Collection: `members`
+
 ```typescript
 {
   user_id: string          // Firebase Auth UID
@@ -244,6 +251,7 @@ clube-geek-toys/
 ```
 
 ### Collection: `payments`
+
 ```typescript
 {
   member_id: string
@@ -256,7 +264,45 @@ clube-geek-toys/
 }
 ```
 
+### Collection: `subscriptions`
+
+```typescript
+{
+  id: string                    // = Mercado Pago preapproval_id
+  member_id: string
+  mercado_pago_id: string
+  status: 'pending' | 'authorized' | 'paused' | 'cancelled'
+  plan: 'silver' | 'gold' | 'black'
+  frequency_type: 'months' | 'years'
+  transaction_amount: number
+  next_payment_date?: string
+  last_payment_date?: string
+  failed_payments: number       // Contador (max 3 antes de cancelar)
+  card_last_four?: string
+  card_brand?: string
+  payer_email: string
+  created_at: string
+  cancelled_at?: string
+  paused_at?: string
+}
+```
+
+### Collection: `subscription_payments`
+
+```typescript
+{
+  subscription_id: string
+  member_id: string
+  amount: number
+  status: 'approved' | 'rejected' | 'pending'
+  payment_date: string
+  mercado_pago_payment_id?: string
+  failure_reason?: string
+}
+```
+
 ### Collection: `point_transactions`
+
 ```typescript
 {
   member_id: string
@@ -272,6 +318,7 @@ clube-geek-toys/
 ```
 
 ### Collection: `audit_logs`
+
 ```typescript
 {
   action: string
@@ -285,13 +332,14 @@ clube-geek-toys/
 
 ## Planos de Assinatura
 
-| Plano | Mensal | Anual | Multiplicador de Pontos |
-|-------|--------|-------|------------------------|
-| Silver | R$ 29,90 | R$ 299,00 | 1x |
-| Gold | R$ 49,90 | R$ 499,00 | 1.5x |
-| Black | R$ 79,90 | R$ 799,00 | 2x |
+| Plano  | Mensal   | Anual     | Multiplicador de Pontos |
+| ------ | -------- | --------- | ----------------------- |
+| Silver | R$ 29,90 | R$ 299,00 | 1x                      |
+| Gold   | R$ 49,90 | R$ 499,00 | 1.5x                    |
+| Black  | R$ 79,90 | R$ 799,00 | 2x                      |
 
 ### Cálculo de Pontos
+
 ```
 pontos = (valor_compra / 10) * multiplicador_plano
 ```
@@ -301,6 +349,7 @@ Exemplo: Compra de R$ 100,00 no plano Gold = 15 pontos
 ## Segurança
 
 ### Firestore Rules
+
 - Default deny para todas as collections
 - Leitura de `users`: próprio usuário ou admin
 - Criação de `users`: self-registration (role=member) ou admin
@@ -309,6 +358,7 @@ Exemplo: Compra de R$ 100,00 no plano Gold = 15 pontos
 - Transactions e logs são imutáveis
 
 ### Headers de Segurança (firebase.json)
+
 - X-Content-Type-Options: nosniff
 - X-Frame-Options: DENY
 - X-XSS-Protection: 1; mode=block
@@ -355,25 +405,55 @@ npm run deploy:firebase  # Deploy regras Firebase
 
 O sistema detecta automaticamente o subdomínio para mostrar interfaces diferentes:
 
-| Subdomínio | Interface | Roles Permitidos |
-|------------|-----------|------------------|
-| `admin.*` ou `adm.*` | Painel Admin | admin, seller |
-| `club.*` ou outros | Área do Membro | member |
+| Subdomínio           | Interface      | Roles Permitidos |
+| -------------------- | -------------- | ---------------- |
+| `admin.*` ou `adm.*` | Painel Admin   | admin, seller    |
+| `club.*` ou outros   | Área do Membro | member           |
 
 Em desenvolvimento, use `?subdomain=adm` para simular.
 
 ## Integrações Externas
 
 ### Mercado Pago
+
 - SDK: `@mercadopago/sdk-react`
 - Métodos: PIX, Cartão de Crédito
 - Webhooks processados via Cloudflare Workers
 
 ### Brasil API
+
 - Validação de CPF
 - Endpoint: `https://brasilapi.com.br/api/cpf/v1/{cpf}`
 
-### Cloudflare Workers
-- API para envio de emails
-- Processamento de webhooks de pagamento
-- Endpoint configurável via `VITE_API_URL`
+### Cloudflare Workers (api-worker)
+
+**URL:** `https://api-worker.leoschlanger.workers.dev`
+
+| Endpoint                        | Método | Descrição                    |
+| ------------------------------- | ------ | ---------------------------- |
+| `/health`                       | GET    | Health check                 |
+| `/pix/create`                   | POST   | Gera QR Code PIX             |
+| `/checkout/create`              | POST   | Cria preferência de checkout |
+| `/payment/status/:id`           | GET    | Verifica status de pagamento |
+| `/subscription/create`          | POST   | Cria assinatura recorrente   |
+| `/subscription/:id`             | GET    | Detalhes da assinatura       |
+| `/subscription/:id/pause`       | PUT    | Pausa assinatura             |
+| `/subscription/:id/resume`      | PUT    | Reativa assinatura           |
+| `/subscription/:id/cancel`      | PUT    | Cancela assinatura           |
+| `/subscription/:id/update-card` | PUT    | Atualiza cartão              |
+| `/webhook/mercadopago`          | POST   | Processa webhooks do MP      |
+| `/email/send`                   | POST   | Envia emails (Resend)        |
+
+**Webhooks Processados:**
+
+- `payment` - Pagamentos PIX/cartão únicos
+- `subscription_preapproval` - Status da assinatura
+- `subscription_authorized_payment` - Cobranças recorrentes
+
+**Templates de Email (10):**
+
+- welcome, payment-confirmed, payment-failed
+- renewal-reminder, points-expiring
+- subscription-created, subscription-payment
+- subscription-paused, subscription-cancelled
+- subscription-payment-failed
