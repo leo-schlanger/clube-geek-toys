@@ -8,12 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.jpg', 'favicon.ico'],
+      includeAssets: ['logo.jpg', 'favicon.ico', 'og-image.jpg'],
       manifest: {
         name: 'Clube Geek & Toys',
         short_name: 'Geek Club',
         description: 'Programa de fidelidade Geek & Toys',
-        theme_color: '#7c3aed',
+        theme_color: '#d4a520',
         background_color: '#09090b',
         display: 'standalone',
         orientation: 'portrait',
