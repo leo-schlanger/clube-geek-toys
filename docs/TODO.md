@@ -53,6 +53,14 @@
 - [x] 🆓 **Configurar Vercel Analytics** ✅ (plano gratuito)
 - [x] 🆓 **Criar custom hooks** ✅
 - [x] 🆓 **Adicionar retry com exponential backoff** ✅
+- [x] 🆓 **Sistema de Email com Resend** ✅ (Março 2026)
+  - Domínio verificado: `geeketoys.com.br`
+  - 10 templates de email (welcome, payment, subscription, etc.)
+  - Integrado ao Cloudflare Worker
+- [x] 🆓 **Webhooks Mercado Pago** ✅ (Março 2026)
+  - Configurados no painel do MP
+  - Eventos: payment, subscription_preapproval, subscription_authorized_payment
+  - Verificação HMAC-SHA256
 
 ---
 
@@ -67,6 +75,12 @@
 - [x] 🆓 **Exportação CSV** ✅
 - [x] 🆓 **Detecção offline** ✅ - Banner de reconexão automático
 - [x] 🆓 **Acessibilidade (A11y)** ✅ - Skip link, ARIA attributes
+- [x] 🆓 **SEO Completo** ✅ (Março 2026)
+  - Open Graph (Facebook/WhatsApp)
+  - Twitter Cards
+  - Schema.org JSON-LD
+  - Meta tags otimizadas
+  - Canonical URL
 
 ### Code Quality (Concluído)
 
@@ -91,7 +105,7 @@
 
 - [x] 🆓 **Infraestrutura de testes** ✅
   - Vitest + React Testing Library configurados
-  - 217 testes unitários passando
+  - 237 testes unitários passando
   - Cobertura: ~11% (utilitários e hooks com ~100%)
   - `npm run test` / `npm run test:coverage`
 
@@ -170,11 +184,7 @@
 - [ ] 💰 **Deletar usuário do Firebase Auth**
   - Requer Admin SDK em Cloud Function
   - Atualmente usando soft-delete (gratuito)
-
-- [x] 🆓 **Webhooks de pagamento** ✅
-  - Implementado via Cloudflare Workers (gratuito)
-  - Processa: payment, subscription_preapproval, subscription_authorized_payment
-  - Signature verification com HMAC-SHA256
+  - **Alternativa atual:** Cloudflare Workers para webhooks (gratuito) ✅
 
 ---
 
@@ -218,13 +228,16 @@
 
 ## Stack Atual (Gratuita)
 
-| Serviço          | Plano | Limite Gratuito                    |
-| ---------------- | ----- | ---------------------------------- |
-| Firebase Auth    | Spark | Ilimitado                          |
-| Firestore        | Spark | 50k leituras/dia, 20k escritas/dia |
-| Vercel Hosting   | Hobby | 100GB bandwidth/mês                |
-| Vercel Analytics | Hobby | 2.5k eventos/mês                   |
-| GitHub           | Free  | Repos privados ilimitados          |
+| Serviço            | Plano | Limite Gratuito                    |
+| ------------------ | ----- | ---------------------------------- |
+| Firebase Auth      | Spark | Ilimitado                          |
+| Firestore          | Spark | 50k leituras/dia, 20k escritas/dia |
+| Vercel Hosting     | Hobby | 100GB bandwidth/mês                |
+| Vercel Analytics   | Hobby | 2.5k eventos/mês                   |
+| GitHub             | Free  | Repos privados ilimitados          |
+| Cloudflare Workers | Free  | 100k requests/dia                  |
+| Resend (Email)     | Free  | 3k emails/mês                      |
+| Mercado Pago       | Free  | Taxa por transação apenas          |
 
 ## Débitos Técnicos
 
