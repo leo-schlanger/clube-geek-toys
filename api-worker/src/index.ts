@@ -495,11 +495,16 @@ async function verifyWebhookSignature(
 	xSignature: string | null,
 	xRequestId: string | null,
 	dataId: string | null,
-	secret: string
+	secret: string,
+	isProduction: boolean
 ): Promise<boolean> {
-	// If no secret configured, skip verification (development mode)
+	// CRITICAL: In production, webhook secret is REQUIRED
 	if (!secret) {
-		console.warn('Webhook secret not configured - skipping verification');
+		if (isProduction) {
+			console.error('SECURITY ERROR: Webhook secret not configured in production - rejecting request');
+			return false;
+		}
+		console.warn('⚠️ DEV MODE: Webhook secret not configured - skipping verification (NOT SAFE FOR PRODUCTION)');
 		return true;
 	}
 
@@ -607,6 +612,12 @@ export default {
 					return jsonResponse({ error: 'Missing required fields: amount, payer_email' }, 400, origin);
 				}
 
+				// CRITICAL: Validate external_reference (memberId) is provided
+				// Without this, webhook cannot activate the member after payment
+				if (!external_reference || external_reference.trim() === '') {
+					return jsonResponse({ error: 'Missing required field: external_reference (memberId)' }, 400, origin);
+				}
+
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
 					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
 				}
@@ -655,6 +666,12 @@ export default {
 
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
 					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
+				}
+
+				// CRITICAL: Validate external_reference (memberId) is provided
+				// Without this, webhook cannot activate the member after payment
+				if (!external_reference || external_reference.trim() === '') {
+					return jsonResponse({ error: 'Missing required field: external_reference (memberId)' }, 400, origin);
 				}
 
 				// Generate idempotency key
@@ -720,60 +737,168 @@ export default {
 
 				const dataId = url.searchParams.get('data.id') || body?.data?.id;
 
-				if (!verifyWebhookSignature(xSignature, xRequestId, dataId ?? null, env.MERCADOPAGO_WEBHOOK_SECRET || '')) {
+				// Detect production environment (check if WORKER_URL contains localhost or dev domains)
+				const isProduction = env.WORKER_URL ?
+					!env.WORKER_URL.includes('localhost') && !env.WORKER_URL.includes('127.0.0.1') :
+					true;
+
+				const signatureValid = await verifyWebhookSignature(
+					xSignature,
+					xRequestId,
+					dataId ?? null,
+					env.MERCADOPAGO_WEBHOOK_SECRET || '',
+					isProduction
+				);
+
+				if (!signatureValid) {
+					console.error(`Webhook signature verification failed for payment ${dataId}`);
 					return new Response('Unauthorized', { status: 401 });
 				}
 
 				const { type, data } = body;
 
 				if (type === 'payment' && data?.id) {
-					const paymentInfo = await mpRequest<MpPaymentResponse>(env.MERCADOPAGO_ACCESS_TOKEN, `/v1/payments/${data.id}`);
+					const paymentId = data.id;
+					console.log(`[WEBHOOK] Processing payment ${paymentId}`);
+
+					// IDEMPOTENCY CHECK: Check if this webhook was already processed
+					try {
+						const existingPayment = await firestoreRequest<FirestoreDocument>(
+							env.FIREBASE_PROJECT_ID,
+							`payments/${paymentId}`
+						);
+
+						const existingStatus = existingPayment.fields?.status?.stringValue;
+						const webhookProcessedAt = existingPayment.fields?.webhook_processed_at?.timestampValue;
+
+						// If already processed as 'paid', skip to avoid duplicate processing
+						if (existingStatus === 'paid' && webhookProcessedAt) {
+							console.log(`[WEBHOOK] Payment ${paymentId} already processed at ${webhookProcessedAt} - skipping`);
+							return new Response('OK - Already processed', { status: 200 });
+						}
+					} catch {
+						// Payment doesn't exist in Firestore yet, continue processing
+						console.log(`[WEBHOOK] Payment ${paymentId} not found in Firestore, will create`);
+					}
+
+					// Fetch payment details from Mercado Pago
+					const paymentInfo = await mpRequest<MpPaymentResponse>(env.MERCADOPAGO_ACCESS_TOKEN, `/v1/payments/${paymentId}`);
 
 					const memberId = paymentInfo.external_reference;
 					const status = paymentInfo.status;
+					const amount = paymentInfo.transaction_amount;
 
-					// Update payment in Firestore
-					const paymentStatus = status === 'approved' ? 'paid' : status === 'pending' ? 'pending' : 'failed';
+					console.log(`[WEBHOOK] Payment ${paymentId}: status=${status}, memberId=${memberId}, amount=${amount}`);
 
+					// Map Mercado Pago status to our status
+					const paymentStatus = status === 'approved' ? 'paid' :
+						status === 'pending' || status === 'in_process' ? 'pending' :
+						status === 'refunded' ? 'refunded' : 'failed';
+
+					// Update payment in Firestore with webhook_processed_at for idempotency
+					const now = new Date().toISOString();
 					await firestoreRequest(
 						env.FIREBASE_PROJECT_ID,
-						`payments/${data.id}?updateMask.fieldPaths=status&updateMask.fieldPaths=paid_at`,
+						`payments/${paymentId}?updateMask.fieldPaths=status&updateMask.fieldPaths=paid_at&updateMask.fieldPaths=webhook_processed_at&updateMask.fieldPaths=mercadopago_status`,
 						'PATCH',
 						{
 							fields: {
 								status: { stringValue: paymentStatus },
-								...(status === 'approved' && { paid_at: { timestampValue: new Date().toISOString() } }),
+								mercadopago_status: { stringValue: status },
+								webhook_processed_at: { timestampValue: now },
+								...(status === 'approved' && { paid_at: { timestampValue: now } }),
 							},
 						}
 					);
 
+					console.log(`[WEBHOOK] Payment ${paymentId} updated to status: ${paymentStatus}`);
+
 					// If approved, activate member
 					if (status === 'approved' && memberId) {
 						try {
+							// Fetch member data
 							const memberData = await firestoreRequest<FirestoreDocument>(env.FIREBASE_PROJECT_ID, `members/${memberId}`);
-							const expiryDate = new Date();
-							const paymentType = memberData.fields?.payment_type?.stringValue || 'monthly';
 
-							if (paymentType === 'annual') {
-								expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+							// Check if member is already active (idempotency)
+							const currentMemberStatus = memberData.fields?.status?.stringValue;
+							if (currentMemberStatus === 'active') {
+								console.log(`[WEBHOOK] Member ${memberId} already active - skipping activation`);
 							} else {
-								expiryDate.setMonth(expiryDate.getMonth() + 1);
-							}
+								// Calculate expiry date based on payment type
+								const expiryDate = new Date();
+								const paymentType = memberData.fields?.payment_type?.stringValue || 'monthly';
 
-							await firestoreRequest(
-								env.FIREBASE_PROJECT_ID,
-								`members/${memberId}?updateMask.fieldPaths=status&updateMask.fieldPaths=expiry_date`,
-								'PATCH',
-								{
-									fields: {
-										status: { stringValue: 'active' },
-										expiry_date: { stringValue: expiryDate.toISOString().split('T')[0] },
-									},
+								if (paymentType === 'annual') {
+									expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+								} else {
+									expiryDate.setMonth(expiryDate.getMonth() + 1);
 								}
-							);
+
+								const expiryDateStr = expiryDate.toISOString().split('T')[0];
+								const startDateStr = new Date().toISOString().split('T')[0];
+
+								// Activate member
+								await firestoreRequest(
+									env.FIREBASE_PROJECT_ID,
+									`members/${memberId}?updateMask.fieldPaths=status&updateMask.fieldPaths=expiry_date&updateMask.fieldPaths=start_date&updateMask.fieldPaths=activated_at&updateMask.fieldPaths=activated_by_payment`,
+									'PATCH',
+									{
+										fields: {
+											status: { stringValue: 'active' },
+											expiry_date: { stringValue: expiryDateStr },
+											start_date: { stringValue: startDateStr },
+											activated_at: { timestampValue: now },
+											activated_by_payment: { stringValue: paymentId },
+										},
+									}
+								);
+
+								console.log(`[WEBHOOK] Member ${memberId} activated successfully. Expiry: ${expiryDateStr}`);
+
+								// Clear pending_payment from member
+								try {
+									await firestoreRequest(
+										env.FIREBASE_PROJECT_ID,
+										`members/${memberId}?updateMask.fieldPaths=pending_payment`,
+										'PATCH',
+										{
+											fields: {
+												pending_payment: { nullValue: null },
+											},
+										}
+									);
+								} catch {
+									// Ignore error if pending_payment field doesn't exist
+								}
+
+								// Send confirmation email (non-blocking)
+								if (env.RESEND_API_KEY) {
+									const memberEmail = memberData.fields?.email?.stringValue;
+									const memberName = memberData.fields?.full_name?.stringValue;
+									const plan = memberData.fields?.plan?.stringValue;
+
+									if (memberEmail && memberName) {
+										sendEmail(
+											env.RESEND_API_KEY,
+											memberEmail,
+											'payment-confirmed',
+											{
+												nome: memberName,
+												valor: amount?.toFixed(2).replace('.', ',') || '0,00',
+												plano: plan || 'Clube',
+												validade: expiryDateStr,
+											}
+										).catch(err => console.error('[WEBHOOK] Email send error:', err));
+									}
+								}
+							}
 						} catch (e) {
-							console.error('Member activation error:', e);
+							console.error(`[WEBHOOK] Member activation error for ${memberId}:`, e);
+							// Return 500 to trigger webhook retry from Mercado Pago
+							return jsonResponse({ error: 'Member activation failed' }, 500, origin);
 						}
+					} else if (status === 'approved' && !memberId) {
+						console.error(`[WEBHOOK] CRITICAL: Payment ${paymentId} approved but no memberId (external_reference) found!`);
 					}
 				}
 
@@ -1256,7 +1381,7 @@ export default {
 								const expiryDate = doc.document.fields?.expiry_date?.stringValue;
 								const memberId = doc.document.name.split('/').pop();
 
-								if (email && fullName) {
+								if (email && fullName && expiryDate) {
 									const result = await sendEmail(
 										env.RESEND_API_KEY,
 										email,

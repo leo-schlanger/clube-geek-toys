@@ -218,8 +218,24 @@ export async function generatePixPayment(
   payerEmail: string,
   memberId: string
 ): Promise<PixPaymentData | null> {
+  // CRITICAL: Validate memberId is provided
+  if (!memberId || memberId.trim() === '') {
+    paymentLogger.error('Cannot create PIX payment: memberId is required')
+    return null
+  }
+
   if (!PAYMENT_API_URL) {
-    paymentLogger.warn('Payment API not configured. Using simulation mode.')
+    // SECURITY: Only allow simulation in development mode
+    const isDevelopment = import.meta.env.VITE_ENVIRONMENT === 'development' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1'
+
+    if (!isDevelopment) {
+      paymentLogger.error('CRITICAL: Payment API not configured in production!')
+      return null
+    }
+
+    paymentLogger.warn('⚠️ DEV MODE: Payment API not configured. Using simulation mode.')
     return generatePixPaymentSimulation(amount, description, memberId)
   }
 
