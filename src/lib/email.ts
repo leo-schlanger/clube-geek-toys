@@ -5,6 +5,34 @@
 import { logger } from './logger'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-worker.leoschlanger.workers.dev'
+const DEFAULT_TIMEOUT = 10000 // 10 seconds
+
+/**
+ * Fetch with timeout support
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeout: number = DEFAULT_TIMEOUT
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout')
+    }
+    throw error
+  }
+}
 
 export type EmailTemplate =
   | 'welcome'
@@ -12,6 +40,7 @@ export type EmailTemplate =
   | 'payment-failed'
   | 'renewal-reminder'
   | 'points-expiring'
+  | 'verify-email'
 
 export interface EmailVariables {
   nome?: string
@@ -24,6 +53,7 @@ export interface EmailVariables {
   dashboard_url?: string
   retry_url?: string
   renew_url?: string
+  verification_link?: string
 }
 
 export interface SendEmailParams {
@@ -50,7 +80,7 @@ export interface EmailTemplateInfo {
  */
 export async function sendEmail(params: SendEmailParams): Promise<EmailResponse> {
   try {
-    const response = await fetch(`${API_URL}/email/send`, {
+    const response = await fetchWithTimeout(`${API_URL}/email/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +122,9 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResponse>
  */
 export async function getEmailTemplates(): Promise<EmailTemplateInfo[]> {
   try {
-    const response = await fetch(`${API_URL}/email/templates`)
+    const response = await fetchWithTimeout(`${API_URL}/email/templates`, {
+      method: 'GET',
+    })
     const data = await response.json()
 
     if (!response.ok) {
@@ -212,4 +244,86 @@ export async function sendPointsExpiringEmail(
     },
     memberId,
   })
+}
+
+/**
+ * Send verification email via Worker (custom template)
+ */
+export async function sendVerificationEmail(
+  email: string,
+  uid: string,
+  name?: string
+): Promise<EmailResponse> {
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/auth/send-verification-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        uid,
+        name,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to send verification email',
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Verification email sent',
+    }
+  } catch (error: unknown) {
+    logger.error('Verification email error:', error)
+    const err = error as { message?: string }
+    return {
+      success: false,
+      error: err.message || 'Network error',
+    }
+  }
+}
+
+/**
+ * Verify email token via Worker
+ */
+export async function verifyEmailToken(
+  token: string
+): Promise<{ success: boolean; uid?: string; error?: string }> {
+  try {
+    const response = await fetchWithTimeout(`${API_URL}/auth/verify-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Verification failed',
+      }
+    }
+
+    return {
+      success: true,
+      uid: data.uid,
+    }
+  } catch (error: unknown) {
+    logger.error('Email verification error:', error)
+    const err = error as { message?: string }
+    return {
+      success: false,
+      error: err.message || 'Network error',
+    }
+  }
 }

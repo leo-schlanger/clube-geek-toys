@@ -17,6 +17,7 @@ import { PaymentModal } from '../components/PaymentModal'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency, validateCPF } from '../lib/utils'
 import { createMember, isCPFRegistered, updateMember } from '../lib/members'
+import { sendWelcomeEmail, sendPaymentConfirmedEmail } from '../lib/email'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -62,6 +63,7 @@ export default function Register() {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [createdMemberId, setCreatedMemberId] = useState<string | null>(null)
   const [memberEmail, setMemberEmail] = useState<string>('')
+  const [memberName, setMemberName] = useState<string>('')
   const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
   const [validatingCpf, setValidatingCpf] = useState(false)
   const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
@@ -185,6 +187,7 @@ export default function Register() {
           if (member) {
             setCreatedMemberId(member.id)
             setMemberEmail(member.email)
+            setMemberName(sanitizedData.fullName)
           }
         } catch (memberError) {
           logger.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
@@ -204,7 +207,7 @@ export default function Register() {
   }
 
   /**
-   * Handle successful payment - updates member status to active
+   * Handle successful payment - updates member status to active and sends emails
    */
   async function handlePaymentSuccess() {
     setShowPaymentModal(false)
@@ -219,17 +222,65 @@ export default function Register() {
         expiryDate.setFullYear(expiryDate.getFullYear() + 1)
       }
 
-      // Update member status to active
-      const success = await updateMember(createdMemberId, {
-        status: 'active',
-        startDate: now.toISOString().split('T')[0],
-        expiryDate: expiryDate.toISOString().split('T')[0],
-      })
+      const expiryDateStr = expiryDate.toISOString().split('T')[0]
+
+      // Update member status to active with retry
+      let success = false
+      let retryCount = 0
+      const maxRetries = 3
+
+      while (!success && retryCount < maxRetries) {
+        success = await updateMember(createdMemberId, {
+          status: 'active',
+          startDate: now.toISOString().split('T')[0],
+          expiryDate: expiryDateStr,
+        })
+
+        if (!success) {
+          retryCount++
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
+          }
+        }
+      }
 
       if (success) {
         toast.success('Pagamento confirmado! Bem-vindo ao Clube Geek & Toys!')
+
+        // Send confirmation emails (non-blocking)
+        const email = memberEmail
+        const name = memberName || 'Membro'
+        const planName = PLANS[selectedPlan].name
+
+        // Send payment confirmation email
+        sendPaymentConfirmedEmail(
+          email,
+          name,
+          price,
+          planName,
+          expiryDateStr,
+          createdMemberId
+        ).catch(err => logger.error('Erro ao enviar email de confirmação:', err))
+
+        // Send welcome email
+        sendWelcomeEmail(
+          email,
+          name,
+          planName,
+          createdMemberId
+        ).catch(err => logger.error('Erro ao enviar email de boas-vindas:', err))
       } else {
-        toast.warning('Pagamento recebido, mas houve um erro ao ativar. Entre em contato com o suporte.')
+        // After all retries failed, show error with manual retry option
+        toast.error('Pagamento recebido, mas houve um erro ao ativar sua conta.', {
+          description: 'Entre em contato com o suporte ou tente fazer login novamente.',
+          duration: 10000,
+          action: {
+            label: 'Tentar novamente',
+            onClick: () => handlePaymentSuccess(),
+          },
+        })
+        // Don't navigate - let user retry
+        return
       }
     } else {
       toast.success('Pagamento confirmado! Bem-vindo ao clube!')

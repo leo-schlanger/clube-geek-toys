@@ -14,13 +14,12 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  sendEmailVerification,
   type User,
-  type ActionCodeSettings,
 } from 'firebase/auth'
 import { doc, setDoc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import { authLogger } from '../lib/logger'
+import { sendVerificationEmail } from '../lib/email'
 import { toast } from 'sonner'
 import type { UserRole } from '../types'
 
@@ -47,19 +46,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Configuração do action code para emails de verificação
-function getActionCodeSettings(): ActionCodeSettings {
-  // Em produção, usa o domínio real; em dev, usa localhost
-  const baseUrl = typeof window !== 'undefined'
-    ? window.location.origin
-    : 'http://localhost:5173'
-
-  return {
-    url: `${baseUrl}/verificar-email`,
-    handleCodeInApp: false, // Abre no navegador, não no app
-  }
-}
-
 // =============================================================================
 // Provider
 // =============================================================================
@@ -71,35 +57,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [emailVerified, setEmailVerified] = useState(false)
 
-  // Buscar role do Firestore
-  async function fetchUserRole(uid: string): Promise<UserRole | null> {
+  // Buscar role e emailVerified do Firestore
+  async function fetchUserData(uid: string): Promise<{ role: UserRole | null; firestoreEmailVerified: boolean }> {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid))
 
       if (!userDoc.exists()) {
         setError('Usuário não cadastrado no sistema')
-        return null
+        return { role: null, firestoreEmailVerified: false }
       }
 
       const data = userDoc.data()
       const userRole = data?.role as UserRole | 'disabled'
+      const firestoreEmailVerified = data?.emailVerified === true
 
       if (!userRole) {
         setError('Permissão não definida')
-        return null
+        return { role: null, firestoreEmailVerified }
       }
 
       // Bloquear acesso para usuários desativados
       if (userRole === 'disabled') {
         setError('Sua conta foi desativada. Entre em contato com o administrador.')
-        return null
+        return { role: null, firestoreEmailVerified }
       }
 
-      return userRole as UserRole
+      return { role: userRole as UserRole, firestoreEmailVerified }
     } catch (err) {
-      authLogger.error('Erro ao buscar role:', err)
+      authLogger.error('Erro ao buscar dados do usuário:', err)
       setError('Erro ao carregar permissões')
-      return null
+      return { role: null, firestoreEmailVerified: false }
     }
   }
 
@@ -110,12 +97,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser)
-        setEmailVerified(firebaseUser.emailVerified)
 
-        const userRole = await fetchUserRole(firebaseUser.uid)
+        const { role: userRole, firestoreEmailVerified } = await fetchUserData(firebaseUser.uid)
+
+        // Email é verificado se Firebase Auth OU Firestore dizem que é
+        // (nosso sistema customizado atualiza Firestore, Firebase nativo atualiza Auth)
+        const isEmailVerified = firebaseUser.emailVerified || firestoreEmailVerified
 
         // Só atualiza se ainda for o usuário atual (evita race condition)
         if (isCurrent && auth.currentUser?.uid === firebaseUser.uid) {
+          setEmailVerified(isEmailVerified)
           setRole(userRole)
           if (userRole) setError(null)
         }
@@ -177,27 +168,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
       })
 
-      // Enviar email de verificação
+      // Enviar email de verificação via Worker (template customizado)
       try {
-        const actionCodeSettings = getActionCodeSettings()
-        await sendEmailVerification(result.user, actionCodeSettings)
-        authLogger.info('Email de verificação enviado para:', result.user.email)
-      } catch (verificationError: unknown) {
-        const err = verificationError as { code?: string; message?: string }
-        authLogger.error('Erro ao enviar email de verificação:', err?.code, err?.message)
+        const emailResult = await sendVerificationEmail(
+          result.user.email || email,
+          result.user.uid,
+          result.user.displayName || undefined
+        )
 
-        // Feedback visual para o usuário
-        const errorMessages: Record<string, string> = {
-          'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos para reenviar o email.',
-          'auth/invalid-email': 'Email inválido. Verifique o endereço informado.',
-          'auth/user-not-found': 'Erro interno. Tente fazer login novamente.',
+        if (emailResult.success) {
+          authLogger.info('Email de verificação enviado para:', result.user.email)
+        } else {
+          throw new Error(emailResult.error || 'Failed to send verification email')
         }
-
-        const userMessage = errorMessages[err?.code || ''] ||
-          `Não foi possível enviar o email de verificação (${err?.code || 'erro desconhecido'}). Você pode reenviar após o login.`
+      } catch (verificationError: unknown) {
+        const err = verificationError as { message?: string }
+        authLogger.error('Erro ao enviar email de verificação:', err?.message)
 
         toast.warning('Atenção: Email de verificação', {
-          description: userMessage,
+          description: 'Não foi possível enviar o email de verificação. Você pode reenviar após o login.',
           duration: 8000,
         })
       }
@@ -219,37 +208,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Reenviar email de verificação
+  // Reenviar email de verificação via Worker
   async function sendVerificationEmailFn() {
     if (!user) {
       return { success: false, error: 'Usuário não autenticado' }
     }
 
-    if (user.emailVerified) {
+    // Verificar se já está verificado (Firebase Auth ou Firestore)
+    if (emailVerified) {
       return { success: false, error: 'Email já verificado' }
     }
 
     try {
-      const actionCodeSettings = getActionCodeSettings()
-      await sendEmailVerification(user, actionCodeSettings)
-      authLogger.info('Email de verificação reenviado para:', user.email)
-      return { success: true }
-    } catch (err: unknown) {
-      const error = err as { code?: string; message?: string }
-      authLogger.error('Erro ao reenviar verificação:', error?.code, error?.message)
+      const result = await sendVerificationEmail(
+        user.email || '',
+        user.uid,
+        user.displayName || undefined
+      )
 
-      const errorMessages: Record<string, string> = {
-        'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos antes de reenviar.',
-        'auth/invalid-email': 'Email inválido. Verifique o endereço informado.',
-        'auth/user-not-found': 'Usuário não encontrado. Faça login novamente.',
-        'auth/network-request-failed': 'Erro de conexão. Verifique sua internet.',
-        'auth/internal-error': 'Erro interno do Firebase. Tente novamente mais tarde.',
+      if (result.success) {
+        authLogger.info('Email de verificação reenviado para:', user.email)
+        return { success: true }
+      } else {
+        throw new Error(result.error || 'Failed to send verification email')
       }
+    } catch (err: unknown) {
+      const error = err as { message?: string }
+      authLogger.error('Erro ao reenviar verificação:', error?.message)
 
-      const userMessage = errorMessages[error?.code || ''] ||
-        `Erro ao enviar email (${error?.code || 'desconhecido'}). Verifique se o domínio está autorizado no Firebase Console.`
-
-      return { success: false, error: userMessage }
+      return {
+        success: false,
+        error: error?.message || 'Erro ao enviar email. Tente novamente mais tarde.',
+      }
     }
   }
 
@@ -258,8 +248,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const currentUser = auth.currentUser
     if (currentUser) {
       await currentUser.reload()
-      // Atualizar estado de emailVerified após reload
-      setEmailVerified(currentUser.emailVerified)
+
+      // Verificar também no Firestore (nosso sistema customizado)
+      const { firestoreEmailVerified } = await fetchUserData(currentUser.uid)
+
+      // Email é verificado se Firebase Auth OU Firestore dizem que é
+      const isEmailVerified = currentUser.emailVerified || firestoreEmailVerified
+      setEmailVerified(isEmailVerified)
     }
   }
 

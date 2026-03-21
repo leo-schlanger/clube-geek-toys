@@ -27,6 +27,11 @@
 - [x] 🆓 **Rotacionar credenciais se expostas** ✅
 - [x] 🆓 **Implementar rate limiting** ✅
 - [x] 🆓 **Adicionar verificação de email** ✅
+- [x] 🆓 **Email de verificação customizado via Resend** ✅ (Março 2026)
+  - Template de email personalizado com branding
+  - Sistema de token customizado (24h expiry)
+  - Armazenamento de verificação em Firestore
+  - Verificação dupla: Firebase Auth + Firestore
 
 ### Pagamentos
 
@@ -250,6 +255,31 @@
 7. **vendor-charts bundle (421KB)** - Já está lazy loaded via ReportsTab, carrega apenas ao acessar relatórios
 8. ~~api-worker tem erros de lint~~ ✅ Resolvido - Adicionadas interfaces TypeScript, removido uso de `any`
 9. ~~Assinaturas recorrentes~~ ✅ Resolvido - Implementado com Mercado Pago Preapproval API
+10. ~~Email verificação customizado~~ ✅ Resolvido - Sistema de token próprio via Cloudflare Worker
+
+## Issues Identificados (Março 2026)
+
+### 🟠 ALTO - Fluxo de Pagamento (Resolvidos ✅)
+
+- [x] 🆓 **Enviar emails de confirmação após pagamento** (Register.tsx) ✅
+  - Implementado: `handlePaymentSuccess()` agora envia payment-confirmed + welcome emails
+
+- [x] 🆓 **Timeout em polling de pagamento** (PaymentModal.tsx) ✅
+  - Implementado: Polling com limite de 30 minutos
+
+- [x] 🆓 **Tratamento de falha na ativação do membro** (Register.tsx) ✅
+  - Implementado: Retry automático (3x) + botão de retry manual + não navega em caso de falha
+
+### 🟡 MÉDIO - Integrações
+
+- [ ] 🆓 **Criar registro de Subscription no Firestore** (PaymentModal.tsx)
+  - Atualmente: Pagamento por cartão com assinatura não cria registro completo
+  - Necessário: Sincronizar Member + Subscription records
+  - **Complexidade:** Média
+  - **Nota:** O webhook do Mercado Pago já cria o registro, mas pode haver delay
+
+- [x] 🆓 **Timeout em requests de email** (src/lib/email.ts) ✅
+  - Implementado: fetchWithTimeout com AbortController (10s default)
 
 ## Dependências para Monitorar
 

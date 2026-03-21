@@ -15,6 +15,7 @@ FROM_EMAIL = "Clube Geek & Toys <contato@geeketoys.com.br>"
 # - MERCADOPAGO_ACCESS_TOKEN
 # - MERCADOPAGO_WEBHOOK_SECRET (optional)
 # - RESEND_API_KEY (for email sending)
+# - FIREBASE_API_KEY (for email verification links)
 
 # Cron triggers for scheduled tasks
 # Runs daily at 6:00 AM UTC (3:00 AM BRT)

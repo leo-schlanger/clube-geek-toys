@@ -213,7 +213,17 @@ export function PaymentModal({
   }
 
   function startPaymentPolling(paymentId: string) {
+    const pollStartTime = Date.now()
+    const maxPollingDuration = 30 * 60 * 1000 // 30 minutes max polling
+
     pollIntervalRef.current = setInterval(async () => {
+      // Check if polling has exceeded max duration
+      if (Date.now() - pollStartTime > maxPollingDuration) {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+        toast.warning('Tempo de verificação expirado. Clique em "Verificar Pagamento" para checar manualmente.')
+        return
+      }
+
       const status = await checkPixPaymentStatus(paymentId)
 
       if (status === 'paid') {
