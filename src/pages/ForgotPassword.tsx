@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { sendPasswordResetEmail } from 'firebase/auth'
-import { auth } from '../lib/firebase'
 import { normalizeEmail } from '../lib/sanitize'
+import { sendPasswordResetEmail } from '../lib/email'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -26,17 +25,15 @@ export default function ForgotPassword() {
 
     try {
       const normalizedEmail = normalizeEmail(email)
-      await sendPasswordResetEmail(auth, normalizedEmail)
-      setSent(true)
-    } catch (err: unknown) {
-      const firebaseError = err as { code?: string }
-      if (firebaseError.code === 'auth/user-not-found') {
-        setError('Email não encontrado')
-      } else if (firebaseError.code === 'auth/invalid-email') {
-        setError('Email inválido')
+      const result = await sendPasswordResetEmail(normalizedEmail)
+
+      if (result.success) {
+        setSent(true)
       } else {
-        setError('Erro ao enviar email. Tente novamente.')
+        setError(result.error || 'Erro ao enviar email. Tente novamente.')
       }
+    } catch {
+      setError('Erro ao enviar email. Tente novamente.')
     }
 
     setLoading(false)

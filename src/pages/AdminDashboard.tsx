@@ -26,6 +26,11 @@ import {
 import { FirestoreManager } from '../lib/db-utils'
 import { toast } from 'sonner'
 import {
+  sendVerificationEmail,
+  sendWelcomeEmail,
+  sendRenewalReminderEmail,
+} from '../lib/email'
+import {
   Users,
   CreditCard,
   TrendingUp,
@@ -235,6 +240,40 @@ export default function AdminDashboard() {
     }
   }, [fetchData])
 
+  const handleResendEmail = useCallback(async (member: Member, type: 'verification' | 'welcome' | 'renewal') => {
+    const plan = PLANS[member.plan as PlanType]
+
+    try {
+      let result
+
+      switch (type) {
+        case 'verification':
+          result = await sendVerificationEmail(member.email, member.id, member.fullName)
+          break
+        case 'welcome':
+          result = await sendWelcomeEmail(member.email, member.fullName, plan.name, member.id)
+          break
+        case 'renewal':
+          result = await sendRenewalReminderEmail(member.email, member.fullName, member.expiryDate, member.id)
+          break
+      }
+
+      if (result.success) {
+        const emailTypes = {
+          verification: 'verificação',
+          welcome: 'boas-vindas',
+          renewal: 'lembrete de renovação'
+        }
+        toast.success(`Email de ${emailTypes[type]} enviado para ${member.email}`)
+      } else {
+        toast.error(result.error || 'Erro ao enviar email')
+      }
+    } catch (error) {
+      logger.error('Error sending email:', error)
+      toast.error('Erro ao enviar email')
+    }
+  }, [])
+
 
   if (loading) {
     return (
@@ -401,6 +440,7 @@ export default function AdminDashboard() {
                 onDelete={handleDeleteMember}
                 onActivate={handleQuickActivate}
                 onCreate={() => openModal('create')}
+                onResendEmail={handleResendEmail}
               />
             )}
             {activeTab === 'users' && (

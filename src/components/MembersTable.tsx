@@ -13,7 +13,17 @@ import {
   Crown,
   Sparkles,
   Plus,
+  Mail,
+  MoreHorizontal,
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu'
 
 interface MembersTableProps {
   members: Member[]
@@ -23,6 +33,7 @@ interface MembersTableProps {
   onDelete: (member: Member) => void
   onActivate: (member: Member) => void
   onCreate: () => void
+  onResendEmail?: (member: Member, type: 'verification' | 'welcome' | 'renewal') => void
 }
 
 // Plan icons (memoized outside component)
@@ -40,6 +51,7 @@ export function MembersTable({
   onDelete,
   onActivate,
   onCreate,
+  onResendEmail,
 }: MembersTableProps) {
   // Table columns configuration
   const columns: Column<Member>[] = useMemo(
@@ -193,21 +205,61 @@ export function MembersTable({
         >
           <Edit className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete(member)
-          }}
-          title="Desativar membro"
-        >
-          <UserX className="h-4 w-4" />
-        </Button>
+        {onResendEmail && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={(e) => e.stopPropagation()}
+                title="Enviar email"
+              >
+                <Mail className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuLabel>Reenviar Email</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onResendEmail(member, 'verification')}>
+                <Mail className="h-4 w-4 mr-2" />
+                Verificação de Email
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onResendEmail(member, 'welcome')}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Boas-vindas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onResendEmail(member, 'renewal')}>
+                <Star className="h-4 w-4 mr-2" />
+                Lembrete de Renovação
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem
+              className="text-red-500 focus:text-red-500"
+              onClick={() => onDelete(member)}
+            >
+              <UserX className="h-4 w-4 mr-2" />
+              Desativar membro
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     ),
-    [onView, onEdit, onDelete]
+    [onView, onEdit, onDelete, onResendEmail]
   )
 
   // Export data function

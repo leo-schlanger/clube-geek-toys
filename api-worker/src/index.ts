@@ -158,6 +158,10 @@ interface VerificationEmailBody {
 	name?: string;
 }
 
+interface PasswordResetBody {
+	email: string;
+}
+
 interface FirebaseOobCodeResponse {
 	oobLink?: string;
 	email?: string;
@@ -181,7 +185,7 @@ interface MonthlyReport {
 // EMAIL TEMPLATES
 // ============================================
 
-type EmailTemplate = 'welcome' | 'payment-confirmed' | 'payment-failed' | 'renewal-reminder' | 'points-expiring' | 'subscription-created' | 'subscription-payment' | 'subscription-paused' | 'subscription-cancelled' | 'subscription-payment-failed' | 'verify-email';
+type EmailTemplate = 'welcome' | 'payment-confirmed' | 'payment-failed' | 'renewal-reminder' | 'points-expiring' | 'subscription-created' | 'subscription-payment' | 'subscription-paused' | 'subscription-cancelled' | 'subscription-payment-failed' | 'verify-email' | 'password-reset';
 
 interface EmailTemplateConfig {
 	subject: string;
@@ -662,6 +666,41 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, EmailTemplateConfig> = {
 						</p>
 						<p style="color: ${BRAND.primaryGold}; font-size: 12px; word-break: break-all; margin: 8px 0 0 0;">
 							${vars.verification_link}
+						</p>
+					</div>
+				</td>
+			</tr>
+		`),
+	},
+	'password-reset': {
+		subject: 'Redefinir sua Senha - Clube Geek & Toys',
+		html: (vars) => createEmailBase('Redefinir Senha', `
+			${emailHeaderWithLogo}
+			<tr>
+				<td style="padding: 32px;">
+					<h2 style="color: ${BRAND.primaryGold}; font-size: 24px; font-weight: 600; margin: 0 0 8px 0;">Redefinir Senha</h2>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Recebemos uma solicitação para redefinir a senha da sua conta no ${BRAND.siteName}. Clique no botão abaixo para criar uma nova senha:
+					</p>
+
+					<div style="text-align: center; margin: 32px 0;">
+						${createButton('Redefinir Senha', vars.reset_link)}
+					</div>
+
+					<p style="color: ${BRAND.textMuted}; font-size: 13px; line-height: 1.6; margin: 24px 0 0 0; text-align: center;">
+						Este link expira em 1 hora.<br>
+						Se você não solicitou a redefinição, ignore este email.
+					</p>
+
+					<div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid ${BRAND.darkBorder};">
+						<p style="color: ${BRAND.textMuted}; font-size: 12px; line-height: 1.5; margin: 0;">
+							Se o botão não funcionar, copie e cole este link no seu navegador:
+						</p>
+						<p style="color: ${BRAND.primaryGold}; font-size: 12px; word-break: break-all; margin: 8px 0 0 0;">
+							${vars.reset_link}
 						</p>
 					</div>
 				</td>
@@ -2126,6 +2165,113 @@ export default {
 					const err = error as { message?: string };
 					console.error('[AUTH] Verify email error:', err);
 					return jsonResponse({ error: err.message || 'Verification failed' }, 500, origin);
+				}
+			}
+
+			// Send Password Reset Email
+			if (path === '/auth/send-password-reset' && method === 'POST') {
+				try {
+					const body = await request.json() as PasswordResetBody;
+
+					if (!body.email) {
+						return jsonResponse({ error: 'Missing email' }, 400, origin);
+					}
+
+					if (!env.FIREBASE_API_KEY) {
+						return jsonResponse({ error: 'Firebase API key not configured' }, 500, origin);
+					}
+
+					if (!env.RESEND_API_KEY) {
+						return jsonResponse({ error: 'Email service not configured' }, 500, origin);
+					}
+
+					// Use Firebase Auth REST API to generate password reset link
+					const firebaseResponse = await fetch(
+						`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${env.FIREBASE_API_KEY}`,
+						{
+							method: 'POST',
+							headers: { 'Content-Type': 'application/json' },
+							body: JSON.stringify({
+								requestType: 'PASSWORD_RESET',
+								email: body.email,
+								returnOobLink: true,
+							}),
+						}
+					);
+
+					const firebaseData = await firebaseResponse.json() as FirebaseOobCodeResponse;
+
+					if (!firebaseResponse.ok || firebaseData.error) {
+						const errorMessage = firebaseData.error?.message || 'Failed to generate reset link';
+						// Don't expose "EMAIL_NOT_FOUND" to client for security
+						if (errorMessage === 'EMAIL_NOT_FOUND') {
+							// Return success even if email not found (security best practice)
+							console.log('[AUTH] Password reset requested for non-existent email:', body.email);
+							return jsonResponse({ success: true }, 200, origin);
+						}
+						console.error('[AUTH] Firebase password reset error:', errorMessage);
+						return jsonResponse({ error: 'Failed to process request' }, 500, origin);
+					}
+
+					const resetLink = firebaseData.oobLink;
+					if (!resetLink) {
+						console.error('[AUTH] No reset link returned from Firebase');
+						return jsonResponse({ error: 'Failed to generate reset link' }, 500, origin);
+					}
+
+					// Try to get user's name from Firestore for personalization
+					let userName = 'Membro';
+					try {
+						// Query users collection by email
+						const queryResult = await firestoreRequest<{ documents?: FirestoreDocument[] }>(
+							env.FIREBASE_PROJECT_ID,
+							`:runQuery`,
+							'POST',
+							{
+								structuredQuery: {
+									from: [{ collectionId: 'members' }],
+									where: {
+										fieldFilter: {
+											field: { fieldPath: 'email' },
+											op: 'EQUAL',
+											value: { stringValue: body.email },
+										},
+									},
+									limit: 1,
+								},
+							}
+						) as FirestoreQueryResult[];
+
+						if (queryResult[0]?.document?.fields?.fullName?.stringValue) {
+							userName = queryResult[0].document.fields.fullName.stringValue;
+						}
+					} catch {
+						console.log('[AUTH] Could not fetch user name, using default');
+					}
+
+					// Send custom email via Resend
+					const emailResult = await sendEmail(
+						env.RESEND_API_KEY,
+						body.email,
+						'password-reset',
+						{
+							nome: userName,
+							reset_link: resetLink,
+						},
+						env.FROM_EMAIL
+					);
+
+					if (!emailResult.success) {
+						console.error('[AUTH] Password reset email send error:', emailResult.error);
+						return jsonResponse({ error: emailResult.error || 'Failed to send email' }, 500, origin);
+					}
+
+					console.log(`[AUTH] Password reset email sent to ${body.email}`);
+					return jsonResponse({ success: true }, 200, origin);
+				} catch (error: unknown) {
+					const err = error as { message?: string };
+					console.error('[AUTH] Password reset error:', err);
+					return jsonResponse({ error: err.message || 'Failed to send password reset email' }, 500, origin);
 				}
 			}
 

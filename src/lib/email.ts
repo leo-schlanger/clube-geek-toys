@@ -6,6 +6,8 @@ import { logger } from './logger'
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://api-worker.leoschlanger.workers.dev'
 const DEFAULT_TIMEOUT = 10000 // 10 seconds
+const MAX_RETRIES = 3
+const BASE_DELAY = 1000 // 1 second
 
 /**
  * Fetch with timeout support
@@ -32,6 +34,35 @@ async function fetchWithTimeout(
     }
     throw error
   }
+}
+
+/**
+ * Fetch with retry and exponential backoff
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries: number = MAX_RETRIES,
+  timeout: number = DEFAULT_TIMEOUT
+): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fetchWithTimeout(url, options, timeout)
+    } catch (error) {
+      lastError = error as Error
+      logger.warn(`Email request failed (attempt ${attempt + 1}/${retries}):`, lastError.message)
+
+      if (attempt < retries - 1) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = BASE_DELAY * Math.pow(2, attempt)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+  }
+
+  throw lastError || new Error('Request failed after retries')
 }
 
 export type EmailTemplate =
@@ -76,11 +107,11 @@ export interface EmailTemplateInfo {
 }
 
 /**
- * Send an email using the API Worker
+ * Send an email using the API Worker with retry
  */
 export async function sendEmail(params: SendEmailParams): Promise<EmailResponse> {
   try {
-    const response = await fetchWithTimeout(`${API_URL}/email/send`, {
+    const response = await fetchWithRetry(`${API_URL}/email/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -247,7 +278,7 @@ export async function sendPointsExpiringEmail(
 }
 
 /**
- * Send verification email via Worker (custom template)
+ * Send verification email via Worker (custom template) with retry
  */
 export async function sendVerificationEmail(
   email: string,
@@ -255,7 +286,7 @@ export async function sendVerificationEmail(
   name?: string
 ): Promise<EmailResponse> {
   try {
-    const response = await fetchWithTimeout(`${API_URL}/auth/send-verification-email`, {
+    const response = await fetchWithRetry(`${API_URL}/auth/send-verification-email`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -282,6 +313,42 @@ export async function sendVerificationEmail(
     }
   } catch (error: unknown) {
     logger.error('Verification email error:', error)
+    const err = error as { message?: string }
+    return {
+      success: false,
+      error: err.message || 'Network error',
+    }
+  }
+}
+
+/**
+ * Send password reset email via Worker (custom template)
+ */
+export async function sendPasswordResetEmail(email: string): Promise<EmailResponse> {
+  try {
+    const response = await fetchWithRetry(`${API_URL}/auth/send-password-reset`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to send password reset email',
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Password reset email sent',
+    }
+  } catch (error: unknown) {
+    logger.error('Password reset email error:', error)
     const err = error as { message?: string }
     return {
       success: false,
