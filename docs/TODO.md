@@ -270,7 +270,7 @@
 - [x] 🆓 **Tratamento de falha na ativação do membro** (Register.tsx) ✅
   - Implementado: Retry automático (3x) + botão de retry manual + não navega em caso de falha
 
-### 🟡 MÉDIO - Integrações
+### 🟡 MÉDIO - Integrações (Resolvidos ✅)
 
 - [ ] 🆓 **Criar registro de Subscription no Firestore** (PaymentModal.tsx)
   - Atualmente: Pagamento por cartão com assinatura não cria registro completo
@@ -280,6 +280,19 @@
 
 - [x] 🆓 **Timeout em requests de email** (src/lib/email.ts) ✅
   - Implementado: fetchWithTimeout com AbortController (10s default)
+
+- [x] 🆓 **Reenvio de emails no Admin** (MembersTable.tsx) ✅ (Março 2026)
+  - Dropdown com opções: Verificação, Boas-vindas, Renovação
+  - Integrado ao AdminDashboard via `handleResendEmail`
+
+- [x] 🆓 **Email de reset de senha customizado** (ForgotPassword.tsx) ✅ (Março 2026)
+  - Template personalizado com branding via Resend
+  - Endpoint Worker: `/auth/send-password-reset`
+  - Usa Firebase Auth para gerar link válido
+
+- [x] 🆓 **Retry automático em envio de emails** (email.ts) ✅ (Março 2026)
+  - `fetchWithRetry` com exponential backoff (3 tentativas: 1s, 2s, 4s)
+  - Aplicado em todas as funções de email
 
 ## Dependências para Monitorar
 
@@ -310,4 +323,4 @@
 
 ---
 
-_Documento atualizado em Março 2026_
+_Documento atualizado em 21 de Março de 2026_

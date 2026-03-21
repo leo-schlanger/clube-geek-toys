@@ -108,7 +108,8 @@ clube-geek-toys/
 │   │   │   ├── badge.tsx
 │   │   │   ├── label.tsx
 │   │   │   ├── loading.tsx
-│   │   │   └── pagination.tsx
+│   │   │   ├── pagination.tsx
+│   │   │   └── dropdown-menu.tsx
 │   │   │
 │   │   ├── admin/              # Componentes do AdminDashboard (lazy loaded)
 │   │   │   ├── index.ts        # Barrel exports
@@ -429,20 +430,23 @@ Em desenvolvimento, use `?subdomain=adm` para simular.
 
 **URL:** `https://api-worker.leoschlanger.workers.dev`
 
-| Endpoint                        | Método | Descrição                    |
-| ------------------------------- | ------ | ---------------------------- |
-| `/health`                       | GET    | Health check                 |
-| `/pix/create`                   | POST   | Gera QR Code PIX             |
-| `/checkout/create`              | POST   | Cria preferência de checkout |
-| `/payment/status/:id`           | GET    | Verifica status de pagamento |
-| `/subscription/create`          | POST   | Cria assinatura recorrente   |
-| `/subscription/:id`             | GET    | Detalhes da assinatura       |
-| `/subscription/:id/pause`       | PUT    | Pausa assinatura             |
-| `/subscription/:id/resume`      | PUT    | Reativa assinatura           |
-| `/subscription/:id/cancel`      | PUT    | Cancela assinatura           |
-| `/subscription/:id/update-card` | PUT    | Atualiza cartão              |
-| `/webhook/mercadopago`          | POST   | Processa webhooks do MP      |
-| `/email/send`                   | POST   | Envia emails (Resend)        |
+| Endpoint                        | Método | Descrição                     |
+| ------------------------------- | ------ | ----------------------------- |
+| `/health`                       | GET    | Health check                  |
+| `/pix/create`                   | POST   | Gera QR Code PIX              |
+| `/checkout/create`              | POST   | Cria preferência de checkout  |
+| `/payment/status/:id`           | GET    | Verifica status de pagamento  |
+| `/subscription/create`          | POST   | Cria assinatura recorrente    |
+| `/subscription/:id`             | GET    | Detalhes da assinatura        |
+| `/subscription/:id/pause`       | PUT    | Pausa assinatura              |
+| `/subscription/:id/resume`      | PUT    | Reativa assinatura            |
+| `/subscription/:id/cancel`      | PUT    | Cancela assinatura            |
+| `/subscription/:id/update-card` | PUT    | Atualiza cartão               |
+| `/webhook/mercadopago`          | POST   | Processa webhooks do MP       |
+| `/email/send`                   | POST   | Envia emails (Resend)         |
+| `/auth/send-verification-email` | POST   | Envia email de verificação    |
+| `/auth/verify-email`            | POST   | Valida token de verificação   |
+| `/auth/send-password-reset`     | POST   | Envia email de reset de senha |
 
 **Webhooks Processados:**
 
@@ -450,10 +454,11 @@ Em desenvolvimento, use `?subdomain=adm` para simular.
 - `subscription_preapproval` - Status da assinatura
 - `subscription_authorized_payment` - Cobranças recorrentes
 
-**Templates de Email (10):**
+**Templates de Email (12):**
 
 - welcome, payment-confirmed, payment-failed
 - renewal-reminder, points-expiring
 - subscription-created, subscription-payment
 - subscription-paused, subscription-cancelled
 - subscription-payment-failed
+- verify-email, password-reset
