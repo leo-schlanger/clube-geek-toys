@@ -32,6 +32,15 @@ Sistema completo de gerenciamento de clube de assinaturas para a loja Geek & Toy
 - **Retry com Backoff**: Operações resilientes com retry automático
 - **Export CSV**: Exportação de membros e relatórios
 
+### Segurança
+
+- **Validação Zod**: Todos os endpoints validados com schemas rigorosos
+- **HMAC-SHA256**: Verificação de assinatura em webhooks
+- **Sanitização HTML**: Prevenção de XSS em templates de email
+- **Idempotência**: Webhooks processados apenas uma vez
+- **Path Sanitization**: Prevenção de path traversal no Storage
+- **Audit Logging**: Registro completo de ações críticas
+
 ## Tecnologias
 
 - **Frontend**: React 19, TypeScript, Vite 7
@@ -40,6 +49,7 @@ Sistema completo de gerenciamento de clube de assinaturas para a loja Geek & Toy
 - **Pagamentos**: Mercado Pago (PIX e Cartão)
 - **State Management**: React Query (TanStack Query)
 - **Forms**: React Hook Form + Zod validation
+- **API Validation**: Zod 4 (schemas com limites rigorosos)
 - **PDF Generation**: pdf-lib (contratos digitais)
 - **Signature**: signature_pad (assinatura digital)
 - **Virtualização**: @tanstack/react-virtual

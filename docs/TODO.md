@@ -271,6 +271,57 @@
 9. ~~Assinaturas recorrentes~~ ✅ Resolvido - Implementado com Mercado Pago Preapproval API
 10. ~~Email verificação customizado~~ ✅ Resolvido - Sistema de token próprio via Cloudflare Worker
 
+## Melhorias de Segurança (Março 2026) ✅
+
+### Fase 1: Validação de Entrada (Crítico) ✅
+
+- [x] 🆓 **Webhook secret obrigatório** ✅
+  - Rejeita webhooks se secret não configurado
+  - HMAC-SHA256 verificação
+
+- [x] 🆓 **Validação Zod em todos endpoints** ✅
+  - `PixCreateSchema`, `EmailSendSchema`, `ContractEmailSchema`
+  - `CheckoutCreateSchema`, `SubscriptionCreateSchema`
+  - `VerificationEmailSchema`, `PasswordResetSchema`
+  - `UpdateCardSchema`, `VerifyEmailTokenSchema`
+  - Limites de tamanho em todos os campos
+
+- [x] 🆓 **Sanitização HTML em emails** ✅
+  - Função `escapeHtml()` previne XSS
+  - `sanitizeEmailVariables()` aplicado em templates
+  - Dados de contrato e admin sanitizados
+
+### Fase 2: Infraestrutura (Alto) ✅
+
+- [x] 🆓 **Idempotência em webhooks** ✅
+  - Coleção `processed_webhooks` previne duplicatas
+  - Regras Firestore adicionadas
+
+- [x] 🆓 **Remoção de config no /health** ✅
+  - Endpoint retorna apenas status e timestamp
+  - Nenhuma informação de configuração exposta
+
+- [x] 🆓 **Validação de path no Storage** ✅
+  - `sanitizeForFilePath()` previne path traversal
+  - Remove `..`, `/`, `\` e caracteres especiais
+  - Limite de 100 caracteres
+
+### Fase 3: Auditoria (Médio) ✅
+
+- [x] 🆓 **Limites em todos os schemas** ✅
+  - Emails: max 254 chars
+  - Nomes: max 100 chars
+  - Tokens: max 500 chars
+  - PDFs: max 10MB base64
+
+- [x] 🆓 **UUID completo para logs** ✅
+  - Removido `.slice(0, 8)` dos UUIDs
+  - Melhor unicidade e rastreabilidade
+
+- [x] 🆓 **Audit logging em contratos** ✅
+  - Registro `contract_signed` em `audit_logs`
+  - Inclui: hash, IP, user_agent, timestamp
+
 ## Issues Identificados (Março 2026)
 
 ### 🟠 ALTO - Fluxo de Pagamento (Resolvidos ✅)
@@ -337,4 +388,4 @@
 
 ---
 
-_Documento atualizado em 24 de Março de 2026_
+_Documento atualizado em 24 de Março de 2026 - Segurança implementada_

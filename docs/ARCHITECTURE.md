@@ -392,12 +392,36 @@ const id = await withRetry(
 │  - Role-based access control                        │
 │  - Field-level permissions                          │
 ├────────────────────────────────────────────────────┤
-│              LAYER 5: Data Validation               │
-│  - Zod schemas (frontend)                           │
-│  - Firestore rules validation (backend)             │
-│  - CPF validation (Brasil API)                      │
+│              LAYER 5: Input Validation              │
+│  - Zod schemas (API Worker - all endpoints)         │
+│  - Firestore rules validation                       │
+│  - CPF validation (Brasil)                          │
+│  - HTML sanitization (email templates)              │
+│  - File path sanitization (Storage uploads)         │
+├────────────────────────────────────────────────────┤
+│              LAYER 6: Webhook Security              │
+│  - HMAC-SHA256 signature verification               │
+│  - Mandatory webhook secret                         │
+│  - Idempotency checking (processed_webhooks)        │
+│  - Rate limiting                                    │
 └────────────────────────────────────────────────────┘
 ```
+
+### Medidas de Segurança (Março 2026)
+
+**Validação Zod em todos os endpoints:**
+
+- `PixCreateSchema` - Limites de valor e formato de email
+- `EmailSendSchema` - Templates e variáveis validadas
+- `CheckoutCreateSchema` - Items e valores limitados
+- `SubscriptionCreateSchema` - Planos enum, tokens limitados
+- `ContractEmailSchema` - PDFs até 10MB
+
+**Sanitização de HTML em emails** - Previne XSS em templates
+
+**Idempotência em webhooks** - Coleção `processed_webhooks` evita duplicatas
+
+**Validação de caminhos** - `sanitizeForFilePath()` previne path traversal
 
 ### Firestore Security Rules Summary
 

@@ -7,18 +7,21 @@ import {
   collection,
   doc,
   setDoc,
+  addDoc,
   query,
   where,
   getDocs,
   updateDoc,
   orderBy,
   limit,
+  serverTimestamp,
 } from 'firebase/firestore'
 import { db, storage } from './firebase'
 import { logger } from './logger'
 import type { ContractData, Contract, ContractStatus } from '../types'
 
 const CONTRACTS_COLLECTION = 'contracts'
+const AUDIT_LOGS_COLLECTION = 'audit_logs'
 const STORAGE_PATH = 'contracts'
 const MAX_RETRIES = 3
 const RETRY_DELAY = 1000
@@ -31,6 +34,18 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
+ * Sanitize string for use in file path
+ * Prevents path traversal and removes special characters
+ */
+function sanitizeForFilePath(input: string): string {
+  return input
+    .replace(/\.\./g, '') // Remove path traversal
+    .replace(/[/\\]/g, '') // Remove path separators
+    .replace(/[^a-zA-Z0-9_-]/g, '_') // Only alphanumeric, underscore, hyphen
+    .substring(0, 100) // Limit length
+}
+
+/**
  * Upload PDF to Firebase Storage with retry
  */
 export async function uploadContractPDF(
@@ -38,8 +53,12 @@ export async function uploadContractPDF(
   pdfBytes: Uint8Array,
   timestamp: string
 ): Promise<{ url: string; path: string }> {
-  const fileName = `contract_${memberId}_${timestamp.replace(/[:.]/g, '-')}.pdf`
-  const filePath = `${STORAGE_PATH}/${memberId}/${fileName}`
+  // Sanitize inputs to prevent path traversal attacks
+  const safeMemberId = sanitizeForFilePath(memberId)
+  const safeTimestamp = sanitizeForFilePath(timestamp)
+
+  const fileName = `contract_${safeMemberId}_${safeTimestamp}.pdf`
+  const filePath = `${STORAGE_PATH}/${safeMemberId}/${fileName}`
   const storageRef = ref(storage, filePath)
 
   let lastError: Error | null = null
@@ -138,6 +157,27 @@ export async function saveContractToFirestore(
     try {
       await setDoc(contractRef, contract)
       logger.info(`Contract saved to Firestore: ${contractId}`)
+
+      // Log audit (non-critical, don't block on failure)
+      try {
+        await addDoc(collection(db, AUDIT_LOGS_COLLECTION), {
+          action: 'contract_signed',
+          member_id: contractData.memberId,
+          contract_id: contractId,
+          member_name: contractData.memberName,
+          member_email: contractData.memberEmail,
+          plan: contractData.plan,
+          document_hash: contractData.documentHash,
+          ip_address: contractData.ipAddress,
+          user_agent: contractData.userAgent.substring(0, 200), // Truncate long user agents
+          signed_at: contractData.signedAt,
+          timestamp: serverTimestamp(),
+        })
+      } catch {
+        // Non-critical - silently ignore audit failures
+        logger.warn('Failed to create audit log for contract')
+      }
+
       return contractId
     } catch (error) {
       lastError = error as Error

@@ -204,6 +204,22 @@ service cloud.firestore {
     }
 
     // ============================================
+    // COLLECTION: PROCESSED_WEBHOOKS (Idempotency)
+    // ============================================
+
+    match /processed_webhooks/{webhookId} {
+      // Read: only admin (for debugging)
+      allow read: if isAdmin();
+
+      // Create/Update: system only (via Cloud Functions/Workers)
+      // Used for webhook idempotency checks
+      allow create, update: if false;
+
+      // Delete: never (audit trail)
+      allow delete: if false;
+    }
+
+    // ============================================
     // COLLECTION: CONTRACTS
     // ============================================
 

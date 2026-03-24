@@ -67,44 +67,13 @@ interface FirestoreQueryResult {
 	document?: FirestoreDocument;
 }
 
-// Request Body Types
-interface PixCreateBody {
-	amount: number;
-	description?: string;
-	payer_email: string;
-	external_reference?: string;
-}
-
-interface CheckoutCreateBody {
-	items: Array<{
-		title: string;
-		quantity: number;
-		unit_price: number;
-	}>;
-	payer?: {
-		email?: string;
-		name?: string;
-	};
-	external_reference?: string;
-}
-
+// Request Body Types (only WebhookBody - others use Zod validation)
 interface WebhookBody {
 	type?: string;
 	action?: string;
 	data?: {
 		id?: string;
 	};
-}
-
-// Subscription Types
-interface SubscriptionCreateBody {
-	member_id: string;
-	plan: 'silver' | 'gold' | 'black';
-	frequency_type: 'months' | 'years';
-	payer_email: string;
-	card_token: string;
-	transaction_amount: number;
-	reason: string;
 }
 
 interface MpPreapprovalResponse {
@@ -145,32 +114,7 @@ interface MpAuthorizedPaymentResponse {
 	date_created?: string;
 }
 
-interface EmailSendBody {
-	template: string;
-	to: string;
-	variables?: Record<string, string>;
-	member_id?: string;
-}
-
-interface VerificationEmailBody {
-	email: string;
-	uid: string;
-	name?: string;
-}
-
-interface PasswordResetBody {
-	email: string;
-}
-
-interface ContractEmailBody {
-	to: string;
-	member_name: string;
-	plan: string;
-	signed_at: string;
-	hash: string;
-	pdf_base64: string;
-	admin_email?: string;
-}
+// Email body interfaces removed - using Zod validation instead
 
 interface FirebaseOobCodeResponse {
 	oobLink?: string;
@@ -189,6 +133,155 @@ interface MonthlyReport {
 	newMembers: number;
 	pointsEarned: number;
 	pointsRedeemed: number;
+}
+
+// ============================================
+// INPUT VALIDATION SCHEMAS (Zod)
+// ============================================
+
+import { z } from 'zod';
+
+// ============================================
+// HTML SANITIZATION
+// ============================================
+
+/**
+ * Escapes HTML special characters to prevent XSS attacks in email templates
+ */
+function escapeHtml(unsafe: string): string {
+	if (!unsafe) return '';
+	return unsafe
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#039;');
+}
+
+/**
+ * Sanitizes all string values in a variables object
+ */
+function sanitizeEmailVariables(variables: Record<string, string>): Record<string, string> {
+	const sanitized: Record<string, string> = {};
+	for (const [key, value] of Object.entries(variables)) {
+		sanitized[key] = escapeHtml(value);
+	}
+	return sanitized;
+}
+
+// ============================================
+// INPUT VALIDATION SCHEMAS (Zod)
+// ============================================
+
+// PIX Create Schema
+const PixCreateSchema = z.object({
+	amount: z.number().positive().max(100000, 'Amount too large'),
+	description: z.string().max(200).optional(),
+	payer_email: z.string().email().max(254),
+	external_reference: z.string().min(1).max(100),
+});
+
+// Email Send Schema
+const EmailSendSchema = z.object({
+	template: z.string().min(1).max(50),
+	to: z.string().email().max(254),
+	variables: z.record(z.string(), z.string().max(1000)).optional(),
+	member_id: z.string().max(100).optional(),
+});
+
+// Contract Email Schema
+const ContractEmailSchema = z.object({
+	to: z.string().email().max(254),
+	member_name: z.string().min(1).max(100),
+	plan: z.string().min(1).max(20),
+	signed_at: z.string().min(1).max(50),
+	hash: z.string().max(100),
+	pdf_base64: z.string().min(1).max(10 * 1024 * 1024), // Max 10MB base64
+	admin_email: z.string().email().max(254).optional(),
+});
+
+// Checkout Create Schema
+const CheckoutCreateSchema = z.object({
+	items: z.array(z.object({
+		title: z.string().min(1).max(200),
+		quantity: z.number().int().positive().max(100),
+		unit_price: z.number().positive().max(100000),
+	})).min(1).max(20),
+	payer: z.object({
+		email: z.string().email().max(254).optional(),
+		name: z.string().max(100).optional(),
+	}).optional(),
+	external_reference: z.string().max(100).optional(),
+});
+
+// Subscription Create Schema
+const SubscriptionCreateSchema = z.object({
+	member_id: z.string().min(1).max(100),
+	plan: z.enum(['silver', 'gold', 'black']),
+	frequency_type: z.enum(['months', 'years']),
+	payer_email: z.string().email().max(254),
+	card_token: z.string().min(1).max(500),
+	transaction_amount: z.number().positive().max(10000),
+	reason: z.string().min(1).max(200),
+});
+
+// Verification Email Schema
+const VerificationEmailSchema = z.object({
+	email: z.string().email().max(254),
+	uid: z.string().min(1).max(100),
+	name: z.string().max(100).optional(),
+});
+
+// Password Reset Schema
+const PasswordResetSchema = z.object({
+	email: z.string().email().max(254),
+});
+
+// Update Card Schema
+const UpdateCardSchema = z.object({
+	card_token: z.string().min(1).max(500),
+});
+
+// Verify Email Token Schema
+const VerifyEmailTokenSchema = z.object({
+	token: z.string().min(1).max(500),
+});
+
+// Helper function to validate and parse request body
+async function validateRequestBody<T>(
+	request: Request,
+	schema: z.ZodSchema<T>,
+	maxSize: number = 1024 * 100 // 100KB default
+): Promise<{ success: true; data: T } | { success: false; error: string }> {
+	try {
+		// Check content length
+		const contentLength = request.headers.get('content-length');
+		if (contentLength && parseInt(contentLength) > maxSize) {
+			return { success: false, error: `Request body too large (max ${maxSize} bytes)` };
+		}
+
+		// Parse JSON
+		const rawBody = await request.text();
+		if (rawBody.length > maxSize) {
+			return { success: false, error: `Request body too large (max ${maxSize} bytes)` };
+		}
+
+		const body = JSON.parse(rawBody);
+
+		// Validate with Zod
+		const result = schema.safeParse(body);
+		if (!result.success) {
+			const errors = result.error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ');
+			return { success: false, error: `Validation failed: ${errors}` };
+		}
+
+		return { success: true, data: result.data };
+	} catch (error) {
+		if (error instanceof SyntaxError) {
+			return { success: false, error: 'Invalid JSON in request body' };
+		}
+		return { success: false, error: 'Failed to parse request body' };
+	}
 }
 
 // ============================================
@@ -771,6 +864,9 @@ async function sendEmail(
 		return { success: false, error: `Template '${template}' not found` };
 	}
 
+	// Sanitize all user-provided variables to prevent XSS
+	const sanitizedVars = sanitizeEmailVariables(variables);
+
 	try {
 		const response = await fetch('https://api.resend.com/emails', {
 			method: 'POST',
@@ -782,7 +878,7 @@ async function sendEmail(
 				from: fromEmail || DEFAULT_FROM_EMAIL,
 				to: [to],
 				subject: templateConfig.subject,
-				html: templateConfig.html(variables),
+				html: templateConfig.html(sanitizedVars),
 			}),
 		});
 
@@ -902,22 +998,22 @@ async function verifyWebhookSignature(
 	xSignature: string | null,
 	xRequestId: string | null,
 	dataId: string | null,
-	secret: string,
-	isProduction: boolean
-): Promise<boolean> {
-	// CRITICAL: In production, webhook secret is REQUIRED
+	secret: string
+): Promise<{ valid: boolean; reason?: string }> {
+	// SECURITY: Webhook secret is ALWAYS required - reject if not configured
 	if (!secret) {
-		if (isProduction) {
-			console.error('SECURITY ERROR: Webhook secret not configured in production - rejecting request');
-			return false;
-		}
-		console.warn('⚠️ DEV MODE: Webhook secret not configured - skipping verification (NOT SAFE FOR PRODUCTION)');
-		return true;
+		console.error('[WEBHOOK SECURITY] REJECTED: Webhook secret not configured');
+		return { valid: false, reason: 'webhook_secret_not_configured' };
 	}
 
-	if (!xSignature || !xRequestId) {
-		console.error('Missing x-signature or x-request-id headers');
-		return false;
+	if (!xSignature) {
+		console.error('[WEBHOOK SECURITY] REJECTED: Missing x-signature header');
+		return { valid: false, reason: 'missing_signature' };
+	}
+
+	if (!xRequestId) {
+		console.error('[WEBHOOK SECURITY] REJECTED: Missing x-request-id header');
+		return { valid: false, reason: 'missing_request_id' };
 	}
 
 	try {
@@ -932,15 +1028,15 @@ async function verifyWebhookSignature(
 		const v1 = signatureParts['v1'];
 
 		if (!ts || !v1) {
-			console.error('Invalid signature format');
-			return false;
+			console.error('[WEBHOOK SECURITY] REJECTED: Invalid signature format');
+			return { valid: false, reason: 'invalid_signature_format' };
 		}
 
 		// Check timestamp is not too old (5 minutes)
 		const timestampAge = Date.now() - parseInt(ts, 10) * 1000;
 		if (timestampAge > 5 * 60 * 1000) {
-			console.error('Webhook timestamp too old');
-			return false;
+			console.error('[WEBHOOK SECURITY] REJECTED: Timestamp too old (replay attack?)');
+			return { valid: false, reason: 'timestamp_expired' };
 		}
 
 		// Build manifest string for HMAC
@@ -964,15 +1060,15 @@ async function verifyWebhookSignature(
 			.map(b => b.toString(16).padStart(2, '0'))
 			.join('');
 
-		const isValid = calculatedHash === v1;
-		if (!isValid) {
-			console.error('Webhook signature mismatch');
+		if (calculatedHash !== v1) {
+			console.error('[WEBHOOK SECURITY] REJECTED: Signature mismatch (forged request?)');
+			return { valid: false, reason: 'signature_mismatch' };
 		}
 
-		return isValid;
+		return { valid: true };
 	} catch (error) {
-		console.error('Signature verification error:', error);
-		return false;
+		console.error('[WEBHOOK SECURITY] REJECTED: Verification error:', error);
+		return { valid: false, reason: 'verification_error' };
 	}
 }
 
@@ -1002,28 +1098,22 @@ export default {
 
 			// Health check
 			if (path === '/health' && method === 'GET') {
+				// Only expose minimal health information - no config details
 				return jsonResponse({
 					status: 'ok',
-					service: 'Clube Geek & Toys - Payment API',
 					timestamp: new Date().toISOString(),
-					hasAccessToken: !!env.MERCADOPAGO_ACCESS_TOKEN,
 				}, 200, origin);
 			}
 
 			// PIX Create
 			if (path === '/pix/create' && method === 'POST') {
-				const body = await request.json() as PixCreateBody;
-				const { amount, description, payer_email, external_reference } = body;
-
-				if (!amount || !payer_email) {
-					return jsonResponse({ error: 'Missing required fields: amount, payer_email' }, 400, origin);
+				// Validate input with Zod
+				const validation = await validateRequestBody(request, PixCreateSchema);
+				if (!validation.success) {
+					return jsonResponse({ error: validation.error }, 400, origin);
 				}
 
-				// CRITICAL: Validate external_reference (memberId) is provided
-				// Without this, webhook cannot activate the member after payment
-				if (!external_reference || external_reference.trim() === '') {
-					return jsonResponse({ error: 'Missing required field: external_reference (memberId)' }, 400, origin);
-				}
+				const { amount, description, payer_email, external_reference } = validation.data;
 
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
 					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
@@ -1068,8 +1158,13 @@ export default {
 
 			// Checkout Create (Card payment via Preference)
 			if (path === '/checkout/create' && method === 'POST') {
-				const body = await request.json() as CheckoutCreateBody;
-				const { items, payer, external_reference } = body;
+				// Validate input with Zod
+				const validation = await validateRequestBody(request, CheckoutCreateSchema);
+				if (!validation.success) {
+					return jsonResponse({ error: validation.error }, 400, origin);
+				}
+
+				const { items, payer, external_reference } = validation.data;
 
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
 					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
@@ -1142,12 +1237,13 @@ export default {
 
 			// Create Subscription
 			if (path === '/subscription/create' && method === 'POST') {
-				const body = await request.json() as SubscriptionCreateBody;
-				const { member_id, plan, frequency_type, payer_email, card_token, transaction_amount, reason } = body;
-
-				if (!member_id || !plan || !frequency_type || !payer_email || !card_token) {
-					return jsonResponse({ error: 'Missing required fields' }, 400, origin);
+				// Validate input with Zod
+				const validation = await validateRequestBody(request, SubscriptionCreateSchema);
+				if (!validation.success) {
+					return jsonResponse({ error: validation.error }, 400, origin);
 				}
+
+				const { member_id, plan, frequency_type, payer_email, card_token, transaction_amount, reason } = validation.data;
 
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
 					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
@@ -1458,11 +1554,14 @@ export default {
 			// Update Subscription Card
 			if (path.match(/^\/subscription\/[^/]+\/update-card$/) && method === 'PUT') {
 				const subscriptionId = path.split('/')[2];
-				const body = await request.json() as { card_token: string };
 
-				if (!body.card_token) {
-					return jsonResponse({ error: 'Card token required' }, 400, origin);
+				// Validate input with Zod
+				const validation = await validateRequestBody(request, UpdateCardSchema);
+				if (!validation.success) {
+					return jsonResponse({ error: validation.error }, 400, origin);
 				}
+
+				const { card_token } = validation.data;
 
 				if (!env.MERCADOPAGO_ACCESS_TOKEN) {
 					return jsonResponse({ error: 'Payment service not configured' }, 500, origin);
@@ -1474,7 +1573,7 @@ export default {
 						env.MERCADOPAGO_ACCESS_TOKEN,
 						`/preapproval/${subscriptionId}`,
 						'PUT',
-						{ card_token_id: body.card_token }
+						{ card_token_id: card_token }
 					);
 
 					// Update card info in Firestore
@@ -1514,25 +1613,59 @@ export default {
 
 				const dataId = url.searchParams.get('data.id') || body?.data?.id;
 
-				// Detect production environment (check if WORKER_URL contains localhost or dev domains)
-				const isProduction = env.WORKER_URL ?
-					!env.WORKER_URL.includes('localhost') && !env.WORKER_URL.includes('127.0.0.1') :
-					true;
-
-				const signatureValid = await verifyWebhookSignature(
+				// Verify webhook signature - ALWAYS required
+				const signatureResult = await verifyWebhookSignature(
 					xSignature,
 					xRequestId,
 					dataId ?? null,
-					env.MERCADOPAGO_WEBHOOK_SECRET || '',
-					isProduction
+					env.MERCADOPAGO_WEBHOOK_SECRET || ''
 				);
 
-				if (!signatureValid) {
-					console.error(`Webhook signature verification failed for payment ${dataId}`);
-					return new Response('Unauthorized', { status: 401 });
+				if (!signatureResult.valid) {
+					console.error(`[WEBHOOK] Rejected: ${signatureResult.reason} for payment ${dataId}`);
+					return jsonResponse(
+						{ error: 'Webhook signature verification failed', reason: signatureResult.reason },
+						401,
+						origin
+					);
 				}
 
 				const { type, action, data } = body;
+
+				// Idempotency check - prevent duplicate processing
+				const webhookKey = `${type}_${data?.id}`;
+				const idempotencyDocPath = `processed_webhooks/${webhookKey}`;
+
+				try {
+					// Check if webhook was already processed
+					const existingDoc = await firestoreRequest<FirestoreDocument>(
+						env.FIREBASE_PROJECT_ID,
+						idempotencyDocPath
+					);
+
+					if (existingDoc?.fields?.processed_at) {
+						console.log(`[WEBHOOK] Already processed: ${webhookKey}`);
+						return new Response('OK', { status: 200 });
+					}
+				} catch {
+					// Document doesn't exist, which is expected for new webhooks
+				}
+
+				// Mark as processing before doing any work
+				await firestoreRequest(
+					env.FIREBASE_PROJECT_ID,
+					idempotencyDocPath,
+					'PATCH',
+					{
+						fields: {
+							processed_at: { timestampValue: new Date().toISOString() },
+							type: { stringValue: type },
+							action: { stringValue: action || '' },
+							data_id: { stringValue: data?.id || '' },
+							request_id: { stringValue: xRequestId || '' },
+						},
+					}
+				);
 
 				// Handle subscription preapproval events
 				if (type === 'subscription_preapproval' && data?.id) {
@@ -2006,11 +2139,13 @@ export default {
 			// Send Verification Email
 			if (path === '/auth/send-verification-email' && method === 'POST') {
 				try {
-					const body = await request.json() as VerificationEmailBody;
-
-					if (!body.email || !body.uid) {
-						return jsonResponse({ error: 'Missing email or uid' }, 400, origin);
+					// Validate input with Zod
+					const validation = await validateRequestBody(request, VerificationEmailSchema);
+					if (!validation.success) {
+						return jsonResponse({ error: validation.error }, 400, origin);
 					}
+
+					const { email, uid, name } = validation.data;
 
 					if (!env.FIREBASE_API_KEY) {
 						return jsonResponse({ error: 'Firebase API key not configured' }, 500, origin);
@@ -2030,7 +2165,7 @@ export default {
 							headers: { 'Content-Type': 'application/json' },
 							body: JSON.stringify({
 								requestType: 'VERIFY_EMAIL',
-								email: body.email,
+								email: email,
 								continueUrl: continueUrl,
 								canHandleCodeInApp: false,
 							}),
@@ -2097,8 +2232,8 @@ export default {
 						'PATCH',
 						{
 							fields: {
-								uid: { stringValue: body.uid },
-								email: { stringValue: body.email },
+								uid: { stringValue: uid },
+								email: { stringValue: email },
 								expires_at: { timestampValue: expiresAt },
 								verified: { booleanValue: false },
 								created_at: { timestampValue: new Date().toISOString() },
@@ -2112,10 +2247,10 @@ export default {
 					// Send custom email via Resend
 					const emailResult = await sendEmail(
 						env.RESEND_API_KEY,
-						body.email,
+						email,
 						'verify-email',
 						{
-							nome: body.name || 'Membro',
+							nome: name || 'Membro',
 							verification_link: verificationLink,
 						},
 						env.FROM_EMAIL
@@ -2126,7 +2261,7 @@ export default {
 						return jsonResponse({ error: emailResult.error || 'Failed to send email' }, 500, origin);
 					}
 
-					console.log(`[AUTH] Verification email sent to ${body.email}`);
+					console.log(`[AUTH] Verification email sent to ${email}`);
 					return jsonResponse({ success: true }, 200, origin);
 				} catch (error: unknown) {
 					const err = error as { message?: string };
@@ -2138,18 +2273,20 @@ export default {
 			// Verify Email Token
 			if (path === '/auth/verify-email' && method === 'POST') {
 				try {
-					const body = await request.json() as { token: string };
-
-					if (!body.token) {
-						return jsonResponse({ error: 'Missing token' }, 400, origin);
+					// Validate input with Zod
+					const validation = await validateRequestBody(request, VerifyEmailTokenSchema);
+					if (!validation.success) {
+						return jsonResponse({ error: validation.error }, 400, origin);
 					}
+
+					const { token } = validation.data;
 
 					// Get verification record from Firestore
 					let verificationDoc: FirestoreDocument;
 					try {
 						verificationDoc = await firestoreRequest<FirestoreDocument>(
 							env.FIREBASE_PROJECT_ID,
-							`email_verifications/${body.token}`
+							`email_verifications/${token}`
 						);
 					} catch {
 						return jsonResponse({ error: 'Invalid or expired token' }, 400, origin);
@@ -2174,7 +2311,7 @@ export default {
 					// Mark as verified in Firestore
 					await firestoreRequest(
 						env.FIREBASE_PROJECT_ID,
-						`email_verifications/${body.token}?updateMask.fieldPaths=verified&updateMask.fieldPaths=verified_at`,
+						`email_verifications/${token}?updateMask.fieldPaths=verified&updateMask.fieldPaths=verified_at`,
 						'PATCH',
 						{
 							fields: {
@@ -2215,11 +2352,13 @@ export default {
 			// Send Password Reset Email
 			if (path === '/auth/send-password-reset' && method === 'POST') {
 				try {
-					const body = await request.json() as PasswordResetBody;
-
-					if (!body.email) {
-						return jsonResponse({ error: 'Missing email' }, 400, origin);
+					// Validate input with Zod
+					const validation = await validateRequestBody(request, PasswordResetSchema);
+					if (!validation.success) {
+						return jsonResponse({ error: validation.error }, 400, origin);
 					}
+
+					const { email } = validation.data;
 
 					if (!env.FIREBASE_API_KEY) {
 						return jsonResponse({ error: 'Firebase API key not configured' }, 500, origin);
@@ -2237,7 +2376,7 @@ export default {
 							headers: { 'Content-Type': 'application/json' },
 							body: JSON.stringify({
 								requestType: 'PASSWORD_RESET',
-								email: body.email,
+								email: email,
 								returnOobLink: true,
 							}),
 						}
@@ -2250,7 +2389,7 @@ export default {
 						// Don't expose "EMAIL_NOT_FOUND" to client for security
 						if (errorMessage === 'EMAIL_NOT_FOUND') {
 							// Return success even if email not found (security best practice)
-							console.log('[AUTH] Password reset requested for non-existent email:', body.email);
+							console.log('[AUTH] Password reset requested for non-existent email:', email);
 							return jsonResponse({ success: true }, 200, origin);
 						}
 						console.error('[AUTH] Firebase password reset error:', errorMessage);
@@ -2278,7 +2417,7 @@ export default {
 										fieldFilter: {
 											field: { fieldPath: 'email' },
 											op: 'EQUAL',
-											value: { stringValue: body.email },
+											value: { stringValue: email },
 										},
 									},
 									limit: 1,
@@ -2296,7 +2435,7 @@ export default {
 					// Send custom email via Resend
 					const emailResult = await sendEmail(
 						env.RESEND_API_KEY,
-						body.email,
+						email,
 						'password-reset',
 						{
 							nome: userName,
@@ -2310,7 +2449,7 @@ export default {
 						return jsonResponse({ error: emailResult.error || 'Failed to send email' }, 500, origin);
 					}
 
-					console.log(`[AUTH] Password reset email sent to ${body.email}`);
+					console.log(`[AUTH] Password reset email sent to ${email}`);
 					return jsonResponse({ success: true }, 200, origin);
 				} catch (error: unknown) {
 					const err = error as { message?: string };
@@ -2329,12 +2468,13 @@ export default {
 					return jsonResponse({ error: 'Email service not configured' }, 500, origin);
 				}
 
-				const body = await request.json() as EmailSendBody;
-				const { template, to, variables, member_id } = body;
-
-				if (!template || !to) {
-					return jsonResponse({ error: 'Missing required fields: template, to' }, 400, origin);
+				// Validate input with Zod
+				const validation = await validateRequestBody(request, EmailSendSchema);
+				if (!validation.success) {
+					return jsonResponse({ error: validation.error }, 400, origin);
 				}
+
+				const { template, to, variables, member_id } = validation.data;
 
 				if (!Object.keys(EMAIL_TEMPLATES).includes(template)) {
 					return jsonResponse({
@@ -2346,7 +2486,7 @@ export default {
 
 				// Log email in Firestore
 				try {
-					const logId = `email_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+					const logId = `email_${Date.now()}_${crypto.randomUUID()}`;
 					await firestoreRequest(env.FIREBASE_PROJECT_ID, `email_logs/${logId}`, 'PATCH', {
 						fields: {
 							member_id: { stringValue: member_id || '' },
@@ -2704,7 +2844,7 @@ export default {
 							);
 
 							// Create expiration transaction record
-							const txId = `expire_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+							const txId = `expire_${Date.now()}_${crypto.randomUUID()}`;
 							await firestoreRequest(
 								env.FIREBASE_PROJECT_ID,
 								`point_transactions/${txId}`,
@@ -2815,7 +2955,7 @@ export default {
 
 									// Log email
 									try {
-										const logId = `email_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+										const logId = `email_${Date.now()}_${crypto.randomUUID()}`;
 										await firestoreRequest(
 											env.FIREBASE_PROJECT_ID,
 											`email_logs/${logId}`,
@@ -2860,12 +3000,19 @@ export default {
 					return jsonResponse({ error: 'Email service not configured' }, 500, origin);
 				}
 
-				const body = await request.json() as ContractEmailBody;
-				const { to, member_name, plan, signed_at, hash, pdf_base64, admin_email } = body;
-
-				if (!to || !member_name || !plan || !signed_at || !pdf_base64) {
-					return jsonResponse({ error: 'Missing required fields: to, member_name, plan, signed_at, pdf_base64' }, 400, origin);
+				// Validate input with Zod (larger size limit for PDF)
+				const validation = await validateRequestBody(request, ContractEmailSchema, 10 * 1024 * 1024);
+				if (!validation.success) {
+					return jsonResponse({ error: validation.error }, 400, origin);
 				}
+
+				const { to, member_name, plan, signed_at, hash, pdf_base64, admin_email } = validation.data;
+
+				// Sanitize user-provided data to prevent XSS
+				const safeName = escapeHtml(member_name);
+				const safePlan = escapeHtml(plan);
+				const safeHash = escapeHtml(hash || '');
+				const safeTo = escapeHtml(to);
 
 				// Format date for display
 				const signedDate = new Date(signed_at);
@@ -2877,17 +3024,22 @@ export default {
 					minute: '2-digit',
 				});
 
-				// Get template HTML
+				// Get template HTML with sanitized variables
 				const templateConfig = EMAIL_TEMPLATES['contract-signed'];
 				const htmlContent = templateConfig.html({
-					nome: member_name,
-					plano: plan,
+					nome: safeName,
+					plano: safePlan,
 					data_assinatura: formattedDate,
-					hash: hash || '',
+					hash: safeHash,
 				});
 
-				// Prepare filename
-				const fileName = `contrato_${member_name.replace(/\s+/g, '_')}_${signedDate.toISOString().split('T')[0]}.pdf`;
+				// Prepare filename (sanitize for filesystem safety)
+				const safeFileName = member_name
+					.normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
+					.replace(/[^a-zA-Z0-9\s]/g, '') // Only alphanumeric and spaces
+					.replace(/\s+/g, '_') // Replace spaces with underscores
+					.substring(0, 50); // Limit length
+				const fileName = `contrato_${safeFileName}_${signedDate.toISOString().split('T')[0]}.pdf`;
 
 				try {
 					// Send email to member with PDF attachment using Resend API
@@ -2930,15 +3082,15 @@ export default {
 							body: JSON.stringify({
 								from: env.FROM_EMAIL || DEFAULT_FROM_EMAIL,
 								to: [adminTo],
-								subject: `[Admin] Contrato Assinado - ${member_name}`,
+								subject: `[Admin] Contrato Assinado - ${safeName}`,
 								html: `
 									<p>Um novo contrato foi assinado:</p>
 									<ul>
-										<li><strong>Nome:</strong> ${member_name}</li>
-										<li><strong>Email:</strong> ${to}</li>
-										<li><strong>Plano:</strong> ${plan}</li>
+										<li><strong>Nome:</strong> ${safeName}</li>
+										<li><strong>Email:</strong> ${safeTo}</li>
+										<li><strong>Plano:</strong> ${safePlan}</li>
 										<li><strong>Data:</strong> ${formattedDate}</li>
-										<li><strong>Hash:</strong> ${hash || 'N/A'}</li>
+										<li><strong>Hash:</strong> ${safeHash || 'N/A'}</li>
 									</ul>
 									<p>O contrato está anexado a este email.</p>
 								`,
@@ -2957,7 +3109,7 @@ export default {
 
 					// Log email in Firestore
 					try {
-						const logId = `contract_email_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+						const logId = `contract_email_${Date.now()}_${crypto.randomUUID()}`;
 						await firestoreRequest(env.FIREBASE_PROJECT_ID, `email_logs/${logId}`, 'PATCH', {
 							fields: {
 								type: { stringValue: 'contract' },
