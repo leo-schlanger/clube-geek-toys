@@ -358,6 +358,59 @@ export async function sendPasswordResetEmail(email: string): Promise<EmailRespon
 }
 
 /**
+ * Send contract email with PDF attachment
+ */
+export async function sendContractEmail(
+  email: string,
+  memberName: string,
+  plan: string,
+  signedAt: string,
+  hash: string,
+  pdfBase64: string,
+  adminEmail?: string
+): Promise<EmailResponse> {
+  try {
+    const response = await fetchWithRetry(`${API_URL}/email/send-contract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: email,
+        member_name: memberName,
+        plan,
+        signed_at: signedAt,
+        hash,
+        pdf_base64: pdfBase64,
+        admin_email: adminEmail,
+      }),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || 'Failed to send contract email',
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Contract email sent',
+      id: data.id,
+    }
+  } catch (error: unknown) {
+    logger.error('Contract email error:', error)
+    const err = error as { message?: string }
+    return {
+      success: false,
+      error: err.message || 'Network error',
+    }
+  }
+}
+
+/**
  * Verify email token via Worker
  */
 export async function verifyEmailToken(

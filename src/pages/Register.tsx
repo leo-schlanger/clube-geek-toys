@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/badge'
 import { Loading } from '../components/ui/loading'
 import { PaymentModal } from '../components/PaymentModal'
+import { ContractModal } from '../components/ContractModal'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency, validateCPF } from '../lib/utils'
 import { createMember, isCPFRegistered, updateMember } from '../lib/members'
@@ -61,9 +62,13 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showContractModal, setShowContractModal] = useState(false)
+  const [contractSigned, setContractSigned] = useState(false)
   const [createdMemberId, setCreatedMemberId] = useState<string | null>(null)
   const [memberEmail, setMemberEmail] = useState<string>('')
   const [memberName, setMemberName] = useState<string>('')
+  const [memberCPF, setMemberCPF] = useState<string>('')
+  const [memberPhone, setMemberPhone] = useState<string>('')
   const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
   const [validatingCpf, setValidatingCpf] = useState(false)
   const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
@@ -188,15 +193,22 @@ export default function Register() {
             setCreatedMemberId(member.id)
             setMemberEmail(member.email)
             setMemberName(sanitizedData.fullName)
+            setMemberCPF(sanitizedData.cpf)
+            setMemberPhone(sanitizedData.phone)
           }
         } catch (memberError) {
           logger.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
+          // Set member data even if Firestore save failed
+          setMemberEmail(sanitizedData.email)
+          setMemberName(sanitizedData.fullName)
+          setMemberCPF(sanitizedData.cpf)
+          setMemberPhone(sanitizedData.phone)
         }
       }
 
-      // 5. Move to payment step
-      setStep(3)
-      toast.success('Conta criada! Verifique seu email e finalize o pagamento.', { id: 'reg-status' })
+      // 5. Show contract modal for signature (before payment)
+      toast.success('Conta criada! Agora assine o contrato de adesão.', { id: 'reg-status' })
+      setShowContractModal(true)
 
     } catch (error) {
       logger.error('Error registering:', error)
@@ -204,6 +216,16 @@ export default function Register() {
     }
 
     setLoading(false)
+  }
+
+  /**
+   * Handle contract signed - move to payment step
+   */
+  function handleContractSigned() {
+    setShowContractModal(false)
+    setContractSigned(true)
+    setStep(3) // Move to payment step
+    toast.success('Contrato assinado! Agora finalize o pagamento.')
   }
 
   /**
@@ -421,17 +443,24 @@ export default function Register() {
 
         {/* Progress Steps */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
+          {[1, 2, 3, 4].map((s) => (
             <div key={s} className="flex items-center">
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${step >= s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                  }`}
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                  (s < 3 && step >= s) || (s === 3 && contractSigned) || (s === 4 && step >= 3)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground'
+                }`}
               >
-                {step > s ? <Check className="h-4 w-4" /> : s}
+                {(s < 3 && step > s) || (s === 3 && contractSigned) ? <Check className="h-4 w-4" /> : s}
               </div>
-              {s < 3 && (
+              {s < 4 && (
                 <div
-                  className={`w-12 h-1 transition-colors ${step > s ? 'bg-primary' : 'bg-muted'}`}
+                  className={`w-8 h-1 transition-colors ${
+                    (s < 2 && step > s) || (s === 2 && contractSigned) || (s === 3 && step >= 3)
+                      ? 'bg-primary'
+                      : 'bg-muted'
+                  }`}
                 />
               )}
             </div>
@@ -679,16 +708,33 @@ export default function Register() {
                 <CardHeader>
                   <CardTitle>Quase lá!</CardTitle>
                   <CardDescription>
-                    Sua conta foi criada. Agora finalize o pagamento para ativar seus benefícios.
+                    {contractSigned
+                      ? 'Contrato assinado! Agora finalize o pagamento para ativar seus benefícios.'
+                      : 'Sua conta foi criada. Agora finalize o pagamento para ativar seus benefícios.'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {contractSigned && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-green-600 bg-green-500/10 rounded-lg p-3">
+                      <Check className="h-4 w-4" />
+                      <span>Contrato assinado digitalmente</span>
+                    </div>
+                  )}
                   <p className="text-muted-foreground text-sm">
                     Você será redirecionado para o ambiente seguro do Mercado Pago.
                   </p>
-                  <Button className="w-full h-12 text-lg" onClick={() => setShowPaymentModal(true)}>
+                  <Button
+                    className="w-full h-12 text-lg"
+                    onClick={() => setShowPaymentModal(true)}
+                    disabled={!contractSigned}
+                  >
                     Finalizar Pagamento
                   </Button>
+                  {!contractSigned && (
+                    <p className="text-xs text-muted-foreground">
+                      Você precisa assinar o contrato antes de prosseguir com o pagamento.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -705,6 +751,23 @@ export default function Register() {
           <Link to="/privacidade" className="hover:text-foreground hover:underline">Privacidade</Link>
         </div>
       </motion.div>
+
+      {showContractModal && createdMemberId && (
+        <ContractModal
+          memberId={createdMemberId}
+          memberName={memberName}
+          memberCPF={memberCPF}
+          memberEmail={memberEmail}
+          memberPhone={memberPhone}
+          plan={selectedPlan}
+          paymentType={paymentType}
+          onClose={() => {
+            // Don't allow closing without signing
+            toast.error('Você precisa assinar o contrato para continuar')
+          }}
+          onSigned={handleContractSigned}
+        />
+      )}
 
       {showPaymentModal && (
         <PaymentModal

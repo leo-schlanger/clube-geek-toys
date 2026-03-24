@@ -305,3 +305,48 @@ export interface MemberWithSubscription extends Member {
   subscriptionStatus?: SubscriptionStatus
   autoRenewal?: boolean
 }
+
+// ============================================
+// CONTRACT TYPES
+// ============================================
+
+// Contract status
+export type ContractStatus = 'active' | 'superseded'
+
+// Contract data for digital signature
+export interface ContractData {
+  memberId: string
+  memberName: string
+  memberCPF: string
+  memberEmail: string
+  memberPhone: string
+  plan: PlanType
+  paymentType: PaymentType
+  signatureImage: string      // Base64 PNG of signature
+  signedAt: string            // ISO timestamp
+  ipAddress: string
+  userAgent: string
+  documentHash: string        // SHA-256 hash
+  pdfUrl?: string             // Firebase Storage URL
+  pdfPath?: string            // Storage path
+  createdAt: string
+}
+
+// Contract document stored in Firestore
+export interface Contract {
+  id: string
+  memberId: string
+  memberName: string
+  memberCPF: string
+  memberEmail: string
+  plan: PlanType
+  signaturePreview: string    // First 100 chars of base64 (for preview)
+  signedAt: string
+  ipAddress: string
+  userAgent: string
+  documentHash: string
+  pdfUrl: string
+  pdfPath: string
+  status: ContractStatus
+  createdAt: string
+}

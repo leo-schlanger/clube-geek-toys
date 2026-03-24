@@ -109,6 +109,10 @@ export default defineConfig({
             if (id.includes('recharts') || id.includes('d3-')) {
               return 'vendor-charts'
             }
+            // PDF and signature libraries - lazy loaded with contract
+            if (id.includes('pdf-lib') || id.includes('signature_pad')) {
+              return 'vendor-contract'
+            }
           }
         },
       },

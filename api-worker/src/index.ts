@@ -162,6 +162,16 @@ interface PasswordResetBody {
 	email: string;
 }
 
+interface ContractEmailBody {
+	to: string;
+	member_name: string;
+	plan: string;
+	signed_at: string;
+	hash: string;
+	pdf_base64: string;
+	admin_email?: string;
+}
+
 interface FirebaseOobCodeResponse {
 	oobLink?: string;
 	email?: string;
@@ -185,7 +195,7 @@ interface MonthlyReport {
 // EMAIL TEMPLATES
 // ============================================
 
-type EmailTemplate = 'welcome' | 'payment-confirmed' | 'payment-failed' | 'renewal-reminder' | 'points-expiring' | 'subscription-created' | 'subscription-payment' | 'subscription-paused' | 'subscription-cancelled' | 'subscription-payment-failed' | 'verify-email' | 'password-reset';
+type EmailTemplate = 'welcome' | 'payment-confirmed' | 'payment-failed' | 'renewal-reminder' | 'points-expiring' | 'subscription-created' | 'subscription-payment' | 'subscription-paused' | 'subscription-cancelled' | 'subscription-payment-failed' | 'verify-email' | 'password-reset' | 'contract-signed';
 
 interface EmailTemplateConfig {
 	subject: string;
@@ -667,6 +677,40 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, EmailTemplateConfig> = {
 						<p style="color: ${BRAND.primaryGold}; font-size: 12px; word-break: break-all; margin: 8px 0 0 0;">
 							${vars.verification_link}
 						</p>
+					</div>
+				</td>
+			</tr>
+		`),
+	},
+	'contract-signed': {
+		subject: 'Contrato Assinado - Clube Geek & Toys',
+		html: (vars) => createEmailBase('Contrato Assinado', `
+			${createStatusHeader('✓', 'Contrato Assinado', '#166534')}
+			<tr>
+				<td style="padding: 32px;">
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 8px 0;">
+						Olá, <strong style="color: ${BRAND.textPrimary};">${vars.nome}</strong>!
+					</p>
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 0 0 24px 0;">
+						Seu contrato de adesão ao Clube Geek & Toys foi assinado digitalmente com sucesso.
+					</p>
+
+					${createInfoCard([
+						createInfoItem('Plano', vars.plano),
+						createInfoItem('Data da Assinatura', vars.data_assinatura),
+						createInfoItem('Hash do Documento', vars.hash ? vars.hash.substring(0, 16) + '...' : 'N/A', true),
+					], BRAND.successGreen)}
+
+					<p style="color: ${BRAND.textSecondary}; font-size: 15px; line-height: 1.7; margin: 24px 0;">
+						Uma cópia do contrato assinado está anexada a este email. Guarde este documento para seus registros.
+					</p>
+
+					<p style="color: ${BRAND.textMuted}; font-size: 13px; line-height: 1.6; margin: 24px 0 0 0;">
+						Este contrato tem validade jurídica conforme Lei 14.063/2020 (assinatura eletrônica simples).
+					</p>
+
+					<div style="text-align: center; margin: 32px 0 8px 0;">
+						${createButton('Acessar Minha Conta', vars.dashboard_url || BRAND.clubUrl + '/minha-conta', BRAND.primaryGold)}
 					</div>
 				</td>
 			</tr>
@@ -2803,6 +2847,143 @@ export default {
 				} catch (error: unknown) {
 					console.error('Renewal reminders error:', error);
 					return jsonResponse({ error: 'Failed to send renewal reminders' }, 500, origin);
+				}
+			}
+
+			// ============================================
+			// CONTRACT EMAIL ROUTE
+			// ============================================
+
+			// Send Contract Email with PDF attachment
+			if (path === '/email/send-contract' && method === 'POST') {
+				if (!env.RESEND_API_KEY) {
+					return jsonResponse({ error: 'Email service not configured' }, 500, origin);
+				}
+
+				const body = await request.json() as ContractEmailBody;
+				const { to, member_name, plan, signed_at, hash, pdf_base64, admin_email } = body;
+
+				if (!to || !member_name || !plan || !signed_at || !pdf_base64) {
+					return jsonResponse({ error: 'Missing required fields: to, member_name, plan, signed_at, pdf_base64' }, 400, origin);
+				}
+
+				// Format date for display
+				const signedDate = new Date(signed_at);
+				const formattedDate = signedDate.toLocaleString('pt-BR', {
+					day: '2-digit',
+					month: '2-digit',
+					year: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit',
+				});
+
+				// Get template HTML
+				const templateConfig = EMAIL_TEMPLATES['contract-signed'];
+				const htmlContent = templateConfig.html({
+					nome: member_name,
+					plano: plan,
+					data_assinatura: formattedDate,
+					hash: hash || '',
+				});
+
+				// Prepare filename
+				const fileName = `contrato_${member_name.replace(/\s+/g, '_')}_${signedDate.toISOString().split('T')[0]}.pdf`;
+
+				try {
+					// Send email to member with PDF attachment using Resend API
+					const memberEmailResult = await fetch('https://api.resend.com/emails', {
+						method: 'POST',
+						headers: {
+							'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							from: env.FROM_EMAIL || DEFAULT_FROM_EMAIL,
+							to: [to],
+							subject: templateConfig.subject,
+							html: htmlContent,
+							attachments: [
+								{
+									filename: fileName,
+									content: pdf_base64,
+								},
+							],
+						}),
+					});
+
+					const memberResult = await memberEmailResult.json() as ResendResponse;
+
+					if (!memberEmailResult.ok) {
+						console.error('Failed to send contract email to member:', memberResult);
+						return jsonResponse({ error: memberResult.message || 'Failed to send email' }, 500, origin);
+					}
+
+					// Send copy to admin (if configured)
+					const adminTo = admin_email || 'admin@geeketoys.com.br';
+					try {
+						await fetch('https://api.resend.com/emails', {
+							method: 'POST',
+							headers: {
+								'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+								'Content-Type': 'application/json',
+							},
+							body: JSON.stringify({
+								from: env.FROM_EMAIL || DEFAULT_FROM_EMAIL,
+								to: [adminTo],
+								subject: `[Admin] Contrato Assinado - ${member_name}`,
+								html: `
+									<p>Um novo contrato foi assinado:</p>
+									<ul>
+										<li><strong>Nome:</strong> ${member_name}</li>
+										<li><strong>Email:</strong> ${to}</li>
+										<li><strong>Plano:</strong> ${plan}</li>
+										<li><strong>Data:</strong> ${formattedDate}</li>
+										<li><strong>Hash:</strong> ${hash || 'N/A'}</li>
+									</ul>
+									<p>O contrato está anexado a este email.</p>
+								`,
+								attachments: [
+									{
+										filename: fileName,
+										content: pdf_base64,
+									},
+								],
+							}),
+						});
+					} catch (adminError) {
+						console.error('Failed to send admin copy:', adminError);
+						// Don't fail the request if admin email fails
+					}
+
+					// Log email in Firestore
+					try {
+						const logId = `contract_email_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+						await firestoreRequest(env.FIREBASE_PROJECT_ID, `email_logs/${logId}`, 'PATCH', {
+							fields: {
+								type: { stringValue: 'contract' },
+								recipient: { stringValue: to },
+								member_name: { stringValue: member_name },
+								plan: { stringValue: plan },
+								hash: { stringValue: hash || '' },
+								status: { stringValue: 'sent' },
+								sent_at: { timestampValue: new Date().toISOString() },
+								resend_id: { stringValue: memberResult.id || '' },
+							},
+						});
+					} catch (e) {
+						console.error('Contract email log save error:', e);
+					}
+
+					return jsonResponse({
+						success: true,
+						message: 'Contract email sent successfully',
+						id: memberResult.id,
+					}, 200, origin);
+
+				} catch (error: unknown) {
+					console.error('Contract email error:', error);
+					const err = error as { message?: string };
+					return jsonResponse({ error: err.message || 'Failed to send contract email' }, 500, origin);
 				}
 			}
 

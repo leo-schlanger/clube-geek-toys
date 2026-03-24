@@ -204,6 +204,34 @@ service cloud.firestore {
     }
 
     // ============================================
+    // COLLECTION: CONTRACTS
+    // ============================================
+
+    match /contracts/{contractId} {
+      // Read: own contracts (by member_id) or admin
+      allow read: if isAuthenticated() &&
+        (exists(/databases/$(database)/documents/members/$(resource.data.memberId)) &&
+         get(/databases/$(database)/documents/members/$(resource.data.memberId)).data.user_id == request.auth.uid ||
+         isAdmin());
+
+      // Create: authenticated user can create own contract
+      allow create: if isAuthenticated() &&
+        (request.resource.data.memberId != null &&
+         exists(/databases/$(database)/documents/members/$(request.resource.data.memberId)) &&
+         get(/databases/$(database)/documents/members/$(request.resource.data.memberId)).data.user_id == request.auth.uid);
+
+      // Update: only admin (to mark as superseded)
+      allow update: if isAdmin() ||
+        (isAuthenticated() &&
+         exists(/databases/$(database)/documents/members/$(resource.data.memberId)) &&
+         get(/databases/$(database)/documents/members/$(resource.data.memberId)).data.user_id == request.auth.uid &&
+         onlyFieldsChanged(['status']));
+
+      // Delete: never (audit trail)
+      allow delete: if false;
+    }
+
+    // ============================================
     // DEFAULT: DENY ALL
     // ============================================
 
