@@ -43,6 +43,19 @@
   - 10 templates de email para ciclo de vida da assinatura
   - Cancelamento automático após 3 falhas consecutivas
 
+### Jurídico
+
+- [x] 🆓 **Sistema de Contrato Digital com Assinatura Eletrônica** ✅ (Março 2026)
+  - ContractModal com 3 steps: leitura obrigatória, assinatura, confirmação
+  - Geração de PDF A4 profissional com pdf-lib
+  - Captura de assinatura digital via canvas (signature_pad)
+  - Hash SHA-256 para integridade do documento
+  - Registro de auditoria: IP, User-Agent, timestamp
+  - Upload automático para Firebase Storage
+  - Envio de cópia por email (membro + admin)
+  - Conformidade com Lei 14.063/2020 (assinatura eletrônica simples)
+  - Integrado ao fluxo de cadastro (antes do pagamento)
+
 ---
 
 ## 🟠 ALTO - Concluído ✅
@@ -237,6 +250,7 @@
 | ------------------ | ----- | ---------------------------------- |
 | Firebase Auth      | Spark | Ilimitado                          |
 | Firestore          | Spark | 50k leituras/dia, 20k escritas/dia |
+| Firebase Storage   | Spark | 5GB storage, 1GB/dia download      |
 | Vercel Hosting     | Hobby | 100GB bandwidth/mês                |
 | Vercel Analytics   | Hobby | 2.5k eventos/mês                   |
 | GitHub             | Free  | Repos privados ilimitados          |
@@ -323,4 +337,4 @@
 
 ---
 
-_Documento atualizado em 21 de Março de 2026_
+_Documento atualizado em 24 de Março de 2026_

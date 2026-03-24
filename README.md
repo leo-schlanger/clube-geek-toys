@@ -23,6 +23,7 @@ Sistema completo de gerenciamento de clube de assinaturas para a loja Geek & Toy
 ### Recursos Avançados
 
 - **Sistema de Pontos**: Acúmulo e resgate de pontos com histórico completo
+- **Contrato Digital**: Assinatura eletrônica com validade jurídica (Lei 14.063/2020)
 - **PWA (Progressive Web App)**: Instalável como app no celular
 - **Virtual Scrolling**: Performance otimizada para listas grandes
 - **Skeleton Loading**: Carregamento visual com placeholders animados
@@ -35,12 +36,15 @@ Sistema completo de gerenciamento de clube de assinaturas para a loja Geek & Toy
 
 - **Frontend**: React 19, TypeScript, Vite 7
 - **Estilização**: Tailwind CSS 3, shadcn/ui components
-- **Backend**: Firebase (Auth, Firestore, Cloud Functions)
+- **Backend**: Firebase (Auth, Firestore, Storage), Cloudflare Workers
 - **Pagamentos**: Mercado Pago (PIX e Cartão)
 - **State Management**: React Query (TanStack Query)
 - **Forms**: React Hook Form + Zod validation
+- **PDF Generation**: pdf-lib (contratos digitais)
+- **Signature**: signature_pad (assinatura digital)
 - **Virtualização**: @tanstack/react-virtual
 - **PWA**: vite-plugin-pwa
+- **Email**: Resend API (templates customizados)
 - **Analytics**: Vercel Analytics + Speed Insights
 - **Code Quality**: ESLint, Prettier, Husky, lint-staged
 
@@ -229,8 +233,11 @@ clube-geek-toys/
 │   │   │   └── SettingsTab.tsx   # Configurações
 │   │   ├── VirtualTable.tsx # Tabela com virtual scrolling
 │   │   ├── PaymentModal.tsx # Modal de pagamento PIX/Cartão
+│   │   ├── ContractModal.tsx # Modal de contrato com assinatura digital
 │   │   ├── QRScanner.tsx    # Scanner de QR Code
 │   │   └── ...              # Outros componentes
+│   ├── data/                # Dados estáticos
+│   │   └── contract-content.ts # Conteúdo do regulamento
 │   ├── contexts/            # Contextos React
 │   │   └── AuthContext.tsx  # Autenticação Firebase
 │   ├── hooks/               # Custom React Hooks
@@ -241,6 +248,10 @@ clube-geek-toys/
 │   │   ├── members.ts       # CRUD membros
 │   │   ├── payments.ts      # Integração pagamentos
 │   │   ├── points.ts        # Sistema de pontos
+│   │   ├── contract-generator.ts # Geração de PDF de contrato
+│   │   ├── contract-storage.ts   # Upload de contratos
+│   │   ├── signature-utils.ts    # Hash SHA-256 e validação
+│   │   ├── email.ts         # Envio de emails
 │   │   ├── retry.ts         # Retry com exponential backoff
 │   │   ├── rate-limit.ts    # Rate limiting para login
 │   │   ├── error-tracking.ts # Error tracking (Sentry ready)
@@ -265,7 +276,8 @@ clube-geek-toys/
 │   └── TODO.md              # Lista de melhorias
 ├── .husky/                  # Git hooks
 │   └── pre-commit           # Lint antes do commit
-├── firestore.rules          # Regras de segurança
+├── firestore.rules          # Regras de segurança Firestore
+├── storage.rules            # Regras de segurança Storage
 ├── firestore.indexes.json   # Índices do Firestore
 ├── firebase.json            # Configuração Firebase
 └── .env.example             # Exemplo de variáveis
