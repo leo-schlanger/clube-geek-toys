@@ -16,6 +16,9 @@
     "setup:seller": "npx tsx scripts/setup-seller.ts",
     "get:uid": "npx tsx scripts/get-uid-by-email.ts",
     "deploy:firestore": "firebase deploy --only firestore",
+    "deploy:storage": "firebase deploy --only storage",
+    "deploy:rules": "firebase deploy --only firestore,storage",
+    "backup:firestore": "gcloud firestore export gs://clube-geek-toys-backups/$(date +%Y%m%d_%H%M%S) --project=clube-geek-toys",
     "emulators": "firebase emulators:start",
     "prepare": "husky"
   },

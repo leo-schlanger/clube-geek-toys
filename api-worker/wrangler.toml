@@ -21,3 +21,12 @@ FROM_EMAIL = "Clube Geek & Toys <contato@geeketoys.com.br>"
 # Runs daily at 6:00 AM UTC (3:00 AM BRT)
 [triggers]
 crons = ["0 6 * * *"]
+
+# Rate Limiting KV (create with: wrangler kv namespace create RATE_LIMIT)
+# Uncomment after creating the namespace:
+# [[kv_namespaces]]
+# binding = "RATE_LIMIT"
+# id = "<your-kv-namespace-id>"
+
+# Security: Rate limiting configuration
+# To enable, create KV namespace and add rate limiting logic to worker

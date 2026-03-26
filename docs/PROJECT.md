@@ -4,6 +4,17 @@
 
 Sistema de gestão de clube de assinaturas para a loja Geek & Toys. Permite gerenciar membros, planos de assinatura, pontos de fidelidade e pagamentos.
 
+## Dados da Empresa
+
+| Campo             | Valor                                                  |
+| ----------------- | ------------------------------------------------------ |
+| **Razão Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda |
+| **Nome Fantasia** | Geek & Toys                                            |
+| **CNPJ**          | 52.846.344/0001-10                                     |
+| **Endereço**      | Rua Barata Ribeiro, 181, Loja J - Copacabana, RJ       |
+| **CEP**           | 22.011-001                                             |
+| **Situação**      | ATIVA                                                  |
+
 ## Stack Tecnológica
 
 ### Frontend
@@ -11,16 +22,16 @@ Sistema de gestão de clube de assinaturas para a loja Geek & Toys. Permite gere
 | Tecnologia      | Versão  | Uso                     |
 | --------------- | ------- | ----------------------- |
 | React           | 19.2.0  | UI Framework            |
-| TypeScript      | 5.8.3   | Tipagem estática        |
+| TypeScript      | 5.9.3   | Tipagem estática        |
 | Vite            | 7.3.1   | Build tool              |
-| TailwindCSS     | 4.1.3   | Estilização             |
+| TailwindCSS     | 3.4.17  | Estilização             |
 | React Router    | 7.13.1  | Roteamento SPA          |
 | TanStack Query  | 5.90.21 | Cache e estado servidor |
 | React Hook Form | 7.71.2  | Formulários             |
-| Zod             | 3.25.2  | Validação de schemas    |
-| Framer Motion   | 12.11.4 | Animações               |
+| Zod             | 4.3.6   | Validação de schemas    |
+| Framer Motion   | 12.34.4 | Animações               |
 | Lucide React    | 0.575.0 | Ícones                  |
-| Sonner          | 2.0.5   | Notificações toast      |
+| Sonner          | 2.0.7   | Notificações toast      |
 
 ### Backend/Serviços
 
@@ -28,9 +39,11 @@ Sistema de gestão de clube de assinaturas para a loja Geek & Toys. Permite gere
 | ------------------ | --------------------------- |
 | Firebase Auth      | Autenticação de usuários    |
 | Firebase Firestore | Banco de dados NoSQL        |
-| Vercel             | Hosting do frontend         |
+| Firebase Storage   | Armazenamento de contratos  |
+| Firebase Hosting   | Hosting do frontend         |
 | Cloudflare Workers | API para emails e webhooks  |
 | Mercado Pago       | Processamento de pagamentos |
+| Resend             | Emails transacionais        |
 | Brasil API         | Validação de CPF            |
 
 ## Arquitetura
@@ -333,19 +346,19 @@ clube-geek-toys/
 
 ## Planos de Assinatura
 
-| Plano  | Mensal   | Anual     | Multiplicador de Pontos |
-| ------ | -------- | --------- | ----------------------- |
-| Silver | R$ 29,90 | R$ 299,00 | 1x                      |
-| Gold   | R$ 49,90 | R$ 499,00 | 1.5x                    |
-| Black  | R$ 79,90 | R$ 799,00 | 2x                      |
+| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Serviços | Multiplicador Pontos |
+| ------ | -------- | --------- | -------------- | -------------- | -------------------- |
+| Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x                   |
+| Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                   |
+| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x                   |
 
 ### Cálculo de Pontos
 
 ```
-pontos = (valor_compra / 10) * multiplicador_plano
+pontos = valor_compra * multiplicador_plano
 ```
 
-Exemplo: Compra de R$ 100,00 no plano Gold = 15 pontos
+Exemplo: Compra de R$ 100,00 no plano Gold = 200 pontos
 
 ## Segurança
 

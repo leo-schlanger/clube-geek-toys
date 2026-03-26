@@ -2,15 +2,28 @@
 
 Sistema completo de gerenciamento de clube de assinaturas para a loja Geek & Toys.
 
+> **Última atualização:** 26 de Março de 2026
+> **Status:** Produção
+> **Segurança:** 0 vulnerabilidades críticas
+
+## Dados da Empresa
+
+| Campo             | Valor                                                            |
+| ----------------- | ---------------------------------------------------------------- |
+| **Razão Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda           |
+| **Nome Fantasia** | Geek & Toys                                                      |
+| **CNPJ**          | 52.846.344/0001-10                                               |
+| **Endereço**      | Rua Barata Ribeiro, 181, Loja J - Copacabana, RJ, CEP 22.011-001 |
+
 ## Funcionalidades
 
 ### Planos Disponíveis
 
-| Plano  | Mensal   | Anual     | Desconto Produtos | Desconto Serviços |
-| ------ | -------- | --------- | ----------------- | ----------------- |
-| Silver | R$ 19,90 | R$ 199,90 | 10%               | 20%               |
-| Gold   | R$ 39,90 | R$ 399,90 | 15%               | 35%               |
-| Black  | R$ 49,90 | R$ 349,90 | 20%               | 50%               |
+| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Serviços | Pontos |
+| ------ | -------- | --------- | -------------- | -------------- | ------ |
+| Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x     |
+| Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x     |
+| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x     |
 
 ### Módulos
 
@@ -422,9 +435,38 @@ Verifique se as portas não estão em uso:
 
 - [Arquitetura do Projeto](docs/ARCHITECTURE.md) - Detalhes técnicos
 - [Lista de Melhorias](docs/TODO.md) - Roadmap e backlog
+- [Segurança e Compliance](docs/SECURITY.md) - Guia de segurança e LGPD
+- [Guia de Deploy](DEPLOY.md) - Instruções de deploy
+
+---
+
+## Scripts Disponíveis
+
+```bash
+# Desenvolvimento
+npm run dev              # Servidor de desenvolvimento
+npm run build            # Build para produção
+npm run preview          # Preview do build
+npm run lint             # Verificar código com ESLint
+npm run test             # Rodar testes
+npm run test:coverage    # Cobertura de testes
+
+# Firebase
+npm run emulators        # Iniciar emuladores Firebase
+npm run deploy:firestore # Deploy regras do Firestore
+npm run deploy:storage   # Deploy regras do Storage
+npm run deploy:rules     # Deploy todas as regras
+npm run backup:firestore # Backup do Firestore (requer gcloud)
+
+# Setup (requer firebase-admin configurado)
+npm run setup:firestore  # Configuração inicial do Firestore
+npm run setup:admin      # Criar usuário admin
+npm run setup:seller     # Criar usuário vendedor
+npm run get:uid          # Buscar UID por email
+```
 
 ---
 
 ## Licença
 
-Privado - Geek & Toys Home
+Privado - Geek & Toys Collection

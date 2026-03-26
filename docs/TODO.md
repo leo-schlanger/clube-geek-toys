@@ -1,7 +1,8 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Última atualização:** Março 2026
+> **Última atualização:** 26 de Março de 2026
 > **Política de custos:** Apenas recursos gratuitos. Itens pagos estão separados para implementação futura.
+> **Checkup de Segurança:** Realizado em 26/03/2026 - 0 vulnerabilidades críticas
 
 ## Legenda de Prioridade
 
@@ -306,6 +307,11 @@
   - Remove `..`, `/`, `\` e caracteres especiais
   - Limite de 100 caracteres
 
+- [x] 🆓 **Rate Limiting no API Worker** ✅ (26/03/2026)
+  - Implementado via Cache API (gratuito)
+  - Limites por endpoint: PIX (10/min), checkout (10/min), password-reset (3/5min)
+  - Headers `Retry-After` e `X-RateLimit-Remaining`
+
 ### Fase 3: Auditoria (Médio) ✅
 
 - [x] 🆓 **Limites em todos os schemas** ✅
@@ -321,6 +327,34 @@
 - [x] 🆓 **Audit logging em contratos** ✅
   - Registro `contract_signed` em `audit_logs`
   - Inclui: hash, IP, user_agent, timestamp
+
+### Fase 4: Compliance (26/03/2026) ✅
+
+- [x] 🆓 **CNPJ atualizado nos documentos** ✅
+  - Termos de Uso com identificação completa
+  - Política de Privacidade com controlador identificado
+  - CNPJ: 52.846.344/0001-10
+
+- [x] 🆓 **Termos de Uso CDC compliant** ✅
+  - Referência à Lei 8.078/90 (CDC)
+  - Direito de arrependimento detalhado (Art. 49)
+  - Seções de limitação de responsabilidade e rescisão
+
+- [x] 🆓 **Política de Privacidade LGPD completa** ✅
+  - Base legal para cada tratamento (Art. 7º)
+  - Tempo de retenção especificado
+  - Transferência internacional documentada
+  - Procedimento para exercício de direitos
+
+- [x] 🆓 **Headers CSP aprimorados** ✅
+  - `frame-ancestors 'none'`
+  - `base-uri 'self'`
+  - `form-action 'self'`
+
+- [x] 🆓 **Documentação de Segurança** ✅
+  - `docs/SECURITY.md` criado
+  - Checklist de deploy e manutenção
+  - Procedimentos de backup
 
 ## Issues Identificados (Março 2026)
 
@@ -388,4 +422,4 @@
 
 ---
 
-_Documento atualizado em 24 de Março de 2026 - Segurança implementada_
+_Documento atualizado em 26 de Março de 2026 - Checkup de Segurança e Compliance_

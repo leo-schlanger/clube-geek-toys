@@ -403,7 +403,14 @@ const id = await withRetry(
 │  - HMAC-SHA256 signature verification               │
 │  - Mandatory webhook secret                         │
 │  - Idempotency checking (processed_webhooks)        │
-│  - Rate limiting                                    │
+│  - Timestamp validation (5 min max)                 │
+├────────────────────────────────────────────────────┤
+│              LAYER 7: Rate Limiting                 │
+│  - Cloudflare Cache API (gratuito)                  │
+│  - Por IP e por endpoint                            │
+│  - PIX/Checkout: 10 req/min                         │
+│  - Password Reset: 3 req/5min                       │
+│  - Default: 100 req/min                             │
 └────────────────────────────────────────────────────┘
 ```
 

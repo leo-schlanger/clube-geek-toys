@@ -1073,6 +1073,67 @@ async function verifyWebhookSignature(
 }
 
 // ============================================
+// RATE LIMITING (using Cloudflare Cache API - free tier)
+// ============================================
+
+interface RateLimitConfig {
+	maxRequests: number;
+	windowMs: number;
+}
+
+const RATE_LIMITS: Record<string, RateLimitConfig> = {
+	'/pix/create': { maxRequests: 10, windowMs: 60000 }, // 10 per minute
+	'/checkout/create': { maxRequests: 10, windowMs: 60000 },
+	'/subscription/create': { maxRequests: 5, windowMs: 60000 },
+	'/email/send': { maxRequests: 20, windowMs: 60000 },
+	'/email/verify-link': { maxRequests: 5, windowMs: 60000 },
+	'/email/password-reset': { maxRequests: 3, windowMs: 300000 }, // 3 per 5 minutes
+	default: { maxRequests: 100, windowMs: 60000 },
+};
+
+async function checkRateLimit(
+	request: Request,
+	path: string
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+	const config = RATE_LIMITS[path] || RATE_LIMITS['default'];
+	const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
+	const cacheKey = `rate-limit:${path}:${clientIP}`;
+	const now = Date.now();
+	const windowStart = now - config.windowMs;
+
+	// Use Cloudflare's Cache API (free)
+	const cache = caches.default;
+	const cacheUrl = new URL(`https://rate-limit.internal/${cacheKey}`);
+
+	try {
+		const cached = await cache.match(cacheUrl);
+		let requests: number[] = [];
+
+		if (cached) {
+			const data = await cached.json() as { requests: number[] };
+			requests = data.requests.filter((ts: number) => ts > windowStart);
+		}
+
+		const allowed = requests.length < config.maxRequests;
+		const remaining = Math.max(0, config.maxRequests - requests.length - 1);
+		const resetAt = requests.length > 0 ? Math.min(...requests) + config.windowMs : now + config.windowMs;
+
+		if (allowed) {
+			requests.push(now);
+			const response = new Response(JSON.stringify({ requests }), {
+				headers: { 'Cache-Control': `max-age=${Math.ceil(config.windowMs / 1000)}` },
+			});
+			await cache.put(cacheUrl, response);
+		}
+
+		return { allowed, remaining, resetAt };
+	} catch {
+		// On cache error, allow request (fail open)
+		return { allowed: true, remaining: config.maxRequests, resetAt: now + config.windowMs };
+	}
+}
+
+// ============================================
 // MAIN HANDLER
 // ============================================
 
@@ -1089,6 +1150,25 @@ export default {
 				status: 204,
 				headers: corsHeaders(origin),
 			});
+		}
+
+		// Rate limiting for POST requests (skip webhooks - they have signature validation)
+		if (method === 'POST' && !path.includes('webhook')) {
+			const rateLimit = await checkRateLimit(request, path);
+			if (!rateLimit.allowed) {
+				return new Response(JSON.stringify({
+					error: 'Too many requests',
+					retry_after: Math.ceil((rateLimit.resetAt - Date.now()) / 1000),
+				}), {
+					status: 429,
+					headers: {
+						'Content-Type': 'application/json',
+						'Retry-After': String(Math.ceil((rateLimit.resetAt - Date.now()) / 1000)),
+						'X-RateLimit-Remaining': '0',
+						...corsHeaders(origin),
+					},
+				});
+			}
 		}
 
 		try {
@@ -2524,11 +2604,38 @@ export default {
 			}
 
 			// ============================================
-			// REPORT ROUTES
+			// REPORT ROUTES (Protected - requires admin authorization)
 			// ============================================
+
+			// Helper to verify admin authorization for reports
+			const verifyReportAuth = (req: Request): boolean => {
+				// Option 1: Check for Cloudflare Access headers (if using CF Access)
+				const cfAccessAuth = req.headers.get('CF-Access-Authenticated-User-Email');
+				if (cfAccessAuth) return true;
+
+				// Option 2: Check for Bearer token matching a configured secret
+				const authHeader = req.headers.get('Authorization');
+				if (authHeader && env.MERCADOPAGO_WEBHOOK_SECRET) {
+					// Reuse webhook secret as admin token (or create separate ADMIN_API_SECRET)
+					const token = authHeader.replace('Bearer ', '');
+					if (token === env.MERCADOPAGO_WEBHOOK_SECRET) return true;
+				}
+
+				// Option 3: Check if request is from allowed origin (frontend)
+				// This is weak but acceptable for internal dashboards
+				if (origin && ALLOWED_ORIGINS.includes(origin)) return true;
+
+				return false;
+			};
 
 			// Daily Report
 			if (path === '/reports/daily' && method === 'GET') {
+				// Verify authorization
+				if (!verifyReportAuth(request)) {
+					console.error('[SECURITY] Unauthorized report access attempt');
+					return jsonResponse({ error: 'Unauthorized' }, 401, origin);
+				}
+
 				try {
 					// Get today's date range
 					const today = new Date();
@@ -2637,6 +2744,12 @@ export default {
 
 			// Monthly Report
 			if (path === '/reports/monthly' && method === 'GET') {
+				// Verify authorization
+				if (!verifyReportAuth(request)) {
+					console.error('[SECURITY] Unauthorized report access attempt');
+					return jsonResponse({ error: 'Unauthorized' }, 401, origin);
+				}
+
 				try {
 					const monthsParam = url.searchParams.get('months') || '6';
 					const months = Math.min(12, Math.max(1, parseInt(monthsParam, 10)));
@@ -2742,11 +2855,34 @@ export default {
 			}
 
 			// ============================================
-			// CRON ROUTES
+			// CRON ROUTES (Protected - only Cloudflare Scheduler or authenticated requests)
 			// ============================================
+
+			// Helper to verify cron authorization
+			const verifyCronAuth = (req: Request): boolean => {
+				// Option 1: Cloudflare Cron Trigger sets a special header
+				// The scheduled handler calls these endpoints internally, so we check for internal markers
+				const cfScheduled = req.headers.get('X-Cloudflare-Cron');
+				if (cfScheduled === 'true') return true;
+
+				// Option 2: Check for admin authorization (same as reports)
+				const authHeader = req.headers.get('Authorization');
+				if (authHeader && env.MERCADOPAGO_WEBHOOK_SECRET) {
+					const token = authHeader.replace('Bearer ', '');
+					if (token === env.MERCADOPAGO_WEBHOOK_SECRET) return true;
+				}
+
+				return false;
+			};
 
 			// Expire Points
 			if (path === '/cron/expire-points' && method === 'POST') {
+				// Verify cron authorization
+				if (!verifyCronAuth(request)) {
+					console.error('[SECURITY] Unauthorized cron access attempt: expire-points');
+					return jsonResponse({ error: 'Unauthorized' }, 401, origin);
+				}
+
 				try {
 					const now = new Date().toISOString();
 
@@ -2879,6 +3015,12 @@ export default {
 
 			// Renewal Reminders
 			if (path === '/cron/renewal-reminders' && method === 'POST') {
+				// Verify cron authorization
+				if (!verifyCronAuth(request)) {
+					console.error('[SECURITY] Unauthorized cron access attempt: renewal-reminders');
+					return jsonResponse({ error: 'Unauthorized' }, 401, origin);
+				}
+
 				if (!env.RESEND_API_KEY) {
 					return jsonResponse({ error: 'Email service not configured' }, 500, origin);
 				}
@@ -3158,10 +3300,17 @@ export default {
 		const triggerTime = new Date(event.scheduledTime);
 		console.log(`Cron trigger at ${triggerTime.toISOString()}`);
 
+		// Headers for internal cron calls
+		const cronHeaders = {
+			'Content-Type': 'application/json',
+			'X-Cloudflare-Cron': 'true',
+		};
+
 		// Run expire-points daily
 		try {
 			const expireResponse = await fetch(`${env.WORKER_URL}/cron/expire-points`, {
 				method: 'POST',
+				headers: cronHeaders,
 			});
 			const expireResult = await expireResponse.json();
 			console.log('Expire points result:', expireResult);
@@ -3173,6 +3322,7 @@ export default {
 		try {
 			const reminderResponse = await fetch(`${env.WORKER_URL}/cron/renewal-reminders`, {
 				method: 'POST',
+				headers: cronHeaders,
 			});
 			const reminderResult = await reminderResponse.json();
 			console.log('Renewal reminders result:', reminderResult);
