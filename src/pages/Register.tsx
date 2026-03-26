@@ -74,6 +74,12 @@ export default function Register() {
   const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
   const [validatingEmail, setValidatingEmail] = useState(false)
 
+  // Rate limiting: max attempts for validation
+  const [cpfValidationAttempts, setCpfValidationAttempts] = useState(0)
+  const [emailValidationAttempts, setEmailValidationAttempts] = useState(0)
+  const MAX_VALIDATION_ATTEMPTS = 5
+  const VALIDATION_COOLDOWN_MS = 60000 // 1 minute cooldown after max attempts
+
   // Get plan from URL params
   const planParam = searchParams.get('plano') as PlanType || 'silver'
   const typeParam = searchParams.get('tipo') as PaymentType || 'monthly'
@@ -348,9 +354,10 @@ export default function Register() {
   }
 
   /**
-   * Validate CPF via Brasil API (com debounce para evitar chamadas excessivas)
+   * Validate CPF via Brasil API (com debounce e rate limiting)
    */
   const cpfValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cpfRateLimitResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleValidateCPF = useCallback((cpf: string) => {
     const cleaned = cpf.replace(/\D/g, '')
@@ -365,21 +372,41 @@ export default function Register() {
       return
     }
 
+    // Rate limiting: bloqueia se excedeu tentativas
+    if (cpfValidationAttempts >= MAX_VALIDATION_ATTEMPTS) {
+      setCpfValidation({
+        valid: false,
+        exists: null,
+        message: 'Muitas tentativas. Aguarde 1 minuto.',
+      })
+      return
+    }
+
     // Debounce de 500ms para evitar chamadas excessivas à API
     cpfValidationTimeoutRef.current = setTimeout(async () => {
       setValidatingCpf(true)
       setCpfValidation(null)
+      setCpfValidationAttempts(prev => prev + 1)
+
+      // Reset rate limit após cooldown
+      if (!cpfRateLimitResetRef.current) {
+        cpfRateLimitResetRef.current = setTimeout(() => {
+          setCpfValidationAttempts(0)
+          cpfRateLimitResetRef.current = null
+        }, VALIDATION_COOLDOWN_MS)
+      }
 
       const result = await fullCPFValidation(cleaned)
       setCpfValidation(result)
       setValidatingCpf(false)
     }, 500)
-  }, [])
+  }, [cpfValidationAttempts])
 
   /**
-   * Validate Email (formato, domínio e temporário)
+   * Validate Email (formato, domínio e temporário) com rate limiting
    */
   const emailValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const emailRateLimitResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleValidateEmail = useCallback((email: string) => {
     const trimmed = email.trim()
@@ -395,16 +422,34 @@ export default function Register() {
       return
     }
 
+    // Rate limiting: bloqueia se excedeu tentativas
+    if (emailValidationAttempts >= MAX_VALIDATION_ATTEMPTS) {
+      setEmailValidation({
+        valid: false,
+        error: 'Muitas tentativas. Aguarde 1 minuto.',
+      })
+      return
+    }
+
     // Debounce de 500ms para evitar chamadas excessivas
     emailValidationTimeoutRef.current = setTimeout(async () => {
       setValidatingEmail(true)
       setEmailValidation(null)
+      setEmailValidationAttempts(prev => prev + 1)
+
+      // Reset rate limit após cooldown
+      if (!emailRateLimitResetRef.current) {
+        emailRateLimitResetRef.current = setTimeout(() => {
+          setEmailValidationAttempts(0)
+          emailRateLimitResetRef.current = null
+        }, VALIDATION_COOLDOWN_MS)
+      }
 
       const result = await validateEmail(trimmed)
       setEmailValidation(result)
       setValidatingEmail(false)
     }, 500)
-  }, [])
+  }, [emailValidationAttempts])
 
   // Cleanup dos timeouts no unmount
   useEffect(() => {
@@ -414,6 +459,12 @@ export default function Register() {
       }
       if (emailValidationTimeoutRef.current) {
         clearTimeout(emailValidationTimeoutRef.current)
+      }
+      if (cpfRateLimitResetRef.current) {
+        clearTimeout(cpfRateLimitResetRef.current)
+      }
+      if (emailRateLimitResetRef.current) {
+        clearTimeout(emailRateLimitResetRef.current)
       }
     }
   }, [])
@@ -441,30 +492,51 @@ export default function Register() {
           </p>
         </div>
 
-        {/* Progress Steps */}
+        {/* Progress Steps - 3 passos simplificados */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3, 4].map((s) => (
-            <div key={s} className="flex items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                  (s < 3 && step >= s) || (s === 3 && contractSigned) || (s === 4 && step >= 3)
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted text-muted-foreground'
-                }`}
-              >
-                {(s < 3 && step > s) || (s === 3 && contractSigned) ? <Check className="h-4 w-4" /> : s}
+          {[
+            { num: 1, label: 'Dados' },
+            { num: 2, label: 'Contrato' },
+            { num: 3, label: 'Pagamento' },
+          ].map((s, index) => {
+            // Determina se o passo está completo
+            const isComplete =
+              (s.num === 1 && step >= 3) || // Dados completos quando chega no contrato
+              (s.num === 2 && contractSigned) || // Contrato completo quando assinado
+              (s.num === 3 && false) // Pagamento nunca fica completo (redirect)
+
+            // Determina se o passo está ativo
+            const isActive =
+              (s.num === 1 && step <= 2) ||
+              (s.num === 2 && step >= 3 && !contractSigned) ||
+              (s.num === 3 && contractSigned)
+
+            return (
+              <div key={s.num} className="flex items-center">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
+                      isComplete
+                        ? 'bg-primary text-primary-foreground'
+                        : isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground'
+                    }`}
+                  >
+                    {isComplete ? <Check className="h-4 w-4" /> : s.num}
+                  </div>
+                  <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{s.label}</span>
+                </div>
+                {index < 2 && (
+                  <div
+                    className={`w-8 sm:w-12 h-1 mx-1 transition-colors ${
+                      isComplete ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  />
+                )}
               </div>
-              {s < 4 && (
-                <div
-                  className={`w-8 h-1 transition-colors ${
-                    (s < 2 && step > s) || (s === 2 && contractSigned) || (s === 3 && step >= 3)
-                      ? 'bg-primary'
-                      : 'bg-muted'
-                  }`}
-                />
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Plan Summary */}
