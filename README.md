@@ -169,29 +169,31 @@ firebase deploy --only firestore:indexes
 1. Na aplicação, vá em **Webhooks**
 2. Configure a URL:
    ```
-   https://southamerica-east1-clube-geek-toys.cloudfunctions.net/api/webhook/mercadopago
+   https://api-worker.leoschlanger.workers.dev/webhook/mercadopago
    ```
-3. Selecione o evento: **Pagamentos**
+3. Selecione os eventos: `payment`, `subscription_preapproval`, `subscription_authorized_payment`
+4. Copie o **Webhook Secret** gerado
 
-### 3. Deploy das Cloud Functions
+### 3. Cloudflare Workers (API)
+
+O backend da aplicação roda em Cloudflare Workers. Veja [DEPLOY.md](DEPLOY.md) para instruções detalhadas.
 
 ```bash
-# Instalar Firebase CLI
-npm install -g firebase-tools
+# Instalar Wrangler CLI
+npm install -g wrangler
 
-# Login no Firebase
-firebase login
+# Login no Cloudflare
+wrangler login
 
-# Instalar dependências das functions
-cd functions
-npm install
-cd ..
-
-# Configurar Access Token do Mercado Pago
-firebase functions:config:set mercadopago.access_token="SEU_ACCESS_TOKEN"
+# Configurar secrets (no diretório api-worker/)
+cd api-worker
+wrangler secret put MERCADOPAGO_ACCESS_TOKEN
+wrangler secret put MERCADOPAGO_WEBHOOK_SECRET  # OBRIGATÓRIO
+wrangler secret put RESEND_API_KEY
+wrangler secret put FIREBASE_API_KEY
 
 # Deploy
-firebase deploy --only functions
+npm run deploy
 ```
 
 ### 4. Deploy do Frontend
@@ -221,16 +223,23 @@ VITE_FIREBASE_APP_ID=seu-app-id
 
 # Mercado Pago
 VITE_MERCADOPAGO_PUBLIC_KEY=APP_USR-xxxxx
-VITE_PAYMENT_API_URL=https://southamerica-east1-SEU-PROJETO.cloudfunctions.net/api
+VITE_PAYMENT_API_URL=https://api-worker.leoschlanger.workers.dev
 
 # PIX (chave da loja)
 VITE_PIX_KEY=sua-chave-pix@email.com
+
+# Ambiente
+VITE_ENVIRONMENT=production
 ```
 
-### Backend (functions/.env)
+### API Worker (via wrangler secret put)
 
-```env
-MERCADOPAGO_ACCESS_TOKEN=APP_USR-xxxxx
+```bash
+# Secrets obrigatórios (configurar no Cloudflare)
+MERCADOPAGO_ACCESS_TOKEN    # Token de acesso Mercado Pago
+MERCADOPAGO_WEBHOOK_SECRET  # Secret do webhook (OBRIGATÓRIO para cron jobs)
+RESEND_API_KEY              # API key do Resend para emails
+FIREBASE_API_KEY            # API key do Firebase
 ```
 
 ---

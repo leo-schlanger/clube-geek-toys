@@ -77,17 +77,23 @@ wrangler login
 
 ### Configuração de Secrets
 
+> **IMPORTANTE:** Todos os secrets abaixo são OBRIGATÓRIOS para o funcionamento correto.
+
 ```bash
 cd api-worker
 
-# Mercado Pago
-wrangler secret put MERCADOPAGO_ACCESS_TOKEN
-wrangler secret put MERCADOPAGO_WEBHOOK_SECRET
+# Mercado Pago (OBRIGATÓRIOS)
+wrangler secret put MERCADOPAGO_ACCESS_TOKEN   # Token de acesso da API
+wrangler secret put MERCADOPAGO_WEBHOOK_SECRET # Secret do webhook - CRÍTICO!
+# ⚠️  O WEBHOOK_SECRET é usado para:
+#    - Validar assinaturas HMAC dos webhooks do Mercado Pago
+#    - Autenticar cron jobs (/cron/expire-points, /cron/renewal-reminders)
+#    - Proteger endpoints de relatórios (/reports/daily, /reports/monthly)
 
-# Resend (emails)
+# Resend (OBRIGATÓRIO para emails)
 wrangler secret put RESEND_API_KEY
 
-# Firebase
+# Firebase (OBRIGATÓRIO)
 wrangler secret put FIREBASE_API_KEY
 ```
 
