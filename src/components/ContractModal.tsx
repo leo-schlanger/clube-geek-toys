@@ -330,14 +330,14 @@ export function ContractModal({
         </CardHeader>
 
         {/* Content */}
-        <CardContent className="flex-1 overflow-hidden p-0">
+        <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
           {/* Step 1: Read Contract */}
           {step === 'read' && (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col min-h-0">
               <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 overflow-y-auto p-6 space-y-6"
+                className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6"
               >
                 {/* Logo and Title */}
                 <div className="text-center space-y-3">
@@ -430,7 +430,7 @@ export function ContractModal({
 
           {/* Step 2: Sign */}
           {step === 'sign' && (
-            <div className="h-full flex flex-col p-6">
+            <div className="h-full flex flex-col min-h-0 p-6">
               <div className="text-center mb-4">
                 <p className="text-sm text-muted-foreground">
                   Desenhe sua assinatura no campo abaixo usando o mouse ou toque
@@ -475,7 +475,7 @@ export function ContractModal({
 
           {/* Step 3: Confirm */}
           {step === 'confirm' && (
-            <div className="h-full flex flex-col p-6 space-y-6">
+            <div className="h-full flex flex-col min-h-0 p-6 space-y-6 overflow-y-auto">
               <div className="text-center">
                 <div className="h-16 w-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center mb-4">
                   <FileCheck className="h-8 w-8 text-primary" />
