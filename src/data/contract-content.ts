@@ -14,7 +14,7 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
     content: [
       'O CLUBE GEEK & TOYS VIP é um programa de fidelidade exclusivo da loja GEEK & TOYS, destinado a oferecer vantagens, descontos e benefícios especiais aos seus membros.',
       'A participação no Clube é voluntária e requer a adesão a um dos planos disponíveis (Silver, Gold ou Black), mediante pagamento da mensalidade ou anuidade correspondente.',
-      'O Clube reserva-se o direito de modificar, suspender ou encerrar o programa a qualquer momento, mediante comunicação prévia aos membros.',
+      'O Clube reserva-se o direito de modificar, suspender ou encerrar o programa a qualquer momento, mediante comunicação prévia de 30 (trinta) dias aos membros, por e-mail.',
     ],
   },
   {
@@ -83,7 +83,15 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
     ],
   },
   {
-    title: '9. FORO',
+    title: '9. DIREITO DE ARREPENDIMENTO',
+    content: [
+      'Nos termos do Art. 49 do Código de Defesa do Consumidor (Lei nº 8.078/1990), o membro que contratar o Clube de forma remota (internet) poderá desistir da contratação no prazo de 7 (sete) dias corridos a contar da adesão, com direito ao reembolso integral dos valores pagos.',
+      'Para exercer o direito de arrependimento, o membro deve entrar em contato através do e-mail contato@geeketoys.com.br ou pelo canal de atendimento disponível na área do membro.',
+      'O reembolso será processado em até 30 (trinta) dias após a solicitação, utilizando o mesmo meio de pagamento da contratação.',
+    ],
+  },
+  {
+    title: '10. FORO',
     content: [
       'Para dirimir quaisquer controvérsias oriundas deste contrato, as partes elegem o Foro da Comarca do Rio de Janeiro/RJ, com exclusão de qualquer outro, por mais privilegiado que seja.',
       'As partes declaram ter lido e compreendido integralmente este regulamento, concordando com todos os seus termos e condições.',
