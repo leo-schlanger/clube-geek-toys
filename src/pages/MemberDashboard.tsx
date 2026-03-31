@@ -309,12 +309,12 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Digital Card */}
           <div className="lg:col-span-1">
             <Card className="overflow-hidden">
               {/* Card header */}
-              <div className={`p-6 text-white bg-gradient-to-br ${planColors[member.plan as PlanType]}`}>
+              <div className={`p-4 sm:p-6 text-white bg-gradient-to-br ${planColors[member.plan as PlanType]}`}>
                 <div className="flex items-center justify-between mb-4">
                   <img src="/logo.jpg" alt="Geek & Toys" className="h-8 rounded" />
                   <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
@@ -322,13 +322,13 @@ export default function MemberDashboard() {
                     {plan.name}
                   </Badge>
                 </div>
-                <h2 className="text-xl font-bold mb-1">{member.fullName}</h2>
+                <h2 className="text-lg sm:text-xl font-bold mb-1">{member.fullName}</h2>
                 <p className="text-sm opacity-80">{formatCPF(member.cpf)}</p>
               </div>
 
-              <CardContent className="p-6">
+              <CardContent className="p-4 sm:p-6">
                 {/* QR Code */}
-                <div className="flex justify-center mb-6">
+                <div className="flex justify-center mb-4 sm:mb-6">
                   <div className="bg-white p-4 rounded-xl shadow-lg">
                     <QRCodeSVG value={qrData} size={180} level="H" includeMargin />
                   </div>
@@ -385,7 +385,7 @@ export default function MemberDashboard() {
           {/* Info Cards */}
           <div className="lg:col-span-2 space-y-6">
             {/* Quick Stats */}
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <Card className="hover:shadow-lg transition-shadow">
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="p-3 rounded-full bg-primary/10">

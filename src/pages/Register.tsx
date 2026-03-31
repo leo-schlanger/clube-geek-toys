@@ -470,7 +470,7 @@ export default function Register() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background py-8 px-4">
+    <div className="min-h-screen bg-background py-6 sm:py-8 px-4">
       <motion.div
         className="max-w-lg mx-auto"
         initial={{ opacity: 0, y: 20 }}
@@ -486,7 +486,7 @@ export default function Register() {
           <div className="mb-4">
             <img src="/logo.jpg" alt="Geek & Toys" className="h-14 rounded mx-auto" />
           </div>
-          <h1 className="text-3xl font-heading font-bold text-foreground">Criar Conta</h1>
+          <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Criar Conta</h1>
           <p className="text-muted-foreground mt-2">
             Complete seu cadastro para ativar o plano {plan.name}
           </p>

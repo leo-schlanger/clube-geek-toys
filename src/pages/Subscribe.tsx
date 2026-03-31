@@ -44,13 +44,13 @@ export default function Subscribe() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="glass border-b border-border sticky top-0 z-50">
-        <div className="container flex items-center justify-between h-16 md:h-20">
+        <div className="container flex items-center justify-between h-14 sm:h-16 md:h-20 px-4 sm:px-6">
           <Link to="/" className="flex items-center">
-            <img src="/logo.jpg" alt="Geek & Toys" className="h-12 md:h-14 rounded" />
+            <img src="/logo.jpg" alt="Geek & Toys" className="h-10 sm:h-12 md:h-14 rounded" />
           </Link>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link to="/login">
-              <Button variant="outline" className="border-primary/50 hover:border-primary">
+              <Button variant="outline" size="sm" className="border-primary/50 hover:border-primary text-xs sm:text-sm">
                 Já sou membro
               </Button>
             </Link>
@@ -59,9 +59,9 @@ export default function Subscribe() {
       </header>
 
       {/* Hero */}
-      <section className="py-16 px-6 text-center">
+      <section className="py-8 sm:py-12 md:py-16 px-4 sm:px-6 text-center">
         <motion.h1
-          className="text-4xl md:text-5xl font-heading font-bold text-foreground mb-4"
+          className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-heading font-bold text-foreground mb-3 sm:mb-4"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -69,7 +69,7 @@ export default function Subscribe() {
           Faça parte do <span className="gradient-text text-glow-primary">Clube</span>
         </motion.h1>
         <motion.p
-          className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8"
+          className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-6 sm:mb-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
@@ -78,10 +78,10 @@ export default function Subscribe() {
         </motion.p>
 
         {/* Payment Type Toggle */}
-        <div className="inline-flex items-center gap-2 glass border border-border p-1 rounded-lg">
+        <div className="inline-flex items-center gap-1 sm:gap-2 glass border border-border p-1 rounded-lg">
           <button
             onClick={() => setPaymentType('monthly')}
-            className={`px-6 py-2 rounded-md font-medium transition-all ${paymentType === 'monthly'
+            className={`px-3 sm:px-6 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-medium transition-all ${paymentType === 'monthly'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
               }`}
@@ -90,21 +90,21 @@ export default function Subscribe() {
           </button>
           <button
             onClick={() => setPaymentType('annual')}
-            className={`px-6 py-2 rounded-md font-medium transition-all flex items-center gap-2 ${paymentType === 'annual'
+            className={`px-3 sm:px-6 py-1.5 sm:py-2 rounded-md text-sm sm:text-base font-medium transition-all flex items-center gap-1 sm:gap-2 ${paymentType === 'annual'
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground'
               }`}
           >
             Anual
-            <Badge variant="success" className="text-xs">Economize!</Badge>
+            <Badge variant="success" className="text-[10px] sm:text-xs">Economize!</Badge>
           </button>
         </div>
       </section>
 
       {/* Plans */}
-      <section className="py-8 px-6">
+      <section className="py-6 sm:py-8 px-4 sm:px-6">
         <motion.div
-          className="container grid md:grid-cols-3 gap-6"
+          className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
           initial="hidden"
           whileInView="show"
           viewport={{ once: true }}
@@ -133,33 +133,35 @@ export default function Subscribe() {
               >
                 <Card
                   className={`relative overflow-hidden transition-all cursor-pointer hover-glow-primary flex flex-col h-full ${isSelected ? 'ring-2 ring-primary border-glow-primary' : ''
-                    } ${isPopular ? 'md:-mt-4 md:mb-4' : ''}`}
+                    } ${isPopular ? 'lg:-mt-4 lg:mb-4' : ''}`}
                   onClick={() => setSelectedPlan(planId)}
                 >
                   {isPopular && (
-                    <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-bl-lg z-10">
+                    <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] sm:text-xs font-medium px-2 sm:px-3 py-1 rounded-bl-lg z-10">
                       Mais Popular
                     </div>
                   )}
 
                   {/* Plan Header */}
-                  <div className={`p-6 bg-gradient-to-br ${planColors[planId]} text-white`}>
-                    <div className="flex items-center gap-3 mb-3">
-                      {planIcons[planId]}
-                      <h3 className="text-2xl font-heading font-bold">{plan.name}</h3>
+                  <div className={`p-4 sm:p-6 bg-gradient-to-br ${planColors[planId]} text-white`}>
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+                      <div className="[&>svg]:h-6 [&>svg]:w-6 sm:[&>svg]:h-8 sm:[&>svg]:w-8">
+                        {planIcons[planId]}
+                      </div>
+                      <h3 className="text-xl sm:text-2xl font-heading font-bold">{plan.name}</h3>
                     </div>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold">{formatCurrency(getPrice(planId))}</span>
-                      <span className="text-sm opacity-80">
+                      <span className="text-2xl sm:text-3xl md:text-4xl font-bold">{formatCurrency(getPrice(planId))}</span>
+                      <span className="text-xs sm:text-sm opacity-80">
                         /{paymentType === 'monthly' ? 'mês' : 'ano'}
                       </span>
                     </div>
                     {paymentType === 'annual' && (
                       <div className="mt-2 space-y-1">
-                        <p className="text-sm opacity-80">
+                        <p className="text-xs sm:text-sm opacity-80">
                           = {formatCurrency(getMonthlyEquivalent(planId))}/mês
                         </p>
-                        <Badge variant="success" className="text-xs">
+                        <Badge variant="success" className="text-[10px] sm:text-xs">
                           Economia de {formatCurrency(getSavings(planId))}
                         </Badge>
                       </div>
@@ -167,21 +169,21 @@ export default function Subscribe() {
                   </div>
 
                   {/* Benefits */}
-                  <CardContent className="p-6 flex-grow">
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-lg font-semibold">
+                  <CardContent className="p-4 sm:p-6 flex-grow">
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex items-center gap-2 text-base sm:text-lg font-semibold">
                         <span className="text-green-500">{plan.discountProducts}%</span>
                         <span>em produtos</span>
                       </div>
-                      <div className="flex items-center gap-2 text-lg font-semibold">
+                      <div className="flex items-center gap-2 text-base sm:text-lg font-semibold">
                         <span className="text-green-500">{plan.discountServices}%</span>
                         <span>em serviços</span>
                       </div>
-                      <hr className="my-4 border-border" />
-                      <ul className="space-y-2">
+                      <hr className="my-3 sm:my-4 border-border" />
+                      <ul className="space-y-1.5 sm:space-y-2">
                         {plan.benefits.slice(2).map((benefit, index) => (
-                          <li key={index} className="flex items-start gap-2 text-sm">
-                            <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <li key={index} className="flex items-start gap-2 text-xs sm:text-sm">
+                            <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 mt-0.5 flex-shrink-0" />
                             <span>{benefit}</span>
                           </li>
                         ))}
@@ -189,8 +191,8 @@ export default function Subscribe() {
                     </div>
                   </CardContent>
 
-                  <CardFooter className="p-6 pt-0">
-                    <Button className="w-full" size="lg" variant={isSelected ? 'default' : 'outline'}>
+                  <CardFooter className="p-4 sm:p-6 pt-0">
+                    <Button className="w-full" size="default" variant={isSelected ? 'default' : 'outline'}>
                       {isSelected ? 'Selecionado' : 'Selecionar'}
                     </Button>
                   </CardFooter>
@@ -203,31 +205,31 @@ export default function Subscribe() {
 
       {/* CTA */}
       {selectedPlan && (
-        <section className="py-8 px-6">
+        <section className="py-6 sm:py-8 px-4 sm:px-6">
           <motion.div
             className="max-w-md mx-auto"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
           >
             <Card className="bg-primary text-primary-foreground border-glow-primary">
-              <CardHeader>
-                <CardTitle className="font-heading">Plano {PLANS[selectedPlan].name} selecionado</CardTitle>
-                <CardDescription className="text-primary-foreground/80">
+              <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-3">
+                <CardTitle className="font-heading text-lg sm:text-xl">Plano {PLANS[selectedPlan].name} selecionado</CardTitle>
+                <CardDescription className="text-primary-foreground/80 text-sm">
                   {paymentType === 'monthly' ? 'Cobrança mensal' : 'Cobrança anual única'}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
+              <CardContent className="p-4 sm:p-6 pt-0">
+                <p className="text-2xl sm:text-3xl font-bold">
                   {formatCurrency(getPrice(selectedPlan))}
-                  <span className="text-lg font-normal opacity-80">
+                  <span className="text-base sm:text-lg font-normal opacity-80">
                     /{paymentType === 'monthly' ? 'mês' : 'ano'}
                   </span>
                 </p>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="p-4 sm:p-6 pt-0">
                 <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`} className="w-full">
-                  <Button variant="secondary" size="lg" className="w-full font-semibold">
-                    Continuar <ArrowRight className="ml-2 h-5 w-5" />
+                  <Button variant="secondary" size="lg" className="w-full font-semibold text-sm sm:text-base">
+                    Continuar <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
                 </Link>
               </CardFooter>
@@ -237,18 +239,20 @@ export default function Subscribe() {
       )}
 
       {/* Footer */}
-      <footer className="py-8 px-6 text-center border-t border-border mt-12">
-        <div className="flex justify-center mb-4">
-          <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
+      <footer className="py-6 sm:py-8 px-4 sm:px-6 text-center border-t border-border mt-8 sm:mt-12">
+        <div className="flex justify-center mb-3 sm:mb-4">
+          <img src="/logo.jpg" alt="Geek & Toys" className="h-8 sm:h-10 rounded" />
         </div>
-        <p className="text-muted-foreground text-sm">© 2024 Geek & Toys. Todos os direitos reservados.</p>
-        <p className="mt-2 text-sm">
+        <p className="text-muted-foreground text-xs sm:text-sm">© 2026 Geek & Toys. Todos os direitos reservados.</p>
+        <p className="mt-2 text-xs sm:text-sm flex flex-wrap justify-center gap-1 sm:gap-0">
           <a href="https://geeketoys.com.br" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             Visite nossa loja
           </a>
-          {' · '}
+          <span className="hidden sm:inline">{' · '}</span>
+          <span className="sm:hidden"> · </span>
           <Link to="/termos" className="text-muted-foreground hover:text-foreground">Termos de Uso</Link>
-          {' · '}
+          <span className="hidden sm:inline">{' · '}</span>
+          <span className="sm:hidden"> · </span>
           <Link to="/privacidade" className="text-muted-foreground hover:text-foreground">Privacidade</Link>
         </p>
       </footer>

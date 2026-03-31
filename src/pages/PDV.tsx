@@ -440,20 +440,20 @@ export default function PDV() {
                     <>
                       <hr />
                       {/* Discounts */}
-                      <div className="grid grid-cols-2 gap-4 p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                      <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
                         <div className="text-center">
-                          <p className="text-3xl font-bold text-green-600">
+                          <p className="text-2xl sm:text-3xl font-bold text-green-600">
                             {PLANS[result.member.plan as PlanType].discountProducts}%
                           </p>
-                          <p className="text-sm text-green-700 dark:text-green-300">
+                          <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
                             Desconto em Produtos
                           </p>
                         </div>
                         <div className="text-center">
-                          <p className="text-3xl font-bold text-green-600">
+                          <p className="text-2xl sm:text-3xl font-bold text-green-600">
                             {PLANS[result.member.plan as PlanType].discountServices}%
                           </p>
-                          <p className="text-sm text-green-700 dark:text-green-300">
+                          <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
                             Desconto em Serviços
                           </p>
                         </div>
