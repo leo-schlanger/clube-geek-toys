@@ -431,6 +431,47 @@ export async function sendContractEmail(
 }
 
 /**
+ * Resend contract email by downloading PDF from Storage URL
+ */
+export async function resendContractEmail(
+  email: string,
+  memberName: string,
+  plan: string,
+  signedAt: string,
+  hash: string,
+  pdfUrl: string
+): Promise<EmailResponse> {
+  try {
+    // Download PDF from Firebase Storage
+    const pdfResponse = await fetch(pdfUrl)
+    if (!pdfResponse.ok) {
+      return {
+        success: false,
+        error: 'Não foi possível baixar o contrato',
+      }
+    }
+
+    // Convert to base64
+    const pdfArrayBuffer = await pdfResponse.arrayBuffer()
+    const pdfBytes = new Uint8Array(pdfArrayBuffer)
+    const pdfBase64 = btoa(String.fromCharCode(...pdfBytes))
+
+    // Send via existing endpoint
+    return sendContractEmail(email, memberName, plan, signedAt, hash, pdfBase64)
+  } catch (error: unknown) {
+    logger.error('Resend contract error:', error)
+    let errorMessage = 'Erro ao reenviar contrato'
+    if (error instanceof Error) {
+      errorMessage = error.message
+    }
+    return {
+      success: false,
+      error: errorMessage,
+    }
+  }
+}
+
+/**
  * Verify email token via Worker
  */
 export async function verifyEmailToken(

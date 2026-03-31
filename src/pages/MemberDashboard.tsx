@@ -15,6 +15,9 @@ import { SubscriptionManagement } from '../components/SubscriptionManagement'
 import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction, type Subscription } from '../types'
 import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
+import { getMemberContract } from '../lib/contract-storage'
+import { resendContractEmail } from '../lib/email'
+import type { Contract } from '../types'
 import {
   getPointsHistory,
   getExpiringPoints,
@@ -53,6 +56,9 @@ import {
   ChevronUp,
   Edit,
   Repeat,
+  FileText,
+  Download,
+  Send,
 } from 'lucide-react'
 
 type ModalType = 'renew' | 'upgrade' | 'profile' | null
@@ -70,6 +76,8 @@ export default function MemberDashboard() {
   const [showRedemptionRules, setShowRedemptionRules] = useState(false)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [showSubscription, setShowSubscription] = useState(false)
+  const [contract, setContract] = useState<Contract | null>(null)
+  const [resendingContract, setResendingContract] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -87,14 +95,16 @@ export default function MemberDashboard() {
 
       if (memberData) {
         setLoadingPoints(true)
-        const [history, expiring, sub] = await Promise.all([
+        const [history, expiring, sub, memberContract] = await Promise.all([
           getPointsHistory(memberData.id, 20),
           getExpiringPoints(memberData.id),
           getActiveSubscriptionByMemberId(memberData.id),
+          getMemberContract(memberData.id),
         ])
         setPointsHistory(history)
         setExpiringPoints(expiring)
         setSubscription(sub)
+        setContract(memberContract)
         setLoadingPoints(false)
       }
     } catch (error) {
@@ -133,6 +143,33 @@ export default function MemberDashboard() {
       copyMemberId()
     }
   }, [member, copyMemberId])
+
+  const handleResendContract = useCallback(async () => {
+    if (!contract || !member) return
+
+    setResendingContract(true)
+    try {
+      const result = await resendContractEmail(
+        member.email,
+        contract.memberName,
+        PLANS[contract.plan as PlanType].name,
+        contract.signedAt,
+        contract.documentHash,
+        contract.pdfUrl
+      )
+
+      if (result.success) {
+        toast.success('Contrato enviado para seu email!')
+      } else {
+        toast.error(result.error || 'Erro ao reenviar contrato')
+      }
+    } catch (error) {
+      logger.error('Error resending contract:', error)
+      toast.error('Erro ao reenviar contrato')
+    } finally {
+      setResendingContract(false)
+    }
+  }, [contract, member])
 
   // Memoized computed values - must be called before any early returns
   const expiringPointsTotal = useMemo(
@@ -699,6 +736,78 @@ export default function MemberDashboard() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Contract */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Meu Contrato
+                </CardTitle>
+                <CardDescription>
+                  Seu termo de adesão ao Clube Geek & Toys
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {contract ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <div>
+                        <p className="font-medium text-green-700 dark:text-green-400">Contrato Assinado</p>
+                        <p className="text-sm text-muted-foreground">
+                          Assinado em {new Date(contract.signedAt).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => window.open(contract.pdfUrl, '_blank')}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Baixar PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={handleResendContract}
+                        disabled={resendingContract}
+                      >
+                        {resendingContract ? (
+                          <Loading size="sm" />
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Enviar por Email
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Hash: {contract.documentHash.substring(0, 16)}...
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-30" />
+                    <p className="text-muted-foreground">Nenhum contrato encontrado</p>
+                    <p className="text-sm text-muted-foreground">
+                      Entre em contato com o suporte se precisar de uma cópia.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

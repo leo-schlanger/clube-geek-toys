@@ -5,10 +5,12 @@ import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { PaymentModal } from './PaymentModal'
+import { ContractModal } from './ContractModal'
 import { updateMember, clearPendingPayment } from '../lib/members'
 import { checkPixPaymentStatus, isMercadoPagoConfigured } from '../lib/payments'
+import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
-import { PLANS, type Member, type PlanType } from '../types'
+import { PLANS, type Member, type PlanType, type Contract } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -22,6 +24,8 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
+  FileText,
+  PenTool,
 } from 'lucide-react'
 
 interface PendingPaymentScreenProps {
@@ -33,6 +37,9 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   const navigate = useNavigate()
   const { signOut } = useAuth()
   const [showPayment, setShowPayment] = useState(false)
+  const [showContract, setShowContract] = useState(false)
+  const [contract, setContract] = useState<Contract | null>(null)
+  const [loadingContract, setLoadingContract] = useState(true)
   const [cancelling, setCancelling] = useState(false)
   const [checkingPrevious, setCheckingPrevious] = useState(false)
   const [hasPendingPayment, setHasPendingPayment] = useState(!!member.pendingPayment)
@@ -41,8 +48,22 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   const price = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
   const isConfigured = isMercadoPagoConfigured()
 
-  // Check for previous pending payment on mount
+  // Check for contract and previous pending payment on mount
   useEffect(() => {
+    async function checkContract() {
+      setLoadingContract(true)
+      try {
+        const memberContract = await getMemberContract(member.id)
+        setContract(memberContract)
+      } catch {
+        // Ignore errors - contract might not exist
+      } finally {
+        setLoadingContract(false)
+      }
+    }
+
+    checkContract()
+
     if (member.pendingPayment && isConfigured) {
       checkPreviousPayment()
     }
@@ -118,6 +139,13 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
     } else {
       toast.error('Erro ao ativar assinatura. Entre em contato com o suporte.')
     }
+  }
+
+  function handleContractSigned() {
+    setShowContract(false)
+    // Refetch contract to update state
+    getMemberContract(member.id).then(setContract)
+    toast.success('Contrato assinado! Agora finalize o pagamento.')
   }
 
   async function handleCancelMembership() {
@@ -240,14 +268,67 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
 
           {/* Actions */}
           <div className="space-y-6">
-            <Card>
+            {/* Contract Step */}
+            <Card className={contract ? 'border-green-500/50' : 'border-yellow-500/50'}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Passo 1: Contrato de Adesão
+                </CardTitle>
+                <CardDescription>
+                  Leia e assine o termo de adesão ao clube
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingContract ? (
+                  <div className="py-4">
+                    <Loading size="md" text="Verificando contrato..." />
+                  </div>
+                ) : contract ? (
+                  <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <div>
+                      <p className="font-medium text-green-700 dark:text-green-400">Contrato Assinado</p>
+                      <p className="text-sm text-muted-foreground">
+                        Assinado em {new Date(contract.signedAt).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                      <div>
+                        <p className="font-medium text-yellow-700 dark:text-yellow-400">Contrato Pendente</p>
+                        <p className="text-sm text-muted-foreground">
+                          Você precisa assinar o contrato antes de pagar
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="lg"
+                      className="w-full"
+                      onClick={() => setShowContract(true)}
+                    >
+                      <PenTool className="h-5 w-5 mr-2" />
+                      Assinar Contrato
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Payment Step */}
+            <Card className={contract ? '' : 'opacity-60'}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCard className="h-5 w-5" />
-                  Finalizar Pagamento
+                  Passo 2: Finalizar Pagamento
                 </CardTitle>
                 <CardDescription>
-                  Escolha a forma de pagamento e ative sua assinatura
+                  {contract
+                    ? 'Escolha a forma de pagamento e ative sua assinatura'
+                    : 'Complete o passo 1 primeiro'}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -275,12 +356,13 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                       size="lg"
                       className="w-full"
                       onClick={() => setShowPayment(true)}
+                      disabled={!contract}
                     >
                       <CreditCard className="h-5 w-5 mr-2" />
                       {hasPendingPayment ? 'Continuar Pagamento' : 'Pagar Agora'}
                     </Button>
 
-                    {hasPendingPayment && (
+                    {hasPendingPayment && contract && (
                       <Button
                         variant="outline"
                         className="w-full"
@@ -347,6 +429,21 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
           initialPendingPayment={hasPendingPayment ? member.pendingPayment : undefined}
           onClose={() => setShowPayment(false)}
           onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {/* Contract Modal */}
+      {showContract && (
+        <ContractModal
+          memberId={member.id}
+          memberName={member.fullName}
+          memberCPF={member.cpf}
+          memberEmail={member.email}
+          memberPhone={member.phone}
+          plan={member.plan as PlanType}
+          paymentType={member.paymentType as 'monthly' | 'annual'}
+          onClose={() => setShowContract(false)}
+          onSigned={handleContractSigned}
         />
       )}
     </div>
