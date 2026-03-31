@@ -975,6 +975,79 @@ async function mpRequest<T = MpPaymentResponse>(
 	return data;
 }
 
+// HMAC token helpers for email verification (stateless, no Firestore required)
+async function createVerificationToken(
+	uid: string,
+	email: string,
+	secret: string,
+	expiresInHours = 24
+): Promise<string> {
+	const expiresAt = Date.now() + expiresInHours * 60 * 60 * 1000;
+	const payload = JSON.stringify({ uid, email, exp: expiresAt });
+	const payloadBase64 = btoa(payload);
+
+	// Create HMAC signature
+	const encoder = new TextEncoder();
+	const key = await crypto.subtle.importKey(
+		'raw',
+		encoder.encode(secret),
+		{ name: 'HMAC', hash: 'SHA-256' },
+		false,
+		['sign']
+	);
+	const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payloadBase64));
+	const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+	// Return token as payload.signature (URL-safe base64)
+	return `${payloadBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}.${signatureBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+}
+
+async function verifyVerificationToken(
+	token: string,
+	secret: string
+): Promise<{ valid: boolean; uid?: string; email?: string; error?: string }> {
+	try {
+		const [payloadBase64, signatureBase64] = token.split('.');
+		if (!payloadBase64 || !signatureBase64) {
+			return { valid: false, error: 'Invalid token format' };
+		}
+
+		// Restore base64 padding
+		const payloadPadded = payloadBase64.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - payloadBase64.length % 4) % 4);
+		const signaturePadded = signatureBase64.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - signatureBase64.length % 4) % 4);
+
+		// Verify signature
+		const encoder = new TextEncoder();
+		const key = await crypto.subtle.importKey(
+			'raw',
+			encoder.encode(secret),
+			{ name: 'HMAC', hash: 'SHA-256' },
+			false,
+			['verify']
+		);
+
+		const signatureBytes = Uint8Array.from(atob(signaturePadded), c => c.charCodeAt(0));
+		const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, encoder.encode(payloadPadded));
+
+		if (!isValid) {
+			return { valid: false, error: 'Invalid signature' };
+		}
+
+		// Decode payload
+		const payload = JSON.parse(atob(payloadPadded)) as { uid: string; email: string; exp: number };
+
+		// Check expiration
+		if (payload.exp < Date.now()) {
+			return { valid: false, error: 'Token expired' };
+		}
+
+		return { valid: true, uid: payload.uid, email: payload.email };
+	} catch (e) {
+		console.error('[AUTH] Token verification error:', e);
+		return { valid: false, error: 'Token verification failed' };
+	}
+}
+
 async function firestoreRequest<T = FirestoreDocument>(
 	projectId: string,
 	path: string,
@@ -2234,103 +2307,15 @@ export default {
 
 					const { email, uid, name } = validation.data;
 
-					if (!env.FIREBASE_API_KEY) {
-						return jsonResponse({ error: 'Firebase API key not configured' }, 500, origin);
-					}
-
 					if (!env.RESEND_API_KEY) {
 						return jsonResponse({ error: 'Email service not configured' }, 500, origin);
 					}
 
-					// Generate verification link using Firebase Auth REST API
-					const continueUrl = `${env.FRONTEND_URL}/verificar-email`;
-
-					const firebaseResponse = await fetch(
-						`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${env.FIREBASE_API_KEY}`,
-						{
-							method: 'POST',
-							headers: { 'Content-Type': 'application/json' },
-							body: JSON.stringify({
-								requestType: 'VERIFY_EMAIL',
-								email: email,
-								continueUrl: continueUrl,
-								canHandleCodeInApp: false,
-							}),
-						}
-					);
-
-					const firebaseData = await firebaseResponse.json() as FirebaseOobCodeResponse;
-
-					if (!firebaseResponse.ok || firebaseData.error) {
-						console.error('[AUTH] Firebase error:', firebaseData.error);
-						return jsonResponse({
-							error: firebaseData.error?.message || 'Failed to generate verification link',
-						}, 500, origin);
-					}
-
-					// The sendOobCode endpoint with VERIFY_EMAIL already sends an email via Firebase
-					// But we want to use our custom template, so we need to use a different approach
-					// We'll generate the link using the admin endpoint instead
-
-					// Use Firebase Auth REST API to generate email verification link
-					// This requires the Identity Toolkit API with admin credentials
-					// Since we can't use Firebase Admin SDK in Workers, we'll use a workaround:
-					// Generate the link using the getOobConfirmationCode endpoint
-
-					// Actually, the sendOobCode already sends the email via Firebase
-					// To use custom email, we need to disable "Email Action Handlers" in Firebase Console
-					// and use the action URL with custom handling
-
-					// For now, let's use a different approach:
-					// 1. Use Firebase's email link generation (which sends via Firebase)
-					// 2. OR implement our own verification system
-
-					// The cleanest solution without Firebase Admin SDK:
-					// Generate a custom verification token and handle it ourselves
-					// But this requires changes to the verification flow
-
-					// Alternative: Use the email that Firebase sends but customize the template
-					// in Firebase Console, or use the Action URL approach
-
-					// For this implementation, since sendOobCode already sent the Firebase email,
-					// we'll also send our custom email with the same link concept
-					// This requires getting the verification link differently
-
-					// Let's try a different approach - generate link manually
-					// Firebase verification links have a specific format we can construct
-
-					// The best approach for Workers is to use Firebase's email action URL
-					// and customize the landing page, but for truly custom emails we need
-					// to implement our own token system
-
-					// For now, let's send a welcome-style email and rely on Firebase's email
-					// OR implement custom verification token
-
-					// IMPLEMENTATION: Custom verification using Firestore
-					// Generate a token, store in Firestore, send custom email, verify on callback
-
-					const verificationToken = crypto.randomUUID();
-					const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
-
-					// Store verification token in Firestore
-					await firestoreRequest(
-						env.FIREBASE_PROJECT_ID,
-						`email_verifications/${verificationToken}`,
-						'PATCH',
-						{
-							fields: {
-								uid: { stringValue: uid },
-								email: { stringValue: email },
-								expires_at: { timestampValue: expiresAt },
-								verified: { booleanValue: false },
-								created_at: { timestampValue: new Date().toISOString() },
-							},
-						}
-					);
+				// Create signed verification token (HMAC-based, stateless - no Firestore required)
+					const verificationToken = await createVerificationToken(uid, email, env.RESEND_API_KEY, 24);
 
 					// Build verification link
-					const verificationLink = `${env.FRONTEND_URL}/verificar-email?token=${verificationToken}`;
-
+					const verificationLink = `${env.FRONTEND_URL}/verificar-email?token=${encodeURIComponent(verificationToken)}`;
 					// Send custom email via Resend
 					const emailResult = await sendEmail(
 						env.RESEND_API_KEY,
@@ -2368,45 +2353,17 @@ export default {
 
 					const { token } = validation.data;
 
-					// Get verification record from Firestore
-					let verificationDoc: FirestoreDocument;
-					try {
-						verificationDoc = await firestoreRequest<FirestoreDocument>(
-							env.FIREBASE_PROJECT_ID,
-							`email_verifications/${token}`
-						);
-					} catch {
-						return jsonResponse({ error: 'Invalid or expired token' }, 400, origin);
+					// Verify HMAC-signed token (stateless verification)
+					if (!env.RESEND_API_KEY) {
+						return jsonResponse({ error: 'Verification service not configured' }, 500, origin);
 					}
 
-					if (!verificationDoc.fields) {
-						return jsonResponse({ error: 'Invalid or expired token' }, 400, origin);
+					const tokenResult = await verifyVerificationToken(token, env.RESEND_API_KEY);
+					if (!tokenResult.valid) {
+						return jsonResponse({ error: tokenResult.error || 'Invalid or expired token' }, 400, origin);
 					}
 
-					const expiresAt = verificationDoc.fields.expires_at?.timestampValue;
-					const verified = verificationDoc.fields.verified?.booleanValue;
-					const uid = verificationDoc.fields.uid?.stringValue;
-
-					if (verified) {
-						return jsonResponse({ error: 'Email already verified' }, 400, origin);
-					}
-
-					if (expiresAt && new Date(expiresAt) < new Date()) {
-						return jsonResponse({ error: 'Token expired' }, 400, origin);
-					}
-
-					// Mark as verified in Firestore
-					await firestoreRequest(
-						env.FIREBASE_PROJECT_ID,
-						`email_verifications/${token}?updateMask.fieldPaths=verified&updateMask.fieldPaths=verified_at`,
-						'PATCH',
-						{
-							fields: {
-								verified: { booleanValue: true },
-								verified_at: { timestampValue: new Date().toISOString() },
-							},
-						}
-					);
+					const { uid, email: verifiedEmail } = tokenResult;
 
 					// Update user's emailVerified status in Firestore users collection
 					if (uid) {
@@ -2424,10 +2381,11 @@ export default {
 							);
 						} catch (e) {
 							console.error('[AUTH] Error updating user emailVerified:', e);
+							// Don't fail - token was valid, just couldn't update Firestore
 						}
 					}
 
-					console.log(`[AUTH] Email verified for uid ${uid}`);
+					console.log(`[AUTH] Email verified for uid ${uid} (email: ${verifiedEmail})`);
 					return jsonResponse({ success: true, uid }, 200, origin);
 				} catch (error: unknown) {
 					const err = error as { message?: string };
