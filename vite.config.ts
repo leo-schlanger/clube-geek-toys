@@ -61,13 +61,13 @@ export default defineConfig({
         manualChunks(id) {
           // Separar node_modules em chunks por biblioteca
           if (id.includes('node_modules')) {
-            // React Router - deve vir antes do react-core para evitar match parcial
-            if (id.includes('react-router')) {
-              return 'vendor-router'
-            }
-            // React core - carrega sempre (inclui react, react-dom, scheduler)
-            if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('scheduler')) {
-              return 'vendor-react-core'
+            // React ecosystem - tudo junto para evitar problemas de ordem de carregamento
+            if (
+              id.includes('react') ||
+              id.includes('scheduler') ||
+              id.includes('use-sync-external-store')
+            ) {
+              return 'vendor-react'
             }
             // Firebase Auth - crítico para login
             if (id.includes('firebase/auth') || id.includes('@firebase/auth')) {
