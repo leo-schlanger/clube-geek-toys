@@ -204,7 +204,8 @@ export default function Register() {
           }
         } catch (memberError) {
           logger.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
-          // Set member data even if Firestore save failed
+          // Set member data even if Firestore save failed - use Firebase UID as fallback ID
+          setCreatedMemberId(newUser.uid)
           setMemberEmail(sanitizedData.email)
           setMemberName(sanitizedData.fullName)
           setMemberCPF(sanitizedData.cpf)
