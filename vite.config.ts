@@ -61,13 +61,13 @@ export default defineConfig({
         manualChunks(id) {
           // Separar node_modules em chunks por biblioteca
           if (id.includes('node_modules')) {
-            // React core - carrega sempre
-            if (id.includes('react-dom') || id.includes('scheduler')) {
-              return 'vendor-react-core'
-            }
-            // React Router - carrega sempre
+            // React Router - deve vir antes do react-core para evitar match parcial
             if (id.includes('react-router')) {
               return 'vendor-router'
+            }
+            // React core - carrega sempre (inclui react, react-dom, scheduler)
+            if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('scheduler')) {
+              return 'vendor-react-core'
             }
             // Firebase Auth - crítico para login
             if (id.includes('firebase/auth') || id.includes('@firebase/auth')) {
