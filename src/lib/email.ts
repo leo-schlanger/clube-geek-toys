@@ -451,10 +451,14 @@ export async function resendContractEmail(
       }
     }
 
-    // Convert to base64
+    // Convert to base64 (loop to avoid stack overflow with large arrays)
     const pdfArrayBuffer = await pdfResponse.arrayBuffer()
     const pdfBytes = new Uint8Array(pdfArrayBuffer)
-    const pdfBase64 = btoa(String.fromCharCode(...pdfBytes))
+    let binary = ''
+    for (let i = 0; i < pdfBytes.length; i++) {
+      binary += String.fromCharCode(pdfBytes[i])
+    }
+    const pdfBase64 = btoa(binary)
 
     // Send via existing endpoint
     return sendContractEmail(email, memberName, plan, signedAt, hash, pdfBase64)
