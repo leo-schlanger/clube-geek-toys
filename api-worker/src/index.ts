@@ -11,6 +11,7 @@ interface Env {
 	WORKER_URL: string;
 	RESEND_API_KEY?: string;
 	FROM_EMAIL?: string;
+	ADMIN_EMAIL?: string;
 }
 
 // Resend API Response
@@ -850,7 +851,9 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, EmailTemplateConfig> = {
 // EMAIL HELPER
 // ============================================
 
-const DEFAULT_FROM_EMAIL = 'Clube Geek & Toys <onboarding@resend.dev>';
+// Default sender email - should always use env.FROM_EMAIL in production
+// This fallback is only for development/testing with Resend sandbox
+const DEFAULT_FROM_EMAIL = 'Clube Geek & Toys <contato@geeketoys.com.br>';
 
 async function sendEmail(
 	apiKey: string,
@@ -1086,8 +1089,12 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
 	'/checkout/create': { maxRequests: 10, windowMs: 60000 },
 	'/subscription/create': { maxRequests: 5, windowMs: 60000 },
 	'/email/send': { maxRequests: 20, windowMs: 60000 },
+	'/email/send-contract': { maxRequests: 5, windowMs: 60000 }, // 5 per minute
 	'/email/verify-link': { maxRequests: 5, windowMs: 60000 },
 	'/email/password-reset': { maxRequests: 3, windowMs: 300000 }, // 3 per 5 minutes
+	'/auth/send-verification-email': { maxRequests: 5, windowMs: 300000 }, // 5 per 5 minutes (anti-spam)
+	'/auth/send-password-reset': { maxRequests: 3, windowMs: 300000 }, // 3 per 5 minutes (anti-brute-force)
+	'/auth/verify-email': { maxRequests: 10, windowMs: 60000 }, // 10 per minute
 	default: { maxRequests: 100, windowMs: 60000 },
 };
 
@@ -3212,8 +3219,9 @@ export default {
 						return jsonResponse({ error: memberResult.message || 'Failed to send email' }, 500, origin);
 					}
 
-					// Send copy to admin (if configured)
-					const adminTo = admin_email || 'admin@geeketoys.com.br';
+					// Send copy to admin (if configured via request or env)
+					const adminTo = admin_email || env.ADMIN_EMAIL;
+					if (adminTo) {
 					try {
 						await fetch('https://api.resend.com/emails', {
 							method: 'POST',
@@ -3247,6 +3255,7 @@ export default {
 					} catch (adminError) {
 						console.error('Failed to send admin copy:', adminError);
 						// Don't fail the request if admin email fails
+					}
 					}
 
 					// Log email in Firestore

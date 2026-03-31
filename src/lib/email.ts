@@ -140,10 +140,15 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResponse>
     }
   } catch (error: unknown) {
     logger.error('Email send error:', error)
-    const err = error as { message?: string }
+    let errorMessage = 'Erro de rede ao enviar email'
+    if (error instanceof Error) {
+      errorMessage = error.message === 'Request timeout'
+        ? 'Tempo limite excedido ao enviar email'
+        : error.message
+    }
     return {
       success: false,
-      error: err.message || 'Network error',
+      error: errorMessage,
     }
   }
 }
@@ -313,10 +318,15 @@ export async function sendVerificationEmail(
     }
   } catch (error: unknown) {
     logger.error('Verification email error:', error)
-    const err = error as { message?: string }
+    let errorMessage = 'Erro de rede ao enviar email de verificação'
+    if (error instanceof Error) {
+      errorMessage = error.message === 'Request timeout'
+        ? 'Tempo limite excedido'
+        : error.message
+    }
     return {
       success: false,
-      error: err.message || 'Network error',
+      error: errorMessage,
     }
   }
 }
@@ -349,10 +359,15 @@ export async function sendPasswordResetEmail(email: string): Promise<EmailRespon
     }
   } catch (error: unknown) {
     logger.error('Password reset email error:', error)
-    const err = error as { message?: string }
+    let errorMessage = 'Erro de rede ao enviar email de redefinição'
+    if (error instanceof Error) {
+      errorMessage = error.message === 'Request timeout'
+        ? 'Tempo limite excedido'
+        : error.message
+    }
     return {
       success: false,
-      error: err.message || 'Network error',
+      error: errorMessage,
     }
   }
 }
@@ -402,10 +417,15 @@ export async function sendContractEmail(
     }
   } catch (error: unknown) {
     logger.error('Contract email error:', error)
-    const err = error as { message?: string }
+    let errorMessage = 'Erro de rede ao enviar contrato'
+    if (error instanceof Error) {
+      errorMessage = error.message === 'Request timeout'
+        ? 'Tempo limite excedido'
+        : error.message
+    }
     return {
       success: false,
-      error: err.message || 'Network error',
+      error: errorMessage,
     }
   }
 }
@@ -440,10 +460,15 @@ export async function verifyEmailToken(
     }
   } catch (error: unknown) {
     logger.error('Email verification error:', error)
-    const err = error as { message?: string }
+    let errorMessage = 'Erro de rede ao verificar email'
+    if (error instanceof Error) {
+      errorMessage = error.message === 'Request timeout'
+        ? 'Tempo limite excedido'
+        : error.message
+    }
     return {
       success: false,
-      error: err.message || 'Network error',
+      error: errorMessage,
     }
   }
 }
