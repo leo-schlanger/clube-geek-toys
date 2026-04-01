@@ -81,7 +81,7 @@ export function ContractModal({
 
     const rect = container.getBoundingClientRect()
     const width = Math.max(rect.width - 8, 280)
-    const height = 150
+    const height = 170
 
     // Set canvas dimensions
     const dpr = window.devicePixelRatio || 1
@@ -264,13 +264,13 @@ export function ContractModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[9999]">
+    <div className="fixed inset-0 z-[9999] overflow-hidden">
       {/* Overlay */}
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/70" onClick={onClose} />
 
-      {/* Modal */}
-      <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
-        <div className="bg-background rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col pointer-events-auto">
+      {/* Modal - centered with proper sizing */}
+      <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+        <div className="relative bg-background rounded-lg shadow-2xl w-full max-w-2xl h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b shrink-0">
             <div>
@@ -291,8 +291,8 @@ export function ContractModal({
             <div className={`h-1.5 flex-1 rounded-full transition-colors ${step === 'confirm' ? 'bg-primary' : 'bg-muted'}`} />
           </div>
 
-          {/* Content */}
-          <div ref={contentRef} className="flex-1 overflow-y-auto p-4 min-h-0">
+          {/* Content - scrollable area */}
+          <div ref={contentRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 min-h-0">
             {/* STEP 1: READ */}
             {step === 'read' && (
               <div className="space-y-4">
@@ -327,14 +327,21 @@ export function ContractModal({
 
                 <p className="text-center text-xs text-muted-foreground py-2">— Fim do Regulamento —</p>
 
-                <label className="flex items-start gap-3 p-4 border-2 border-primary/40 rounded-lg bg-primary/10 cursor-pointer hover:bg-primary/15 transition-colors">
+                <label className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                  acceptedTerms
+                    ? 'border-green-500 bg-green-500/10'
+                    : 'border-primary/40 bg-primary/10 hover:bg-primary/15 animate-pulse'
+                }`}>
                   <input
                     type="checkbox"
                     checked={acceptedTerms}
                     onChange={e => setAcceptedTerms(e.target.checked)}
-                    className="mt-0.5 h-5 w-5 accent-primary cursor-pointer"
+                    className="mt-0.5 h-6 w-6 accent-primary cursor-pointer shrink-0"
                   />
-                  <span className="text-sm font-medium">Li e concordo com todos os termos do regulamento acima</span>
+                  <span className="text-sm sm:text-base font-medium">
+                    Li e concordo com todos os termos do regulamento acima
+                    {!acceptedTerms && <span className="block text-xs text-muted-foreground mt-1">Marque esta opção para continuar</span>}
+                  </span>
                 </label>
               </div>
             )}
@@ -349,13 +356,13 @@ export function ContractModal({
 
                 <div
                   ref={canvasContainerRef}
-                  className="border-2 border-dashed border-primary/50 rounded-lg bg-white overflow-hidden"
-                  style={{ minHeight: '160px' }}
+                  className="border-2 border-dashed border-primary/50 rounded-lg bg-white overflow-hidden cursor-crosshair"
+                  style={{ minHeight: '180px' }}
                 >
                   <canvas
                     ref={canvasRef}
-                    className="block w-full"
-                    style={{ touchAction: 'none', minHeight: '150px' }}
+                    className="block w-full cursor-crosshair"
+                    style={{ touchAction: 'none', minHeight: '170px' }}
                   />
                 </div>
 
@@ -422,51 +429,55 @@ export function ContractModal({
             )}
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t shrink-0 bg-muted/20">
+          {/* Footer - always visible */}
+          <div className="p-4 sm:p-6 border-t shrink-0 bg-background shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
             {step === 'read' && (
-              <Button className="w-full h-11" disabled={!acceptedTerms} onClick={() => setStep('sign')}>
+              <Button className="w-full h-12 text-base font-semibold" disabled={!acceptedTerms} onClick={() => setStep('sign')}>
                 Continuar para Assinatura
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             )}
 
             {step === 'sign' && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep('read')}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Voltar
-                </Button>
-                <Button variant="outline" onClick={clearSignature} disabled={!canvasReady}>
-                  <RotateCcw className="mr-1 h-4 w-4" />
-                  Limpar
-                </Button>
-                <Button className="flex-1 h-11" onClick={confirmSignature} disabled={!canvasReady}>
-                  Confirmar
-                  <Check className="ml-1 h-4 w-4" />
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setStep('read')}>
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Voltar
+                  </Button>
+                  <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={clearSignature} disabled={!canvasReady}>
+                    <RotateCcw className="mr-1 h-4 w-4" />
+                    Limpar
+                  </Button>
+                </div>
+                <Button className="flex-1 h-12 text-base font-semibold" onClick={confirmSignature} disabled={!canvasReady}>
+                  Confirmar Assinatura
+                  <Check className="ml-2 h-5 w-5" />
                 </Button>
               </div>
             )}
 
             {step === 'confirm' && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep('sign')} disabled={loading}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Voltar
-                </Button>
-                <Button variant="outline" onClick={handleDownload} disabled={loading}>
-                  <Download className="mr-1 h-4 w-4" />
-                  PDF
-                </Button>
-                <Button className="flex-1 h-11" onClick={processContract} disabled={loading}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setStep('sign')} disabled={loading}>
+                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    Voltar
+                  </Button>
+                  <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={handleDownload} disabled={loading}>
+                    <Download className="mr-1 h-4 w-4" />
+                    PDF
+                  </Button>
+                </div>
+                <Button className="flex-1 h-12 text-base font-semibold" onClick={processContract} disabled={loading}>
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Salvando...
                     </>
                   ) : (
                     <>
-                      <Check className="mr-1 h-4 w-4" />
+                      <Check className="mr-2 h-5 w-5" />
                       Finalizar Contrato
                     </>
                   )}
