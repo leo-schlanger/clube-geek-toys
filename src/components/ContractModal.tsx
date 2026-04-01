@@ -151,13 +151,30 @@ export function ContractModal({
     toast.loading('Processando contrato...', { id: 'contract' })
 
     try {
-      const ipAddress = await getClientIP()
+      // Get IP with timeout fallback
+      let ipAddress = 'Não identificado'
+      try {
+        ipAddress = await Promise.race([
+          getClientIP(),
+          new Promise<string>((_, reject) => setTimeout(() => reject('timeout'), 3000))
+        ]) as string
+      } catch {
+        ipAddress = 'Não identificado'
+      }
+
       const userAgent = getUserAgent()
       const signedAt = new Date().toISOString()
 
-      const documentHash = await generateContractHash({
-        memberId, memberName, memberCPF, memberEmail, plan, signedAt, ipAddress,
-      })
+      // Generate hash
+      let documentHash = ''
+      try {
+        documentHash = await generateContractHash({
+          memberId, memberName, memberCPF, memberEmail, plan, signedAt, ipAddress,
+        })
+      } catch (err) {
+        logger.error('Hash generation failed:', err)
+        documentHash = `fallback_${Date.now()}`
+      }
 
       const contractData: ContractData = {
         memberId, memberName, memberCPF, memberEmail, memberPhone,
@@ -165,23 +182,50 @@ export function ContractModal({
         userAgent, documentHash, createdAt: signedAt,
       }
 
+      // Generate PDF
       toast.loading('Gerando PDF...', { id: 'contract' })
-      const pdfBytes = await generateContractPDF({ ...contractData, signedAt })
+      let pdfBytes: Uint8Array
+      try {
+        pdfBytes = await generateContractPDF({ ...contractData, signedAt })
+      } catch (err) {
+        logger.error('PDF generation failed:', err)
+        toast.error('Erro ao gerar PDF. Tente novamente.', { id: 'contract' })
+        setLoading(false)
+        return
+      }
 
+      // Store contract
       toast.loading('Salvando contrato...', { id: 'contract' })
-      const { pdfUrl: storedPdfUrl } = await storeContract(contractData, pdfBytes)
-      setPdfUrl(storedPdfUrl)
-      contractData.pdfUrl = storedPdfUrl
+      let storedPdfUrl = ''
+      try {
+        const result = await storeContract(contractData, pdfBytes)
+        storedPdfUrl = result.pdfUrl
+        setPdfUrl(storedPdfUrl)
+        contractData.pdfUrl = storedPdfUrl
+      } catch (err) {
+        logger.error('Contract storage failed:', err)
+        toast.error('Erro ao salvar contrato. Verifique sua conexão e tente novamente.', { id: 'contract' })
+        setLoading(false)
+        return
+      }
 
-      sendContractEmail(
-        memberEmail, memberName, planData.name, signedAt, documentHash, pdfToBase64(pdfBytes)
-      ).catch(err => logger.error('Contract email error:', err))
+      // Send email (non-blocking, don't fail if this fails)
+      try {
+        const pdfBase64 = pdfToBase64(pdfBytes)
+        sendContractEmail(
+          memberEmail, memberName, planData.name, signedAt, documentHash, pdfBase64
+        ).catch(err => logger.warn('Contract email failed:', err))
+      } catch (err) {
+        logger.warn('Email preparation failed:', err)
+      }
 
       toast.success('Contrato assinado com sucesso!', { id: 'contract' })
       onSigned(contractData)
+
     } catch (error) {
-      logger.error('Contract error:', error)
-      toast.error('Erro ao processar contrato. Tente novamente.', { id: 'contract' })
+      logger.error('Contract processing error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido'
+      toast.error(`Erro: ${errorMessage}`, { id: 'contract' })
     } finally {
       setLoading(false)
     }
