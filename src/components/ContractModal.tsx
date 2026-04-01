@@ -60,51 +60,129 @@ export function ContractModal({
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [signaturePadReady, setSignaturePadReady] = useState(false)
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
   const signaturePadRef = useRef<SignaturePad | null>(null)
 
   const planData = PLANS[plan]
   const price = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
 
-  // Initialize signature pad when entering sign step
+  // Check if content fits in viewport on mount and after render
   useEffect(() => {
-    if (step === 'sign' && canvasRef.current && !signaturePadRef.current) {
-      const canvas = canvasRef.current
-      const ratio = Math.max(window.devicePixelRatio || 1, 1)
+    if (step === 'read') {
+      const checkScroll = () => {
+        if (scrollContainerRef.current) {
+          const { scrollHeight, clientHeight } = scrollContainerRef.current
+          // If content fits or is very close, enable the button
+          if (scrollHeight <= clientHeight + 10) {
+            setHasScrolledToEnd(true)
+          }
+        }
+      }
 
-      canvas.width = canvas.offsetWidth * ratio
-      canvas.height = canvas.offsetHeight * ratio
-      canvas.getContext('2d')?.scale(ratio, ratio)
-
-      signaturePadRef.current = new SignaturePad(canvas, {
-        backgroundColor: 'rgb(255, 255, 255)',
-        penColor: 'rgb(0, 0, 0)',
-      })
+      // Check immediately and after a short delay for render
+      checkScroll()
+      const timeout = setTimeout(checkScroll, 100)
+      return () => clearTimeout(timeout)
     }
   }, [step])
 
-  // Handle resize for signature pad
+  // Initialize signature pad when entering sign step
   useEffect(() => {
-    function handleResize() {
-      if (step === 'sign' && canvasRef.current && signaturePadRef.current) {
-        const canvas = canvasRef.current
-        const ratio = Math.max(window.devicePixelRatio || 1, 1)
-        const data = signaturePadRef.current.toData()
+    if (step === 'sign') {
+      // Small delay to ensure DOM is ready
+      const initTimeout = setTimeout(() => {
+        initializeSignaturePad()
+      }, 50)
 
-        canvas.width = canvas.offsetWidth * ratio
-        canvas.height = canvas.offsetHeight * ratio
-        canvas.getContext('2d')?.scale(ratio, ratio)
-
-        signaturePadRef.current.clear()
-        signaturePadRef.current.fromData(data)
+      return () => clearTimeout(initTimeout)
+    } else {
+      // Cleanup when leaving sign step
+      if (signaturePadRef.current) {
+        signaturePadRef.current.off()
+        signaturePadRef.current = null
+        setSignaturePadReady(false)
       }
+    }
+  }, [step])
+
+  // Initialize signature pad
+  const initializeSignaturePad = useCallback(() => {
+    const canvas = canvasRef.current
+    const container = canvasContainerRef.current
+
+    if (!canvas || !container) {
+      logger.warn('Canvas or container not found for signature pad')
+      return
+    }
+
+    // Get actual container dimensions
+    const rect = container.getBoundingClientRect()
+    const width = rect.width || 400
+    const height = rect.height || 200
+
+    // Set canvas size accounting for device pixel ratio
+    const ratio = Math.max(window.devicePixelRatio || 1, 1)
+    canvas.width = width * ratio
+    canvas.height = height * ratio
+    canvas.style.width = `${width}px`
+    canvas.style.height = `${height}px`
+
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.scale(ratio, ratio)
+    }
+
+    // Clear any existing signature pad
+    if (signaturePadRef.current) {
+      signaturePadRef.current.off()
+    }
+
+    // Create new signature pad
+    signaturePadRef.current = new SignaturePad(canvas, {
+      backgroundColor: 'rgb(255, 255, 255)',
+      penColor: 'rgb(0, 0, 0)',
+      minWidth: 1,
+      maxWidth: 3,
+    })
+
+    setSignaturePadReady(true)
+    logger.info('Signature pad initialized', { width, height, ratio })
+  }, [])
+
+  // Handle window resize
+  useEffect(() => {
+    if (step !== 'sign') return
+
+    let resizeTimeout: ReturnType<typeof setTimeout>
+
+    const handleResize = () => {
+      clearTimeout(resizeTimeout)
+      resizeTimeout = setTimeout(() => {
+        if (signaturePadRef.current && canvasRef.current) {
+          // Save current signature data
+          const data = signaturePadRef.current.toData()
+
+          // Reinitialize
+          initializeSignaturePad()
+
+          // Restore signature data if any
+          if (data.length > 0 && signaturePadRef.current) {
+            signaturePadRef.current.fromData(data)
+          }
+        }
+      }, 100)
     }
 
     window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [step])
+    return () => {
+      clearTimeout(resizeTimeout)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [step, initializeSignaturePad])
 
   // Handle scroll detection
   const handleScroll = useCallback(() => {
@@ -126,16 +204,25 @@ export function ContractModal({
 
   // Confirm signature and move to next step
   function confirmSignature() {
-    if (signaturePadRef.current) {
-      if (signaturePadRef.current.isEmpty()) {
-        toast.error('Por favor, desenhe sua assinatura')
-        return
-      }
-
-      const dataUrl = signaturePadRef.current.toDataURL('image/png')
-      setSignatureImage(dataUrl)
-      setStep('confirm')
+    if (!signaturePadRef.current) {
+      toast.error('Área de assinatura não carregada. Recarregue a página.')
+      return
     }
+
+    if (signaturePadRef.current.isEmpty()) {
+      toast.error('Por favor, desenhe sua assinatura')
+      return
+    }
+
+    const dataUrl = signaturePadRef.current.toDataURL('image/png')
+    setSignatureImage(dataUrl)
+    setStep('confirm')
+  }
+
+  // Go back to sign step (keep signature)
+  function goBackToSign() {
+    setStep('sign')
+    // The signature will be restored when needed
   }
 
   // Process contract signing
@@ -226,6 +313,8 @@ export function ContractModal({
     if (!signatureImage) return
 
     try {
+      toast.loading('Gerando PDF...', { id: 'download-pdf' })
+
       const ipAddress = await getClientIP()
       const userAgent = getUserAgent()
       const signedAt = new Date().toISOString()
@@ -255,18 +344,18 @@ export function ContractModal({
       })
 
       downloadPDF(pdfBytes, `contrato_${memberName.replace(/\s+/g, '_')}.pdf`)
-      toast.success('PDF baixado com sucesso!')
+      toast.success('PDF baixado com sucesso!', { id: 'download-pdf' })
     } catch (error) {
       logger.error('Download error:', error)
-      toast.error('Erro ao gerar PDF')
+      toast.error('Erro ao gerar PDF', { id: 'download-pdf' })
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-background border-border">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <Card className="w-full max-w-2xl mx-4 flex flex-col bg-background border-border" style={{ maxHeight: 'calc(100vh - 2rem)', height: 'auto' }}>
         {/* Header */}
-        <CardHeader className="flex-shrink-0 border-b border-border">
+        <CardHeader className="flex-shrink-0 border-b border-border pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -291,6 +380,7 @@ export function ContractModal({
               onClick={onClose}
               className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
               disabled={loading}
+              aria-label="Fechar"
             >
               <X className="h-4 w-4" />
             </button>
@@ -330,14 +420,15 @@ export function ContractModal({
         </CardHeader>
 
         {/* Content */}
-        <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
+        <CardContent className="flex-1 overflow-hidden p-0" style={{ minHeight: 0 }}>
           {/* Step 1: Read Contract */}
           {step === 'read' && (
-            <div className="h-full flex flex-col min-h-0">
+            <div className="flex flex-col h-full">
               <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
-                className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6"
+                className="flex-1 overflow-y-auto p-6 space-y-6"
+                style={{ minHeight: 0 }}
               >
                 {/* Logo and Title */}
                 <div className="text-center space-y-3">
@@ -353,7 +444,7 @@ export function ContractModal({
                 {/* Member Data */}
                 <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                   <h3 className="font-semibold text-sm text-primary">Dados do Assinante</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Nome:</span>{' '}
                       <span className="font-medium">{memberName}</span>
@@ -364,13 +455,13 @@ export function ContractModal({
                     </div>
                     <div>
                       <span className="text-muted-foreground">Email:</span>{' '}
-                      <span className="font-medium">{memberEmail}</span>
+                      <span className="font-medium break-all">{memberEmail}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Telefone:</span>{' '}
                       <span className="font-medium">{memberPhone}</span>
                     </div>
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <span className="text-muted-foreground">Plano:</span>{' '}
                       <Badge variant={plan}>{planData.name}</Badge>{' '}
                       <span className="text-muted-foreground">
@@ -395,20 +486,30 @@ export function ContractModal({
                   ))}
                 </div>
 
-                {/* Scroll indicator */}
-                {!hasScrolledToEnd && (
+                {/* End marker - ensures scroll detection works */}
+                <div className="text-center py-4 border-t border-border mt-6">
+                  <p className="text-sm text-muted-foreground">
+                    — Fim do Regulamento —
+                  </p>
+                </div>
+              </div>
+
+              {/* Scroll indicator - only show if not at end */}
+              {!hasScrolledToEnd && (
+                <div className="flex-shrink-0 py-2 bg-gradient-to-t from-background to-transparent">
                   <div className="flex items-center justify-center gap-2 text-muted-foreground animate-bounce">
                     <ChevronDown className="h-4 w-4" />
                     <span className="text-sm">Role para ler todo o contrato</span>
                     <ChevronDown className="h-4 w-4" />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Action button */}
               <div className="flex-shrink-0 p-4 border-t border-border">
                 <Button
                   className="w-full"
+                  size="lg"
                   onClick={() => setStep('sign')}
                   disabled={!hasScrolledToEnd}
                 >
@@ -430,27 +531,40 @@ export function ContractModal({
 
           {/* Step 2: Sign */}
           {step === 'sign' && (
-            <div className="h-full flex flex-col min-h-0 p-6">
+            <div className="flex flex-col h-full p-6">
               <div className="text-center mb-4">
                 <p className="text-sm text-muted-foreground">
-                  Desenhe sua assinatura no campo abaixo usando o mouse ou toque
+                  Desenhe sua assinatura no campo abaixo usando o mouse ou o dedo
                 </p>
               </div>
 
-              {/* Signature canvas */}
-              <div className="flex-1 border-2 border-dashed border-border rounded-lg overflow-hidden bg-white">
+              {/* Signature canvas container */}
+              <div
+                ref={canvasContainerRef}
+                className="flex-1 border-2 border-dashed border-border rounded-lg overflow-hidden bg-white relative"
+                style={{ minHeight: '200px', maxHeight: '300px' }}
+              >
                 <canvas
                   ref={canvasRef}
-                  className="w-full h-full touch-none"
-                  style={{ minHeight: '200px' }}
+                  className="absolute inset-0 w-full h-full"
+                  style={{ touchAction: 'none' }}
                 />
+                {!signaturePadReady && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
               </div>
+
+              {/* Instructions */}
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                Use o mouse ou toque na tela para desenhar sua assinatura
+              </p>
 
               {/* Actions */}
               <div className="flex gap-3 mt-4">
                 <Button
                   variant="outline"
-                  className="flex-1"
                   onClick={() => setStep('read')}
                 >
                   Voltar
@@ -458,13 +572,16 @@ export function ContractModal({
                 <Button
                   variant="outline"
                   onClick={clearSignature}
+                  disabled={!signaturePadReady}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" />
                   Limpar
                 </Button>
                 <Button
                   className="flex-1"
+                  size="lg"
                   onClick={confirmSignature}
+                  disabled={!signaturePadReady}
                 >
                   Confirmar Assinatura
                   <Check className="ml-2 h-4 w-4" />
@@ -475,8 +592,8 @@ export function ContractModal({
 
           {/* Step 3: Confirm */}
           {step === 'confirm' && (
-            <div className="h-full flex flex-col min-h-0 p-6 space-y-6 overflow-y-auto">
-              <div className="text-center">
+            <div className="flex flex-col h-full overflow-y-auto p-6 space-y-4">
+              <div className="text-center flex-shrink-0">
                 <div className="h-16 w-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center mb-4">
                   <FileCheck className="h-8 w-8 text-primary" />
                 </div>
@@ -488,18 +605,18 @@ export function ContractModal({
 
               {/* Signature preview */}
               {signatureImage && (
-                <div className="border rounded-lg p-4 bg-white">
+                <div className="border rounded-lg p-4 bg-white flex-shrink-0">
                   <p className="text-xs text-muted-foreground mb-2 text-center">Sua assinatura:</p>
                   <img
                     src={signatureImage}
                     alt="Assinatura"
-                    className="max-h-24 mx-auto"
+                    className="max-h-20 mx-auto"
                   />
                 </div>
               )}
 
               {/* Summary */}
-              <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm flex-shrink-0">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Nome:</span>
                   <span className="font-medium">{memberName}</span>
@@ -519,18 +636,17 @@ export function ContractModal({
               </div>
 
               {/* Legal notice */}
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-xs text-muted-foreground text-center flex-shrink-0">
                 Ao clicar em "Confirmar e Finalizar", você concorda com todos os termos
                 do regulamento e declara que as informações fornecidas são verdadeiras.
                 Este documento tem validade jurídica conforme Lei 14.063/2020.
               </p>
 
               {/* Actions */}
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
                 <Button
                   variant="outline"
-                  className="flex-1"
-                  onClick={() => setStep('sign')}
+                  onClick={goBackToSign}
                   disabled={loading}
                 >
                   Voltar
@@ -545,6 +661,7 @@ export function ContractModal({
                 </Button>
                 <Button
                   className="flex-1"
+                  size="lg"
                   onClick={processContract}
                   disabled={loading}
                 >
@@ -564,7 +681,7 @@ export function ContractModal({
 
               {/* PDF download link after success */}
               {pdfUrl && (
-                <div className="text-center">
+                <div className="text-center flex-shrink-0">
                   <a
                     href={pdfUrl}
                     target="_blank"
