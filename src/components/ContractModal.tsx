@@ -1,6 +1,6 @@
 /**
  * Contract Modal - Digital contract with signature capture
- * Full-page approach for maximum compatibility
+ * Responsive: full-page on mobile, centered modal on desktop
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
@@ -57,15 +57,19 @@ export function ContractModal({
   const [loading, setLoading] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
 
+  const modalRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
   const signaturePadRef = useRef<SignaturePad | null>(null)
 
   const planData = PLANS[plan]
   const price = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
 
-  // Scroll to top when step changes
+  // Scroll to top of modal when step changes
   useEffect(() => {
-    window.scrollTo(0, 0)
+    if (modalRef.current) {
+      modalRef.current.scrollTop = 0
+    }
   }, [step])
 
   // Initialize signature pad
@@ -73,13 +77,11 @@ export function ContractModal({
     if (step === 'sign') {
       const timer = setTimeout(() => {
         const canvas = canvasRef.current
-        if (!canvas) return
-
-        const container = canvas.parentElement
-        if (!container) return
+        const container = canvasContainerRef.current
+        if (!canvas || !container) return
 
         const rect = container.getBoundingClientRect()
-        const width = rect.width || 300
+        const width = Math.max(rect.width - 4, 280) // -4 for border
         const height = 180
 
         canvas.width = width * 2
@@ -94,13 +96,17 @@ export function ContractModal({
           ctx.fillRect(0, 0, width, height)
         }
 
+        if (signaturePadRef.current) {
+          signaturePadRef.current.off()
+        }
+
         signaturePadRef.current = new SignaturePad(canvas, {
           backgroundColor: 'rgb(255, 255, 255)',
           penColor: 'rgb(0, 0, 0)',
           minWidth: 1,
           maxWidth: 2.5,
         })
-      }, 100)
+      }, 150)
 
       return () => clearTimeout(timer)
     }
@@ -118,8 +124,10 @@ export function ContractModal({
       signaturePadRef.current.clear()
       const ctx = canvasRef.current.getContext('2d')
       if (ctx) {
+        const width = canvasRef.current.width / 2
+        const height = canvasRef.current.height / 2
         ctx.fillStyle = 'white'
-        ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        ctx.fillRect(0, 0, width, height)
       }
     }
   }, [])
@@ -201,136 +209,146 @@ export function ContractModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background overflow-auto">
-      {/* Fixed Header */}
-      <div className="sticky top-0 z-10 bg-background border-b border-border">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">
-              {step === 'read' && '1. Leitura'}
-              {step === 'sign' && '2. Assinatura'}
-              {step === 'confirm' && '3. Confirmação'}
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="p-2 hover:bg-muted rounded-full"
-            aria-label="Fechar"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        {/* Progress bar */}
-        <div className="h-1 bg-muted">
-          <div
-            className="h-1 bg-primary transition-all duration-300"
-            style={{ width: step === 'read' ? '33%' : step === 'sign' ? '66%' : '100%' }}
-          />
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-lg mx-auto px-4 py-6">
-
-        {/* === STEP 1: READ === */}
-        {step === 'read' && (
-          <div className="space-y-6">
-            {/* Header */}
-            <div className="text-center">
-              <img src="/logo.jpg" alt="Geek & Toys" className="h-16 mx-auto rounded mb-3" />
-              <h1 className="text-xl font-bold text-primary">{CONTRACT_TITLE}</h1>
-              <p className="text-sm text-muted-foreground">{CONTRACT_SUBTITLE}</p>
+    <div className="fixed inset-0 z-[100] flex items-start md:items-center justify-center bg-black/60 backdrop-blur-sm overflow-y-auto p-0 md:p-4">
+      {/* Modal container - full screen on mobile, centered box on desktop */}
+      <div
+        ref={modalRef}
+        className="w-full min-h-screen md:min-h-0 md:max-h-[90vh] md:max-w-2xl md:rounded-lg bg-background md:border md:border-border overflow-y-auto"
+      >
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-background border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">
+                {step === 'read' && 'Passo 1: Leitura do Contrato'}
+                {step === 'sign' && 'Passo 2: Assinatura Digital'}
+                {step === 'confirm' && 'Passo 3: Confirmação'}
+              </h2>
             </div>
-
-            {/* Member Info */}
-            <div className="bg-muted rounded-lg p-4 text-sm space-y-1">
-              <p className="font-semibold text-primary mb-2">Seus Dados</p>
-              <p><strong>Nome:</strong> {memberName}</p>
-              <p><strong>CPF:</strong> {memberCPF}</p>
-              <p><strong>Email:</strong> {memberEmail}</p>
-              <p><strong>Telefone:</strong> {memberPhone}</p>
-              <p className="pt-2">
-                <strong>Plano:</strong>{' '}
-                <Badge variant={plan}>{planData.name}</Badge>{' '}
-                ({paymentType === 'monthly' ? 'Mensal' : 'Anual'}) - <strong>{formatCurrency(price)}</strong>
-              </p>
-            </div>
-
-            {/* Contract Sections */}
-            <div className="space-y-6">
-              {CONTRACT_SECTIONS.map((section, i) => (
-                <div key={i} className="border-b border-border pb-4 last:border-0">
-                  <h3 className="font-semibold text-sm mb-2">{section.title}</h3>
-                  <div className="space-y-2">
-                    {section.content.map((p, j) => (
-                      <p key={j} className="text-sm text-muted-foreground leading-relaxed">{p}</p>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="text-center text-muted-foreground text-sm py-4">
-              — Fim do Regulamento —
-            </div>
-
-            {/* Acceptance */}
-            <div className="bg-primary/5 border-2 border-primary/20 rounded-lg p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={acceptedTerms}
-                  onChange={(e) => setAcceptedTerms(e.target.checked)}
-                  className="mt-0.5 h-5 w-5 rounded border-2 border-primary accent-primary"
-                />
-                <span className="text-sm font-medium">
-                  Li e concordo com todos os termos do regulamento acima
-                </span>
-              </label>
-            </div>
-
-            {/* Action */}
-            <Button
-              className="w-full h-12 text-base"
-              disabled={!acceptedTerms}
-              onClick={() => setStep('sign')}
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="p-2 hover:bg-muted rounded-full -mr-2"
+              aria-label="Fechar"
             >
-              Continuar para Assinatura
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+              <X className="h-5 w-5" />
+            </button>
           </div>
-        )}
+          {/* Progress bar */}
+          <div className="flex gap-1 mt-3">
+            <div className={`h-1 flex-1 rounded ${step === 'read' || step === 'sign' || step === 'confirm' ? 'bg-primary' : 'bg-muted'}`} />
+            <div className={`h-1 flex-1 rounded ${step === 'sign' || step === 'confirm' ? 'bg-primary' : 'bg-muted'}`} />
+            <div className={`h-1 flex-1 rounded ${step === 'confirm' ? 'bg-primary' : 'bg-muted'}`} />
+          </div>
+        </div>
 
-        {/* === STEP 2: SIGN === */}
-        {step === 'sign' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <h2 className="text-xl font-bold">Assinatura Digital</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Desenhe sua assinatura no campo abaixo
+        {/* Content */}
+        <div className="p-4 md:p-6">
+
+          {/* === STEP 1: READ === */}
+          {step === 'read' && (
+            <div className="space-y-5">
+              {/* Header */}
+              <div className="text-center">
+                <img src="/logo.jpg" alt="Geek & Toys" className="h-14 mx-auto rounded mb-2" />
+                <h1 className="text-lg font-bold text-primary">{CONTRACT_TITLE}</h1>
+                <p className="text-sm text-muted-foreground">{CONTRACT_SUBTITLE}</p>
+              </div>
+
+              {/* Member Info */}
+              <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                <p className="font-semibold text-primary mb-2">Dados do Assinante</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                  <p><span className="text-muted-foreground">Nome:</span> {memberName}</p>
+                  <p><span className="text-muted-foreground">CPF:</span> {memberCPF}</p>
+                  <p><span className="text-muted-foreground">Email:</span> {memberEmail}</p>
+                  <p><span className="text-muted-foreground">Tel:</span> {memberPhone}</p>
+                </div>
+                <p className="mt-2 pt-2 border-t border-border">
+                  <span className="text-muted-foreground">Plano:</span>{' '}
+                  <Badge variant={plan}>{planData.name}</Badge>{' '}
+                  <span className="text-muted-foreground">
+                    ({paymentType === 'monthly' ? 'Mensal' : 'Anual'})
+                  </span>{' '}
+                  - <span className="font-bold text-primary">{formatCurrency(price)}</span>
+                </p>
+              </div>
+
+              {/* Contract Content */}
+              <div className="space-y-4">
+                {CONTRACT_SECTIONS.map((section, i) => (
+                  <div key={i} className="pb-4 border-b border-border last:border-0">
+                    <h3 className="font-semibold text-sm mb-2">{section.title}</h3>
+                    <div className="space-y-1.5">
+                      {section.content.map((p, j) => (
+                        <p key={j} className="text-sm text-muted-foreground leading-relaxed">{p}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-center text-muted-foreground text-sm py-2">
+                — Fim do Regulamento —
+              </div>
+
+              {/* Acceptance Checkbox */}
+              <div className="bg-primary/10 border-2 border-primary/30 rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 h-5 w-5 rounded accent-primary cursor-pointer"
+                  />
+                  <span className="text-sm font-medium leading-tight">
+                    Li e concordo com todos os termos do regulamento do Clube Geek & Toys VIP
+                  </span>
+                </label>
+              </div>
+
+              {/* Next Button */}
+              <Button
+                className="w-full h-12 text-base font-semibold"
+                disabled={!acceptedTerms}
+                onClick={() => setStep('sign')}
+              >
+                Continuar para Assinatura
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {/* === STEP 2: SIGN === */}
+          {step === 'sign' && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <h2 className="text-lg font-bold">Desenhe sua Assinatura</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Use o mouse ou dedo para assinar no campo abaixo
+                </p>
+              </div>
+
+              {/* Signature Canvas Container */}
+              <div
+                ref={canvasContainerRef}
+                className="border-2 border-dashed border-primary/50 rounded-lg bg-white overflow-hidden"
+                style={{ minHeight: '180px' }}
+              >
+                <canvas
+                  ref={canvasRef}
+                  style={{ touchAction: 'none', display: 'block' }}
+                />
+              </div>
+
+              <p className="text-xs text-center text-muted-foreground">
+                Sua assinatura terá validade jurídica conforme Lei 14.063/2020
               </p>
-            </div>
 
-            {/* Signature Area */}
-            <div className="border-2 border-dashed border-primary/50 rounded-lg p-1 bg-white">
-              <canvas
-                ref={canvasRef}
-                className="w-full rounded"
-                style={{ touchAction: 'none', minHeight: '180px' }}
-              />
-            </div>
-
-            <p className="text-xs text-center text-muted-foreground">
-              Use o dedo ou mouse para desenhar sua assinatura
-            </p>
-
-            {/* Actions */}
-            <div className="space-y-3">
+              {/* Actions */}
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  className="flex-1"
                   onClick={() => setStep('read')}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -343,66 +361,64 @@ export function ContractModal({
                   <RotateCcw className="mr-2 h-4 w-4" />
                   Limpar
                 </Button>
+                <Button
+                  className="flex-1 h-11"
+                  onClick={confirmSignature}
+                >
+                  Confirmar
+                  <Check className="ml-2 h-4 w-4" />
+                </Button>
               </div>
-              <Button
-                className="w-full h-12 text-base"
-                onClick={confirmSignature}
-              >
-                Confirmar Assinatura
-                <Check className="ml-2 h-5 w-5" />
-              </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* === STEP 3: CONFIRM === */}
-        {step === 'confirm' && (
-          <div className="space-y-6">
-            <div className="text-center">
-              <div className="h-16 w-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-3">
-                <Check className="h-8 w-8 text-green-500" />
+          {/* === STEP 3: CONFIRM === */}
+          {step === 'confirm' && (
+            <div className="space-y-5">
+              <div className="text-center">
+                <div className="h-14 w-14 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-3">
+                  <Check className="h-7 w-7 text-green-500" />
+                </div>
+                <h2 className="text-lg font-bold">Revise e Confirme</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Verifique se tudo está correto
+                </p>
               </div>
-              <h2 className="text-xl font-bold">Confirmar Assinatura</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Revise os dados e finalize
+
+              {/* Signature Preview */}
+              {signatureImage && (
+                <div className="bg-white border rounded-lg p-3">
+                  <p className="text-xs text-center text-muted-foreground mb-2">Sua assinatura:</p>
+                  <img src={signatureImage} alt="Assinatura" className="max-h-16 mx-auto" />
+                </div>
+              )}
+
+              {/* Summary */}
+              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Nome:</span>
+                  <span className="font-medium">{memberName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">CPF:</span>
+                  <span className="font-medium">{memberCPF}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Plano:</span>
+                  <Badge variant={plan}>{planData.name}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Data:</span>
+                  <span className="font-medium">{formatTimestamp(new Date().toISOString())}</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-center text-muted-foreground">
+                Documento com validade jurídica conforme Lei 14.063/2020
               </p>
-            </div>
 
-            {/* Signature Preview */}
-            {signatureImage && (
-              <div className="bg-white border rounded-lg p-4">
-                <p className="text-xs text-center text-muted-foreground mb-2">Sua assinatura:</p>
-                <img src={signatureImage} alt="Assinatura" className="max-h-20 mx-auto" />
-              </div>
-            )}
-
-            {/* Summary */}
-            <div className="bg-muted rounded-lg p-4 text-sm space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Nome:</span>
-                <span className="font-medium">{memberName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">CPF:</span>
-                <span className="font-medium">{memberCPF}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Plano:</span>
-                <Badge variant={plan}>{planData.name}</Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Data:</span>
-                <span className="font-medium">{formatTimestamp(new Date().toISOString())}</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-center text-muted-foreground">
-              Documento com validade jurídica conforme Lei 14.063/2020
-            </p>
-
-            {/* Actions */}
-            <div className="space-y-3">
-              <div className="flex gap-3">
+              {/* Actions */}
+              <div className="flex flex-wrap gap-3">
                 <Button
                   variant="outline"
                   onClick={() => setStep('sign')}
@@ -419,43 +435,43 @@ export function ContractModal({
                   <Download className="mr-2 h-4 w-4" />
                   PDF
                 </Button>
+                <Button
+                  className="flex-1 h-12 text-base font-semibold"
+                  onClick={processContract}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      Finalizar Contrato
+                      <Check className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
               </div>
-              <Button
-                className="w-full h-12 text-base"
-                onClick={processContract}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    Finalizar Contrato
-                    <Check className="ml-2 h-5 w-5" />
-                  </>
-                )}
-              </Button>
+
+              {pdfUrl && (
+                <a
+                  href={pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-center text-primary text-sm hover:underline"
+                >
+                  <Download className="inline h-4 w-4 mr-1" />
+                  Baixar contrato assinado
+                </a>
+              )}
             </div>
+          )}
+        </div>
 
-            {pdfUrl && (
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block text-center text-primary text-sm hover:underline"
-              >
-                <Download className="inline h-4 w-4 mr-1" />
-                Baixar contrato assinado
-              </a>
-            )}
-          </div>
-        )}
+        {/* Bottom padding for mobile safe area */}
+        <div className="h-6 md:h-0" />
       </div>
-
-      {/* Bottom safe area for mobile */}
-      <div className="h-8" />
     </div>
   )
 }
