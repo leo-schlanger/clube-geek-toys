@@ -74,7 +74,7 @@ export default function Subscribe() {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          Descontos exclusivos, brindes mensais, acesso antecipado e muito mais!
+          Descontos exclusivos em produtos e serviços, acesso antecipado a promoções e muito mais!
         </motion.p>
 
         {/* Payment Type Toggle */}
