@@ -56,6 +56,7 @@ export function ContractModal({
   const [loading, setLoading] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [canvasReady, setCanvasReady] = useState(false)
+  const [canvasError, setCanvasError] = useState(false)
 
   const contentRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -122,21 +123,27 @@ export function ContractModal({
         signaturePadRef.current.off()
         signaturePadRef.current = null
       }
+      setCanvasError(false)
       return
     }
 
     // Try multiple times with increasing delays
-    const attempts = [50, 150, 300, 500]
+    const attempts = [50, 150, 300, 500, 800]
     let attemptIndex = 0
     let timeoutId: ReturnType<typeof setTimeout>
 
     const trySetup = () => {
       if (setupCanvas()) {
+        setCanvasError(false)
         return // Success
       }
       attemptIndex++
       if (attemptIndex < attempts.length) {
         timeoutId = setTimeout(trySetup, attempts[attemptIndex])
+      } else {
+        // All attempts failed - show error to user
+        setCanvasError(true)
+        toast.error('Erro ao carregar área de assinatura. Tente recarregar a página.')
       }
     }
 
@@ -263,10 +270,15 @@ export function ContractModal({
     }
   }
 
+  // Prevent accidental close - contract is mandatory
+  const handleOverlayClick = () => {
+    toast.error('Você precisa assinar o contrato para continuar', { id: 'contract-required' })
+  }
+
   return (
     <div className="fixed inset-0 z-[9999] overflow-hidden">
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/70" onClick={onClose} />
+      {/* Overlay - doesn't close modal, shows warning instead */}
+      <div className="fixed inset-0 bg-black/70" onClick={handleOverlayClick} />
 
       {/* Modal - centered with proper sizing */}
       <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
@@ -279,9 +291,20 @@ export function ContractModal({
               </h2>
               <p className="text-sm text-muted-foreground">Passo {step === 'read' ? 1 : step === 'sign' ? 2 : 3} de 3</p>
             </div>
-            <button onClick={onClose} disabled={loading} className="p-2 hover:bg-muted rounded-full" aria-label="Fechar">
-              <X className="h-5 w-5" />
-            </button>
+            {/* X button only shown during loading or after contract signed, not during required steps */}
+            {loading ? (
+              <div className="p-2">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : step === 'confirm' && pdfUrl ? (
+              <button onClick={onClose} className="p-2 hover:bg-muted rounded-full" aria-label="Fechar">
+                <X className="h-5 w-5" />
+              </button>
+            ) : (
+              <div className="p-2 text-muted-foreground" title="Contrato obrigatório">
+                <Badge variant="outline" className="text-xs">Obrigatório</Badge>
+              </div>
+            )}
           </div>
 
           {/* Progress */}
@@ -366,10 +389,31 @@ export function ContractModal({
                   />
                 </div>
 
-                {!canvasReady && (
+                {!canvasReady && !canvasError && (
                   <div className="text-center text-sm text-muted-foreground">
                     <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
                     Carregando área de assinatura...
+                  </div>
+                )}
+
+                {canvasError && (
+                  <div className="text-center p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-2">
+                      Erro ao carregar área de assinatura
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCanvasError(false)
+                        setCanvasReady(false)
+                        // Force re-setup
+                        setTimeout(() => setupCanvas(), 100)
+                      }}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Tentar novamente
+                    </Button>
                   </div>
                 )}
 

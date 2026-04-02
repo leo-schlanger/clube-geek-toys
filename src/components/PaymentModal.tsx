@@ -145,14 +145,21 @@ export function PaymentModal({
     setCheckingPreviousPayment(false)
   }
 
-  // Expiration timer for PIX
+  // Expiration timer for PIX - prevents negative values
   useEffect(() => {
     if (pixData && method === 'pix') {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
-          if (prev <= 1) {
+          // Prevent going below 0
+          if (prev <= 0) {
+            if (timerRef.current) clearInterval(timerRef.current)
+            return 0
+          }
+          if (prev === 1) {
             if (timerRef.current) clearInterval(timerRef.current)
             toast.error('QR Code expirado. Gere um novo.')
+            // Stop polling when expired
+            if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
             return 0
           }
           return prev - 1
@@ -166,6 +173,7 @@ export function PaymentModal({
   }, [pixData, method])
 
   function formatTime(seconds: number): string {
+    if (seconds <= 0) return '0:00'
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
@@ -213,34 +221,47 @@ export function PaymentModal({
   }
 
   function startPaymentPolling(paymentId: string) {
-    const pollStartTime = Date.now()
-    const maxPollingDuration = 30 * 60 * 1000 // 30 minutes max polling
+    // Clear any existing polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+    }
+
+    let pollCount = 0
+    const MAX_POLL_REQUESTS = 180 // Max 180 requests (15 min at 5s intervals)
+    const POLL_INTERVAL = 5000 // 5 seconds
 
     pollIntervalRef.current = setInterval(async () => {
-      // Check if polling has exceeded max duration
-      if (Date.now() - pollStartTime > maxPollingDuration) {
+      pollCount++
+
+      // Stop polling after max requests
+      if (pollCount > MAX_POLL_REQUESTS) {
         if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-        toast.warning('Tempo de verificação expirado. Clique em "Verificar Pagamento" para checar manualmente.')
+        toast.warning('Verificação automática pausada. Clique em "Verificar Pagamento" para checar.')
         return
       }
 
-      const status = await checkPixPaymentStatus(paymentId)
+      try {
+        const status = await checkPixPaymentStatus(paymentId)
 
-      if (status === 'paid') {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-        if (memberId !== 'temp_member') {
-          await clearPendingPayment(memberId)
+        if (status === 'paid') {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+          if (memberId !== 'temp_member') {
+            await clearPendingPayment(memberId)
+          }
+          toast.success('Pagamento confirmado!')
+          onSuccess()
+        } else if (status === 'failed') {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+          if (memberId !== 'temp_member') {
+            await clearPendingPayment(memberId)
+          }
+          toast.error('Pagamento não aprovado')
         }
-        toast.success('Pagamento confirmado!')
-        onSuccess()
-      } else if (status === 'failed') {
-        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
-        if (memberId !== 'temp_member') {
-          await clearPendingPayment(memberId)
-        }
-        toast.error('Pagamento não aprovado')
+      } catch (error) {
+        paymentLogger.warn('Polling error (will retry):', error)
+        // Don't stop polling on error, just log it
       }
-    }, 5000)
+    }, POLL_INTERVAL)
   }
 
   async function checkPaymentManually() {
@@ -371,9 +392,9 @@ export function PaymentModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 bg-black/70" onClick={onClose}>
       <Card
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto overflow-hidden"
+        className="w-full max-w-md h-[95vh] sm:h-auto sm:max-h-[90vh] overflow-y-auto overflow-x-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Plan Header Banner */}

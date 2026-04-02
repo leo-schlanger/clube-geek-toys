@@ -131,18 +131,18 @@ export default function Register() {
 
     try {
       // 1. Validate email (format, disposable, domain)
-      toast.loading('Validando email...', { id: 'reg-status' })
+      toast.loading('Etapa 1/4: Validando email...', { id: 'reg-progress' })
       const emailResult = await validateEmail(sanitizedData.email)
 
       if (!emailResult.valid) {
-        toast.error(emailResult.error || 'Email inválido', { id: 'reg-status' })
+        toast.error(emailResult.error || 'Email inválido', { id: 'reg-progress' })
         setEmailValidation(emailResult)
         setLoading(false)
         return
       }
 
       // 2. Check if CPF is already registered (MUST succeed - no silent failures)
-      toast.loading('Verificando CPF...', { id: 'reg-status' })
+      toast.loading('Etapa 2/4: Verificando CPF...', { id: 'reg-progress' })
       let isRegistered: boolean
       try {
         isRegistered = await withTimeout(
@@ -153,58 +153,72 @@ export default function Register() {
       } catch {
         // CRITICAL: Do NOT allow registration if CPF check fails
         // This prevents duplicate accounts when Firestore is slow
-        toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-status' })
+        toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-progress' })
         setLoading(false)
         return
       }
 
       if (isRegistered) {
-        toast.error('Este CPF já está cadastrado', { id: 'reg-status' })
+        toast.error('Este CPF já está cadastrado', { id: 'reg-progress' })
         setLoading(false)
         return
       }
 
       // 3. Create account in Firebase Auth
-      toast.loading('Criando sua conta...', { id: 'reg-status' })
+      toast.loading('Etapa 3/4: Criando sua conta...', { id: 'reg-progress' })
       const result = await signUp(sanitizedData.email, sanitizedData.password)
 
       if (!result.success) {
-        toast.error(result.error || 'Erro ao criar conta', { id: 'reg-status' })
+        toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
         setLoading(false)
         return
       }
 
-      // 4. Create member record immediately (pending status)
-      // After signUp, user is automatically signed in and available via auth.currentUser
+      // 4. Create member record with retry logic
       const { auth } = await import('../lib/firebase')
       const newUser = auth.currentUser
 
       if (newUser) {
-        toast.loading('Finalizando cadastro...', { id: 'reg-status' })
-        try {
-          const member = await withTimeout(
-            createMember(newUser.uid, {
-              fullName: sanitizedData.fullName,
-              email: sanitizedData.email,
-              cpf: sanitizedData.cpf,
-              phone: sanitizedData.phone,
-              plan: selectedPlan,
-              paymentType: paymentType,
-            }),
-            5000,
-            'Cadastro finalizado com resiliência.'
-          )
+        toast.loading('Etapa 4/4: Salvando dados...', { id: 'reg-progress' })
 
-          if (member) {
-            setCreatedMemberId(member.id)
-            setMemberEmail(member.email)
-            setMemberName(sanitizedData.fullName)
-            setMemberCPF(sanitizedData.cpf)
-            setMemberPhone(sanitizedData.phone)
+        // Retry member creation up to 3 times
+        let member = null
+        let lastError = null
+        const maxRetries = 3
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            member = await withTimeout(
+              createMember(newUser.uid, {
+                fullName: sanitizedData.fullName,
+                email: sanitizedData.email,
+                cpf: sanitizedData.cpf,
+                phone: sanitizedData.phone,
+                plan: selectedPlan,
+                paymentType: paymentType,
+              }),
+              5000,
+              'Salvando dados...'
+            )
+            if (member) break // Success, exit loop
+          } catch (err) {
+            lastError = err
+            logger.warn(`Member creation attempt ${attempt}/${maxRetries} failed:`, err)
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Exponential backoff
+            }
           }
-        } catch (memberError) {
-          logger.warn('Member doc creation timed out or failed, but auth succeeded:', memberError)
-          // Set member data even if Firestore save failed - use Firebase UID as fallback ID
+        }
+
+        if (member) {
+          setCreatedMemberId(member.id)
+          setMemberEmail(member.email)
+          setMemberName(sanitizedData.fullName)
+          setMemberCPF(sanitizedData.cpf)
+          setMemberPhone(sanitizedData.phone)
+        } else {
+          // All retries failed - use Firebase UID as fallback
+          logger.warn('All member creation attempts failed, using UID fallback:', lastError)
           setCreatedMemberId(newUser.uid)
           setMemberEmail(sanitizedData.email)
           setMemberName(sanitizedData.fullName)
@@ -214,12 +228,12 @@ export default function Register() {
       }
 
       // 5. Show contract modal for signature (before payment)
-      toast.success('Conta criada! Agora assine o contrato de adesão.', { id: 'reg-status' })
+      toast.success('Conta criada! Agora assine o contrato.', { id: 'reg-progress' })
       setShowContractModal(true)
 
     } catch (error) {
       logger.error('Error registering:', error)
-      toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-status' })
+      toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-progress' })
     }
 
     setLoading(false)
