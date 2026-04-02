@@ -216,20 +216,24 @@ export default function Register() {
           setMemberName(sanitizedData.fullName)
           setMemberCPF(sanitizedData.cpf)
           setMemberPhone(sanitizedData.phone)
+
+          // 5. Show contract modal for signature (before payment)
+          toast.success('Conta criada! Agora assine o contrato.', { id: 'reg-progress' })
+          setShowContractModal(true)
         } else {
-          // All retries failed - use Firebase UID as fallback
-          logger.warn('All member creation attempts failed, using UID fallback:', lastError)
-          setCreatedMemberId(newUser.uid)
-          setMemberEmail(sanitizedData.email)
-          setMemberName(sanitizedData.fullName)
-          setMemberCPF(sanitizedData.cpf)
-          setMemberPhone(sanitizedData.phone)
+          // All retries failed - cannot proceed without member document
+          // The member document is required for contract storage permissions
+          logger.error('All member creation attempts failed:', lastError)
+          toast.error('Erro ao criar seu cadastro. Por favor, tente novamente.', {
+            id: 'reg-progress',
+            duration: 8000,
+            description: 'Se o problema persistir, entre em contato com o suporte.'
+          })
+          // Don't show contract modal - user needs to retry registration
+          setLoading(false)
+          return
         }
       }
-
-      // 5. Show contract modal for signature (before payment)
-      toast.success('Conta criada! Agora assine o contrato.', { id: 'reg-progress' })
-      setShowContractModal(true)
 
     } catch (error) {
       logger.error('Error registering:', error)

@@ -230,7 +230,7 @@ export function isMemberActive(member: Member): boolean {
 export function getMemberDiscount(plan: PlanType): { products: number; services: number } {
   switch (plan) {
     case 'silver':
-      return { products: 10, services: 20 }
+      return { products: 10, services: 25 }
     case 'gold':
       return { products: 15, services: 35 }
     case 'black':

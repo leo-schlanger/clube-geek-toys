@@ -69,7 +69,7 @@ const SYSTEM_CONFIG = {
       monthly: 19.90,
       annual: 199.90,
       discount_products: 10,
-      discount_services: 20,
+      discount_services: 25,
     },
     gold: {
       monthly: 39.90,
