@@ -172,7 +172,9 @@ export async function createMember(
     createdAt: now,
   })
 
-  const id = await FirestoreManager.save(MEMBERS_COLLECTION, null, memberData)
+  // Use Firebase Auth UID as document ID for reliable Storage rules cross-check
+  // This ensures Storage rules can verify ownership via members/{userId} lookup
+  const id = await FirestoreManager.save(MEMBERS_COLLECTION, userId, memberData)
   if (!id) return null
 
   return toMember(id, memberData)

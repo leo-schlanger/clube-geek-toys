@@ -174,8 +174,9 @@ service cloud.firestore {
       // Read: only admin
       allow read: if isAdmin();
 
-      // Create: seller or admin can create logs (for point operations, etc.)
-      allow create: if isSellerOrAdmin();
+      // Create: seller/admin for point operations, or authenticated user for contract signing
+      allow create: if isSellerOrAdmin() ||
+        (isAuthenticated() && request.resource.data.action == 'contract_signed');
 
       // Update: never (immutable logs)
       allow update: if false;
