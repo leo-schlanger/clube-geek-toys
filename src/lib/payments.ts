@@ -1,6 +1,6 @@
 import { api, API_URL } from './api-client'
 import { paymentLogger } from './logger'
-import type { Payment, PaymentMethod, PaymentStatus, PlanType, PaymentType } from '../types'
+import type { Payment, PaymentStatus, PlanType, PaymentType } from '../types'
 import { PLANS } from '../types'
 
 // ============================================
@@ -29,25 +29,13 @@ export function calculatePlanPrice(plan: PlanType, paymentType: PaymentType): nu
 // API CRUD
 // ============================================
 
-export async function createPayment(
-  _memberId: string,
-  _amount: number,
-  _method: PaymentMethod,
-  _reference?: string
-): Promise<Payment | null> {
-  return null
-}
-
-export async function updatePaymentStatus(
-  _paymentId: string,
-  _status: PaymentStatus,
-  _reference?: string
-): Promise<boolean> {
-  return true
-}
-
-export async function getMemberPayments(_memberId: string): Promise<Payment[]> {
-  return []
+export async function getMemberPayments(memberId: string): Promise<Payment[]> {
+  try {
+    const result = await api.get<Payment[]>(`/payments?member_id=${memberId}&limit=50`)
+    return result.data || []
+  } catch {
+    return []
+  }
 }
 
 // ============================================

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  COLLECTIONS,
+  TABLES,
   STORAGE_KEYS,
   TIMEOUTS,
   LIMITS,
@@ -11,13 +11,13 @@ import {
   MESSAGES,
 } from './constants'
 
-describe('COLLECTIONS', () => {
-  it('should have correct collection names', () => {
-    expect(COLLECTIONS.MEMBERS).toBe('members')
-    expect(COLLECTIONS.USERS).toBe('users')
-    expect(COLLECTIONS.PAYMENTS).toBe('payments')
-    expect(COLLECTIONS.POINTS).toBe('point_transactions')
-    expect(COLLECTIONS.AUDIT_LOGS).toBe('audit_logs')
+describe('TABLES', () => {
+  it('should have correct table names', () => {
+    expect(TABLES.MEMBERS).toBe('members')
+    expect(TABLES.USERS).toBe('users')
+    expect(TABLES.PAYMENTS).toBe('payments')
+    expect(TABLES.POINTS).toBe('point_transactions')
+    expect(TABLES.AUDIT_LOGS).toBe('audit_logs')
   })
 })
 

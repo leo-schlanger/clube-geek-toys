@@ -103,8 +103,8 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2)
   })
 
-  it('should handle Firebase unavailable code', async () => {
-    const error = new Error('Firebase error')
+  it('should handle server unavailable code', async () => {
+    const error = new Error('Server error')
     ;(error as Error & { code: string }).code = 'unavailable'
     const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('success')
 
@@ -116,8 +116,8 @@ describe('withRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2)
   })
 
-  it('should handle Firebase deadline-exceeded code', async () => {
-    const error = new Error('Firebase error')
+  it('should handle server deadline-exceeded code', async () => {
+    const error = new Error('Server error')
     ;(error as Error & { code: string }).code = 'deadline-exceeded'
     const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('success')
 

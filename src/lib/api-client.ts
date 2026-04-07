@@ -1,6 +1,6 @@
 /**
  * API Client — centralized HTTP client with JWT auth
- * Replaces Firebase SDK and FirestoreManager
+ * Communicates with Express API on VPS (PostgreSQL backend)
  */
 
 import { logger } from './logger'

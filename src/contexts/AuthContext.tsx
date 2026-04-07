@@ -1,5 +1,5 @@
 /**
- * AuthContext — JWT Authentication (replaces Firebase Auth)
+ * AuthContext — JWT Authentication
  */
 
 import {

@@ -152,6 +152,28 @@ export async function updateCard(id: string, _encryptedCard: string, _payerName:
   return { message: 'Cartão atualizado com sucesso' };
 }
 
+export async function getSubscriptionPayments(subscriptionId: string, limit?: number) {
+  const maxRows = Math.min(limit || 20, 100);
+  const result = await query(
+    `SELECT * FROM subscription_payments
+     WHERE subscription_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [subscriptionId, maxRows]
+  );
+
+  return result.rows.map((row) => ({
+    id: row.id,
+    subscriptionId: row.subscription_id,
+    amount: parseFloat(row.amount),
+    status: row.status,
+    providerId: row.provider_id,
+    providerStatus: row.provider_status,
+    paidAt: row.paid_at,
+    createdAt: row.created_at,
+  }));
+}
+
 function mapSubscriptionRow(row: Record<string, unknown>) {
   return {
     id: row.id,
@@ -160,7 +182,7 @@ function mapSubscriptionRow(row: Record<string, unknown>) {
     status: row.status,
     plan: row.plan,
     frequencyType: row.frequency_type,
-    transactionAmount: parseFloat(row.transaction_amount),
+    transactionAmount: parseFloat(row.transaction_amount as string),
     nextPaymentDate: row.next_payment_date,
     lastPaymentDate: row.last_payment_date,
     failedPayments: row.failed_payments,

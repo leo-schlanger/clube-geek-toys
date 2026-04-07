@@ -152,7 +152,7 @@ export default function Register() {
         )
       } catch {
         // CRITICAL: Do NOT allow registration if CPF check fails
-        // This prevents duplicate accounts when Firestore is slow
+        // This prevents duplicate accounts when the server is slow
         toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-progress' })
         setLoading(false)
         return
@@ -164,7 +164,7 @@ export default function Register() {
         return
       }
 
-      // 3. Create account in Firebase Auth
+      // 3. Create account via API
       toast.loading('Etapa 3/4: Criando sua conta...', { id: 'reg-progress' })
       const result = await signUp(sanitizedData.email, sanitizedData.password)
 

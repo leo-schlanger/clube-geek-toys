@@ -57,6 +57,61 @@ export async function getMonthlyReport(months: number) {
   }));
 }
 
+export async function getChurnReport() {
+  const result = await query(
+    `SELECT
+       TO_CHAR(updated_at, 'YYYY-MM') as month,
+       COUNT(*) FILTER (WHERE status = 'expired')::int as expired,
+       COUNT(*) FILTER (WHERE status = 'inactive')::int as cancelled,
+       COUNT(*)::int as total
+     FROM members
+     WHERE status IN ('expired', 'inactive')
+       AND updated_at >= NOW() - INTERVAL '6 months'
+     GROUP BY TO_CHAR(updated_at, 'YYYY-MM')
+     ORDER BY month DESC`
+  );
+
+  return result.rows.map((row) => ({
+    month: row.month,
+    expired: row.expired,
+    cancelled: row.cancelled,
+    total: row.total,
+  }));
+}
+
+export async function getPointsOverview() {
+  const result = await query(
+    `SELECT
+       TO_CHAR(created_at, 'YYYY-MM') as month,
+       COALESCE(SUM(points) FILTER (WHERE type = 'earn'), 0)::int as earned,
+       COALESCE(SUM(ABS(points)) FILTER (WHERE type = 'redeem'), 0)::int as redeemed
+     FROM point_transactions
+     WHERE created_at >= NOW() - INTERVAL '3 months'
+     GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+     ORDER BY month DESC`
+  );
+
+  return result.rows.map((row) => ({
+    month: row.month,
+    earned: row.earned,
+    redeemed: row.redeemed,
+  }));
+}
+
+export async function getTodayRevenue() {
+  const result = await query(
+    `SELECT COALESCE(SUM(amount), 0)::float as total, COUNT(*)::int as count
+     FROM payments
+     WHERE status = 'paid' AND paid_at::date = CURRENT_DATE`
+  );
+
+  return {
+    total: result.rows[0].total,
+    paymentCount: result.rows[0].count,
+    date: new Date().toISOString().split('T')[0],
+  };
+}
+
 export async function getRealtimeStats() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();

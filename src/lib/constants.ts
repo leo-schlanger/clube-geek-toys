@@ -8,10 +8,10 @@
  */
 
 // =============================================================================
-// Firestore Collections
+// Database Tables (for reference — queries go through the API)
 // =============================================================================
 
-export const COLLECTIONS = {
+export const TABLES = {
   MEMBERS: 'members',
   USERS: 'users',
   PAYMENTS: 'payments',

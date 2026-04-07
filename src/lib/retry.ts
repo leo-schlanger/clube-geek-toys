@@ -30,9 +30,9 @@ function defaultShouldRetry(error: unknown): boolean {
       return true
     }
 
-    // Firestore-specific: retry on permission errors that might be transient
-    const firebaseError = error as { code?: string }
-    if (firebaseError.code === 'unavailable' || firebaseError.code === 'deadline-exceeded') {
+    // Retry on server errors with specific error codes
+    const serverError = error as { code?: string }
+    if (serverError.code === 'unavailable' || serverError.code === 'deadline-exceeded') {
       return true
     }
   }

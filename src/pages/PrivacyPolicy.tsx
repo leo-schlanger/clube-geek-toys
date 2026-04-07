@@ -81,8 +81,7 @@ export default function PrivacyPolicy() {
                             <p>Não vendemos seus dados. Compartilhamos apenas com:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li><strong>PagBank:</strong> Processamento de pagamentos (PIX e cartão).</li>
-                                <li><strong>Firebase/Google Cloud:</strong> Hospedagem e banco de dados.</li>
-                                <li><strong>Cloudflare:</strong> Segurança e CDN.</li>
+                                <li><strong>Servidor próprio (VPS):</strong> Hospedagem e banco de dados PostgreSQL.</li>
                                 <li><strong>Resend:</strong> Envio de e-mails transacionais.</li>
                                 <li><strong>Autoridades:</strong> Quando exigido por lei ou ordem judicial.</li>
                             </ul>
@@ -90,7 +89,7 @@ export default function PrivacyPolicy() {
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">6. Transferência Internacional</h2>
-                            <p>Alguns de nossos prestadores de serviços (Firebase, Cloudflare) podem armazenar dados em servidores localizados fora do Brasil. Essas transferências são realizadas com base em:</p>
+                            <p>Alguns de nossos prestadores de serviços (PagBank, Resend) podem armazenar dados em servidores localizados fora do Brasil. Essas transferências são realizadas com base em:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Cláusulas contratuais padrão aprovadas pela ANPD.</li>
                                 <li>Certificações de adequação dos prestadores às normas de proteção de dados.</li>
@@ -102,7 +101,7 @@ export default function PrivacyPolicy() {
                             <p>Implementamos medidas técnicas e organizacionais para proteger seus dados:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Criptografia de dados em trânsito (HTTPS/TLS).</li>
-                                <li>Autenticação segura com Firebase Authentication.</li>
+                                <li>Autenticação segura com JWT (JSON Web Tokens).</li>
                                 <li>Senhas armazenadas com hash criptográfico (nunca em texto plano).</li>
                                 <li>Controle de acesso baseado em funções (admin, vendedor, membro).</li>
                                 <li>Monitoramento e logs de auditoria.</li>

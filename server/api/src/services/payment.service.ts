@@ -2,7 +2,69 @@ import { query } from '../config/database.js';
 import { env } from '../config/env.js';
 import { pagbankRequest, mapPagBankStatus } from '../utils/pagbank.js';
 import type { PagBankOrder } from '../utils/pagbank.js';
+import { AppError } from '../middleware/error-handler.js';
+import { PLAN_PRICES } from '../types/index.js';
 import crypto from 'crypto';
+
+const MIN_AMOUNT = 1.00;
+const MAX_AMOUNT = 999.90;
+
+function validateAmount(amount: number) {
+  if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
+    throw new AppError(400, `Valor deve estar entre R$${MIN_AMOUNT.toFixed(2)} e R$${MAX_AMOUNT.toFixed(2)}`);
+  }
+  // Cross-check: amount should match one of the plan prices
+  const validPrices: number[] = Object.values(PLAN_PRICES).flatMap((p) => [p.monthly, p.annual]);
+  if (!validPrices.includes(amount)) {
+    console.warn(`[PAYMENT] Amount R$${amount} does not match any plan price`);
+  }
+}
+
+export async function getPayments(filters: { memberId?: string; status?: string; limit?: number }) {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  let paramIndex = 1;
+
+  if (filters.memberId) {
+    conditions.push(`p.member_id = $${paramIndex++}`);
+    params.push(filters.memberId);
+  }
+  if (filters.status) {
+    conditions.push(`p.status = $${paramIndex++}`);
+    params.push(filters.status);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = Math.min(filters.limit || 20, 100);
+
+  const result = await query(
+    `SELECT p.*, m.full_name as member_name
+     FROM payments p
+     LEFT JOIN members m ON m.id = p.member_id
+     ${where}
+     ORDER BY p.created_at DESC
+     LIMIT $${paramIndex}`,
+    [...params, limit]
+  );
+
+  return result.rows.map(mapPaymentRow);
+}
+
+function mapPaymentRow(row: Record<string, unknown>) {
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    memberName: row.member_name || null,
+    amount: parseFloat(row.amount as string),
+    method: row.method,
+    status: row.status,
+    providerId: row.provider_id,
+    providerStatus: row.provider_status,
+    reference: row.reference,
+    paidAt: row.paid_at,
+    createdAt: row.created_at,
+  };
+}
 
 export async function createPixPayment(data: {
   amount: number;
@@ -10,6 +72,7 @@ export async function createPixPayment(data: {
   payer_email: string;
   external_reference: string;
 }) {
+  validateAmount(data.amount);
   const referenceId = crypto.randomUUID();
 
   const order = await pagbankRequest<PagBankOrder>({
@@ -77,6 +140,7 @@ export async function createCardPayment(data: {
   external_reference: string;
   installments?: number;
 }) {
+  validateAmount(data.amount);
   const order = await pagbankRequest<PagBankOrder>({
     method: 'POST',
     path: '/orders',

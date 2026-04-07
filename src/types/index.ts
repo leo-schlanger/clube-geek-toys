@@ -320,12 +320,12 @@ export interface ContractData {
   ipAddress: string
   userAgent: string
   documentHash: string        // SHA-256 hash
-  pdfUrl?: string             // Firebase Storage URL
-  pdfPath?: string            // Storage path
+  pdfUrl?: string             // URL do PDF armazenado no servidor
+  pdfPath?: string            // Caminho do arquivo no servidor
   createdAt: string
 }
 
-// Contract document stored in Firestore
+// Contract document stored in PostgreSQL
 export interface Contract {
   id: string
   memberId: string

@@ -38,19 +38,19 @@ export async function processWebhook(input: WebhookInput) {
     return;
   }
 
-  // Mark as processed
-  await query(
-    `INSERT INTO processed_webhooks (webhook_key, type, action, data_id, request_id)
-     VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
-    [webhookKey, 'pagbank_order', charges[0]?.status || 'notification', orderId, requestId || '']
-  );
-
   // Determine if this is a charge (card) or QR code (PIX) payment
   if (charges.length > 0) {
     await processChargeNotification(orderId, charges[0], referenceId || '');
   } else if (qrCodes.length > 0) {
     await processPixNotification(orderId, qrCodes[0], referenceId || '');
   }
+
+  // Mark as processed AFTER successful processing
+  await query(
+    `INSERT INTO processed_webhooks (webhook_key, type, action, data_id, request_id)
+     VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+    [webhookKey, 'pagbank_order', charges[0]?.status || 'notification', orderId, requestId || '']
+  );
 }
 
 async function processChargeNotification(orderId: string, charge: PagBankCharge, referenceId: string) {

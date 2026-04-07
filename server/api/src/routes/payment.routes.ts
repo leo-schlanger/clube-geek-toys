@@ -44,6 +44,21 @@ paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(ca
   }
 });
 
+// GET /payments — list payments with optional filters
+paymentRouter.get('/', authenticate, async (req, res, next) => {
+  try {
+    const filters = {
+      memberId: req.query.member_id as string | undefined,
+      status: req.query.status as string | undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    };
+    const result = await paymentService.getPayments(filters);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /payment/status/:orderId
 paymentRouter.get('/status/:paymentId', authenticate, async (req, res, next) => {
   try {

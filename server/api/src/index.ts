@@ -38,6 +38,7 @@ app.use('/users', userRouter);
 app.use('/pix', paymentRouter);
 app.use('/checkout', paymentRouter);
 app.use('/payment', paymentRouter);
+app.use('/payments', paymentRouter);
 app.use('/subscription', subscriptionRouter);
 app.use('/webhook', webhookRouter);
 app.use('/email', emailRouter);

@@ -38,7 +38,7 @@ export async function earnPoints(
     await client.query('BEGIN');
 
     // Get member plan
-    const memberResult = await client.query('SELECT plan, points FROM members WHERE id = $1', [memberId]);
+    const memberResult = await client.query('SELECT plan, points FROM members WHERE id = $1 FOR UPDATE', [memberId]);
     if (memberResult.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
 
     const { plan, points: currentPoints } = memberResult.rows[0];
@@ -92,7 +92,7 @@ export async function addBonusPoints(
   try {
     await client.query('BEGIN');
 
-    const memberResult = await client.query('SELECT points FROM members WHERE id = $1', [memberId]);
+    const memberResult = await client.query('SELECT points FROM members WHERE id = $1 FOR UPDATE', [memberId]);
     if (memberResult.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
 
     const newBalance = memberResult.rows[0].points + points;
@@ -173,7 +173,7 @@ function mapPointRow(row: Record<string, unknown>) {
     points: row.points,
     balance: row.balance,
     description: row.description,
-    purchaseValue: row.purchase_value ? parseFloat(row.purchase_value) : null,
+    purchaseValue: row.purchase_value ? parseFloat(row.purchase_value as string) : null,
     expiresAt: row.expires_at,
     expired: row.expired,
     isPromotion: row.is_promotion,

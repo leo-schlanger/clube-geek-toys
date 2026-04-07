@@ -9,13 +9,8 @@
  * - Atacantes podem usar múltiplos dispositivos/navegadores
  * - NÃO substitui rate limiting server-side
  *
- * Para rate limiting real, seria necessário:
- * - Firebase Cloud Functions (requer plano Blaze - pago)
- * - Middleware em backend próprio
- *
- * O Firebase Auth já possui proteção própria:
- * - Retorna 'auth/too-many-requests' após muitas tentativas
- * - Esta camada adicional melhora UX mostrando feedback imediato
+ * Para rate limiting real, o backend Express possui middleware próprio.
+ * Esta camada client-side melhora UX mostrando feedback imediato.
  *
  * Comportamento:
  * - Rastreia tentativas falhas por email

@@ -1,10 +1,13 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: clube-geek-postgres
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,6 +24,11 @@ services:
       retries: 5
 
   api:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     build:
       context: ./api
       dockerfile: Dockerfile

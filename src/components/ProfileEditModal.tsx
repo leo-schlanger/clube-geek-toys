@@ -114,7 +114,7 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
         toast.warning('Alteração de email/senha será implementada em breve')
       }
 
-      // Update member in Firestore
+      // Update member via API
       const updateData: Partial<Member> = {
         fullName: data.fullName,
         phone: data.phone.replace(/\D/g, ''),

@@ -19,6 +19,17 @@ interface UserRow {
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = '15m';
+
+async function auditLog(action: string, userId: string | null, details: Record<string, unknown>) {
+  try {
+    await query(
+      'INSERT INTO audit_logs (action, user_id, details) VALUES ($1, $2, $3)',
+      [action, userId, JSON.stringify(details)]
+    );
+  } catch (err) {
+    console.error('[AUDIT] Failed to write audit log:', err);
+  }
+}
 function generateTokens(user: { id: string; email: string; role: string }) {
   const accessToken = jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
@@ -31,7 +42,7 @@ function generateTokens(user: { id: string; email: string; role: string }) {
   return { accessToken, refreshToken };
 }
 
-export async function register(data: { email: string; password: string; name?: string }) {
+export async function register(data: { email: string; password: string; name?: string; ip?: string }) {
   // Check if email already exists
   const existing = await query('SELECT id FROM users WHERE email = $1', [data.email.toLowerCase()]);
   if (existing.rows.length > 0) {
@@ -67,6 +78,8 @@ export async function register(data: { email: string; password: string; name?: s
     console.error('[AUTH] Failed to send verification email:', err);
   }
 
+  await auditLog('auth.register', user.id, { email: user.email, ip: data.ip || null });
+
   return {
     accessToken,
     refreshToken,
@@ -79,24 +92,27 @@ export async function register(data: { email: string; password: string; name?: s
   };
 }
 
-export async function login(data: { email: string; password: string }) {
+export async function login(data: { email: string; password: string; ip?: string }) {
   const result = await query<UserRow>(
     'SELECT id, email, password_hash, role, email_verified FROM users WHERE email = $1',
     [data.email.toLowerCase()]
   );
 
   if (result.rows.length === 0) {
+    await auditLog('auth.login_failed', null, { email: data.email, reason: 'not_found', ip: data.ip || null });
     throw new AppError(401, 'Email ou senha inválidos');
   }
 
   const user = result.rows[0];
 
   if (user.role === 'disabled') {
+    await auditLog('auth.login_failed', user.id, { email: data.email, reason: 'disabled', ip: data.ip || null });
     throw new AppError(403, 'Conta desativada');
   }
 
   const passwordMatch = await bcrypt.compare(data.password, user.password_hash);
   if (!passwordMatch) {
+    await auditLog('auth.login_failed', user.id, { email: data.email, reason: 'wrong_password', ip: data.ip || null });
     throw new AppError(401, 'Email ou senha inválidos');
   }
 
@@ -106,6 +122,8 @@ export async function login(data: { email: string; password: string }) {
     hashSha256(refreshToken),
     user.id,
   ]);
+
+  await auditLog('auth.login', user.id, { email: user.email, ip: data.ip || null });
 
   return {
     accessToken,
@@ -235,6 +253,42 @@ export async function sendPasswordReset(email: string) {
   });
 }
 
+export async function updateProfile(userId: string, data: { email?: string; currentPassword?: string; newPassword?: string }) {
+  const userResult = await query<UserRow>(
+    'SELECT id, email, password_hash FROM users WHERE id = $1',
+    [userId]
+  );
+  if (userResult.rows.length === 0) {
+    throw new AppError(404, 'Usuário não encontrado');
+  }
+  const user = userResult.rows[0];
+
+  // Password change
+  if (data.newPassword) {
+    if (!data.currentPassword) {
+      throw new AppError(400, 'Senha atual é obrigatória para alterar a senha');
+    }
+    const match = await bcrypt.compare(data.currentPassword, user.password_hash);
+    if (!match) {
+      throw new AppError(401, 'Senha atual incorreta');
+    }
+    const newHash = await bcrypt.hash(data.newPassword, BCRYPT_ROUNDS);
+    await query('UPDATE users SET password_hash = $1, refresh_token_hash = NULL WHERE id = $2', [newHash, userId]);
+  }
+
+  // Email change
+  if (data.email && data.email.toLowerCase() !== user.email) {
+    const existing = await query('SELECT id FROM users WHERE email = $1 AND id != $2', [data.email.toLowerCase(), userId]);
+    if (existing.rows.length > 0) {
+      throw new AppError(409, 'Email já está em uso');
+    }
+    await query('UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2', [data.email.toLowerCase(), userId]);
+    await query('UPDATE members SET email = $1 WHERE user_id = $2', [data.email.toLowerCase(), userId]);
+  }
+
+  return { message: 'Perfil atualizado com sucesso' };
+}
+
 export async function resetPassword(token: string, newPassword: string) {
   const payload = verifyHmacToken(token);
   if (!payload || !payload.email) {
@@ -251,4 +305,6 @@ export async function resetPassword(token: string, newPassword: string) {
   if (result.rowCount === 0) {
     throw new AppError(404, 'Usuário não encontrado');
   }
+
+  await auditLog('auth.password_reset', result.rows[0].id, { email: payload.email });
 }

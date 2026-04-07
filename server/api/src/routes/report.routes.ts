@@ -26,6 +26,36 @@ reportRouter.get('/monthly', async (req, res, next) => {
   }
 });
 
+// GET /reports/churn — expired + cancelled members grouped by month
+reportRouter.get('/churn', async (_req, res, next) => {
+  try {
+    const result = await reportService.getChurnReport();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /reports/points-overview — points earned vs redeemed by month
+reportRouter.get('/points-overview', async (_req, res, next) => {
+  try {
+    const result = await reportService.getPointsOverview();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /reports/today-revenue — sum of paid payments today
+reportRouter.get('/today-revenue', async (_req, res, next) => {
+  try {
+    const result = await reportService.getTodayRevenue();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /reports/realtime-stats — replaces Firestore onSnapshot
 reportRouter.get('/realtime-stats', async (_req, res, next) => {
   try {

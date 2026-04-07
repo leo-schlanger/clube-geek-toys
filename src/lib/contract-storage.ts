@@ -1,5 +1,5 @@
 /**
- * Contract Storage — API-based (replaces Firebase Storage + Firestore)
+ * Contract Storage — API-based (PostgreSQL + file storage on VPS)
  */
 
 import { api } from './api-client'
@@ -13,21 +13,33 @@ export async function uploadContractPDF(
   pdfBytes: Uint8Array,
   _timestamp: string
 ): Promise<{ url: string; path: string }> {
-  // Convert to base64 for JSON upload
-  let binary = ''
-  for (let i = 0; i < pdfBytes.length; i++) {
-    binary += String.fromCharCode(pdfBytes[i])
-  }
-  void btoa(binary)
+  try {
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+    const formData = new FormData()
+    formData.append('pdf', blob, `contract-${memberId}.pdf`)
+    formData.append('memberId', memberId)
 
-  // Upload will happen as part of storeContract
-  return { url: '', path: '' }
+    const { getAccessToken, API_URL: apiUrl } = await import('./api-client')
+    const token = getAccessToken()
+
+    const response = await fetch(`${apiUrl}/contracts`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    })
+
+    if (!response.ok) throw new Error('Upload failed')
+    const data = await response.json()
+    return { url: data.pdfUrl || '', path: data.pdfPath || '' }
+  } catch {
+    return { url: '', path: '' }
+  }
 }
 
 /**
  * Save contract data to API
  */
-export async function saveContractToFirestore(
+export async function saveContract(
   contractData: ContractData,
   _pdfUrl: string,
   _pdfPath: string

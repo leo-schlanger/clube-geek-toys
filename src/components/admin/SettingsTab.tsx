@@ -8,13 +8,13 @@ import { toast } from 'sonner'
 import { Save, RotateCcw, Star, Crown, Sparkles, Gift, AlertTriangle } from 'lucide-react'
 import { PLANS, POINTS_MULTIPLIER, POINTS_CONFIG } from '../../types'
 
-// Note: In a production app, these would be stored in Firestore
+// Note: In a production app, these would be stored in the database via API
 // For now, we display the current configuration (read-only with visual edit)
 
 export function SettingsTab() {
   const [hasChanges, setHasChanges] = useState(false)
 
-  // Local state mirrors the constants (would be fetched from Firestore in production)
+  // Local state mirrors the constants (would be fetched from the API in production)
   const [plans, setPlans] = useState({
     silver: { ...PLANS.silver },
     gold: { ...PLANS.gold },
@@ -47,7 +47,7 @@ export function SettingsTab() {
   }
 
   const handleSave = () => {
-    // In production, this would save to Firestore
+    // In production, this would save via API to PostgreSQL
     toast.info('Configurações serão salvas no banco de dados em breve. Por enquanto, as configurações são definidas no código.')
     setHasChanges(false)
   }

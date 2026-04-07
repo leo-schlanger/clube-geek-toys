@@ -75,5 +75,5 @@ export const logger = createLogger()
 // Loggers pré-configurados para módulos específicos
 export const authLogger = createLogger({ prefix: 'Auth' })
 export const paymentLogger = createLogger({ prefix: 'Payment' })
-export const firestoreLogger = createLogger({ prefix: 'Firestore' })
+export const dbLogger = createLogger({ prefix: 'Database' })
 export const membersLogger = createLogger({ prefix: 'Members' })

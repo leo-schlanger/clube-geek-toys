@@ -18,6 +18,12 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const updateProfileSchema = z.object({
+  email: z.string().email().optional(),
+  currentPassword: z.string().min(1).optional(),
+  newPassword: z.string().min(6).optional(),
+});
+
 const resetRequestSchema = z.object({
   email: z.string().email(),
 });
@@ -39,7 +45,8 @@ const sendVerificationSchema = z.object({
 
 authRouter.post('/register', authLimiter, validate(registerSchema), async (req, res, next) => {
   try {
-    const result = await authService.register(req.body);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const result = await authService.register({ ...req.body, ip });
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -48,7 +55,8 @@ authRouter.post('/register', authLimiter, validate(registerSchema), async (req, 
 
 authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, next) => {
   try {
-    const result = await authService.login(req.body);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const result = await authService.login({ ...req.body, ip });
     res.json(result);
   } catch (err) {
     next(err);
@@ -82,6 +90,15 @@ authRouter.get('/me', authenticate, async (req, res, next) => {
   try {
     const user = await authService.getMe(req.user!.userId);
     res.json(user);
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.patch('/update-profile', authenticate, validate(updateProfileSchema), async (req, res, next) => {
+  try {
+    const result = await authService.updateProfile(req.user!.userId, req.body);
+    res.json(result);
   } catch (err) {
     next(err);
   }

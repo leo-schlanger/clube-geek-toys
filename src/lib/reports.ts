@@ -98,15 +98,24 @@ export async function getRevenueByPlan(): Promise<PlanDistribution[]> {
  * Get churn rate over time
  */
 export async function getChurnRate(_months: number = 6): Promise<ChurnData[]> {
-  // Can be derived from monthly report or dedicated endpoint
-  return []
+  try {
+    const result = await api.get<ChurnData[]>('/reports/churn')
+    return result.data || []
+  } catch {
+    return []
+  }
 }
 
 /**
  * Get points overview over time
  */
 export async function getPointsOverview(_months: number = 3): Promise<PointsOverview[]> {
-  return []
+  try {
+    const result = await api.get<PointsOverview[]>('/reports/points-overview')
+    return result.data || []
+  } catch {
+    return []
+  }
 }
 
 /**

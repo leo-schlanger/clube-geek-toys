@@ -70,7 +70,6 @@ const POLL_INTERVAL = 30000 // 30 seconds
 
 /**
  * Hook for dashboard statistics — polls API every 30 seconds
- * Replaces Firestore onSnapshot listeners
  */
 export function useRealtimeStats(): RealtimeStatsResult {
   const [stats, setStats] = useState<RealtimeStats>(initialStats)
@@ -106,7 +105,7 @@ export function useRealtimeStats(): RealtimeStatsResult {
           pendingMembers: members.pending || 0,
           expiredMembers: (members.expired || 0) + (members.inactive || 0),
           monthlyRevenue: payments.month_revenue || 0,
-          todayRevenue: 0, // TODO: daily revenue endpoint
+          todayRevenue: payments.today_revenue || 0,
           membersByPlan: {
             silver: members.silver || 0,
             gold: members.gold || 0,

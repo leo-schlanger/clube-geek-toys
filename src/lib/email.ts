@@ -1,5 +1,5 @@
 /**
- * Email client — uses Express API (replaces Cloudflare Worker calls)
+ * Email client — sends emails via Express API (Resend)
  */
 
 import { api } from './api-client'

@@ -139,7 +139,7 @@ export async function updateSubscriptionCard(
 }
 
 // ============================================
-// API QUERIES (replacing Firestore)
+// API QUERIES
 // ============================================
 
 /**
@@ -169,10 +169,15 @@ export async function getActiveSubscriptionByMemberId(_memberId: string): Promis
  * Get subscription payment history
  */
 export async function getSubscriptionPayments(
-  _subscriptionId: string,
+  subscriptionId: string,
   _limitCount = 20
 ): Promise<SubscriptionPayment[]> {
-  return []
+  try {
+    const result = await api.get<SubscriptionPayment[]>(`/subscription/${subscriptionId}/payments?limit=${_limitCount}`)
+    return result.data || []
+  } catch {
+    return []
+  }
 }
 
 /**
