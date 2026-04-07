@@ -1,0 +1,43 @@
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().default(3001),
+
+  // Database
+  DATABASE_URL: z.string().url(),
+
+  // JWT
+  JWT_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  HMAC_SECRET: z.string().min(32),
+
+  // PagBank
+  PAGBANK_TOKEN: z.string().min(1),
+  PAGBANK_PUBLIC_KEY: z.string().optional(),
+
+  // Email (Resend)
+  RESEND_API_KEY: z.string().min(1),
+  FROM_EMAIL: z.string().default('Clube Geek & Toys <contato@geeketoys.com.br>'),
+  ADMIN_EMAIL: z.string().email().default('admin@geeketoys.com.br'),
+
+  // URLs
+  FRONTEND_URL: z.string().url(),
+  API_URL: z.string().url(),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+function loadEnv(): Env {
+  const result = envSchema.safeParse(process.env);
+  if (!result.success) {
+    console.error('Invalid environment variables:');
+    for (const issue of result.error.issues) {
+      console.error(`  ${issue.path.join('.')}: ${issue.message}`);
+    }
+    process.exit(1);
+  }
+  return result.data;
+}
+
+export const env = loadEnv();

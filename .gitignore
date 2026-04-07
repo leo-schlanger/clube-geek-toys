@@ -84,3 +84,15 @@ serviceAccountKey.json
 *-firebase-adminsdk-*.json
 
 .vercel
+
+# Server (VPS Docker)
+server/api/node_modules/
+server/api/dist/
+server/nginx/html/
+server/nginx/ssl/*.pem
+server/.env
+server/uploads/
+
+# Deploy scripts with credentials (NEVER commit)
+server/scripts/ssh_exec.py
+server/scripts/sftp_upload.py

@@ -48,7 +48,7 @@ export default function TermsOfUse() {
                                 <li>As assinaturas podem ser mensais ou anuais com renovação automática.</li>
                                 <li><strong>Direito de Arrependimento (Art. 49, CDC):</strong> O consumidor pode desistir da contratação no prazo de 7 (sete) dias a contar da assinatura, com reembolso integral dos valores pagos.</li>
                                 <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas não gera estorno de períodos já pagos.</li>
-                                <li>Os pagamentos são processados de forma segura via Mercado Pago (PIX ou cartão de crédito).</li>
+                                <li>Os pagamentos são processados de forma segura via PagBank (PIX ou cartão de crédito).</li>
                                 <li>Os valores podem ser reajustados anualmente, com comunicação prévia de 30 dias.</li>
                             </ul>
                         </section>

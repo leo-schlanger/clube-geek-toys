@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      target: development
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./api/src:/app/src:ro
+      - uploads:/app/uploads
+    ports:
+      - "3001:3001"
+
+  nginx:
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../dist:/usr/share/nginx/html:ro
+      - uploads:/var/www/uploads:ro

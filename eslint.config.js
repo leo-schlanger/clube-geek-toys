@@ -25,6 +25,11 @@ export default defineConfig([
         'warn',
         { allowConstantExport: true },
       ],
+      // Allow underscore-prefixed unused vars (common pattern for intentionally unused params)
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
     },
   },
 ])

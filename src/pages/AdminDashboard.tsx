@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react'
-import { orderBy } from 'firebase/firestore'
+import { api } from '../lib/api-client'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
@@ -23,7 +23,6 @@ import {
   type ChurnData,
   type PointsOverview,
 } from '../lib/reports'
-import { FirestoreManager } from '../lib/db-utils'
 import { toast } from 'sonner'
 import {
   sendVerificationEmail,
@@ -134,7 +133,7 @@ export default function AdminDashboard() {
       const [membersData, logsData, usersData] = await Promise.all([
         getAllMembers(),
         getRecentLogs(),
-        FirestoreManager.findMany('users', [orderBy('createdAt', 'desc')], (id, data) => ({ id, ...data }))
+        api.get('/users').then(r => r.data || [])
       ])
 
       setMembers(membersData || [])
@@ -152,7 +151,8 @@ export default function AdminDashboard() {
 
   const handleUpdateRole = useCallback(async (userId: string, newRole: string) => {
     try {
-      await FirestoreManager.update('users', userId, { role: newRole })
+      const result = await api.patch(`/users/${userId}/role`, { role: newRole })
+      if (result.error) throw new Error(result.error)
       toast.success('Cargo atualizado com sucesso')
       fetchData(true)
     } catch (error) {
@@ -168,11 +168,8 @@ export default function AdminDashboard() {
 
     try {
       // Soft-delete: marca como 'disabled' em vez de deletar
-      // Isso impede acesso ao sistema sem afetar o Firebase Auth
-      await FirestoreManager.update('users', userId, {
-        role: 'disabled',
-        disabledAt: new Date().toISOString()
-      })
+      const result = await api.patch(`/users/${userId}/role`, { role: 'disabled' })
+      if (result.error) throw new Error(result.error)
       toast.success('Usuário desativado com sucesso')
       fetchData(true)
     } catch (error) {

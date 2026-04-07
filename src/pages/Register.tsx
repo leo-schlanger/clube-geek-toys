@@ -175,10 +175,9 @@ export default function Register() {
       }
 
       // 4. Create member record with retry logic
-      const { auth } = await import('../lib/firebase')
-      const newUser = auth.currentUser
-
-      if (newUser) {
+      // User is now authenticated via JWT (stored in localStorage by AuthContext)
+      const newUserId = user?.id
+      if (newUserId) {
         toast.loading('Etapa 4/4: Salvando dados...', { id: 'reg-progress' })
 
         // Retry member creation up to 3 times
@@ -189,7 +188,7 @@ export default function Register() {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
             member = await withTimeout(
-              createMember(newUser.uid, {
+              createMember(user?.id || '', {
                 fullName: sanitizedData.fullName,
                 email: sanitizedData.email,
                 cpf: sanitizedData.cpf,
@@ -812,7 +811,7 @@ export default function Register() {
                     </div>
                   )}
                   <p className="text-muted-foreground text-sm">
-                    Você será redirecionado para o ambiente seguro do Mercado Pago.
+                    Você será redirecionado para o ambiente seguro do PagBank.
                   </p>
                   <Button
                     className="w-full h-12 text-lg"

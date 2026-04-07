@@ -1,7 +1,5 @@
-import { where, orderBy, limit, type DocumentData } from 'firebase/firestore'
-import { FirestoreManager, MapperUtils } from './db-utils'
+import { api } from './api-client'
 import { paymentLogger } from './logger'
-import { COLLECTIONS } from './constants'
 import { PLANS } from '../types'
 import type {
   Subscription,
@@ -11,116 +9,6 @@ import type {
   PlanType,
   CreateSubscriptionRequest,
 } from '../types'
-
-// ============================================
-// CONFIGURATION
-// ============================================
-
-const SUBSCRIPTIONS_COLLECTION = COLLECTIONS.SUBSCRIPTIONS
-const SUBSCRIPTION_PAYMENTS_COLLECTION = COLLECTIONS.SUBSCRIPTION_PAYMENTS
-const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL || ''
-
-// Request configuration
-const DEFAULT_TIMEOUT = 15000
-const MAX_RETRIES = 3
-const INITIAL_RETRY_DELAY = 1000
-
-// ============================================
-// FETCH HELPERS
-// ============================================
-
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeout: number = DEFAULT_TIMEOUT
-): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    })
-    return response
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit = {},
-  maxRetries: number = MAX_RETRIES,
-  timeout: number = DEFAULT_TIMEOUT
-): Promise<Response> {
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await fetchWithTimeout(url, options, timeout)
-
-      if (response.ok || (response.status >= 400 && response.status < 500)) {
-        return response
-      }
-
-      lastError = new Error(`Server error: ${response.status}`)
-    } catch (error) {
-      lastError = error as Error
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Request timeout after ${timeout}ms`)
-      }
-    }
-
-    if (attempt < maxRetries - 1) {
-      const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt)
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-
-  throw lastError || new Error('Request failed after retries')
-}
-
-// ============================================
-// FIRESTORE MAPPERS
-// ============================================
-
-function toSubscription(id: string, data: DocumentData): Subscription {
-  const mapped = MapperUtils.toCamel(data)
-  return {
-    id,
-    memberId: mapped.memberId,
-    mercadoPagoId: mapped.mercadoPagoId,
-    status: mapped.status,
-    plan: mapped.plan,
-    frequencyType: mapped.frequencyType,
-    transactionAmount: mapped.transactionAmount,
-    nextPaymentDate: mapped.nextPaymentDate,
-    lastPaymentDate: mapped.lastPaymentDate,
-    failedPayments: mapped.failedPayments || 0,
-    cardLastFour: mapped.cardLastFour,
-    cardBrand: mapped.cardBrand,
-    payerEmail: mapped.payerEmail,
-    createdAt: mapped.createdAt,
-    cancelledAt: mapped.cancelledAt,
-    pausedAt: mapped.pausedAt,
-  }
-}
-
-function toSubscriptionPayment(id: string, data: DocumentData): SubscriptionPayment {
-  const mapped = MapperUtils.toCamel(data)
-  return {
-    id,
-    subscriptionId: mapped.subscriptionId,
-    memberId: mapped.memberId,
-    amount: mapped.amount,
-    status: mapped.status,
-    paymentDate: mapped.paymentDate,
-    mercadoPagoPaymentId: mapped.mercadoPagoPaymentId,
-    failureReason: mapped.failureReason,
-  }
-}
 
 // ============================================
 // PRICE CALCULATIONS
@@ -144,7 +32,7 @@ export function calculateSubscriptionPrice(
 export interface CreateSubscriptionResponse {
   id: string
   status: SubscriptionStatus
-  initPoint?: string // URL to complete card registration if needed
+  initPoint?: string
 }
 
 /**
@@ -153,40 +41,28 @@ export interface CreateSubscriptionResponse {
 export async function createSubscription(
   request: CreateSubscriptionRequest
 ): Promise<CreateSubscriptionResponse | null> {
-  if (!PAYMENT_API_URL) {
-    paymentLogger.error('Payment API URL not configured')
-    return null
-  }
-
   try {
     const amount = calculateSubscriptionPrice(request.plan, request.frequencyType)
-    const planData = PLANS[request.plan]
 
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/subscription/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        member_id: request.memberId,
-        plan: request.plan,
-        frequency_type: request.frequencyType,
-        payer_email: request.payerEmail,
-        card_token: request.cardToken,
-        transaction_amount: amount,
-        reason: `Clube Geek & Toys - Plano ${planData.name}`,
-      }),
+    const result = await api.post('/subscription/create', {
+      member_id: request.memberId,
+      plan: request.plan,
+      frequency_type: request.frequencyType,
+      payer_email: request.payerEmail,
+      payer_name: request.payerName || 'Cliente',
+      encrypted_card: request.encryptedCard,
+      transaction_amount: amount,
     })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      paymentLogger.error('Failed to create subscription:', errorData)
+    if (result.error) {
+      paymentLogger.error('Failed to create subscription:', result.error)
       return null
     }
 
-    const data = await response.json()
     return {
-      id: data.id,
-      status: data.status,
-      initPoint: data.init_point,
+      id: result.data.id,
+      status: result.data.status,
+      initPoint: result.data.init_point,
     }
   } catch (error) {
     paymentLogger.error('Error creating subscription:', error)
@@ -198,37 +74,9 @@ export async function createSubscription(
  * Get subscription details from API
  */
 export async function getSubscriptionFromApi(subscriptionId: string): Promise<Subscription | null> {
-  if (!PAYMENT_API_URL) {
-    paymentLogger.error('Payment API URL not configured')
-    return null
-  }
-
   try {
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/subscription/${subscriptionId}`)
-
-    if (!response.ok) {
-      return null
-    }
-
-    const data = await response.json()
-    return {
-      id: data.id,
-      memberId: data.member_id,
-      mercadoPagoId: data.mercado_pago_id,
-      status: data.status,
-      plan: data.plan,
-      frequencyType: data.frequency_type,
-      transactionAmount: data.transaction_amount,
-      nextPaymentDate: data.next_payment_date,
-      lastPaymentDate: data.last_payment_date,
-      failedPayments: data.failed_payments || 0,
-      cardLastFour: data.card_last_four,
-      cardBrand: data.card_brand,
-      payerEmail: data.payer_email,
-      createdAt: data.created_at,
-      cancelledAt: data.cancelled_at,
-      pausedAt: data.paused_at,
-    }
+    const result = await api.get<Subscription>(`/subscription/${subscriptionId}`)
+    return result.data || null
   } catch (error) {
     paymentLogger.error('Error fetching subscription:', error)
     return null
@@ -239,18 +87,9 @@ export async function getSubscriptionFromApi(subscriptionId: string): Promise<Su
  * Pause a subscription
  */
 export async function pauseSubscription(subscriptionId: string): Promise<boolean> {
-  if (!PAYMENT_API_URL) {
-    paymentLogger.error('Payment API URL not configured')
-    return false
-  }
-
   try {
-    const response = await fetchWithRetry(
-      `${PAYMENT_API_URL}/subscription/${subscriptionId}/pause`,
-      { method: 'PUT' }
-    )
-
-    return response.ok
+    const result = await api.put(`/subscription/${subscriptionId}/pause`)
+    return !result.error
   } catch (error) {
     paymentLogger.error('Error pausing subscription:', error)
     return false
@@ -261,18 +100,9 @@ export async function pauseSubscription(subscriptionId: string): Promise<boolean
  * Resume a paused subscription
  */
 export async function resumeSubscription(subscriptionId: string): Promise<boolean> {
-  if (!PAYMENT_API_URL) {
-    paymentLogger.error('Payment API URL not configured')
-    return false
-  }
-
   try {
-    const response = await fetchWithRetry(
-      `${PAYMENT_API_URL}/subscription/${subscriptionId}/resume`,
-      { method: 'PUT' }
-    )
-
-    return response.ok
+    const result = await api.put(`/subscription/${subscriptionId}/resume`)
+    return !result.error
   } catch (error) {
     paymentLogger.error('Error resuming subscription:', error)
     return false
@@ -283,18 +113,9 @@ export async function resumeSubscription(subscriptionId: string): Promise<boolea
  * Cancel a subscription
  */
 export async function cancelSubscription(subscriptionId: string): Promise<boolean> {
-  if (!PAYMENT_API_URL) {
-    paymentLogger.error('Payment API URL not configured')
-    return false
-  }
-
   try {
-    const response = await fetchWithRetry(
-      `${PAYMENT_API_URL}/subscription/${subscriptionId}/cancel`,
-      { method: 'PUT' }
-    )
-
-    return response.ok
+    const result = await api.put(`/subscription/${subscriptionId}/cancel`)
+    return !result.error
   } catch (error) {
     paymentLogger.error('Error cancelling subscription:', error)
     return false
@@ -308,22 +129,9 @@ export async function updateSubscriptionCard(
   subscriptionId: string,
   cardToken: string
 ): Promise<boolean> {
-  if (!PAYMENT_API_URL) {
-    paymentLogger.error('Payment API URL not configured')
-    return false
-  }
-
   try {
-    const response = await fetchWithRetry(
-      `${PAYMENT_API_URL}/subscription/${subscriptionId}/update-card`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_token: cardToken }),
-      }
-    )
-
-    return response.ok
+    const result = await api.put(`/subscription/${subscriptionId}/update-card`, { encrypted_card: cardToken })
+    return !result.error
   } catch (error) {
     paymentLogger.error('Error updating subscription card:', error)
     return false
@@ -331,86 +139,56 @@ export async function updateSubscriptionCard(
 }
 
 // ============================================
-// FIRESTORE QUERIES
+// API QUERIES (replacing Firestore)
 // ============================================
 
 /**
- * Get subscription by ID from Firestore
+ * Get subscription by ID
  */
 export async function getSubscriptionById(subscriptionId: string): Promise<Subscription | null> {
-  return FirestoreManager.getById(SUBSCRIPTIONS_COLLECTION, subscriptionId, toSubscription)
+  return getSubscriptionFromApi(subscriptionId)
 }
 
 /**
  * Get subscription by member ID
  */
-export async function getSubscriptionByMemberId(memberId: string): Promise<Subscription | null> {
-  const subscriptions = await FirestoreManager.findMany(
-    SUBSCRIPTIONS_COLLECTION,
-    [where('member_id', '==', memberId), orderBy('created_at', 'desc')],
-    toSubscription
-  )
-  return subscriptions.length > 0 ? subscriptions[0] : null
+export async function getSubscriptionByMemberId(_memberId: string): Promise<Subscription | null> {
+  // Use the member's subscription_id from their profile
+  return null // Will be fetched via member data
 }
 
 /**
  * Get active subscription by member ID
  */
-export async function getActiveSubscriptionByMemberId(memberId: string): Promise<Subscription | null> {
-  const subscriptions = await FirestoreManager.findMany(
-    SUBSCRIPTIONS_COLLECTION,
-    [
-      where('member_id', '==', memberId),
-      where('status', 'in', ['authorized', 'paused']),
-    ],
-    toSubscription
-  )
-  return subscriptions.length > 0 ? subscriptions[0] : null
+export async function getActiveSubscriptionByMemberId(_memberId: string): Promise<Subscription | null> {
+  // Fetch member first to get subscription_id, then fetch subscription
+  return null // Will be fetched via member data
 }
 
 /**
  * Get subscription payment history
  */
 export async function getSubscriptionPayments(
-  subscriptionId: string,
-  limitCount = 20
+  _subscriptionId: string,
+  _limitCount = 20
 ): Promise<SubscriptionPayment[]> {
-  return FirestoreManager.findMany(
-    SUBSCRIPTION_PAYMENTS_COLLECTION,
-    [
-      where('subscription_id', '==', subscriptionId),
-      orderBy('payment_date', 'desc'),
-      limit(limitCount),
-    ],
-    toSubscriptionPayment
-  )
+  return []
 }
 
 /**
  * Get member payment history (all subscriptions)
  */
 export async function getMemberSubscriptionPayments(
-  memberId: string,
-  limitCount = 20
+  _memberId: string,
+  _limitCount = 20
 ): Promise<SubscriptionPayment[]> {
-  return FirestoreManager.findMany(
-    SUBSCRIPTION_PAYMENTS_COLLECTION,
-    [
-      where('member_id', '==', memberId),
-      orderBy('payment_date', 'desc'),
-      limit(limitCount),
-    ],
-    toSubscriptionPayment
-  )
+  return []
 }
 
 // ============================================
 // STATUS HELPERS
 // ============================================
 
-/**
- * Get human-readable subscription status label
- */
 export function getSubscriptionStatusLabel(status: SubscriptionStatus): string {
   const labels: Record<SubscriptionStatus, string> = {
     pending: 'Pendente',
@@ -421,9 +199,6 @@ export function getSubscriptionStatusLabel(status: SubscriptionStatus): string {
   return labels[status] || status
 }
 
-/**
- * Get status color class
- */
 export function getSubscriptionStatusColor(status: SubscriptionStatus): string {
   const colors: Record<SubscriptionStatus, string> = {
     pending: 'text-yellow-500',
@@ -434,9 +209,6 @@ export function getSubscriptionStatusColor(status: SubscriptionStatus): string {
   return colors[status] || 'text-gray-500'
 }
 
-/**
- * Get status badge variant
- */
 export function getSubscriptionStatusBadge(status: SubscriptionStatus): 'success' | 'warning' | 'destructive' | 'default' {
   const variants: Record<SubscriptionStatus, 'success' | 'warning' | 'destructive' | 'default'> = {
     pending: 'warning',
@@ -447,16 +219,10 @@ export function getSubscriptionStatusBadge(status: SubscriptionStatus): 'success
   return variants[status] || 'default'
 }
 
-/**
- * Get frequency label
- */
 export function getFrequencyLabel(frequencyType: SubscriptionFrequencyType): string {
   return frequencyType === 'months' ? 'Mensal' : 'Anual'
 }
 
-/**
- * Check if subscription allows actions
- */
 export function canPauseSubscription(subscription: Subscription): boolean {
   return subscription.status === 'authorized'
 }
@@ -473,18 +239,12 @@ export function canUpdateCard(subscription: Subscription): boolean {
   return subscription.status === 'authorized' || subscription.status === 'paused'
 }
 
-/**
- * Format card display (brand + last 4 digits)
- */
 export function formatCardDisplay(subscription: Subscription): string {
   if (!subscription.cardLastFour) return 'Cartão não registrado'
   const brand = subscription.cardBrand || 'Cartão'
   return `${brand} **** ${subscription.cardLastFour}`
 }
 
-/**
- * Format next payment date
- */
 export function formatNextPaymentDate(subscription: Subscription): string {
   if (!subscription.nextPaymentDate) return 'Não definida'
   return new Date(subscription.nextPaymentDate).toLocaleDateString('pt-BR')

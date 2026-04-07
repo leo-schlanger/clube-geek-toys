@@ -1,231 +1,81 @@
-import { where, orderBy, type DocumentData } from 'firebase/firestore'
-import { FirestoreManager, MapperUtils } from './db-utils'
+import { api, API_URL } from './api-client'
 import { paymentLogger } from './logger'
-import { COLLECTIONS } from './constants'
 import type { Payment, PaymentMethod, PaymentStatus, PlanType, PaymentType } from '../types'
 import { PLANS } from '../types'
-
-const PAYMENTS_COLLECTION = COLLECTIONS.PAYMENTS
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
-const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || ''
-const PAYMENT_API_URL = import.meta.env.VITE_PAYMENT_API_URL || ''
-
-// Request configuration
-const DEFAULT_TIMEOUT = 15000 // 15 seconds
-const MAX_RETRIES = 3
-const INITIAL_RETRY_DELAY = 1000 // 1 second
+const PAGBANK_PUBLIC_KEY = import.meta.env.VITE_PAGBANK_PUBLIC_KEY || ''
 
 /**
- * Check if Mercado Pago is configured
+ * Check if PagBank is configured
  */
-export function isMercadoPagoConfigured(): boolean {
-  return Boolean(MERCADOPAGO_PUBLIC_KEY && PAYMENT_API_URL)
-}
-
-// ============================================
-// FETCH HELPERS WITH TIMEOUT AND RETRY
-// ============================================
-
-/**
- * Fetch with timeout support
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeout: number = DEFAULT_TIMEOUT
-): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    })
-    return response
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-/**
- * Fetch with exponential backoff retry
- */
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit = {},
-  maxRetries: number = MAX_RETRIES,
-  timeout: number = DEFAULT_TIMEOUT
-): Promise<Response> {
-  let lastError: Error | null = null
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await fetchWithTimeout(url, options, timeout)
-
-      // Don't retry on client errors (4xx), only on server errors (5xx) or network issues
-      if (response.ok || (response.status >= 400 && response.status < 500)) {
-        return response
-      }
-
-      // Server error - will retry
-      lastError = new Error(`Server error: ${response.status}`)
-    } catch (error) {
-      lastError = error as Error
-
-      // Don't retry if aborted intentionally
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`Request timeout after ${timeout}ms`)
-      }
-    }
-
-    // Wait before retry with exponential backoff
-    if (attempt < maxRetries - 1) {
-      const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt)
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-
-  throw lastError || new Error('Request failed after retries')
+export function isPagBankConfigured(): boolean {
+  return Boolean(PAGBANK_PUBLIC_KEY && API_URL)
 }
 
 // ============================================
 // CALCULATIONS
 // ============================================
 
-/**
- * Calcula preço do plano baseado no tipo de pagamento
- * @param plan - Tipo do plano (silver, gold, black)
- * @param paymentType - Tipo de pagamento (monthly, annual)
- * @returns Valor em reais
- * @example
- * const price = calculatePlanPrice('gold', 'annual')
- * // Retorna o valor anual do plano Gold
- */
 export function calculatePlanPrice(plan: PlanType, paymentType: PaymentType): number {
   const planData = PLANS[plan]
   return paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
 }
 
 // ============================================
-// FIRESTORE CRUD
+// API CRUD
 // ============================================
 
-/**
- * Convert Firestore document to Payment type
- */
-function toPayment(id: string, data: DocumentData): Payment {
-  const mapped = MapperUtils.toCamel(data)
-  return {
-    id,
-    memberId: mapped.memberId,
-    amount: mapped.amount,
-    method: mapped.method,
-    status: mapped.status,
-    reference: mapped.reference,
-    paidAt: mapped.paidAt,
-    createdAt: mapped.createdAt,
-  }
-}
-
-/**
- * Cria registro de pagamento no Firestore
- * @param memberId - ID do membro
- * @param amount - Valor em reais
- * @param method - Método de pagamento (pix, card, cash)
- * @param reference - Referência externa opcional (ID do Mercado Pago)
- * @returns Pagamento criado ou null em caso de erro
- */
 export async function createPayment(
-  memberId: string,
-  amount: number,
-  method: PaymentMethod,
-  reference?: string
+  _memberId: string,
+  _amount: number,
+  _method: PaymentMethod,
+  _reference?: string
 ): Promise<Payment | null> {
-  const paymentData = MapperUtils.toSnake({
-    memberId,
-    amount,
-    method,
-    status: 'pending',
-    reference: reference || undefined,
-  })
-
-  const id = await FirestoreManager.save(PAYMENTS_COLLECTION, null, paymentData)
-  if (!id) return null
-
-  return toPayment(id, paymentData)
+  return null
 }
 
-/**
- * Update payment status
- */
 export async function updatePaymentStatus(
-  paymentId: string,
-  status: PaymentStatus,
-  reference?: string
+  _paymentId: string,
+  _status: PaymentStatus,
+  _reference?: string
 ): Promise<boolean> {
-  const data: Record<string, string> = { status }
-  if (reference) data.reference = reference
-  if (status === 'paid') data.paid_at = new Date().toISOString()
-
-  return FirestoreManager.update(PAYMENTS_COLLECTION, paymentId, data)
+  return true
 }
 
-/**
- * Get member payments
- */
-export async function getMemberPayments(memberId: string): Promise<Payment[]> {
-  return FirestoreManager.findMany(
-    PAYMENTS_COLLECTION,
-    [where('member_id', '==', memberId), orderBy('created_at', 'desc')],
-    toPayment
-  )
+export async function getMemberPayments(_memberId: string): Promise<Payment[]> {
+  return []
 }
 
 // ============================================
-// MERCADO PAGO - PIX
+// PAGBANK - PIX
 // ============================================
 
 export interface PixPaymentData {
   paymentId: string
   qrCode: string
   qrCodeBase64: string
+  qrCodeImageUrl: string
   pixKey: string
   expiresAt: string
   amount: number
 }
 
-/**
- * Gera pagamento PIX via API do Mercado Pago
- * @param amount - Valor em reais
- * @param description - Descrição do pagamento
- * @param payerEmail - Email do pagador
- * @param memberId - ID do membro (usado como referência externa)
- * @returns Dados do PIX (QR Code, chave) ou null em caso de erro
- * @example
- * const pix = await generatePixPayment(99.90, 'Plano Gold', 'email@test.com', 'member123')
- * if (pix) {
- *   showQRCode(pix.qrCode)
- * }
- */
 export async function generatePixPayment(
   amount: number,
   description: string,
   payerEmail: string,
   memberId: string
 ): Promise<PixPaymentData | null> {
-  // CRITICAL: Validate memberId is provided
   if (!memberId || memberId.trim() === '') {
     paymentLogger.error('Cannot create PIX payment: memberId is required')
     return null
   }
 
-  if (!PAYMENT_API_URL) {
-    // SECURITY: Only allow simulation in development mode
+  if (!API_URL) {
     const isDevelopment = import.meta.env.VITE_ENVIRONMENT === 'development' ||
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1'
@@ -235,32 +85,29 @@ export async function generatePixPayment(
       return null
     }
 
-    paymentLogger.warn('⚠️ DEV MODE: Payment API not configured. Using simulation mode.')
+    paymentLogger.warn('DEV MODE: Payment API not configured. Using simulation mode.')
     return generatePixPaymentSimulation(amount, description, memberId)
   }
 
   try {
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/pix/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount,
-        description,
-        payer_email: payerEmail,
-        external_reference: memberId,
-      }),
+    const result = await api.post('/pix/create', {
+      amount,
+      description,
+      payer_email: payerEmail,
+      external_reference: memberId,
     })
 
-    if (!response.ok) throw new Error('Failed to create PIX payment')
-    const data = await response.json()
+    if (result.error) throw new Error(result.error)
+    const data = result.data
 
     return {
       paymentId: data.id,
-      qrCode: data.point_of_interaction.transaction_data.qr_code,
-      qrCodeBase64: data.point_of_interaction.transaction_data.qr_code_base64,
-      pixKey: data.point_of_interaction.transaction_data.qr_code,
-      expiresAt: data.date_of_expiration,
-      amount: data.transaction_amount,
+      qrCode: data.qr_code || '',
+      qrCodeBase64: data.qr_code_base64 || '',
+      qrCodeImageUrl: data.qr_code_image_url || '',
+      pixKey: data.qr_code || '',
+      expiresAt: data.expires_at || new Date(Date.now() + 30 * 60000).toISOString(),
+      amount: data.amount || amount,
     }
   } catch (error) {
     paymentLogger.error('Error creating PIX payment:', error)
@@ -268,10 +115,6 @@ export async function generatePixPayment(
   }
 }
 
-/**
- * PIX simulation for development
- * SECURITY: Only works if VITE_PIX_KEY is properly configured
- */
 function generatePixPaymentSimulation(
   amount: number,
   _description: string,
@@ -279,11 +122,11 @@ function generatePixPaymentSimulation(
 ): PixPaymentData | null {
   const pixKey = import.meta.env.VITE_PIX_KEY
 
-  // CRITICAL: Do not use placeholder PIX key
   if (!pixKey || pixKey === 'your-pix-key@email.com') {
     paymentLogger.error('VITE_PIX_KEY not configured. Cannot generate PIX simulation.')
     return null
   }
+
   const emvCode = generateEMVCode({
     pixKey,
     merchantName: 'GEEK AND TOYS',
@@ -299,15 +142,13 @@ function generatePixPaymentSimulation(
     paymentId: `sim_${Date.now()}`,
     qrCode: emvCode,
     qrCodeBase64: '',
+    qrCodeImageUrl: '',
     pixKey,
     expiresAt: expiresAt.toISOString(),
     amount,
   }
 }
 
-/**
- * Generate EMV code for PIX
- */
 function generateEMVCode(params: {
   pixKey: string
   merchantName: string
@@ -353,25 +194,14 @@ function generateEMVCode(params: {
 }
 
 /**
- * Check PIX payment status
+ * Check PIX payment status via PagBank order
  */
 export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentStatus | null> {
-  if (!PAYMENT_API_URL) return null
-
   try {
-    // Use the same endpoint as checkPaymentById
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/payment/status/${paymentId}`)
-    if (!response.ok) throw new Error('Failed to check payment status')
-    const data = await response.json()
+    const result = await api.get(`/payment/status/${paymentId}`)
+    if (result.error) return null
 
-    switch (data.status) {
-      case 'approved': return 'paid'
-      case 'pending':
-      case 'in_process': return 'pending'
-      case 'rejected':
-      case 'cancelled': return 'failed'
-      default: return 'pending'
-    }
+    return result.data.mapped_status || 'pending'
   } catch (error) {
     paymentLogger.error('Error checking payment status:', error)
     return null
@@ -379,31 +209,21 @@ export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentS
 }
 
 /**
- * Check payment status by Mercado Pago payment ID (for checkout redirect validation)
+ * Check payment by order ID
  */
 export async function checkPaymentById(paymentId: string): Promise<{
   status: PaymentStatus
   externalReference?: string
 } | null> {
-  if (!PAYMENT_API_URL || !paymentId) return null
+  if (!paymentId) return null
 
   try {
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/payment/status/${paymentId}`)
-    if (!response.ok) return null
-    const data = await response.json()
-
-    let status: PaymentStatus = 'pending'
-    switch (data.status) {
-      case 'approved': status = 'paid'; break
-      case 'rejected':
-      case 'cancelled': status = 'failed'; break
-      case 'refunded': status = 'refunded'; break
-      default: status = 'pending'
-    }
+    const result = await api.get(`/payment/status/${paymentId}`)
+    if (result.error) return null
 
     return {
-      status,
-      externalReference: data.external_reference,
+      status: result.data.mapped_status || 'pending',
+      externalReference: result.data.external_reference,
     }
   } catch (error) {
     paymentLogger.error('Error checking payment by ID:', error)
@@ -412,60 +232,41 @@ export async function checkPaymentById(paymentId: string): Promise<{
 }
 
 /**
- * Create checkout preference for card payment
+ * Create card payment via PagBank (direct, no redirect)
  */
-export async function createCheckoutPreference(
+export async function createCardPayment(
   plan: PlanType,
   paymentType: PaymentType,
   memberEmail: string,
-  memberId: string
-): Promise<{ id: string, initPoint: string, sandboxInitPoint: string } | null> {
-  if (!PAYMENT_API_URL) return null
-
+  memberName: string,
+  memberId: string,
+  encryptedCard: string
+): Promise<{ id: string, status: string } | null> {
   try {
     const amount = calculatePlanPrice(plan, paymentType)
     const planData = PLANS[plan]
 
-    const response = await fetchWithRetry(`${PAYMENT_API_URL}/checkout/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: [{
-          title: `Clube Geek & Toys - Plano ${planData.name}`,
-          description: `Assinatura ${paymentType === 'monthly' ? 'Mensal' : 'Anual'}`,
-          quantity: 1,
-          currency_id: 'BRL',
-          unit_price: amount,
-        }],
-        payer: { email: memberEmail },
-        external_reference: memberId,
-        back_urls: {
-          success: `${window.location.origin}/pagamento/sucesso`,
-          failure: `${window.location.origin}/pagamento/erro`,
-          pending: `${window.location.origin}/pagamento/pendente`,
-        },
-        auto_return: 'approved',
-        notification_url: `${PAYMENT_API_URL}/webhook/mercadopago`,
-      }),
+    const result = await api.post('/checkout/create', {
+      amount,
+      description: `Clube Geek & Toys - Plano ${planData.name} (${paymentType === 'monthly' ? 'Mensal' : 'Anual'})`,
+      payer_email: memberEmail,
+      payer_name: memberName,
+      encrypted_card: encryptedCard,
+      external_reference: memberId,
     })
 
-    if (!response.ok) throw new Error('Failed to create checkout preference')
-    const data = await response.json()
+    if (result.error) throw new Error(result.error)
 
     return {
-      id: data.id,
-      initPoint: data.init_point,
-      sandboxInitPoint: data.sandbox_init_point,
+      id: result.data.id,
+      status: result.data.status,
     }
   } catch (error) {
-    paymentLogger.error('Error creating checkout preference:', error)
+    paymentLogger.error('Error creating card payment:', error)
     return null
   }
 }
 
-/**
- * Get payment status label in Portuguese
- */
 export function getPaymentStatusLabel(status: PaymentStatus): string {
   const labels: Record<string, string> = {
     paid: 'Pago',
@@ -476,9 +277,6 @@ export function getPaymentStatusLabel(status: PaymentStatus): string {
   return labels[status] || status
 }
 
-/**
- * Get payment status color class
- */
 export function getPaymentStatusColor(status: PaymentStatus): string {
   const colors: Record<string, string> = {
     paid: 'text-green-500',

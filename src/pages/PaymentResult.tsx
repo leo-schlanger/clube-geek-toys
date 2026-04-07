@@ -42,7 +42,7 @@ export default function PaymentResult({ type: initialType }: PaymentResultProps)
   const [isValidating, setIsValidating] = useState(false)
   const [validatedType, setValidatedType] = useState<ResultType | null>(null)
 
-  // Get payment_id from URL (Mercado Pago redirect includes this)
+  // Get payment_id from URL params
   const paymentId = searchParams.get('payment_id')
 
   // Validate payment status on mount

@@ -90,7 +90,7 @@ export default function MemberDashboard() {
     if (!user) return
 
     try {
-      const memberData = await getMemberByUserId(user.uid)
+      const memberData = await getMemberByUserId(user.id)
       setMember(memberData)
 
       if (memberData) {

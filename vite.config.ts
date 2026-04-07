@@ -69,18 +69,6 @@ export default defineConfig({
             ) {
               return 'vendor-react'
             }
-            // Firebase Auth - crítico para login
-            if (id.includes('firebase/auth') || id.includes('@firebase/auth')) {
-              return 'vendor-firebase-auth'
-            }
-            // Firebase Firestore - pode lazy load
-            if (id.includes('firebase/firestore') || id.includes('@firebase/firestore')) {
-              return 'vendor-firebase-firestore'
-            }
-            // Firebase Core
-            if (id.includes('firebase') || id.includes('@firebase')) {
-              return 'vendor-firebase-core'
-            }
             // Framer Motion - lazy load
             if (id.includes('framer-motion')) {
               return 'vendor-framer'

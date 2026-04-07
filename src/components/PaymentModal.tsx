@@ -10,9 +10,9 @@ import { PLANS, type PlanType, type PaymentType, type PendingPaymentInfo, type S
 import { formatCurrency } from '../lib/utils'
 import {
   generatePixPayment,
-  createCheckoutPreference,
+  createCardPayment,
   checkPixPaymentStatus,
-  isMercadoPagoConfigured,
+  isPagBankConfigured,
   type PixPaymentData,
 } from '../lib/payments'
 import { createSubscription } from '../lib/subscriptions'
@@ -77,7 +77,7 @@ export function PaymentModal({
 
   const planData = PLANS[plan]
   const amount = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
-  const isConfigured = isMercadoPagoConfigured()
+  const isConfigured = isPagBankConfigured()
   const frequencyType: SubscriptionFrequencyType = paymentType === 'monthly' ? 'months' : 'years'
 
   // Cleanup on unmount
@@ -288,20 +288,32 @@ export function PaymentModal({
     setCheckingPayment(false)
   }
 
-  async function handleCardPayment() {
+  async function handleCardToken(encryptedCard: string, cardInfo: CardInfo) {
     setLoading(true)
 
-    const preference = await createCheckoutPreference(
-      plan,
-      paymentType,
-      memberEmail,
-      memberId
-    )
+    try {
+      const result = await createCardPayment(
+        plan,
+        paymentType,
+        memberEmail,
+        cardInfo.cardholderName,
+        memberId,
+        encryptedCard
+      )
 
-    if (preference) {
-      window.location.href = preference.initPoint
-    } else {
-      toast.error('Erro ao iniciar pagamento com cartão')
+      if (result && result.status === 'paid') {
+        toast.success('Pagamento aprovado!')
+        onSuccess()
+      } else if (result) {
+        toast.info('Pagamento em processamento...')
+        onSuccess()
+      } else {
+        toast.error('Erro ao processar pagamento com cartão')
+      }
+    } catch (error) {
+      paymentLogger.error('Card payment error:', error)
+      toast.error('Erro ao processar pagamento')
+    } finally {
       setLoading(false)
     }
   }
@@ -318,7 +330,8 @@ export function PaymentModal({
         plan,
         frequencyType,
         payerEmail: memberEmail,
-        cardToken: token,
+        payerName: cardInfo.cardholderName,
+        encryptedCard: token,
       })
 
       if (result) {
@@ -341,7 +354,7 @@ export function PaymentModal({
     if (selectedMethod === 'pix') {
       handlePixPayment()
     } else if (selectedMethod === 'card') {
-      handleCardPayment()
+      // Card form will be shown in the UI — no redirect needed with PagBank
     }
     // subscription-card is handled by CardTokenizationForm
   }
@@ -811,13 +824,15 @@ export function PaymentModal({
                 </div>
               )}
 
-              {/* Card (loading while redirecting) */}
+              {/* Card (direct payment via PagBank) */}
               {method === 'card' && (
-                <div className="py-8 text-center">
-                  <Loading size="lg" text="Redirecionando para pagamento..." />
-                  <p className="text-sm text-muted-foreground mt-4">
-                    Você será redirecionado para o checkout seguro
-                  </p>
+                <div>
+                  <CardTokenizationForm
+                    amount={amount}
+                    onTokenGenerated={handleCardToken}
+                    onCancel={() => setMethod(null)}
+                    disabled={loading}
+                  />
                 </div>
               )}
             </>

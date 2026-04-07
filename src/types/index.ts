@@ -241,17 +241,17 @@ export const POINTS_MULTIPLIER: Record<PlanType, number> = {
 // SUBSCRIPTION TYPES
 // ============================================
 
-// Subscription status (from Mercado Pago)
+// Subscription status
 export type SubscriptionStatus = 'pending' | 'authorized' | 'paused' | 'cancelled'
 
 // Subscription frequency
 export type SubscriptionFrequencyType = 'months' | 'years'
 
-// Subscription interface (stored in Firestore 'subscriptions' collection)
+// Subscription interface
 export interface Subscription {
-  id: string                           // = Mercado Pago preapproval_id
+  id: string
   memberId: string
-  mercadoPagoId: string
+  providerId: string
   status: SubscriptionStatus
   plan: PlanType
   frequencyType: SubscriptionFrequencyType
@@ -275,7 +275,7 @@ export interface SubscriptionPayment {
   amount: number
   status: 'approved' | 'rejected' | 'pending'
   paymentDate: string
-  mercadoPagoPaymentId: string
+  providerPaymentId: string
   failureReason?: string
 }
 
@@ -285,7 +285,8 @@ export interface CreateSubscriptionRequest {
   plan: PlanType
   frequencyType: SubscriptionFrequencyType
   payerEmail: string
-  cardToken: string
+  payerName: string
+  encryptedCard: string
 }
 
 // Subscription management actions

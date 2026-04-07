@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { paymentLogger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -14,59 +14,33 @@ import {
   CheckCircle,
 } from 'lucide-react'
 
-// MercadoPago SDK types
+// PagBank Checkout SDK types
 declare global {
   interface Window {
-    MercadoPago?: new (publicKey: string, options?: { locale: string }) => MercadoPagoInstance
-  }
-}
-
-interface CardTokenData {
-  cardNumber: string
-  cardholderName: string
-  cardExpirationMonth: string
-  cardExpirationYear: string
-  securityCode: string
-  identificationType: string
-  identificationNumber: string
-}
-
-interface CardTokenResponse {
-  id: string
-  public_key: string
-  first_six_digits: string
-  last_four_digits: string
-  expiration_month: number
-  expiration_year: number
-  cardholder: {
-    name: string
-    identification: {
-      type: string
-      number: string
+    PagSeguro?: {
+      encryptCard: (data: PagBankCardData) => PagBankEncryptResult
     }
   }
-  status: string
-  date_created: string
-  date_last_updated: string
-  date_due: string
-  luhn_validation: boolean
-  live_mode: boolean
-  require_esc: boolean
-  card_number_length: number
-  security_code_length: number
 }
 
-interface MercadoPagoInstance {
-  createCardToken: (data: CardTokenData) => Promise<CardTokenResponse>
-  getIdentificationTypes: () => Promise<Array<{ id: string; name: string }>>
-  getPaymentMethods: (options: { bin: string }) => Promise<{ results: Array<{ id: string; name: string; payment_type_id: string }> }>
-  getIssuers: (options: { paymentMethodId: string; bin: string }) => Promise<Array<{ id: string; name: string }>>
-  getInstallments: (options: { amount: string; bin: string; paymentTypeId: string }) => Promise<Array<{ payment_method_id: string; payment_type_id: string; issuer: { id: string; name: string }; payer_costs: Array<{ installments: number; installment_rate: number; labels: string[]; min_allowed_amount: number; max_allowed_amount: number; recommended_message: string; installment_amount: number; total_amount: number }> }>>
+interface PagBankCardData {
+  publicKey: string
+  holder: string
+  number: string
+  expMonth: string
+  expYear: string
+  securityCode: string
+}
+
+interface PagBankEncryptResult {
+  encryptedCard: string
+  hasErrors: boolean
+  errors: Array<{ code: string; message: string }>
 }
 
 interface CardTokenizationFormProps {
-  amount: number // Used by MercadoPago SDK for validation
-  onTokenGenerated: (token: string, cardInfo: CardInfo) => void
+  amount: number
+  onTokenGenerated: (encryptedCard: string, cardInfo: CardInfo) => void
   onCancel: () => void
   disabled?: boolean
 }
@@ -79,46 +53,41 @@ export interface CardInfo {
   cardholderName: string
 }
 
-const MERCADOPAGO_PUBLIC_KEY = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY || ''
-const SDK_URL = 'https://sdk.mercadopago.com/js/v2'
+const PAGBANK_PUBLIC_KEY = import.meta.env.VITE_PAGBANK_PUBLIC_KEY || ''
+const SDK_URL = 'https://assets.pagseguro.com.br/checkout-sdk-js/rc/dist/browser/pagseguro.min.js'
 
 export function CardTokenizationForm({
-  amount: _, // Amount passed for future installment calculations
+  amount: _,
   onTokenGenerated,
   onCancel,
   disabled = false,
 }: CardTokenizationFormProps) {
-  void _ // Suppress unused variable warning - amount reserved for installments API
+  void _
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [sdkLoaded, setSdkLoaded] = useState(false)
+  const [, setSdkLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Manual form state (fallback when SDK is not available)
   const [cardNumber, setCardNumber] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
   const [securityCode, setSecurityCode] = useState('')
   const [cardholderName, setCardholderName] = useState('')
   const [identificationNumber, setIdentificationNumber] = useState('')
 
-  const mpInstanceRef = useRef<MercadoPagoInstance | null>(null)
-
-  // Load MercadoPago SDK
+  // Load PagBank SDK
   useEffect(() => {
-    if (!MERCADOPAGO_PUBLIC_KEY) {
-      setError('Chave pública do Mercado Pago não configurada')
+    if (!PAGBANK_PUBLIC_KEY) {
+      setError('Chave pública do PagBank não configurada')
       setLoading(false)
       return
     }
 
-    // Check if SDK is already loaded
-    if (window.MercadoPago) {
+    if (window.PagSeguro) {
       setSdkLoaded(true)
       setLoading(false)
       return
     }
 
-    // Load SDK dynamically
     const script = document.createElement('script')
     script.src = SDK_URL
     script.async = true
@@ -133,36 +102,17 @@ export function CardTokenizationForm({
     document.body.appendChild(script)
 
     return () => {
-      // Cleanup: remove script if component unmounts during loading
-      if (!window.MercadoPago && script.parentNode) {
+      if (!window.PagSeguro && script.parentNode) {
         script.parentNode.removeChild(script)
       }
     }
   }, [])
 
-  // Initialize MercadoPago form
-  useEffect(() => {
-    if (!sdkLoaded || !window.MercadoPago || !MERCADOPAGO_PUBLIC_KEY) return
-
-    try {
-      mpInstanceRef.current = new window.MercadoPago(MERCADOPAGO_PUBLIC_KEY, {
-        locale: 'pt-BR',
-      })
-      setLoading(false)
-    } catch (err) {
-      paymentLogger.error('Error initializing MercadoPago:', err)
-      setError('Erro ao inicializar pagamento')
-      setLoading(false)
-    }
-  }, [sdkLoaded])
-
-  // Format card number (add spaces)
   const formatCardNumber = useCallback((value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 16)
     return digits.replace(/(\d{4})(?=\d)/g, '$1 ')
   }, [])
 
-  // Format expiration date
   const formatExpirationDate = useCallback((value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 4)
     if (digits.length > 2) {
@@ -171,12 +121,10 @@ export function CardTokenizationForm({
     return digits
   }, [])
 
-  // Format CVV
   const formatCVV = useCallback((value: string) => {
     return value.replace(/\D/g, '').slice(0, 4)
   }, [])
 
-  // Format CPF
   const formatCPF = useCallback((value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11)
     return digits
@@ -185,7 +133,6 @@ export function CardTokenizationForm({
       .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
   }, [])
 
-  // Detect card brand with emoji icons
   const detectCardBrand = useCallback((number: string): { name: string; color: string } => {
     const clean = number.replace(/\D/g, '')
     if (clean.startsWith('4')) return { name: 'Visa', color: 'text-blue-600' }
@@ -196,7 +143,6 @@ export function CardTokenizationForm({
     return { name: 'Cartão', color: 'text-muted-foreground' }
   }, [])
 
-  // Validate form
   const validateForm = useCallback((): boolean => {
     const cleanCardNumber = cardNumber.replace(/\D/g, '')
     if (cleanCardNumber.length < 13 || cleanCardNumber.length > 19) {
@@ -237,44 +183,6 @@ export function CardTokenizationForm({
     return true
   }, [cardNumber, expirationDate, securityCode, cardholderName, identificationNumber])
 
-  // Map Mercado Pago error codes to user-friendly messages
-  const getMercadoPagoErrorMessage = (error: unknown): string => {
-    const errorMessages: Record<string, string> = {
-      '205': 'Número do cartão inválido',
-      '208': 'Mês de expiração inválido',
-      '209': 'Ano de expiração inválido',
-      '212': 'Tipo de documento inválido',
-      '213': 'Número de documento inválido',
-      '214': 'Número de documento inválido',
-      '220': 'Banco emissor não encontrado',
-      '221': 'Nome do titular inválido',
-      '224': 'Código de segurança inválido',
-      'E301': 'Número do cartão inválido',
-      'E302': 'Código de segurança inválido',
-      '316': 'Nome do titular inválido',
-      '322': 'Tipo de documento inválido',
-      '323': 'Documento inválido',
-      '324': 'Documento inválido',
-      '325': 'Mês de expiração inválido',
-      '326': 'Ano de expiração inválido',
-    }
-
-    if (error && typeof error === 'object' && 'cause' in error) {
-      const cause = (error as { cause?: Array<{ code: string }> }).cause
-      if (Array.isArray(cause) && cause.length > 0) {
-        const code = cause[0].code
-        return errorMessages[code] || `Erro de validação: ${code}`
-      }
-    }
-
-    if (error && typeof error === 'object' && 'message' in error) {
-      return (error as { message: string }).message
-    }
-
-    return 'Erro ao processar cartão. Verifique os dados e tente novamente.'
-  }
-
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -286,50 +194,44 @@ export function CardTokenizationForm({
     try {
       const cleanCardNumber = cardNumber.replace(/\D/g, '')
       const [month, year] = expirationDate.split('/')
-      const cleanCPF = identificationNumber.replace(/\D/g, '')
 
-      // If MercadoPago SDK is available, use it to create real token
-      if (mpInstanceRef.current && MERCADOPAGO_PUBLIC_KEY) {
-        paymentLogger.info('Creating card token with MercadoPago SDK...')
+      if (window.PagSeguro && PAGBANK_PUBLIC_KEY) {
+        paymentLogger.info('Encrypting card with PagBank SDK...')
 
-        const tokenData: CardTokenData = {
-          cardNumber: cleanCardNumber,
-          cardholderName: cardholderName.trim().toUpperCase(),
-          cardExpirationMonth: month.padStart(2, '0'),
-          cardExpirationYear: `20${year}`,
+        const result = window.PagSeguro.encryptCard({
+          publicKey: PAGBANK_PUBLIC_KEY,
+          holder: cardholderName.trim().toUpperCase(),
+          number: cleanCardNumber,
+          expMonth: month.padStart(2, '0'),
+          expYear: `20${year}`,
           securityCode: securityCode,
-          identificationType: 'CPF',
-          identificationNumber: cleanCPF,
-        }
+        })
 
-        const tokenResponse = await mpInstanceRef.current.createCardToken(tokenData)
-
-        if (!tokenResponse || !tokenResponse.id) {
-          throw new Error('Token inválido retornado pelo Mercado Pago')
+        if (result.hasErrors) {
+          const errorMsg = result.errors.map(e => e.message).join(', ')
+          throw new Error(errorMsg || 'Erro ao encriptar cartão')
         }
 
         const cardInfo: CardInfo = {
-          lastFourDigits: tokenResponse.last_four_digits,
+          lastFourDigits: cleanCardNumber.slice(-4),
           brand: detectCardBrand(cleanCardNumber).name,
-          expirationMonth: String(tokenResponse.expiration_month).padStart(2, '0'),
-          expirationYear: String(tokenResponse.expiration_year),
-          cardholderName: tokenResponse.cardholder?.name || cardholderName.trim().toUpperCase(),
+          expirationMonth: month.padStart(2, '0'),
+          expirationYear: `20${year}`,
+          cardholderName: cardholderName.trim().toUpperCase(),
         }
 
-        paymentLogger.info('Card token generated successfully:', tokenResponse.id.substring(0, 8) + '...')
-        onTokenGenerated(tokenResponse.id, cardInfo)
+        paymentLogger.info('Card encrypted successfully')
+        onTokenGenerated(result.encryptedCard, cardInfo)
       } else {
-        // Fallback: generate mock token ONLY in development mode
         const isDevelopment = import.meta.env.VITE_ENVIRONMENT === 'development'
 
         if (!isDevelopment) {
-          setError('Mercado Pago SDK não disponível. Tente novamente.')
+          setError('PagBank SDK não disponível. Tente novamente.')
           toast.error('Erro de configuração do pagamento')
           return
         }
 
-        // Development mock token
-        const mockToken = `dev_tok_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        const mockEncrypted = `dev_enc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         const cardInfo: CardInfo = {
           lastFourDigits: cleanCardNumber.slice(-4),
           brand: detectCardBrand(cleanCardNumber).name,
@@ -338,13 +240,13 @@ export function CardTokenizationForm({
           cardholderName: cardholderName.trim().toUpperCase(),
         }
 
-        paymentLogger.warn('Using MOCK token (development mode only)')
-        toast.info('Modo desenvolvimento: usando token de teste')
-        onTokenGenerated(mockToken, cardInfo)
+        paymentLogger.warn('Using MOCK encrypted card (development mode only)')
+        toast.info('Modo desenvolvimento: usando cartão de teste')
+        onTokenGenerated(mockEncrypted, cardInfo)
       }
     } catch (err) {
-      paymentLogger.error('Error generating card token:', err)
-      const errorMessage = getMercadoPagoErrorMessage(err)
+      paymentLogger.error('Error encrypting card:', err)
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao processar cartão. Verifique os dados e tente novamente.'
       setError(errorMessage)
       toast.error(errorMessage)
     } finally {
@@ -360,7 +262,7 @@ export function CardTokenizationForm({
     )
   }
 
-  if (error && !MERCADOPAGO_PUBLIC_KEY) {
+  if (error && !PAGBANK_PUBLIC_KEY) {
     return (
       <div className="p-6 text-center">
         <AlertCircle className="h-12 w-12 mx-auto text-red-500 mb-4" />
@@ -518,7 +420,7 @@ export function CardTokenizationForm({
       <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-lg">
         <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-2">
           <Lock className="h-4 w-4 flex-shrink-0" />
-          <span>Ambiente seguro. Seus dados são criptografados e processados via Mercado Pago.</span>
+          <span>Ambiente seguro. Seus dados são criptografados e processados via PagBank.</span>
         </p>
       </div>
 

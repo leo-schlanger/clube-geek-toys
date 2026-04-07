@@ -1,0 +1,75 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        env:
+          VITE_API_URL: https://api.geeketoys.com.br
+          VITE_PAGBANK_PUBLIC_KEY: ${{ secrets.PAGBANK_PUBLIC_KEY }}
+          VITE_PIX_KEY: ac0836c7-c70e-47d7-b158-2da864326719
+          VITE_ENVIRONMENT: production
+        run: npx vite build --mode production
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy server files
+        run: |
+          rsync -avz --delete \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='scripts/' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            server/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/server/
+
+      - name: Deploy frontend
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            dist/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/dist/
+
+      - name: Rebuild and restart containers
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
+            cd /opt/clube-geek-toys/server
+            docker compose build --no-cache api
+            docker compose up -d --force-recreate api nginx
+            sleep 3
+            docker ps --format 'table {{.Names}}\t{{.Status}}'
+            echo "Deploy completed at $(date)"
+          DEPLOY
+
+      - name: Health check
+        run: |
+          sleep 5
+          STATUS=$(curl -sf http://${{ secrets.VPS_HOST }}/api/health | jq -r '.status')
+          if [ "$STATUS" = "ok" ]; then
+            echo "Health check passed!"
+          else
+            echo "Health check FAILED!"
+            exit 1
+          fi

@@ -1,71 +1,23 @@
-import { where, orderBy, type DocumentData, type DocumentSnapshot } from 'firebase/firestore'
-import { FirestoreManager, MapperUtils } from './db-utils'
-import { COLLECTIONS } from './constants'
+import { api } from './api-client'
 import type { Member, MemberFormData, PlanType, PendingPaymentInfo } from '../types'
 
 export interface PaginatedResult<T> {
   data: T[]
-  lastDoc: DocumentSnapshot | null
   hasMore: boolean
   totalCount?: number
 }
 
-const MEMBERS_COLLECTION = COLLECTIONS.MEMBERS
-
-/**
- * Converte documento Firestore para tipo Member
- * @param id - ID do documento Firestore
- * @param data - Dados brutos do documento
- * @returns Objeto Member tipado
- * @internal
- */
-function toMember(id: string, data: DocumentData): Member {
-  const mapped = MapperUtils.toCamel(data)
-  return {
-    id,
-    userId: mapped.userId || '',
-    cpf: mapped.cpf,
-    fullName: mapped.fullName,
-    email: mapped.email,
-    phone: mapped.phone,
-    photoUrl: mapped.photoUrl,
-    plan: mapped.plan,
-    status: mapped.status,
-    paymentType: mapped.paymentType,
-    startDate: mapped.startDate,
-    expiryDate: mapped.expiryDate,
-    points: mapped.points || 0,
-    pendingPayment: mapped.pendingPayment,
-    createdAt: mapped.createdAt,
-    updatedAt: mapped.updatedAt,
-  }
-}
-
 /**
  * Busca membro pelo CPF
- * @param cpf - CPF do membro (com ou sem formatação)
- * @returns Membro encontrado ou null se não existir
- * @example
- * const member = await getMemberByCPF('123.456.789-00')
- * if (member) console.log(member.fullName)
  */
 export async function getMemberByCPF(cpf: string): Promise<Member | null> {
-  const results = await FirestoreManager.findMany(
-    MEMBERS_COLLECTION,
-    [where('cpf', '==', cpf.replace(/\D/g, ''))],
-    toMember
-  )
-  return results.length > 0 ? results[0] : null
+  const cleanCpf = cpf.replace(/\D/g, '')
+  const result = await api.get<Member>(`/members/by-cpf/${cleanCpf}`)
+  return result.data || null
 }
 
 /**
  * Verifica se CPF já está cadastrado no sistema
- * @param cpf - CPF a verificar (com ou sem formatação)
- * @returns true se já existe membro com este CPF
- * @example
- * if (await isCPFRegistered('12345678900')) {
- *   toast.error('CPF já cadastrado')
- * }
  */
 export async function isCPFRegistered(cpf: string): Promise<boolean> {
   const member = await getMemberByCPF(cpf)
@@ -73,33 +25,27 @@ export async function isCPFRegistered(cpf: string): Promise<boolean> {
 }
 
 /**
- * Get member by user ID
+ * Get member by user ID (own profile)
  */
-export async function getMemberByUserId(userId: string): Promise<Member | null> {
-  const results = await FirestoreManager.findMany(
-    MEMBERS_COLLECTION,
-    [where('user_id', '==', userId)],
-    toMember
-  )
-  return results.length > 0 ? results[0] : null
+export async function getMemberByUserId(_userId?: string): Promise<Member | null> {
+  const result = await api.get<Member>('/members/me')
+  return result.data || null
 }
 
 /**
  * Get member by ID
  */
 export async function getMemberById(id: string): Promise<Member | null> {
-  return FirestoreManager.getById(MEMBERS_COLLECTION, id, toMember)
+  const result = await api.get<Member>(`/members/${id}`)
+  return result.data || null
 }
 
 /**
- * Get all members (no pagination - use for small datasets or reports)
+ * Get all members (admin/seller)
  */
 export async function getAllMembers(): Promise<Member[]> {
-  return FirestoreManager.findMany(
-    MEMBERS_COLLECTION,
-    [orderBy('created_at', 'desc')],
-    toMember
-  )
+  const result = await api.get<{ members: Member[]; total: number }>('/members?limit=1000')
+  return result.data?.members || []
 }
 
 /**
@@ -107,127 +53,75 @@ export async function getAllMembers(): Promise<Member[]> {
  */
 export async function getMembersPaginated(
   pageSize: number = 20,
-  lastDoc?: DocumentSnapshot
+  page: number = 1
 ): Promise<PaginatedResult<Member>> {
-  const result = await FirestoreManager.findManyPaginated(
-    MEMBERS_COLLECTION,
-    [orderBy('created_at', 'desc')],
-    toMember,
-    pageSize,
-    lastDoc
+  const result = await api.get<{ members: Member[]; total: number; page: number }>(
+    `/members?limit=${pageSize}&page=${page}`
   )
-  return result
+  const members = result.data?.members || []
+  const total = result.data?.total || 0
+  return {
+    data: members,
+    hasMore: page * pageSize < total,
+    totalCount: total,
+  }
 }
 
 /**
  * Get total count of members
  */
 export async function getMembersCount(): Promise<number> {
-  return FirestoreManager.getCount(MEMBERS_COLLECTION, [])
+  const result = await api.get<{ count: number }>('/members/count')
+  return result.data?.count || 0
 }
 
 /**
  * Cria novo membro no sistema
- * @param userId - UID do Firebase Auth
- * @param data - Dados do formulário de cadastro
- * @returns Membro criado ou null em caso de erro
- * @example
- * const member = await createMember(user.uid, {
- *   cpf: '12345678900',
- *   fullName: 'João Silva',
- *   email: 'joao@email.com',
- *   phone: '11999999999',
- *   plan: 'gold',
- *   paymentType: 'monthly'
- * })
  */
 export async function createMember(
-  userId: string,
+  _userId: string,
   data: MemberFormData
 ): Promise<Member | null> {
-  const now = new Date().toISOString()
-  const startDate = now.split('T')[0]
-
-  // Calculate expiry date
-  const expiryDate = new Date()
-  if (data.paymentType === 'annual') {
-    expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-  } else {
-    expiryDate.setMonth(expiryDate.getMonth() + 1)
-  }
-
-  const memberData = MapperUtils.toSnake({
-    userId,
+  const result = await api.post<Member>('/members', {
     cpf: data.cpf.replace(/\D/g, ''),
     fullName: data.fullName,
     email: data.email,
     phone: data.phone,
-    photoUrl: null,
     plan: data.plan,
-    status: 'pending',
     paymentType: data.paymentType,
-    startDate,
-    expiryDate: expiryDate.toISOString().split('T')[0],
-    points: 0,
-    createdAt: now,
   })
-
-  // Use Firebase Auth UID as document ID for reliable Storage rules cross-check
-  // This ensures Storage rules can verify ownership via members/{userId} lookup
-  const id = await FirestoreManager.save(MEMBERS_COLLECTION, userId, memberData)
-  if (!id) return null
-
-  return toMember(id, memberData)
+  return result.data || null
 }
 
 /**
  * Atualiza dados de um membro
- * @param id - ID do membro no Firestore
- * @param data - Campos a atualizar (parcial)
- * @returns true se atualizado com sucesso
- * @example
- * await updateMember(member.id, { status: 'active', points: 100 })
  */
 export async function updateMember(
   id: string,
   data: Partial<Member>
 ): Promise<boolean> {
-  const firestoreData = MapperUtils.toSnake(data)
-  return FirestoreManager.update(MEMBERS_COLLECTION, id, firestoreData)
+  const result = await api.patch(`/members/${id}`, data)
+  return !result.error
 }
 
 /**
  * Ativa membro após confirmação de pagamento
- * @param id - ID do membro
- * @returns true se ativado com sucesso
  */
 export async function activateMember(id: string): Promise<boolean> {
-  return updateMember(id, { status: 'active' })
+  return updateMember(id, { status: 'active' } as Partial<Member>)
 }
 
 /**
  * Verifica se membro está ativo (status + data de expiração)
- * @param member - Objeto membro
- * @returns true se status é 'active' E não expirou
- * @example
- * if (!isMemberActive(member)) {
- *   toast.warning('Assinatura expirada')
- * }
  */
 export function isMemberActive(member: Member): boolean {
   if (member.status !== 'active') return false
-
   const expiryDate = new Date(member.expiryDate)
   return expiryDate >= new Date()
 }
 
 /**
  * Retorna percentuais de desconto baseado no plano
- * @param plan - Tipo do plano (silver, gold, black)
- * @returns Objeto com percentuais de desconto para produtos e serviços
- * @example
- * const { products, services } = getMemberDiscount('gold')
- * // products = 15, services = 35
  */
 export function getMemberDiscount(plan: PlanType): { products: number; services: number } {
   switch (plan) {
@@ -244,26 +138,17 @@ export function getMemberDiscount(plan: PlanType): { products: number; services:
 
 /**
  * Salva informações do pagamento PIX pendente no registro do membro
- * @param memberId - ID do membro
- * @param paymentInfo - Dados do pagamento PIX gerado
- * @returns true se salvo com sucesso
  */
 export async function savePendingPayment(
   memberId: string,
   paymentInfo: PendingPaymentInfo
 ): Promise<boolean> {
-  return FirestoreManager.update(MEMBERS_COLLECTION, memberId, {
-    pending_payment: MapperUtils.toSnake(paymentInfo),
-  })
+  return updateMember(memberId, { pendingPayment: paymentInfo } as Partial<Member>)
 }
 
 /**
- * Remove informações do pagamento pendente (após confirmação ou expiração)
- * @param memberId - ID do membro
- * @returns true se removido com sucesso
+ * Remove informações do pagamento pendente
  */
 export async function clearPendingPayment(memberId: string): Promise<boolean> {
-  return FirestoreManager.update(MEMBERS_COLLECTION, memberId, {
-    pending_payment: null,
-  })
+  return updateMember(memberId, { pendingPayment: null } as Partial<Member>)
 }

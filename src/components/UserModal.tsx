@@ -2,10 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { initializeApp, deleteApp } from 'firebase/app'
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
-import { doc, setDoc } from 'firebase/firestore'
-import { app, db } from '../lib/firebase'
+import { api } from '../lib/api-client'
 import { logger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -89,34 +86,21 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
   async function onSubmit(data: UserFormData) {
     setLoading(true)
 
-    // Create a secondary Firebase app to avoid signing out the current admin
-    // createUserWithEmailAndPassword automatically signs in the new user,
-    // so we use a separate auth instance
-    let secondaryApp = null
-
     try {
-      // Initialize secondary app with same config
-      secondaryApp = initializeApp(app.options, 'SecondaryApp')
-      const secondaryAuth = getAuth(secondaryApp)
-
-      // Create user in Firebase Auth using secondary auth (won't affect main session)
-      const userCredential = await createUserWithEmailAndPassword(
-        secondaryAuth,
-        data.email,
-        data.password
-      )
-
-      // Create user document in Firestore with role
-      // This uses the main db instance with the admin's auth context
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      // Create user via API (admin endpoint)
+      const result = await api.post('/auth/register', {
         email: data.email,
-        role: data.role,
-        createdAt: new Date().toISOString(),
-        createdBy: 'admin',
-      })
+        password: data.password,
+      }, { skipAuth: false })
 
-      // Sign out from secondary auth and clean up
-      await secondaryAuth.signOut()
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      // Set role if not member (default)
+      if (data.role !== 'member' && result.data?.user?.id) {
+        await api.patch(`/users/${result.data.user.id}/role`, { role: data.role })
+      }
 
       toast.success(`Usuário ${data.role} criado com sucesso!`)
       onSuccess()
@@ -124,19 +108,11 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
       logger.error('Error creating user:', error)
       const err = error as { code?: string; message?: string }
 
-      if (err.code === 'auth/email-already-in-use') {
+      const message = err.message || 'desconhecido'
+      if (message.includes('já cadastrado')) {
         toast.error('Este email já está em uso')
-      } else if (err.code === 'auth/invalid-email') {
-        toast.error('Email inválido')
-      } else if (err.code === 'auth/weak-password') {
-        toast.error('Senha muito fraca')
       } else {
-        toast.error('Erro ao criar usuário: ' + (err.message || 'desconhecido'))
-      }
-    } finally {
-      // Always clean up the secondary app
-      if (secondaryApp) {
-        await deleteApp(secondaryApp)
+        toast.error('Erro ao criar usuário: ' + message)
       }
     }
 

@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { updateEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth'
-import { auth } from '../lib/firebase'
 import { updateMember } from '../lib/members'
 import { logger } from '../lib/logger'
 import { Button } from './ui/button'
@@ -101,12 +99,6 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
   }
 
   async function onSubmit(data: ProfileFormData) {
-    const user = auth.currentUser
-    if (!user) {
-      toast.error('Sessão expirada. Por favor, faça login novamente.')
-      return
-    }
-
     // Check if auth changes need password
     if ((emailChanged || passwordChanging) && !data.currentPassword) {
       toast.error('Senha atual é necessária para alterar email ou senha')
@@ -116,26 +108,10 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
     setSaving(true)
 
     try {
-      // If email or password changing, reauthenticate first
-      if ((emailChanged || passwordChanging) && data.currentPassword) {
-        const credential = EmailAuthProvider.credential(user.email!, data.currentPassword)
-        try {
-          await reauthenticateWithCredential(user, credential)
-        } catch {
-          toast.error('Senha atual incorreta')
-          setSaving(false)
-          return
-        }
-
-        // Update email if changed
-        if (emailChanged) {
-          await updateEmail(user, data.email)
-        }
-
-        // Update password if provided
-        if (passwordChanging && data.newPassword) {
-          await updatePassword(user, data.newPassword)
-        }
+      // TODO: Add /auth/update-profile endpoint for email/password changes
+      // For now, email and password changes are not supported via API
+      if (emailChanged || passwordChanging) {
+        toast.warning('Alteração de email/senha será implementada em breve')
       }
 
       // Update member in Firestore
