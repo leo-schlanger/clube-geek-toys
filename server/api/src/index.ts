@@ -1,6 +1,8 @@
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
+import crypto from 'crypto';
 import { env } from './config/env.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { errorHandler } from './middleware/error-handler.js';
@@ -20,8 +22,18 @@ import { initCronJobs } from './services/cron.service.js';
 
 const app = express();
 
+// Trust nginx proxy (correct IP for rate limiting and audit logs)
+app.set('trust proxy', 1);
+
+// Request ID for tracing
+app.use((req, _res, next) => {
+  (req as unknown as Record<string, unknown>).id = req.headers['x-request-id'] || crypto.randomUUID();
+  next();
+});
+
 // Global middleware
 app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression());
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(corsMiddleware);
 

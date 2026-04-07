@@ -10,7 +10,9 @@
     "seed:admin": "tsx src/db/seed-admin.ts"
   },
   "dependencies": {
+    "@types/compression": "^1.8.1",
     "bcrypt": "^5.1.1",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.1",
