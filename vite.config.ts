@@ -59,47 +59,16 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // Separar node_modules em chunks por biblioteca
           if (id.includes('node_modules')) {
-            // React ecosystem - tudo junto para evitar problemas de ordem de carregamento
+            // React core — MUST stay together to avoid useLayoutEffect errors
             if (
-              id.includes('react') ||
-              id.includes('scheduler') ||
+              id.includes('/react/') ||
+              id.includes('/react-dom/') ||
+              id.includes('/react-router') ||
+              id.includes('/scheduler/') ||
               id.includes('use-sync-external-store')
             ) {
               return 'vendor-react'
-            }
-            // Framer Motion - lazy load
-            if (id.includes('framer-motion')) {
-              return 'vendor-framer'
-            }
-            // Radix UI - usado em vários lugares
-            if (id.includes('@radix-ui')) {
-              return 'vendor-radix'
-            }
-            // Sonner (toasts)
-            if (id.includes('sonner')) {
-              return 'vendor-sonner'
-            }
-            // Form libraries
-            if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) {
-              return 'vendor-forms'
-            }
-            // QR code libraries - lazy load
-            if (id.includes('qrcode') || id.includes('jsqr') || id.includes('@zxing')) {
-              return 'vendor-qr'
-            }
-            // TanStack Query
-            if (id.includes('@tanstack')) {
-              return 'vendor-query'
-            }
-            // Charts - lazy loaded with reports
-            if (id.includes('recharts') || id.includes('d3-')) {
-              return 'vendor-charts'
-            }
-            // PDF and signature libraries - lazy loaded with contract
-            if (id.includes('pdf-lib') || id.includes('signature_pad')) {
-              return 'vendor-contract'
             }
           }
         },
