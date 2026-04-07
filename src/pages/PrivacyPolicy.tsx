@@ -115,7 +115,7 @@ export default function PrivacyPolicy() {
                             <p>Utilizamos cookies para:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li><strong>Cookies essenciais:</strong> Autenticação e funcionamento do site.</li>
-                                <li><strong>Cookies de desempenho:</strong> Análise de uso via Vercel Analytics (anonimizado).</li>
+                                <li><strong>Cookies de desempenho:</strong> Análise de uso anonimizada para melhoria do serviço.</li>
                             </ul>
                             <p>Você pode gerenciar cookies nas configurações do seu navegador.</p>
                         </section>
