@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -36,7 +36,12 @@ import {
   CheckCircle,
   XCircle,
   HelpCircle,
+  Shield,
+  Trash2,
+  RefreshCw,
+  MailCheck,
 } from 'lucide-react'
+import { GoogleSignInButton } from '../components/GoogleSignInButton'
 
 // Form validation schema
 const registerSchema = z.object({
@@ -56,8 +61,7 @@ type RegisterFormData = z.infer<typeof registerSchema>
 export default function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { signUp, user } = useAuth()
-
+  const { signUp, signInWithGoogle, user, sendVerificationEmail, refreshUser, emailVerified } = useAuth()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -73,6 +77,17 @@ export default function Register() {
   const [validatingCpf, setValidatingCpf] = useState(false)
   const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
   const [validatingEmail, setValidatingEmail] = useState(false)
+
+  // Email verification state (step between account creation and contract)
+  const [awaitingEmailVerification, setAwaitingEmailVerification] = useState(false)
+  const [verificationCooldown, setVerificationCooldown] = useState(0)
+  const [checkingVerification, setCheckingVerification] = useState(false)
+
+  // localStorage draft state
+  const DRAFT_KEY = 'clube_geek_register_draft'
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false)
+  const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Rate limiting: max attempts for validation
   const [cpfValidationAttempts, setCpfValidationAttempts] = useState(0)
@@ -95,16 +110,153 @@ export default function Register() {
     handleSubmit,
     formState: { errors },
     setValue,
+    watch,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   })
 
-  // Redirect if already logged in
+  // Redirect if already logged in (but not during email verification flow)
   useEffect(() => {
-    if (user) {
+    if (user && !awaitingEmailVerification && step >= 3) {
       navigate('/membro')
     }
-  }, [user, navigate])
+  }, [user, navigate, awaitingEmailVerification, step])
+
+  // =========================================================================
+  // Password Strength Meter
+  // =========================================================================
+  const watchedPassword = watch('password', '')
+  const passwordStrength = useMemo(() => {
+    if (!watchedPassword) return { score: 0, label: '', color: '', width: '0%' }
+    let score = 0
+    if (watchedPassword.length >= 8) score++
+    if (/[A-Z]/.test(watchedPassword)) score++
+    if (/[0-9]/.test(watchedPassword)) score++
+    if (/[!@#$%^&*]/.test(watchedPassword)) score++
+    const levels = [
+      { label: '', color: '', width: '0%' },
+      { label: 'Fraca', color: 'bg-red-500', width: '25%' },
+      { label: 'Razoável', color: 'bg-orange-500', width: '50%' },
+      { label: 'Boa', color: 'bg-yellow-500', width: '75%' },
+      { label: 'Forte', color: 'bg-green-500', width: '100%' },
+    ]
+    return { score, ...levels[score] }
+  }, [watchedPassword])
+
+  // =========================================================================
+  // localStorage Auto-save Draft
+  // =========================================================================
+
+  // On mount, check for existing draft
+  useEffect(() => {
+    if (draftLoaded) return
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const draft = JSON.parse(raw)
+        if (draft && draft.fullName) {
+          setShowDraftPrompt(true)
+        }
+      }
+    } catch { /* ignore corrupt data */ }
+    setDraftLoaded(true)
+  }, [draftLoaded])
+
+  function loadDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const draft = JSON.parse(raw)
+        if (draft.fullName) setValue('fullName', draft.fullName)
+        if (draft.email) setValue('email', draft.email)
+        if (draft.cpf) setValue('cpf', draft.cpf)
+        if (draft.phone) setValue('phone', draft.phone)
+        if (draft.step) setStep(draft.step)
+        toast.success('Cadastro em andamento restaurado.')
+      }
+    } catch { /* ignore */ }
+    setShowDraftPrompt(false)
+  }
+
+  function discardDraft() {
+    localStorage.removeItem(DRAFT_KEY)
+    setShowDraftPrompt(false)
+    toast.info('Formulário limpo.')
+  }
+
+  function clearForm() {
+    localStorage.removeItem(DRAFT_KEY)
+    setValue('fullName', '')
+    setValue('email', '')
+    setValue('cpf', '')
+    setValue('phone', '')
+    setValue('password', '')
+    setValue('confirmPassword', '')
+    setStep(1)
+    toast.info('Formulário limpo.')
+  }
+
+  // Watch fields and debounce-save to localStorage (every 2 seconds)
+  const watchedFields = watch(['fullName', 'email', 'cpf', 'phone'])
+  useEffect(() => {
+    // Don't save if we're past the form steps
+    if (step >= 3) return
+    if (!draftLoaded) return
+
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current)
+    }
+
+    draftSaveTimeoutRef.current = setTimeout(() => {
+      const [fullName, email, cpf, phone] = watchedFields
+      // Only save if there's something meaningful
+      if (fullName || email || cpf || phone) {
+        const draft = { fullName, email, cpf, phone, step }
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+      }
+    }, 2000)
+
+    return () => {
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current)
+      }
+    }
+  }, [watchedFields, step, draftLoaded])
+
+  // =========================================================================
+  // Email Verification Cooldown Timer
+  // =========================================================================
+  useEffect(() => {
+    if (verificationCooldown <= 0) return
+    const timer = setTimeout(() => setVerificationCooldown(prev => prev - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [verificationCooldown])
+
+  async function handleResendVerification() {
+    setVerificationCooldown(60)
+    const result = await sendVerificationEmail()
+    if (result.success) {
+      toast.success('Email de verificação reenviado!')
+    } else {
+      toast.error(result.error || 'Erro ao reenviar email.')
+    }
+  }
+
+  async function handleCheckVerification() {
+    setCheckingVerification(true)
+    await refreshUser()
+    // After refreshUser, emailVerified from context will update
+    setCheckingVerification(false)
+  }
+
+  // Watch for emailVerified becoming true while awaiting
+  useEffect(() => {
+    if (awaitingEmailVerification && emailVerified) {
+      setAwaitingEmailVerification(false)
+      toast.success('Email verificado! Agora assine o contrato.')
+      setShowContractModal(true)
+    }
+  }, [emailVerified, awaitingEmailVerification])
 
   /**
    * Handle form submission
@@ -216,9 +368,19 @@ export default function Register() {
           setMemberCPF(sanitizedData.cpf)
           setMemberPhone(sanitizedData.phone)
 
-          // 5. Show contract modal for signature (before payment)
-          toast.success('Conta criada! Agora assine o contrato.', { id: 'reg-progress' })
-          setShowContractModal(true)
+          // 5. Send verification email and show verification step
+          toast.success('Conta criada! Verifique seu email.', { id: 'reg-progress' })
+
+          // Clear localStorage draft on successful account creation
+          localStorage.removeItem(DRAFT_KEY)
+
+          // Send verification email automatically
+          sendVerificationEmail().catch(err =>
+            logger.error('Erro ao enviar email de verificação:', err)
+          )
+          setVerificationCooldown(60)
+          setAwaitingEmailVerification(true)
+          setStep(3) // Move to step 3 area to show verification UI
         } else {
           // All retries failed - cannot proceed without member document
           // The member document is required for contract storage permissions
@@ -484,6 +646,9 @@ export default function Register() {
       if (emailRateLimitResetRef.current) {
         clearTimeout(emailRateLimitResetRef.current)
       }
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -510,24 +675,27 @@ export default function Register() {
           </p>
         </div>
 
-        {/* Progress Steps - 3 passos simplificados */}
+        {/* Progress Steps - 4 passos */}
         <div className="flex items-center justify-center gap-2 mb-8">
           {[
             { num: 1, label: 'Dados' },
-            { num: 2, label: 'Contrato' },
-            { num: 3, label: 'Pagamento' },
+            { num: 2, label: 'Email' },
+            { num: 3, label: 'Contrato' },
+            { num: 4, label: 'Pagamento' },
           ].map((s, index) => {
             // Determina se o passo está completo
             const isComplete =
-              (s.num === 1 && step >= 3) || // Dados completos quando chega no contrato
-              (s.num === 2 && contractSigned) || // Contrato completo quando assinado
-              (s.num === 3 && false) // Pagamento nunca fica completo (redirect)
+              (s.num === 1 && step >= 3) || // Dados completos when account created
+              (s.num === 2 && !awaitingEmailVerification && step >= 3) || // Email verified
+              (s.num === 3 && contractSigned) || // Contrato assinado
+              (s.num === 4 && false) // Pagamento nunca fica completo (redirect)
 
             // Determina se o passo está ativo
             const isActive =
               (s.num === 1 && step <= 2) ||
-              (s.num === 2 && step >= 3 && !contractSigned) ||
-              (s.num === 3 && contractSigned)
+              (s.num === 2 && awaitingEmailVerification) ||
+              (s.num === 3 && step >= 3 && !awaitingEmailVerification && !contractSigned) ||
+              (s.num === 4 && contractSigned)
 
             return (
               <div key={s.num} className="flex items-center">
@@ -545,7 +713,7 @@ export default function Register() {
                   </div>
                   <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{s.label}</span>
                 </div>
-                {index < 2 && (
+                {index < 3 && (
                   <div
                     className={`w-8 sm:w-12 h-1 mx-1 transition-colors ${
                       isComplete ? 'bg-primary' : 'bg-muted'
@@ -572,6 +740,23 @@ export default function Register() {
           </CardContent>
         </Card>
 
+        {/* Draft prompt */}
+        {showDraftPrompt && (
+          <Card className="mb-4 border-yellow-500/50 bg-yellow-500/10">
+            <CardContent className="p-4">
+              <p className="text-sm font-medium mb-2">Encontramos um cadastro em andamento. Deseja continuar?</p>
+              <div className="flex gap-2">
+                <Button size="sm" variant="default" onClick={loadDraft}>
+                  Sim, continuar
+                </Button>
+                <Button size="sm" variant="outline" onClick={discardDraft}>
+                  Não, começar novo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Form Steps */}
         <AnimatePresence mode="wait">
           {step < 3 ? (
@@ -593,6 +778,48 @@ export default function Register() {
                   <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                     {step === 1 && (
                       <div className="space-y-4">
+                        {/* Google Sign-In for registration */}
+                        <GoogleSignInButton
+                          label="Cadastrar com Google"
+                          disabled={loading}
+                          onSuccess={(data) => {
+                            const result = signInWithGoogle(data)
+                            if (result.success) {
+                              if (result.isNewUser) {
+                                // Pre-fill name and email, skip to CPF/phone step
+                                if (result.googleName) {
+                                  setValue('fullName', result.googleName)
+                                  setMemberName(result.googleName)
+                                }
+                                if (data.user.email) {
+                                  setValue('email', data.user.email)
+                                  setMemberEmail(data.user.email)
+                                }
+                                toast.success('Conta Google conectada! Complete seus dados.')
+                              } else {
+                                // Existing user — redirect to member area
+                                toast.success('Bem-vindo de volta!')
+                                navigate('/membro')
+                              }
+                            } else {
+                              toast.error(result.error || 'Erro ao autenticar com Google')
+                            }
+                          }}
+                          onError={(err) => toast.error(err)}
+                        />
+
+                        {/* Divider */}
+                        {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+                          <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                              <span className="w-full border-t" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                              <span className="bg-card px-2 text-muted-foreground">ou preencha manualmente</span>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-2">
                           <Label htmlFor="fullName">Nome Completo</Label>
                           <div className="relative">
@@ -737,6 +964,13 @@ export default function Register() {
                         <Button type="button" className="w-full" onClick={() => setStep(2)}>
                           Próximo Passo <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
+                        <button
+                          type="button"
+                          className="w-full text-center text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 mt-2"
+                          onClick={clearForm}
+                        >
+                          <Trash2 className="h-3 w-3" /> Limpar formulário
+                        </button>
                       </div>
                     )}
 
@@ -760,6 +994,30 @@ export default function Register() {
                             </button>
                           </div>
                           {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
+                          {/* Password Strength Meter */}
+                          {watchedPassword && (
+                            <div className="space-y-1">
+                              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                                  style={{ width: passwordStrength.width }}
+                                />
+                              </div>
+                              {passwordStrength.label && (
+                                <div className="flex items-center gap-1">
+                                  <Shield className="h-3 w-3 text-muted-foreground" />
+                                  <span className={`text-xs ${
+                                    passwordStrength.score <= 1 ? 'text-red-500' :
+                                    passwordStrength.score === 2 ? 'text-orange-500' :
+                                    passwordStrength.score === 3 ? 'text-yellow-600' :
+                                    'text-green-600'
+                                  }`}>
+                                    {passwordStrength.label}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -784,6 +1042,53 @@ export default function Register() {
                       </div>
                     )}
                   </form>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : awaitingEmailVerification ? (
+            <motion.div
+              key="step-email-verify"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="text-center p-6">
+                <CardHeader>
+                  <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                    <MailCheck className="h-8 w-8 text-primary" />
+                  </div>
+                  <CardTitle>Verifique seu email</CardTitle>
+                  <CardDescription>
+                    Enviamos um email de verificação para <span className="font-medium text-foreground">{memberEmail}</span>.
+                    Verifique sua caixa de entrada (e spam) e clique no link de verificação.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button
+                    className="w-full"
+                    onClick={handleCheckVerification}
+                    disabled={checkingVerification}
+                  >
+                    {checkingVerification ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando...</>
+                    ) : (
+                      <><CheckCircle className="mr-2 h-4 w-4" /> Já verifiquei</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleResendVerification}
+                    disabled={verificationCooldown > 0}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    {verificationCooldown > 0
+                      ? `Reenviar email (${verificationCooldown}s)`
+                      : 'Reenviar email'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Verifique seu email antes de continuar para a assinatura do contrato.
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>

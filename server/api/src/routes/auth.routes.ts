@@ -37,6 +37,10 @@ const verifyEmailSchema = z.object({
   token: z.string(),
 });
 
+const googleAuthSchema = z.object({
+  idToken: z.string().min(1),
+});
+
 const sendVerificationSchema = z.object({
   email: z.string().email(),
   uid: z.string().optional(),
@@ -57,6 +61,16 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, n
   try {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
     const result = await authService.login({ ...req.body, ip });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+authRouter.post('/google', authLimiter, validate(googleAuthSchema), async (req, res, next) => {
+  try {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const result = await authService.googleAuth(req.body.idToken, ip);
     res.json(result);
   } catch (err) {
     next(err);

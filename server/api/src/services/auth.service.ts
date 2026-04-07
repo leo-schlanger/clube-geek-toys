@@ -289,6 +289,116 @@ export async function updateProfile(userId: string, data: { email?: string; curr
   return { message: 'Perfil atualizado com sucesso' };
 }
 
+export async function googleAuth(idToken: string, ip?: string) {
+  // 1. Verify Google ID token via Google's tokeninfo endpoint
+  const response = await fetch(
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+  );
+
+  if (!response.ok) {
+    throw new AppError(401, 'Token Google inválido');
+  }
+
+  const payload = (await response.json()) as {
+    email?: string;
+    name?: string;
+    email_verified?: string;
+    sub?: string;
+    aud?: string;
+  };
+
+  if (!payload.email || !payload.sub) {
+    throw new AppError(401, 'Token Google não contém informações necessárias');
+  }
+
+  // 2. Optional audience check
+  if (env.GOOGLE_CLIENT_ID && payload.aud !== env.GOOGLE_CLIENT_ID) {
+    throw new AppError(401, 'Token Google com audience inválido');
+  }
+
+  const email = payload.email.toLowerCase();
+  const name = payload.name || '';
+  const emailVerified = payload.email_verified === 'true';
+
+  // 3. Check if user exists
+  const existing = await query<UserRow>(
+    'SELECT id, email, password_hash, role, email_verified FROM users WHERE email = $1',
+    [email]
+  );
+
+  if (existing.rows.length > 0) {
+    // 4. User exists — log them in
+    const user = existing.rows[0];
+
+    if (user.role === 'disabled') {
+      throw new AppError(403, 'Conta desativada');
+    }
+
+    // Update email_verified if Google says it's verified and we haven't yet
+    if (emailVerified && !user.email_verified) {
+      await query(
+        'UPDATE users SET email_verified = TRUE, email_verified_at = NOW() WHERE id = $1',
+        [user.id]
+      );
+      user.email_verified = true;
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user);
+
+    await query('UPDATE users SET refresh_token_hash = $1 WHERE id = $2', [
+      hashSha256(refreshToken),
+      user.id,
+    ]);
+
+    await auditLog('auth.google_login', user.id, { email: user.email, ip: ip || null });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        emailVerified: user.email_verified,
+      },
+    };
+  }
+
+  // 5. User does not exist — register with random password
+  const randomPassword = crypto.randomBytes(32).toString('hex');
+  const passwordHash = await bcrypt.hash(randomPassword, BCRYPT_ROUNDS);
+
+  const result = await query<UserRow>(
+    `INSERT INTO users (email, password_hash, role, email_verified, email_verified_at)
+     VALUES ($1, $2, 'member', $3, $4)
+     RETURNING id, email, role, email_verified, created_at`,
+    [email, passwordHash, emailVerified, emailVerified ? new Date() : null]
+  );
+
+  const user = result.rows[0];
+  const { accessToken, refreshToken } = generateTokens(user);
+
+  await query('UPDATE users SET refresh_token_hash = $1 WHERE id = $2', [
+    hashSha256(refreshToken),
+    user.id,
+  ]);
+
+  await auditLog('auth.google_register', user.id, { email: user.email, name, ip: ip || null });
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      emailVerified: user.email_verified,
+    },
+    isNewUser: true,
+    googleName: name,
+  };
+}
+
 export async function resetPassword(token: string, newPassword: string) {
   const payload = verifyHmacToken(token);
   if (!payload || !payload.email) {

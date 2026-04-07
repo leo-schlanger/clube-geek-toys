@@ -21,6 +21,9 @@ const envSchema = z.object({
   FROM_EMAIL: z.string().default('Clube Geek & Toys <contato@geeketoys.com.br>'),
   ADMIN_EMAIL: z.string().email().default('admin@geeketoys.com.br'),
 
+  // Google OAuth
+  GOOGLE_CLIENT_ID: z.string().optional(),
+
   // URLs
   FRONTEND_URL: z.string().url(),
   API_URL: z.string().url(),

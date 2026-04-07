@@ -25,6 +25,13 @@ interface AuthUser {
   emailVerified: boolean
 }
 
+interface GoogleAuthResult {
+  success: boolean
+  error?: string
+  isNewUser?: boolean
+  googleName?: string
+}
+
 interface AuthContextType {
   user: AuthUser | null
   role: UserRole | null
@@ -33,6 +40,13 @@ interface AuthContextType {
   emailVerified: boolean
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signInWithGoogle: (data: {
+    accessToken: string
+    refreshToken: string
+    user: { id: string; email: string; role: string; emailVerified: boolean }
+    isNewUser?: boolean
+    googleName?: string
+  }) => GoogleAuthResult
   signOut: () => Promise<{ success: boolean; error?: string }>
   sendVerificationEmail: () => Promise<{ success: boolean; error?: string }>
   refreshUser: () => Promise<void>
@@ -163,6 +177,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // Google sign-in (tokens already obtained by GoogleSignInButton)
+  function signInWithGoogle(data: {
+    accessToken: string
+    refreshToken: string
+    user: { id: string; email: string; role: string; emailVerified: boolean }
+    isNewUser?: boolean
+    googleName?: string
+  }): GoogleAuthResult {
+    try {
+      setError(null)
+      setTokens(data.accessToken, data.refreshToken)
+      setAuthState(data.user as AuthUser)
+      return {
+        success: true,
+        isNewUser: data.isNewUser,
+        googleName: data.googleName,
+      }
+    } catch {
+      return { success: false, error: 'Erro ao autenticar com Google' }
+    }
+  }
+
   // Resend verification email
   async function sendVerificationEmailFn() {
     if (!user) {
@@ -237,6 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailVerified,
         signIn,
         signUp,
+        signInWithGoogle,
         signOut,
         sendVerificationEmail: sendVerificationEmailFn,
         refreshUser,

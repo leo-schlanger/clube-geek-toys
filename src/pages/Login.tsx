@@ -10,6 +10,7 @@ import { Loading } from '../components/ui/loading'
 import { Eye, EyeOff, LogIn, ShieldAlert } from 'lucide-react'
 import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 import { isBlocked, recordFailedAttempt, clearAttempts } from '../lib/rate-limit'
+import { GoogleSignInButton } from '../components/GoogleSignInButton'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -19,7 +20,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lockoutTime, setLockoutTime] = useState(0)
 
-  const { user, role, loading, error, emailVerified, signIn } = useAuth()
+  const { user, role, loading, error, emailVerified, signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
   // Countdown do lockout
@@ -130,6 +131,32 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
+            {/* Google Sign-In */}
+            <GoogleSignInButton
+              label="Entrar com Google"
+              disabled={isSubmitting || isLocked}
+              onSuccess={(data) => {
+                const result = signInWithGoogle(data)
+                if (!result.success) {
+                  setFormError(result.error || 'Erro ao autenticar com Google')
+                }
+                // Redirect handled by useEffect watching user/role
+              }}
+              onError={(err) => setFormError(err)}
+            />
+
+            {/* Divider */}
+            {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">ou</span>
+                </div>
+              </div>
+            )}
+
             {/* Aviso de bloqueio */}
             {isLocked && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-500 text-sm">
