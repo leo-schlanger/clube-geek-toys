@@ -1,105 +1,119 @@
-# Segurança e Compliance - Clube Geek & Toys
+# Seguranca e Compliance - Clube Geek & Toys
 
-**Última atualização:** 26 de março de 2026
+> **Ultima atualizacao:** 07 de Abril de 2026
 
-## Visão Geral
+## Visao Geral
 
-Este documento descreve as medidas de segurança implementadas na plataforma Clube Geek & Toys.
+Este documento descreve as medidas de seguranca implementadas na plataforma Clube Geek & Toys, hospedada em VPS propria com Docker.
 
-## 1. Autenticação e Autorização
+## 1. Autenticacao (JWT + bcrypt)
 
-### Firebase Authentication
+### Hash de Senhas
 
-- Login com email/senha
-- Verificação de email obrigatória
-- Proteção contra brute force nativa do Firebase
-- Tokens JWT com expiração automática
+- **bcrypt** com 12 rounds de salt
+- Senhas nunca armazenadas em texto puro
+- Hash armazenado na coluna `password_hash` da tabela `users`
 
-### Roles (Papéis)
+### Tokens JWT
+
+| Token   | Expiracao | Armazenamento      | Uso                       |
+| ------- | --------- | ------------------ | ------------------------- |
+| Access  | 15 min    | Memoria (frontend) | Autenticacao de requests  |
+| Refresh | 7 dias    | localStorage       | Renovacao do access token |
+
+- **Access token**: Payload `{ userId, email, role }`, assinado com `JWT_SECRET`
+- **Refresh token**: Assinado com `JWT_REFRESH_SECRET`, hash armazenado no banco
+- Rotacao de refresh token a cada renovacao
+- Invalidacao ao fazer logout (limpa hash do banco)
+
+### Fluxo de Refresh
+
+1. Access token expira (15 min)
+2. Frontend envia refresh token para `POST /auth/refresh`
+3. API valida refresh token contra hash no banco
+4. Gera novo access token + novo refresh token
+5. Antigo refresh token invalidado
+
+## 2. Autorizacao (RBAC)
+
+### Roles (Papeis)
 
 | Role     | Acesso                                   |
 | -------- | ---------------------------------------- |
 | `member` | Dashboard pessoal, pontos, contratos     |
 | `seller` | PDV, verificar membros, adicionar pontos |
-| `admin`  | Painel completo, gestão de usuários      |
+| `admin`  | Painel completo, gestao de usuarios      |
 
-## 2. Firestore Security Rules
+### Middleware de Autorizacao
 
-### Princípios
+```
+Request → auth.ts (verifica JWT) → role check → route handler
+```
 
-- **Deny by default**: Tudo é negado exceto explicitamente permitido
-- **Role-based access**: Validação de papel do usuário
-- **Owner validation**: Usuários só acessam seus próprios dados
-- **Audit trail**: Coleções críticas são imutáveis (sem delete)
+- Middleware `requireAuth` valida o token JWT em todas as rotas protegidas
+- Middleware `requireRole(['admin'])` verifica se o role do usuario esta na lista permitida
+- Frontend usa `ProtectedRoute` para proteger rotas por role
 
-### Coleções Imutáveis
+### Protecao por Endpoint
 
-- `payments` - Histórico de pagamentos
-- `point_transactions` - Transações de pontos
-- `audit_logs` - Logs de auditoria
-- `email_logs` - Logs de emails
-- `contracts` - Contratos assinados
+| Endpoint                | Roles Permitidos                |
+| ----------------------- | ------------------------------- |
+| `POST /auth/login`      | Publico                         |
+| `POST /auth/register`   | Publico                         |
+| `GET /members`          | admin                           |
+| `GET /members/:id`      | admin, seller, owner            |
+| `PUT /members/:id`      | admin, owner (campos limitados) |
+| `POST /points/add`      | admin, seller                   |
+| `GET /reports/*`        | admin                           |
+| `GET /logs`             | admin                           |
+| `POST /webhook/pagbank` | Publico (validado por HMAC)     |
 
-## 3. Storage Security Rules
+## 3. Seguranca do Banco de Dados
 
-- **Contratos (PDF)**: Máx. 5MB, apenas owner pode criar, owner/admin podem ler
-- **Fotos de membros**: Máx. 2MB, apenas imagens, owner pode criar/deletar
-- **Default deny**: Qualquer outro path é negado
+### PostgreSQL
 
-## 4. API Worker (Cloudflare)
+- **Acesso restrito**: Porta 5432 vinculada apenas a `127.0.0.1` (nao acessivel externamente)
+- **Parametrized queries**: Todas as queries usam placeholders `$1, $2, ...` (prevencao de SQL injection)
+- **CHECK constraints**: Campos enum validados no banco (role, status, plan, method)
+- **Foreign keys**: Integridade referencial com ON DELETE CASCADE/SET NULL
+- **Tabelas imutaveis**: `point_transactions`, `audit_logs`, `email_logs` nao permitem UPDATE/DELETE via aplicacao
+- **UUID** como primary keys (nao sequencial, nao previsivel)
 
-### Rate Limiting
+### Dados Sensiveis
 
-Implementado via Cache API (gratuito):
+- Senhas: apenas hash bcrypt armazenado
+- Refresh tokens: apenas hash armazenado
+- CPF: armazenado sem formatacao (11 digitos)
+- Dados de cartao: nunca armazenados (tokenizacao via PagBank)
 
-| Endpoint                | Limite  | Janela |
-| ----------------------- | ------- | ------ |
-| `/pix/create`           | 10 req  | 1 min  |
-| `/checkout/create`      | 10 req  | 1 min  |
-| `/subscription/create`  | 5 req   | 1 min  |
-| `/email/send`           | 20 req  | 1 min  |
-| `/email/password-reset` | 3 req   | 5 min  |
-| Outros                  | 100 req | 1 min  |
+## 4. Seguranca de Rede
 
-### Endpoints Protegidos
+### Firewall (UFW)
 
-**Relatórios (GET):**
+Apenas 3 portas abertas na VPS:
 
-- `/reports/daily` - Requer CORS origin válida ou Bearer token
-- `/reports/monthly` - Requer CORS origin válida ou Bearer token
+| Porta | Protocolo | Servico                    |
+| ----- | --------- | -------------------------- |
+| 22    | TCP       | SSH                        |
+| 80    | TCP       | HTTP (redirect para HTTPS) |
+| 443   | TCP       | HTTPS                      |
 
-**Cron Jobs (POST):**
+### SSH
 
-- `/cron/expire-points` - Requer header `X-Cloudflare-Cron: true` ou Bearer token
-- `/cron/renewal-reminders` - Requer header `X-Cloudflare-Cron: true` ou Bearer token
+- Acesso apenas por chave publica (senha desabilitada)
+- Root login desabilitado
+- Recomendacao: usar usuario dedicado com sudo
 
-O Bearer token é o mesmo `MERCADOPAGO_WEBHOOK_SECRET` configurado nos secrets.
+### SSL/TLS
 
-### CORS
+- Certificados Let's Encrypt via Certbot
+- Renovacao automatica (container certbot)
+- HTTP Strict Transport Security (HSTS) habilitado
+- Redirect automatico HTTP -> HTTPS
 
-Whitelist de origens permitidas:
+### Headers de Seguranca (Nginx)
 
-- `https://clube-geek-toys.web.app`
-- `https://clube-geek-toys.firebaseapp.com`
-- `https://club.geeketoys.com.br`
-- `https://adm.geeketoys.com.br`
-- `localhost` (desenvolvimento)
-
-### Webhook Security
-
-- Validação HMAC-SHA256 obrigatória
-- Timestamp validation (máx. 5 minutos)
-- Idempotência via `processed_webhooks`
-
-### Input Validation
-
-- Zod schemas para todos os endpoints
-- Sanitização HTML para emails (XSS prevention)
-- Limites de tamanho em todas as requisições
-
-## 5. Headers de Segurança
-
-Configurados no `firebase.json`:
+Configurados em `shared-headers.conf`, aplicados a todos os dominios:
 
 ```
 X-Content-Type-Options: nosniff
@@ -107,125 +121,222 @@ X-Frame-Options: DENY
 X-XSS-Protection: 1; mode=block
 Referrer-Policy: strict-origin-when-cross-origin
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-Content-Security-Policy: [configurado com whitelist]
+Content-Security-Policy: default-src 'self'; ...
 ```
 
-### CSP Directives
+### CORS
 
-- `frame-ancestors 'none'` - Proteção clickjacking
-- `base-uri 'self'` - Proteção base injection
-- `form-action 'self'` - Restrição de form submissions
+Whitelist de origens permitidas (middleware `cors.ts`):
 
-## 6. Gestão de Secrets
+- `https://club.geeketoys.com.br`
+- `https://admin.geeketoys.com.br`
+- `https://adm.geeketoys.com.br`
+- `localhost` (apenas desenvolvimento)
 
-### Secrets via Wrangler (Worker)
+## 5. Seguranca de Webhooks
 
-```bash
-wrangler secret put MERCADOPAGO_ACCESS_TOKEN
-wrangler secret put RESEND_API_KEY
-wrangler secret put FIREBASE_API_KEY
-wrangler secret put MERCADOPAGO_WEBHOOK_SECRET
+### Validacao PagBank
+
+- Verificacao de assinatura HMAC do payload
+- Idempotencia: tabela `processed_webhooks` evita processamento duplicado
+- Webhook key = combinacao de `type + action + data_id`
+
+### Idempotencia
+
+```
+Webhook recebido
+  → Gera webhook_key (type + action + data_id)
+  → Consulta processed_webhooks
+  → Se ja processado: retorna 200 (ignora)
+  → Se novo: processa + insere em processed_webhooks
 ```
 
-### Variáveis de Ambiente (Frontend)
+## 6. Rate Limiting
 
-- Armazenadas em `.env` (não commitado)
-- Prefix `VITE_` para exposição no build
+Implementado no middleware `rate-limit.ts`:
 
-### Nunca Commitar
+| Endpoint                    | Limite  | Janela |
+| --------------------------- | ------- | ------ |
+| `POST /auth/login`          | 5 req   | 5 min  |
+| `POST /auth/register`       | 5 req   | 5 min  |
+| `POST /payment/pix`         | 10 req  | 1 min  |
+| `POST /payment/checkout`    | 10 req  | 1 min  |
+| `POST /auth/password-reset` | 3 req   | 5 min  |
+| Outros endpoints            | 100 req | 1 min  |
 
-- `.env`, `.env.local`, `.env.production`
-- `serviceAccountKey.json`
-- Qualquer arquivo `.pem`, `.key`
+- Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`
+- Baseado em IP do cliente
 
-## 7. Backup e Recuperação
+## 7. Validacao de Entrada
 
-### Backup Manual do Firestore
+### Zod Schemas
 
-```bash
-npm run backup:firestore
+Todos os endpoints validam entrada com schemas Zod:
+
+- Limites de tamanho em todos os campos (email: max 254 chars, nome: max 200 chars)
+- Validacao de formato (email, CPF, UUID)
+- Enums validados (plan, method, role)
+- Valores numericos com limites (amount > 0, points > 0)
+
+### Sanitizacao
+
+- HTML escapado em templates de email (prevencao XSS)
+- Path sanitization para uploads (prevencao path traversal)
+- CPF validado com algoritmo completo
+
+## 8. Audit Logging
+
+### Eventos Registrados
+
+| Acao                     | Quem registra |
+| ------------------------ | ------------- |
+| `user_login`             | Sistema       |
+| `user_login_failed`      | Sistema       |
+| `member_created`         | Sistema       |
+| `member_updated`         | Admin/Owner   |
+| `member_activated`       | Sistema       |
+| `points_added`           | Seller/Admin  |
+| `points_redeemed`        | Seller/Admin  |
+| `points_expired`         | Cron          |
+| `payment_created`        | Sistema       |
+| `payment_confirmed`      | Webhook       |
+| `contract_signed`        | Membro        |
+| `subscription_created`   | Sistema       |
+| `subscription_cancelled` | Admin/Membro  |
+| `role_changed`           | Admin         |
+
+### Dados do Log
+
+```json
+{
+  "action": "member_activated",
+  "member_id": "uuid",
+  "user_id": "uuid",
+  "details": { "plan": "gold", "payment_id": "uuid" },
+  "timestamp": "2026-04-07T10:00:00Z"
+}
 ```
 
-Exporta para: `gs://clube-geek-toys-backups/YYYYMMDD_HHMMSS`
+- Logs sao imutaveis (INSERT only, sem UPDATE/DELETE)
+- Acessiveis apenas para admins via `GET /logs`
 
-### Restauração
-
-```bash
-gcloud firestore import gs://clube-geek-toys-backups/[backup-name] --project=clube-geek-toys
-```
-
-### Retenção Recomendada
-
-- Backups diários: 7 dias
-- Backups semanais: 4 semanas
-- Backups mensais: 12 meses
-
-## 8. LGPD Compliance
+## 9. Protecao de Dados (LGPD)
 
 ### Dados Coletados
 
 - Nome, email, CPF, telefone (cadastro)
-- Endereço IP, user agent (contratos)
-- Dados de navegação (cookies)
+- Endereco IP, user agent (contratos e logs de auth)
+- Dados de navegacao (Umami Analytics - anonimizado)
 
-### Tempo de Retenção
+### Tempo de Retencao
 
-| Dado              | Período                  |
+| Dado              | Periodo                  |
 | ----------------- | ------------------------ |
-| Cadastro          | 5 anos após cancelamento |
+| Cadastro          | 5 anos apos cancelamento |
 | Pagamentos        | 5 anos (fiscal)          |
 | Contratos         | 10 anos                  |
-| Logs de navegação | 6 meses                  |
+| Logs de auditoria | 2 anos                   |
+| Logs de email     | 1 ano                    |
 
 ### Direitos do Titular
 
-- Acesso, correção, exclusão
-- Portabilidade, revogação
+- Acesso, correcao, exclusao dos dados pessoais
+- Portabilidade, revogacao de consentimento
 - Contato: contato@geeketoys.com.br
 
-## 9. Monitoramento
+### Analytics (Umami)
 
-### Logs Disponíveis
+- Self-hosted (dados nao saem da VPS)
+- Anonimizado por padrao (sem cookies, sem tracking pessoal)
+- Conformidade LGPD/GDPR nativa
 
-- `audit_logs`: Ações críticas de admin
-- `email_logs`: Emails enviados
-- Console Cloudflare: Erros do Worker
-- Firebase Console: Auth e Firestore
+## 10. Gestao de Secrets
 
-### Alertas Recomendados
+### Servidor (server/.env)
 
-1. Falhas de autenticação em massa
-2. Erros de webhook
-3. Rate limit atingido frequentemente
-4. Tentativas de acesso não autorizado
+Arquivo `.env` no servidor com:
 
-## 10. Checklist de Segurança
+- Credenciais PostgreSQL
+- JWT secrets (access + refresh)
+- HMAC secret (webhooks)
+- PagBank token e public key
+- Resend API key
+
+**Regras:**
+
+- `.env` nunca commitado (listado no `.gitignore`)
+- Criado manualmente na VPS
+- Permissoes restritas (`chmod 600`)
+
+### CI/CD (GitHub Secrets)
+
+| Secret        | Uso                        |
+| ------------- | -------------------------- |
+| `VPS_HOST`    | IP do servidor para deploy |
+| `VPS_USER`    | Usuario SSH                |
+| `VPS_SSH_KEY` | Chave privada SSH          |
+
+### Nunca Commitar
+
+- `.env`, `.env.local`, `.env.production`
+- Chaves SSH (`*.pem`, `*.key`)
+- Tokens de acesso
+- Backups do banco de dados
+
+## 11. Backup e Recuperacao
+
+### Backup do PostgreSQL
+
+```bash
+# Backup manual
+docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys > backup.sql
+
+# Backup comprimido
+docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys | gzip > backup.sql.gz
+```
+
+### Restauracao
+
+```bash
+cat backup.sql | docker exec -i clube-geek-postgres psql -U clube_geek clube_geek_toys
+```
+
+### Retencao
+
+- Backups diarios: 7 dias
+- Backups semanais: 4 semanas
+- Backups mensais: 12 meses
+
+## 12. Checklist de Seguranca
 
 ### Deploy
 
-- [ ] Verificar .gitignore inclui .env
-- [ ] Rodar `npm audit` sem vulnerabilidades críticas
+- [ ] Verificar `.gitignore` inclui `.env`
+- [ ] Rodar `npm audit` sem vulnerabilidades criticas
+- [ ] Confirmar firewall (UFW) com apenas portas 22, 80, 443
+- [ ] Verificar certificados SSL validos
 - [ ] Testar rate limiting
-- [ ] Validar CORS em produção
-- [ ] Confirmar webhook secret configurado
+- [ ] Confirmar CORS em producao
+- [ ] Confirmar health check passando
 
-### Manutenção Mensal
+### Manutencao Mensal
 
-- [ ] Revisar dependências com `npm audit`
-- [ ] Verificar logs de auditoria
-- [ ] Confirmar backups funcionando
-- [ ] Revisar acessos de usuários admin
+- [ ] Revisar dependencias com `npm audit`
+- [ ] Verificar logs de auditoria para atividades suspeitas
+- [ ] Confirmar backups automaticos funcionando
+- [ ] Revisar acessos de usuarios admin
+- [ ] Atualizar imagens Docker (`docker compose pull`)
 
 ### Anual
 
-- [ ] Rotacionar secrets
-- [ ] Revisar política de privacidade
-- [ ] Teste de penetração (opcional)
-- [ ] Atualizar documentação
+- [ ] Rotacionar JWT secrets
+- [ ] Rotacionar credenciais PagBank
+- [ ] Revisar politica de privacidade
+- [ ] Atualizar sistema operacional da VPS
+- [ ] Revisar regras de firewall
 
-## 11. Contatos de Emergência
+## 13. Contatos de Emergencia
 
-- **Incidentes de Segurança**: contato@geeketoys.com.br
+- **Incidentes de Seguranca**: contato@geeketoys.com.br
 - **ANPD (Vazamento de Dados)**: www.gov.br/anpd
-- **Firebase Status**: status.firebase.google.com
-- **Cloudflare Status**: www.cloudflarestatus.com
+- **PagBank Status**: status.pagseguro.uol.com.br

@@ -15,8 +15,9 @@ function validateAmount(amount: number) {
   }
   // Cross-check: amount should match one of the plan prices
   const validPrices: number[] = Object.values(PLAN_PRICES).flatMap((p) => [p.monthly, p.annual]);
-  if (!validPrices.includes(amount)) {
-    console.warn(`[PAYMENT] Amount R$${amount} does not match any plan price`);
+  const matchesPrice = validPrices.some((p) => Math.abs(p - amount) < 0.01);
+  if (!matchesPrice) {
+    console.warn(`[PAYMENT] Amount R$${amount.toFixed(2)} does not match any plan price`);
   }
 }
 

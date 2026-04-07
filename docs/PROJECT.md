@@ -1,203 +1,229 @@
-# Clube Geek & Toys - Documentação do Projeto
+# Clube Geek & Toys - Documentacao do Projeto
 
-## Visão Geral
+> **Ultima atualizacao:** 07 de Abril de 2026
 
-Sistema de gestão de clube de assinaturas para a loja Geek & Toys. Permite gerenciar membros, planos de assinatura, pontos de fidelidade e pagamentos.
+## Visao Geral
+
+Sistema de gestao de clube de assinaturas para a loja Geek & Toys. Permite gerenciar membros, planos de assinatura, pontos de fidelidade e pagamentos.
 
 ## Dados da Empresa
 
 | Campo             | Valor                                                  |
 | ----------------- | ------------------------------------------------------ |
-| **Razão Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda |
+| **Razao Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda |
 | **Nome Fantasia** | Geek & Toys                                            |
 | **CNPJ**          | 52.846.344/0001-10                                     |
-| **Endereço**      | Rua Barata Ribeiro, 181, Loja J - Copacabana, RJ       |
+| **Endereco**      | Rua Barata Ribeiro, 181, Loja J - Copacabana, RJ       |
 | **CEP**           | 22.011-001                                             |
-| **Situação**      | ATIVA                                                  |
+| **Situacao**      | ATIVA                                                  |
 
-## Stack Tecnológica
+## Stack Tecnologica
 
 ### Frontend
 
-| Tecnologia      | Versão  | Uso                     |
-| --------------- | ------- | ----------------------- |
-| React           | 19.2.0  | UI Framework            |
-| TypeScript      | 5.9.3   | Tipagem estática        |
-| Vite            | 7.3.1   | Build tool              |
-| TailwindCSS     | 3.4.17  | Estilização             |
-| React Router    | 7.13.1  | Roteamento SPA          |
-| TanStack Query  | 5.90.21 | Cache e estado servidor |
-| React Hook Form | 7.71.2  | Formulários             |
-| Zod             | 4.3.6   | Validação de schemas    |
-| Framer Motion   | 12.34.4 | Animações               |
-| Lucide React    | 0.575.0 | Ícones                  |
-| Sonner          | 2.0.7   | Notificações toast      |
+| Tecnologia      | Uso                     |
+| --------------- | ----------------------- |
+| React 19        | UI Framework            |
+| TypeScript      | Tipagem estatica        |
+| Vite 7          | Build tool              |
+| TailwindCSS 3   | Estilizacao             |
+| React Router 7  | Roteamento SPA          |
+| TanStack Query  | Cache e estado servidor |
+| React Hook Form | Formularios             |
+| Zod             | Validacao de schemas    |
+| Framer Motion   | Animacoes               |
+| Lucide React    | Icones                  |
+| Sonner          | Notificacoes toast      |
 
-### Backend/Serviços
+### Backend
 
-| Serviço            | Uso                         |
-| ------------------ | --------------------------- |
-| Firebase Auth      | Autenticação de usuários    |
-| Firebase Firestore | Banco de dados NoSQL        |
-| Firebase Storage   | Armazenamento de contratos  |
-| Firebase Hosting   | Hosting do frontend         |
-| Cloudflare Workers | API para emails e webhooks  |
-| Mercado Pago       | Processamento de pagamentos |
-| Resend             | Emails transacionais        |
-| Brasil API         | Validação de CPF            |
+| Tecnologia    | Uso                       |
+| ------------- | ------------------------- |
+| Node.js 20    | Runtime                   |
+| Express       | Framework HTTP            |
+| PostgreSQL 16 | Banco de dados relacional |
+| bcrypt        | Hash de senhas            |
+| jsonwebtoken  | Autenticacao JWT          |
+| node-cron     | Tarefas agendadas         |
+| Zod           | Validacao de entrada      |
+| pg            | Driver PostgreSQL         |
+
+### Servicos Externos
+
+| Servico | Uso                       |
+| ------- | ------------------------- |
+| PagBank | Pagamentos (PIX + Cartao) |
+| Resend  | Emails transacionais      |
+
+### Infraestrutura
+
+| Servico          | Uso                       |
+| ---------------- | ------------------------- |
+| VPS Ubuntu 24.04 | Servidor de producao      |
+| Docker           | Containerizacao           |
+| Nginx            | Reverse proxy + SSL + SPA |
+| Let's Encrypt    | Certificados SSL          |
+| Umami            | Analytics (self-hosted)   |
+| GitHub Actions   | CI/CD automatico          |
 
 ## Arquitetura
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        VERCEL                                │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │              React SPA (Vite Build)                  │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │    │
-│  │  │  Admin   │  │  Member  │  │      PDV         │   │    │
-│  │  │  Routes  │  │  Routes  │  │  (Point of Sale) │   │    │
-│  │  └──────────┘  └──────────┘  └──────────────────┘   │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      FIREBASE                                │
-│  ┌─────────────────┐    ┌─────────────────────────────┐     │
-│  │  Authentication │    │         Firestore           │     │
-│  │  - Email/Pass   │    │  - users (roles)            │     │
-│  │  - Sessions     │    │  - members (assinantes)     │     │
-│  └─────────────────┘    │  - payments                 │     │
-│                         │  - point_transactions       │     │
-│                         │  - audit_logs               │     │
-│                         │  - config                   │     │
-│                         └─────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   EXTERNAL SERVICES                          │
-│  ┌─────────────────┐    ┌─────────────────────────────┐     │
-│  │  Mercado Pago   │    │   Cloudflare Workers        │     │
-│  │  - PIX          │    │   - Email API               │     │
-│  │  - Credit Card  │    │   - Payment Webhooks        │     │
-│  └─────────────────┘    └─────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    VPS (Docker)                               │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │                 Nginx (80/443)                          │  │
+│  │  Reverse proxy + SSL + Security headers                │  │
+│  └──────┬──────────┬──────────┬──────────────────────────┘  │
+│         │          │          │                              │
+│    club/admin   api.*    analytics.*                         │
+│      (SPA)                                                   │
+│         │          │          │                              │
+│    ┌────┴───┐ ┌────┴─────┐ ┌─┴──────┐                      │
+│    │ Static │ │ Express  │ │ Umami  │                      │
+│    │ Files  │ │  :3001   │ │ :3000  │                      │
+│    └────────┘ └────┬─────┘ └────┬───┘                      │
+│                    │            │                            │
+│              ┌─────┴──────┐ ┌───┴─────┐                     │
+│              │ PostgreSQL │ │umami-db │                     │
+│              │   :5432    │ │ :5433   │                     │
+│              └────────────┘ └─────────┘                     │
+│                                                              │
+│  ┌──────────┐                                                │
+│  │ Certbot  │ Renovacao SSL automatica                      │
+│  └──────────┘                                                │
+└──────────────────────────────────────────────────────────────┘
+          │                    │
+    ┌─────┴──────┐      ┌─────┴──────┐
+    │  PagBank   │      │   Resend   │
+    │ (webhooks) │      │  (emails)  │
+    └────────────┘      └────────────┘
 ```
 
-## Estrutura de Diretórios
+## Estrutura de Diretorios
 
 ```
 clube-geek-toys/
-├── docs/                    # Documentação
-│   ├── PROJECT.md          # Este arquivo
-│   ├── ARCHITECTURE.md     # Detalhes de arquitetura
-│   └── TODO.md             # Plano de melhorias
+├── server/                      # Backend (roda na VPS)
+│   ├── api/
+│   │   ├── src/
+│   │   │   ├── index.ts         # Entrypoint Express + cron
+│   │   │   ├── config/          # Configuracoes (DB, constantes)
+│   │   │   ├── db/
+│   │   │   │   ├── schema.sql   # Schema PostgreSQL completo
+│   │   │   │   ├── migrations/  # Migrations incrementais
+│   │   │   │   └── seed-admin.ts
+│   │   │   ├── middleware/
+│   │   │   │   ├── auth.ts      # JWT + RBAC
+│   │   │   │   ├── cors.ts      # CORS whitelist
+│   │   │   │   ├── rate-limit.ts
+│   │   │   │   ├── validate.ts  # Zod validation
+│   │   │   │   └── error-handler.ts
+│   │   │   ├── routes/
+│   │   │   │   ├── auth.routes.ts
+│   │   │   │   ├── member.routes.ts
+│   │   │   │   ├── payment.routes.ts
+│   │   │   │   ├── subscription.routes.ts
+│   │   │   │   ├── points.routes.ts
+│   │   │   │   ├── webhook.routes.ts
+│   │   │   │   ├── email.routes.ts
+│   │   │   │   ├── contract.routes.ts
+│   │   │   │   ├── report.routes.ts
+│   │   │   │   ├── log.routes.ts
+│   │   │   │   ├── user.routes.ts
+│   │   │   │   └── health.routes.ts
+│   │   │   ├── services/
+│   │   │   │   ├── auth.service.ts
+│   │   │   │   ├── member.service.ts
+│   │   │   │   ├── payment.service.ts
+│   │   │   │   ├── subscription.service.ts
+│   │   │   │   ├── points.service.ts
+│   │   │   │   ├── webhook.service.ts
+│   │   │   │   ├── email.service.ts
+│   │   │   │   ├── contract.service.ts
+│   │   │   │   ├── report.service.ts
+│   │   │   │   ├── log.service.ts
+│   │   │   │   └── cron.service.ts
+│   │   │   ├── types/
+│   │   │   └── utils/
+│   │   └── Dockerfile
+│   ├── nginx/
+│   │   ├── nginx.conf
+│   │   ├── conf.d/              # Server blocks por dominio
+│   │   └── shared-headers.conf  # Security headers
+│   ├── scripts/
+│   ├── docker-compose.yml       # Producao
+│   ├── docker-compose.dev.yml   # Desenvolvimento
+│   └── .env.example
 │
-├── src/
-│   ├── App.tsx             # Router principal e providers
-│   │
+├── src/                         # Frontend React
+│   ├── App.tsx                  # Router + providers
 │   ├── contexts/
-│   │   └── AuthContext.tsx # Contexto de autenticação (React 19)
-│   │
-│   ├── pages/              # Páginas da aplicação
-│   │   ├── AdminLogin.tsx      # Login administrativo
-│   │   ├── AdminDashboard.tsx  # Painel admin (494kb - precisa split)
-│   │   ├── PDV.tsx             # Ponto de venda
-│   │   ├── Login.tsx           # Login de membros
-│   │   ├── Register.tsx        # Cadastro de membros
-│   │   ├── Subscribe.tsx       # Página de assinatura
-│   │   ├── MemberDashboard.tsx # Área do membro
-│   │   ├── PaymentResult.tsx   # Resultado de pagamento
-│   │   ├── ForgotPassword.tsx  # Recuperação de senha
-│   │   ├── TermsOfUse.tsx      # Termos de uso
-│   │   └── PrivacyPolicy.tsx   # Política de privacidade
-│   │
+│   │   └── AuthContext.tsx      # JWT auth context
+│   ├── pages/
+│   │   ├── Subscribe.tsx        # Landing page
+│   │   ├── Register.tsx         # Cadastro
+│   │   ├── Login.tsx            # Login
+│   │   ├── ForgotPassword.tsx   # Recuperar senha
+│   │   ├── MemberDashboard.tsx  # Area do membro
+│   │   ├── AdminDashboard.tsx   # Painel admin
+│   │   ├── PDV.tsx              # Ponto de venda
+│   │   ├── PaymentResult.tsx    # Resultado pagamento
+│   │   ├── TermsOfUse.tsx       # Termos de uso
+│   │   └── PrivacyPolicy.tsx    # Politica de privacidade
 │   ├── components/
-│   │   ├── ui/                 # Componentes base (shadcn-style)
-│   │   │   ├── button.tsx
-│   │   │   ├── input.tsx
-│   │   │   ├── card.tsx
-│   │   │   ├── badge.tsx
-│   │   │   ├── label.tsx
-│   │   │   ├── loading.tsx
-│   │   │   ├── pagination.tsx
-│   │   │   └── dropdown-menu.tsx
-│   │   │
-│   │   ├── admin/              # Componentes do AdminDashboard (lazy loaded)
-│   │   │   ├── index.ts        # Barrel exports
-│   │   │   ├── MembersTab.tsx  # Aba de membros
-│   │   │   ├── UsersTab.tsx    # Aba de usuários do sistema
-│   │   │   ├── LogsTab.tsx     # Aba de logs de atividade
-│   │   │   ├── ReportsTab.tsx  # Aba de relatórios e gráficos
-│   │   │   └── PointsTab.tsx   # Aba de ranking de pontos
-│   │   │
-│   │   ├── reports/            # Componentes de gráficos (lazy loaded)
-│   │   │   ├── index.ts
-│   │   │   ├── MembersChart.tsx
-│   │   │   ├── RevenueChart.tsx
-│   │   │   ├── PointsChart.tsx
-│   │   │   ├── ChurnMetrics.tsx
-│   │   │   └── ReportFilters.tsx
-│   │   │
-│   │   ├── ErrorBoundary.tsx   # Tratamento de erros
-│   │   ├── MemberModal.tsx     # Modal de membro
-│   │   ├── UserModal.tsx       # Modal de usuário do sistema
-│   │   ├── PaymentModal.tsx    # Modal de pagamento (PIX + Assinatura)
-│   │   ├── PointsModal.tsx     # Modal de pontos
-│   │   ├── MembersTable.tsx    # Tabela de membros
-│   │   ├── QRScanner.tsx       # Scanner QR para PDV
-│   │   ├── CardTokenizationForm.tsx  # Tokenização de cartão (MP SDK)
-│   │   └── SubscriptionManagement.tsx # Gestão de assinatura
-│   │
-│   ├── lib/                    # Utilitários e serviços
-│   │   ├── firebase.ts         # Configuração Firebase
-│   │   ├── db-utils.ts         # CRUD genérico Firestore
-│   │   ├── members.ts          # Operações de membros
-│   │   ├── points.ts           # Sistema de pontos
-│   │   ├── payments.ts         # Processamento de pagamentos (PIX, checkout)
-│   │   ├── subscriptions.ts    # Assinaturas recorrentes (Mercado Pago)
-│   │   ├── reports.ts          # Relatórios e analytics
-│   │   ├── email.ts            # Envio de emails
-│   │   ├── logs.ts             # Audit logs
-│   │   ├── cpf-validation.ts   # Validação de CPF
-│   │   ├── subdomain.ts        # Roteamento por subdomínio
-│   │   └── utils.ts            # Utilitários gerais
-│   │
-│   ├── types/
-│   │   └── index.ts            # Definições de tipos TypeScript
-│   │
-│   └── hooks/                  # Custom hooks (vazio atualmente)
+│   │   ├── ui/                  # Componentes base (shadcn)
+│   │   ├── admin/               # Tabs admin (lazy loaded)
+│   │   │   ├── MembersTab.tsx
+│   │   │   ├── PointsTab.tsx
+│   │   │   ├── UsersTab.tsx
+│   │   │   ├── LogsTab.tsx
+│   │   │   ├── ReportsTab.tsx
+│   │   │   └── SettingsTab.tsx
+│   │   ├── reports/             # Graficos (lazy loaded)
+│   │   ├── PaymentModal.tsx
+│   │   ├── ContractModal.tsx
+│   │   ├── MemberModal.tsx
+│   │   ├── QRScanner.tsx
+│   │   └── SubscriptionManagement.tsx
+│   ├── lib/
+│   │   ├── api-client.ts        # Cliente HTTP (fetch + JWT)
+│   │   ├── members.ts           # CRUD membros
+│   │   ├── payments.ts          # Integracao pagamentos
+│   │   ├── points.ts            # Sistema de pontos
+│   │   ├── subscriptions.ts     # Assinaturas
+│   │   ├── reports.ts           # Relatorios
+│   │   ├── email.ts             # Envio de emails
+│   │   ├── logs.ts              # Audit logs
+│   │   └── utils.ts             # Utilitarios
+│   ├── hooks/                   # Custom hooks
+│   └── types/                   # Tipos TypeScript
 │
-├── public/
-│   └── logo.jpg                # Logo da empresa
+├── .github/workflows/
+│   └── deploy.yml               # CI/CD GitHub Actions
 │
-├── Configuration Files
-│   ├── package.json            # Dependências
-│   ├── tsconfig.json           # TypeScript config
-│   ├── tsconfig.app.json       # TypeScript app config
-│   ├── vite.config.ts          # Vite build config
-│   ├── tailwind.config.js      # Tailwind CSS config
-│   ├── eslint.config.js        # ESLint config
-│   ├── firebase.json           # Firebase hosting/rules
-│   ├── firestore.rules         # Regras de segurança Firestore
-│   ├── firestore.indexes.json  # Índices Firestore
-│   └── .env.example            # Exemplo de variáveis de ambiente
+├── docs/
+│   ├── PROJECT.md               # Este arquivo
+│   ├── ARCHITECTURE.md          # Arquitetura tecnica
+│   ├── SECURITY.md              # Seguranca e LGPD
+│   └── TODO.md                  # Roadmap
 │
-└── vercel.json                 # Configuração Vercel (se existir)
+├── DEPLOY.md                    # Guia de deploy
+└── .env.example                 # Variaveis frontend
 ```
 
 ## Sistema de Roles
 
-### Tipos de Usuário
+### Tipos de Usuario
 
-| Role     | Acesso         | Descrição                           |
+| Role     | Acesso         | Descricao                           |
 | -------- | -------------- | ----------------------------------- |
 | `admin`  | Total          | Administrador do sistema            |
 | `seller` | PDV            | Vendedor - acesso ao ponto de venda |
-| `member` | Área do membro | Assinante do clube                  |
+| `member` | Area do membro | Assinante do clube                  |
 
-### Fluxo de Autenticação
+### Fluxo de Autenticacao
 
 ```
 ┌─────────────────┐
@@ -206,153 +232,184 @@ clube-geek-toys/
          │
          ▼
 ┌─────────────────┐
-│  Firebase Auth  │
-│  signInWithEmail│
+│  POST /auth/    │
+│     login       │
+│  (bcrypt check) │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ onAuthStateChanged │
-│  (useSyncExternalStore) │
+│  Gera JWT:      │
+│  - access (15m) │
+│  - refresh (7d) │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  Fetch Role     │
-│  (onSnapshot)   │
+│  Frontend salva │
+│  tokens         │
+│  AuthContext     │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  Redirect based │
-│  on role        │
-│  - admin → /admin │
-│  - seller → /pdv  │
-│  - member → /membro │
+│  Redirect:      │
+│  admin  → /admin│
+│  seller → /pdv  │
+│  member → /membro│
 └─────────────────┘
 ```
 
-## Modelos de Dados (Firestore)
+## Modelo de Dados (PostgreSQL)
 
-### Collection: `users`
+### Tabela: `users`
 
-```typescript
-{
-  email: string
-  role: 'admin' | 'seller' | 'member'
-  createdAt: string (ISO)
-  createdBy?: 'admin' | 'self'
-}
-```
+| Coluna             | Tipo         | Descricao             |
+| ------------------ | ------------ | --------------------- |
+| id                 | UUID (PK)    | ID unico              |
+| email              | VARCHAR(254) | Email unico           |
+| password_hash      | VARCHAR(255) | Hash bcrypt           |
+| role               | VARCHAR(20)  | member, seller, admin |
+| email_verified     | BOOLEAN      | Email verificado?     |
+| email_verified_at  | TIMESTAMPTZ  | Data de verificacao   |
+| refresh_token_hash | VARCHAR(255) | Hash do refresh token |
+| created_at         | TIMESTAMPTZ  | Data de criacao       |
+| updated_at         | TIMESTAMPTZ  | Ultima atualizacao    |
 
-### Collection: `members`
+### Tabela: `members`
 
-```typescript
-{
-  user_id: string          // Firebase Auth UID
-  full_name: string
-  email: string
-  cpf: string
-  phone?: string
-  plan: 'silver' | 'gold' | 'black'
-  status: 'pending' | 'active' | 'expired' | 'cancelled'
-  payment_type: 'monthly' | 'annual'
-  expiry_date: string      // ISO date
-  points: number
-  created_at: string
-  updated_at: string
-}
-```
+| Coluna              | Tipo         | Descricao                          |
+| ------------------- | ------------ | ---------------------------------- |
+| id                  | UUID (PK)    | ID unico                           |
+| user_id             | UUID (FK)    | Referencia users                   |
+| cpf                 | VARCHAR(11)  | CPF (unico)                        |
+| full_name           | VARCHAR(200) | Nome completo                      |
+| email               | VARCHAR(254) | Email                              |
+| phone               | VARCHAR(20)  | Telefone                           |
+| plan                | VARCHAR(10)  | silver, gold, black                |
+| status              | VARCHAR(20)  | active, pending, inactive, expired |
+| payment_type        | VARCHAR(10)  | monthly, annual                    |
+| start_date          | DATE         | Data de inicio                     |
+| expiry_date         | DATE         | Data de vencimento                 |
+| points              | INTEGER      | Saldo de pontos                    |
+| pending_payment     | JSONB        | Pagamento pendente                 |
+| subscription_id     | TEXT         | ID da assinatura PagBank           |
+| subscription_status | VARCHAR(20)  | Status da assinatura               |
+| auto_renewal        | BOOLEAN      | Renovacao automatica               |
+| created_at          | TIMESTAMPTZ  | Data de criacao                    |
 
-### Collection: `payments`
+### Tabela: `payments`
 
-```typescript
-{
-  member_id: string
-  amount: number
-  method: 'pix' | 'credit_card' | 'boleto'
-  status: 'pending' | 'approved' | 'rejected' | 'refunded'
-  external_id?: string     // Mercado Pago ID
-  pix_qr_code?: string
-  created_at: string
-}
-```
+| Coluna               | Tipo          | Descricao                       |
+| -------------------- | ------------- | ------------------------------- |
+| id                   | UUID (PK)     | ID unico                        |
+| member_id            | UUID (FK)     | Referencia members              |
+| amount               | DECIMAL(10,2) | Valor                           |
+| method               | VARCHAR(20)   | pix, credit_card, boleto, cash  |
+| status               | VARCHAR(20)   | pending, paid, failed, refunded |
+| provider_id          | TEXT          | ID no PagBank                   |
+| provider_status      | TEXT          | Status no PagBank               |
+| reference            | TEXT          | Referencia interna              |
+| paid_at              | TIMESTAMPTZ   | Data do pagamento               |
+| webhook_processed_at | TIMESTAMPTZ   | Quando webhook processou        |
+| created_at           | TIMESTAMPTZ   | Data de criacao                 |
 
-### Collection: `subscriptions`
+### Tabela: `point_transactions`
 
-```typescript
-{
-  id: string                    // = Mercado Pago preapproval_id
-  member_id: string
-  mercado_pago_id: string
-  status: 'pending' | 'authorized' | 'paused' | 'cancelled'
-  plan: 'silver' | 'gold' | 'black'
-  frequency_type: 'months' | 'years'
-  transaction_amount: number
-  next_payment_date?: string
-  last_payment_date?: string
-  failed_payments: number       // Contador (max 3 antes de cancelar)
-  card_last_four?: string
-  card_brand?: string
-  payer_email: string
-  created_at: string
-  cancelled_at?: string
-  paused_at?: string
-}
-```
+| Coluna         | Tipo          | Descricao                   |
+| -------------- | ------------- | --------------------------- |
+| id             | UUID (PK)     | ID unico                    |
+| member_id      | UUID (FK)     | Referencia members          |
+| type           | VARCHAR(10)   | earn, redeem, expire, bonus |
+| points         | INTEGER       | Quantidade de pontos        |
+| balance        | INTEGER       | Saldo apos transacao        |
+| description    | TEXT          | Descricao                   |
+| purchase_value | DECIMAL(10,2) | Valor da compra (se earn)   |
+| expires_at     | DATE          | Data de expiracao           |
+| expired        | BOOLEAN       | Ja expirou?                 |
+| created_by     | UUID (FK)     | Quem adicionou              |
+| created_at     | TIMESTAMPTZ   | Data da transacao           |
 
-### Collection: `subscription_payments`
+### Tabela: `subscriptions`
 
-```typescript
-{
-  subscription_id: string
-  member_id: string
-  amount: number
-  status: 'approved' | 'rejected' | 'pending'
-  payment_date: string
-  mercado_pago_payment_id?: string
-  failure_reason?: string
-}
-```
+| Coluna             | Tipo          | Descricao                              |
+| ------------------ | ------------- | -------------------------------------- |
+| id                 | TEXT (PK)     | ID do PagBank (preapproval)            |
+| member_id          | UUID (FK)     | Referencia members                     |
+| provider_id        | TEXT          | ID no PagBank                          |
+| status             | VARCHAR(20)   | pending, authorized, paused, cancelled |
+| plan               | VARCHAR(10)   | silver, gold, black                    |
+| frequency_type     | VARCHAR(10)   | months, years                          |
+| transaction_amount | DECIMAL(10,2) | Valor da cobranca                      |
+| next_payment_date  | TIMESTAMPTZ   | Proxima cobranca                       |
+| last_payment_date  | TIMESTAMPTZ   | Ultima cobranca                        |
+| failed_payments    | INTEGER       | Falhas consecutivas (max 3)            |
+| card_last_four     | VARCHAR(4)    | Ultimos 4 digitos                      |
+| card_brand         | VARCHAR(50)   | Bandeira do cartao                     |
+| payer_email        | VARCHAR(254)  | Email do pagador                       |
+| created_at         | TIMESTAMPTZ   | Data de criacao                        |
 
-### Collection: `point_transactions`
+### Tabela: `contracts`
 
-```typescript
-{
-  member_id: string
-  type: 'earn' | 'redeem' | 'expire'
-  points: number
-  balance_after: number
-  description: string
-  purchase_amount?: number
-  created_by?: string
-  is_manual?: boolean
-  created_at: string
-}
-```
+| Coluna            | Tipo         | Descricao                     |
+| ----------------- | ------------ | ----------------------------- |
+| id                | TEXT (PK)    | ID do contrato                |
+| member_id         | UUID (FK)    | Referencia members            |
+| member_name       | VARCHAR(200) | Nome no momento da assinatura |
+| member_cpf        | VARCHAR(11)  | CPF                           |
+| member_email      | VARCHAR(254) | Email                         |
+| plan              | VARCHAR(10)  | Plano                         |
+| signature_preview | TEXT         | Preview da assinatura         |
+| signed_at         | TIMESTAMPTZ  | Data da assinatura            |
+| ip_address        | VARCHAR(45)  | IP do signatario              |
+| user_agent        | TEXT         | User agent do navegador       |
+| document_hash     | VARCHAR(64)  | Hash SHA-256 do documento     |
+| pdf_url           | TEXT         | URL do PDF                    |
+| status            | VARCHAR(20)  | active, superseded            |
 
-### Collection: `audit_logs`
+### Tabela: `audit_logs`
 
-```typescript
-{
-  action: string
-  entity_type: string
-  entity_id: string
-  user_id: string
-  details?: object
-  created_at: string
-}
-```
+| Coluna    | Tipo         | Descricao            |
+| --------- | ------------ | -------------------- |
+| id        | UUID (PK)    | ID unico             |
+| action    | VARCHAR(100) | Acao realizada       |
+| member_id | UUID (FK)    | Membro afetado       |
+| user_id   | UUID (FK)    | Usuario que realizou |
+| details   | JSONB        | Detalhes adicionais  |
+| timestamp | TIMESTAMPTZ  | Data/hora            |
+
+### Tabela: `email_logs`
+
+| Coluna        | Tipo         | Descricao                    |
+| ------------- | ------------ | ---------------------------- |
+| id            | UUID (PK)    | ID unico                     |
+| member_id     | UUID (FK)    | Membro destinatario          |
+| template      | VARCHAR(50)  | Nome do template             |
+| recipient     | VARCHAR(254) | Email destinatario           |
+| status        | VARCHAR(20)  | sent, failed                 |
+| resend_id     | TEXT         | ID no Resend                 |
+| error_message | TEXT         | Mensagem de erro (se falhou) |
+| sent_at       | TIMESTAMPTZ  | Data de envio                |
+
+### Tabela: `processed_webhooks`
+
+| Coluna       | Tipo        | Descricao                   |
+| ------------ | ----------- | --------------------------- |
+| webhook_key  | TEXT (PK)   | Chave unica de idempotencia |
+| type         | TEXT        | Tipo do webhook             |
+| action       | TEXT        | Acao do webhook             |
+| data_id      | TEXT        | ID do recurso               |
+| processed_at | TIMESTAMPTZ | Data de processamento       |
 
 ## Planos de Assinatura
 
-| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Serviços | Multiplicador Pontos |
+| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Servicos | Multiplicador Pontos |
 | ------ | -------- | --------- | -------------- | -------------- | -------------------- |
 | Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x                   |
 | Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                   |
 | Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x                   |
 
-### Cálculo de Pontos
+### Calculo de Pontos
 
 ```
 pontos = valor_compra * multiplicador_plano
@@ -360,118 +417,177 @@ pontos = valor_compra * multiplicador_plano
 
 Exemplo: Compra de R$ 100,00 no plano Gold = 200 pontos
 
-## Segurança
+## Endpoints da API
 
-### Firestore Rules
+**Base URL:** `https://api.geeketoys.com.br`
 
-- Default deny para todas as collections
-- Leitura de `users`: próprio usuário ou admin
-- Criação de `users`: self-registration (role=member) ou admin
-- Membros não podem alterar: cpf, plan, status, points
-- Sellers só podem alterar: points (via PDV)
-- Transactions e logs são imutáveis
+### Autenticacao
 
-### Headers de Segurança (firebase.json)
+| Metodo | Endpoint                        | Descricao                   | Auth    |
+| ------ | ------------------------------- | --------------------------- | ------- |
+| POST   | `/auth/register`                | Cadastro de novo usuario    | Publico |
+| POST   | `/auth/login`                   | Login                       | Publico |
+| POST   | `/auth/refresh`                 | Renovar access token        | Refresh |
+| POST   | `/auth/logout`                  | Logout (invalida refresh)   | JWT     |
+| POST   | `/auth/send-verification-email` | Envia email de verificacao  | JWT     |
+| POST   | `/auth/verify-email`            | Valida token de verificacao | Publico |
+| POST   | `/auth/send-password-reset`     | Envia email reset de senha  | Publico |
 
-- X-Content-Type-Options: nosniff
-- X-Frame-Options: DENY
-- X-XSS-Protection: 1; mode=block
-- Strict-Transport-Security: max-age=31536000
-- Content-Security-Policy: (configurado para Firebase/MercadoPago)
+### Membros
 
-## Variáveis de Ambiente
+| Metodo | Endpoint       | Descricao        | Auth               |
+| ------ | -------------- | ---------------- | ------------------ |
+| GET    | `/members`     | Listar membros   | admin              |
+| GET    | `/members/:id` | Buscar membro    | admin/seller/owner |
+| POST   | `/members`     | Criar membro     | JWT                |
+| PUT    | `/members/:id` | Atualizar membro | admin/owner        |
+| DELETE | `/members/:id` | Remover membro   | admin              |
+
+### Pagamentos
+
+| Metodo | Endpoint                   | Descricao                    | Auth |
+| ------ | -------------------------- | ---------------------------- | ---- |
+| POST   | `/payment/pix/create`      | Gera QR Code PIX             | JWT  |
+| POST   | `/payment/checkout/create` | Cria pagamento cartao        | JWT  |
+| GET    | `/payment/status/:id`      | Verifica status de pagamento | JWT  |
+
+### Assinaturas
+
+| Metodo | Endpoint                        | Descricao              | Auth |
+| ------ | ------------------------------- | ---------------------- | ---- |
+| POST   | `/subscription/create`          | Cria assinatura        | JWT  |
+| GET    | `/subscription/:id`             | Detalhes da assinatura | JWT  |
+| PUT    | `/subscription/:id/pause`       | Pausa assinatura       | JWT  |
+| PUT    | `/subscription/:id/resume`      | Reativa assinatura     | JWT  |
+| PUT    | `/subscription/:id/cancel`      | Cancela assinatura     | JWT  |
+| PUT    | `/subscription/:id/update-card` | Atualiza cartao        | JWT  |
+
+### Pontos
+
+| Metodo | Endpoint            | Descricao           | Auth               |
+| ------ | ------------------- | ------------------- | ------------------ |
+| POST   | `/points/add`       | Adicionar pontos    | admin/seller       |
+| POST   | `/points/redeem`    | Resgatar pontos     | admin/seller       |
+| GET    | `/points/:memberId` | Historico de pontos | admin/seller/owner |
+
+### Webhooks
+
+| Metodo | Endpoint           | Descricao                 | Auth |
+| ------ | ------------------ | ------------------------- | ---- |
+| POST   | `/webhook/pagbank` | Processa webhooks PagBank | HMAC |
+
+### Email
+
+| Metodo | Endpoint      | Descricao              | Auth |
+| ------ | ------------- | ---------------------- | ---- |
+| POST   | `/email/send` | Envia email (template) | JWT  |
+
+### Contratos
+
+| Metodo | Endpoint              | Descricao                 | Auth |
+| ------ | --------------------- | ------------------------- | ---- |
+| POST   | `/contract/create`    | Criar contrato digital    | JWT  |
+| GET    | `/contract/:memberId` | Buscar contrato do membro | JWT  |
+
+### Relatorios
+
+| Metodo | Endpoint           | Descricao        | Auth  |
+| ------ | ------------------ | ---------------- | ----- |
+| GET    | `/reports/daily`   | Relatorio diario | admin |
+| GET    | `/reports/monthly` | Relatorio mensal | admin |
+
+### Usuarios (Admin)
+
+| Metodo | Endpoint          | Descricao       | Auth  |
+| ------ | ----------------- | --------------- | ----- |
+| GET    | `/users`          | Listar usuarios | admin |
+| PUT    | `/users/:id/role` | Alterar role    | admin |
+
+### Logs
+
+| Metodo | Endpoint | Descricao         | Auth  |
+| ------ | -------- | ----------------- | ----- |
+| GET    | `/logs`  | Listar audit logs | admin |
+
+### Health
+
+| Metodo | Endpoint  | Descricao             | Auth    |
+| ------ | --------- | --------------------- | ------- |
+| GET    | `/health` | Status da API + banco | Publico |
+
+## Templates de Email
+
+| Template                      | Quando enviado               |
+| ----------------------------- | ---------------------------- |
+| `welcome`                     | Apos ativacao do membro      |
+| `payment-confirmed`           | Pagamento aprovado           |
+| `payment-failed`              | Pagamento rejeitado          |
+| `renewal-reminder`            | 7 dias antes do vencimento   |
+| `points-expiring`             | Pontos proximos da expiracao |
+| `subscription-created`        | Assinatura recorrente criada |
+| `subscription-payment`        | Cobranca recorrente aprovada |
+| `subscription-paused`         | Assinatura pausada           |
+| `subscription-cancelled`      | Assinatura cancelada         |
+| `subscription-payment-failed` | Cobranca recorrente falhou   |
+| `verify-email`                | Verificacao de email         |
+| `password-reset`              | Recuperacao de senha         |
+
+## Subdominios
+
+| Subdominio                   | Interface      | Roles Permitidos |
+| ---------------------------- | -------------- | ---------------- |
+| `club.geeketoys.com.br`      | Area do Membro | member           |
+| `admin.geeketoys.com.br`     | Painel Admin   | admin, seller    |
+| `adm.geeketoys.com.br`       | Painel Admin   | admin, seller    |
+| `api.geeketoys.com.br`       | API Express    | -                |
+| `analytics.geeketoys.com.br` | Umami          | -                |
+
+Em desenvolvimento, use `?subdomain=adm` para simular o admin.
+
+## Variaveis de Ambiente
+
+### Frontend (.env)
 
 ```env
-# Firebase
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-
-# Mercado Pago
-VITE_MERCADOPAGO_PUBLIC_KEY=
-VITE_PAYMENT_API_URL=
-
-# PIX
-VITE_PIX_KEY=
-
-# API
-VITE_API_URL=
-
-# Environment
-VITE_ENVIRONMENT=development|production
+VITE_API_URL=https://api.geeketoys.com.br
+VITE_PAGBANK_PUBLIC_KEY=<chave_publica_PagBank>
+VITE_PIX_KEY=<chave_PIX>
+VITE_ENVIRONMENT=production
 ```
 
-## Scripts Disponíveis
+### Backend (server/.env)
+
+```env
+POSTGRES_USER=clube_geek
+POSTGRES_PASSWORD=<senha>
+POSTGRES_DB=clube_geek_toys
+JWT_SECRET=<secret>
+JWT_REFRESH_SECRET=<secret>
+HMAC_SECRET=<secret>
+PAGBANK_TOKEN=<token>
+PAGBANK_PUBLIC_KEY=<key>
+RESEND_API_KEY=<key>
+FROM_EMAIL=Clube Geek & Toys <contato@geeketoys.com.br>
+ADMIN_EMAIL=admin@geeketoys.com.br
+FRONTEND_URL=https://club.geeketoys.com.br
+API_URL=https://api.geeketoys.com.br
+```
+
+## Scripts Disponiveis
 
 ```bash
-npm run dev          # Desenvolvimento local
-npm run build        # Build de produção
-npm run preview      # Preview do build
-npm run lint         # Verificar código
-npm run setup        # Configurar projeto
-npm run deploy:firebase  # Deploy regras Firebase
+# Frontend
+npm run dev              # Desenvolvimento local
+npm run build            # Build de producao
+npm run preview          # Preview do build
+npm run lint             # Verificar codigo
+npm run test             # Rodar testes
+npm run test:coverage    # Cobertura de testes
+
+# Backend (Docker)
+cd server
+docker compose up -d             # Subir todos os servicos
+docker compose down              # Parar servicos
+docker compose logs -f api       # Logs da API
+docker compose build --no-cache api  # Rebuild API
 ```
-
-## Subdomínios
-
-O sistema detecta automaticamente o subdomínio para mostrar interfaces diferentes:
-
-| Subdomínio           | Interface      | Roles Permitidos |
-| -------------------- | -------------- | ---------------- |
-| `admin.*` ou `adm.*` | Painel Admin   | admin, seller    |
-| `club.*` ou outros   | Área do Membro | member           |
-
-Em desenvolvimento, use `?subdomain=adm` para simular.
-
-## Integrações Externas
-
-### Mercado Pago
-
-- SDK: `@mercadopago/sdk-react`
-- Métodos: PIX, Cartão de Crédito
-- Webhooks processados via Cloudflare Workers
-
-### Brasil API
-
-- Validação de CPF
-- Endpoint: `https://brasilapi.com.br/api/cpf/v1/{cpf}`
-
-### Cloudflare Workers (api-worker)
-
-**URL:** `https://api-worker.leoschlanger.workers.dev`
-
-| Endpoint                        | Método | Descrição                     |
-| ------------------------------- | ------ | ----------------------------- |
-| `/health`                       | GET    | Health check                  |
-| `/pix/create`                   | POST   | Gera QR Code PIX              |
-| `/checkout/create`              | POST   | Cria preferência de checkout  |
-| `/payment/status/:id`           | GET    | Verifica status de pagamento  |
-| `/subscription/create`          | POST   | Cria assinatura recorrente    |
-| `/subscription/:id`             | GET    | Detalhes da assinatura        |
-| `/subscription/:id/pause`       | PUT    | Pausa assinatura              |
-| `/subscription/:id/resume`      | PUT    | Reativa assinatura            |
-| `/subscription/:id/cancel`      | PUT    | Cancela assinatura            |
-| `/subscription/:id/update-card` | PUT    | Atualiza cartão               |
-| `/webhook/mercadopago`          | POST   | Processa webhooks do MP       |
-| `/email/send`                   | POST   | Envia emails (Resend)         |
-| `/auth/send-verification-email` | POST   | Envia email de verificação    |
-| `/auth/verify-email`            | POST   | Valida token de verificação   |
-| `/auth/send-password-reset`     | POST   | Envia email de reset de senha |
-
-**Webhooks Processados:**
-
-- `payment` - Pagamentos PIX/cartão únicos
-- `subscription_preapproval` - Status da assinatura
-- `subscription_authorized_payment` - Cobranças recorrentes
-
-**Templates de Email (12):**
-
-- welcome, payment-confirmed, payment-failed
-- renewal-reminder, points-expiring
-- subscription-created, subscription-payment
-- subscription-paused, subscription-cancelled
-- subscription-payment-failed
-- verify-email, password-reset

@@ -1,717 +1,420 @@
-# Arquitetura Técnica - Clube Geek & Toys
+# Arquitetura Tecnica - Clube Geek & Toys
 
-## Padrões de Projeto Utilizados
+> **Ultima atualizacao:** 07 de Abril de 2026
 
-### 1. Context API com External Store (React 19)
+## Visao Geral do Sistema
 
-O AuthContext utiliza `useSyncExternalStore` para sincronização com Firebase Auth:
-
-```typescript
-// Padrão: External Store
-function createAuthStore(firebaseAuth: Auth) {
-  let currentUser: User | null = null;
-  const listeners = new Set<() => void>();
-
-  // Subscribe ao Firebase
-  onAuthStateChanged(firebaseAuth, (user) => {
-    currentUser = user;
-    listeners.forEach((listener) => listener());
-  });
-
-  return {
-    subscribe: (listener) => {
-      /* ... */
-    },
-    getSnapshot: () => ({ user: currentUser, isInitialized }),
-    getServerSnapshot: () => ({ user: null, isInitialized: false }),
-  };
-}
-
-// Uso no componente
-function useFirebaseAuth() {
-  return useSyncExternalStore(
-    authStore.subscribe,
-    authStore.getSnapshot,
-    authStore.getServerSnapshot,
-  );
-}
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                         VPS (76.13.114.173)                          │
+│                         Ubuntu 24.04 + Docker                        │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │                     Nginx (porta 80/443)                       │  │
+│  │  SSL termination (Let's Encrypt) + Reverse Proxy               │  │
+│  │  Security headers (HSTS, X-Frame DENY, nosniff, etc.)         │  │
+│  └──────┬──────────┬──────────┬──────────┬───────────────────────┘  │
+│         │          │          │          │                            │
+│    club.*     api.*     adm.*     analytics.*                        │
+│    admin.*                                                           │
+│         │          │                    │                            │
+│    ┌────┴───┐ ┌────┴─────┐        ┌────┴────┐                      │
+│    │  SPA   │ │ Express  │        │  Umami  │                      │
+│    │ (dist/)│ │  :3001   │        │ :3000   │                      │
+│    └────────┘ └────┬─────┘        └────┬────┘                      │
+│                    │                   │                            │
+│              ┌─────┴──────┐     ┌──────┴────┐                      │
+│              │ PostgreSQL │     │ umami-db  │                      │
+│              │   :5432    │     │  :5433    │                      │
+│              └────────────┘     └───────────┘                      │
+│                                                                      │
+│  ┌──────────┐                                                        │
+│  │ Certbot  │  Auto-renovacao SSL                                   │
+│  └──────────┘                                                        │
+└──────────────────────────────────────────────────────────────────────┘
+                    │                    │
+              ┌─────┴──────┐      ┌─────┴──────┐
+              │  PagBank   │      │   Resend   │
+              │ (webhooks) │      │  (emails)  │
+              └────────────┘      └────────────┘
 ```
 
-**Por que este padrão?**
+## Frontend (React SPA)
 
-- React 19 concurrent mode compatibility
-- Evita tearing (inconsistência de estado)
-- Performance otimizada para re-renders
+### Stack
 
-### 2. Repository Pattern (Firestore)
+- **React 19** + TypeScript + Vite 7
+- **Tailwind CSS 3** + shadcn/ui
+- **React Router 7** (SPA com subdomain routing)
+- **TanStack Query** (cache e estado servidor)
+- **React Hook Form** + Zod (formularios e validacao)
 
-Abstração de acesso a dados via `FirestoreManager`:
+### Roteamento por Subdominio
 
-```typescript
-// src/lib/db-utils.ts
-class FirestoreManager {
-  static async getById<T>(collection, id, mapper): Promise<T | null>;
-  static async findMany<T>(collection, constraints, mapper): Promise<T[]>;
-  static async save<T>(collection, id, data): Promise<string | null>;
-  static async update<T>(collection, id, data): Promise<boolean>;
-}
+O frontend detecta o subdominio para exibir interfaces diferentes:
 
-// Uso específico
-// src/lib/members.ts
-export async function getMemberById(id: string): Promise<Member | null> {
-  return FirestoreManager.getById(COLLECTION, id, memberMapper);
-}
-```
+| Subdominio           | Interface      | Roles Permitidos |
+| -------------------- | -------------- | ---------------- |
+| `admin.*` ou `adm.*` | Painel Admin   | admin, seller    |
+| `club.*` ou outros   | Area do Membro | member           |
 
-**Benefícios:**
+### Padroes Utilizados
 
-- Centraliza lógica de acesso a dados
-- Facilita testes com mocks
-- Padroniza tratamento de erros
-
-### 3. Mapper Pattern (DTO Transformation)
-
-Conversão entre formatos de dados:
-
-```typescript
-// snake_case (Firestore) <-> camelCase (TypeScript)
-const memberMapper = (id: string, data: DocumentData): Member => ({
-  id,
-  ...MapperUtils.toCamel(data),
-});
-
-// Inverso para escrita
-const firestoreData = MapperUtils.toSnake(memberData);
-```
-
-### 4. Protected Route Pattern
-
-Componentes HOC para controle de acesso:
+**Protected Route Pattern:**
 
 ```typescript
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, role, loading } = useAuth()
-
   if (loading) return <LoadingPage />
   if (!user) return <Navigate to="/login" />
-  if (role === null) return <RoleError />
   if (!allowedRoles.includes(role)) return <Navigate to="/acesso-negado" />
-
   return <>{children}</>
 }
-
-// Uso
-<Route path="/admin" element={
-  <ProtectedRoute allowedRoles={['admin']}>
-    <AdminDashboard />
-  </ProtectedRoute>
-} />
 ```
 
-### 5. Lazy Loading com Suspense
-
-Code splitting por rota:
+**Lazy Loading com Suspense:**
 
 ```typescript
-// Lazy load de páginas
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 
-// Provider com Suspense
 <Suspense fallback={<LoadingPage />}>
   <AppRoutes />
 </Suspense>
 ```
 
-### 6. Custom Hooks Pattern
+**Custom Hooks Pattern:**
 
-Hooks encapsulam lógica de negócio:
+- `useMembers()` - operacoes de membros via API
+- `usePoints()` - sistema de pontos
+- `useRealtimeStats()` - metricas em tempo real
 
-```typescript
-// src/hooks/useMembers.ts
-export function useMembers(options = {}) {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(false);
+### Code Splitting
 
-  const fetchMembers = useCallback(async () => {
-    setLoading(true);
-    const data = await getAllMembers();
-    setMembers(data);
-    setLoading(false);
-  }, []);
+- Lazy load por rota e por componente
+- Admin tabs carregadas sob demanda (MembersTab, PointsTab, ReportsTab, etc.)
+- Vendor chunks separados (charts, forms, qr, etc.)
+- PWA com service worker (workbox)
 
-  return { members, loading, refetch: fetchMembers };
-}
+## Backend (Express API)
 
-// src/hooks/usePoints.ts
-export function usePoints() {
-  const addPoints = useCallback(async (memberId, value) => {
-    return withRetry(() => addPointsApi(memberId, value));
-  }, []);
+### Stack
 
-  return { addPoints, redeemPoints, getBalance };
-}
+- **Node.js 20** + Express + TypeScript
+- **PostgreSQL 16** (via pg/node-postgres)
+- **Zod** (validacao de entrada em todos os endpoints)
+- **bcrypt** (hash de senhas, 12 rounds)
+- **jsonwebtoken** (JWT access + refresh tokens)
+- **node-cron** (tarefas agendadas)
+
+### Estrutura de Diretorio
+
+```
+server/api/src/
+├── index.ts              # Entrypoint, Express app + cron setup
+├── config/               # Configuracoes (DB pool, constantes)
+├── db/
+│   ├── schema.sql        # Schema completo PostgreSQL
+│   ├── migrations/       # Migrations incrementais
+│   └── seed-admin.ts     # Seed do primeiro admin
+├── middleware/
+│   ├── auth.ts           # JWT verification + RBAC
+│   ├── cors.ts           # CORS whitelist
+│   ├── rate-limit.ts     # Rate limiting por endpoint
+│   ├── validate.ts       # Validacao Zod
+│   └── error-handler.ts  # Error handler global
+├── routes/
+│   ├── auth.routes.ts        # Login, registro, refresh, verify-email
+│   ├── member.routes.ts      # CRUD membros
+│   ├── payment.routes.ts     # PIX, checkout, status
+│   ├── subscription.routes.ts # Assinaturas recorrentes
+│   ├── points.routes.ts      # Pontos (add, redeem, expire)
+│   ├── webhook.routes.ts     # Webhooks PagBank
+│   ├── email.routes.ts       # Envio de emails
+│   ├── contract.routes.ts    # Contratos digitais
+│   ├── report.routes.ts      # Relatorios e metricas
+│   ├── log.routes.ts         # Audit logs
+│   ├── user.routes.ts        # Gestao de usuarios (admin)
+│   └── health.routes.ts      # Health check
+├── services/
+│   ├── auth.service.ts       # Login, hash, JWT, refresh
+│   ├── member.service.ts     # Logica de membros
+│   ├── payment.service.ts    # Integracao PagBank
+│   ├── subscription.service.ts
+│   ├── points.service.ts     # Calculo e expiracao de pontos
+│   ├── webhook.service.ts    # Processamento de webhooks
+│   ├── email.service.ts      # Templates + Resend API
+│   ├── contract.service.ts
+│   ├── report.service.ts     # Queries de relatorios
+│   ├── log.service.ts        # Audit logging
+│   └── cron.service.ts       # Tarefas agendadas
+├── types/                # Tipos TypeScript
+└── utils/                # Utilitarios
 ```
 
-**Benefícios:**
+### Middleware Pipeline
 
-- Separa lógica de estado dos componentes
-- Reutilizável entre diferentes views
-- Facilita testes unitários
-
-### 7. Retry Pattern com Exponential Backoff
-
-```typescript
-// src/lib/retry.ts
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: { maxRetries?: number; initialDelay?: number } = {},
-): Promise<T> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (!shouldRetry(error) || attempt === maxRetries - 1) throw error;
-      await sleep(initialDelay * Math.pow(2, attempt));
-    }
-  }
-}
-
-// Uso
-const id = await withRetry(
-  () => FirestoreManager.save(COLLECTION, null, data),
-  { maxRetries: 3 },
-);
+```
+Request
+  → CORS check
+  → Rate limiting
+  → JWT verification (rotas protegidas)
+  → Role check (RBAC)
+  → Zod validation (body/params/query)
+  → Route handler
+  → Error handler (global)
+Response
 ```
 
-## Fluxo de Dados
+## Banco de Dados (PostgreSQL 16)
 
-### Autenticação
+### Tabelas
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
+│    users     │     │   members    │     │    payments      │
+├──────────────┤     ├──────────────┤     ├──────────────────┤
+│ id (UUID PK) │◄────│ user_id (FK) │     │ member_id (FK)   │
+│ email        │     │ cpf          │     │ amount           │
+│ password_hash│     │ full_name    │     │ method           │
+│ role         │     │ plan         │     │ status           │
+│ email_verified│    │ status       │     │ provider_id      │
+│ refresh_token│     │ payment_type │     │ paid_at          │
+│ created_at   │     │ expiry_date  │     │ created_at       │
+└──────────────┘     │ points       │     └──────────────────┘
+                     │ subscription_id│
+                     └───────┬──────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+   ┌──────────┴───┐ ┌───────┴──────┐ ┌────┴──────────┐
+   │point_transact│ │ subscriptions│ │   contracts   │
+   ├──────────────┤ ├──────────────┤ ├───────────────┤
+   │ member_id FK │ │ member_id FK │ │ member_id FK  │
+   │ type         │ │ provider_id  │ │ member_name   │
+   │ points       │ │ status       │ │ signature     │
+   │ balance      │ │ plan         │ │ document_hash │
+   │ expires_at   │ │ frequency    │ │ pdf_url       │
+   │ created_at   │ │ amount       │ │ signed_at     │
+   └──────────────┘ │ failed_pays  │ └───────────────┘
+                     └──────┬──────┘
+                            │
+                  ┌─────────┴──────────┐
+                  │subscription_payments│
+                  ├────────────────────┤
+                  │ subscription_id FK │
+                  │ member_id FK       │
+                  │ amount             │
+                  │ status             │
+                  │ payment_date       │
+                  └────────────────────┘
+
+┌──────────────┐  ┌──────────────┐  ┌───────────────────┐
+│  audit_logs  │  │  email_logs  │  │processed_webhooks │
+├──────────────┤  ├──────────────┤  ├───────────────────┤
+│ action       │  │ template     │  │ webhook_key (PK)  │
+│ member_id FK │  │ recipient    │  │ type              │
+│ user_id FK   │  │ status       │  │ action            │
+│ details JSONB│  │ resend_id    │  │ processed_at      │
+│ timestamp    │  │ sent_at      │  └───────────────────┘
+└──────────────┘  └──────────────┘
+```
+
+### Recursos do PostgreSQL
+
+- **UUID** como primary keys (uuid-ossp extension)
+- **CHECK constraints** em campos enum (role, status, plan, method)
+- **Foreign keys** com ON DELETE CASCADE/SET NULL
+- **Indexes** otimizados para queries frequentes
+- **Triggers** para auto-update de `updated_at`
+- **JSONB** para dados flexiveis (details, pending_payment)
+- **Parametrized queries** em todos os acessos (prevencao de SQL injection)
+
+## Fluxo de Autenticacao (JWT)
 
 ```
 ┌──────────┐    ┌──────────────┐    ┌─────────────┐
-│  Login   │───▶│ Firebase Auth │───▶│ AuthContext │
-│  Form    │    │ signInWithEmail│   │ (setState)  │
+│  Login   │───▶│  POST /auth  │───▶│   Valida    │
+│  Form    │    │  /login      │    │  bcrypt     │
+└──────────┘    └──────────────┘    └──────┬──────┘
+                                           │
+                      ┌────────────────────┘
+                      ▼
+              ┌──────────────┐
+              │ Gera tokens: │
+              │ - access (15min) │
+              │ - refresh (7d)   │
+              └──────┬──────┘
+                     │
+              ┌──────┴──────┐
+              │  Response:  │
+              │  tokens +   │
+              │  user data  │
+              └──────┬──────┘
+                     │
+    ┌────────────────┴────────────────┐
+    │                                 │
+    ▼                                 ▼
+┌──────────┐                  ┌──────────────┐
+│ Frontend │  (token expirou) │ POST /auth   │
+│ guarda   │─────────────────▶│ /refresh     │
+│ tokens   │                  │ (refresh tok)│
+└──────────┘                  └──────┬───────┘
+                                     │
+                              ┌──────┴──────┐
+                              │ Novo access │
+                              │ token (15m) │
+                              └─────────────┘
+```
+
+### Detalhes
+
+- **Access token**: JWT com payload `{ userId, email, role }`, expira em 15 minutos
+- **Refresh token**: JWT separado, expira em 7 dias, hash armazenado no banco
+- **bcrypt**: 12 rounds para hash de senhas
+- **RBAC**: Middleware verifica `role` do token antes de permitir acesso
+
+## Fluxo de Pagamento (PagBank)
+
+### PIX
+
+```
+┌──────────┐    ┌──────────────┐    ┌─────────────┐
+│ Checkout │───▶│  POST /payment│──▶│  PagBank    │
+│  Modal   │    │  /pix/create │    │  API        │
 └──────────┘    └──────────────┘    └──────┬──────┘
                                            │
                       ┌────────────────────┘
                       ▼
               ┌──────────────┐    ┌─────────────┐
-              │  Firestore   │───▶│ Role State  │
-              │ users/{uid}  │    │ (onSnapshot)│
-              └──────────────┘    └──────┬──────┘
-                                         │
-                    ┌────────────────────┘
-                    ▼
-            ┌──────────────┐
-            │   Redirect   │
-            │  based on    │
-            │    role      │
-            └──────────────┘
-```
-
-### Pagamento PIX
-
-```
-┌──────────┐    ┌──────────────┐    ┌─────────────┐
-│ Checkout │───▶│ createPixPayment│─▶│ Firestore  │
-│  Modal   │    │ (payments.ts)│   │ payments/  │
-└──────────┘    └──────────────┘    └──────┬──────┘
-                                           │
-                      ┌────────────────────┘
-                      ▼
-              ┌──────────────┐    ┌─────────────┐
-              │  Display QR  │───▶│ Poll Status │
-              │   Code       │    │ (interval)  │
+              │  QR Code +   │───▶│ Poll status │
+              │  Copia/Cola  │    │ (interval)  │
               └──────────────┘    └──────┬──────┘
                                          │
                     ┌────────────────────┘
                     ▼
             ┌──────────────┐    ┌─────────────┐
-            │   Webhook    │───▶│ Update      │
-            │ (CF Worker)  │    │ Payment     │
-            └──────────────┘    └──────┬──────┘
-                                       │
-                  ┌────────────────────┘
-                  ▼
-          ┌──────────────┐
-          │  Activate    │
-          │   Member     │
-          └──────────────┘
+            │   Webhook    │───▶│  Ativa      │
+            │ POST /webhook│    │  membro     │
+            │  /pagbank    │    │  + email    │
+            └──────────────┘    └─────────────┘
 ```
 
-### Sistema de Pontos
+### Cartao de Credito
+
+```
+Frontend (PagBank.js SDK)
+  → Tokeniza cartao (client-side)
+  → POST /payment/checkout/create (token + dados)
+  → API cria cobranca no PagBank
+  → Webhook confirma pagamento
+  → Membro ativado
+```
+
+## Sistema de Pontos
 
 ```
 ┌──────────┐    ┌──────────────┐    ┌─────────────────┐
-│   PDV    │───▶│  addPoints() │───▶│ Transaction     │
-│  (scan)  │    │  (points.ts) │    │ point_transactions │
+│   PDV    │───▶│ POST /points │───▶│ point_transactions│
+│  (scan)  │    │  /add        │    │ (type: earn)     │
 └──────────┘    └──────────────┘    └────────┬────────┘
                                              │
                         ┌────────────────────┘
                         ▼
                 ┌──────────────┐    ┌─────────────┐
-                │ Update Member│───▶│ Audit Log   │
-                │    points    │    │ audit_logs/ │
+                │ UPDATE member│───▶│ Audit Log   │
+                │    points    │    │ audit_logs  │
                 └──────────────┘    └─────────────┘
+
+Calculo: pontos = valor_compra * multiplicador_plano
+  Silver: 1x  |  Gold: 2x  |  Black: 3x
 ```
 
-### Assinatura Recorrente (Mercado Pago)
+### Expiracao de Pontos
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                    FLUXO DE CRIAÇÃO                         │
-└────────────────────────────────────────────────────────────┘
+- Cron job diario as 6AM UTC
+- Expira transacoes `earn` com `expires_at < NOW()` e `expired = FALSE`
+- Recalcula saldo do membro
+- Envia email de aviso quando pontos estao proximos de expirar
 
-┌──────────┐    ┌──────────────────┐    ┌─────────────────┐
-│ Payment  │───▶│ CardTokenization │───▶│  MercadoPago    │
-│  Modal   │    │  Form (MP SDK)   │    │  createToken()  │
-└──────────┘    └──────────────────┘    └────────┬────────┘
-                                                  │
-                         ┌────────────────────────┘
-                         ▼
-              ┌──────────────────┐    ┌─────────────────────┐
-              │  API Worker      │───▶│  Mercado Pago API   │
-              │ /subscription/   │    │  POST /preapproval  │
-              │    create        │    └──────────┬──────────┘
-              └──────────────────┘               │
-                                                 │
-                         ┌───────────────────────┘
-                         ▼
-              ┌──────────────────┐    ┌─────────────────────┐
-              │   Firestore      │    │   Member Updated    │
-              │  subscriptions/  │    │  subscription_id    │
-              │  {preapproval_id}│    │  subscription_status│
-              └──────────────────┘    └─────────────────────┘
+## Cron Jobs (node-cron)
 
-┌────────────────────────────────────────────────────────────┐
-│                  FLUXO DE COBRANÇA AUTOMÁTICA               │
-└────────────────────────────────────────────────────────────┘
+Executados diariamente as 6:00 UTC:
 
-┌──────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│ Mercado Pago │───▶│  Webhook POST    │───▶│   API Worker    │
-│ (scheduler)  │    │  /webhook/mp     │    │  signature      │
-└──────────────┘    └──────────────────┘    │  validation     │
-                                            └────────┬────────┘
-                                                     │
-          ┌──────────────────────────────────────────┘
-          │
-          ▼ (subscription_authorized_payment)
-┌──────────────────┐    ┌─────────────────────────────────┐
-│ approved?        │    │                                 │
-│ ├── YES ─────────┼───▶│  Save to subscription_payments  │
-│ │                │    │  Reset failed_payments = 0      │
-│ │                │    │  Update member expiry_date      │
-│ │                │    │  Send subscription-payment email│
-│ │                │    └─────────────────────────────────┘
-│ │                │
-│ └── NO (rejected)│    ┌─────────────────────────────────┐
-│      │           │───▶│  Increment failed_payments      │
-│      │           │    │  If failed >= 3: auto-cancel    │
-│      │           │    │  Send payment-failed email      │
-└──────┴───────────┘    └─────────────────────────────────┘
+| Job                 | Descricao                                           |
+| ------------------- | --------------------------------------------------- |
+| `expire-points`     | Expira pontos vencidos e atualiza saldos            |
+| `renewal-reminders` | Envia lembretes para membros proximos do vencimento |
 
-┌────────────────────────────────────────────────────────────┐
-│                    GESTÃO DE ASSINATURA                     │
-└────────────────────────────────────────────────────────────┘
+## Infraestrutura Docker
 
-┌────────────────────┐
-│ SubscriptionMgmt   │
-│    Component       │
-├────────────────────┤
-│ [Pausar]    ──────▶│ PUT /subscription/:id/pause
-│ [Reativar]  ──────▶│ PUT /subscription/:id/resume
-│ [Cancelar]  ──────▶│ PUT /subscription/:id/cancel
-│ [Atualizar] ──────▶│ PUT /subscription/:id/update-card
-│ [Histórico] ──────▶│ GET subscription_payments (Firestore)
-└────────────────────┘
-```
+### Containers
 
-## Decisões de Arquitetura
+| Container             | Imagem                   | Porta    | Funcao                    |
+| --------------------- | ------------------------ | -------- | ------------------------- |
+| `clube-geek-postgres` | postgres:16-alpine       | 5432\*   | Banco principal           |
+| `clube-geek-api`      | Build local (Dockerfile) | 3001\*\* | API Express               |
+| `clube-geek-nginx`    | nginx:alpine             | 80/443   | Reverse proxy + SSL + SPA |
+| `certbot`             | certbot                  | -        | Renovacao SSL automatica  |
+| `clube-geek-umami`    | umami:postgresql-latest  | 3000\*\* | Analytics                 |
+| `umami-db`            | postgres:16-alpine       | 5433\*   | Banco do Umami            |
 
-### Por que Firebase + Vercel?
+\* Apenas acessivel em 127.0.0.1 (localhost)
+\*\* Apenas acessivel internamente via rede Docker
 
-| Aspecto   | Firebase                 | Vercel              |
-| --------- | ------------------------ | ------------------- |
-| Auth      | ✅ Suporte nativo        | ❌ Precisa integrar |
-| Database  | ✅ Firestore (real-time) | ❌ Não tem          |
-| Hosting   | ✅ Funciona mas limitado | ✅ Melhor para SPA  |
-| Functions | ✅ Cloud Functions       | ✅ Edge Functions   |
-| Deploy    | 😐 Manual                | ✅ Auto via Git     |
-| CDN       | ✅ Global                | ✅ Global (melhor)  |
-| SSL       | ✅ Automático            | ✅ Automático       |
+### Volumes Docker
 
-**Conclusão:** Firebase para backend (auth + db), Vercel para frontend (melhor DX e CDN).
+- `pgdata` - Dados do PostgreSQL
+- `uploads` - Uploads de arquivos
+- `certbot-etc` - Certificados SSL
+- `certbot-www` - Challenge ACME
 
-### Por que não usar Firebase Hosting?
+### Nginx Config
 
-1. Vercel tem deploy automático via GitHub
-2. Edge functions mais flexíveis
-3. Analytics integrado
-4. Preview deployments por PR
-5. Melhor integração com React/Vite
-
-### Por que Firestore ao invés de Realtime Database?
-
-1. Queries mais poderosas (where, orderBy, limit)
-2. Estrutura de dados mais flexível
-3. Melhor escalabilidade
-4. Offline persistence nativo
-5. Security rules mais granulares
-
-### Por que Mercado Pago?
-
-1. Gateway brasileiro (BRL nativo)
-2. PIX integrado
-3. SDK React oficial
-4. Taxas competitivas
-5. Checkout transparente
-
-## Considerações de Segurança
-
-### Defense in Depth
-
-```
-┌────────────────────────────────────────────────────┐
-│                   LAYER 1: CDN                      │
-│  - Vercel Edge Network                              │
-│  - DDoS Protection                                  │
-│  - SSL/TLS                                          │
-├────────────────────────────────────────────────────┤
-│                LAYER 2: Headers                     │
-│  - CSP (Content-Security-Policy)                    │
-│  - HSTS (Strict-Transport-Security)                 │
-│  - X-Frame-Options: DENY                            │
-├────────────────────────────────────────────────────┤
-│              LAYER 3: Authentication                │
-│  - Firebase Auth                                    │
-│  - Session tokens (httpOnly)                        │
-│  - Token refresh automático                         │
-├────────────────────────────────────────────────────┤
-│              LAYER 4: Authorization                 │
-│  - Firestore Security Rules                         │
-│  - Role-based access control                        │
-│  - Field-level permissions                          │
-├────────────────────────────────────────────────────┤
-│              LAYER 5: Input Validation              │
-│  - Zod schemas (API Worker - all endpoints)         │
-│  - Firestore rules validation                       │
-│  - CPF validation (Brasil)                          │
-│  - HTML sanitization (email templates)              │
-│  - File path sanitization (Storage uploads)         │
-├────────────────────────────────────────────────────┤
-│              LAYER 6: Webhook Security              │
-│  - HMAC-SHA256 signature verification               │
-│  - Mandatory webhook secret                         │
-│  - Idempotency checking (processed_webhooks)        │
-│  - Timestamp validation (5 min max)                 │
-├────────────────────────────────────────────────────┤
-│              LAYER 7: Rate Limiting                 │
-│  - Cloudflare Cache API (gratuito)                  │
-│  - Por IP e por endpoint                            │
-│  - PIX/Checkout: 10 req/min                         │
-│  - Password Reset: 3 req/5min                       │
-│  - Default: 100 req/min                             │
-└────────────────────────────────────────────────────┘
-```
-
-### Medidas de Segurança (Março 2026)
-
-**Validação Zod em todos os endpoints:**
-
-- `PixCreateSchema` - Limites de valor e formato de email
-- `EmailSendSchema` - Templates e variáveis validadas
-- `CheckoutCreateSchema` - Items e valores limitados
-- `SubscriptionCreateSchema` - Planos enum, tokens limitados
-- `ContractEmailSchema` - PDFs até 10MB
-
-**Sanitização de HTML em emails** - Previne XSS em templates
-
-**Idempotência em webhooks** - Coleção `processed_webhooks` evita duplicatas
-
-**Validação de caminhos** - `sanitizeForFilePath()` previne path traversal
-
-### Firestore Security Rules Summary
-
-```
-users/{userId}
-├── read: owner OR admin
-├── create: self (role=member) OR admin
-├── update: admin OR owner (except role)
-└── delete: admin only
-
-members/{memberId}
-├── read: owner OR seller OR admin
-├── create: authenticated OR admin
-├── update: admin (all) OR seller (points only) OR owner (profile)
-└── delete: admin only
-
-payments/{paymentId}
-├── read: admin OR seller OR owner
-├── create: authenticated
-├── update: admin only
-└── delete: NEVER
-
-point_transactions/{txId}
-├── read: owner OR seller OR admin
-├── create: seller OR admin
-├── update: NEVER
-└── delete: NEVER
-
-audit_logs/{logId}
-├── read: admin only
-├── create: seller OR admin
-├── update: NEVER
-└── delete: NEVER
-```
+- Reverse proxy para API (`api.*` -> Express:3001)
+- Reverse proxy para Umami (`analytics.*` -> Umami:3000)
+- Serve SPA estatica (`club.*`, `admin.*`, `adm.*` -> `/usr/share/nginx/html/`)
+- SPA fallback: `try_files $uri /index.html`
+- Security headers compartilhados (`shared-headers.conf`)
+- SSL/TLS com certificados Let's Encrypt
+- Redirect HTTP -> HTTPS
 
 ## Performance
 
-### Bundle Analysis
+### Otimizacoes Frontend
 
-```
-Total Build Size: ~1.3MB (uncompressed)
-Gzipped: ~500KB
+1. **Code Splitting** - Lazy load por rota e componente
+2. **Vendor Chunks** - Separacao de bibliotecas
+3. **Tree Shaking** - Vite + ESM modules
+4. **Minification** - Terser com drop_console
+5. **Cache Headers** - 1 ano para assets imutaveis (via Nginx)
+6. **Suspense Fallbacks** - Loading states durante lazy load
+7. **Virtual Scrolling** - @tanstack/react-virtual para tabelas grandes
+8. **PWA** - Service worker com workbox
 
-Breakdown (após code-splitting):
-├── vendor-firebase-firestore: 261KB (76KB gzip)
-├── vendor-charts: 421KB (108KB gzip) - lazy loaded
-├── vendor-react-core: 190KB (60KB gzip)
-├── vendor-qr: 146KB (51KB gzip)
-├── vendor-framer: 122KB (39KB gzip)
-├── vendor-forms: 83KB (24KB gzip)
-├── vendor-firebase-core: 82KB (28KB gzip)
-├── vendor-firebase-auth: 77KB (22KB gzip)
-├── AdminDashboard: 37KB (10KB gzip) ✅ OTIMIZADO
-├── MembersTab: 19KB (6KB gzip)
-├── ReportsTab: 15KB (4KB gzip)
-├── PointsTab: 2.5KB (1KB gzip)
-├── UsersTab: 3.4KB (1.3KB gzip)
-├── LogsTab: 4KB (1.6KB gzip)
-└── outros: ~200KB
-```
+### Otimizacoes Backend
 
-### Otimizações Implementadas
-
-1. **Code Splitting** - Lazy load por rota e por componente
-2. **Tab Components Splitting** - AdminDashboard dividido em 7 componentes lazy
-3. **Vendor Chunks** - Separação de bibliotecas (charts, forms, firebase, etc.)
-4. **Tree Shaking** - Vite + ESM modules
-5. **Minification** - Terser com drop_console
-6. **Cache Headers** - 1 ano para assets imutáveis
-7. **Firestore Long Polling** - Evita WebSocket issues
-8. **Suspense Fallbacks** - Loading states durante lazy load
-9. **Skeleton Loading** - Perceived performance durante carregamento
-10. **Virtual Scrolling** - `VirtualTable` com @tanstack/react-virtual
-11. **PWA** - Service worker com workbox, instalável como app
-12. **Vercel Analytics** - Monitoramento de Core Web Vitals
-
-### Otimizações Pendentes
-
-1. **Image Optimization** - Sem next/image
-2. **Sentry Integration** - Error tracking em produção
+1. **Connection pooling** - PostgreSQL pool gerenciado
+2. **Indexes** - Otimizados para queries frequentes
+3. **Parametrized queries** - Seguranca + performance
+4. **Rate limiting** - Protecao contra abuso
+5. **Gzip** - Compressao no Nginx
 
 ## Monitoramento
 
-### Vercel Analytics (Implementado)
+### Umami Analytics (Self-hosted)
 
-```typescript
-// src/main.tsx
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/react'
+- Page views e navegacao
+- Eventos customizados
+- Core Web Vitals
+- Disponivel em `https://analytics.geeketoys.com.br`
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-    <Analytics />
-    <SpeedInsights />
-  </StrictMode>,
-)
-```
+### Logs
 
-**Métricas monitoradas:**
+- **audit_logs** (PostgreSQL): Acoes criticas (admin, vendedor)
+- **email_logs** (PostgreSQL): Emails enviados/falhados
+- **Docker logs**: `docker compose logs -f <servico>`
 
-- LCP (Largest Contentful Paint)
-- FID (First Input Delay)
-- CLS (Cumulative Layout Shift)
-- TTFB (Time to First Byte)
-- Page views e navegação
+### Health Check
 
-### Logs Atuais
-
-```typescript
-// Erros são logados no console
-console.error("[Firestore] Error:", error);
-console.error("[Auth] Sign in error:", error);
-```
-
-### Recomendação: Sentry
-
-```typescript
-// Proposta de implementação
-import * as Sentry from "@sentry/react";
-
-Sentry.init({
-  dsn: process.env.VITE_SENTRY_DSN,
-  environment: process.env.VITE_ENVIRONMENT,
-  integrations: [new Sentry.BrowserTracing(), new Sentry.Replay()],
-});
-
-// Substituir console.error por:
-Sentry.captureException(error);
-```
-
-## Testes
-
-### Estrutura Proposta
-
-```
-src/
-├── __tests__/
-│   ├── unit/
-│   │   ├── lib/
-│   │   │   ├── members.test.ts
-│   │   │   ├── points.test.ts
-│   │   │   └── payments.test.ts
-│   │   └── components/
-│   │       └── MemberModal.test.tsx
-│   │
-│   ├── integration/
-│   │   └── auth-flow.test.tsx
-│   │
-│   └── e2e/
-│       ├── login.spec.ts
-│       ├── register.spec.ts
-│       └── checkout.spec.ts
-│
-├── vitest.config.ts
-└── playwright.config.ts
-```
-
-### Mocking Firebase
-
-```typescript
-// __mocks__/firebase.ts
-export const auth = {
-  currentUser: null,
-  onAuthStateChanged: vi.fn(),
-  signInWithEmailAndPassword: vi.fn(),
-};
-
-export const db = {
-  collection: vi.fn(),
-  doc: vi.fn(),
-};
-```
-
-## Componentes UI
-
-### shadcn/ui Components
-
-Componentes baseados em Radix UI com Tailwind CSS:
-
-```
-src/components/ui/
-├── badge.tsx          # Badges de status e planos
-├── button.tsx         # Botões com variantes
-├── card.tsx           # Cards para conteúdo
-├── dialog.tsx         # Modais acessíveis
-├── input.tsx          # Inputs de formulário
-├── label.tsx          # Labels de formulário
-├── loading.tsx        # Spinners e loading states
-├── pagination.tsx     # Paginação de tabelas
-├── progress.tsx       # Barras de progresso
-├── sheet.tsx          # Drawer/sidebar mobile
-├── skeleton.tsx       # Skeleton loading
-├── success-animation.tsx  # Animações de sucesso/erro
-└── form-feedback.tsx  # Feedback de formulários
-```
-
-### Componentes de Negócio
-
-```
-src/components/
-├── admin/
-│   ├── AdminSidebar.tsx   # Navegação lateral admin
-│   ├── MembersTab.tsx     # Gestão de membros
-│   ├── PointsTab.tsx      # Ranking e dar pontos
-│   ├── UsersTab.tsx       # Gestão de usuários
-│   ├── LogsTab.tsx        # Logs de auditoria
-│   ├── ReportsTab.tsx     # Relatórios e métricas
-│   └── SettingsTab.tsx    # Configurações do sistema
-├── DataTable.tsx          # Tabela genérica com filtros
-├── VirtualTable.tsx       # Tabela virtualizada para grandes datasets
-├── MembersTable.tsx       # Tabela de membros
-├── MemberModal.tsx        # Modal de membro (CRUD)
-├── PaymentModal.tsx       # Modal de pagamento (PIX + Assinatura)
-├── CardTokenizationForm.tsx    # Tokenização de cartão (Mercado Pago SDK)
-└── SubscriptionManagement.tsx  # Gestão de assinatura recorrente
-```
-
-### Componentes de Assinatura
-
-```
-CardTokenizationForm.tsx
-├── Carrega MercadoPago.js SDK dinamicamente
-├── Visualização do cartão em tempo real
-├── Detecção de bandeira (Visa, Mastercard, Elo, etc)
-├── Validação de campos (número, validade, CVV, CPF)
-├── Tokenização via mp.createCardToken()
-└── Fallback mock para desenvolvimento
-
-SubscriptionManagement.tsx
-├── Banner do plano com gradiente personalizado
-├── Grid de informações (cartão, próxima cobrança, membro desde)
-├── Alertas de pagamentos falhados
-├── Botões de ação (pausar, reativar, cancelar)
-├── Histórico de cobranças com status
-├── Dialog de confirmação com ícones
-└── Dialog de atualização de cartão
-```
-
-### Hooks Personalizados
-
-```
-src/hooks/
-├── index.ts           # Exports centralizados
-├── useMembers.ts      # Hook para operações de membros
-│   ├── useMembers()   # Lista de membros
-│   └── useMember()    # Membro individual
-└── usePoints.ts       # Hook para sistema de pontos
-    ├── usePoints()    # Operações de pontos
-    └── useMemberPoints()  # Pontos de um membro
-```
-
-## PWA (Progressive Web App)
-
-### Configuração
-
-```typescript
-// vite.config.ts
-import { VitePWA } from "vite-plugin-pwa";
-
-VitePWA({
-  registerType: "autoUpdate",
-  manifest: {
-    name: "Clube Geek & Toys",
-    short_name: "Geek Club",
-    theme_color: "#7c3aed",
-    background_color: "#09090b",
-    display: "standalone",
-    icons: [
-      /* ... */
-    ],
-  },
-  workbox: {
-    globPatterns: ["**/*.{js,css,html,ico,png,jpg,svg,woff2}"],
-    runtimeCaching: [
-      /* Google Fonts cache */
-    ],
-  },
-});
-```
-
-### Funcionalidades
-
-- **Instalável** - Adicionar à tela inicial no celular
-- **Offline** - Cache de assets estáticos
-- **Auto-update** - Service worker atualiza automaticamente
+- `GET /health` - Status da API e conexao com banco
+- Verificado automaticamente pelo CI/CD apos deploy

@@ -1,253 +1,328 @@
 # Guia de Deploy - Clube Geek & Toys
 
-> **Última atualização:** 26 de Março de 2026
+> **Ultima atualizacao:** 07 de Abril de 2026
 
-Este documento descreve os passos necessários para realizar o deploy do sistema em produção.
+Este documento descreve como realizar o deploy do sistema em producao na VPS.
 
 ## Requisitos
 
-- Node.js 18+ instalado
-- Conta no Firebase (plano Spark gratuito é suficiente)
-- Conta no Cloudflare (plano gratuito)
-- Conta no Mercado Pago (Credenciais de Produção)
-- Conta no Resend (plano gratuito: 3k emails/mês)
+- VPS Ubuntu 24.04 (ou compativel)
+- Docker e Docker Compose instalados
+- Dominio configurado apontando para o IP da VPS
+- Chave SSH para acesso ao servidor
+- Conta no GitHub com acesso ao repositorio
 
 ## Arquitetura de Deploy
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    FIREBASE HOSTING                          │
-│  - Frontend React (SPA)                                      │
-│  - Headers de segurança (CSP, HSTS, etc.)                   │
-│  - CDN global                                                │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    CLOUDFLARE WORKERS                        │
-│  - API de pagamentos (Mercado Pago)                         │
-│  - Webhooks (PIX, assinaturas)                              │
-│  - Envio de emails (Resend)                                 │
-│  - Rate limiting                                             │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       FIREBASE                               │
-│  - Authentication (usuários)                                 │
-│  - Firestore (banco de dados)                               │
-│  - Storage (contratos PDF)                                   │
-└─────────────────────────────────────────────────────────────┘
+                    Internet
+                       |
+              ┌────────┴────────┐
+              │   Nginx (443)   │  SSL termination (Let's Encrypt)
+              └────────┬────────┘
+         ┌─────────┬───┴───┬──────────┐
+         │         │       │          │
+    club.*     api.*   analytics.*  adm.*
+    (SPA)    (Express)  (Umami)    (SPA)
+         │         │       │
+         │    ┌────┴────┐  │
+         │    │ API:3001│  │
+         │    └────┬────┘  │
+         │         │       │
+         │    ┌────┴────┐  ┌────┴────┐
+         │    │PostgreSQL│  │umami-db │
+         │    │  :5432   │  │  :5433  │
+         │    └─────────┘  └─────────┘
+         │
+    /opt/clube-geek-toys/dist/
+    (arquivos estaticos)
 ```
 
-## 1. Configuração do Firebase
+## 1. Deploy do Zero
 
-### Instalação do Firebase CLI
+### 1.1 Preparar a VPS
 
 ```bash
-npm install -g firebase-tools
+# Conectar na VPS
+ssh root@76.13.114.173
+
+# Instalar Docker
+curl -fsSL https://get.docker.com | sh
+
+# Instalar Docker Compose (se nao veio com Docker)
+apt install -y docker-compose-plugin
+
+# Criar diretorio do projeto
+mkdir -p /opt/clube-geek-toys/{server,dist}
 ```
 
-### Login e Inicialização
+### 1.2 Clonar o Repositorio
 
 ```bash
-firebase login
-firebase use --add clube-geek-toys
+cd /opt/clube-geek-toys
+git clone <url-do-repositorio> .
 ```
 
-### Deploy das Regras de Segurança
+### 1.3 Configurar Variaveis de Ambiente
 
 ```bash
-# Deploy Firestore + Storage rules
-npm run deploy:rules
-
-# Ou separadamente:
-firebase deploy --only firestore
-firebase deploy --only storage
+cp server/.env.example server/.env
+nano server/.env
 ```
 
-## 2. Configuração do Cloudflare Workers
+Preencha todas as variaveis (veja secao "Variaveis de Ambiente" abaixo).
 
-### Instalação do Wrangler CLI
+### 1.4 Subir os Containers
 
 ```bash
-npm install -g wrangler
-wrangler login
+cd /opt/clube-geek-toys/server
+docker compose up -d
 ```
 
-### Configuração de Secrets
+Isso inicia todos os servicos: PostgreSQL, API Express, Nginx, Umami e Certbot.
 
-> **IMPORTANTE:** Todos os secrets abaixo são OBRIGATÓRIOS para o funcionamento correto.
+### 1.5 Verificar Status
 
 ```bash
-cd api-worker
+docker compose ps
+# Todos devem estar "Up" e "healthy"
 
-# Mercado Pago (OBRIGATÓRIOS)
-wrangler secret put MERCADOPAGO_ACCESS_TOKEN   # Token de acesso da API
-wrangler secret put MERCADOPAGO_WEBHOOK_SECRET # Secret do webhook - CRÍTICO!
-# ⚠️  O WEBHOOK_SECRET é usado para:
-#    - Validar assinaturas HMAC dos webhooks do Mercado Pago
-#    - Autenticar cron jobs (/cron/expire-points, /cron/renewal-reminders)
-#    - Proteger endpoints de relatórios (/reports/daily, /reports/monthly)
-
-# Resend (OBRIGATÓRIO para emails)
-wrangler secret put RESEND_API_KEY
-
-# Firebase (OBRIGATÓRIO)
-wrangler secret put FIREBASE_API_KEY
+# Testar API
+curl https://api.geeketoys.com.br/health
 ```
 
-### Deploy do Worker
+## 2. Variaveis de Ambiente
 
-```bash
-cd api-worker
-npm run deploy
-```
-
-**URL do Worker:** `https://api-worker.leoschlanger.workers.dev`
-
-## 3. Configuração do Mercado Pago
-
-1. Acesse o [Painel do Desenvolvedor](https://www.mercadopago.com.br/developers/panel)
-2. Configure o Webhook:
-   - URL: `https://api-worker.leoschlanger.workers.dev/webhook/mercadopago`
-   - Eventos: `payment`, `subscription_preapproval`, `subscription_authorized_payment`
-3. Copie o Webhook Secret para o Cloudflare
-
-## 4. Configuração do Resend
-
-1. Acesse [Resend Dashboard](https://resend.com/domains)
-2. Adicione e verifique o domínio `geeketoys.com.br`
-3. Copie a API Key para o Cloudflare Worker
-
-## 5. Deploy do Frontend
-
-### Build de Produção
-
-```bash
-npm run build
-```
-
-### Deploy no Firebase Hosting
-
-```bash
-firebase deploy --only hosting
-```
-
-**URLs de Produção:**
-
-- https://clube-geek-toys.web.app
-- https://clube-geek-toys.firebaseapp.com
-
-## 6. Variáveis de Ambiente
-
-### Frontend (.env.production)
+### server/.env
 
 ```env
-VITE_FIREBASE_API_KEY=xxx
-VITE_FIREBASE_AUTH_DOMAIN=clube-geek-toys.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=clube-geek-toys
-VITE_FIREBASE_STORAGE_BUCKET=clube-geek-toys.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=xxx
-VITE_FIREBASE_APP_ID=xxx
-VITE_MERCADOPAGO_PUBLIC_KEY=APP_USR-xxx
-VITE_PAYMENT_API_URL=https://api-worker.leoschlanger.workers.dev
-VITE_PIX_KEY=xxx
-VITE_ENVIRONMENT=production
+# PostgreSQL
+POSTGRES_USER=clube_geek
+POSTGRES_PASSWORD=<senha_forte_aleatoria>
+POSTGRES_DB=clube_geek_toys
+
+# JWT
+JWT_SECRET=<string_aleatoria_64_chars>
+JWT_REFRESH_SECRET=<string_aleatoria_diferente_64_chars>
+HMAC_SECRET=<outra_string_aleatoria_64_chars>
+
+# PagBank
+PAGBANK_TOKEN=<token_do_painel_PagBank>
+PAGBANK_PUBLIC_KEY=<chave_publica_PagBank>
+
+# Email (Resend)
+RESEND_API_KEY=<api_key_do_Resend>
+FROM_EMAIL=Clube Geek & Toys <contato@geeketoys.com.br>
+ADMIN_EMAIL=admin@geeketoys.com.br
+
+# URLs
+FRONTEND_URL=https://club.geeketoys.com.br
+API_URL=https://api.geeketoys.com.br
 ```
 
-### Worker (via wrangler.toml)
+### Frontend (build via CI/CD)
 
-```toml
-[vars]
-FIREBASE_PROJECT_ID = "clube-geek-toys"
-FRONTEND_URL = "https://clube-geek-toys.web.app"
-WORKER_URL = "https://api-worker.leoschlanger.workers.dev"
-FROM_EMAIL = "Clube Geek & Toys <contato@geeketoys.com.br>"
-```
+As variaveis do frontend sao injetadas durante o build no GitHub Actions:
 
-## 7. Checklist de Deploy
+| Variavel                  | Valor                          |
+| ------------------------- | ------------------------------ |
+| `VITE_API_URL`            | `https://api.geeketoys.com.br` |
+| `VITE_PAGBANK_PUBLIC_KEY` | Chave publica PagBank          |
+| `VITE_PIX_KEY`            | Chave PIX da empresa           |
+| `VITE_ENVIRONMENT`        | `production`                   |
 
-### Antes do Deploy
+## 3. SSL com Certbot
 
-- [ ] `npm audit` sem vulnerabilidades críticas
-- [ ] `npm run lint` sem erros
-- [ ] `npm run build` completa com sucesso
-- [ ] Variáveis de ambiente configuradas
-- [ ] Secrets do Worker configurados
-
-### Após o Deploy
-
-- [ ] Testar login/cadastro
-- [ ] Testar pagamento PIX (sandbox)
-- [ ] Verificar envio de emails
-- [ ] Verificar webhook do Mercado Pago
-- [ ] Testar rate limiting
-
-## 8. Backup e Recuperação
-
-### Backup Manual do Firestore
+### Emissao Inicial de Certificados
 
 ```bash
-# Requer gcloud CLI configurado
-npm run backup:firestore
+# O container certbot gera automaticamente os certificados
+# Mas para a primeira vez, pode ser necessario:
+docker compose run --rm certbot certonly \
+  --webroot -w /var/www/certbot \
+  -d club.geeketoys.com.br \
+  -d admin.geeketoys.com.br \
+  -d adm.geeketoys.com.br \
+  -d api.geeketoys.com.br \
+  -d analytics.geeketoys.com.br
 ```
 
-### Restauração
+### Renovacao Automatica
+
+O container `certbot` renova os certificados automaticamente. O Nginx recarrega a cada 6 horas via cron interno.
+
+## 4. Pipeline CI/CD
+
+### Fluxo Automatico (GitHub Actions)
+
+A cada push na branch `master`:
+
+1. **Checkout** do codigo
+2. **Build** do frontend (React/Vite) com variaveis de producao
+3. **rsync** dos arquivos do servidor para `/opt/clube-geek-toys/server/`
+4. **rsync** do frontend compilado para `/opt/clube-geek-toys/dist/`
+5. **Rebuild** do container da API (`docker compose build --no-cache api`)
+6. **Restart** dos containers API e Nginx
+7. **Health check** automatico (`/api/health`)
+
+### GitHub Secrets Necessarios
+
+| Secret        | Descricao                     |
+| ------------- | ----------------------------- |
+| `VPS_HOST`    | IP da VPS (76.13.114.173)     |
+| `VPS_USER`    | Usuario SSH (ex: `deploy`)    |
+| `VPS_SSH_KEY` | Chave privada SSH para deploy |
+
+### Deploy Manual
+
+Se precisar fazer deploy manual:
 
 ```bash
-gcloud firestore import gs://clube-geek-toys-backups/[backup-name] --project=clube-geek-toys
+# No repositorio local
+npm run build
+
+# Copiar frontend
+rsync -avz --delete dist/ user@76.13.114.173:/opt/clube-geek-toys/dist/
+
+# Copiar servidor
+rsync -avz --delete --exclude='node_modules' --exclude='.env' \
+  server/ user@76.13.114.173:/opt/clube-geek-toys/server/
+
+# Na VPS
+cd /opt/clube-geek-toys/server
+docker compose build --no-cache api
+docker compose up -d --force-recreate api nginx
 ```
 
-## 9. Monitoramento
+## 5. Backup e Recuperacao
 
-### Firebase Console
+### Backup do PostgreSQL
 
-- **Authentication:** Usuários e sessões
-- **Firestore:** Uso e regras
-- **Storage:** Arquivos e bandwidth
+```bash
+# Backup manual
+docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys > backup_$(date +%Y%m%d).sql
 
-### Cloudflare Dashboard
+# Recomendacao: cron diario
+# Adicionar ao crontab da VPS:
+0 3 * * * docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys | gzip > /opt/backups/db_$(date +\%Y\%m\%d).sql.gz
+```
 
-- **Workers:** Requests, erros, latência
-- **Rate limiting:** Requisições bloqueadas
+### Restauracao
 
-### Logs
+```bash
+# Restaurar de um backup
+cat backup.sql | docker exec -i clube-geek-postgres psql -U clube_geek clube_geek_toys
+```
 
-- `audit_logs` (Firestore): Ações de admin
-- `email_logs` (Firestore): Emails enviados
-- Console Cloudflare: Erros do Worker
+### Retencao Recomendada
 
-## 10. Troubleshooting
+- Backups diarios: 7 dias
+- Backups semanais: 4 semanas
+- Backups mensais: 12 meses
 
-### Worker retorna 500
+## 6. Monitoramento
 
-1. Verificar logs no Cloudflare Dashboard
-2. Confirmar secrets configurados
-3. Testar endpoint `/health`
+### Containers Docker
 
-### Emails não enviados
+```bash
+# Status de todos os containers
+docker compose ps
 
-1. Verificar API key do Resend
-2. Confirmar domínio verificado
-3. Checar `email_logs` no Firestore
+# Logs da API
+docker compose logs -f api
 
-### Webhook não processado
+# Logs do Nginx
+docker compose logs -f nginx
 
-1. Verificar assinatura HMAC
-2. Confirmar URL no painel MP
-3. Checar `processed_webhooks` (idempotência)
+# Uso de recursos
+docker stats
+```
 
-### Rate limit atingido
+### Analytics (Umami)
 
-1. Aguardar janela de tempo
-2. Verificar se não é ataque
-3. Ajustar limites se necessário
+Acesse `https://analytics.geeketoys.com.br` para metricas de uso do sistema.
+
+### Logs da Aplicacao
+
+- `audit_logs` (PostgreSQL): Acoes criticas de admin
+- `email_logs` (PostgreSQL): Emails enviados
+- Logs Docker: `docker compose logs <servico>`
+
+## 7. Troubleshooting
+
+### API retorna 502 Bad Gateway
+
+1. Verificar se o container API esta rodando: `docker compose ps api`
+2. Verificar logs: `docker compose logs api`
+3. Verificar se o PostgreSQL esta saudavel: `docker compose ps postgres`
+4. Reiniciar: `docker compose restart api`
+
+### Certificado SSL expirado
+
+1. Verificar status do certbot: `docker compose logs certbot`
+2. Renovar manualmente: `docker compose run --rm certbot renew`
+3. Recarregar Nginx: `docker compose exec nginx nginx -s reload`
+
+### Banco de dados sem conexao
+
+1. Verificar status: `docker compose ps postgres`
+2. Verificar logs: `docker compose logs postgres`
+3. Verificar espaco em disco: `df -h`
+4. Reiniciar: `docker compose restart postgres`
+
+### Emails nao enviados
+
+1. Verificar API key do Resend na `.env`
+2. Verificar dominio verificado no painel Resend
+3. Consultar `email_logs` no banco: `SELECT * FROM email_logs ORDER BY sent_at DESC LIMIT 10;`
+
+### Webhook nao processado
+
+1. Verificar `processed_webhooks`: `SELECT * FROM processed_webhooks ORDER BY processed_at DESC LIMIT 10;`
+2. Verificar logs da API: `docker compose logs api | grep webhook`
+3. Confirmar URL do webhook no painel PagBank
+
+### Container com restart loop
+
+```bash
+# Ver motivo da falha
+docker compose logs --tail=50 <servico>
+
+# Verificar uso de memoria/disco
+docker stats --no-stream
+df -h
+```
+
+## 8. Seguranca da VPS
+
+### Firewall (UFW)
+
+```bash
+# Portas abertas
+ufw status
+# Deve mostrar: 22 (SSH), 80 (HTTP), 443 (HTTPS)
+```
+
+### SSH
+
+- Acesso apenas por chave (senha desabilitada)
+- Root login desabilitado (usar usuario com sudo)
+
+### Atualizacoes
+
+```bash
+# Manter sistema atualizado
+apt update && apt upgrade -y
+
+# Atualizar imagens Docker
+docker compose pull
+docker compose up -d
+```
 
 ---
 
-**Documentação relacionada:**
+**Documentacao relacionada:**
 
-- [SECURITY.md](docs/SECURITY.md) - Guia de segurança
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Arquitetura técnica
+- [SECURITY.md](docs/SECURITY.md) - Guia de seguranca
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Arquitetura tecnica
 - [TODO.md](docs/TODO.md) - Roadmap

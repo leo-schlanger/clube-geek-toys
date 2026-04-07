@@ -30,6 +30,7 @@ export async function saveContract(
     const contractId = `contract_${data.memberId}_${Date.now()}`;
     const pdfPath = file ? file.path.replace(/\\/g, '/') : null;
     const pdfUrl = file ? `${env.API_URL}/uploads/contracts/${data.memberId}/${file.filename}` : null;
+    const signedAt = data.signedAt || new Date().toISOString();
 
     await client.query(
       `INSERT INTO contracts (id, member_id, member_name, member_cpf, member_email, plan,
@@ -37,7 +38,7 @@ export async function saveContract(
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')`,
       [
         contractId, data.memberId, data.memberName, data.memberCpf, data.memberEmail,
-        data.plan, data.signaturePreview || null, data.signedAt,
+        data.plan, data.signaturePreview || null, signedAt,
         data.ipAddress || null, data.userAgent || null, data.documentHash || null,
         pdfUrl, pdfPath,
       ]
