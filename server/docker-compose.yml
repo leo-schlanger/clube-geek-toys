@@ -65,6 +65,36 @@ services:
       - certbot-etc:/etc/letsencrypt:ro
       - certbot-www:/var/www/certbot:ro
 
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: clube-geek-umami
+    restart: unless-stopped
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-umami_secret}@umami-db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:-replace_me_with_random_string}
+      DISABLE_TELEMETRY: 1
+    expose:
+      - "3000"
+
+  umami-db:
+    image: postgres:16-alpine
+    container_name: clube-geek-umami-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami_secret}
+      POSTGRES_DB: umami
+    volumes:
+      - umami-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   certbot:
     image: certbot/certbot
     container_name: clube-geek-certbot
@@ -76,5 +106,6 @@ services:
 volumes:
   pgdata:
   uploads:
+  umami-pgdata:
   certbot-etc:
   certbot-www:
