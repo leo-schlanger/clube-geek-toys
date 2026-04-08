@@ -72,7 +72,7 @@ async function processChargeNotification(orderId: string, charge: PagBankCharge,
     // If failed, notify member
     if (status === 'failed' && referenceId) {
       const memberResult = await client.query(
-        'SELECT email, full_name FROM members WHERE id = $1 OR user_id::text = $1',
+        'SELECT id, email, full_name FROM members WHERE id = $1',
         [referenceId]
       );
       if (memberResult.rows.length > 0) {
@@ -81,6 +81,7 @@ async function processChargeNotification(orderId: string, charge: PagBankCharge,
           template: 'payment-failed',
           to: m.email,
           variables: { name: m.full_name },
+          member_id: m.id,
         }).catch((err) => console.error('[WEBHOOK] Email error:', err));
       }
     }
@@ -169,19 +170,21 @@ async function activateMember(client: pg.PoolClient, memberId: string, paymentRe
 
   // Send confirmation email
   const memberResult = await client.query(
-    'SELECT email, full_name, plan FROM members WHERE id = $1',
+    'SELECT id, email, full_name, plan FROM members WHERE id = $1',
     [member.id]
   );
   if (memberResult.rows.length > 0) {
-    const member = memberResult.rows[0];
+    const m = memberResult.rows[0];
     sendTemplateEmail({
       template: 'payment-confirmed',
-      to: member.email,
+      to: m.email,
       variables: {
-        name: member.full_name,
-        amount: String(amount),
-        plan: member.plan,
+        name: m.full_name,
+        amount: amount.toFixed(2).replace('.', ','),
+        plan: m.plan,
+        expiry_date: expiryDate.toLocaleDateString('pt-BR'),
       },
+      member_id: m.id,
     }).catch((err) => console.error('[WEBHOOK] Email error:', err));
   }
 }

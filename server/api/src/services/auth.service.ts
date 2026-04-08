@@ -231,7 +231,10 @@ export async function verifyEmail(token: string) {
 }
 
 export async function sendPasswordReset(email: string) {
-  const result = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+  const result = await query(
+    'SELECT u.id, m.full_name FROM users u LEFT JOIN members m ON m.user_id = u.id WHERE u.email = $1',
+    [email.toLowerCase()]
+  );
   if (result.rows.length === 0) {
     // Don't reveal if email exists
     return;
@@ -248,6 +251,7 @@ export async function sendPasswordReset(email: string) {
     template: 'password-reset',
     to: email,
     variables: {
+      name: result.rows[0].full_name || email,
       reset_url: resetUrl,
     },
   });

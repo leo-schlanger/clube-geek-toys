@@ -1,38 +1,12 @@
 /**
  * Email client — sends emails via Express API (Resend)
+ *
+ * IMPORTANT: Variable names must match backend templates (English names):
+ * name, amount, plan, expiry_date, points, verify_url, reset_url, etc.
  */
 
 import { api } from './api-client'
 import { logger } from './logger'
-
-export type EmailTemplate =
-  | 'welcome'
-  | 'payment-confirmed'
-  | 'payment-failed'
-  | 'renewal-reminder'
-  | 'points-expiring'
-  | 'verify-email'
-
-export interface EmailVariables {
-  nome?: string
-  plano?: string
-  valor?: string
-  validade?: string
-  motivo?: string
-  pontos?: string
-  data_expiracao?: string
-  dashboard_url?: string
-  retry_url?: string
-  renew_url?: string
-  verification_link?: string
-}
-
-export interface SendEmailParams {
-  template: EmailTemplate
-  to: string
-  variables: EmailVariables
-  memberId?: string
-}
 
 export interface EmailResponse {
   success: boolean
@@ -41,15 +15,15 @@ export interface EmailResponse {
   error?: string
 }
 
-export interface EmailTemplateInfo {
-  name: string
-  subject: string
-}
-
 /**
  * Send an email using the API
  */
-export async function sendEmail(params: SendEmailParams): Promise<EmailResponse> {
+async function sendEmail(params: {
+  template: string
+  to: string
+  variables: Record<string, string | undefined>
+  memberId?: string
+}): Promise<EmailResponse> {
   try {
     const result = await api.post('/email/send', {
       template: params.template,
@@ -70,24 +44,17 @@ export async function sendEmail(params: SendEmailParams): Promise<EmailResponse>
 }
 
 /**
- * Get available email templates
- */
-export async function getEmailTemplates(): Promise<EmailTemplateInfo[]> {
-  try {
-    const result = await api.get('/email/templates')
-    return result.data?.templates || []
-  } catch {
-    return []
-  }
-}
-
-/**
  * Send welcome email to new member
  */
 export async function sendWelcomeEmail(
   email: string, name: string, plan: string, memberId?: string
 ): Promise<EmailResponse> {
-  return sendEmail({ template: 'welcome', to: email, variables: { nome: name, plano: plan }, memberId })
+  return sendEmail({
+    template: 'welcome',
+    to: email,
+    variables: { name, plan },
+    memberId,
+  })
 }
 
 /**
@@ -97,10 +64,13 @@ export async function sendPaymentConfirmedEmail(
   email: string, name: string, amount: number, plan: string, expiryDate: string, memberId?: string
 ): Promise<EmailResponse> {
   return sendEmail({
-    template: 'payment-confirmed', to: email,
+    template: 'payment-confirmed',
+    to: email,
     variables: {
-      nome: name, valor: amount.toFixed(2).replace('.', ','),
-      plano: plan, validade: new Date(expiryDate).toLocaleDateString('pt-BR'),
+      name,
+      amount: amount.toFixed(2).replace('.', ','),
+      plan,
+      expiry_date: new Date(expiryDate).toLocaleDateString('pt-BR'),
     },
     memberId,
   })
@@ -110,11 +80,12 @@ export async function sendPaymentConfirmedEmail(
  * Send payment failed email
  */
 export async function sendPaymentFailedEmail(
-  email: string, name: string, amount: number, reason?: string, memberId?: string
+  email: string, name: string, _amount?: number, _reason?: string, memberId?: string
 ): Promise<EmailResponse> {
   return sendEmail({
-    template: 'payment-failed', to: email,
-    variables: { nome: name, valor: amount.toFixed(2).replace('.', ','), motivo: reason },
+    template: 'payment-failed',
+    to: email,
+    variables: { name },
     memberId,
   })
 }
@@ -126,8 +97,12 @@ export async function sendRenewalReminderEmail(
   email: string, name: string, expiryDate: string, memberId?: string
 ): Promise<EmailResponse> {
   return sendEmail({
-    template: 'renewal-reminder', to: email,
-    variables: { nome: name, validade: new Date(expiryDate).toLocaleDateString('pt-BR') },
+    template: 'renewal-reminder',
+    to: email,
+    variables: {
+      name,
+      expiry_date: new Date(expiryDate).toLocaleDateString('pt-BR'),
+    },
     memberId,
   })
 }
@@ -139,8 +114,13 @@ export async function sendPointsExpiringEmail(
   email: string, name: string, points: number, expirationDate: string, memberId?: string
 ): Promise<EmailResponse> {
   return sendEmail({
-    template: 'points-expiring', to: email,
-    variables: { nome: name, pontos: points.toString(), data_expiracao: new Date(expirationDate).toLocaleDateString('pt-BR') },
+    template: 'points-expiring',
+    to: email,
+    variables: {
+      name,
+      points: points.toString(),
+      expiry_date: new Date(expirationDate).toLocaleDateString('pt-BR'),
+    },
     memberId,
   })
 }
