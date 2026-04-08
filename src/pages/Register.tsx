@@ -396,7 +396,7 @@ export default function Register() {
   /**
    * Handle contract signed - move to payment step
    */
-  function handleContractSigned() {
+  function handleContractSigned(_contractData?: unknown) {
     setShowContractModal(false)
     setContractSigned(true)
     setStep(3) // Move to payment step
@@ -467,17 +467,12 @@ export default function Register() {
           createdMemberId
         ).catch(err => logger.error('Erro ao enviar email de boas-vindas:', err))
       } else {
-        // After all retries failed, show error with manual retry option
+        // After all retries failed
         toast.error('Pagamento recebido, mas houve um erro ao ativar sua conta.', {
-          description: 'Entre em contato com o suporte ou tente fazer login novamente.',
+          description: 'Faça login novamente — o sistema ativará sua conta automaticamente.',
           duration: 10000,
-          action: {
-            label: 'Tentar novamente',
-            onClick: () => handlePaymentSuccess(),
-          },
         })
-        // Don't navigate - let user retry
-        return
+        // Navigate anyway — webhook will activate the member when payment confirms
       }
     } else {
       toast.success('Pagamento confirmado! Bem-vindo ao clube!')
