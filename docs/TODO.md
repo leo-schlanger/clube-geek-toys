@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 07 de Abril de 2026
+> **Ultima atualizacao:** 08 de Abril de 2026
 
 ## Legenda
 
@@ -22,6 +22,9 @@
 - [x] **Analytics com Umami** - Self-hosted em analytics.geeketoys.com.br
 - [x] **Docker Compose** - Todos os servicos containerizados
 - [x] **Nginx reverse proxy** - SSL termination + security headers + SPA serving
+- [x] **Backup automatico PostgreSQL** - Script pg_dump + cron diario + retencao 7 dias
+- [x] **Log rotation** - Docker json-file driver com max-size 10m em todos os servicos
+- [x] **Health check + alertas** - Script de monitoramento com alerta via Resend
 
 ### Backend (Abril 2026)
 
@@ -33,6 +36,9 @@
 - [x] **Cron jobs** - node-cron para expiracao de pontos e lembretes
 - [x] **Rate limiting server-side** - Middleware Express (antes era client-side)
 - [x] **RBAC middleware** - Verificacao de roles no servidor
+- [x] **Error tracking local** - Tabela error_logs no PostgreSQL + captura global de erros do frontend
+- [x] **Update profile endpoint** - PATCH /auth/update-profile para troca de email/senha
+- [x] **HTML email templates** - 13 templates HTML responsivos com branding e CTAs
 
 ### Seguranca (Marco-Abril 2026)
 
@@ -57,7 +63,7 @@
 - [x] **Termos de Uso CDC** - Referencia Lei 8.078/90
 - [x] **Politica de Privacidade LGPD** - Base legal documentada
 
-### Frontend (Marco 2026)
+### Frontend (Marco-Abril 2026)
 
 - [x] **Code-split AdminDashboard** - Tabs lazy loaded
 - [x] **Virtual scrolling** - Tabelas grandes
@@ -65,7 +71,8 @@
 - [x] **Skeleton loading** - Carregamento visual
 - [x] **SEO completo** - Open Graph, Twitter Cards, Schema.org
 - [x] **Exportacao CSV** - Membros e relatorios
-- [x] **Email templates customizados** - 12 templates via Resend
+- [x] **Email templates customizados** - 13 templates HTML via Resend
+- [x] **Error tracking no admin** - Tela de erros com filtros, stats e stack traces
 
 ### Testes
 
@@ -79,15 +86,9 @@
 ### ALTO - Proximo Sprint
 
 - [ ] **Whitelist PagBank** - Configurar IP da VPS no painel PagBank para webhooks em producao
-- [ ] **Backup automatico PostgreSQL** - Cron job diario com retencao configurada
-- [ ] **Monitoramento de uptime** - Alerta quando API ou VPS fica fora do ar
+- [ ] **Configurar cron na VPS** - Executar scripts de backup e health check (instrucos em DEPLOY.md)
 
 ### MEDIO - Planejado
-
-- [ ] **Error tracking (Sentry)** - Monitoramento de erros em producao
-  - Base ja criada em `src/lib/error-tracking.ts`
-  - Precisa: instalar @sentry/react e configurar DSN
-  - Custo: ~$26/mes (plano Team) ou gratuito com limites
 
 - [ ] **Aumentar cobertura de testes** - Meta: 70%
   - Requer mocking de API e PostgreSQL
@@ -96,8 +97,6 @@
 - [ ] **Testes E2E** - Playwright
   - Fluxos criticos: cadastro, login, pagamento
   - Integrar ao CI/CD
-
-- [ ] **Log rotation na VPS** - Configurar logrotate para logs Docker
 
 ### BAIXO - Nice to Have
 
@@ -129,8 +128,9 @@
 
 1. MapperUtils usa `any` (necessario para flexibilidade)
 2. Soft-delete de usuarios (nao remove do banco, apenas muda role para `disabled`)
-3. **vendor-charts bundle (421KB)** - Ja lazy loaded via ReportsTab
+3. **vendor-charts bundle (435KB)** - Ja lazy loaded via ReportsTab
 4. Migracao de dados Firestore -> PostgreSQL (feita manualmente, sem script reverso)
+5. Erros TypeScript pre-existentes em payments.ts, points.ts, reports.ts (tipos `unknown` nao tipados)
 
 ---
 
@@ -167,4 +167,4 @@
 
 ---
 
-_Documento atualizado em 07 de Abril de 2026 - Pos-migracao VPS_
+_Documento atualizado em 08 de Abril de 2026_

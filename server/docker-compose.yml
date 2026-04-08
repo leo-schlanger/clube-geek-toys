@@ -59,6 +59,11 @@ services:
     image: nginx:alpine
     container_name: clube-geek-nginx
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       - api
     ports:
@@ -77,6 +82,11 @@ services:
     image: ghcr.io/umami-software/umami:postgresql-latest
     container_name: clube-geek-umami
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       umami-db:
         condition: service_healthy
@@ -91,6 +101,11 @@ services:
     image: postgres:16-alpine
     container_name: clube-geek-umami-db
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       POSTGRES_USER: umami
       POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami_secret}

@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { updateMember } from '../lib/members'
+import { api } from '../lib/api-client'
 import { logger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -108,20 +109,28 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
     setSaving(true)
 
     try {
-      // TODO: Add /auth/update-profile endpoint for email/password changes
-      // For now, email and password changes are not supported via API
+      // Update auth (email/password) if changed
       if (emailChanged || passwordChanging) {
-        toast.warning('Alteração de email/senha será implementada em breve')
+        const authUpdate: Record<string, unknown> = {}
+        if (emailChanged) authUpdate.email = data.email
+        if (data.currentPassword) authUpdate.currentPassword = data.currentPassword
+        if (data.newPassword) authUpdate.newPassword = data.newPassword
+
+        const result = await api.patch('/auth/update-profile', authUpdate)
+        if (result.error) {
+          toast.error(result.error)
+          setSaving(false)
+          return
+        }
       }
 
-      // Update member via API
+      // Update member profile data
       const updateData: Partial<Member> = {
         fullName: data.fullName,
         phone: data.phone.replace(/\D/g, ''),
         updatedAt: new Date().toISOString(),
       }
 
-      // Only include email if it changed
       if (emailChanged) {
         updateData.email = data.email
       }
@@ -132,17 +141,8 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
       onSuccess()
     } catch (error: unknown) {
       logger.error('Profile update error:', error)
-      const err = error as { code?: string; message?: string }
-
-      if (err.code === 'auth/requires-recent-login') {
-        toast.error('Sessão expirada. Por favor, faça login novamente.')
-      } else if (err.code === 'auth/email-already-in-use') {
-        toast.error('Este email já está em uso')
-      } else if (err.code === 'auth/weak-password') {
-        toast.error('Senha muito fraca')
-      } else {
-        toast.error(err.message || 'Erro ao atualizar perfil')
-      }
+      const err = error as { message?: string }
+      toast.error(err.message || 'Erro ao atualizar perfil')
     } finally {
       setSaving(false)
     }

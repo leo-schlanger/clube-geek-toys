@@ -161,6 +161,21 @@ CREATE TABLE processed_webhooks (
   processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Error Logs (frontend + backend error tracking)
+CREATE TABLE error_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  severity VARCHAR(10) NOT NULL DEFAULT 'error' CHECK (severity IN ('debug', 'info', 'warning', 'error', 'fatal')),
+  message TEXT NOT NULL,
+  stack TEXT,
+  source VARCHAR(10) NOT NULL DEFAULT 'frontend' CHECK (source IN ('frontend', 'backend')),
+  context JSONB DEFAULT '{}',
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  url TEXT,
+  user_agent TEXT,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Config (key-value store)
 CREATE TABLE config (
   key VARCHAR(100) PRIMARY KEY,
@@ -218,6 +233,11 @@ CREATE INDEX idx_audit_action ON audit_logs(action, timestamp DESC);
 -- Email Logs
 CREATE INDEX idx_email_member ON email_logs(member_id);
 CREATE INDEX idx_email_sent ON email_logs(sent_at DESC);
+
+-- Error Logs
+CREATE INDEX idx_error_created ON error_logs(created_at DESC);
+CREATE INDEX idx_error_severity ON error_logs(severity, created_at DESC);
+CREATE INDEX idx_error_source ON error_logs(source, created_at DESC);
 
 -- ============================================
 -- TRIGGERS

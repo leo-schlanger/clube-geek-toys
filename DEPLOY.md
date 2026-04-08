@@ -196,31 +196,54 @@ docker compose up -d --force-recreate api nginx
 
 ## 5. Backup e Recuperacao
 
-### Backup do PostgreSQL
+### Configurar Backup Automatico
 
 ```bash
-# Backup manual
-docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys > backup_$(date +%Y%m%d).sql
+# Na VPS, tornar scripts executaveis
+chmod +x /opt/clube-geek-toys/server/scripts/backup-postgres.sh
+chmod +x /opt/clube-geek-toys/server/scripts/restore-postgres.sh
 
-# Recomendacao: cron diario
-# Adicionar ao crontab da VPS:
-0 3 * * * docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys | gzip > /opt/backups/db_$(date +\%Y\%m\%d).sql.gz
+# Adicionar ao crontab (backup diario as 3h UTC, retencao 7 dias)
+crontab -e
+# Adicionar a linha:
+0 3 * * * cd /opt/clube-geek-toys/server && ./scripts/backup-postgres.sh >> /var/log/clube-backup.log 2>&1
+```
+
+### Backup Manual
+
+```bash
+cd /opt/clube-geek-toys/server
+./scripts/backup-postgres.sh
+# Backups salvos em /opt/clube-geek-toys/backups/
 ```
 
 ### Restauracao
 
 ```bash
-# Restaurar de um backup
-cat backup.sql | docker exec -i clube-geek-postgres psql -U clube_geek clube_geek_toys
+cd /opt/clube-geek-toys/server
+./scripts/restore-postgres.sh /opt/clube-geek-toys/backups/<arquivo>.sql.gz
 ```
 
-### Retencao Recomendada
+### Retencao
 
-- Backups diarios: 7 dias
-- Backups semanais: 4 semanas
-- Backups mensais: 12 meses
+- Backups diarios automaticos: 7 dias (limpeza automatica pelo script)
 
 ## 6. Monitoramento
+
+### Health Check Automatico
+
+```bash
+# Na VPS, tornar script executavel
+chmod +x /opt/clube-geek-toys/server/scripts/health-check.sh
+
+# Adicionar ao crontab (a cada 5 minutos)
+crontab -e
+# Adicionar a linha:
+*/5 * * * * cd /opt/clube-geek-toys/server && ./scripts/health-check.sh >> /var/log/clube-health.log 2>&1
+```
+
+O script verifica `/api/health` e envia email via Resend se a API estiver fora.
+Envia alerta apenas na primeira falha e novamente quando recupera (evita spam).
 
 ### Containers Docker
 

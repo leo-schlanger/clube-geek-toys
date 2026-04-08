@@ -1,16 +1,13 @@
 /**
  * Error Tracking Service
  *
- * A lightweight error tracking service that can be integrated with
- * Sentry, LogRocket, or other error tracking services.
+ * Sends errors to the backend PostgreSQL error_logs table.
+ * Also keeps a local buffer for debugging.
  *
  * Usage:
  * import { ErrorTracker } from './lib/error-tracking'
  *
- * // Capture an error
  * ErrorTracker.captureException(error, { userId, context: 'payment_flow' })
- *
- * // Capture a message
  * ErrorTracker.captureMessage('Payment failed', 'warning', { paymentId })
  */
 
@@ -33,6 +30,8 @@ interface ErrorEvent {
   context: ErrorContext
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
 class ErrorTrackingService {
   private events: ErrorEvent[] = []
   private maxEvents = 100
@@ -54,11 +53,7 @@ class ErrorTrackingService {
 
     this.addEvent(event)
     this.logToConsole(event)
-
-    // TODO: Send to Sentry or other service
-    // if (this.isProduction) {
-    //   Sentry.captureException(error, { extra: context })
-    // }
+    this.sendToBackend(event)
   }
 
   /**
@@ -82,18 +77,15 @@ class ErrorTrackingService {
       this.logToConsole(event)
     }
 
-    // TODO: Send to Sentry or other service
-    // if (this.isProduction) {
-    //   Sentry.captureMessage(message, severity)
-    // }
+    if (severity === 'warning' || severity === 'error' || severity === 'fatal') {
+      this.sendToBackend(event)
+    }
   }
 
   /**
    * Set user context for error tracking
    */
   setUser(userId: string, email?: string): void {
-    // TODO: Send to Sentry
-    // Sentry.setUser({ id: userId, email })
     logger.debug('User set:', { userId, email })
   }
 
@@ -101,8 +93,7 @@ class ErrorTrackingService {
    * Clear user context (on logout)
    */
   clearUser(): void {
-    // TODO: Send to Sentry
-    // Sentry.setUser(null)
+    // No-op — user is extracted from JWT on the backend
   }
 
   /**
@@ -126,11 +117,29 @@ class ErrorTrackingService {
     }
   }
 
+  private sendToBackend(event: ErrorEvent): void {
+    // Fire-and-forget — don't block on error reporting
+    const token = localStorage.getItem('clube_geek_access_token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+
+    fetch(`${API_URL}/logs/errors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        severity: event.severity,
+        message: event.message,
+        stack: event.stack,
+        context: event.context,
+        url: window.location.href,
+      }),
+    }).catch(() => {
+      // Silently fail — can't report errors about error reporting
+    })
+  }
+
   private logToConsole(event: ErrorEvent): void {
-    if (this.isProduction) {
-      // In production, we rely on error tracking service
-      return
-    }
+    if (this.isProduction) return
 
     const { message, severity, stack, context } = event
     const contextStr = Object.keys(context).length > 0
@@ -166,4 +175,22 @@ export async function withErrorTracking<T>(
     ErrorTracker.captureException(error, context)
     throw error
   }
+}
+
+// Global error handlers — capture unhandled errors
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    ErrorTracker.captureException(event.error || event.message, {
+      context: 'window.onerror',
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+    })
+  })
+
+  window.addEventListener('unhandledrejection', (event) => {
+    ErrorTracker.captureException(event.reason || 'Unhandled promise rejection', {
+      context: 'unhandledrejection',
+    })
+  })
 }
