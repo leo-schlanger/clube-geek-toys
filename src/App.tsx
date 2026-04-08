@@ -7,6 +7,7 @@ import { LoadingPage } from './components/ui/loading'
 import { SkipLink } from './components/ui/skip-link'
 import { OfflineBanner } from './components/ui/offline-banner'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { CookieConsent } from './components/CookieConsent'
 import { getAppMode } from './lib/subdomain'
 
 // Lazy loaded pages - Member Area
@@ -266,6 +267,7 @@ function App() {
               </main>
             </Suspense>
             <Toaster position="top-right" richColors />
+            <CookieConsent />
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

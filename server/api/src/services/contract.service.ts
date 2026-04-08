@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { query, getClient } from '../config/database.js';
 import { env } from '../config/env.js';
+import { AppError } from '../middleware/error-handler.js';
 
 export async function saveContract(
   data: {
@@ -80,6 +81,38 @@ export async function getContractHistory(memberId: string) {
     [memberId]
   );
   return result.rows.map(mapContractRow);
+}
+
+export async function revokeContract(contractId: string, memberId: string, reason?: string) {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE contracts SET status = 'revoked' WHERE id = $1 AND member_id = $2 AND status = 'active' RETURNING id`,
+      [contractId, memberId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new AppError(404, 'Contrato ativo não encontrado');
+    }
+
+    // Audit log
+    await client.query(
+      `INSERT INTO audit_logs (action, member_id, details)
+       VALUES ('contract_revoked', $1, $2)`,
+      [memberId, JSON.stringify({ contractId, reason: reason || null, revokedAt: new Date().toISOString() })]
+    );
+
+    await client.query('COMMIT');
+
+    return { message: 'Contrato revogado com sucesso', contractId };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 function mapContractRow(row: pg.QueryResultRow) {

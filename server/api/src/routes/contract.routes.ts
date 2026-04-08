@@ -71,3 +71,19 @@ contractRouter.get('/:memberId/history', async (req, res, next) => {
     next(err);
   }
 });
+
+// POST /contracts/:contractId/revoke — revoke active contract
+contractRouter.post('/:contractId/revoke', async (req, res, next) => {
+  try {
+    const { memberId, reason } = req.body;
+    if (!memberId) {
+      res.status(400).json({ error: 'memberId é obrigatório' });
+      return;
+    }
+    if (!await verifyMemberOwnership(req, res, memberId)) return;
+    const result = await contractService.revokeContract(req.params.contractId, memberId, reason);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});

@@ -23,6 +23,8 @@ import {
   Loader2,
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
+  Shield,
 } from 'lucide-react'
 
 type ContractStep = 'read' | 'sign' | 'confirm'
@@ -52,19 +54,40 @@ export function ContractModal({
 }: ContractModalProps) {
   const [step, setStep] = useState<ContractStep>('read')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [canvasReady, setCanvasReady] = useState(false)
   const [canvasError, setCanvasError] = useState(false)
+  const [scrolledToBottom, setScrolledToBottom] = useState(false)
 
   const contentRef = useRef<HTMLDivElement>(null)
+  const checkboxRef = useRef<HTMLLabelElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const signaturePadRef = useRef<SignaturePad | null>(null)
 
   const planData = PLANS[plan]
   const price = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+  const canProceed = acceptedTerms && acceptedPrivacy
+
+  // Track scroll position in read step
+  useEffect(() => {
+    if (step !== 'read') return
+    const el = contentRef.current
+    if (!el) return
+
+    const handleScroll = () => {
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+      if (isNearBottom) setScrolledToBottom(true)
+    }
+
+    el.addEventListener('scroll', handleScroll)
+    // Check initial state (short content)
+    handleScroll()
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [step])
 
   // Scroll to top when step changes
   useEffect(() => {
@@ -84,14 +107,12 @@ export function ContractModal({
     const width = Math.max(rect.width - 8, 280)
     const height = 170
 
-    // Set canvas dimensions
     const dpr = window.devicePixelRatio || 1
     canvas.width = width * dpr
     canvas.height = height * dpr
     canvas.style.width = `${width}px`
     canvas.style.height = `${height}px`
 
-    // Setup context
     const ctx = canvas.getContext('2d')
     if (ctx) {
       ctx.scale(dpr, dpr)
@@ -99,12 +120,10 @@ export function ContractModal({
       ctx.fillRect(0, 0, width, height)
     }
 
-    // Destroy old pad if exists
     if (signaturePadRef.current) {
       signaturePadRef.current.off()
     }
 
-    // Create new signature pad
     signaturePadRef.current = new SignaturePad(canvas, {
       backgroundColor: 'rgb(255, 255, 255)',
       penColor: 'rgb(0, 0, 0)',
@@ -127,7 +146,6 @@ export function ContractModal({
       return
     }
 
-    // Try multiple times with increasing delays
     const attempts = [50, 150, 300, 500, 800]
     let attemptIndex = 0
     let timeoutId: ReturnType<typeof setTimeout>
@@ -135,13 +153,12 @@ export function ContractModal({
     const trySetup = () => {
       if (setupCanvas()) {
         setCanvasError(false)
-        return // Success
+        return
       }
       attemptIndex++
       if (attemptIndex < attempts.length) {
         timeoutId = setTimeout(trySetup, attempts[attemptIndex])
       } else {
-        // All attempts failed - show error to user
         setCanvasError(true)
         toast.error('Erro ao carregar área de assinatura. Tente recarregar a página.')
       }
@@ -190,6 +207,13 @@ export function ContractModal({
     }
     setSignatureImage(signaturePadRef.current.toDataURL('image/png'))
     setStep('confirm')
+  }
+
+  // When user clicks disabled button, scroll to checkboxes
+  function handleDisabledContinueClick() {
+    if (canProceed) return
+    checkboxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    toast.error('Aceite os termos e a política de privacidade para continuar', { id: 'accept-terms' })
   }
 
   async function processContract() {
@@ -292,17 +316,14 @@ export function ContractModal({
     }
   }
 
-  // Prevent accidental close - contract is mandatory
   const handleOverlayClick = () => {
     toast.error('Você precisa assinar o contrato para continuar', { id: 'contract-required' })
   }
 
   return (
     <div className="fixed inset-0 z-[9999] overflow-hidden">
-      {/* Overlay - doesn't close modal, shows warning instead */}
       <div className="fixed inset-0 bg-black/70" onClick={handleOverlayClick} />
 
-      {/* Modal - centered with proper sizing */}
       <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4 overflow-hidden">
         <div className="relative bg-background rounded-lg shadow-2xl w-full max-w-2xl h-[95vh] sm:h-auto sm:max-h-[90vh] flex flex-col">
           {/* Header */}
@@ -313,7 +334,6 @@ export function ContractModal({
               </h2>
               <p className="text-sm text-muted-foreground">Passo {step === 'read' ? 1 : step === 'sign' ? 2 : 3} de 3</p>
             </div>
-            {/* X button only shown during loading or after contract signed, not during required steps */}
             {loading ? (
               <div className="p-2">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -349,7 +369,7 @@ export function ContractModal({
 
                 <div className="bg-muted/50 rounded-lg p-3 text-sm">
                   <p className="font-semibold mb-1">Seus Dados:</p>
-                  <p>{memberName} • CPF: {memberCPF}</p>
+                  <p>{memberName} &bull; CPF: {memberCPF}</p>
                   <p className="break-all">{memberEmail}</p>
                   <p>{memberPhone}</p>
                   <p className="mt-2 pt-2 border-t">
@@ -372,22 +392,44 @@ export function ContractModal({
 
                 <p className="text-center text-xs text-muted-foreground py-2">— Fim do Regulamento —</p>
 
-                <label className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                  acceptedTerms
-                    ? 'border-green-500 bg-green-500/10'
-                    : 'border-primary/40 bg-primary/10 hover:bg-primary/15 animate-pulse'
-                }`}>
-                  <input
-                    type="checkbox"
-                    checked={acceptedTerms}
-                    onChange={e => setAcceptedTerms(e.target.checked)}
-                    className="mt-0.5 h-6 w-6 accent-primary cursor-pointer shrink-0"
-                  />
-                  <span className="text-sm sm:text-base font-medium">
-                    Li e concordo com todos os termos do regulamento acima
-                    {!acceptedTerms && <span className="block text-xs text-muted-foreground mt-1">Marque esta opção para continuar</span>}
-                  </span>
-                </label>
+                {/* Checkboxes */}
+                <div className="space-y-3">
+                  <label ref={checkboxRef} className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    acceptedTerms
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-primary/40 bg-primary/5 hover:bg-primary/10'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={acceptedTerms}
+                      onChange={e => setAcceptedTerms(e.target.checked)}
+                      className="mt-0.5 h-5 w-5 accent-primary cursor-pointer shrink-0"
+                    />
+                    <span className="text-sm font-medium">
+                      Li e concordo com todos os termos do regulamento acima
+                    </span>
+                  </label>
+
+                  <label className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    acceptedPrivacy
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-primary/40 bg-primary/5 hover:bg-primary/10'
+                  }`}>
+                    <input
+                      type="checkbox"
+                      checked={acceptedPrivacy}
+                      onChange={e => setAcceptedPrivacy(e.target.checked)}
+                      className="mt-0.5 h-5 w-5 accent-primary cursor-pointer shrink-0"
+                    />
+                    <span className="text-sm font-medium">
+                      Aceito a{' '}
+                      <a href="/privacidade" target="_blank" className="text-primary underline">
+                        Política de Privacidade
+                      </a>{' '}
+                      e autorizo o tratamento dos meus dados conforme a LGPD
+                    </span>
+                  </label>
+                </div>
               </div>
             )}
 
@@ -397,6 +439,15 @@ export function ContractModal({
                 <div className="text-center">
                   <h3 className="font-bold text-lg">Desenhe sua Assinatura</h3>
                   <p className="text-sm text-muted-foreground">Use o mouse ou toque na tela</p>
+                </div>
+
+                {/* Data collection notice */}
+                <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-200">
+                  <Shield className="h-4 w-4 shrink-0 mt-0.5 text-blue-400" />
+                  <p>
+                    Para validade jurídica (Lei 14.063/2020), serão registrados: seu endereço IP,
+                    informações do dispositivo, data/hora e um hash SHA-256 do documento.
+                  </p>
                 </div>
 
                 <div
@@ -429,7 +480,6 @@ export function ContractModal({
                       onClick={() => {
                         setCanvasError(false)
                         setCanvasReady(false)
-                        // Force re-setup
                         setTimeout(() => setupCanvas(), 100)
                       }}
                     >
@@ -498,10 +548,28 @@ export function ContractModal({
           {/* Footer - always visible */}
           <div className="p-4 sm:p-6 border-t shrink-0 bg-background shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
             {step === 'read' && (
-              <Button className="w-full h-12 text-base font-semibold" disabled={!acceptedTerms} onClick={() => setStep('sign')}>
-                Continuar para Assinatura
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
+              <div className="space-y-2">
+                {/* Scroll hint when checkboxes not yet visible */}
+                {!scrolledToBottom && !canProceed && (
+                  <button
+                    onClick={() => checkboxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                    className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+                  >
+                    <ChevronDown className="h-4 w-4 animate-bounce" />
+                    Role até o final para aceitar os termos
+                  </button>
+                )}
+                <div onClick={!canProceed ? handleDisabledContinueClick : undefined}>
+                  <Button
+                    className="w-full h-12 text-base font-semibold"
+                    disabled={!canProceed}
+                    onClick={() => setStep('sign')}
+                  >
+                    Continuar para Assinatura
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
             )}
 
             {step === 'sign' && (

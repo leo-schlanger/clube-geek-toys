@@ -18,6 +18,7 @@ import { pointsRouter } from './routes/points.routes.js';
 import { contractRouter } from './routes/contract.routes.js';
 import { reportRouter } from './routes/report.routes.js';
 import { logRouter } from './routes/log.routes.js';
+import { lgpdRouter } from './routes/lgpd.routes.js';
 import { initCronJobs } from './services/cron.service.js';
 
 const app = express();
@@ -70,6 +71,7 @@ app.use('/points', pointsRouter);
 app.use('/contracts', contractRouter);
 app.use('/reports', reportRouter);
 app.use('/logs', logRouter);
+app.use('/lgpd', lgpdRouter);
 app.use('/cron', reportRouter); // cron endpoints share admin auth pattern
 
 // Error handler
