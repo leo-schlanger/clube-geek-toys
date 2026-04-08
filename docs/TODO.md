@@ -33,12 +33,12 @@
 - [x] **Autenticacao JWT** - Migrado de Firebase Auth para JWT customizado (bcrypt + refresh tokens)
 - [x] **PagBank** - Migrado de Mercado Pago para PagBank (PIX + Cartao)
 - [x] **Audit logging** - Registro de acoes criticas no banco
-- [x] **Cron jobs** - node-cron para expiracao de pontos e lembretes
+- [x] **Cron jobs** - node-cron para expiracao de pontos, lembretes e notificacao de pontos expirando
 - [x] **Rate limiting server-side** - Middleware Express (antes era client-side)
 - [x] **RBAC middleware** - Verificacao de roles no servidor
 - [x] **Error tracking local** - Tabela error_logs no PostgreSQL + captura global de erros do frontend
 - [x] **Update profile endpoint** - PATCH /auth/update-profile para troca de email/senha
-- [x] **HTML email templates** - 13 templates HTML responsivos com branding e CTAs
+- [x] **HTML email templates** - 13 templates HTML responsivos com branding, preheader, CTAs e footer CNPJ
 
 ### Seguranca (Marco-Abril 2026)
 
@@ -50,6 +50,13 @@
 - [x] **SSH key-only** - Senha desabilitada
 - [x] **Security headers** - HSTS, X-Frame DENY, nosniff via Nginx
 - [x] **LGPD compliance** - Politica de privacidade e termos atualizados
+- [x] **Webhook verification** - Verificacao server-to-server via API PagBank
+- [x] **IDOR protection** - Middleware de ownership em pontos, pagamentos, contratos
+- [x] **Amount validation** - Rejeicao de valores que nao correspondem a planos
+- [x] **CSP habilitado** - Content Security Policy via Helmet
+- [x] **CPF checksum** - Validacao Modulo 11 no cadastro
+- [x] **Senha forte** - Minimo 8 chars + 1 maiuscula + 1 numero
+- [x] **Audit logs auth** - Verificacao de email, reset e update de perfil logados
 
 ### Pagamentos (Marco 2026)
 
@@ -71,8 +78,9 @@
 - [x] **Skeleton loading** - Carregamento visual
 - [x] **SEO completo** - Open Graph, Twitter Cards, Schema.org
 - [x] **Exportacao CSV** - Membros e relatorios
-- [x] **Email templates customizados** - 13 templates HTML via Resend
+- [x] **Email templates customizados** - 13 templates HTML responsivos via Resend
 - [x] **Error tracking no admin** - Tela de erros com filtros, stats e stack traces
+- [x] **Todos os emails conectados** - 7 templates que nao eram enviados agora funcionam
 
 ### Testes
 
@@ -86,7 +94,6 @@
 ### ALTO - Proximo Sprint
 
 - [ ] **Whitelist PagBank** - Configurar IP da VPS no painel PagBank para webhooks em producao
-- [ ] **Configurar cron na VPS** - Executar scripts de backup e health check (instrucos em DEPLOY.md)
 
 ### MEDIO - Planejado
 
@@ -167,4 +174,4 @@
 
 ---
 
-_Documento atualizado em 08 de Abril de 2026_
+_Documento atualizado em 08 de Abril de 2026 — Pos-auditoria de seguranca + email rewrite_

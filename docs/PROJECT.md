@@ -1,6 +1,6 @@
 # Clube Geek & Toys - Documentacao do Projeto
 
-> **Ultima atualizacao:** 07 de Abril de 2026
+> **Ultima atualizacao:** 08 de Abril de 2026
 
 ## Visao Geral
 
@@ -517,20 +517,24 @@ Exemplo: Compra de R$ 100,00 no plano Gold = 200 pontos
 
 ## Templates de Email
 
-| Template                      | Quando enviado               |
-| ----------------------------- | ---------------------------- |
-| `welcome`                     | Apos ativacao do membro      |
-| `payment-confirmed`           | Pagamento aprovado           |
-| `payment-failed`              | Pagamento rejeitado          |
-| `renewal-reminder`            | 7 dias antes do vencimento   |
-| `points-expiring`             | Pontos proximos da expiracao |
-| `subscription-created`        | Assinatura recorrente criada |
-| `subscription-payment`        | Cobranca recorrente aprovada |
-| `subscription-paused`         | Assinatura pausada           |
-| `subscription-cancelled`      | Assinatura cancelada         |
-| `subscription-payment-failed` | Cobranca recorrente falhou   |
-| `verify-email`                | Verificacao de email         |
-| `password-reset`              | Recuperacao de senha         |
+13 templates HTML responsivos com branding, preheader text, CTAs e footer com dados da empresa.
+Enviados via Resend API. Todos logados na tabela `email_logs`.
+
+| Template                      | Quando enviado                                | Trigger              |
+| ----------------------------- | --------------------------------------------- | -------------------- |
+| `verify-email`                | Apos registro — link de confirmacao (24h)     | Backend (auto)       |
+| `password-reset`              | Solicitacao de recuperacao de senha (1h)      | Backend (auto)       |
+| `welcome`                     | Apos ativacao do membro                       | Frontend             |
+| `payment-confirmed`           | Pagamento aprovado (PIX ou cartao)            | Webhook PagBank      |
+| `payment-failed`              | Pagamento rejeitado                           | Webhook PagBank      |
+| `contract-signed`             | Contrato digital assinado (com PDF anexo)     | Frontend             |
+| `subscription-created`        | Assinatura recorrente criada com sucesso      | Backend (auto)       |
+| `subscription-payment`        | Cobranca recorrente processada                | Webhook PagBank      |
+| `subscription-paused`         | Assinatura pausada pelo membro                | Backend (auto)       |
+| `subscription-cancelled`      | Assinatura cancelada (manual ou 3 falhas)     | Backend/Webhook      |
+| `subscription-payment-failed` | Cobranca recorrente falhou (mostra X/3)       | Webhook PagBank      |
+| `renewal-reminder`            | 5-8 dias antes do vencimento (dedup via logs) | Cron diario (6h UTC) |
+| `points-expiring`             | 5-8 dias antes da expiracao de pontos         | Cron diario (6h UTC) |
 
 ## Subdominios
 

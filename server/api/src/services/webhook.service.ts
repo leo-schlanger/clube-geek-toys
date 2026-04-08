@@ -69,6 +69,22 @@ async function processChargeNotification(orderId: string, charge: PagBankCharge,
       [status, charge.status, charge.paid_at || null, orderId]
     );
 
+    // If failed, notify member
+    if (status === 'failed' && referenceId) {
+      const memberResult = await client.query(
+        'SELECT email, full_name FROM members WHERE id = $1 OR user_id::text = $1',
+        [referenceId]
+      );
+      if (memberResult.rows.length > 0) {
+        const m = memberResult.rows[0];
+        sendTemplateEmail({
+          template: 'payment-failed',
+          to: m.email,
+          variables: { name: m.full_name },
+        }).catch((err) => console.error('[WEBHOOK] Email error:', err));
+      }
+    }
+
     // If paid, check if this is a subscription payment or one-time
     if (status === 'paid' && referenceId) {
       // Check if it's a subscription charge
@@ -175,6 +191,14 @@ async function processSubscriptionPayment(client: pg.PoolClient, subscriptionId:
     ]
   );
 
+  // Get member info for email notifications
+  const memberResult = await client.query(
+    `SELECT m.id, m.email, m.full_name, s.plan, s.transaction_amount, s.next_payment_date
+     FROM members m JOIN subscriptions s ON s.id = $1 WHERE m.subscription_id = $1`,
+    [subscriptionId]
+  );
+  const member = memberResult.rows[0];
+
   if (status === 'PAID') {
     await client.query(
       `UPDATE subscriptions SET failed_payments = 0, last_payment_date = NOW() WHERE id = $1`,
@@ -185,13 +209,46 @@ async function processSubscriptionPayment(client: pg.PoolClient, subscriptionId:
        WHERE subscription_id = $1`,
       [subscriptionId]
     );
+
+    // Send subscription payment confirmation
+    if (member) {
+      sendTemplateEmail({
+        template: 'subscription-payment',
+        to: member.email,
+        variables: {
+          name: member.full_name,
+          amount: amountInReais.toFixed(2).replace('.', ','),
+          plan: member.plan,
+          next_payment: member.next_payment_date
+            ? new Date(member.next_payment_date).toLocaleDateString('pt-BR')
+            : '—',
+        },
+        member_id: member.id,
+      }).catch((err) => console.error('[WEBHOOK] Email error:', err));
+    }
   } else if (status === 'DECLINED') {
     const result = await client.query(
       `UPDATE subscriptions SET failed_payments = failed_payments + 1 WHERE id = $1 RETURNING failed_payments`,
       [subscriptionId]
     );
 
-    if (result.rows[0]?.failed_payments >= 3) {
+    const failedCount = result.rows[0]?.failed_payments || 0;
+
+    // Send failure notification
+    if (member) {
+      sendTemplateEmail({
+        template: 'subscription-payment-failed',
+        to: member.email,
+        variables: {
+          name: member.full_name,
+          amount: (member.transaction_amount || amountInReais).toFixed(2).replace('.', ','),
+          failed_count: String(failedCount),
+        },
+        member_id: member.id,
+      }).catch((err) => console.error('[WEBHOOK] Email error:', err));
+    }
+
+    if (failedCount >= 3) {
       await client.query(
         `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1`,
         [subscriptionId]
@@ -200,6 +257,16 @@ async function processSubscriptionPayment(client: pg.PoolClient, subscriptionId:
         `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE WHERE subscription_id = $1`,
         [subscriptionId]
       );
+
+      // Send cancellation email (after 3 failures)
+      if (member) {
+        sendTemplateEmail({
+          template: 'subscription-cancelled',
+          to: member.email,
+          variables: { name: member.full_name },
+          member_id: member.id,
+        }).catch((err) => console.error('[WEBHOOK] Email error:', err));
+      }
     }
   }
 }

@@ -1,6 +1,6 @@
 # Seguranca e Compliance - Clube Geek & Toys
 
-> **Ultima atualizacao:** 07 de Abril de 2026
+> **Ultima atualizacao:** 08 de Abril de 2026
 
 ## Visao Geral
 
@@ -135,48 +135,76 @@ Whitelist de origens permitidas (middleware `cors.ts`):
 
 ## 5. Seguranca de Webhooks
 
-### Validacao PagBank
+### Verificacao Server-to-Server
 
-- Verificacao de assinatura HMAC do payload
-- Idempotencia: tabela `processed_webhooks` evita processamento duplicado
-- Webhook key = combinacao de `type + action + data_id`
+Webhooks PagBank sao verificados via consulta direta a API PagBank:
+
+```
+Webhook recebido (POST /webhook/pagbank)
+  → Rate limit: 60 req/min
+  → Extrai order ID do body
+  → GET /orders/{orderId} na API PagBank (verificacao server-to-server)
+  → Usa dados verificados (nao o body enviado)
+  → Processa pagamento com dados confiáveis
+```
 
 ### Idempotencia
 
-```
-Webhook recebido
-  → Gera webhook_key (type + action + data_id)
-  → Consulta processed_webhooks
-  → Se ja processado: retorna 200 (ignora)
-  → Se novo: processa + insere em processed_webhooks
-```
+- Webhook key = `pagbank_{orderId}_{chargeId}` (baseado em ID, nao status)
+- Tabela `processed_webhooks` evita processamento duplicado
+- INSERT com `ON CONFLICT DO NOTHING`
 
-## 6. Rate Limiting
+## 6. Controle de Acesso (IDOR Protection)
+
+### Middleware de Ownership
+
+Middleware centralizado (`middleware/ownership.ts`) aplicado em:
+
+- `GET /points/:memberId/*` — membros so veem seus proprios pontos
+- `POST /pix/create`, `POST /checkout/create` — valida que external_reference pertence ao user
+- `GET /payments` — membros so veem seus proprios pagamentos
+- `POST /contracts` — valida ownership do memberId
+- `GET /contracts/:memberId/*` — valida ownership
+- `GET /subscription/:id/*` — valida ownership
+
+Admins e sellers fazem bypass das verificacoes de ownership.
+
+## 7. Rate Limiting
 
 Implementado no middleware `rate-limit.ts`:
 
-| Endpoint                    | Limite  | Janela |
-| --------------------------- | ------- | ------ |
-| `POST /auth/login`          | 5 req   | 5 min  |
-| `POST /auth/register`       | 5 req   | 5 min  |
-| `POST /payment/pix`         | 10 req  | 1 min  |
-| `POST /payment/checkout`    | 10 req  | 1 min  |
-| `POST /auth/password-reset` | 3 req   | 5 min  |
-| Outros endpoints            | 100 req | 1 min  |
+| Endpoint                | Limite  | Janela |
+| ----------------------- | ------- | ------ |
+| `POST /auth/login`      | 10 req  | 5 min  |
+| `POST /auth/register`   | 10 req  | 5 min  |
+| `POST /auth/refresh`    | 10 req  | 5 min  |
+| `POST /payment/*`       | 10 req  | 1 min  |
+| `POST /webhook/pagbank` | 60 req  | 1 min  |
+| Outros endpoints        | 100 req | 1 min  |
 
 - Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`
 - Baseado em IP do cliente
 
-## 7. Validacao de Entrada
+## 8. Content Security Policy (CSP)
+
+Habilitado via Helmet com diretivas estritas:
+
+- `default-src: 'self'`
+- `script-src: 'self', assets.pagseguro.com.br, accounts.google.com`
+- `connect-src: 'self', api.pagseguro.com, accounts.google.com`
+- `frame-src: accounts.google.com`
+
+## 9. Validacao de Entrada
 
 ### Zod Schemas
 
 Todos os endpoints validam entrada com schemas Zod:
 
 - Limites de tamanho em todos os campos (email: max 254 chars, nome: max 200 chars)
-- Validacao de formato (email, CPF, UUID)
+- Validacao de formato (email, CPF com checksum Modulo 11, UUID)
 - Enums validados (plan, method, role)
-- Valores numericos com limites (amount > 0, points > 0)
+- Valores numericos com limites (amount deve corresponder a preco de plano)
+- Senhas: minimo 8 caracteres, 1 maiuscula, 1 numero
 
 ### Sanitizacao
 

@@ -16,6 +16,11 @@ export function initCronJobs() {
     } catch (err) {
       console.error('[CRON] Renewal reminders error:', err);
     }
+    try {
+      await sendPointsExpiringNotifications();
+    } catch (err) {
+      console.error('[CRON] Points expiring notifications error:', err);
+    }
   });
 
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
@@ -113,4 +118,46 @@ async function sendRenewalReminders() {
   }
 
   console.log(`[CRON] Sent ${sent} renewal reminders`);
+}
+
+async function sendPointsExpiringNotifications() {
+  // Notify members whose points expire in 5-8 days (dedup via email_logs)
+  const result = await query(
+    `SELECT m.id, m.full_name, m.email,
+            SUM(pt.points) as expiring_points,
+            MIN(pt.expires_at) as earliest_expiry
+     FROM point_transactions pt
+     JOIN members m ON m.id = pt.member_id
+     WHERE pt.type = 'earn' AND pt.expired = FALSE
+       AND pt.expires_at BETWEEN CURRENT_DATE + INTERVAL '5 days' AND CURRENT_DATE + INTERVAL '8 days'
+       AND NOT EXISTS (
+         SELECT 1 FROM email_logs el
+         WHERE el.member_id = m.id
+           AND el.template = 'points-expiring'
+           AND el.sent_at > CURRENT_DATE - INTERVAL '7 days'
+       )
+     GROUP BY m.id, m.full_name, m.email
+     HAVING SUM(pt.points) > 0`
+  );
+
+  let sent = 0;
+  for (const row of result.rows) {
+    try {
+      await sendTemplateEmail({
+        template: 'points-expiring',
+        to: row.email,
+        variables: {
+          name: row.full_name,
+          points: String(row.expiring_points),
+          expiry_date: new Date(row.earliest_expiry).toLocaleDateString('pt-BR'),
+        },
+        member_id: row.id,
+      });
+      sent++;
+    } catch (err) {
+      console.error(`[CRON] Failed to send points-expiring to ${row.email}:`, err);
+    }
+  }
+
+  console.log(`[CRON] Sent ${sent} points-expiring notifications`);
 }

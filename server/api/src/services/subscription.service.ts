@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { pagbankRequest } from '../utils/pagbank.js';
 import type { PagBankOrder } from '../utils/pagbank.js';
 import { AppError } from '../middleware/error-handler.js';
+import { sendTemplateEmail } from './email.service.js';
 import crypto from 'crypto';
 
 export async function createSubscription(data: {
@@ -95,6 +96,23 @@ export async function createSubscription(data: {
     );
   }
 
+  // Send confirmation email
+  const memberResult = await query('SELECT full_name, email FROM members WHERE id = $1', [data.member_id]);
+  if (memberResult.rows.length > 0) {
+    const member = memberResult.rows[0];
+    sendTemplateEmail({
+      template: 'subscription-created',
+      to: member.email,
+      variables: {
+        name: member.full_name,
+        plan: data.plan,
+        amount: data.transaction_amount.toFixed(2).replace('.', ','),
+        card_last_four: charge?.payment_method?.card?.last_digits || '****',
+      },
+      member_id: data.member_id,
+    }).catch((err) => console.error('[SUBSCRIPTION] Email error:', err));
+  }
+
   return { id: subscriptionId, status };
 }
 
@@ -111,6 +129,18 @@ export async function pauseSubscription(id: string) {
   );
   if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
   await query(`UPDATE members SET subscription_status = 'paused' WHERE subscription_id = $1`, [id]);
+
+  // Send pause notification
+  const member = await query('SELECT full_name, email, id FROM members WHERE subscription_id = $1', [id]);
+  if (member.rows.length > 0) {
+    sendTemplateEmail({
+      template: 'subscription-paused',
+      to: member.rows[0].email,
+      variables: { name: member.rows[0].full_name },
+      member_id: member.rows[0].id,
+    }).catch((err) => console.error('[SUBSCRIPTION] Email error:', err));
+  }
+
   return mapSubscriptionRow(result.rows[0]);
 }
 
@@ -134,6 +164,18 @@ export async function cancelSubscription(id: string) {
     `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE WHERE subscription_id = $1`,
     [id]
   );
+
+  // Send cancellation notification
+  const member = await query('SELECT full_name, email, id FROM members WHERE subscription_id = $1', [id]);
+  if (member.rows.length > 0) {
+    sendTemplateEmail({
+      template: 'subscription-cancelled',
+      to: member.rows[0].email,
+      variables: { name: member.rows[0].full_name },
+      member_id: member.rows[0].id,
+    }).catch((err) => console.error('[SUBSCRIPTION] Email error:', err));
+  }
+
   return mapSubscriptionRow(result.rows[0]);
 }
 
