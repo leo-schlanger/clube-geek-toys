@@ -9,19 +9,19 @@ export const pointsRouter = Router();
 pointsRouter.use(authenticate);
 
 const earnSchema = z.object({
-  purchaseValue: z.number().positive(),
+  purchaseValue: z.number().positive().multipleOf(0.01),
   isPromotion: z.boolean().default(false),
 });
 
 const bonusSchema = z.object({
   points: z.number().int().positive().max(50000),
-  reason: z.string().min(1),
+  reason: z.string().min(1).max(500),
 });
 
 const redeemSchema = z.object({
-  ruleId: z.string(),
+  ruleId: z.string().max(50),
   points: z.number().int().positive(),
-  description: z.string(),
+  description: z.string().max(500),
 });
 
 // GET /points/:memberId/history

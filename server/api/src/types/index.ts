@@ -135,3 +135,10 @@ export const POINTS_MULTIPLIER = {
 
 // Points expiration in months
 export const POINTS_EXPIRY_MONTHS = 6;
+
+// Valid redemption rules (enforced server-side)
+export const REDEMPTION_RULES = [
+  { points: 500, value: 25, description: 'R$ 25 de desconto' },
+  { points: 800, value: 50, description: 'R$ 50 de desconto' },
+  { points: 1500, value: 100, description: 'R$ 100 de desconto' },
+] as const;

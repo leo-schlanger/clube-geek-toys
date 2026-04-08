@@ -35,7 +35,7 @@ CREATE TABLE members (
   payment_type VARCHAR(10) NOT NULL CHECK (payment_type IN ('monthly', 'annual')),
   start_date DATE,
   expiry_date DATE,
-  points INTEGER NOT NULL DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
   pending_payment JSONB,
   subscription_id TEXT,
   subscription_status VARCHAR(20),

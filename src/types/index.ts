@@ -191,7 +191,7 @@ export interface MemberVerification {
 // ============================================
 
 // Point transaction type
-export type PointTransactionType = 'earn' | 'redeem' | 'expire'
+export type PointTransactionType = 'earn' | 'redeem' | 'expire' | 'bonus'
 
 export interface PointTransaction {
   id: string

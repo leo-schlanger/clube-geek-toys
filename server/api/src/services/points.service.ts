@@ -1,6 +1,6 @@
 import { query, getClient } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
-import { POINTS_MULTIPLIER, POINTS_EXPIRY_MONTHS } from '../types/index.js';
+import { POINTS_MULTIPLIER, POINTS_EXPIRY_MONTHS, REDEMPTION_RULES } from '../types/index.js';
 import type { PlanType } from '../types/index.js';
 
 export async function getPointsHistory(memberId: string, limit: number) {
@@ -37,16 +37,50 @@ export async function earnPoints(
   try {
     await client.query('BEGIN');
 
-    // Get member plan
-    const memberResult = await client.query('SELECT plan, points FROM members WHERE id = $1 FOR UPDATE', [memberId]);
+    // Get member plan and status
+    const memberResult = await client.query(
+      'SELECT plan, points, status FROM members WHERE id = $1 FOR UPDATE',
+      [memberId]
+    );
     if (memberResult.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
 
-    const { plan, points: currentPoints } = memberResult.rows[0];
+    const { plan, points: currentPoints, status } = memberResult.rows[0];
+
+    // Only active members can earn points
+    if (status !== 'active') {
+      throw new AppError(400, 'Apenas membros ativos podem acumular pontos');
+    }
+
     const multiplier = POINTS_MULTIPLIER[plan as PlanType] || 1;
-    const earnedPoints = Math.floor(purchaseValue * multiplier * (isPromotion ? 2 : 1));
+
+    // Promotions don't earn points (0 points)
+    const earnedPoints = isPromotion ? 0 : Math.floor(purchaseValue * multiplier);
+
+    if (earnedPoints === 0 && isPromotion) {
+      // Record the transaction for audit purposes but don't change balance
+      const txResult = await client.query(
+        `INSERT INTO point_transactions (member_id, type, points, balance, description, purchase_value, is_promotion, created_by)
+         VALUES ($1, 'earn', 0, $2, $3, $4, TRUE, $5) RETURNING *`,
+        [
+          memberId, currentPoints,
+          `Compra promocional R$ ${purchaseValue.toFixed(2)} (sem pontos)`,
+          purchaseValue, createdBy,
+        ]
+      );
+
+      await client.query(
+        `INSERT INTO audit_logs (action, member_id, user_id, details)
+         VALUES ('points_earn', $1, $2, $3)`,
+        [memberId, createdBy, JSON.stringify({ points: 0, purchaseValue, isPromotion: true })]
+      );
+
+      await client.query('COMMIT');
+      return mapPointRow(txResult.rows[0]);
+    }
+
     const newBalance = currentPoints + earnedPoints;
 
-    // Calculate expiration
+    // Calculate expiration (6 months)
     const expiresAt = new Date();
     expiresAt.setMonth(expiresAt.getMonth() + POINTS_EXPIRY_MONTHS);
 
@@ -56,9 +90,9 @@ export async function earnPoints(
        VALUES ($1, 'earn', $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
         memberId, earnedPoints, newBalance,
-        `Compra R$ ${purchaseValue.toFixed(2)} (${multiplier}x${isPromotion ? ' promo' : ''})`,
+        `Compra R$ ${purchaseValue.toFixed(2)} (${multiplier}x)`,
         purchaseValue, expiresAt.toISOString().split('T')[0],
-        isPromotion, createdBy,
+        false, createdBy,
       ]
     );
 
@@ -69,7 +103,7 @@ export async function earnPoints(
     await client.query(
       `INSERT INTO audit_logs (action, member_id, user_id, details)
        VALUES ('points_earn', $1, $2, $3)`,
-      [memberId, createdBy, JSON.stringify({ points: earnedPoints, purchaseValue, isPromotion })]
+      [memberId, createdBy, JSON.stringify({ points: earnedPoints, purchaseValue, isPromotion: false })]
     );
 
     await client.query('COMMIT');
@@ -92,15 +126,22 @@ export async function addBonusPoints(
   try {
     await client.query('BEGIN');
 
-    const memberResult = await client.query('SELECT points FROM members WHERE id = $1 FOR UPDATE', [memberId]);
+    const memberResult = await client.query(
+      'SELECT points, status FROM members WHERE id = $1 FOR UPDATE',
+      [memberId]
+    );
     if (memberResult.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
+
+    if (memberResult.rows[0].status !== 'active') {
+      throw new AppError(400, 'Apenas membros ativos podem receber pontos bônus');
+    }
 
     const newBalance = memberResult.rows[0].points + points;
 
     const txResult = await client.query(
       `INSERT INTO point_transactions (member_id, type, points, balance, description, created_by)
        VALUES ($1, 'bonus', $2, $3, $4, $5) RETURNING *`,
-      [memberId, points, newBalance, reason, createdBy]
+      [memberId, points, newBalance, reason.slice(0, 500), createdBy]
     );
 
     await client.query('UPDATE members SET points = $1 WHERE id = $2', [newBalance, memberId]);
@@ -108,7 +149,7 @@ export async function addBonusPoints(
     await client.query(
       `INSERT INTO audit_logs (action, member_id, user_id, details)
        VALUES ('points_bonus', $1, $2, $3)`,
-      [memberId, createdBy, JSON.stringify({ points, reason })]
+      [memberId, createdBy, JSON.stringify({ points, reason: reason.slice(0, 200) })]
     );
 
     await client.query('COMMIT');
@@ -127,16 +168,29 @@ export async function redeemPoints(
   description: string,
   createdBy: string
 ) {
+  // Validate against redemption rules
+  const validRule = REDEMPTION_RULES.find(r => r.points === points);
+  if (!validRule) {
+    throw new AppError(400, `Quantidade de pontos inválida para resgate. Valores aceitos: ${REDEMPTION_RULES.map(r => r.points).join(', ')}`);
+  }
+
   const client = await getClient();
   try {
     await client.query('BEGIN');
 
-    const memberResult = await client.query('SELECT points FROM members WHERE id = $1 FOR UPDATE', [memberId]);
+    const memberResult = await client.query(
+      'SELECT points, status FROM members WHERE id = $1 FOR UPDATE',
+      [memberId]
+    );
     if (memberResult.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
+
+    if (memberResult.rows[0].status !== 'active') {
+      throw new AppError(400, 'Apenas membros ativos podem resgatar pontos');
+    }
 
     const currentPoints = memberResult.rows[0].points;
     if (currentPoints < points) {
-      throw new AppError(400, 'Pontos insuficientes');
+      throw new AppError(400, `Pontos insuficientes. Saldo: ${currentPoints}, necessário: ${points}`);
     }
 
     const newBalance = currentPoints - points;
@@ -144,7 +198,7 @@ export async function redeemPoints(
     const txResult = await client.query(
       `INSERT INTO point_transactions (member_id, type, points, balance, description, created_by)
        VALUES ($1, 'redeem', $2, $3, $4, $5) RETURNING *`,
-      [memberId, -points, newBalance, description, createdBy]
+      [memberId, -points, newBalance, `${validRule.description} (${description})`.slice(0, 500), createdBy]
     );
 
     await client.query('UPDATE members SET points = $1 WHERE id = $2', [newBalance, memberId]);
@@ -152,7 +206,7 @@ export async function redeemPoints(
     await client.query(
       `INSERT INTO audit_logs (action, member_id, user_id, details)
        VALUES ('points_redeem', $1, $2, $3)`,
-      [memberId, createdBy, JSON.stringify({ points, description })]
+      [memberId, createdBy, JSON.stringify({ points, value: validRule.value, description })]
     );
 
     await client.query('COMMIT');

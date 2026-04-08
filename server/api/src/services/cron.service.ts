@@ -74,6 +74,13 @@ async function expirePoints() {
 
       // Update member balance
       await client.query('UPDATE members SET points = $1 WHERE id = $2', [newBalance, tx.member_id]);
+
+      // Audit log
+      await client.query(
+        `INSERT INTO audit_logs (action, member_id, details)
+         VALUES ('points_expired', $1, $2)`,
+        [tx.member_id, JSON.stringify({ transactionId: tx.id, pointsExpired: tx.points, newBalance })]
+      );
     }
 
     await client.query('COMMIT');

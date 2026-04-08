@@ -63,14 +63,7 @@ export async function addPoints(
   isPromotion: boolean,
   _sellerId?: string
 ): Promise<{ success: boolean; pointsAdded: number; message: string }> {
-  if (isPromotion) {
-    return {
-      success: true,
-      pointsAdded: 0,
-      message: 'Compra em promoção - pontos não acumulam',
-    }
-  }
-
+  // Always call the backend — it handles promotion logic (0 points for promos)
   const result = await api.post(`/points/${memberId}/earn`, {
     purchaseValue,
     isPromotion,
@@ -80,11 +73,12 @@ export async function addPoints(
     return { success: false, pointsAdded: 0, message: result.error }
   }
 
-  const tx = result.data
+  const tx = result.data as { points: number }
+  const pts = tx?.points ?? 0
   return {
     success: true,
-    pointsAdded: tx.points,
-    message: `${tx.points} pontos adicionados`,
+    pointsAdded: pts,
+    message: pts > 0 ? `${pts} pontos adicionados` : 'Compra em promoção — pontos não acumulam',
   }
 }
 
