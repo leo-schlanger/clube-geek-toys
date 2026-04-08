@@ -112,7 +112,7 @@ export async function createPixPayment(data: {
   // Save payment to database
   await query(
     `INSERT INTO payments (member_id, amount, method, status, provider_id, provider_status, reference)
-     VALUES ((SELECT id FROM members WHERE id = $1 OR user_id::text = $1 LIMIT 1), $2, 'pix', 'pending', $3, $4, $5)`,
+     VALUES ((SELECT id FROM members WHERE id = $1 LIMIT 1), $2, 'pix', 'pending', $3, $4, $5)`,
     [
       data.external_reference,
       data.amount,
@@ -187,7 +187,7 @@ export async function createCardPayment(data: {
   // Save payment to database
   await query(
     `INSERT INTO payments (member_id, amount, method, status, provider_id, provider_status, reference)
-     VALUES ((SELECT id FROM members WHERE id = $1 OR user_id::text = $1 LIMIT 1), $2, 'credit_card', $3, $4, $5, $6)`,
+     VALUES ((SELECT id FROM members WHERE id = $1 LIMIT 1), $2, 'credit_card', $3, $4, $5, $6)`,
     [
       data.external_reference,
       data.amount,

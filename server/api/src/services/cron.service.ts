@@ -21,6 +21,11 @@ export function initCronJobs() {
     } catch (err) {
       console.error('[CRON] Points expiring notifications error:', err);
     }
+    try {
+      await expireMembers();
+    } catch (err) {
+      console.error('[CRON] Expire members error:', err);
+    }
   });
 
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
@@ -160,4 +165,31 @@ async function sendPointsExpiringNotifications() {
   }
 
   console.log(`[CRON] Sent ${sent} points-expiring notifications`);
+}
+
+async function expireMembers() {
+  // Mark active members as expired when their expiry_date has passed
+  const result = await query(
+    `UPDATE members SET status = 'expired'
+     WHERE status = 'active'
+       AND expiry_date IS NOT NULL
+       AND expiry_date < CURRENT_DATE
+       AND auto_renewal = FALSE
+     RETURNING id, full_name, email`
+  );
+
+  if (result.rowCount && result.rowCount > 0) {
+    console.log(`[CRON] Expired ${result.rowCount} members`);
+
+    // Log each expiration in audit_logs
+    for (const member of result.rows) {
+      await query(
+        `INSERT INTO audit_logs (action, member_id, details)
+         VALUES ('member_expired', $1, '{"reason":"expiry_date_passed","auto":true}')`,
+        [member.id]
+      ).catch(() => {});
+    }
+  } else {
+    console.log('[CRON] No members to expire');
+  }
 }

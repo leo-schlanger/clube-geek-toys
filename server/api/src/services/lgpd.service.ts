@@ -12,7 +12,7 @@ const BCRYPT_ROUNDS = 12;
 export async function exportUserData(userId: string) {
   // User info (exclude sensitive fields)
   const userResult = await query(
-    `SELECT id, email, role, email_verified, email_verified_at, google_id, created_at, updated_at
+    `SELECT id, email, role, email_verified, email_verified_at, created_at, updated_at
      FROM users WHERE id = $1`,
     [userId]
   );

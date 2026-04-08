@@ -125,7 +125,7 @@ CREATE TABLE contracts (
   document_hash VARCHAR(64),
   pdf_url TEXT,
   pdf_path TEXT,
-  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'superseded')),
+  status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'superseded', 'revoked')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -214,6 +214,7 @@ CREATE INDEX idx_points_expires ON point_transactions(expires_at) WHERE type = '
 CREATE INDEX idx_subscriptions_member_id ON subscriptions(member_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 CREATE INDEX idx_subscriptions_member_status ON subscriptions(member_id, status);
+CREATE INDEX idx_subscriptions_provider_id ON subscriptions(provider_id);
 
 -- Subscription Payments
 CREATE INDEX idx_subpayments_subscription ON subscription_payments(subscription_id);

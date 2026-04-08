@@ -142,21 +142,35 @@ async function processPixNotification(orderId: string, qrCode: NonNullable<PagBa
 }
 
 async function activateMember(client: pg.PoolClient, memberId: string, paymentRef: string, amount: number) {
+  // First, fetch member to determine payment_type for correct expiry calculation
+  const memberLookup = await client.query(
+    'SELECT id, payment_type FROM members WHERE id = $1',
+    [memberId]
+  );
+  if (memberLookup.rows.length === 0) return;
+
+  const member = memberLookup.rows[0];
   const now = new Date();
   const expiryDate = new Date(now);
-  expiryDate.setMonth(expiryDate.getMonth() + 1);
+
+  // Calculate expiry based on payment type
+  if (member.payment_type === 'annual') {
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+  } else {
+    expiryDate.setMonth(expiryDate.getMonth() + 1);
+  }
 
   await client.query(
     `UPDATE members SET status = 'active', start_date = $1, expiry_date = $2,
      activated_at = NOW(), activated_by_payment = $3, pending_payment = NULL
-     WHERE (id = $4 OR user_id::text = $4) AND status != 'active'`,
-    [now.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], paymentRef, memberId]
+     WHERE id = $4 AND status != 'active'`,
+    [now.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], paymentRef, member.id]
   );
 
   // Send confirmation email
   const memberResult = await client.query(
-    'SELECT email, full_name, plan FROM members WHERE id = $1 OR user_id::text = $1',
-    [memberId]
+    'SELECT email, full_name, plan FROM members WHERE id = $1',
+    [member.id]
   );
   if (memberResult.rows.length > 0) {
     const member = memberResult.rows[0];
@@ -191,13 +205,14 @@ async function processSubscriptionPayment(client: pg.PoolClient, subscriptionId:
     ]
   );
 
-  // Get member info for email notifications
+  // Get member + subscription info for expiry calculation and email
   const memberResult = await client.query(
-    `SELECT m.id, m.email, m.full_name, s.plan, s.transaction_amount, s.next_payment_date
+    `SELECT m.id, m.email, m.full_name, s.plan, s.frequency_type, s.transaction_amount, s.next_payment_date
      FROM members m JOIN subscriptions s ON s.id = $1 WHERE m.subscription_id = $1`,
     [subscriptionId]
   );
   const member = memberResult.rows[0];
+  const interval = member?.frequency_type === 'years' ? '1 year' : '1 month';
 
   if (status === 'PAID') {
     await client.query(
@@ -205,7 +220,7 @@ async function processSubscriptionPayment(client: pg.PoolClient, subscriptionId:
       [subscriptionId]
     );
     await client.query(
-      `UPDATE members SET expiry_date = expiry_date + INTERVAL '1 month', status = 'active'
+      `UPDATE members SET expiry_date = expiry_date + INTERVAL '${interval}', status = 'active'
        WHERE subscription_id = $1`,
       [subscriptionId]
     );
