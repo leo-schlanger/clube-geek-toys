@@ -249,6 +249,17 @@ export default function Register() {
     setCheckingVerification(false)
   }
 
+  // Auto-poll for email verification while awaiting (every 5 seconds)
+  useEffect(() => {
+    if (!awaitingEmailVerification || emailVerified) return
+
+    const interval = setInterval(async () => {
+      await refreshUser()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [awaitingEmailVerification, emailVerified, refreshUser])
+
   // Watch for emailVerified becoming true while awaiting
   useEffect(() => {
     if (awaitingEmailVerification && emailVerified) {
@@ -1070,9 +1081,10 @@ export default function Register() {
                       ? `Reenviar email (${verificationCooldown}s)`
                       : 'Reenviar email'}
                   </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Verifique seu email antes de continuar para a assinatura do contrato.
-                  </p>
+                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Verificando automaticamente a cada 5 segundos...
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>

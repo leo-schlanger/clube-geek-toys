@@ -38,16 +38,18 @@ export default function VerifyEmail() {
           setTokenVerified(true)
           setMessage({
             type: 'success',
-            text: 'Email verificado com sucesso! Redirecionando...',
+            text: 'Email verificado com sucesso!',
           })
 
           // Atualizar estado do usuário
           await refreshUser()
 
-          // Redirecionar após breve delay
+          // Se user veio do registro (não tem member ativo), não redirecionar
+          // O Register.tsx detectará o emailVerified via polling
+          // Se user já é membro, redirecionar para /membro
           setTimeout(() => {
             navigate('/membro', { replace: true })
-          }, 2000)
+          }, 3000)
         } else {
           setMessage({
             type: 'error',
@@ -172,9 +174,12 @@ export default function VerifyEmail() {
               Seu email foi verificado com sucesso.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground">Redirecionando...</p>
-            <Loading size="sm" className="mt-4" />
+          <CardContent className="text-center space-y-3">
+            <p className="text-muted-foreground text-sm">
+              Se estava preenchendo o cadastro, volte para a aba anterior — o sistema detectará a verificação automaticamente.
+            </p>
+            <p className="text-muted-foreground text-xs">Redirecionando em instantes...</p>
+            <Loading size="sm" className="mt-2" />
           </CardContent>
         </Card>
       </div>

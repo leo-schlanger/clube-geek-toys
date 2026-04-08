@@ -231,9 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Refresh user data
+  // Refresh user data from server (uses JWT token, not React state)
   async function refreshUser() {
-    if (!user) return
+    const token = getAccessToken()
+    if (!token) return
 
     try {
       const result = await api.get('/auth/me')
