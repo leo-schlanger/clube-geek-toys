@@ -98,6 +98,10 @@ export async function createMember(
     paymentType: string;
   }
 ): Promise<Member> {
+  if (!userId || userId.trim() === '') {
+    throw new AppError(400, 'userId é obrigatório');
+  }
+
   // Check CPF uniqueness
   const existing = await query('SELECT id FROM members WHERE cpf = $1', [data.cpf]);
   if (existing.rows.length > 0) {

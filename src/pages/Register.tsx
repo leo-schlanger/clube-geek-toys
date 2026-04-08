@@ -327,73 +327,62 @@ export default function Register() {
       }
 
       // 4. Create member record with retry logic
-      // User is now authenticated via JWT (stored in localStorage by AuthContext)
-      const newUserId = user?.id
-      if (newUserId) {
-        toast.loading('Etapa 4/4: Salvando dados...', { id: 'reg-progress' })
+      // signUp already set JWT tokens in localStorage — backend uses req.user from JWT
+      toast.loading('Etapa 4/4: Salvando dados...', { id: 'reg-progress' })
 
-        // Retry member creation up to 3 times
-        let member = null
-        let lastError = null
-        const maxRetries = 3
+      let member = null
+      let lastError = null
+      const maxRetries = 3
 
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            member = await withTimeout(
-              createMember(user?.id || '', {
-                fullName: sanitizedData.fullName,
-                email: sanitizedData.email,
-                cpf: sanitizedData.cpf,
-                phone: sanitizedData.phone,
-                plan: selectedPlan,
-                paymentType: paymentType,
-              }),
-              5000,
-              'Salvando dados...'
-            )
-            if (member) break // Success, exit loop
-          } catch (err) {
-            lastError = err
-            logger.warn(`Member creation attempt ${attempt}/${maxRetries} failed:`, err)
-            if (attempt < maxRetries) {
-              await new Promise(resolve => setTimeout(resolve, 1000 * attempt)) // Exponential backoff
-            }
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          member = await withTimeout(
+            createMember(result.userId || '', {
+              fullName: sanitizedData.fullName,
+              email: sanitizedData.email,
+              cpf: sanitizedData.cpf,
+              phone: sanitizedData.phone,
+              plan: selectedPlan,
+              paymentType: paymentType,
+            }),
+            5000,
+            'Salvando dados...'
+          )
+          if (member) break
+        } catch (err) {
+          lastError = err
+          logger.warn(`Member creation attempt ${attempt}/${maxRetries} failed:`, err)
+          if (attempt < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
           }
         }
+      }
 
-        if (member) {
-          setCreatedMemberId(member.id)
-          setMemberEmail(member.email)
-          setMemberName(sanitizedData.fullName)
-          setMemberCPF(sanitizedData.cpf)
-          setMemberPhone(sanitizedData.phone)
+      if (member) {
+        setCreatedMemberId(member.id)
+        setMemberEmail(member.email)
+        setMemberName(sanitizedData.fullName)
+        setMemberCPF(sanitizedData.cpf)
+        setMemberPhone(sanitizedData.phone)
 
-          // 5. Send verification email and show verification step
-          toast.success('Conta criada! Verifique seu email.', { id: 'reg-progress' })
+        toast.success('Conta criada! Verifique seu email.', { id: 'reg-progress' })
+        localStorage.removeItem(DRAFT_KEY)
 
-          // Clear localStorage draft on successful account creation
-          localStorage.removeItem(DRAFT_KEY)
-
-          // Send verification email automatically
-          sendVerificationEmail().catch(err =>
-            logger.error('Erro ao enviar email de verificação:', err)
-          )
-          setVerificationCooldown(60)
-          setAwaitingEmailVerification(true)
-          setStep(3) // Move to step 3 area to show verification UI
-        } else {
-          // All retries failed - cannot proceed without member document
-          // The member document is required for contract storage permissions
-          logger.error('All member creation attempts failed:', lastError)
-          toast.error('Erro ao criar seu cadastro. Por favor, tente novamente.', {
-            id: 'reg-progress',
-            duration: 8000,
-            description: 'Se o problema persistir, entre em contato com o suporte.'
-          })
-          // Don't show contract modal - user needs to retry registration
-          setLoading(false)
-          return
-        }
+        sendVerificationEmail().catch(err =>
+          logger.error('Erro ao enviar email de verificação:', err)
+        )
+        setVerificationCooldown(60)
+        setAwaitingEmailVerification(true)
+        setStep(3)
+      } else {
+        logger.error('All member creation attempts failed:', lastError)
+        toast.error('Erro ao criar seu cadastro. Por favor, tente novamente.', {
+          id: 'reg-progress',
+          duration: 8000,
+          description: 'Se o problema persistir, entre em contato com o suporte.'
+        })
+        setLoading(false)
+        return
       }
 
     } catch (error) {

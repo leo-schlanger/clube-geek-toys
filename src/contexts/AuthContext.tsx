@@ -39,7 +39,7 @@ interface AuthContextType {
   error: string | null
   emailVerified: boolean
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string; userId?: string }>
   signInWithGoogle: (data: {
     accessToken: string
     refreshToken: string
@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTokens(accessToken, refreshToken)
       setAuthState(userData)
 
-      return { success: true }
+      return { success: true, userId: userData.id }
     } catch {
       return { success: false, error: 'Erro ao criar conta' }
     }
