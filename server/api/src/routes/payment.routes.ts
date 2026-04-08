@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { verifyMemberOwnership, getMemberIdForUser } from '../middleware/ownership.js';
 import { paymentLimiter } from '../middleware/rate-limit.js';
 import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
@@ -27,6 +28,8 @@ const cardCreateSchema = z.object({
 // POST /pix/create — PIX QR code payment
 paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSchema), async (req, res, next) => {
   try {
+    // Verify the user owns the member being paid for
+    if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
     const result = await paymentService.createPixPayment(req.body);
     res.status(201).json(result);
   } catch (err) {
@@ -37,6 +40,8 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
 // POST /checkout/create — Credit card direct payment (PagBank encrypted)
 paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(cardCreateSchema), async (req, res, next) => {
   try {
+    // Verify the user owns the member being paid for
+    if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
     const result = await paymentService.createCardPayment(req.body);
     res.status(201).json(result);
   } catch (err) {
@@ -47,8 +52,20 @@ paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(ca
 // GET /payments — list payments with optional filters
 paymentRouter.get('/', authenticate, async (req, res, next) => {
   try {
+    let memberId = req.query.member_id as string | undefined;
+
+    // Members can only see their own payments
+    if (req.user!.role === 'member') {
+      const userMemberId = await getMemberIdForUser(req.user!.userId);
+      if (!userMemberId) {
+        res.json([]);
+        return;
+      }
+      memberId = userMemberId;
+    }
+
     const filters = {
-      memberId: req.query.member_id as string | undefined,
+      memberId,
       status: req.query.status as string | undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
     };

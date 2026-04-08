@@ -223,10 +223,10 @@ export async function verifyEmail(token: string) {
   );
 
   if (result.rowCount === 0) {
-    // Already verified or user not found
     return { message: 'Email já verificado ou usuário não encontrado' };
   }
 
+  await auditLog('auth.email_verified', result.rows[0].id, { email: payload.email });
   return { message: 'Email verificado com sucesso', user: result.rows[0] };
 }
 
@@ -286,6 +286,11 @@ export async function updateProfile(userId: string, data: { email?: string; curr
     await query('UPDATE members SET email = $1 WHERE user_id = $2', [data.email.toLowerCase(), userId]);
   }
 
+  const changes: string[] = [];
+  if (data.newPassword) changes.push('password');
+  if (data.email) changes.push('email');
+  await auditLog('auth.profile_updated', userId, { changed: changes });
+
   return { message: 'Perfil atualizado com sucesso' };
 }
 
@@ -311,8 +316,11 @@ export async function googleAuth(idToken: string, ip?: string) {
     throw new AppError(401, 'Token Google não contém informações necessárias');
   }
 
-  // 2. Optional audience check
-  if (env.GOOGLE_CLIENT_ID && payload.aud !== env.GOOGLE_CLIENT_ID) {
+  // 2. Audience check — reject if GOOGLE_CLIENT_ID not configured
+  if (!env.GOOGLE_CLIENT_ID) {
+    throw new AppError(503, 'Login Google não configurado no servidor');
+  }
+  if (payload.aud !== env.GOOGLE_CLIENT_ID) {
     throw new AppError(401, 'Token Google com audience inválido');
   }
 

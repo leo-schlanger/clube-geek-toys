@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { verifyMemberOwnership } from '../middleware/ownership.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import * as contractService from '../services/contract.service.js';
-import { query } from '../config/database.js';
 
 export const contractRouter = Router();
 contractRouter.use(authenticate);
@@ -37,24 +37,14 @@ const upload = multer({
 // POST /contracts — upload contract PDF
 contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
   try {
+    const memberId = req.body.memberId;
+    if (memberId && !await verifyMemberOwnership(req, res, memberId)) return;
     const result = await contractService.saveContract(req.body, req.file);
     res.status(201).json(result);
   } catch (err) {
     next(err);
   }
 });
-
-// Helper: verify the authenticated user owns the member or is admin/seller
-async function verifyMemberOwnership(req: import('express').Request, res: import('express').Response, memberId: string) {
-  if (req.user!.role !== 'admin' && req.user!.role !== 'seller') {
-    const memberCheck = await query('SELECT user_id FROM members WHERE id = $1', [memberId]);
-    if (memberCheck.rows.length === 0 || memberCheck.rows[0].user_id !== req.user!.userId) {
-      res.status(403).json({ error: 'Acesso negado' });
-      return false;
-    }
-  }
-  return true;
-}
 
 // GET /contracts/:memberId — active contract
 contractRouter.get('/:memberId', async (req, res, next) => {

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { verifyMemberOwnership } from '../middleware/ownership.js';
 import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
 import * as pointsService from '../services/points.service.js';
@@ -13,7 +14,7 @@ const earnSchema = z.object({
 });
 
 const bonusSchema = z.object({
-  points: z.number().int().positive(),
+  points: z.number().int().positive().max(50000),
   reason: z.string().min(1),
 });
 
@@ -26,6 +27,7 @@ const redeemSchema = z.object({
 // GET /points/:memberId/history
 pointsRouter.get('/:memberId/history', async (req, res, next) => {
   try {
+    if (!await verifyMemberOwnership(req, res, req.params.memberId)) return;
     const limit = Number(req.query.limit) || 50;
     const result = await pointsService.getPointsHistory(req.params.memberId as string, limit);
     res.json(result);
@@ -37,6 +39,7 @@ pointsRouter.get('/:memberId/history', async (req, res, next) => {
 // GET /points/:memberId/expiring
 pointsRouter.get('/:memberId/expiring', async (req, res, next) => {
   try {
+    if (!await verifyMemberOwnership(req, res, req.params.memberId)) return;
     const result = await pointsService.getExpiringPoints(req.params.memberId as string);
     res.json(result);
   } catch (err) {
@@ -47,6 +50,7 @@ pointsRouter.get('/:memberId/expiring', async (req, res, next) => {
 // GET /points/:memberId/balance
 pointsRouter.get('/:memberId/balance', async (req, res, next) => {
   try {
+    if (!await verifyMemberOwnership(req, res, req.params.memberId)) return;
     const result = await pointsService.getBalance(req.params.memberId as string);
     res.json(result);
   } catch (err) {

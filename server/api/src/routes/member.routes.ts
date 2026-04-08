@@ -4,12 +4,13 @@ import { validate } from '../middleware/validate.js';
 import { defaultLimiter } from '../middleware/rate-limit.js';
 import { z } from 'zod';
 import * as memberService from '../services/member.service.js';
+import { isValidCPF } from '../utils/cpf.js';
 
 export const memberRouter = Router();
 memberRouter.use(authenticate);
 
 const createMemberSchema = z.object({
-  cpf: z.string().length(11),
+  cpf: z.string().length(11).refine(isValidCPF, { message: 'CPF inválido' }),
   fullName: z.string().min(3).max(200),
   email: z.string().email(),
   phone: z.string().optional(),

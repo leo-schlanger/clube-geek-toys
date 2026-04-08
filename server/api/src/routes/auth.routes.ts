@@ -7,9 +7,13 @@ import * as authService from '../services/auth.service.js';
 
 export const authRouter = Router();
 
+const passwordSchema = z.string().min(8, 'Senha deve ter pelo menos 8 caracteres')
+  .regex(/[A-Z]/, 'Senha deve conter pelo menos 1 letra maiúscula')
+  .regex(/[0-9]/, 'Senha deve conter pelo menos 1 número');
+
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: passwordSchema,
   name: z.string().optional(),
 });
 
@@ -21,7 +25,7 @@ const loginSchema = z.object({
 const updateProfileSchema = z.object({
   email: z.string().email().optional(),
   currentPassword: z.string().min(1).optional(),
-  newPassword: z.string().min(6).optional(),
+  newPassword: passwordSchema.optional(),
 });
 
 const resetRequestSchema = z.object({
@@ -30,7 +34,7 @@ const resetRequestSchema = z.object({
 
 const resetPasswordSchema = z.object({
   token: z.string(),
-  password: z.string().min(6),
+  password: passwordSchema,
 });
 
 const verifyEmailSchema = z.object({
@@ -77,7 +81,7 @@ authRouter.post('/google', authLimiter, validate(googleAuthSchema), async (req, 
   }
 });
 
-authRouter.post('/refresh', async (req, res, next) => {
+authRouter.post('/refresh', authLimiter, async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {

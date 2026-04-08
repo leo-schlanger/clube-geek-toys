@@ -27,8 +27,9 @@ export async function processWebhook(input: WebhookInput) {
     throw new AppError(400, 'Webhook inválido: sem order ID');
   }
 
-  // Idempotency check
-  const webhookKey = `pagbank_${orderId}_${charges[0]?.status || qrCodes[0]?.status || 'unknown'}`;
+  // Idempotency check — key uses chargeId/qrCodeId (not status) to prevent replays
+  const entityId = charges[0]?.id || qrCodes[0]?.id || 'unknown';
+  const webhookKey = `pagbank_${orderId}_${entityId}`;
   const existing = await query(
     'SELECT webhook_key FROM processed_webhooks WHERE webhook_key = $1',
     [webhookKey]

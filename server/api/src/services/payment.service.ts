@@ -17,7 +17,7 @@ function validateAmount(amount: number) {
   const validPrices: number[] = Object.values(PLAN_PRICES).flatMap((p) => [p.monthly, p.annual]);
   const matchesPrice = validPrices.some((p) => Math.abs(p - amount) < 0.01);
   if (!matchesPrice) {
-    console.warn(`[PAYMENT] Amount R$${amount.toFixed(2)} does not match any plan price`);
+    throw new AppError(400, `Valor R$${amount.toFixed(2)} não corresponde a nenhum plano válido`);
   }
 }
 

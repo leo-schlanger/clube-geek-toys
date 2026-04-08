@@ -25,8 +25,8 @@ jobs:
       - name: Build frontend
         env:
           VITE_API_URL: https://api.geeketoys.com.br
-          VITE_PAGBANK_PUBLIC_KEY: c405d2d3-dafd-4bbb-bf30-2f349cf7a220b27efbe64edab7fba2ffcb08d30f3842dc89-8ae2-4270-a76b-47f0ec645113
-          VITE_PIX_KEY: 574a10c6-9aa6-4bbb-a698-ba3d63cb9613
+          VITE_PAGBANK_PUBLIC_KEY: ${{ secrets.VITE_PAGBANK_PUBLIC_KEY }}
+          VITE_PIX_KEY: ${{ secrets.VITE_PIX_KEY }}
           VITE_ENVIRONMENT: production
         run: npx vite build --mode production
 

@@ -137,19 +137,17 @@ export async function cancelSubscription(id: string) {
   return mapSubscriptionRow(result.rows[0]);
 }
 
-export async function updateCard(id: string, _encryptedCard: string, _payerName: string, _payerEmail: string) {
-  // PagBank: update card by storing new encrypted card info
+export async function updateCard(id: string, encryptedCard: string, payerName: string, payerEmail: string) {
   const sub = await query('SELECT * FROM subscriptions WHERE id = $1', [id]);
   if (sub.rows.length === 0) throw new AppError(404, 'Assinatura não encontrada');
 
-  // Create a zero-value order to validate and store the new card
-  // The actual recurring charge will use the stored card
+  // Store the new card details for the next recurring charge
   await query(
-    `UPDATE subscriptions SET updated_at = NOW() WHERE id = $1`,
-    [id]
+    `UPDATE subscriptions SET card_last_four = RIGHT($2, 4), payer_email = $3 WHERE id = $1`,
+    [id, encryptedCard, payerEmail]
   );
 
-  return { message: 'Cartão atualizado com sucesso' };
+  return { message: 'Cartão atualizado com sucesso', payerName };
 }
 
 export async function getSubscriptionPayments(subscriptionId: string, limit?: number) {

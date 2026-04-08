@@ -197,7 +197,7 @@ export default function Register() {
   }
 
   // Watch fields and debounce-save to localStorage (every 2 seconds)
-  const watchedFields = watch(['fullName', 'email', 'cpf', 'phone'])
+  const watchedFields = watch(['fullName', 'phone'])
   useEffect(() => {
     // Don't save if we're past the form steps
     if (step >= 3) return
@@ -208,10 +208,10 @@ export default function Register() {
     }
 
     draftSaveTimeoutRef.current = setTimeout(() => {
-      const [fullName, email, cpf, phone] = watchedFields
-      // Only save if there's something meaningful
-      if (fullName || email || cpf || phone) {
-        const draft = { fullName, email, cpf, phone, step }
+      const [fullName, phone] = watchedFields
+      // Only save non-sensitive fields (no CPF or email)
+      if (fullName || phone) {
+        const draft = { fullName, phone, step }
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
       }
     }, 2000)

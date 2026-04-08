@@ -21,7 +21,7 @@ export interface PagBankOrder {
   id: string;
   reference_id?: string;
   charges?: PagBankCharge[];
-  qr_codes?: { status?: string; amount?: { value: number }; links?: PagBankLink[] }[];
+  qr_codes?: { id?: string; status?: string; amount?: { value: number }; links?: PagBankLink[] }[];
 }
 
 interface PagBankRequestOptions {
