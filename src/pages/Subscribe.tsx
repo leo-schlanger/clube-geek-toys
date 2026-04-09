@@ -87,35 +87,24 @@ export default function Subscribe() {
             <img
               src="/logo-vip.png"
               alt="Clube Geek & Toys VIP"
-              className="h-32 sm:h-40 md:h-52 mx-auto drop-shadow-[0_0_30px_rgba(212,165,32,0.3)]"
-              width="208"
-              height="208"
+              className="w-64 sm:w-80 md:w-[420px] lg:w-[500px] mx-auto drop-shadow-[0_0_40px_rgba(212,165,32,0.35)]"
+              width="1536"
+              height="1024"
               loading="eager"
+              style={{ aspectRatio: '3/2', objectFit: 'contain' }}
             />
           </motion.div>
 
-          {/* Headline */}
+          {/* Tagline */}
           <motion.h1
-            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 tracking-tight"
-            initial={{ opacity: 0, y: 20 }}
+            className="text-xl sm:text-2xl md:text-3xl font-semibold text-muted-foreground mb-6 max-w-lg mx-auto"
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <span className="text-shimmer">CLUBE GEEK & TOYS</span>
-            <span className="block text-lg sm:text-xl md:text-2xl font-semibold text-primary mt-2 tracking-widest">
-              VIP
-            </span>
+            Seu universo geek com{' '}
+            <span className="text-shimmer font-extrabold">vantagens VIP</span>
           </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p
-            className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-xl mx-auto mb-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            Seu universo geek com vantagens VIP
-          </motion.p>
 
           {/* Price tag + CTA */}
           <motion.div
@@ -215,7 +204,7 @@ export default function Subscribe() {
                   )}
 
                   {/* Plan Header */}
-                  <div className={`p-5 sm:p-6 ${isPopular ? 'pt-8' : ''}`}>
+                  <div className={`p-5 sm:p-6 ${isPopular ? 'pt-10' : ''}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`p-2.5 rounded-xl bg-gradient-to-br ${planGradients[planId]} text-black/80`}>
                         {planIcons[planId]}
@@ -252,12 +241,24 @@ export default function Subscribe() {
                   {/* Benefits */}
                   <CardContent className="px-5 sm:px-6 pb-4 flex-grow">
                     <ul className="space-y-2.5">
-                      {plan.benefits.slice(2).map((benefit, index) => (
+                      {plan.benefits.map((benefit, index) => (
                         <li key={index} className="flex items-start gap-2.5 text-sm">
                           <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                           <span className="text-muted-foreground group-hover:text-foreground transition-colors">{benefit}</span>
                         </li>
                       ))}
+                      <li className="flex items-start gap-2.5 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground group-hover:text-foreground transition-colors">Carteirinha digital com QR Code</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground group-hover:text-foreground transition-colors">Programa de pontos ({planId === 'silver' ? '1x' : planId === 'gold' ? '2x' : '3x'} por real)</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground group-hover:text-foreground transition-colors">Cancele quando quiser</span>
+                      </li>
                     </ul>
                   </CardContent>
 

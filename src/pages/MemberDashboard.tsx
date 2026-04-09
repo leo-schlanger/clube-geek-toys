@@ -218,7 +218,7 @@ export default function MemberDashboard() {
         <Card className="max-w-md text-center">
           <CardHeader>
             <div className="mx-auto mb-4">
-              <img src="/logo.jpg" alt="Geek & Toys" className="h-14 rounded mx-auto" />
+              <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-40 mx-auto" />
             </div>
             <div className="mx-auto mb-4 p-4 bg-warning/20 rounded-full w-fit">
               <AlertTriangle className="h-12 w-12 text-warning" />
@@ -293,7 +293,7 @@ export default function MemberDashboard() {
       <header className="glass border-b border-border sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
+            <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-10" />
             <span className="text-lg font-heading font-bold text-foreground">Clube Geek & Toys</span>
           </div>
           <div className="flex items-center gap-2">
@@ -353,7 +353,7 @@ export default function MemberDashboard() {
               {/* Card header */}
               <div className={`p-4 sm:p-6 text-white bg-gradient-to-br ${planColors[member.plan as PlanType]}`}>
                 <div className="flex items-center justify-between mb-4">
-                  <img src="/logo.jpg" alt="Geek & Toys" className="h-8 rounded" />
+                  <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-8" />
                   <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
                     {planIcons[member.plan as PlanType]}
                     {plan.name}

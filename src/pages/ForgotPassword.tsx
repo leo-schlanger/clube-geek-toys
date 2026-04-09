@@ -75,7 +75,7 @@ export default function ForgotPassword() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <img src="/logo.jpg" alt="Geek & Toys" className="h-14 rounded mx-auto" />
+            <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-48 sm:w-56 mx-auto" />
           </div>
           <CardTitle className="text-2xl font-heading">Recuperar Senha</CardTitle>
           <CardDescription>

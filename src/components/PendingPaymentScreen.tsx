@@ -176,7 +176,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
       <header className="glass border-b border-border sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.jpg" alt="Geek & Toys" className="h-10 rounded" />
+            <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-10" />
             <span className="text-lg font-heading font-bold text-foreground">Clube Geek & Toys</span>
           </div>
           <Button variant="ghost" size="icon" onClick={signOut}>
