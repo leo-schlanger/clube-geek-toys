@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import { query, getClient } from '../config/database.js';
 import { env } from '../config/env.js';
 import { pagbankRequest } from '../utils/pagbank.js';
 import type { PagBankOrder } from '../utils/pagbank.js';
@@ -60,43 +60,55 @@ export async function createSubscription(data: {
   const subscriptionId = `sub_${order.id}`;
   const status = charge?.status === 'PAID' ? 'authorized' : 'pending';
 
-  // Save subscription
-  await query(
-    `INSERT INTO subscriptions (id, member_id, provider_id, status, plan, frequency_type, transaction_amount, payer_email, card_last_four, card_brand)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
-      subscriptionId,
-      data.member_id,
-      order.id,
-      status,
-      data.plan,
-      data.frequency_type,
-      data.transaction_amount,
-      data.payer_email,
-      charge?.payment_method?.card?.last_digits || null,
-      charge?.payment_method?.card?.brand || null,
-    ]
-  );
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
 
-  // Update member
-  await query(
-    `UPDATE members SET subscription_id = $1, subscription_status = $2, auto_renewal = TRUE WHERE id = $3`,
-    [subscriptionId, status, data.member_id]
-  );
-
-  // If first charge was paid, set next payment date
-  if (status === 'authorized') {
-    const nextDate = data.frequency_type === 'months'
-      ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
-
-    await query(
-      `UPDATE subscriptions SET next_payment_date = $1, last_payment_date = NOW() WHERE id = $2`,
-      [nextDate.toISOString(), subscriptionId]
+    // Save subscription
+    await client.query(
+      `INSERT INTO subscriptions (id, member_id, provider_id, status, plan, frequency_type, transaction_amount, payer_email, card_last_four, card_brand)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        subscriptionId,
+        data.member_id,
+        order.id,
+        status,
+        data.plan,
+        data.frequency_type,
+        data.transaction_amount,
+        data.payer_email,
+        charge?.payment_method?.card?.last_digits || null,
+        charge?.payment_method?.card?.brand || null,
+      ]
     );
+
+    // Update member
+    await client.query(
+      `UPDATE members SET subscription_id = $1, subscription_status = $2, auto_renewal = TRUE WHERE id = $3`,
+      [subscriptionId, status, data.member_id]
+    );
+
+    // If first charge was paid, set next payment date
+    if (status === 'authorized') {
+      const nextDate = data.frequency_type === 'months'
+        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+
+      await client.query(
+        `UPDATE subscriptions SET next_payment_date = $1, last_payment_date = NOW() WHERE id = $2`,
+        [nextDate.toISOString(), subscriptionId]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 
-  // Send confirmation email
+  // Send confirmation email (outside transaction)
   const memberResult = await query('SELECT full_name, email FROM members WHERE id = $1', [data.member_id]);
   if (memberResult.rows.length > 0) {
     const member = memberResult.rows[0];
@@ -123,14 +135,29 @@ export async function getSubscription(id: string) {
 }
 
 export async function pauseSubscription(id: string) {
-  const result = await query(
-    `UPDATE subscriptions SET status = 'paused', paused_at = NOW() WHERE id = $1 RETURNING *`,
-    [id]
-  );
-  if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
-  await query(`UPDATE members SET subscription_status = 'paused' WHERE subscription_id = $1`, [id]);
+  const client = await getClient();
+  let resultRow: Record<string, unknown>;
+  try {
+    await client.query('BEGIN');
 
-  // Send pause notification
+    const result = await client.query(
+      `UPDATE subscriptions SET status = 'paused', paused_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
+    resultRow = result.rows[0];
+
+    await client.query(`UPDATE members SET subscription_status = 'paused' WHERE subscription_id = $1`, [id]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // Send pause notification (outside transaction)
   const member = await query('SELECT full_name, email, id FROM members WHERE subscription_id = $1', [id]);
   if (member.rows.length > 0) {
     sendTemplateEmail({
@@ -141,31 +168,62 @@ export async function pauseSubscription(id: string) {
     }).catch((err) => console.error('[SUBSCRIPTION] Email error:', err));
   }
 
-  return mapSubscriptionRow(result.rows[0]);
+  return mapSubscriptionRow(resultRow);
 }
 
 export async function resumeSubscription(id: string) {
-  const result = await query(
-    `UPDATE subscriptions SET status = 'authorized', paused_at = NULL WHERE id = $1 RETURNING *`,
-    [id]
-  );
-  if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
-  await query(`UPDATE members SET subscription_status = 'authorized' WHERE subscription_id = $1`, [id]);
-  return mapSubscriptionRow(result.rows[0]);
+  const client = await getClient();
+  let resultRow: Record<string, unknown>;
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE subscriptions SET status = 'authorized', paused_at = NULL WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
+    resultRow = result.rows[0];
+
+    await client.query(`UPDATE members SET subscription_status = 'authorized' WHERE subscription_id = $1`, [id]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  return mapSubscriptionRow(resultRow);
 }
 
 export async function cancelSubscription(id: string) {
-  const result = await query(
-    `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1 RETURNING *`,
-    [id]
-  );
-  if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
-  await query(
-    `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE WHERE subscription_id = $1`,
-    [id]
-  );
+  const client = await getClient();
+  let resultRow: Record<string, unknown>;
+  try {
+    await client.query('BEGIN');
 
-  // Send cancellation notification
+    const result = await client.query(
+      `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1 RETURNING *`,
+      [id]
+    );
+    if (result.rowCount === 0) throw new AppError(404, 'Assinatura não encontrada');
+    resultRow = result.rows[0];
+
+    await client.query(
+      `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE WHERE subscription_id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  // Send cancellation notification (outside transaction)
   const member = await query('SELECT full_name, email, id FROM members WHERE subscription_id = $1', [id]);
   if (member.rows.length > 0) {
     sendTemplateEmail({
@@ -176,7 +234,7 @@ export async function cancelSubscription(id: string) {
     }).catch((err) => console.error('[SUBSCRIPTION] Email error:', err));
   }
 
-  return mapSubscriptionRow(result.rows[0]);
+  return mapSubscriptionRow(resultRow);
 }
 
 export async function updateCard(id: string, encryptedCard: string, payerName: string, payerEmail: string) {

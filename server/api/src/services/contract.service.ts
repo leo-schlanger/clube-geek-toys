@@ -1,4 +1,6 @@
 import pg from 'pg';
+import crypto from 'crypto';
+import fs from 'fs';
 import { query, getClient } from '../config/database.js';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
@@ -31,17 +33,24 @@ export async function saveContract(
     const contractId = `contract_${data.memberId}_${Date.now()}`;
     const pdfPath = file ? file.path.replace(/\\/g, '/') : null;
     const pdfUrl = file ? `${env.API_URL}/uploads/contracts/${data.memberId}/${file.filename}` : null;
-    const signedAt = data.signedAt || new Date().toISOString();
+    const signedAt = new Date().toISOString(); // Always server timestamp
+
+    // Calculate PDF hash if file exists
+    let pdfHash: string | null = null;
+    if (file) {
+      const fileBuffer = fs.readFileSync(file.path);
+      pdfHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    }
 
     await client.query(
       `INSERT INTO contracts (id, member_id, member_name, member_cpf, member_email, plan,
-       signature_preview, signed_at, ip_address, user_agent, document_hash, pdf_url, pdf_path, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'active')`,
+       signature_preview, signed_at, ip_address, user_agent, document_hash, pdf_url, pdf_path, pdf_hash, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'active')`,
       [
         contractId, data.memberId, data.memberName, data.memberCpf, data.memberEmail,
         data.plan, data.signaturePreview || null, signedAt,
         data.ipAddress || null, data.userAgent || null, data.documentHash || null,
-        pdfUrl, pdfPath,
+        pdfUrl, pdfPath, pdfHash,
       ]
     );
 
@@ -130,6 +139,7 @@ function mapContractRow(row: pg.QueryResultRow) {
     documentHash: row.document_hash,
     pdfUrl: row.pdf_url,
     pdfPath: row.pdf_path,
+    pdfHash: row.pdf_hash,
     status: row.status,
     createdAt: row.created_at,
   };

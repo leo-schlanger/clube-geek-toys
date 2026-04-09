@@ -219,6 +219,36 @@ export async function redeemPoints(
   }
 }
 
+/**
+ * Reconcile points balance: recalculate from transactions and fix if diverged.
+ * Returns { memberId, storedBalance, calculatedBalance, corrected }
+ */
+export async function reconcileBalance(memberId: string) {
+  const memberResult = await query('SELECT points FROM members WHERE id = $1', [memberId]);
+  if (memberResult.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
+
+  const storedBalance = memberResult.rows[0].points;
+
+  // Sum all transactions: earn/bonus are positive, redeem/expire are negative
+  const txResult = await query(
+    'SELECT COALESCE(SUM(points), 0)::int as total FROM point_transactions WHERE member_id = $1',
+    [memberId]
+  );
+  const calculatedBalance = Math.max(0, txResult.rows[0].total);
+
+  if (storedBalance !== calculatedBalance) {
+    await query('UPDATE members SET points = $1 WHERE id = $2', [calculatedBalance, memberId]);
+    await query(
+      `INSERT INTO audit_logs (action, member_id, details)
+       VALUES ('points_reconciled', $1, $2)`,
+      [memberId, JSON.stringify({ storedBalance, calculatedBalance, corrected: true })]
+    );
+    return { memberId, storedBalance, calculatedBalance, corrected: true };
+  }
+
+  return { memberId, storedBalance, calculatedBalance, corrected: false };
+}
+
 function mapPointRow(row: Record<string, unknown>) {
   return {
     id: row.id,

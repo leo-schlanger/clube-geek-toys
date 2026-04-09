@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,6 +13,7 @@ import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type MemberStatus, type RedemptionRule } from '../types'
 import { createMember, updateMember, activateMember } from '../lib/members'
+import { api } from '../lib/api-client'
 import { formatCurrency, formatCPF, validateCPF, getStatusLabel } from '../lib/utils'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { addPoints, redeemPoints, getRedemptionRules, formatPoints } from '../lib/points'
@@ -36,6 +37,15 @@ import {
   Coins,
   Plus,
   Gift,
+  ChevronDown,
+  ChevronUp,
+  Receipt,
+  FileText,
+  Download,
+  ShieldCheck,
+  Pause,
+  Play,
+  Ban,
 } from 'lucide-react'
 
 // Validation schema
@@ -68,6 +78,25 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
   const [isPromotion, setIsPromotion] = useState(false)
   const [processingPoints, setProcessingPoints] = useState(false)
   const [localMember, setLocalMember] = useState<Member | null>(member || null)
+
+  // Admin detail sections state
+  const [payments, setPayments] = useState<Record<string, unknown>[] | null>(null)
+  const [paymentsLoading, setPaymentsLoading] = useState(false)
+  const [showPayments, setShowPayments] = useState(false)
+
+  const [subscription, setSubscription] = useState<Record<string, unknown> | null>(null)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false)
+  const [showSubscription, setShowSubscription] = useState(false)
+  const [subscriptionActionLoading, setSubscriptionActionLoading] = useState(false)
+
+  const [contract, setContract] = useState<Record<string, unknown> | null>(null)
+  const [contractLoading, setContractLoading] = useState(false)
+  const [showContract, setShowContract] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<{ valid: boolean; message: string } | null>(null)
+  const [verifyLoading, setVerifyLoading] = useState(false)
+
+  const fetchedRef = useRef(false)
+
   const isViewMode = mode === 'view'
   const isEditMode = mode === 'edit'
   const isCreateMode = mode === 'create'
@@ -110,6 +139,74 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       setLocalMember(member)
     }
   }, [member, reset])
+
+  // Fetch admin detail data in view mode
+  useEffect(() => {
+    if (!isViewMode || !member?.id || fetchedRef.current) return
+    fetchedRef.current = true
+
+    // Fetch payments
+    setPaymentsLoading(true)
+    api.get<Record<string, unknown>[]>(`/members/${member.id}/payments`)
+      .then((res) => { setPayments((res.data as Record<string, unknown>[]) || []) })
+      .catch(() => { setPayments([]) })
+      .finally(() => setPaymentsLoading(false))
+
+    // Fetch subscription (only if member has subscriptionId)
+    if (member.subscriptionId) {
+      setSubscriptionLoading(true)
+      api.get<Record<string, unknown>>(`/members/${member.id}/subscription`)
+        .then((res) => { setSubscription((res.data as Record<string, unknown>) || null) })
+        .catch(() => { setSubscription(null) })
+        .finally(() => setSubscriptionLoading(false))
+    }
+
+    // Fetch contract
+    setContractLoading(true)
+    api.get<Record<string, unknown>>(`/contracts/${member.id}`)
+      .then((res) => { setContract((res.data as Record<string, unknown>) || null) })
+      .catch(() => { setContract(null) })
+      .finally(() => setContractLoading(false))
+  }, [isViewMode, member?.id, member?.subscriptionId])
+
+  async function handleSubscriptionAction(action: 'pause' | 'resume' | 'cancel') {
+    if (!subscription) return
+    if (action === 'cancel' && !window.confirm('Tem certeza que deseja cancelar a assinatura? Esta ação não pode ser desfeita.')) return
+
+    setSubscriptionActionLoading(true)
+    try {
+      const subId = subscription.id as string
+      if (action === 'pause') {
+        await api.put(`/subscription/${subId}/pause`)
+        setSubscription({ ...subscription, status: 'paused' })
+        toast.success('Assinatura pausada')
+      } else if (action === 'resume') {
+        await api.put(`/subscription/${subId}/resume`)
+        setSubscription({ ...subscription, status: 'authorized' })
+        toast.success('Assinatura retomada')
+      } else {
+        await api.put(`/subscription/${subId}/cancel`)
+        setSubscription({ ...subscription, status: 'cancelled' })
+        toast.success('Assinatura cancelada')
+      }
+    } catch {
+      toast.error('Erro ao atualizar assinatura')
+    }
+    setSubscriptionActionLoading(false)
+  }
+
+  async function handleVerifyContract() {
+    if (!contract) return
+    setVerifyLoading(true)
+    setVerifyResult(null)
+    try {
+      const res = await api.get<{ valid: boolean; message: string }>(`/contracts/${contract.id as string}/verify`)
+      setVerifyResult(res.data as { valid: boolean; message: string })
+    } catch {
+      setVerifyResult({ valid: false, message: 'Erro ao verificar integridade' })
+    }
+    setVerifyLoading(false)
+  }
 
   // Keyboard shortcuts
   const handleSaveShortcut = useCallback(
@@ -756,6 +853,287 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Payment History (view mode only) */}
+            {isViewMode && localMember && (
+              <Card>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between p-4 text-left"
+                  onClick={() => setShowPayments(!showPayments)}
+                >
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <Receipt className="h-5 w-5 text-primary" />
+                    Histórico de Pagamentos
+                  </h4>
+                  {showPayments ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showPayments && (
+                  <CardContent className="pt-0">
+                    {paymentsLoading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : !payments || payments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">Nenhum pagamento registrado</p>
+                    ) : (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {payments.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-muted rounded-lg text-sm">
+                            <div className="flex items-center gap-3">
+                              <span className="text-muted-foreground">
+                                {new Date(p.created_at as string).toLocaleDateString('pt-BR')}
+                              </span>
+                              <span className="font-medium">
+                                {formatCurrency(Number(p.amount) / 100)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">
+                                {(p.method as string) === 'pix' ? 'PIX' : (p.method as string) === 'credit_card' ? 'Cartão' : String(p.method || 'N/A')}
+                              </Badge>
+                              <Badge
+                                variant={
+                                  (p.status as string) === 'paid' || (p.status as string) === 'approved'
+                                    ? 'success'
+                                    : (p.status as string) === 'pending'
+                                    ? 'warning'
+                                    : 'destructive'
+                                }
+                              >
+                                {(p.status as string) === 'paid' || (p.status as string) === 'approved'
+                                  ? 'Pago'
+                                  : (p.status as string) === 'pending'
+                                  ? 'Pendente'
+                                  : 'Falhou'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            )}
+
+            {/* Subscription (view mode only, if member has subscriptionId) */}
+            {isViewMode && localMember && localMember.subscriptionId && (
+              <Card>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between p-4 text-left"
+                  onClick={() => setShowSubscription(!showSubscription)}
+                >
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Assinatura
+                  </h4>
+                  {showSubscription ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showSubscription && (
+                  <CardContent className="pt-0">
+                    {subscriptionLoading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : !subscription ? (
+                      <p className="text-sm text-muted-foreground py-2">Dados da assinatura indisponíveis</p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>
+                            <Badge
+                              className="ml-2"
+                              variant={
+                                (subscription.status as string) === 'authorized'
+                                  ? 'success'
+                                  : (subscription.status as string) === 'paused'
+                                  ? 'warning'
+                                  : 'destructive'
+                              }
+                            >
+                              {(subscription.status as string) === 'authorized'
+                                ? 'Ativa'
+                                : (subscription.status as string) === 'paused'
+                                ? 'Pausada'
+                                : String(subscription.status)}
+                            </Badge>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Plano:</span>
+                            <span className="ml-2 font-medium">{String(subscription.plan || 'N/A')}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Valor:</span>
+                            <span className="ml-2 font-medium">
+                              {formatCurrency(Number(subscription.transaction_amount || 0))}
+                            </span>
+                          </div>
+                          {subscription.next_payment_date && (
+                            <div>
+                              <span className="text-muted-foreground">Próximo pagamento:</span>
+                              <span className="ml-2 font-medium">
+                                {new Date(subscription.next_payment_date as string).toLocaleDateString('pt-BR')}
+                              </span>
+                            </div>
+                          )}
+                          {subscription.failed_payments != null && (
+                            <div>
+                              <span className="text-muted-foreground">Pagamentos falhos:</span>
+                              <span className="ml-2 font-medium">{String(subscription.failed_payments)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          {(subscription.status as string) === 'authorized' && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={subscriptionActionLoading}
+                              onClick={() => handleSubscriptionAction('pause')}
+                            >
+                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Pause className="h-4 w-4 mr-1" /> Pausar</>}
+                            </Button>
+                          )}
+                          {(subscription.status as string) === 'paused' && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={subscriptionActionLoading}
+                              onClick={() => handleSubscriptionAction('resume')}
+                            >
+                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" /> Retomar</>}
+                            </Button>
+                          )}
+                          {(subscription.status as string) !== 'cancelled' && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              disabled={subscriptionActionLoading}
+                              onClick={() => handleSubscriptionAction('cancel')}
+                            >
+                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Ban className="h-4 w-4 mr-1" /> Cancelar</>}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            )}
+
+            {/* Contract (view mode only) */}
+            {isViewMode && localMember && (
+              <Card>
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between p-4 text-left"
+                  onClick={() => setShowContract(!showContract)}
+                >
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Contrato
+                  </h4>
+                  {showContract ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showContract && (
+                  <CardContent className="pt-0">
+                    {contractLoading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : !contract ? (
+                      <p className="text-sm text-muted-foreground py-2">Nenhum contrato encontrado</p>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Assinado em:</span>
+                            <span className="ml-2 font-medium">
+                              {contract.signed_at
+                                ? new Date(contract.signed_at as string).toLocaleDateString('pt-BR')
+                                : 'N/A'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>
+                            <Badge
+                              className="ml-2"
+                              variant={
+                                (contract.status as string) === 'signed'
+                                  ? 'success'
+                                  : (contract.status as string) === 'pending'
+                                  ? 'warning'
+                                  : 'destructive'
+                              }
+                            >
+                              {(contract.status as string) === 'signed'
+                                ? 'Assinado'
+                                : (contract.status as string) === 'pending'
+                                ? 'Pendente'
+                                : String(contract.status)}
+                            </Badge>
+                          </div>
+                          {contract.hash && (
+                            <div className="sm:col-span-2">
+                              <span className="text-muted-foreground">Hash:</span>
+                              <span className="ml-2 font-mono text-xs">
+                                {String(contract.hash).slice(0, 20)}...
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-2">
+                          {contract.pdf_url && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(contract.pdf_url as string, '_blank')}
+                            >
+                              <Download className="h-4 w-4 mr-1" /> Baixar PDF
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={verifyLoading}
+                            onClick={handleVerifyContract}
+                          >
+                            {verifyLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <><ShieldCheck className="h-4 w-4 mr-1" /> Verificar Integridade</>
+                            )}
+                          </Button>
+                        </div>
+                        {verifyResult && (
+                          <div className={`flex items-center gap-2 text-sm p-2 rounded ${
+                            verifyResult.valid
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                          }`}>
+                            {verifyResult.valid ? (
+                              <CheckCircle className="h-4 w-4" />
+                            ) : (
+                              <XCircle className="h-4 w-4" />
+                            )}
+                            {verifyResult.message}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
             )}
 
             {/* Pending payment alert */}

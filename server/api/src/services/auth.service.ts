@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { query } from '../config/database.js';
+import { query, getClient } from '../config/database.js';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { createHmacToken, verifyHmacToken, hashSha256 } from '../utils/hmac.js';
@@ -286,8 +286,21 @@ export async function updateProfile(userId: string, data: { email?: string; curr
     if (existing.rows.length > 0) {
       throw new AppError(409, 'Email já está em uso');
     }
-    await query('UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2', [data.email.toLowerCase(), userId]);
-    await query('UPDATE members SET email = $1 WHERE user_id = $2', [data.email.toLowerCase(), userId]);
+    const oldEmail = user.email;
+    const newEmail = data.email.toLowerCase();
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+      await client.query('UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2', [newEmail, userId]);
+      await client.query('UPDATE members SET email = $1 WHERE user_id = $2', [newEmail, userId]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    await auditLog('auth.email_changed', userId, { oldEmail, newEmail });
   }
 
   const changes: string[] = [];

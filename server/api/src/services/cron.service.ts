@@ -26,6 +26,14 @@ export function initCronJobs() {
     } catch (err) {
       console.error('[CRON] Expire members error:', err);
     }
+
+    // Record cron execution for health monitoring
+    await query(
+      `INSERT INTO config (key, value) VALUES ('last_cron_run', to_jsonb(NOW()::text))
+       ON CONFLICT (key) DO UPDATE SET value = to_jsonb(NOW()::text), updated_at = NOW()`
+    ).catch(err => console.error('[CRON] Health log error:', err));
+
+    console.log('[CRON] All daily jobs completed');
   });
 
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');

@@ -107,6 +107,16 @@ export async function deleteUserAccount(userId: string, password: string) {
     throw new AppError(401, 'Senha incorreta');
   }
 
+  // Check for active subscriptions
+  const activeSub = await query(
+    `SELECT s.id FROM subscriptions s JOIN members m ON m.id = s.member_id
+     WHERE m.user_id = $1 AND s.status IN ('authorized', 'pending')`,
+    [userId]
+  );
+  if (activeSub.rows.length > 0) {
+    throw new AppError(400, 'Cancele sua assinatura ativa antes de excluir sua conta');
+  }
+
   const client = await getClient();
   try {
     await client.query('BEGIN');

@@ -125,6 +125,7 @@ CREATE TABLE contracts (
   document_hash VARCHAR(64),
   pdf_url TEXT,
   pdf_path TEXT,
+  pdf_hash VARCHAR(64),
   status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'superseded', 'revoked')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

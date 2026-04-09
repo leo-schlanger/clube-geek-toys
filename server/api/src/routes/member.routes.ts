@@ -4,6 +4,8 @@ import { validate } from '../middleware/validate.js';
 import { defaultLimiter } from '../middleware/rate-limit.js';
 import { z } from 'zod';
 import * as memberService from '../services/member.service.js';
+import * as paymentService from '../services/payment.service.js';
+import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
 
 export const memberRouter = Router();
@@ -106,6 +108,25 @@ memberRouter.get('/:id', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// GET /members/:id/payments — admin/seller only
+memberRouter.get('/:id/payments', requireRole('admin', 'seller'), async (req, res, next) => {
+  try {
+    const result = await paymentService.getPayments({ memberId: req.params.id as string, limit: 50 });
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// GET /members/:id/subscription — admin/seller only
+memberRouter.get('/:id/subscription', requireRole('admin', 'seller'), async (req, res, next) => {
+  try {
+    const result = await query(
+      'SELECT * FROM subscriptions WHERE member_id = $1 ORDER BY created_at DESC LIMIT 1',
+      [req.params.id]
+    );
+    res.json(result.rows[0] || null);
+  } catch (err) { next(err); }
 });
 
 // POST /members — create
