@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 08 de Abril de 2026
+> **Ultima atualizacao:** 09 de Abril de 2026
 
 ## Legenda
 
@@ -20,72 +20,87 @@
 - [x] **CI/CD com GitHub Actions** - Deploy automatico no push para master
 - [x] **SSL com Let's Encrypt** - Certbot com renovacao automatica
 - [x] **Analytics com Umami** - Self-hosted em analytics.geeketoys.com.br
-- [x] **Docker Compose** - Todos os servicos containerizados
+- [x] **Docker Compose** - Todos os servicos containerizados com resource limits
 - [x] **Nginx reverse proxy** - SSL termination + security headers + SPA serving
 - [x] **Backup automatico PostgreSQL** - Script pg_dump + cron diario + retencao 7 dias
 - [x] **Log rotation** - Docker json-file driver com max-size 10m em todos os servicos
-- [x] **Health check + alertas** - Script de monitoramento com alerta via Resend
+- [x] **Health check + alertas** - Script cron 5min + alerta via Resend
+- [x] **Cron health monitoring** - Timestamp last_cron_run salvo em config table
 
 ### Backend (Abril 2026)
 
 - [x] **API Express** - Migrado de Cloudflare Workers para Node.js + Express
 - [x] **PostgreSQL** - Migrado de Firestore para PostgreSQL 16
-- [x] **Autenticacao JWT** - Migrado de Firebase Auth para JWT customizado (bcrypt + refresh tokens)
-- [x] **PagBank** - Migrado de Mercado Pago para PagBank (PIX + Cartao)
-- [x] **Audit logging** - Registro de acoes criticas no banco
-- [x] **Cron jobs** - node-cron para expiracao de pontos, lembretes e notificacao de pontos expirando
-- [x] **Rate limiting server-side** - Middleware Express (antes era client-side)
-- [x] **RBAC middleware** - Verificacao de roles no servidor
-- [x] **Error tracking local** - Tabela error_logs no PostgreSQL + captura global de erros do frontend
-- [x] **Update profile endpoint** - PATCH /auth/update-profile para troca de email/senha
-- [x] **HTML email templates** - 13 templates HTML responsivos com branding, preheader, CTAs e footer CNPJ
+- [x] **Autenticacao JWT** - JWT customizado (bcrypt 12 rounds + refresh tokens)
+- [x] **PagBank** - PIX + Cartao + Assinaturas recorrentes
+- [x] **Audit logging** - Registro de acoes criticas (auth, pontos, contratos, email)
+- [x] **Cron jobs** - Expiracao de pontos/membros, lembretes, notificacao de pontos
+- [x] **Rate limiting** - Em todos endpoints criticos incluindo refresh e webhooks
+- [x] **RBAC + Ownership** - Middleware centralizado de verificacao de propriedade
+- [x] **Error tracking local** - error_logs no PostgreSQL + captura global frontend
+- [x] **13 email templates** - Todos conectados (webhook, cron, frontend, backend auto)
+- [x] **LGPD endpoints** - Export dados + delete account + revogacao de contrato
+- [x] **Points reconciliation** - Funcao para recalcular e corrigir saldo de pontos
 
 ### Seguranca (Marco-Abril 2026)
 
-- [x] **Validacao Zod em todos endpoints** - Schemas com limites rigorosos
-- [x] **Sanitizacao HTML em emails** - Prevencao XSS
-- [x] **Idempotencia em webhooks** - Tabela processed_webhooks
-- [x] **Rate limiting server-side** - Por IP e por endpoint
-- [x] **Firewall UFW** - Apenas portas 22, 80, 443
-- [x] **SSH key-only** - Senha desabilitada
-- [x] **Security headers** - HSTS, X-Frame DENY, nosniff via Nginx
-- [x] **LGPD compliance** - Politica de privacidade e termos atualizados
-- [x] **Webhook verification** - Verificacao server-to-server via API PagBank
-- [x] **IDOR protection** - Middleware de ownership em pontos, pagamentos, contratos
-- [x] **Amount validation** - Rejeicao de valores que nao correspondem a planos
+- [x] **Validacao Zod** - Schemas rigorosos em todos endpoints
+- [x] **Sanitizacao HTML** - Prevencao XSS em emails
+- [x] **Webhook verification** - Server-to-server via API PagBank + rate limit
+- [x] **Idempotencia** - Key baseada em chargeId (nao status)
+- [x] **IDOR protection** - Middleware ownership em pontos, pagamentos, contratos
+- [x] **Amount validation** - Rejeicao estrita de valores invalidos
 - [x] **CSP habilitado** - Content Security Policy via Helmet
-- [x] **CPF checksum** - Validacao Modulo 11 no cadastro
-- [x] **Senha forte** - Minimo 8 chars + 1 maiuscula + 1 numero
-- [x] **Audit logs auth** - Verificacao de email, reset e update de perfil logados
+- [x] **CPF checksum** - Validacao Modulo 11 server-side
+- [x] **Senha forte** - Min 8 chars + 1 maiuscula + 1 numero
+- [x] **Transacoes atomicas** - BEGIN/COMMIT em subscriptions e email change
+- [x] **Contrato IP server-side** - IP capturado no backend (nao client)
+- [x] **Contrato timestamp server** - Gerado no server (nao client)
+- [x] **Contract hash verify** - Endpoint GET /contracts/:id/verify
+- [x] **PDF hash** - SHA-256 do PDF armazenado para verificacao de integridade
+- [x] **Cookie consent** - Banner com opcoes essencial/analytics
+- [x] **LGPD block active sub** - Impede exclusao com assinatura ativa
 
-### Pagamentos (Marco 2026)
+### Assinatura Digital (Abril 2026)
 
-- [x] **Assinaturas recorrentes** - PagBank (antes Mercado Pago)
-- [x] **Webhooks de pagamento** - Processamento automatico
-- [x] **Cancelamento automatico** - Apos 3 falhas consecutivas
-
-### Juridico (Marco 2026)
-
-- [x] **Contrato digital** - Assinatura eletronica (Lei 14.063/2020)
-- [x] **Termos de Uso CDC** - Referencia Lei 8.078/90
-- [x] **Politica de Privacidade LGPD** - Base legal documentada
+- [x] **Lei 14.063/2020** - Assinatura eletronica simples com validade juridica
+- [x] **SHA-256 hash** - memberId|nome|cpf|email|plano|timestamp|IP
+- [x] **PDF gerado** - pdf-lib com logo, clausulas, dados, assinatura, hash de validacao
+- [x] **IP server-side** - Capturado via req.ip (nao client-side)
+- [x] **Timestamp server** - Gerado no backend
+- [x] **PDF hash armazenado** - SHA-256 do binario do PDF para integridade
+- [x] **Endpoint de verificacao** - Recalcula hash e compara com armazenado
+- [x] **Contratos versionados** - Status active/superseded/revoked
+- [x] **Audit trail** - Assinatura e revogacao logadas
 
 ### Frontend (Marco-Abril 2026)
 
-- [x] **Code-split AdminDashboard** - Tabs lazy loaded
-- [x] **Virtual scrolling** - Tabelas grandes
-- [x] **PWA** - Instalavel como app
-- [x] **Skeleton loading** - Carregamento visual
-- [x] **SEO completo** - Open Graph, Twitter Cards, Schema.org
-- [x] **Exportacao CSV** - Membros e relatorios
-- [x] **Email templates customizados** - 13 templates HTML responsivos via Resend
-- [x] **Error tracking no admin** - Tela de erros com filtros, stats e stack traces
-- [x] **Todos os emails conectados** - 7 templates que nao eram enviados agora funcionam
+- [x] **Landing page redesign** - Logo VIP, animacoes CSS, shimmer text, glow
+- [x] **SEO completo** - OG image 1200x630, Schema.org Product + FAQ, meta tags VIP
+- [x] **PWA** - Manifest com logo VIP, categories, icons
+- [x] **Email verification auto-polling** - Detecta verificacao a cada 5s
+- [x] **Registration flow recovery** - Detecta user existente e resume do passo correto
+- [x] **Contract scroll UX** - Indicador "role ate o final", scroll-to-checkbox
+- [x] **Privacy checkbox** - Checkbox separado para Politica de Privacidade
+- [x] **Admin member detail** - Pagamentos, assinatura e contrato no modal
+- [x] **Font Outfit** - Tipografia moderna para headings
 
-### Testes
+### Pagamentos (Marco-Abril 2026)
 
-- [x] **Infraestrutura de testes** - Vitest + React Testing Library
-- [x] **Testes unitarios** - 237 testes passando
+- [x] **Assinaturas recorrentes** - PagBank com transacoes atomicas
+- [x] **Webhooks verificados** - Server-to-server + idempotencia
+- [x] **Cancelamento automatico** - Apos 3 falhas consecutivas com email
+- [x] **Expiracao automatica** - Cron marca membros expirados diariamente
+- [x] **Calculo correto de expiry** - Mensal +1 mes, anual +1 ano
+
+### Pontuacao (Abril 2026)
+
+- [x] **Promocao corrigida** - Backend da 0 pontos (nao 2x)
+- [x] **Resgate validado** - Server-side contra REDEMPTION_RULES
+- [x] **Status check** - Apenas membros ativos podem ganhar/resgatar
+- [x] **CHECK constraint** - points >= 0 no banco
+- [x] **Audit completo** - Expiracao logada no audit_logs
+- [x] **Reconciliacao** - Funcao para recalcular saldo
 
 ---
 
@@ -98,19 +113,15 @@
 ### MEDIO - Planejado
 
 - [ ] **Aumentar cobertura de testes** - Meta: 70%
-  - Requer mocking de API e PostgreSQL
-  - Priorizar services e middleware do backend
-
-- [ ] **Testes E2E** - Playwright
-  - Fluxos criticos: cadastro, login, pagamento
-  - Integrar ao CI/CD
+- [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
+- [ ] **Settings dinamico** - Permitir editar precos/planos via admin (hoje e code-only)
 
 ### BAIXO - Nice to Have
 
 - [ ] **Storybook** - Documentar componentes UI
 - [ ] **Otimizar bundle** - Tree-shaking mais agressivo
-- [ ] **Image optimization** - Lazy load e compressao de imagens
-- [ ] **Notificacoes push** - Lembretes de vencimento e pontos expirando
+- [ ] **Image optimization** - Lazy load e compressao
+- [ ] **Notificacoes push** - Lembretes de vencimento e pontos
 
 ---
 
@@ -125,7 +136,7 @@
 
 ### Infraestrutura
 
-- [ ] **Redis** - Cache de segundo nivel para consultas frequentes
+- [ ] **Redis** - Cache para consultas frequentes
 - [ ] **Replica PostgreSQL** - Read replica para relatorios
 - [ ] **Monitoring stack** - Prometheus + Grafana
 
@@ -134,23 +145,14 @@
 ## Debitos Tecnicos
 
 1. MapperUtils usa `any` (necessario para flexibilidade)
-2. Soft-delete de usuarios (nao remove do banco, apenas muda role para `disabled`)
-3. **vendor-charts bundle (435KB)** - Ja lazy loaded via ReportsTab
-4. Migracao de dados Firestore -> PostgreSQL (feita manualmente, sem script reverso)
-5. Erros TypeScript pre-existentes em payments.ts, points.ts, reports.ts (tipos `unknown` nao tipados)
+2. Soft-delete de usuarios (role → `disabled`, nao deleta)
+3. vendor-charts bundle (435KB) - Lazy loaded via ReportsTab
+4. Erros TypeScript pre-existentes em payments.ts, points.ts, reports.ts (tipos `unknown`)
+5. Logo VIP (2.3MB PNG) - Servida como esta, sem WebP (falta sharp em prod)
 
 ---
 
 ## Metricas
-
-### Performance (Lighthouse)
-
-| Metrica          | Meta    |
-| ---------------- | ------- |
-| LCP              | < 2.5s  |
-| FID              | < 100ms |
-| CLS              | < 0.1   |
-| Lighthouse Score | > 90    |
 
 ### Qualidade
 
@@ -174,4 +176,4 @@
 
 ---
 
-_Documento atualizado em 08 de Abril de 2026 — Pos-auditoria de seguranca + email rewrite_
+_Documento atualizado em 09 de Abril de 2026_
