@@ -79,7 +79,7 @@ export default function Subscribe() {
         <div className="relative z-10">
           {/* Logo */}
           <motion.div
-            className="animate-float mb-6 sm:mb-8"
+            className="animate-float mb-2 sm:mb-3"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6 }}
@@ -198,13 +198,13 @@ export default function Subscribe() {
                   onClick={() => setSelectedPlan(planId)}
                 >
                   {isPopular && (
-                    <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-xs font-bold text-center py-1 z-10">
+                    <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-xs font-bold text-center py-1.5">
                       MAIS POPULAR
                     </div>
                   )}
 
                   {/* Plan Header */}
-                  <div className={`p-5 sm:p-6 ${isPopular ? 'pt-10' : ''}`}>
+                  <div className="p-5 sm:p-6">
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`p-2.5 rounded-xl bg-gradient-to-br ${planGradients[planId]} text-black/80`}>
                         {planIcons[planId]}
