@@ -99,8 +99,8 @@ export default function Register() {
   const planParam = searchParams.get('plano') as PlanType || 'silver'
   const typeParam = searchParams.get('tipo') as PaymentType || 'monthly'
 
-  const [selectedPlan] = useState<PlanType>(planParam)
-  const [paymentType] = useState<PaymentType>(typeParam)
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>(planParam)
+  const [paymentType, setPaymentType] = useState<PaymentType>(typeParam)
 
   const plan = PLANS[selectedPlan]
   const price = paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
@@ -115,12 +115,60 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
   })
 
-  // Redirect if already logged in (but not during email verification flow)
+  // Detect returning user: if already authenticated with a member record,
+  // skip form and go to contract/payment step
+  const [initialCheckDone, setInitialCheckDone] = useState(false)
   useEffect(() => {
-    if (user && !awaitingEmailVerification && step >= 3) {
-      navigate('/membro')
+    if (initialCheckDone || !user) return
+
+    async function checkExistingMember() {
+      try {
+        const { getMemberByUserId } = await import('../lib/members')
+        const member = await getMemberByUserId(user!.id)
+        if (member) {
+          // User already has a member record
+          setCreatedMemberId(member.id)
+          setMemberEmail(member.email)
+          setMemberName(member.fullName)
+          setMemberCPF(member.cpf)
+          setMemberPhone(member.phone || '')
+          setSelectedPlan(member.plan as PlanType)
+          setPaymentType(member.paymentType as PaymentType)
+
+          if (member.status === 'active') {
+            // Already active — go to dashboard
+            navigate('/membro', { replace: true })
+            return
+          }
+
+          // Check if contract exists
+          const { getMemberContract } = await import('../lib/contract-storage')
+          const contract = await getMemberContract(member.id)
+
+          if (contract) {
+            // Has contract — go to payment step
+            setContractSigned(true)
+            setStep(3)
+          } else if (emailVerified) {
+            // Email verified, no contract — show contract modal
+            setShowContractModal(true)
+            setStep(3)
+          } else {
+            // Email not verified — show verification
+            setAwaitingEmailVerification(true)
+            setStep(3)
+          }
+        }
+      } catch (err) {
+        // No member found — show registration form (normal flow)
+        logger.debug('No existing member found:', err)
+      } finally {
+        setInitialCheckDone(true)
+      }
     }
-  }, [user, navigate, awaitingEmailVerification, step])
+
+    checkExistingMember()
+  }, [user, emailVerified, initialCheckDone, navigate])
 
   // =========================================================================
   // Password Strength Meter
@@ -646,6 +694,18 @@ export default function Register() {
       }
     }
   }, [])
+
+  // Show loading while checking for existing member
+  if (user && !initialCheckDone) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background py-6 sm:py-8 px-4">
