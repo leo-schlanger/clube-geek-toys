@@ -69,9 +69,9 @@ function ProtectedRoute({
     return <Navigate to="/acesso-negado" replace />
   }
 
-  // Verificar email para membros (admin/seller não precisa)
+  // Membros sem email verificado vão para o cadastro (retoma o fluxo)
   if (requireEmailVerification && role === 'member' && !emailVerified) {
-    return <Navigate to="/verificar-email" replace />
+    return <Navigate to="/cadastro" replace />
   }
 
   return <>{children}</>

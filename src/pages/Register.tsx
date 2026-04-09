@@ -83,6 +83,9 @@ export default function Register() {
   const [verificationCooldown, setVerificationCooldown] = useState(0)
   const [checkingVerification, setCheckingVerification] = useState(false)
 
+  // Account already exists (user logged in but no member record)
+  const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)
+
   // localStorage draft state
   const DRAFT_KEY = 'clube_geek_register_draft'
   const [draftLoaded, setDraftLoaded] = useState(false)
@@ -160,7 +163,14 @@ export default function Register() {
           }
         }
       } catch (err) {
-        // No member found — show registration form (normal flow)
+        // No member found — user has account but no member
+        // Pre-fill email from auth context so they don't re-enter it
+        if (user) {
+          setValue('email', user.email)
+          // Skip to step 2 (password) since account already exists
+          // Mark that we should skip signUp on submit
+          setAccountAlreadyExists(true)
+        }
         logger.debug('No existing member found:', err)
       } finally {
         setInitialCheckDone(true)
@@ -375,18 +385,22 @@ export default function Register() {
         return
       }
 
-      // 3. Create account via API
-      toast.loading('Etapa 3/4: Criando sua conta...', { id: 'reg-progress' })
-      const result = await signUp(sanitizedData.email, sanitizedData.password)
+      // 3. Create account via API (skip if account already exists from interrupted flow)
+      let userId = user?.id || ''
+      if (!accountAlreadyExists) {
+        toast.loading('Etapa 3/4: Criando sua conta...', { id: 'reg-progress' })
+        const result = await signUp(sanitizedData.email, sanitizedData.password)
 
-      if (!result.success) {
-        toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
-        setLoading(false)
-        return
+        if (!result.success) {
+          toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
+          setLoading(false)
+          return
+        }
+        userId = result.userId || ''
       }
 
       // 4. Create member record with retry logic
-      // signUp already set JWT tokens in localStorage — backend uses req.user from JWT
+      // JWT tokens already in localStorage — backend uses req.user from JWT
       toast.loading('Etapa 4/4: Salvando dados...', { id: 'reg-progress' })
 
       let member = null
@@ -396,7 +410,7 @@ export default function Register() {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           member = await withTimeout(
-            createMember(result.userId || '', {
+            createMember(userId, {
               fullName: sanitizedData.fullName,
               email: sanitizedData.email,
               cpf: sanitizedData.cpf,

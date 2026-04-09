@@ -54,9 +54,9 @@ export default function Login() {
   // Redirecionar quando autenticado com role
   useEffect(() => {
     if (!loading && user && role) {
-      // Membros com email não verificado vão para página de verificação
+      // Membros com email não verificado retomam o cadastro
       if (role === 'member' && !emailVerified) {
-        navigate('/verificar-email', { replace: true })
+        navigate('/cadastro', { replace: true })
         return
       }
       const path = getLoginRedirectPath(role, getAppMode())
