@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
@@ -6,9 +6,10 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { LoadingPage, Loading } from '../components/ui/loading'
-import { RenewModal } from '../components/RenewModal'
-import { UpgradeModal } from '../components/UpgradeModal'
-import { ProfileEditModal } from '../components/ProfileEditModal'
+// Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
+const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
+const UpgradeModal = lazy(() => import('../components/UpgradeModal').then(m => ({ default: m.UpgradeModal })))
+const ProfileEditModal = lazy(() => import('../components/ProfileEditModal').then(m => ({ default: m.ProfileEditModal })))
 import { MemberActivityHistory } from '../components/MemberActivityHistory'
 import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
 import { SubscriptionManagement } from '../components/SubscriptionManagement'
@@ -78,6 +79,9 @@ export default function MemberDashboard() {
   const [showSubscription, setShowSubscription] = useState(false)
   const [contract, setContract] = useState<Contract | null>(null)
   const [resendingContract, setResendingContract] = useState(false)
+  // Distinguishes "no member yet (empty state)" from "API error" — the former offers
+  // to subscribe, the latter offers to retry. They look identical in the user's mind otherwise.
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -89,6 +93,7 @@ export default function MemberDashboard() {
   async function fetchMemberData() {
     if (!user) return
 
+    setFetchError(null)
     try {
       const memberData = await getMemberByUserId(user.id)
       setMember(memberData)
@@ -109,6 +114,7 @@ export default function MemberDashboard() {
       }
     } catch (error) {
       logger.error('Error fetching member data:', error)
+      setFetchError('Não conseguimos carregar seus dados. Verifique sua conexão e tente novamente.')
       toast.error('Erro ao carregar dados')
     } finally {
       setLoading(false)
@@ -212,6 +218,35 @@ export default function MemberDashboard() {
     return <LoadingPage />
   }
 
+  // Error state — distinct from "no member" empty state.
+  // Tells the user that something went wrong fetching, with retry as the primary CTA.
+  if (fetchError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md text-center">
+          <CardHeader>
+            <div className="mx-auto mb-4 p-4 bg-destructive/15 rounded-full w-fit">
+              <AlertTriangle className="h-12 w-12 text-destructive" />
+            </div>
+            <CardTitle className="font-heading">Erro ao carregar dados</CardTitle>
+            <CardDescription>{fetchError}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Button onClick={() => { setLoading(true); fetchMemberData() }} size="lg" className="w-full">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Tentar novamente
+            </Button>
+            <Button variant="outline" onClick={signOut} className="w-full">
+              <LogOut className="h-4 w-4 mr-2" />
+              Sair
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // True empty state — user authenticated but has no member record yet.
   if (!member) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -521,6 +556,7 @@ export default function MemberDashboard() {
             {showSubscription && subscription && (
               <SubscriptionManagement
                 memberId={member.id}
+                memberPoints={member.points}
                 onSubscriptionChange={fetchMemberData}
               />
             )}
@@ -852,18 +888,20 @@ export default function MemberDashboard() {
         </div>
       </main>
 
-      {/* Modals */}
-      {modal === 'renew' && (
-        <RenewModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
-      )}
+      {/* Modals — lazy-loaded to keep the initial bundle smaller */}
+      <Suspense fallback={null}>
+        {modal === 'renew' && (
+          <RenewModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
+        )}
 
-      {modal === 'upgrade' && (
-        <UpgradeModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
-      )}
+        {modal === 'upgrade' && (
+          <UpgradeModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
+        )}
 
-      {modal === 'profile' && (
-        <ProfileEditModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
-      )}
+        {modal === 'profile' && (
+          <ProfileEditModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
+        )}
+      </Suspense>
     </div>
   )
 }

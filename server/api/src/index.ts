@@ -19,7 +19,10 @@ import { contractRouter } from './routes/contract.routes.js';
 import { reportRouter } from './routes/report.routes.js';
 import { logRouter } from './routes/log.routes.js';
 import { lgpdRouter } from './routes/lgpd.routes.js';
+import { settingsRouter } from './routes/settings.routes.js';
+import { auditRouter } from './routes/audit.routes.js';
 import { initCronJobs } from './services/cron.service.js';
+import { ensureSchema } from './db/ensure-schema.js';
 
 const app = express();
 
@@ -72,6 +75,8 @@ app.use('/contracts', contractRouter);
 app.use('/reports', reportRouter);
 app.use('/logs', logRouter);
 app.use('/lgpd', lgpdRouter);
+app.use('/settings', settingsRouter);
+app.use('/audit', auditRouter);
 app.use('/cron', reportRouter); // cron endpoints share admin auth pattern
 
 // Error handler
@@ -80,6 +85,9 @@ app.use(errorHandler);
 // Start server
 app.listen(env.PORT, () => {
   console.log(`[API] Server running on port ${env.PORT} (${env.NODE_ENV})`);
+  // Idempotent schema sync — keeps DB schema aligned with deployed code without manual SSH.
+  // Failures here are logged but non-fatal so the API still serves traffic.
+  ensureSchema().catch((err) => console.error('[SCHEMA] ensureSchema unhandled rejection:', err));
   initCronJobs();
 });
 

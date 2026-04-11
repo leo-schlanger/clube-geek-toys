@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '../ui/button'
+import { Badge } from '../ui/badge'
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '../../lib/utils'
+import { useAuth } from '../../contexts/AuthContext'
 
 export type AdminTab = 'dashboard' | 'members' | 'points' | 'users' | 'logs' | 'reports' | 'settings'
 
@@ -103,20 +105,42 @@ function NavContent({
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground"
-          onClick={() => {
-            onSignOut()
-            onClose?.()
-          }}
-        >
-          <LogOut className="h-5 w-5" />
-          <span>Sair</span>
-        </Button>
-      </div>
+      {/* Footer with logged-in user info */}
+      <UserFooter onSignOut={onSignOut} onClose={onClose} />
+    </div>
+  )
+}
+
+function UserFooter({ onSignOut, onClose }: { onSignOut: () => void; onClose?: () => void }) {
+  const { user, role } = useAuth()
+  return (
+    <div className="p-3 border-t border-border space-y-2">
+      {user && (
+        <div className="px-3 py-2 rounded-lg bg-muted/40 flex items-center gap-3 min-w-0">
+          <div className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+            {user.email.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium truncate" title={user.email}>{user.email}</p>
+            {role && (
+              <Badge variant="default" className="mt-0.5 text-[10px] h-4 px-1.5 capitalize">
+                {role}
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+      <Button
+        variant="ghost"
+        className="w-full justify-start gap-3 text-muted-foreground"
+        onClick={() => {
+          onSignOut()
+          onClose?.()
+        }}
+      >
+        <LogOut className="h-5 w-5" />
+        <span>Sair</span>
+      </Button>
     </div>
   )
 }

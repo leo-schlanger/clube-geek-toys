@@ -186,14 +186,28 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        {/* Alert Banner */}
+        {/* Critical Inactive Banner — clearly tells the user benefits are not active yet */}
+        <div className="mb-6 p-4 rounded-lg bg-red-500/15 border-2 border-red-500/50 flex items-start gap-4">
+          <AlertTriangle className="h-6 w-6 text-red-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="font-bold text-red-100 text-lg flex items-center gap-2">
+              ⚠ ASSINATURA INATIVA
+            </h2>
+            <p className="text-sm text-red-100/90 mt-1">
+              Sua assinatura está <strong>INATIVA</strong> até a confirmação do pagamento.
+              Você <strong>não pode usar os benefícios</strong> (descontos, pontos, brindes) enquanto o pagamento estiver pendente.
+            </p>
+          </div>
+        </div>
+
+        {/* Action Banner */}
         <div className="mb-8 p-4 rounded-lg bg-yellow-500/20 border border-yellow-500/50 flex items-start gap-4">
-          <AlertTriangle className="h-6 w-6 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <Clock className="h-6 w-6 text-yellow-500 flex-shrink-0 mt-0.5" />
           <div>
-            <h2 className="font-bold text-yellow-200">Pagamento Pendente</h2>
+            <h2 className="font-bold text-yellow-200">Complete o pagamento</h2>
             <p className="text-sm text-yellow-200/80 mt-1">
-              Seu cadastro foi realizado, mas o pagamento ainda não foi confirmado.
-              Complete o pagamento para ativar sua assinatura e aproveitar todos os benefícios.
+              Seu cadastro foi realizado. Complete o pagamento abaixo para ativar sua assinatura
+              e desbloquear todos os benefícios.
             </p>
           </div>
         </div>

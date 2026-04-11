@@ -41,6 +41,29 @@ contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
   try {
     const memberId = req.body.memberId;
     if (memberId && !await verifyMemberOwnership(req, res, memberId)) return;
+
+    // Magic-bytes validation: a real PDF starts with "%PDF" (0x25 0x50 0x44 0x46).
+    // multer's MIME-type filter can be spoofed by the client; this is the actual content check.
+    if (req.file?.path) {
+      try {
+        const fd = fs.openSync(req.file.path, 'r');
+        const header = Buffer.alloc(4);
+        fs.readSync(fd, header, 0, 4, 0);
+        fs.closeSync(fd);
+        const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
+        if (!isPdf) {
+          // Cleanup the bogus file before rejecting.
+          try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+          res.status(400).json({ error: 'Arquivo enviado não é um PDF válido.', code: 'INVALID_PDF' });
+          return;
+        }
+      } catch (err) {
+        console.error('[CONTRACT] Failed to validate PDF magic bytes:', err);
+        res.status(400).json({ error: 'Não foi possível validar o arquivo enviado.', code: 'PDF_VALIDATION_FAILED' });
+        return;
+      }
+    }
+
     const serverIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
     req.body.ipAddress = serverIp;
     const result = await contractService.saveContract(req.body, req.file);
@@ -76,7 +99,7 @@ contractRouter.get('/:memberId/history', async (req, res, next) => {
   }
 });
 
-// GET /contracts/:contractId/verify — verify contract integrity
+// GET /contracts/:contractId/verify — verify contract integrity (member must own, or admin)
 contractRouter.get('/:contractId/verify', async (req, res, next) => {
   try {
     const result = await query(
@@ -84,10 +107,14 @@ contractRouter.get('/:contractId/verify', async (req, res, next) => {
       [req.params.contractId]
     );
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Contrato não encontrado' });
+      res.status(404).json({ error: 'Contrato não encontrado', code: 'CONTRACT_NOT_FOUND' });
       return;
     }
     const contract = result.rows[0];
+
+    // Ownership check — member can only verify their own contract; admin/seller pass-through
+    if (!await verifyMemberOwnership(req, res, contract.member_id)) return;
+
 
     // Recalculate SHA-256 hash from stored fields
     const dataString = [

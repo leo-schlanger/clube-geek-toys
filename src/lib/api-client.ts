@@ -51,6 +51,9 @@ async function fetchWithTimeout(
   try {
     const response = await fetch(url, {
       ...options,
+      // credentials: 'include' lets the httpOnly refresh cookie ride along on /auth/refresh
+      // and any future cookie-based endpoints. Required by Wave 5.1 auth refactor.
+      credentials: 'include',
       signal: controller.signal,
     })
     return response
@@ -70,6 +73,15 @@ async function fetchWithRetry(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const response = await fetchWithTimeout(url, options, timeout)
+
+      // 429: respect Retry-After header up to a sane cap, then retry once
+      if (response.status === 429 && attempt < maxRetries - 1) {
+        const retryAfterHeader = response.headers.get('Retry-After')
+        const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 0
+        const waitMs = Math.min(Math.max(retryAfter * 1000, BASE_DELAY), 10000)
+        await new Promise((resolve) => setTimeout(resolve, waitMs))
+        continue
+      }
 
       if (response.ok || (response.status >= 400 && response.status < 500)) {
         return response
@@ -104,14 +116,17 @@ async function tryRefreshToken(): Promise<boolean> {
   if (refreshPromise) return refreshPromise
 
   refreshPromise = (async () => {
-    const refreshToken = getRefreshToken()
-    if (!refreshToken) return false
+    // The refresh token now lives in an httpOnly cookie set by the backend (Wave 5.1).
+    // We still send the legacy body fallback if present, so existing sessions during the
+    // migration deploy continue to work. Once all clients are on the new flow, the backend
+    // can stop accepting the body field.
+    const legacyRefreshToken = getRefreshToken()
 
     try {
       const response = await fetchWithTimeout(`${API_URL}/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        body: JSON.stringify(legacyRefreshToken ? { refreshToken: legacyRefreshToken } : {}),
       })
 
       if (!response.ok) {
@@ -120,6 +135,8 @@ async function tryRefreshToken(): Promise<boolean> {
       }
 
       const data = await response.json()
+      // Backend continues to return refreshToken in body for the migration period.
+      // Once cookies are the only path, we can drop this and access becomes memory-only.
       setTokens(data.accessToken, data.refreshToken)
       return true
     } catch {
@@ -140,6 +157,9 @@ async function tryRefreshToken(): Promise<boolean> {
 export interface ApiResponse<T = unknown> {
   data?: T
   error?: string
+  /** Internal error code returned by backend (e.g. TOKEN_ALREADY_USED, RECENT_PAYMENT_EXISTS).
+   * Use this in place of fragile string matching against `error`. */
+  code?: string
   details?: Record<string, unknown>
   status: number
 }
@@ -190,7 +210,12 @@ export async function apiRequest<T = unknown>(
         const retryData = await retryResponse.json().catch(() => null)
 
         if (!retryResponse.ok) {
-          return { error: retryData?.error || 'Erro na requisição', status: retryResponse.status }
+          return {
+            error: retryData?.error || 'Erro na requisição',
+            code: retryData?.code,
+            details: retryData?.details,
+            status: retryResponse.status,
+          }
         }
         return { data: retryData, status: retryResponse.status }
       } else {
@@ -205,6 +230,7 @@ export async function apiRequest<T = unknown>(
     if (!response.ok) {
       return {
         error: data?.error || `Erro: ${response.status}`,
+        code: data?.code,
         details: data?.details,
         status: response.status,
       }
@@ -213,9 +239,16 @@ export async function apiRequest<T = unknown>(
     return { data, status: response.status }
   } catch (error) {
     logger.error(`API request failed: ${path}`, error)
-    const message = error instanceof Error
-      ? (error.message.includes('timeout') ? 'Tempo limite excedido' : error.message)
-      : 'Erro de conexão'
+    let message = 'Erro de comunicação com o servidor.'
+    if (error instanceof Error) {
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        message = 'Tempo limite excedido. Tente novamente.'
+      } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        message = 'Sem conexão com a internet. Verifique sua rede e tente novamente.'
+      } else {
+        message = error.message
+      }
+    }
     return { error: message, status: 0 }
   }
 }

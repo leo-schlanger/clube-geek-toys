@@ -44,17 +44,26 @@ export default function VerifyEmail() {
           // Atualizar estado do usuário
           await refreshUser()
 
-          // Se user veio do registro (não tem member ativo), não redirecionar
-          // O Register.tsx detectará o emailVerified via polling
-          // Se user já é membro, redirecionar para /membro
           setTimeout(() => {
             navigate('/membro', { replace: true })
           }, 3000)
         } else {
-          setMessage({
-            type: 'error',
-            text: result.error || 'Token inválido ou expirado',
-          })
+          // Branch on backend error code (Wave 1.9 / 1.11 standardized errors).
+          let text: string
+          switch (result.code) {
+            case 'TOKEN_ALREADY_USED':
+              text = 'Este link já foi usado. Se você acabou de verificar, faça login normalmente.'
+              break
+            case 'TOKEN_INVALID':
+              text = 'Link de verificação inválido ou expirado. Solicite um novo link abaixo.'
+              break
+            case 'USER_NOT_FOUND':
+              text = 'Usuário não encontrado. Verifique se o link está correto.'
+              break
+            default:
+              text = result.error || 'Não foi possível verificar o email.'
+          }
+          setMessage({ type: 'error', text })
         }
       } catch (err: unknown) {
         logger.error('Erro ao verificar token:', err)
@@ -72,10 +81,17 @@ export default function VerifyEmail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // Redirecionar se não autenticado (apenas se não tem token)
+  // Redirecionar se não autenticado (apenas se não tem token).
+  // Se houver rascunho de cadastro em andamento, voltar pro fluxo de cadastro
+  // (preserva contexto). Caso contrário, vai pro login.
   useEffect(() => {
     if (!loading && !user && !token) {
-      navigate('/login', { replace: true })
+      const hasDraft = localStorage.getItem('clube_geek_register_draft')
+      if (hasDraft) {
+        navigate('/cadastro?step=verify', { replace: true })
+      } else {
+        navigate('/login', { replace: true })
+      }
     }
   }, [loading, user, token, navigate])
 

@@ -37,7 +37,7 @@ import {
   RefreshCw,
   ShoppingCart,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 // Lazy load tab components for code splitting
 const MembersTab = lazy(() => import('../components/admin/MembersTab').then(m => ({ default: m.MembersTab })))
@@ -60,12 +60,37 @@ function TabLoadingFallback() {
   )
 }
 
+const VALID_TABS: AdminTab[] = ['dashboard', 'members', 'users', 'points', 'reports', 'logs', 'settings']
+
+function isValidTab(t: string | null): t is AdminTab {
+  return !!t && (VALID_TABS as string[]).includes(t)
+}
+
 export default function AdminDashboard() {
   const { signOut } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard')
+  // Active tab is synchronized with the URL ?tab=... so:
+  //  - Reload preserves the current tab
+  //  - Back/forward navigation feels natural
+  //  - Sharing a link to the admin lands on the right tab
+  const initialTab = searchParams.get('tab')
+  const [activeTab, setActiveTabState] = useState<AdminTab>(isValidTab(initialTab) ? initialTab : 'dashboard')
+
+  const setActiveTab = useCallback((tab: AdminTab) => {
+    setActiveTabState(tab)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'dashboard') {
+        next.delete('tab')
+      } else {
+        next.set('tab', tab)
+      }
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
   const [members, setMembers] = useState<Member[]>([])
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [systemUsers, setSystemUsers] = useState<{ id: string; email: string; role: string; createdAt?: string }[]>([])

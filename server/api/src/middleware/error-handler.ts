@@ -5,11 +5,19 @@ import { createErrorLog } from '../services/log.service.js';
 export class AppError extends Error {
   constructor(
     public statusCode: number,
-    message: string
+    message: string,
+    public code?: string,
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'AppError';
   }
+}
+
+interface ErrorBody {
+  error: string;
+  code?: string;
+  details?: Record<string, unknown>;
 }
 
 export function errorHandler(
@@ -21,12 +29,15 @@ export function errorHandler(
   console.error(`[ERROR] ${err.name}: ${err.message}`);
 
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ error: err.message });
+    const body: ErrorBody = { error: err.message };
+    if (err.code) body.code = err.code;
+    if (err.details) body.details = err.details;
+    res.status(err.statusCode).json(body);
     return;
   }
 
   if (err.message?.includes('CORS')) {
-    res.status(403).json({ error: err.message });
+    res.status(403).json({ error: err.message, code: 'CORS_BLOCKED' });
     return;
   }
 
@@ -41,8 +52,12 @@ export function errorHandler(
     userAgent: req.headers['user-agent'],
   }).catch(() => { /* silently fail — can't log errors about logging */ });
 
-  res.status(500).json({
+  const body: ErrorBody = {
     error: 'Erro interno do servidor',
-    ...(env.NODE_ENV === 'development' && { detail: err.message }),
-  });
+    code: 'INTERNAL_ERROR',
+  };
+  if (env.NODE_ENV === 'development') {
+    body.details = { detail: err.message };
+  }
+  res.status(500).json(body);
 }

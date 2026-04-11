@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { updateMember } from '../lib/members'
 import { api } from '../lib/api-client'
 import { logger } from '../lib/logger'
+import { PASSWORD_MIN_LENGTH } from '../lib/password-validation'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -22,6 +23,8 @@ import {
   EyeOff,
 } from 'lucide-react'
 
+// Profile schema — password rules MUST match backend (auth.routes.ts passwordSchema):
+// min 8 chars, 1 uppercase, 1 digit. Centralized in src/lib/password-validation.ts.
 const profileSchema = z.object({
   fullName: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   phone: z.string().min(14, 'Telefone inválido').max(15, 'Telefone inválido'),
@@ -30,12 +33,22 @@ const profileSchema = z.object({
   newPassword: z.string().optional(),
   confirmPassword: z.string().optional(),
 }).refine((data) => {
-  if (data.newPassword && data.newPassword.length > 0 && data.newPassword.length < 6) {
-    return false
-  }
-  return true
+  if (!data.newPassword) return true
+  return data.newPassword.length >= PASSWORD_MIN_LENGTH
 }, {
-  message: 'Nova senha deve ter pelo menos 6 caracteres',
+  message: `Nova senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`,
+  path: ['newPassword'],
+}).refine((data) => {
+  if (!data.newPassword) return true
+  return /[A-Z]/.test(data.newPassword)
+}, {
+  message: 'Nova senha deve conter pelo menos 1 letra maiúscula',
+  path: ['newPassword'],
+}).refine((data) => {
+  if (!data.newPassword) return true
+  return /[0-9]/.test(data.newPassword)
+}, {
+  message: 'Nova senha deve conter pelo menos 1 número',
   path: ['newPassword'],
 }).refine((data) => {
   if (data.newPassword && data.newPassword !== data.confirmPassword) {
@@ -45,15 +58,6 @@ const profileSchema = z.object({
 }, {
   message: 'Senhas não conferem',
   path: ['confirmPassword'],
-}).refine((data) => {
-  if ((data.newPassword || data.email !== '') && !data.currentPassword) {
-    // This is checked dynamically in component
-    return true
-  }
-  return true
-}, {
-  message: 'Senha atual é necessária para alterar email ou senha',
-  path: ['currentPassword'],
 })
 
 type ProfileFormData = z.infer<typeof profileSchema>

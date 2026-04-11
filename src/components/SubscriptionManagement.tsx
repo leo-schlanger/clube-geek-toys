@@ -53,6 +53,8 @@ import {
 
 interface SubscriptionManagementProps {
   memberId: string
+  /** Used to warn about points loss in the cancel confirmation. */
+  memberPoints?: number
   onSubscriptionChange?: () => void
 }
 
@@ -60,6 +62,7 @@ type ConfirmAction = 'pause' | 'resume' | 'cancel' | null
 
 export function SubscriptionManagement({
   memberId,
+  memberPoints,
   onSubscriptionChange,
 }: SubscriptionManagementProps) {
   const [subscription, setSubscription] = useState<Subscription | null>(null)
@@ -562,11 +565,21 @@ export function SubscriptionManagement({
           </DialogHeader>
 
           {confirmAction === 'cancel' && (
-            <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-600 dark:text-red-400">
-                Você perderá acesso a todos os benefícios imediatamente após o cancelamento.
-              </p>
+            <div className="space-y-3">
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  Você perderá acesso a todos os benefícios imediatamente após o cancelamento.
+                </p>
+              </div>
+              {typeof memberPoints === 'number' && memberPoints > 0 && (
+                <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-orange-700 dark:text-orange-300">
+                    Atenção: seus <strong>{memberPoints.toLocaleString('pt-BR')} pontos acumulados serão perdidos</strong> após o cancelamento.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

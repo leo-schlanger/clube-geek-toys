@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { sanitizeName, normalizeEmail, normalizePhone, normalizeCPF } from '../lib/sanitize'
 import { validateEmail, type EmailValidationResult } from '../lib/email-validation'
+import { PASSWORD_MIN_LENGTH } from '../lib/password-validation'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
@@ -17,8 +18,7 @@ import { PaymentModal } from '../components/PaymentModal'
 import { ContractModal } from '../components/ContractModal'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency, validateCPF } from '../lib/utils'
-import { createMember, isCPFRegistered, updateMember } from '../lib/members'
-import { sendWelcomeEmail, sendPaymentConfirmedEmail } from '../lib/email'
+import { createMember, isCPFRegistered } from '../lib/members'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -43,11 +43,16 @@ import {
 } from 'lucide-react'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
 
-// Form validation schema
+// Form validation schema — password rules MUST match backend (auth.routes.ts passwordSchema):
+// min 8 chars, 1 uppercase, 1 digit. Centralized in src/lib/password-validation.ts.
 const registerSchema = z.object({
   fullName: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, `Senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`)
+    .refine((v) => /[A-Z]/.test(v), 'Senha deve conter pelo menos 1 letra maiúscula')
+    .refine((v) => /[0-9]/.test(v), 'Senha deve conter pelo menos 1 número'),
   confirmPassword: z.string(),
   cpf: z.string().refine((val) => validateCPF(val), 'CPF inválido'),
   phone: z.string().min(10, 'Telefone inválido'),
@@ -327,10 +332,17 @@ export default function Register() {
     }
   }, [emailVerified, awaitingEmailVerification])
 
+  // Synchronous re-entrancy guard. `loading` state is async and doesn't block double-clicks
+  // that fire in the same tick. A ref does — set it before any awaits, clear in finally.
+  const isSubmittingRef = useRef(false)
+
   /**
    * Handle form submission
    */
   async function onSubmit(data: RegisterFormData) {
+    // Atomic double-submit protection (synchronous, before any await)
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
     setLoading(true)
 
     // Sanitizar inputs
@@ -392,7 +404,20 @@ export default function Register() {
         const result = await signUp(sanitizedData.email, sanitizedData.password)
 
         if (!result.success) {
-          toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
+          // Special-case: email already exists → offer login as inline CTA
+          if (result.error === 'Email já cadastrado') {
+            toast.error('Este email já está cadastrado.', {
+              id: 'reg-progress',
+              duration: 8000,
+              description: 'Se você esqueceu a senha, use "Esqueci minha senha" na tela de login.',
+              action: {
+                label: 'Fazer login',
+                onClick: () => navigate(`/login?email=${encodeURIComponent(sanitizedData.email)}`),
+              },
+            })
+          } else {
+            toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
+          }
           setLoading(false)
           return
         }
@@ -461,9 +486,10 @@ export default function Register() {
     } catch (error) {
       logger.error('Error registering:', error)
       toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-progress' })
+    } finally {
+      setLoading(false)
+      isSubmittingRef.current = false
     }
-
-    setLoading(false)
   }
 
   /**
@@ -477,81 +503,24 @@ export default function Register() {
   }
 
   /**
-   * Handle successful payment - updates member status to active and sends emails
+   * Handle successful payment.
+   *
+   * The frontend deliberately does NOT try to activate the member — that's the webhook's job
+   * (the only role with permission to set member.status, expiry, etc.). The frontend just
+   * navigates to /membro; the MemberDashboard polls for the active state and shows the
+   * PendingPaymentScreen with a clear "INATIVO" banner if the webhook hasn't landed yet.
+   *
+   * Welcome and confirmation emails are also sent server-side by the webhook, so we don't
+   * fire them from the frontend (avoids duplicates).
    */
   async function handlePaymentSuccess() {
     setShowPaymentModal(false)
-
-    if (createdMemberId) {
-      // Calculate expiry date based on payment type
-      const now = new Date()
-      const expiryDate = new Date(now)
-      if (paymentType === 'monthly') {
-        expiryDate.setMonth(expiryDate.getMonth() + 1)
-      } else {
-        expiryDate.setFullYear(expiryDate.getFullYear() + 1)
-      }
-
-      const expiryDateStr = expiryDate.toISOString().split('T')[0]
-
-      // Update member status to active with retry
-      let success = false
-      let retryCount = 0
-      const maxRetries = 3
-
-      while (!success && retryCount < maxRetries) {
-        success = await updateMember(createdMemberId, {
-          status: 'active',
-          startDate: now.toISOString().split('T')[0],
-          expiryDate: expiryDateStr,
-        })
-
-        if (!success) {
-          retryCount++
-          if (retryCount < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
-          }
-        }
-      }
-
-      if (success) {
-        toast.success('Pagamento confirmado! Bem-vindo ao Clube Geek & Toys!')
-
-        // Send confirmation emails (non-blocking)
-        const email = memberEmail
-        const name = memberName || 'Membro'
-        const planName = PLANS[selectedPlan].name
-
-        // Send payment confirmation email
-        sendPaymentConfirmedEmail(
-          email,
-          name,
-          price,
-          planName,
-          expiryDateStr,
-          createdMemberId
-        ).catch(err => logger.error('Erro ao enviar email de confirmação:', err))
-
-        // Send welcome email
-        sendWelcomeEmail(
-          email,
-          name,
-          planName,
-          createdMemberId
-        ).catch(err => logger.error('Erro ao enviar email de boas-vindas:', err))
-      } else {
-        // After all retries failed
-        toast.error('Pagamento recebido, mas houve um erro ao ativar sua conta.', {
-          description: 'Faça login novamente — o sistema ativará sua conta automaticamente.',
-          duration: 10000,
-        })
-        // Navigate anyway — webhook will activate the member when payment confirms
-      }
-    } else {
-      toast.success('Pagamento confirmado! Bem-vindo ao clube!')
-    }
-
-    navigate('/membro')
+    toast.success('Pagamento recebido! Estamos ativando sua conta...', {
+      description: 'A confirmação leva alguns segundos. Sua área de membro abrirá em instantes.',
+      duration: 5000,
+    })
+    // Small delay so the webhook usually lands before MemberDashboard fetches.
+    setTimeout(() => navigate('/membro'), 1500)
   }
 
   /**
@@ -910,6 +879,8 @@ export default function Register() {
                             <Input
                               id="email"
                               type="email"
+                              inputMode="email"
+                              autoComplete="email"
                               placeholder="seu@email.com"
                               className={`pl-10 pr-10 ${
                                 emailValidation
@@ -961,6 +932,8 @@ export default function Register() {
                               <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                               <Input
                                 id="cpf"
+                                inputMode="numeric"
+                                autoComplete="off"
                                 placeholder="000.000.000-00"
                                 className={`pl-10 pr-10 ${
                                   cpfValidation
@@ -1020,6 +993,8 @@ export default function Register() {
                               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                               <Input
                                 id="phone"
+                                inputMode="tel"
+                                autoComplete="tel"
                                 placeholder="(21) 99999-9999"
                                 className="pl-10"
                                 {...register('phone')}

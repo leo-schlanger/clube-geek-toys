@@ -12,7 +12,11 @@ import {
 } from 'react'
 import { api, setTokens, clearTokens, getAccessToken } from '../lib/api-client'
 import { authLogger } from '../lib/logger'
+import { useIdleTimer } from '../hooks/useIdleTimer'
+import { toast } from 'sonner'
 import type { UserRole } from '../types'
+
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30 minutes
 
 // =============================================================================
 // Types
@@ -263,6 +267,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return { success: true }
   }
+
+  // Inactivity logout — auto sign-out after 30 minutes of no activity.
+  // Disabled when not authenticated (nothing to log out).
+  useIdleTimer({
+    timeout: IDLE_TIMEOUT_MS,
+    disabled: !user,
+    onIdle: () => {
+      toast.warning('Sessão encerrada por inatividade.', { duration: 5000 })
+      signOut()
+    },
+  })
+
+  // Sync between tabs: listen for token clears and apply them locally.
+  // Logging out in one tab logs out in all tabs.
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'clube_geek_access_token' && !e.newValue) {
+        // Token cleared in another tab → logout here too
+        setAuthState(null)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [setAuthState])
 
   return (
     <AuthContext.Provider

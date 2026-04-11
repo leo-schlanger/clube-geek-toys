@@ -202,15 +202,24 @@ export async function resendContractEmail(
 }
 
 /**
- * Verify email token via API
+ * Verify email token via API.
+ * Returns a `code` from the backend so the UI can branch on cause:
+ *   - TOKEN_INVALID: bad/expired link
+ *   - TOKEN_ALREADY_USED: previously consumed (one-time enforcement)
+ *   - USER_NOT_FOUND: token references a missing user
  */
 export async function verifyEmailToken(
   token: string
-): Promise<{ success: boolean; uid?: string; error?: string }> {
+): Promise<{ success: boolean; uid?: string; error?: string; code?: string }> {
   try {
-    const result = await api.post('/auth/verify-email', { token })
-    if (result.error) return { success: false, error: result.error }
-    return { success: true, uid: result.data?.uid }
+    const result = await api.post<{ uid?: string }>('/auth/verify-email', { token })
+    if (result.error) {
+      // ApiResponse may include `code` from the backend
+      // (extended via standardized error shape — Wave 1.11)
+      const code = (result as { code?: string }).code
+      return { success: false, error: result.error, code }
+    }
+    return { success: true, uid: (result.data as { uid?: string } | undefined)?.uid }
   } catch (error: unknown) {
     logger.error('Email verification error:', error)
     return { success: false, error: 'Erro ao verificar email' }

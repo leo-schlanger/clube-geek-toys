@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { normalizeEmail } from '../lib/sanitize'
 import { Button } from '../components/ui/button'
@@ -13,7 +13,9 @@ import { isBlocked, recordFailedAttempt, clearAttempts } from '../lib/rate-limit
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [searchParams] = useSearchParams()
+  // Pre-fill email if it was passed via ?email=... (e.g. from Register's "email already exists" CTA)
+  const [email, setEmail] = useState(() => searchParams.get('email') || '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState('')

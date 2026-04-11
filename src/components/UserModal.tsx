@@ -7,13 +7,13 @@ import { logger } from '../lib/logger'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
+import { PASSWORD_MIN_LENGTH } from '../lib/password-validation'
 import type { UserRole } from '../types'
 import { toast } from 'sonner'
 import {
-  X,
   Mail,
   Lock,
   Shield,
@@ -22,10 +22,15 @@ import {
   EyeOff,
 } from 'lucide-react'
 
-// Validation schema
+// Validation schema — password rules MUST match backend (auth.routes.ts passwordSchema):
+// min 8 chars, 1 uppercase, 1 digit. See src/lib/password-validation.ts.
 const userSchema = z.object({
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
+  password: z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, `Senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`)
+    .refine((v) => /[A-Z]/.test(v), 'Senha deve conter pelo menos 1 letra maiúscula')
+    .refine((v) => /[0-9]/.test(v), 'Senha deve conter pelo menos 1 número'),
   confirmPassword: z.string(),
   role: z.enum(['admin', 'seller', 'member']),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -120,31 +125,27 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="relative">
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <CardTitle>Novo Usuário do Sistema</CardTitle>
-          <CardDescription>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Novo Usuário do Sistema</DialogTitle>
+          <DialogDescription>
             Crie um novo usuário com acesso ao painel administrativo
-          </CardDescription>
-        </CardHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          <CardContent className="space-y-6">
+          <div className="space-y-6 py-2">
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="user-email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="email"
+                  id="user-email"
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   placeholder="usuario@email.com"
                   className="pl-10"
                   {...register('email')}
@@ -157,19 +158,21 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
 
             {/* Password */}
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="user-password">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="password"
+                  id="user-password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Mínimo 6 caracteres"
+                  autoComplete="new-password"
+                  placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres, 1 maiúscula, 1 número`}
                   className="pl-10 pr-10"
                   {...register('password')}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -182,12 +185,13 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
 
             {/* Confirm Password */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Senha</Label>
+              <Label htmlFor="user-confirm-password">Confirmar Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  id="confirmPassword"
+                  id="user-confirm-password"
                   type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
                   placeholder="Repita a senha"
                   className="pl-10"
                   {...register('confirmPassword')}
@@ -249,18 +253,18 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
                 </div>
               </div>
             )}
-          </CardContent>
+          </div>
 
-          <CardFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+          <DialogFooter className="gap-2 pt-4">
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1" disabled={loading}>
+            <Button type="submit" disabled={loading}>
               {loading ? <Loading size="sm" /> : 'Criar Usuário'}
             </Button>
-          </CardFooter>
+          </DialogFooter>
         </form>
-      </Card>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

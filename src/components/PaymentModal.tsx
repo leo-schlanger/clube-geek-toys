@@ -214,7 +214,11 @@ export function PaymentModal({
       }
     } catch (error) {
       paymentLogger.error('Error generating PIX:', error)
-      toast.error('Erro ao gerar pagamento. Tente novamente.')
+      // Surface backend error message (e.g. 409 RECENT_PAYMENT_EXISTS) instead of a generic line.
+      const message = error instanceof Error && error.message
+        ? error.message
+        : 'Erro ao gerar pagamento. Tente novamente.'
+      toast.error(message)
     } finally {
       setLoading(false)
     }

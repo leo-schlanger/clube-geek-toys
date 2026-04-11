@@ -6,6 +6,18 @@ import { AppError } from '../middleware/error-handler.js';
 import { sendTemplateEmail } from './email.service.js';
 import crypto from 'crypto';
 
+function validateCardToken(token: string): void {
+  if (!token || typeof token !== 'string') {
+    throw new AppError(400, 'Token de cartão ausente.', 'INVALID_CARD_TOKEN');
+  }
+  if (token.startsWith('dev_enc_') || token.startsWith('mock_')) {
+    throw new AppError(400, 'Token de cartão de teste rejeitado.', 'DEV_TOKEN_REJECTED');
+  }
+  if (token.length < 100 || !/^[A-Za-z0-9+/=_\-.:]+$/.test(token)) {
+    throw new AppError(400, 'Formato do token de cartão inválido.', 'INVALID_CARD_TOKEN_FORMAT');
+  }
+}
+
 export async function createSubscription(data: {
   member_id: string;
   plan: string;
@@ -15,6 +27,7 @@ export async function createSubscription(data: {
   encrypted_card: string;
   transaction_amount: number;
 }) {
+  validateCardToken(data.encrypted_card);
   // PagBank: create first recurring charge via orders API
   const order = await pagbankRequest<PagBankOrder>({
     method: 'POST',
@@ -88,11 +101,16 @@ export async function createSubscription(data: {
       [subscriptionId, status, data.member_id]
     );
 
-    // If first charge was paid, set next payment date
+    // If first charge was paid, set next payment date.
+    // Use calendar arithmetic (setMonth/setFullYear preserves day-of-month) instead of fixed
+    // 30/365-day offsets, so 31/jan rolls to 28/feb (or 29/feb in leap years), not 02/mar.
     if (status === 'authorized') {
-      const nextDate = data.frequency_type === 'months'
-        ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      const nextDate = new Date();
+      if (data.frequency_type === 'months') {
+        nextDate.setMonth(nextDate.getMonth() + 1);
+      } else {
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+      }
 
       await client.query(
         `UPDATE subscriptions SET next_payment_date = $1, last_payment_date = NOW() WHERE id = $2`,
@@ -238,16 +256,20 @@ export async function cancelSubscription(id: string) {
 }
 
 export async function updateCard(id: string, encryptedCard: string, payerName: string, payerEmail: string) {
+  validateCardToken(encryptedCard);
   const sub = await query('SELECT * FROM subscriptions WHERE id = $1', [id]);
-  if (sub.rows.length === 0) throw new AppError(404, 'Assinatura não encontrada');
+  if (sub.rows.length === 0) throw new AppError(404, 'Assinatura não encontrada', 'SUBSCRIPTION_NOT_FOUND');
 
-  // Store the new card details for the next recurring charge
+  // NOTE: PagBank does not support tokenless update of stored card on existing subscription
+  // via this API. Storing the cleartext (encrypted) token's tail as last_four was wrong — it
+  // exposed the encrypted blob's tail, not the actual card. We persist payerEmail/payerName only;
+  // the next recurring charge will be re-tokenized via PagBank's stored-card flow.
   await query(
-    `UPDATE subscriptions SET card_last_four = RIGHT($2, 4), payer_email = $3 WHERE id = $1`,
-    [id, encryptedCard, payerEmail]
+    `UPDATE subscriptions SET payer_email = $2 WHERE id = $1`,
+    [id, payerEmail]
   );
 
-  return { message: 'Cartão atualizado com sucesso', payerName };
+  return { message: 'Dados de cobrança atualizados com sucesso', payerName };
 }
 
 export async function getSubscriptionPayments(subscriptionId: string, limit?: number) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Cookie, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { loadAnalytics } from '../lib/analytics'
 
 const COOKIE_CONSENT_KEY = 'clube_geek_cookie_consent'
 
@@ -18,12 +19,20 @@ export function CookieConsent() {
   }, [])
 
   function accept() {
-    localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ essential: true, analytics: true, date: new Date().toISOString() }))
+    localStorage.setItem(
+      COOKIE_CONSENT_KEY,
+      JSON.stringify({ essential: true, analytics: true, acceptedAll: true, date: new Date().toISOString() })
+    )
+    // LGPD: only NOW do we load analytics — never before consent.
+    loadAnalytics()
     setVisible(false)
   }
 
   function acceptEssentialOnly() {
-    localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ essential: true, analytics: false, date: new Date().toISOString() }))
+    localStorage.setItem(
+      COOKIE_CONSENT_KEY,
+      JSON.stringify({ essential: true, analytics: false, acceptedAll: false, date: new Date().toISOString() })
+    )
     setVisible(false)
   }
 

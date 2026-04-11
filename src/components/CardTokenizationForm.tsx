@@ -223,26 +223,12 @@ export function CardTokenizationForm({
         paymentLogger.info('Card encrypted successfully')
         onTokenGenerated(result.encryptedCard, cardInfo)
       } else {
-        const isDevelopment = import.meta.env.VITE_ENVIRONMENT === 'development'
-
-        if (!isDevelopment) {
-          setError('PagBank SDK não disponível. Tente novamente.')
-          toast.error('Erro de configuração do pagamento')
-          return
-        }
-
-        const mockEncrypted = `dev_enc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        const cardInfo: CardInfo = {
-          lastFourDigits: cleanCardNumber.slice(-4),
-          brand: detectCardBrand(cleanCardNumber).name,
-          expirationMonth: month,
-          expirationYear: `20${year}`,
-          cardholderName: cardholderName.trim().toUpperCase(),
-        }
-
-        paymentLogger.warn('Using MOCK encrypted card (development mode only)')
-        toast.info('Modo desenvolvimento: usando cartão de teste')
-        onTokenGenerated(mockEncrypted, cardInfo)
+        // SDK failed to load — block payment regardless of environment.
+        // Mock tokens are NEVER acceptable, even in dev: backend now rejects `dev_enc_*` prefixes
+        // explicitly to prevent any chance of leaking into production.
+        setError('Sistema de pagamento indisponível. Recarregue a página ou tente em alguns minutos.')
+        toast.error('Erro de configuração do pagamento')
+        return
       }
     } catch (err) {
       paymentLogger.error('Error encrypting card:', err)

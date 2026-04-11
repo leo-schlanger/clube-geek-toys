@@ -18,7 +18,9 @@ reportRouter.get('/daily', async (_req, res, next) => {
 // GET /reports/monthly
 reportRouter.get('/monthly', async (req, res, next) => {
   try {
-    const months = Number(req.query.months) || 6;
+    // Bound months to a sensible range to prevent DoS via huge time windows.
+    const requested = Number(req.query.months) || 6;
+    const months = Math.max(1, Math.min(requested, 24));
     const result = await reportService.getMonthlyReport(months);
     res.json(result);
   } catch (err) {

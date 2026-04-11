@@ -5,6 +5,8 @@ import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { createHmacToken, verifyHmacToken, hashSha256 } from '../utils/hmac.js';
 import { sendTemplateEmail } from './email.service.js';
+import { isDisposableEmail } from '../utils/disposable-emails.js';
+import { auditLog as sharedAuditLog } from '../utils/audit.js';
 import crypto from 'crypto';
 
 interface UserRow {
@@ -20,15 +22,9 @@ interface UserRow {
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = '15m';
 
+// Local thin wrapper around the shared auditLog helper for back-compat with existing call sites
 async function auditLog(action: string, userId: string | null, details: Record<string, unknown>) {
-  try {
-    await query(
-      'INSERT INTO audit_logs (action, user_id, details) VALUES ($1, $2, $3)',
-      [action, userId, JSON.stringify(details)]
-    );
-  } catch (err) {
-    console.error('[AUDIT] Failed to write audit log:', err);
-  }
+  await sharedAuditLog(action, userId, details);
 }
 function generateTokens(user: { id: string; email: string; role: string }) {
   const accessToken = jwt.sign(
@@ -43,10 +39,21 @@ function generateTokens(user: { id: string; email: string; role: string }) {
 }
 
 export async function register(data: { email: string; password: string; name?: string; ip?: string }) {
+  const normalizedEmail = data.email.toLowerCase().trim();
+
+  // Defense-in-depth: reject disposable email providers (frontend also blocks).
+  if (isDisposableEmail(normalizedEmail)) {
+    throw new AppError(
+      400,
+      'Por favor, use um email permanente. Emails temporários não são aceitos.',
+      'DISPOSABLE_EMAIL'
+    );
+  }
+
   // Check if email already exists
-  const existing = await query('SELECT id FROM users WHERE email = $1', [data.email.toLowerCase()]);
+  const existing = await query('SELECT id FROM users WHERE email = $1', [normalizedEmail]);
   if (existing.rows.length > 0) {
-    throw new AppError(409, 'Email já cadastrado');
+    throw new AppError(409, 'Email já cadastrado', 'EMAIL_ALREADY_EXISTS');
   }
 
   const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
@@ -55,7 +62,7 @@ export async function register(data: { email: string; password: string; name?: s
     `INSERT INTO users (email, password_hash, role)
      VALUES ($1, $2, 'member')
      RETURNING id, email, role, email_verified, created_at`,
-    [data.email.toLowerCase(), passwordHash]
+    [normalizedEmail, passwordHash]
   );
 
   const user = result.rows[0];
@@ -210,24 +217,64 @@ export async function sendVerificationEmail(data: { email: string; uid?: string;
 }
 
 export async function verifyEmail(token: string) {
+  // 1. HMAC validity & expiration check (24h TTL embedded in token)
   const payload = verifyHmacToken(token);
   if (!payload || !payload.email) {
-    throw new AppError(400, 'Token de verificação inválido ou expirado');
+    throw new AppError(400, 'Link de verificação inválido ou expirado.', 'TOKEN_INVALID');
   }
 
-  const result = await query(
-    `UPDATE users SET email_verified = TRUE, email_verified_at = NOW()
-     WHERE email = $1 AND email_verified = FALSE
-     RETURNING id, email, role, email_verified`,
-    [payload.email]
-  );
+  // 2. One-time use enforcement: claim the token hash atomically.
+  // If another request already consumed it, ON CONFLICT bails out.
+  const tokenHash = hashSha256(token);
 
-  if (result.rowCount === 0) {
-    return { message: 'Email já verificado ou usuário não encontrado' };
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const claim = await client.query(
+      `INSERT INTO consumed_verification_tokens (token_hash, user_id)
+       SELECT $1, id FROM users WHERE email = $2
+       ON CONFLICT (token_hash) DO NOTHING
+       RETURNING token_hash`,
+      [tokenHash, payload.email]
+    );
+
+    if (claim.rowCount === 0) {
+      // Token was either previously consumed OR user not found
+      const existsCheck = await client.query(
+        'SELECT 1 FROM consumed_verification_tokens WHERE token_hash = $1',
+        [tokenHash]
+      );
+      await client.query('ROLLBACK');
+      if (existsCheck.rowCount && existsCheck.rowCount > 0) {
+        throw new AppError(410, 'Este link de verificação já foi usado.', 'TOKEN_ALREADY_USED');
+      }
+      throw new AppError(404, 'Usuário não encontrado.', 'USER_NOT_FOUND');
+    }
+
+    // 3. Mark email as verified (idempotent — only updates if not already verified)
+    const result = await client.query(
+      `UPDATE users SET email_verified = TRUE, email_verified_at = NOW()
+       WHERE email = $1 AND email_verified = FALSE
+       RETURNING id, email, role, email_verified`,
+      [payload.email]
+    );
+
+    await client.query('COMMIT');
+
+    if (result.rowCount === 0) {
+      // Already verified — but token claim succeeded. Return success message.
+      return { message: 'Email já verificado anteriormente.' };
+    }
+
+    await auditLog('auth.email_verified', result.rows[0].id, { email: payload.email });
+    return { message: 'Email verificado com sucesso', user: result.rows[0] };
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* swallow */ }
+    throw err;
+  } finally {
+    client.release();
   }
-
-  await auditLog('auth.email_verified', result.rows[0].id, { email: payload.email });
-  return { message: 'Email verificado com sucesso', user: result.rows[0] };
 }
 
 export async function sendPasswordReset(email: string) {

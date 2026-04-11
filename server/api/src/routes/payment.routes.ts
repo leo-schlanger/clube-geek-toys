@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 import { verifyMemberOwnership, getMemberIdForUser } from '../middleware/ownership.js';
 import { paymentLimiter } from '../middleware/rate-limit.js';
 import { validate } from '../middleware/validate.js';
@@ -30,6 +30,18 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
   try {
     // Verify the user owns the member being paid for
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
+
+    // Duplicate-payment guard: block if a paid payment exists in the recent window
+    const recent = await paymentService.findRecentPayment(req.body.external_reference);
+    if (recent) {
+      res.status(409).json({
+        error: 'Você já tem um pagamento recente. Verifique seu histórico antes de gerar outro.',
+        code: 'RECENT_PAYMENT_EXISTS',
+        details: { recentPaymentId: recent.id, paidAt: recent.paid_at, amount: parseFloat(recent.amount) },
+      });
+      return;
+    }
+
     const result = await paymentService.createPixPayment(req.body);
     res.status(201).json(result);
   } catch (err) {
@@ -42,8 +54,37 @@ paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(ca
   try {
     // Verify the user owns the member being paid for
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
+
+    // Duplicate-payment guard
+    const recent = await paymentService.findRecentPayment(req.body.external_reference);
+    if (recent) {
+      res.status(409).json({
+        error: 'Você já tem um pagamento recente. Verifique seu histórico antes de gerar outro.',
+        code: 'RECENT_PAYMENT_EXISTS',
+        details: { recentPaymentId: recent.id, paidAt: recent.paid_at, amount: parseFloat(recent.amount) },
+      });
+      return;
+    }
+
     const result = await paymentService.createCardPayment(req.body);
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /payments/:id/refund — admin-only refund
+const refundSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+paymentRouter.post('/:id/refund', authenticate, requireRole('admin'), validate(refundSchema), async (req, res, next) => {
+  try {
+    const result = await paymentService.refundPayment({
+      paymentId: req.params.id as string,
+      adminUserId: req.user!.userId,
+      reason: req.body.reason,
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }

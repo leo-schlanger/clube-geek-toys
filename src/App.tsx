@@ -8,6 +8,7 @@ import { SkipLink } from './components/ui/skip-link'
 import { OfflineBanner } from './components/ui/offline-banner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { CookieConsent } from './components/CookieConsent'
+import { ConfirmProvider } from './hooks/useConfirm'
 import { getAppMode } from './lib/subdomain'
 
 // Lazy loaded pages - Member Area
@@ -259,15 +260,17 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <SkipLink />
-            <OfflineBanner />
-            <Suspense fallback={<LoadingPage />}>
-              <main id="main-content">
-                <AppRoutes />
-              </main>
-            </Suspense>
-            <Toaster position="top-right" richColors />
-            <CookieConsent />
+            <ConfirmProvider>
+              <SkipLink />
+              <OfflineBanner />
+              <Suspense fallback={<LoadingPage />}>
+                <main id="main-content">
+                  <AppRoutes />
+                </main>
+              </Suspense>
+              <Toaster position="top-right" richColors />
+              <CookieConsent />
+            </ConfirmProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

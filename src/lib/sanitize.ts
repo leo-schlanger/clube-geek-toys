@@ -42,18 +42,39 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
- * Sanitiza nome: trim, capitaliza primeira letra de cada palavra
+ * Sanitiza nome: trim, capitaliza primeira letra de cada palavra,
+ * e REMOVE caracteres potencialmente perigosos (XSS-safe).
+ *
+ * Defense in depth: backend deve escapar/validar de novo, mas o frontend não envia
+ * conteúdo claramente malicioso.
+ *
  * @param name - Nome a sanitizar
- * @returns Nome capitalizado
+ * @returns Nome limpo, capitalizado e limitado a 200 caracteres
  * @example
  * sanitizeName('joão da silva') // 'João Da Silva'
+ * sanitizeName('<script>alert(1)</script>João') // 'João'
  */
 export function sanitizeName(name: string): string {
   if (!name) return ''
 
-  return sanitizeString(name)
-    // Capitaliza primeira letra de cada palavra
-    .replace(/\b\w/g, (char) => char.toUpperCase())
+  let cleaned = sanitizeString(name)
+    // Strip HTML-tag-like substrings entirely
+    .replace(/<[^>]*>/g, '')
+    // Strip individual special chars (keep accented letters, hyphens, apostrophes for surnames)
+    .replace(/[<>"&]/g, '')
+    // Reject `javascript:` and `data:` URI schemes if pasted
+    .replace(/javascript:/gi, '')
+    .replace(/data:/gi, '')
+    // Reject inline event handlers like `onclick=`
+    .replace(/\bon\w+\s*=/gi, '')
+
+  // Cap length defensively
+  if (cleaned.length > 200) {
+    cleaned = cleaned.substring(0, 200).trim()
+  }
+
+  // Capitalize first letter of each word
+  return cleaned.replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 /**

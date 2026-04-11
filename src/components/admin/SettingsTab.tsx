@@ -1,90 +1,128 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Badge } from '../ui/badge'
 import { toast } from 'sonner'
-import { Save, RotateCcw, Star, Crown, Sparkles, Gift, AlertTriangle } from 'lucide-react'
-import { PLANS, POINTS_MULTIPLIER, POINTS_CONFIG } from '../../types'
+import { Save, RotateCcw, Star, Crown, Sparkles, AlertTriangle, Loader2 } from 'lucide-react'
+import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 
-// Note: In a production app, these would be stored in the database via API
-// For now, we display the current configuration (read-only with visual edit)
+interface SettingsState {
+  values: Record<string, unknown>
+  catalogue: SettingDefinition[]
+}
+
+const PLAN_KEYS = ['silver', 'gold', 'black'] as const
+type PlanKey = typeof PLAN_KEYS[number]
+
+const planIcons: Record<PlanKey, ReactNode> = {
+  silver: <Star className="h-5 w-5" />,
+  gold: <Crown className="h-5 w-5" />,
+  black: <Sparkles className="h-5 w-5" />,
+}
+
+const planColors: Record<PlanKey, string> = {
+  silver: 'from-slate-400 to-slate-600',
+  gold: 'from-yellow-400 to-yellow-600',
+  black: 'from-violet-600 to-purple-800',
+}
 
 export function SettingsTab() {
-  const [hasChanges, setHasChanges] = useState(false)
+  const [state, setState] = useState<SettingsState | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState<Record<string, unknown>>({})
 
-  // Local state mirrors the constants (would be fetched from the API in production)
-  const [plans, setPlans] = useState({
-    silver: { ...PLANS.silver },
-    gold: { ...PLANS.gold },
-    black: { ...PLANS.black },
-  })
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const data = await getSettings()
+      if (!cancelled) {
+        if (data) {
+          setState(data)
+          setDraft({ ...data.values })
+        } else {
+          toast.error('Não foi possível carregar as configurações.')
+        }
+        setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  const [multipliers, setMultipliers] = useState({ ...POINTS_MULTIPLIER })
-  const [rules, setRules] = useState([...POINTS_CONFIG.redemptionRules])
+  const hasChanges = state
+    ? Object.keys(draft).some((k) => JSON.stringify(draft[k]) !== JSON.stringify(state.values[k]))
+    : false
 
-  const handlePlanChange = (plan: 'silver' | 'gold' | 'black', field: string, value: number) => {
-    setPlans(prev => ({
-      ...prev,
-      [plan]: { ...prev[plan], [field]: value }
-    }))
-    setHasChanges(true)
+  const setValue = (key: string, value: unknown) => {
+    setDraft((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleMultiplierChange = (plan: 'silver' | 'gold' | 'black', value: number) => {
-    setMultipliers(prev => ({ ...prev, [plan]: value }))
-    setHasChanges(true)
-  }
-
-  const handleRuleChange = (index: number, field: string, value: number | string) => {
-    setRules(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
-      return updated
-    })
-    setHasChanges(true)
-  }
-
-  const handleSave = () => {
-    // In production, this would save via API to PostgreSQL
-    toast.info('Configurações serão salvas no banco de dados em breve. Por enquanto, as configurações são definidas no código.')
-    setHasChanges(false)
+  const handleSave = async () => {
+    if (!state) return
+    setSaving(true)
+    try {
+      // Send only changed keys
+      const changed: Record<string, unknown> = {}
+      for (const k of Object.keys(draft)) {
+        if (JSON.stringify(draft[k]) !== JSON.stringify(state.values[k])) {
+          changed[k] = draft[k]
+        }
+      }
+      const result = await updateSettings(changed)
+      if (result) {
+        setState({ values: result.values, catalogue: state.catalogue })
+        setDraft({ ...result.values })
+        toast.success('Configurações salvas com sucesso!')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Falha ao salvar.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleReset = () => {
-    setPlans({
-      silver: { ...PLANS.silver },
-      gold: { ...PLANS.gold },
-      black: { ...PLANS.black },
-    })
-    setMultipliers({ ...POINTS_MULTIPLIER })
-    setRules([...POINTS_CONFIG.redemptionRules])
-    setHasChanges(false)
-    toast.success('Configurações restauradas')
+    if (!state) return
+    setDraft({ ...state.values })
+    toast.success('Alterações descartadas.')
   }
 
-  const planIcons = {
-    silver: <Star className="h-5 w-5" />,
-    gold: <Crown className="h-5 w-5" />,
-    black: <Sparkles className="h-5 w-5" />,
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
-  const planColors = {
-    silver: 'from-slate-400 to-slate-600',
-    gold: 'from-yellow-400 to-yellow-600',
-    black: 'from-violet-600 to-purple-800',
+  if (!state) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground">
+          Falha ao carregar configurações.
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const num = (key: string): number => {
+    const v = draft[key]
+    return typeof v === 'number' ? v : 0
   }
 
   return (
     <div className="space-y-6">
-      {/* Warning Banner */}
-      <Card className="border-yellow-500/50 bg-yellow-500/10">
+      <Card className="border-blue-500/40 bg-blue-500/5">
         <CardContent className="p-4 flex items-center gap-3">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            <strong>Nota:</strong> As configurações são atualmente definidas no código.
-            Em breve será possível editá-las dinamicamente pelo painel.
+          <AlertTriangle className="h-5 w-5 text-blue-500 flex-shrink-0" />
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            Configurações persistidas no banco. As alterações entram em vigor imediatamente
+            e ficam registradas no audit log.
           </p>
         </CardContent>
       </Card>
@@ -93,11 +131,11 @@ export function SettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Configuração de Planos</CardTitle>
-          <CardDescription>Defina preços, descontos e benefícios de cada plano</CardDescription>
+          <CardDescription>Defina preços e descontos de cada plano</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-6">
-            {(['silver', 'gold', 'black'] as const).map((planKey) => (
+            {PLAN_KEYS.map((planKey) => (
               <div
                 key={planKey}
                 className={`rounded-xl bg-gradient-to-br ${planColors[planKey]} p-[1px]`}
@@ -105,7 +143,7 @@ export function SettingsTab() {
                 <div className="bg-card rounded-xl p-4 space-y-4">
                   <div className="flex items-center gap-2 text-foreground">
                     {planIcons[planKey]}
-                    <span className="font-bold capitalize">{plans[planKey].name}</span>
+                    <span className="font-bold capitalize">{planKey}</span>
                   </div>
 
                   <div className="space-y-3">
@@ -114,39 +152,36 @@ export function SettingsTab() {
                       <Input
                         type="number"
                         step="0.01"
-                        value={plans[planKey].priceMonthly}
-                        onChange={(e) => handlePlanChange(planKey, 'priceMonthly', parseFloat(e.target.value))}
+                        value={num(`pricing.${planKey}_monthly`)}
+                        onChange={(e) => setValue(`pricing.${planKey}_monthly`, parseFloat(e.target.value) || 0)}
                         className="mt-1"
                       />
                     </div>
-
                     <div>
                       <Label className="text-xs">Preço Anual (R$)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={plans[planKey].priceAnnual}
-                        onChange={(e) => handlePlanChange(planKey, 'priceAnnual', parseFloat(e.target.value))}
+                        value={num(`pricing.${planKey}_annual`)}
+                        onChange={(e) => setValue(`pricing.${planKey}_annual`, parseFloat(e.target.value) || 0)}
                         className="mt-1"
                       />
                     </div>
-
                     <div>
                       <Label className="text-xs">Desconto Produtos (%)</Label>
                       <Input
                         type="number"
-                        value={plans[planKey].discountProducts}
-                        onChange={(e) => handlePlanChange(planKey, 'discountProducts', parseInt(e.target.value))}
+                        value={num(`plan.${planKey}.discount_products`)}
+                        onChange={(e) => setValue(`plan.${planKey}.discount_products`, parseInt(e.target.value) || 0)}
                         className="mt-1"
                       />
                     </div>
-
                     <div>
                       <Label className="text-xs">Desconto Serviços (%)</Label>
                       <Input
                         type="number"
-                        value={plans[planKey].discountServices}
-                        onChange={(e) => handlePlanChange(planKey, 'discountServices', parseInt(e.target.value))}
+                        value={num(`plan.${planKey}.discount_services`)}
+                        onChange={(e) => setValue(`plan.${planKey}.discount_services`, parseInt(e.target.value) || 0)}
                         className="mt-1"
                       />
                     </div>
@@ -158,15 +193,15 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Points Multipliers */}
+      {/* Points */}
       <Card>
         <CardHeader>
           <CardTitle>Multiplicadores de Pontos</CardTitle>
-          <CardDescription>Define quantos pontos cada plano ganha por real gasto</CardDescription>
+          <CardDescription>Quantos pontos cada plano ganha por real gasto</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-4">
-            {(['silver', 'gold', 'black'] as const).map((planKey) => (
+            {PLAN_KEYS.map((planKey) => (
               <div key={planKey} className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                 <Badge variant={planKey} className="gap-1">
                   {planIcons[planKey]}
@@ -177,8 +212,8 @@ export function SettingsTab() {
                     type="number"
                     step="0.1"
                     min="0.1"
-                    value={multipliers[planKey]}
-                    onChange={(e) => handleMultiplierChange(planKey, parseFloat(e.target.value))}
+                    value={num(`points.multiplier_${planKey}`)}
+                    onChange={(e) => setValue(`points.multiplier_${planKey}`, parseFloat(e.target.value) || 0)}
                     className="w-24"
                   />
                 </div>
@@ -186,64 +221,49 @@ export function SettingsTab() {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Redemption Rules */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Regras de Resgate</CardTitle>
-          <CardDescription>Configure as opções de resgate de pontos</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {rules.map((rule, index) => (
-              <div key={index} className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-                <div className="p-2 rounded-full bg-primary/10">
-                  <Gift className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 grid grid-cols-3 gap-4">
-                  <div>
-                    <Label className="text-xs">Descrição</Label>
-                    <Input
-                      value={rule.description}
-                      onChange={(e) => handleRuleChange(index, 'description', e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Pontos Necessários</Label>
-                    <Input
-                      type="number"
-                      value={rule.points}
-                      onChange={(e) => handleRuleChange(index, 'points', parseInt(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Valor (R$)</Label>
-                    <Input
-                      type="number"
-                      value={rule.value}
-                      onChange={(e) => handleRuleChange(index, 'value', parseInt(e.target.value))}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="mt-4">
+            <Label className="text-xs">Dias até expiração de pontos</Label>
+            <Input
+              type="number"
+              value={num('points.expiry_days')}
+              onChange={(e) => setValue('points.expiry_days', parseInt(e.target.value) || 0)}
+              className="mt-1 max-w-xs"
+            />
           </div>
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
+      {/* Payment guards */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Proteções de Pagamento</CardTitle>
+          <CardDescription>Janela para bloquear pagamentos duplicados</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Label className="text-xs">Dias da janela</Label>
+          <Input
+            type="number"
+            value={num('payment.duplicate_window_days')}
+            onChange={(e) => setValue('payment.duplicate_window_days', parseInt(e.target.value) || 0)}
+            className="mt-1 max-w-xs"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Bloqueia novos pagamentos do mesmo membro dentro deste período.
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={handleReset} disabled={!hasChanges}>
+        <Button variant="outline" onClick={handleReset} disabled={!hasChanges || saving}>
           <RotateCcw className="h-4 w-4 mr-2" />
-          Restaurar
+          Descartar
         </Button>
-        <Button onClick={handleSave} disabled={!hasChanges}>
-          <Save className="h-4 w-4 mr-2" />
+        <Button onClick={handleSave} disabled={!hasChanges || saving}>
+          {saving ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
           Salvar Configurações
         </Button>
       </div>

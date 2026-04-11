@@ -1,19 +1,27 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { authenticate, requireRole } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { defaultLimiter } from '../middleware/rate-limit.js';
 import * as logService from '../services/log.service.js';
 
 export const logRouter = Router();
 
-// POST /logs/errors — receives frontend errors (auth optional, rate limited)
-logRouter.post('/errors', async (req, res, next) => {
-  try {
-    const { severity, message, stack, context, url } = req.body;
-    if (!message) {
-      res.status(400).json({ error: 'message is required' });
-      return;
-    }
+// Bounded schema to prevent log flood / disk DoS via large payloads.
+const errorLogSchema = z.object({
+  severity: z.enum(['debug', 'info', 'warning', 'error', 'fatal']).default('error'),
+  message: z.string().min(1).max(5000),
+  stack: z.string().max(20000).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
+  url: z.string().max(2000).optional(),
+});
 
-    // Extract user ID from token if present
+// POST /logs/errors — receives frontend errors (auth optional, rate limited, schema validated)
+logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, res, next) => {
+  try {
+    const { severity, message, stack, context, url } = req.body as z.infer<typeof errorLogSchema>;
+
+    // Extract user ID from token if present (optional auth)
     let userId: string | undefined;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
@@ -28,7 +36,7 @@ logRouter.post('/errors', async (req, res, next) => {
     }
 
     await logService.createErrorLog({
-      severity: severity || 'error',
+      severity,
       message,
       stack,
       source: 'frontend',

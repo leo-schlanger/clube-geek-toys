@@ -85,7 +85,13 @@ export async function generatePixPayment(
       external_reference: memberId,
     })
 
-    if (result.error) throw new Error(result.error)
+    if (result.error) {
+      // Surface the real error (e.g. 409 RECENT_PAYMENT_EXISTS) — never swallow it.
+      // Mark with a known prefix so callers can detect "user-facing" errors vs network failures.
+      const err = new Error(result.error) as Error & { code?: string }
+      err.code = result.code
+      throw err
+    }
     const data = result.data
 
     return {
@@ -99,7 +105,8 @@ export async function generatePixPayment(
     }
   } catch (error) {
     paymentLogger.error('Error creating PIX payment:', error)
-    return null
+    // Re-throw so the caller (PaymentModal) can show the actual message instead of a generic one.
+    throw error
   }
 }
 

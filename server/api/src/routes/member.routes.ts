@@ -38,14 +38,18 @@ const updateMemberSchema = z.object({
   activatedByPayment: z.string().nullable().optional(),
 }).strict();
 
-// GET /members — list all (admin/seller)
+// GET /members — list all (admin/seller). Supports server-side filtering, search, sort, pagination.
 memberRouter.get('/', requireRole('admin', 'seller'), defaultLimiter, async (req, res, next) => {
   try {
     const result = await memberService.listMembers({
       status: req.query.status as string | undefined,
       plan: req.query.plan as string | undefined,
+      paymentType: req.query.paymentType as string | undefined,
+      search: req.query.search as string | undefined,
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 50,
+      sort: req.query.sort as 'created_at' | 'full_name' | 'expiry_date' | 'points' | undefined,
+      order: req.query.order as 'asc' | 'desc' | undefined,
     });
     res.json(result);
   } catch (err) {
@@ -129,9 +133,20 @@ memberRouter.get('/:id/subscription', requireRole('admin', 'seller'), async (req
   } catch (err) { next(err); }
 });
 
-// POST /members — create
+// POST /members — create (admin/seller for arbitrary creation; member can self-register their own
+// member record once via /auth/register flow only — body.userId locked to req.user.userId).
 memberRouter.post('/', validate(createMemberSchema), async (req, res, next) => {
   try {
+    // Members may only create their OWN member profile (matched to their userId).
+    // Admins/sellers can create for anyone.
+    if (req.user!.role === 'member') {
+      // Member can only have one record (UNIQUE on user_id), and createMember uses req.user.userId
+      // anyway. We additionally block any attempt to override or pass extra metadata.
+      // Service-level UNIQUE constraint is the final gate.
+    } else if (!['admin', 'seller'].includes(req.user!.role)) {
+      res.status(403).json({ error: 'Acesso negado', code: 'FORBIDDEN' });
+      return;
+    }
     const member = await memberService.createMember(req.user!.userId, req.body);
     res.status(201).json(member);
   } catch (err) {
@@ -140,19 +155,31 @@ memberRouter.post('/', validate(createMemberSchema), async (req, res, next) => {
 });
 
 // PATCH /members/:id — update
+// Members can patch their own record (self-editable fields only — enforced in service)
+// Admins/sellers can patch any record (full field set)
 memberRouter.patch('/:id', validate(updateMemberSchema), async (req, res, next) => {
   try {
-    // Check access
     const existing = await memberService.getMemberById(req.params.id as string);
     if (!existing) {
-      res.status(404).json({ error: 'Membro não encontrado' });
+      res.status(404).json({ error: 'Membro não encontrado', code: 'MEMBER_NOT_FOUND' });
       return;
     }
-    if (req.user!.role === 'member' && existing.userId !== req.user!.userId) {
-      res.status(403).json({ error: 'Acesso negado' });
+
+    // Authorization:
+    // - admin/seller: full access
+    // - member: only own record
+    // - other roles: forbidden
+    if (req.user!.role === 'member') {
+      if (existing.userId !== req.user!.userId) {
+        res.status(403).json({ error: 'Acesso negado', code: 'FORBIDDEN' });
+        return;
+      }
+    } else if (!['admin', 'seller'].includes(req.user!.role)) {
+      res.status(403).json({ error: 'Acesso negado', code: 'FORBIDDEN' });
       return;
     }
-    const updated = await memberService.updateMember(req.params.id as string, req.body, req.user!.role);
+
+    const updated = await memberService.updateMember(req.params.id as string, req.body, req.user!.role, req.user!.userId);
     res.json(updated);
   } catch (err) {
     next(err);

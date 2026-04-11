@@ -184,6 +184,15 @@ CREATE TABLE config (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Consumed email verification tokens (one-time use enforcement)
+-- Tracks token hashes that have been redeemed; cron cleans up rows older than 48h.
+CREATE TABLE consumed_verification_tokens (
+  token_hash VARCHAR(64) PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  consumed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_consumed_tokens_consumed_at ON consumed_verification_tokens(consumed_at);
+
 -- ============================================
 -- INDEXES
 -- ============================================

@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /membro/
+Disallow: /pdv/
+Disallow: /verificar-email
+Disallow: /recuperar-senha
+Disallow: /resultado-pagamento
+
+Sitemap: https://club.geeketoys.com.br/sitemap.xml
