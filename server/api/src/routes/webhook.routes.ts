@@ -24,30 +24,37 @@ webhookRouter.post('/pagbank', webhookLimiter, async (req: Request, res: Respons
     // 1. RSA signature verification (PagBank uses asymmetric signing, not HMAC).
     // Reference: https://developer.pagbank.com.br/reference/webhooks
     //
-    // - The signature is base64-encoded in the `x-payload-signature` header.
-    // - We fetch PagBank's public key from /public-keys (cached 24h) and verify with RSA-SHA256.
-    // - Sandbox does NOT send the header, so we skip verification in non-production.
-    // - Production: if the public key fetch fails, fall back to server-to-server GET below as
-    //   the only security gate, with a loud warning. Avoids fail-closed deploy.
-    if (env.NODE_ENV === 'production') {
-      const signature = req.headers['x-payload-signature'] as string | undefined;
-      if (!signature) {
-        console.warn(`[WEBHOOK] Missing x-payload-signature header in production (requestId=${requestId})`);
-        res.status(401).json({ error: 'Assinatura do webhook ausente', code: 'WEBHOOK_MISSING_SIGNATURE' });
-        return;
-      }
+    // FAIL-OPEN policy by design — this check is defense-in-depth, not the only gate.
+    //  - If a known signature header IS present AND the public key is reachable → verify.
+    //    Reject on mismatch.
+    //  - If header is ABSENT (e.g. PagBank uses a name we haven't observed yet) → log a
+    //    warning with the actual header names received and fall through to the server-to-
+    //    server verification below (which already protects production today).
+    //  - Once we confirm the real header from live webhooks, this can be flipped to
+    //    fail-closed via a future PAGBANK_REQUIRE_SIGNATURE flag.
+    //
+    // This avoids a deploy that bricks real payments just because we guessed a header name.
+    const signature = (req.headers['x-payload-signature']
+      || req.headers['x-authenticity-token']
+      || req.headers['x-pagbank-signature']) as string | undefined;
+
+    if (signature) {
       const publicKey = await getPagBankPublicKey();
-      if (!publicKey) {
-        console.error('[WEBHOOK] ⚠ Could not fetch PagBank public key. Falling back to server-to-server verification ONLY — degraded security state.');
-        // Fall through to server-to-server verification below.
-      } else {
+      if (publicKey) {
         const valid = verifyWebhookSignature(rawBody, signature, publicKey);
         if (!valid) {
           console.warn(`[WEBHOOK] Rejected webhook with invalid signature (requestId=${requestId})`);
           res.status(401).json({ error: 'Assinatura do webhook inválida', code: 'WEBHOOK_INVALID_SIGNATURE' });
           return;
         }
+        console.log(`[WEBHOOK] ✓ Signature verified (requestId=${requestId})`);
+      } else {
+        console.error('[WEBHOOK] ⚠ Could not fetch PagBank public key. Falling back to server-to-server verification only.');
       }
+    } else if (env.NODE_ENV === 'production') {
+      // Log which x-* headers DID arrive so we can identify the actual signature header name.
+      const headerNames = Object.keys(req.headers).filter((h) => h.startsWith('x-')).join(',');
+      console.warn(`[WEBHOOK] No known signature header present. Available x-* headers: [${headerNames}]. Falling back to server-to-server verification (requestId=${requestId})`);
     }
 
     let body: PagBankOrder;
