@@ -14,7 +14,9 @@ const envSchema = z.object({
 
   // Stripe
   STRIPE_SECRET_KEY: z.string().min(1),
-  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // Optional in dev/early prod — without it, webhook signature verification is skipped.
+  // MUST be set in production once the Stripe Dashboard webhook endpoint is configured.
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1),
