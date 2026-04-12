@@ -140,7 +140,7 @@ export async function createCardPayment(
       clientSecret: string
       paymentIntentId: string
       status?: string
-    }>('/checkout/create', {
+    }>('/checkout/card/create', {
       amount,
       description: `Clube Geek & Toys - Plano ${planName}`,
       payer_email: payerEmail,

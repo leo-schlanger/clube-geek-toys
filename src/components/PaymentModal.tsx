@@ -140,7 +140,7 @@ export function PaymentModal({
         }
       } else {
         // Create one-time PaymentIntent (card + PIX)
-        const res = await api.post<{ clientSecret: string; paymentIntentId: string }>('/checkout/create', {
+        const res = await api.post<{ clientSecret: string; paymentIntentId: string }>('/checkout/card/create', {
           amount,
           description: `Clube Geek & Toys - Plano ${planData.name}`,
           payer_email: memberEmail,

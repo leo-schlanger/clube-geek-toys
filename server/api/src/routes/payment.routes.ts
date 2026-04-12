@@ -54,8 +54,10 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
   }
 });
 
-// POST /checkout/create — create Stripe PaymentIntent for card
-paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(cardCreateSchema), async (req, res, next) => {
+// POST /card/create — create Stripe PaymentIntent for card
+// NOTE: paymentRouter is mounted on multiple paths (/pix, /checkout, /payment, /payments).
+// To avoid route collision, card uses '/card/create' (→ /payment/card/create or /checkout/card/create).
+paymentRouter.post('/card/create', authenticate, paymentLimiter, validate(cardCreateSchema), async (req, res, next) => {
   try {
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
 
