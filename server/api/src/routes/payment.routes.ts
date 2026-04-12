@@ -42,7 +42,12 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
       return;
     }
 
-    const result = await paymentService.createPixPayment(req.body);
+    const result = await paymentService.createPixPayment({
+      amount: req.body.amount,
+      description: req.body.description,
+      payerEmail: req.body.payer_email,
+      memberId: req.body.external_reference,
+    });
     res.status(201).json(result);
   } catch (err) {
     next(err);
@@ -50,12 +55,10 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
 });
 
 // POST /checkout/create — create Stripe PaymentIntent for card
-// No encrypted_card needed — Stripe Elements handles tokenization client-side.
 paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(cardCreateSchema), async (req, res, next) => {
   try {
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
 
-    // Duplicate-payment guard
     const recent = await paymentService.findRecentPayment(req.body.external_reference);
     if (recent) {
       res.status(409).json({
@@ -66,7 +69,13 @@ paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(ca
       return;
     }
 
-    const result = await paymentService.createCardPayment(req.body);
+    const result = await paymentService.createCardPayment({
+      amount: req.body.amount,
+      description: req.body.description,
+      payerEmail: req.body.payer_email,
+      payerName: req.body.payer_name,
+      memberId: req.body.external_reference,
+    });
     res.status(201).json(result);
   } catch (err) {
     next(err);
