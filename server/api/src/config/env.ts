@@ -12,11 +12,9 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   HMAC_SECRET: z.string().min(32),
 
-  // PagBank
-  // PAGBANK_TOKEN: server-side API token used for both authenticated calls AND for fetching
-  // PagBank's public key (used to verify webhook signatures with RSA-SHA256, NOT HMAC).
-  PAGBANK_TOKEN: z.string().min(1),
-  PAGBANK_PUBLIC_KEY: z.string().optional(),
+  // Stripe
+  STRIPE_SECRET_KEY: z.string().min(1),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
 
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1),

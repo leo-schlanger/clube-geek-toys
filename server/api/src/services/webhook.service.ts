@@ -1,15 +1,8 @@
 import pg from 'pg';
+import Stripe from 'stripe';
 import { getClient } from '../config/database.js';
-import { AppError } from '../middleware/error-handler.js';
 import { sendTemplateEmail } from './email.service.js';
-import { mapPagBankStatus } from '../utils/pagbank.js';
 import { auditLog } from '../utils/audit.js';
-import type { PagBankCharge, PagBankOrder } from '../utils/pagbank.js';
-
-interface WebhookInput {
-  body: PagBankOrder;
-  requestId: string;
-}
 
 /**
  * Email job collected during transaction processing — sent AFTER commit.
@@ -24,31 +17,15 @@ interface PendingEmail {
 }
 
 /**
- * PagBank webhook processor.
- * PagBank sends the full order/charge data in the webhook body
- * (same format as the synchronous API response).
+ * Stripe webhook event processor.
  *
  * Idempotency strategy: claim the webhook key via INSERT ... ON CONFLICT in the SAME transaction
  * as the side effects. If processing fails, ROLLBACK undoes both the claim and the side effects,
  * so a retry can re-process. If it succeeds, the claim prevents duplicate processing of the same
  * webhook event (replays, retries, multiple delivery).
  */
-export async function processWebhook(input: WebhookInput): Promise<void> {
-  const { body, requestId } = input;
-
-  const orderId = body.id;
-  const charges = body.charges || [];
-  const qrCodes = body.qr_codes || [];
-  const referenceId = body.reference_id;
-
-  if (!orderId) {
-    throw new AppError(400, 'Webhook inválido: sem order ID', 'WEBHOOK_MISSING_ORDER_ID');
-  }
-
-  // Idempotency key — uses chargeId/qrCodeId so a status update for the same charge is keyed once.
-  const entityId = charges[0]?.id || qrCodes[0]?.id || 'unknown';
-  const status = charges[0]?.status || qrCodes[0]?.status || 'notification';
-  const webhookKey = `pagbank_${orderId}_${entityId}_${status}`;
+export async function processStripeEvent(event: Stripe.Event): Promise<void> {
+  const webhookKey = `stripe_${event.id}`;
 
   const pendingEmails: PendingEmail[] = [];
 
@@ -62,7 +39,7 @@ export async function processWebhook(input: WebhookInput): Promise<void> {
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (webhook_key) DO NOTHING
        RETURNING webhook_key`,
-      [webhookKey, 'pagbank_order', status, orderId, requestId || '']
+      [webhookKey, 'stripe', event.type, event.id, '']
     );
     if (claim.rowCount === 0) {
       console.log(`[WEBHOOK] Already processed: ${webhookKey}`);
@@ -70,11 +47,29 @@ export async function processWebhook(input: WebhookInput): Promise<void> {
       return;
     }
 
-    // Process — collect emails to send AFTER commit
-    if (charges.length > 0) {
-      await processChargeNotification(client, orderId, charges[0], referenceId || '', pendingEmails);
-    } else if (qrCodes.length > 0) {
-      await processPixNotification(client, orderId, qrCodes[0], referenceId || '', pendingEmails);
+    switch (event.type) {
+      case 'payment_intent.succeeded':
+        await handlePaymentIntentSucceeded(client, event.data.object as Stripe.PaymentIntent, pendingEmails);
+        break;
+
+      case 'payment_intent.payment_failed':
+        await handlePaymentIntentFailed(client, event.data.object as Stripe.PaymentIntent, pendingEmails);
+        break;
+
+      case 'invoice.paid':
+        await handleInvoicePaid(client, event.data.object as Stripe.Invoice, pendingEmails);
+        break;
+
+      case 'invoice.payment_failed':
+        await handleInvoicePaymentFailed(client, event.data.object as Stripe.Invoice, pendingEmails);
+        break;
+
+      case 'customer.subscription.deleted':
+        await handleSubscriptionDeleted(client, event.data.object as Stripe.Subscription, pendingEmails);
+        break;
+
+      default:
+        console.log(`[WEBHOOK] Unhandled Stripe event type: ${event.type}`);
     }
 
     await client.query('COMMIT');
@@ -96,88 +91,316 @@ export async function processWebhook(input: WebhookInput): Promise<void> {
   }
 }
 
-async function processChargeNotification(
+// ─── payment_intent.succeeded ────────────────────────────────────────────────
+
+async function handlePaymentIntentSucceeded(
   client: pg.PoolClient,
-  orderId: string,
-  charge: PagBankCharge,
-  referenceId: string,
+  paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
 ): Promise<void> {
-  const status = mapPagBankStatus(charge.status);
-  const amountInReais = (charge.amount?.value || 0) / 100;
+  const memberId = paymentIntent.metadata?.memberId;
+  const amountInReais = paymentIntent.amount / 100;
 
   // Update payment record
   await client.query(
-    `UPDATE payments SET status = $1, provider_status = $2, paid_at = $3, webhook_processed_at = NOW()
-     WHERE provider_id = $4`,
-    [status, charge.status, charge.paid_at || null, orderId]
+    `UPDATE payments SET status = 'paid', provider_status = $1, paid_at = NOW(), webhook_processed_at = NOW()
+     WHERE provider_id = $2`,
+    [paymentIntent.status, paymentIntent.id]
   );
 
-  // If failed, notify member
-  if (status === 'failed' && referenceId) {
-    const memberResult = await client.query(
-      'SELECT id, email, full_name FROM members WHERE id = $1',
-      [referenceId]
-    );
-    if (memberResult.rows.length > 0) {
-      const m = memberResult.rows[0];
-      pendingEmails.push({
-        template: 'payment-failed',
-        to: m.email,
-        variables: { name: m.full_name },
-        member_id: m.id,
-      });
-    }
-    await auditLog('payment.failed', null, { orderId, chargeId: charge.id, amount: amountInReais, providerStatus: charge.status }, referenceId);
+  if (!memberId) {
+    console.warn(`[WEBHOOK] payment_intent.succeeded without memberId metadata: ${paymentIntent.id}`);
+    return;
   }
 
-  // If paid, check if this is a subscription payment or one-time
-  if (status === 'paid' && referenceId) {
-    const subResult = await client.query(
-      'SELECT id FROM subscriptions WHERE provider_id = $1',
-      [orderId]
-    );
+  // Activate member
+  await activateMember(client, memberId, paymentIntent.id, amountInReais, pendingEmails);
 
-    if (subResult.rows.length > 0) {
-      // Subscription recurring payment
-      const subscriptionId = subResult.rows[0].id;
-      await processSubscriptionPayment(client, subscriptionId, charge, orderId, pendingEmails);
-    } else {
-      // One-time payment — activate member
-      await activateMember(client, referenceId, orderId, amountInReais, pendingEmails);
-    }
-
-    await auditLog('payment.received', null, { orderId, chargeId: charge.id, amount: amountInReais }, referenceId);
-  }
-
-  if (status === 'refunded' && referenceId) {
-    await auditLog('payment.refunded', null, { orderId, chargeId: charge.id, amount: amountInReais }, referenceId);
-  }
+  await auditLog(
+    'payment.received',
+    null,
+    { paymentIntentId: paymentIntent.id, amount: amountInReais },
+    memberId,
+  );
 }
 
-async function processPixNotification(
+// ─── payment_intent.payment_failed ───────────────────────────────────────────
+
+async function handlePaymentIntentFailed(
   client: pg.PoolClient,
-  orderId: string,
-  qrCode: NonNullable<PagBankOrder['qr_codes']>[number],
-  referenceId: string,
+  paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
 ): Promise<void> {
-  // PIX QR code was paid
-  if (qrCode.status !== 'PAID') return;
+  const memberId = paymentIntent.metadata?.memberId;
 
-  const amountInReais = (qrCode.amount?.value || 0) / 100;
-
+  // Update payment record
   await client.query(
-    `UPDATE payments SET status = 'paid', provider_status = 'PAID', paid_at = NOW(), webhook_processed_at = NOW()
-     WHERE provider_id = $1`,
-    [orderId]
+    `UPDATE payments SET status = 'failed', provider_status = $1, webhook_processed_at = NOW()
+     WHERE provider_id = $2`,
+    [paymentIntent.status, paymentIntent.id]
   );
 
-  if (referenceId) {
-    await activateMember(client, referenceId, orderId, amountInReais, pendingEmails);
-    await auditLog('payment.received', null, { orderId, method: 'pix', amount: amountInReais }, referenceId);
+  if (!memberId) {
+    console.warn(`[WEBHOOK] payment_intent.payment_failed without memberId metadata: ${paymentIntent.id}`);
+    return;
+  }
+
+  // Queue failure email
+  const memberResult = await client.query(
+    'SELECT id, email, full_name FROM members WHERE id = $1',
+    [memberId]
+  );
+  if (memberResult.rows.length > 0) {
+    const m = memberResult.rows[0];
+    pendingEmails.push({
+      template: 'payment-failed',
+      to: m.email,
+      variables: { name: m.full_name },
+      member_id: m.id,
+    });
+  }
+
+  await auditLog(
+    'payment.failed',
+    null,
+    {
+      paymentIntentId: paymentIntent.id,
+      amount: paymentIntent.amount / 100,
+      providerStatus: paymentIntent.status,
+    },
+    memberId,
+  );
+}
+
+// ─── invoice.paid (subscription payment succeeded) ───────────────────────────
+
+async function handleInvoicePaid(
+  client: pg.PoolClient,
+  invoice: Stripe.Invoice,
+  pendingEmails: PendingEmail[],
+): Promise<void> {
+  const sub = (invoice as unknown as Record<string, unknown>).subscription;
+  const subscriptionId = typeof sub === 'string'
+    ? sub
+    : (sub as { id?: string } | null)?.id;
+
+  if (!subscriptionId) {
+    console.log('[WEBHOOK] invoice.paid without subscription — ignoring');
+    return;
+  }
+
+  const amountInReais = (invoice.amount_paid || 0) / 100;
+
+  // Record subscription payment
+  await client.query(
+    `INSERT INTO subscription_payments (id, subscription_id, member_id, amount, status, provider_payment_id)
+     SELECT $1, id, member_id, $2, 'paid', $3
+     FROM subscriptions WHERE stripe_subscription_id = $4
+     ON CONFLICT (id) DO UPDATE SET status = 'paid'`,
+    [`sp_${invoice.id}`, amountInReais, invoice.id, subscriptionId]
+  );
+
+  // Reset failed_payments counter
+  await client.query(
+    `UPDATE subscriptions SET failed_payments = 0, last_payment_date = NOW()
+     WHERE stripe_subscription_id = $1`,
+    [subscriptionId]
+  );
+
+  // Get member + subscription info for expiry extension
+  const memberResult = await client.query(
+    `SELECT m.id, m.email, m.full_name, m.plan, m.payment_type, s.id as sub_id
+     FROM members m
+     JOIN subscriptions s ON m.subscription_id = s.id
+     WHERE s.stripe_subscription_id = $1`,
+    [subscriptionId]
+  );
+
+  if (memberResult.rows.length === 0) {
+    console.warn(`[WEBHOOK] invoice.paid — no member found for subscription ${subscriptionId}`);
+    return;
+  }
+
+  const member = memberResult.rows[0];
+  const interval = member.payment_type === 'annual' ? '1 year' : '1 month';
+
+  // Extend member expiry
+  await client.query(
+    `UPDATE members SET expiry_date = expiry_date + $2::interval, status = 'active'
+     WHERE id = $1`,
+    [member.id, interval]
+  );
+
+  // Get updated expiry for email
+  const updatedMember = await client.query(
+    'SELECT expiry_date FROM members WHERE id = $1',
+    [member.id]
+  );
+  const nextPayment = updatedMember.rows[0]?.expiry_date
+    ? new Date(updatedMember.rows[0].expiry_date).toLocaleDateString('pt-BR')
+    : '—';
+
+  pendingEmails.push({
+    template: 'subscription-payment',
+    to: member.email,
+    variables: {
+      name: member.full_name,
+      amount: amountInReais.toFixed(2).replace('.', ','),
+      plan: member.plan,
+      next_payment: nextPayment,
+    },
+    member_id: member.id,
+  });
+
+  await auditLog(
+    'subscription.charge.succeeded',
+    null,
+    { subscriptionId, invoiceId: invoice.id, amount: amountInReais },
+    member.id,
+  );
+}
+
+// ─── invoice.payment_failed (subscription payment failed) ────────────────────
+
+async function handleInvoicePaymentFailed(
+  client: pg.PoolClient,
+  invoice: Stripe.Invoice,
+  pendingEmails: PendingEmail[],
+): Promise<void> {
+  const sub = (invoice as unknown as Record<string, unknown>).subscription;
+  const subscriptionId = typeof sub === 'string'
+    ? sub
+    : (sub as { id?: string } | null)?.id;
+
+  if (!subscriptionId) {
+    console.log('[WEBHOOK] invoice.payment_failed without subscription — ignoring');
+    return;
+  }
+
+  const amountInReais = (invoice.amount_due || 0) / 100;
+
+  // Increment failed_payments
+  const result = await client.query(
+    `UPDATE subscriptions SET failed_payments = failed_payments + 1
+     WHERE stripe_subscription_id = $1
+     RETURNING failed_payments, id`,
+    [subscriptionId]
+  );
+
+  if (result.rows.length === 0) {
+    console.warn(`[WEBHOOK] invoice.payment_failed — no subscription found for ${subscriptionId}`);
+    return;
+  }
+
+  const failedCount = result.rows[0].failed_payments;
+  const internalSubId = result.rows[0].id;
+
+  // Get member info for email
+  const memberResult = await client.query(
+    `SELECT m.id, m.email, m.full_name, m.plan
+     FROM members m
+     WHERE m.subscription_id = $1`,
+    [internalSubId]
+  );
+
+  const member = memberResult.rows[0];
+
+  if (member) {
+    pendingEmails.push({
+      template: 'subscription-payment-failed',
+      to: member.email,
+      variables: {
+        name: member.full_name,
+        amount: amountInReais.toFixed(2).replace('.', ','),
+        failed_count: String(failedCount),
+      },
+      member_id: member.id,
+    });
+
+    await auditLog(
+      'subscription.charge.failed',
+      null,
+      { subscriptionId, invoiceId: invoice.id, failedCount, amount: amountInReais },
+      member.id,
+    );
+  }
+
+  // After 3 failures, cancel subscription
+  if (failedCount >= 3) {
+    await client.query(
+      `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW()
+       WHERE stripe_subscription_id = $1`,
+      [subscriptionId]
+    );
+    await client.query(
+      `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE
+       WHERE subscription_id = $1`,
+      [internalSubId]
+    );
+
+    if (member) {
+      pendingEmails.push({
+        template: 'subscription-cancelled',
+        to: member.email,
+        variables: { name: member.full_name },
+        member_id: member.id,
+      });
+
+      await auditLog(
+        'subscription.cancelled',
+        null,
+        { subscriptionId, reason: 'failed_payments_threshold', failedCount },
+        member.id,
+      );
+    }
   }
 }
+
+// ─── customer.subscription.deleted (cancelled externally) ────────────────────
+
+async function handleSubscriptionDeleted(
+  client: pg.PoolClient,
+  subscription: Stripe.Subscription,
+  pendingEmails: PendingEmail[],
+): Promise<void> {
+  const stripeSubId = subscription.id;
+
+  // Update subscription record
+  await client.query(
+    `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW()
+     WHERE stripe_subscription_id = $1`,
+    [stripeSubId]
+  );
+
+  // Update member
+  const memberResult = await client.query(
+    `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE
+     FROM subscriptions s
+     WHERE members.subscription_id = s.id AND s.stripe_subscription_id = $1
+     RETURNING members.id, members.email, members.full_name`,
+    [stripeSubId]
+  );
+
+  if (memberResult.rows.length > 0) {
+    const member = memberResult.rows[0];
+
+    pendingEmails.push({
+      template: 'subscription-cancelled',
+      to: member.email,
+      variables: { name: member.full_name },
+      member_id: member.id,
+    });
+
+    await auditLog(
+      'subscription.cancelled',
+      null,
+      { subscriptionId: stripeSubId, reason: 'cancelled_externally' },
+      member.id,
+    );
+  }
+}
+
+// ─── Shared: activate member after one-time payment ──────────────────────────
 
 async function activateMember(
   client: pg.PoolClient,
@@ -215,7 +438,12 @@ async function activateMember(
   await auditLog(
     'member.activated',
     null,
-    { paymentRef, amount, before: { status: beforeStatus }, after: { status: 'active', expiryDate: expiryDate.toISOString().split('T')[0] } },
+    {
+      paymentRef,
+      amount,
+      before: { status: beforeStatus },
+      after: { status: 'active', expiryDate: expiryDate.toISOString().split('T')[0] },
+    },
     member.id,
   );
 
@@ -237,107 +465,5 @@ async function activateMember(
       },
       member_id: m.id,
     });
-  }
-}
-
-async function processSubscriptionPayment(
-  client: pg.PoolClient,
-  subscriptionId: string,
-  charge: PagBankCharge,
-  orderId: string,
-  pendingEmails: PendingEmail[],
-): Promise<void> {
-  const status = charge.status;
-  const amountInReais = (charge.amount?.value || 0) / 100;
-
-  // Save subscription payment record
-  await client.query(
-    `INSERT INTO subscription_payments (id, subscription_id, member_id, amount, status, provider_payment_id)
-     SELECT $1, $2, member_id, $3, $4, $5
-     FROM subscriptions WHERE id = $2
-     ON CONFLICT (id) DO UPDATE SET status = $4`,
-    [`sp_${orderId}`, subscriptionId, amountInReais, status, charge.id || orderId]
-  );
-
-  // Get member + subscription info for expiry calculation and email
-  const memberResult = await client.query(
-    `SELECT m.id, m.email, m.full_name, s.plan, s.frequency_type, s.transaction_amount, s.next_payment_date
-     FROM members m JOIN subscriptions s ON s.id = $1 WHERE m.subscription_id = $1`,
-    [subscriptionId]
-  );
-  const member = memberResult.rows[0];
-  // interval string passed as a parameter ($::interval) — never interpolated.
-  const interval = member?.frequency_type === 'years' ? '1 year' : '1 month';
-
-  if (status === 'PAID') {
-    await client.query(
-      `UPDATE subscriptions SET failed_payments = 0, last_payment_date = NOW() WHERE id = $1`,
-      [subscriptionId]
-    );
-    // Parametrized interval addition — no string interpolation.
-    await client.query(
-      `UPDATE members SET expiry_date = expiry_date + $2::interval, status = 'active'
-       WHERE subscription_id = $1`,
-      [subscriptionId, interval]
-    );
-
-    if (member) {
-      pendingEmails.push({
-        template: 'subscription-payment',
-        to: member.email,
-        variables: {
-          name: member.full_name,
-          amount: amountInReais.toFixed(2).replace('.', ','),
-          plan: member.plan,
-          next_payment: member.next_payment_date
-            ? new Date(member.next_payment_date).toLocaleDateString('pt-BR')
-            : '—',
-        },
-        member_id: member.id,
-      });
-      await auditLog('subscription.charge.succeeded', null, { subscriptionId, amount: amountInReais, chargeId: charge.id }, member.id);
-    }
-  } else if (status === 'DECLINED') {
-    const result = await client.query(
-      `UPDATE subscriptions SET failed_payments = failed_payments + 1 WHERE id = $1 RETURNING failed_payments`,
-      [subscriptionId]
-    );
-
-    const failedCount = result.rows[0]?.failed_payments || 0;
-
-    if (member) {
-      pendingEmails.push({
-        template: 'subscription-payment-failed',
-        to: member.email,
-        variables: {
-          name: member.full_name,
-          amount: (member.transaction_amount || amountInReais).toFixed(2).replace('.', ','),
-          failed_count: String(failedCount),
-        },
-        member_id: member.id,
-      });
-      await auditLog('subscription.charge.failed', null, { subscriptionId, failedCount, amount: amountInReais }, member.id);
-    }
-
-    if (failedCount >= 3) {
-      await client.query(
-        `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW() WHERE id = $1`,
-        [subscriptionId]
-      );
-      await client.query(
-        `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE WHERE subscription_id = $1`,
-        [subscriptionId]
-      );
-
-      if (member) {
-        pendingEmails.push({
-          template: 'subscription-cancelled',
-          to: member.email,
-          variables: { name: member.full_name },
-          member_id: member.id,
-        });
-        await auditLog('subscription.cancelled', null, { subscriptionId, reason: 'failed_payments_threshold', failedCount }, member.id);
-      }
-    }
   }
 }

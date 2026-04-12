@@ -33,7 +33,7 @@ export default function PrivacyPolicy() {
                             <p>Coletamos informações necessárias para a prestação de nossos serviços:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li><strong>Dados de Cadastro:</strong> Nome completo, e-mail, CPF, telefone e senha (armazenada com criptografia).</li>
-                                <li><strong>Dados de Pagamento:</strong> Processados de forma segura pelo PagBank. Não armazenamos dados de cartão de crédito.</li>
+                                <li><strong>Dados de Pagamento:</strong> Processados de forma segura pelo Stripe. Não armazenamos dados de cartão de crédito.</li>
                                 <li><strong>Dados de Navegação:</strong> Endereço IP, tipo de navegador, páginas visitadas, data e hora de acesso.</li>
                                 <li><strong>Dados de Contrato:</strong> Assinatura digital, data/hora, IP no momento da assinatura.</li>
                             </ul>
@@ -80,7 +80,7 @@ export default function PrivacyPolicy() {
                             <h2 className="text-2xl font-semibold text-foreground">5. Compartilhamento de Dados</h2>
                             <p>Não vendemos seus dados. Compartilhamos apenas com:</p>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li><strong>PagBank:</strong> Processamento de pagamentos (PIX e cartão).</li>
+                                <li><strong>Stripe:</strong> Processamento de pagamentos (PIX e cartão).</li>
                                 <li><strong>Servidor próprio (VPS):</strong> Hospedagem e banco de dados PostgreSQL.</li>
                                 <li><strong>Resend:</strong> Envio de e-mails transacionais.</li>
                                 <li><strong>Autoridades:</strong> Quando exigido por lei ou ordem judicial.</li>
@@ -89,7 +89,7 @@ export default function PrivacyPolicy() {
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">6. Transferência Internacional</h2>
-                            <p>Alguns de nossos prestadores de serviços (PagBank, Resend) podem armazenar dados em servidores localizados fora do Brasil. Essas transferências são realizadas com base em:</p>
+                            <p>Alguns de nossos prestadores de serviços (Stripe, Resend) podem armazenar dados em servidores localizados fora do Brasil. Essas transferências são realizadas com base em:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Cláusulas contratuais padrão aprovadas pela ANPD.</li>
                                 <li>Certificações de adequação dos prestadores às normas de proteção de dados.</li>

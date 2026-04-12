@@ -31,8 +31,15 @@ export async function ensureSchema(): Promise<void> {
     `);
 
     // ─── Wave 2.5 — Settings table (config) is already in schema.sql; no-op here ───
-    // The `config` table was added to the base schema, so no migration is needed for new
-    // deploys. Existing deploys had it from the start (schema.sql:181).
+
+    // ─── Stripe migration — stripe_customer_id on members ────────────────────────
+    await query(`
+      ALTER TABLE members ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT
+    `);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_members_stripe_customer
+        ON members(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL
+    `);
 
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { CheckCircle, XCircle, Clock, Home, RefreshCw, Loader2 } from 'lucide-react'
-import { checkPaymentById } from '../lib/payments'
+import { checkPaymentStatus } from '../lib/payments'
 
 type ResultType = 'success' | 'error' | 'pending'
 
@@ -57,16 +57,14 @@ export default function PaymentResult({ type: initialType }: PaymentResultProps)
       setIsValidating(true)
 
       try {
-        const result = await checkPaymentById(paymentId)
+        const status = await checkPaymentStatus(paymentId)
 
-        if (result) {
-          // Map actual status to result type
-          switch (result.status) {
+        if (status) {
+          switch (status) {
             case 'paid':
               setValidatedType('success')
               break
             case 'failed':
-            case 'refunded':
               setValidatedType('error')
               break
             default:

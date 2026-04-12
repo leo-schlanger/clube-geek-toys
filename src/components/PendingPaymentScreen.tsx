@@ -7,7 +7,7 @@ import { Loading } from './ui/loading'
 import { PaymentModal } from './PaymentModal'
 import { ContractModal } from './ContractModal'
 import { updateMember, clearPendingPayment } from '../lib/members'
-import { checkPixPaymentStatus, isPagBankConfigured } from '../lib/payments'
+import { checkPixPaymentStatus, isPaymentConfigured } from '../lib/payments'
 import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
 import { PLANS, type Member, type PlanType, type Contract } from '../types'
@@ -46,7 +46,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
 
   const plan = PLANS[member.plan as PlanType]
   const price = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
-  const isConfigured = isPagBankConfigured()
+  const isConfigured = isPaymentConfigured()
 
   // Check for contract and previous pending payment on mount
   useEffect(() => {
@@ -392,7 +392,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <RefreshCw className="h-4 w-4" />
-                  <span>Pagamento seguro via PagBank</span>
+                  <span>Pagamento seguro via Stripe</span>
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted text-sm">

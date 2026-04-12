@@ -1,6 +1,15 @@
 import { env } from '../config/env.js';
 import { query } from '../config/database.js';
-import { escapeHtml } from '../utils/pagbank.js';
+
+/** Escape HTML special characters for safe use in email templates. */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 

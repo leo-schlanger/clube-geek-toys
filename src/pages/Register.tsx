@@ -1161,7 +1161,7 @@ export default function Register() {
                     </div>
                   )}
                   <p className="text-muted-foreground text-sm">
-                    Você será redirecionado para o ambiente seguro do PagBank.
+                    Pagamento processado de forma segura via Stripe.
                   </p>
                   <Button
                     className="w-full h-12 text-lg"

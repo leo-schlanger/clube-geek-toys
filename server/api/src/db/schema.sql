@@ -42,6 +42,7 @@ CREATE TABLE members (
   auto_renewal BOOLEAN DEFAULT FALSE,
   activated_at TIMESTAMPTZ,
   activated_by_payment TEXT,
+  stripe_customer_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

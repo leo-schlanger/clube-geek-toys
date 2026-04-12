@@ -40,12 +40,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://assets.pagseguro.com.br", "https://accounts.google.com"],
+      scriptSrc: ["'self'", "https://js.stripe.com", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.pagseguro.com", "https://sandbox.api.pagseguro.com", "https://accounts.google.com"],
+      connectSrc: ["'self'", "https://api.stripe.com", "https://accounts.google.com"],
       fontSrc: ["'self'"],
-      frameSrc: ["https://accounts.google.com"],
+      frameSrc: ["https://js.stripe.com", "https://accounts.google.com"],
     },
   },
 }));

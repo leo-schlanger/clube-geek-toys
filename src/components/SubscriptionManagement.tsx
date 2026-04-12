@@ -4,7 +4,9 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { CardTokenizationForm, type CardInfo } from './CardTokenizationForm'
+// CardTokenizationForm removed — Stripe handles card updates via the update-payment-method API endpoint.
+// For now, updating card requires the member to cancel and re-subscribe (simpler UX until Stripe
+// SetupIntent flow is implemented for card-only updates).
 import {
   Dialog,
   DialogContent,
@@ -21,7 +23,6 @@ import {
   pauseSubscription,
   resumeSubscription,
   cancelSubscription,
-  updateSubscriptionCard,
   getSubscriptionStatusLabel,
   getSubscriptionStatusBadge,
   getFrequencyLabel,
@@ -146,21 +147,8 @@ export function SubscriptionManagement({
     setConfirmAction(null)
   }
 
-  async function handleUpdateCard(token: string, cardInfo: CardInfo) {
-    if (!subscription) return
-    setActionLoading(true)
-
-    const success = await updateSubscriptionCard(subscription.id, token)
-    if (success) {
-      toast.success(`Cartão ${cardInfo.brand} **** ${cardInfo.lastFourDigits} atualizado com sucesso`)
-      fetchSubscriptionData()
-    } else {
-      toast.error('Erro ao atualizar cartão')
-    }
-
-    setActionLoading(false)
-    setShowUpdateCard(false)
-  }
+  // handleUpdateCard — Stripe card update requires SetupIntent flow (future enhancement).
+  // The dialog below informs the user to cancel + re-subscribe. No function needed.
 
   function getPaymentStatusIcon(status: string) {
     switch (status) {
@@ -640,7 +628,7 @@ export function SubscriptionManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Update Card Dialog */}
+      {/* Update Card Dialog — simplified for Stripe migration */}
       <Dialog open={showUpdateCard} onOpenChange={setShowUpdateCard}>
         <DialogContent className="max-w-md">
           <DialogHeader className="text-center sm:text-left">
@@ -649,15 +637,13 @@ export function SubscriptionManagement({
             </div>
             <DialogTitle className="text-xl">Atualizar Cartão</DialogTitle>
             <DialogDescription className="text-base">
-              Insira os dados do novo cartão de crédito para continuar com suas cobranças.
+              Para atualizar o cartão, cancele a assinatura atual e crie uma nova.
+              O saldo restante do período será creditado no novo pagamento.
             </DialogDescription>
           </DialogHeader>
-          <CardTokenizationForm
-            amount={subscription?.transactionAmount || 0}
-            onTokenGenerated={handleUpdateCard}
-            onCancel={() => setShowUpdateCard(false)}
-            disabled={actionLoading}
-          />
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" onClick={() => setShowUpdateCard(false)}>Entendi</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>

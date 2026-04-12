@@ -8,11 +8,14 @@ import * as paymentService from '../services/payment.service.js';
 
 export const paymentRouter = Router();
 
+// Stripe flow: frontend receives clientSecret from these endpoints,
+// then uses Stripe.js to complete payment (no encrypted_card on our server).
+
 const pixCreateSchema = z.object({
   amount: z.number().positive(),
   description: z.string().min(1),
   payer_email: z.string().email(),
-  external_reference: z.string().min(1),
+  external_reference: z.string().min(1), // memberId
 });
 
 const cardCreateSchema = z.object({
@@ -20,18 +23,15 @@ const cardCreateSchema = z.object({
   description: z.string().min(1),
   payer_email: z.string().email(),
   payer_name: z.string().min(1),
-  encrypted_card: z.string().min(1),
-  external_reference: z.string().min(1),
-  installments: z.number().int().min(1).max(12).optional(),
+  external_reference: z.string().min(1), // memberId
 });
 
-// POST /pix/create — PIX QR code payment
+// POST /pix/create — create Stripe PaymentIntent for PIX
 paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSchema), async (req, res, next) => {
   try {
-    // Verify the user owns the member being paid for
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
 
-    // Duplicate-payment guard: block if a paid payment exists in the recent window
+    // Duplicate-payment guard
     const recent = await paymentService.findRecentPayment(req.body.external_reference);
     if (recent) {
       res.status(409).json({
@@ -49,10 +49,10 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
   }
 });
 
-// POST /checkout/create — Credit card direct payment (PagBank encrypted)
+// POST /checkout/create — create Stripe PaymentIntent for card
+// No encrypted_card needed — Stripe Elements handles tokenization client-side.
 paymentRouter.post('/checkout/create', authenticate, paymentLimiter, validate(cardCreateSchema), async (req, res, next) => {
   try {
-    // Verify the user owns the member being paid for
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
 
     // Duplicate-payment guard
@@ -95,7 +95,6 @@ paymentRouter.get('/', authenticate, async (req, res, next) => {
   try {
     let memberId = req.query.member_id as string | undefined;
 
-    // Members can only see their own payments
     if (req.user!.role === 'member') {
       const userMemberId = await getMemberIdForUser(req.user!.userId);
       if (!userMemberId) {
@@ -105,19 +104,18 @@ paymentRouter.get('/', authenticate, async (req, res, next) => {
       memberId = userMemberId;
     }
 
-    const filters = {
+    const result = await paymentService.getPayments({
       memberId,
       status: req.query.status as string | undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
-    };
-    const result = await paymentService.getPayments(filters);
+    });
     res.json(result);
   } catch (err) {
     next(err);
   }
 });
 
-// GET /payment/status/:orderId
+// GET /payment/status/:paymentIntentId — query Stripe for current status
 paymentRouter.get('/status/:paymentId', authenticate, async (req, res, next) => {
   try {
     const result = await paymentService.getPaymentStatus(req.params.paymentId as string);
