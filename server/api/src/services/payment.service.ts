@@ -1,8 +1,16 @@
 import { query } from '../config/database.js';
+import { env } from '../config/env.js';
 import { getStripe, getOrCreateCustomer, mapStripePaymentStatus } from '../utils/stripe.js';
+import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
+import { sendTemplateEmail } from './email.service.js';
 import { AppError } from '../middleware/error-handler.js';
 import { PLAN_PRICES } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
+import crypto from 'crypto';
+
+const PIX_KEY = process.env.VITE_PIX_KEY || '574a10c6-9aa6-4bbb-a698-ba3d63cb9613';
+const PIX_MERCHANT_NAME = 'GEEK E TOYS';
+const PIX_MERCHANT_CITY = 'RIO DE JANEIRO';
 
 const MIN_AMOUNT = 1.00;
 const MAX_AMOUNT = 999.90;
@@ -139,72 +147,169 @@ export async function getPaymentById(id: string) {
  * available immediately. If no QR code is returned yet, the frontend should poll
  * via getPaymentStatus().
  */
+/**
+ * PIX payment — generated locally (not via Stripe, since Stripe PIX isn't available).
+ *
+ * Flow:
+ * 1. Generate EMV code with the club's PIX key + amount + txId
+ * 2. Save pending payment in DB
+ * 3. Notify admin via email that there's a PIX payment to confirm
+ * 4. Return QR data to frontend (EMV code for rendering)
+ * 5. Admin confirms manually via POST /payments/:id/confirm
+ */
 export async function createPixPayment(data: {
   amount: number;
   description: string;
   payerEmail: string;
   memberId: string;
 }): Promise<{
-  clientSecret: string;
-  paymentIntentId: string;
-  pix: { data: string; imageUrl: string; expiresAt: number } | null;
+  paymentId: string;
+  pixData: PixQRData;
 }> {
   validateAmount(data.amount);
 
-  // Ensure Stripe Customer exists for the member
   const memberResult = await query(
-    'SELECT id, email, full_name, stripe_customer_id FROM members WHERE id = $1',
+    'SELECT id, email, full_name, plan FROM members WHERE id = $1',
     [data.memberId]
   );
   if (memberResult.rows.length === 0) {
     throw new AppError(404, 'Membro não encontrado.', 'MEMBER_NOT_FOUND');
   }
   const member = memberResult.rows[0];
-  const customerId = await getOrCreateCustomer({
-    id: member.id as string,
-    email: (member.email as string) || data.payerEmail,
-    fullName: member.full_name as string,
-    stripeCustomerId: member.stripe_customer_id as string | null,
+
+  // Generate PIX EMV code locally
+  const txId = generatePixTxId();
+  const pixData = generatePixEMV({
+    pixKey: PIX_KEY,
+    amount: data.amount,
+    merchantName: PIX_MERCHANT_NAME,
+    merchantCity: PIX_MERCHANT_CITY,
+    txId,
   });
 
-  const stripe = getStripe();
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(data.amount * 100), // Stripe uses cents
-    currency: 'brl',
-    payment_method_types: ['pix'],
-    customer: customerId,
-    description: data.description,
-    metadata: { memberId: data.memberId },
-  });
-
-  // Persist pending payment row
+  // Save pending payment
+  const paymentId = crypto.randomUUID();
   await query(
-    `INSERT INTO payments (member_id, amount, method, status, provider_id, provider_status, reference)
-     VALUES ($1, $2, 'pix', 'pending', $3, $4, $5)`,
-    [
-      data.memberId,
-      data.amount,
-      paymentIntent.id,
-      paymentIntent.status,
-      paymentIntent.id,
-    ]
+    `INSERT INTO payments (id, member_id, amount, method, status, provider_id, provider_status, reference)
+     VALUES ($1, $2, $3, 'pix', 'pending', $4, 'PIX_PENDING', $5)`,
+    [paymentId, data.memberId, data.amount, txId, txId]
   );
 
-  // Extract PIX QR code data if available immediately
-  const pixAction = paymentIntent.next_action?.pix_display_qr_code;
-  const pix = pixAction
-    ? {
-        data: pixAction.data ?? '',
-        imageUrl: pixAction.image_url_png ?? '',
-        expiresAt: pixAction.expires_at ?? 0,
-      }
-    : null;
+  await auditLog('payment.pix_created', null, {
+    paymentId,
+    memberId: data.memberId,
+    amount: data.amount,
+    txId,
+  }, data.memberId);
 
-  return {
-    clientSecret: paymentIntent.client_secret!,
-    paymentIntentId: paymentIntent.id,
-    pix,
-  };
+  // Notify admin via email (non-blocking)
+  sendTemplateEmail({
+    template: 'admin-pix-pending',
+    to: env.ADMIN_EMAIL,
+    variables: {
+      member_name: member.full_name as string,
+      member_email: member.email as string,
+      plan: member.plan as string,
+      amount: data.amount.toFixed(2).replace('.', ','),
+      tx_id: txId,
+      payment_id: paymentId,
+      admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
+    },
+  }).catch((err) => console.error('[PIX] Failed to notify admin:', err));
+
+  return { paymentId, pixData };
+}
+
+/**
+ * Admin manually confirms a PIX payment.
+ * Sets payment status to 'paid' and activates the member.
+ */
+export async function confirmPixPayment(opts: {
+  paymentId: string;
+  adminUserId: string;
+}): Promise<{ success: boolean }> {
+  const payment = await getPaymentById(opts.paymentId);
+  if (!payment) {
+    throw new AppError(404, 'Pagamento não encontrado.', 'PAYMENT_NOT_FOUND');
+  }
+  if (payment.status === 'paid') {
+    return { success: true }; // idempotent
+  }
+  if (payment.method !== 'pix') {
+    throw new AppError(400, 'Apenas pagamentos PIX podem ser confirmados manualmente.', 'NOT_PIX_PAYMENT');
+  }
+
+  // Mark payment as paid
+  await query(
+    `UPDATE payments SET status = 'paid', paid_at = NOW(), webhook_processed_at = NOW() WHERE id = $1`,
+    [opts.paymentId]
+  );
+
+  // Activate or renew member
+  if (payment.memberId) {
+    const memberLookup = await query(
+      'SELECT id, payment_type, status, expiry_date FROM members WHERE id = $1',
+      [payment.memberId]
+    );
+    if (memberLookup.rows.length > 0) {
+      const member = memberLookup.rows[0];
+      const now = new Date();
+
+      // For renewals: extend from the current expiry date (not today), so the member
+      // doesn't lose remaining days. For new activations: start from today.
+      const currentExpiry = member.expiry_date ? new Date(member.expiry_date) : null;
+      const isRenewal = member.status === 'active' && currentExpiry && currentExpiry > now;
+      const baseDate = isRenewal ? currentExpiry : now;
+
+      const expiryDate = new Date(baseDate);
+      if (member.payment_type === 'annual') {
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      } else {
+        expiryDate.setMonth(expiryDate.getMonth() + 1);
+      }
+
+      await query(
+        `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
+         activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
+         auto_renewal = FALSE
+         WHERE id = $4`,
+        [
+          now.toISOString().split('T')[0],
+          expiryDate.toISOString().split('T')[0],
+          opts.paymentId,
+          payment.memberId,
+        ]
+      );
+
+      // Send confirmation email to member
+      const memberData = await query(
+        'SELECT full_name, email, plan FROM members WHERE id = $1',
+        [payment.memberId]
+      );
+      if (memberData.rows.length > 0) {
+        const m = memberData.rows[0];
+        sendTemplateEmail({
+          template: 'payment-confirmed',
+          to: m.email as string,
+          variables: {
+            name: m.full_name as string,
+            amount: payment.amount.toFixed(2).replace('.', ','),
+            plan: m.plan as string,
+            expiry_date: expiryDate.toLocaleDateString('pt-BR'),
+          },
+          member_id: payment.memberId as string,
+        }).catch((err: unknown) => console.error('[PIX] Confirmation email error:', err));
+      }
+    }
+  }
+
+  await auditLog('payment.pix_confirmed', opts.adminUserId, {
+    paymentId: opts.paymentId,
+    memberId: payment.memberId,
+    amount: payment.amount,
+  }, payment.memberId as string);
+
+  return { success: true };
 }
 
 // ─── Stripe PaymentIntent: Card ──────────────────────────────────────────────

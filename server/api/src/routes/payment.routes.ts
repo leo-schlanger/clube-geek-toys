@@ -26,7 +26,7 @@ const cardCreateSchema = z.object({
   external_reference: z.string().min(1), // memberId
 });
 
-// POST /pix/create — create Stripe PaymentIntent for PIX
+// POST /pix/create — generate PIX QR code (local, no Stripe — PIX not available on Stripe)
 paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSchema), async (req, res, next) => {
   try {
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
@@ -79,6 +79,19 @@ paymentRouter.post('/card/create', authenticate, paymentLimiter, validate(cardCr
       memberId: req.body.external_reference,
     });
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /payments/:id/confirm — admin manually confirms a PIX payment
+paymentRouter.post('/:id/confirm', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const result = await paymentService.confirmPixPayment({
+      paymentId: req.params.id as string,
+      adminUserId: req.user!.userId,
+    });
+    res.json(result);
   } catch (err) {
     next(err);
   }

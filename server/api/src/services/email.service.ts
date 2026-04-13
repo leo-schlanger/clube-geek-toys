@@ -17,7 +17,7 @@ const AVAILABLE_TEMPLATES = [
   'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
   'points-expiring', 'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-cancelled', 'subscription-payment-failed',
-  'verify-email', 'password-reset', 'contract-signed',
+  'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
 ];
 
 export function getAvailableTemplates() {
@@ -343,6 +343,25 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         <p style="margin-top:12px;font-size:13px;color:#94a3b8">O PDF do contrato está anexado a este e-mail. Guarde-o para seus registros.</p>`,
       cta: { text: 'Acessar Minha Conta', url: `${frontendUrl}/minha-conta` },
+    },
+
+    // ─── ADMIN: PIX PENDENTE ────────────────────────────
+    'admin-pix-pending': {
+      subject: '🔔 PIX pendente de confirmação — Clube Geek & Toys',
+      preheader: `Novo pagamento PIX de R$ ${v.amount || '0,00'} aguardando confirmação.`,
+      body: `
+        <h2 style="color:#f59e0b;margin:0 0 12px">Pagamento PIX pendente 🔔</h2>
+        <p>Um novo pagamento via PIX foi gerado e aguarda confirmação manual.</p>
+        ${dataTable([
+          ['Membro', escapeHtml(v.member_name || '—')],
+          ['Email', v.member_email || '—'],
+          ['Plano', v.plan || '—'],
+          ['Valor', `<strong style="color:#4ade80">R$ ${v.amount || '0,00'}</strong>`],
+          ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
+          ['Payment ID', `<span style="font-family:monospace;font-size:11px">${v.payment_id || '—'}</span>`],
+        ])}
+        ${infoBox('📋 <strong>O que fazer:</strong><br>1. Verifique no extrato bancário se o PIX com o TX ID acima foi recebido<br>2. Acesse o painel admin e confirme o pagamento<br>3. O membro será ativado automaticamente após a confirmação')}`,
+      cta: { text: 'Abrir Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
     },
   };
 

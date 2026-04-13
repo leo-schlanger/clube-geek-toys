@@ -58,8 +58,9 @@ export interface PixPaymentData {
 }
 
 /**
- * Create a Stripe PaymentIntent for PIX.
- * Returns clientSecret + PIX QR data.
+ * Create a PIX payment (generated locally by the backend, not via Stripe).
+ * Returns EMV code for QR rendering + payment ID.
+ * Admin confirms manually → member gets activated.
  */
 export async function generatePixPayment(
   amount: number,
@@ -74,12 +75,13 @@ export async function generatePixPayment(
 
   try {
     const result = await api.post<{
-      clientSecret: string
-      paymentIntentId: string
-      pixData?: {
-        qrCode?: string
-        qrCodeImageUrl?: string
-        expiresAt?: string
+      paymentId: string
+      pixData: {
+        emvCode: string
+        pixKey: string
+        amount: number
+        txId: string
+        expiresAt: string
       }
     }>('/pix/create', {
       amount,
@@ -96,14 +98,14 @@ export async function generatePixPayment(
 
     const data = result.data!
     return {
-      paymentIntentId: data.paymentIntentId,
-      clientSecret: data.clientSecret,
-      qrCode: data.pixData?.qrCode || '',
+      paymentIntentId: data.paymentId,
+      clientSecret: '', // PIX doesn't use Stripe clientSecret
+      qrCode: data.pixData.emvCode,
       qrCodeBase64: '',
-      qrCodeImageUrl: data.pixData?.qrCodeImageUrl || '',
-      pixKey: data.pixData?.qrCode || '',
-      expiresAt: data.pixData?.expiresAt || new Date(Date.now() + 30 * 60000).toISOString(),
-      amount,
+      qrCodeImageUrl: '',
+      pixKey: data.pixData.pixKey,
+      expiresAt: data.pixData.expiresAt,
+      amount: data.pixData.amount,
     }
   } catch (error) {
     paymentLogger.error('Error creating PIX payment:', error)
