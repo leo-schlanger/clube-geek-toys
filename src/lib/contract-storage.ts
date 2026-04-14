@@ -57,8 +57,8 @@ export async function saveContract(
     documentHash: contractData.documentHash,
   })
 
-  if (result.error) {
-    throw new Error(result.error)
+  if (result.error || !result.data) {
+    throw new Error(result.error || 'Resposta inválida ao salvar contrato')
   }
 
   return result.data.id
@@ -109,8 +109,8 @@ export async function storeContract(
     pdfBase64,
   })
 
-  if (result.error) {
-    throw new Error(result.error)
+  if (result.error || !result.data) {
+    throw new Error(result.error || 'Resposta inválida ao salvar contrato')
   }
 
   return {

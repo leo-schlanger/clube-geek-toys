@@ -96,7 +96,10 @@ export async function generatePixPayment(
       throw err
     }
 
-    const data = result.data!
+    if (!result.data) {
+      throw new Error('Resposta inválida do servidor ao criar pagamento PIX')
+    }
+    const data = result.data
     return {
       paymentIntentId: data.paymentId,
       clientSecret: '', // PIX doesn't use Stripe clientSecret
@@ -156,7 +159,10 @@ export async function createCardPayment(
       throw err
     }
 
-    const data = result.data!
+    if (!result.data) {
+      throw new Error('Resposta inválida do servidor ao criar pagamento com cartão')
+    }
+    const data = result.data
     return {
       paymentIntentId: data.paymentIntentId,
       clientSecret: data.clientSecret,
@@ -218,9 +224,11 @@ export async function createSubscriptionPayment(
       transaction_amount: amount,
     })
 
-    if (result.error) throw new Error(result.error)
+    if (result.error || !result.data) {
+      throw new Error(result.error || 'Resposta inválida do servidor ao criar assinatura')
+    }
 
-    const data = result.data!
+    const data = result.data
     return {
       subscriptionId: data.id,
       clientSecret: data.clientSecret,

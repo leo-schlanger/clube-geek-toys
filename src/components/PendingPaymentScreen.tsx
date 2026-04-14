@@ -73,10 +73,10 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   async function checkPreviousPayment() {
     if (!member.pendingPayment) return
 
-    // Check if payment has expired
+    // Check if payment has expired (also handles invalid dates)
     const expiresAt = new Date(member.pendingPayment.expiresAt)
-    if (expiresAt < new Date()) {
-      // Payment expired, clear it
+    if (isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
+      // Payment expired or invalid date, clear it
       await clearPendingPayment(member.id)
       setHasPendingPayment(false)
       return

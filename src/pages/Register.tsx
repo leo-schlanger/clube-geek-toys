@@ -119,6 +119,7 @@ export default function Register() {
     formState: { errors },
     setValue,
     watch,
+    trigger,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   })
@@ -183,7 +184,7 @@ export default function Register() {
     }
 
     checkExistingMember()
-  }, [user, emailVerified, initialCheckDone, navigate])
+  }, [user, emailVerified, initialCheckDone, navigate, setValue])
 
   // =========================================================================
   // Password Strength Meter
@@ -466,9 +467,14 @@ export default function Register() {
         toast.success('Conta criada! Verifique seu email.', { id: 'reg-progress' })
         localStorage.removeItem(DRAFT_KEY)
 
-        sendVerificationEmail().catch(err =>
+        sendVerificationEmail().then(result => {
+          if (!result.success) {
+            toast.error('Não foi possível enviar o email de verificação. Use o botão "Reenviar" abaixo.', { duration: 6000 })
+          }
+        }).catch(err => {
           logger.error('Erro ao enviar email de verificação:', err)
-        )
+          toast.error('Não foi possível enviar o email de verificação. Use o botão "Reenviar" abaixo.', { duration: 6000 })
+        })
         setVerificationCooldown(60)
         setAwaitingEmailVerification(true)
         setStep(3)
@@ -1005,7 +1011,10 @@ export default function Register() {
                           </div>
                         </div>
 
-                        <Button type="button" className="w-full" onClick={() => setStep(2)}>
+                        <Button type="button" className="w-full" onClick={async () => {
+                          const valid = await trigger(['fullName', 'email', 'cpf', 'phone'])
+                          if (valid) setStep(2)
+                        }}>
                           Próximo Passo <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                         <button
@@ -1026,7 +1035,7 @@ export default function Register() {
                             <Input
                               id="password"
                               type={showPassword ? 'text' : 'password'}
-                              placeholder="No mínimo 6 caracteres"
+                              placeholder={`No mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
                               {...register('password')}
                             />
                             <button

@@ -41,6 +41,11 @@ export async function ensureSchema(): Promise<void> {
         ON members(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL
     `);
 
+    // ─── Refund audit trail — reason column on payments ────────────────────────
+    await query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_reason TEXT
+    `);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

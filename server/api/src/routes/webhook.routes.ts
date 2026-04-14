@@ -40,6 +40,11 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
         res.status(401).json({ error: 'Invalid webhook signature', code: 'WEBHOOK_INVALID_SIGNATURE' });
         return;
       }
+    } else if (env.NODE_ENV === 'production') {
+      // Production MUST have webhook secret — reject all events without it
+      console.error('[WEBHOOK] STRIPE_WEBHOOK_SECRET not set in production — rejecting event');
+      res.status(500).json({ error: 'Webhook secret not configured', code: 'WEBHOOK_MISCONFIGURED' });
+      return;
     } else {
       // Development: no secret configured, parse raw body directly
       console.warn('[WEBHOOK] STRIPE_WEBHOOK_SECRET not set — skipping signature verification (dev only)');

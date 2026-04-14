@@ -329,6 +329,9 @@ export async function updateProfile(userId: string, data: { email?: string; curr
 
   // Email change
   if (data.email && data.email.toLowerCase() !== user.email) {
+    if (isDisposableEmail(data.email)) {
+      throw new AppError(400, 'Email temporário não é permitido');
+    }
     const existing = await query('SELECT id FROM users WHERE email = $1 AND id != $2', [data.email.toLowerCase(), userId]);
     if (existing.rows.length > 0) {
       throw new AppError(409, 'Email já está em uso');

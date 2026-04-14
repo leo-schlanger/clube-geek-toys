@@ -25,7 +25,7 @@ function validateAmount(amount: number): void {
   }
   const validPrices: number[] = Object.values(PLAN_PRICES).flatMap((p) => [p.monthly, p.annual]);
   const matchesPrice = validPrices.some((p) => Math.abs(p - amount) < 0.01);
-  if (!matchesPrice && amount > MAX_AMOUNT) {
+  if (!matchesPrice) {
     throw new AppError(400, `Valor inválido: R$${amount.toFixed(2)}`, 'INVALID_AMOUNT');
   }
 }
@@ -442,9 +442,13 @@ export async function refundPayment(opts: {
   // Refund via Stripe
   try {
     const stripe = getStripe();
+    const stripeReasonMap: Record<string, 'duplicate' | 'fraudulent' | 'requested_by_customer'> = {
+      duplicate: 'duplicate',
+      fraudulent: 'fraudulent',
+    };
     await stripe.refunds.create({
       payment_intent: payment.providerId as string,
-      reason: opts.reason ? 'requested_by_customer' : undefined,
+      reason: stripeReasonMap[opts.reason || ''] || 'requested_by_customer',
     });
   } catch (err) {
     console.error('[REFUND] Stripe refund call failed:', err);
@@ -455,10 +459,10 @@ export async function refundPayment(opts: {
     );
   }
 
-  // Mark as refunded in DB
+  // Mark as refunded in DB (store reason for audit trail)
   await query(
-    `UPDATE payments SET status = 'refunded', updated_at = NOW() WHERE id = $1`,
-    [opts.paymentId]
+    `UPDATE payments SET status = 'refunded', refund_reason = $2, updated_at = NOW() WHERE id = $1`,
+    [opts.paymentId, opts.reason || null]
   );
 
   await auditLog(

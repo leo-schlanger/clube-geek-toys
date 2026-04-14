@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { verifyMemberOwnership } from '../middleware/ownership.js';
 import { paymentLimiter } from '../middleware/rate-limit.js';
 import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
@@ -23,6 +24,7 @@ const createSchema = z.object({
 // POST /subscription/create
 subscriptionRouter.post('/create', paymentLimiter, validate(createSchema), async (req, res, next) => {
   try {
+    if (!await verifyMemberOwnership(req, res, req.body.member_id)) return;
     const result = await subscriptionService.createSubscription(req.body);
     res.status(201).json(result);
   } catch (err) {
@@ -112,7 +114,7 @@ subscriptionRouter.get('/:id/payments', async (req, res, next) => {
 const updatePMSchema = z.object({
   paymentMethodId: z.string().min(1),
 });
-subscriptionRouter.put('/:id/update-payment-method', validate(updatePMSchema), async (req, res, next) => {
+subscriptionRouter.put('/:id/update-payment-method', paymentLimiter, validate(updatePMSchema), async (req, res, next) => {
   try {
     const sub = await verifySubscriptionOwnership(req, res, req.params.id as string);
     if (!sub) return;

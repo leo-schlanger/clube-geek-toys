@@ -17,11 +17,13 @@ export async function getMemberByCPF(cpf: string): Promise<Member | null> {
 }
 
 /**
- * Verifica se CPF já está cadastrado no sistema
+ * Verifica se CPF já está cadastrado no sistema.
+ * Uses a public endpoint that doesn't require authentication.
  */
 export async function isCPFRegistered(cpf: string): Promise<boolean> {
-  const member = await getMemberByCPF(cpf)
-  return member !== null
+  const cleanCpf = cpf.replace(/\D/g, '')
+  const result = await api.get<{ exists: boolean }>(`/members/cpf-exists/${cleanCpf}`, { skipAuth: true })
+  return result.data?.exists ?? false
 }
 
 /**
@@ -76,7 +78,9 @@ export async function getMembersCount(): Promise<number> {
 }
 
 /**
- * Cria novo membro no sistema
+ * Cria novo membro no sistema.
+ * userId is extracted from the JWT on the backend (req.user.userId),
+ * so we only send the member data in the body.
  */
 export async function createMember(
   _userId: string,

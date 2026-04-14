@@ -54,8 +54,8 @@ export async function createSubscription(
       transaction_amount: amount,
     })
 
-    if (result.error) {
-      paymentLogger.error('Failed to create subscription:', result.error)
+    if (result.error || !result.data) {
+      paymentLogger.error('Failed to create subscription:', result.error || 'empty response')
       return null
     }
 

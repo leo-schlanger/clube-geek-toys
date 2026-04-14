@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { defaultLimiter } from '../middleware/rate-limit.js';
+import { defaultLimiter, authLimiter } from '../middleware/rate-limit.js';
 import { z } from 'zod';
 import * as memberService from '../services/member.service.js';
 import * as paymentService from '../services/payment.service.js';
@@ -9,6 +9,23 @@ import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
 
 export const memberRouter = Router();
+
+// Public endpoint: check if CPF is already registered (used during registration).
+// Returns only { exists: boolean } — never exposes member data.
+memberRouter.get('/cpf-exists/:cpf', authLimiter, async (req, res, next) => {
+  try {
+    const cpf = (req.params.cpf as string).replace(/\D/g, '');
+    if (cpf.length !== 11 || !isValidCPF(cpf)) {
+      res.status(400).json({ error: 'CPF inválido' });
+      return;
+    }
+    const member = await memberService.getMemberByCpf(cpf);
+    res.json({ exists: member !== null });
+  } catch (err) {
+    next(err);
+  }
+});
+
 memberRouter.use(authenticate);
 
 const createMemberSchema = z.object({
@@ -38,19 +55,27 @@ const updateMemberSchema = z.object({
   activatedByPayment: z.string().nullable().optional(),
 }).strict();
 
+// Validated query schema for member list
+const listQuerySchema = z.object({
+  status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
+  plan: z.enum(['silver', 'gold', 'black']).optional(),
+  paymentType: z.enum(['monthly', 'annual']).optional(),
+  search: z.string().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  sort: z.enum(['created_at', 'full_name', 'expiry_date', 'points']).default('created_at'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+});
+
 // GET /members — list all (admin/seller). Supports server-side filtering, search, sort, pagination.
 memberRouter.get('/', requireRole('admin', 'seller'), defaultLimiter, async (req, res, next) => {
   try {
-    const result = await memberService.listMembers({
-      status: req.query.status as string | undefined,
-      plan: req.query.plan as string | undefined,
-      paymentType: req.query.paymentType as string | undefined,
-      search: req.query.search as string | undefined,
-      page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 50,
-      sort: req.query.sort as 'created_at' | 'full_name' | 'expiry_date' | 'points' | undefined,
-      order: req.query.order as 'asc' | 'desc' | undefined,
-    });
+    const parsed = listQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Parâmetros de consulta inválidos', details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    const result = await memberService.listMembers(parsed.data);
     res.json(result);
   } catch (err) {
     next(err);
