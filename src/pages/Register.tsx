@@ -527,8 +527,9 @@ export default function Register() {
       description: 'A confirmação leva alguns segundos. Sua área de membro abrirá em instantes.',
       duration: 5000,
     })
-    // Small delay so the webhook usually lands before MemberDashboard fetches.
-    setTimeout(() => navigate('/membro'), 1500)
+    // Delay so the webhook usually lands before MemberDashboard fetches.
+    // 3s gives Stripe webhooks enough time in most cases.
+    setTimeout(() => navigate('/membro'), 3000)
   }
 
   /**

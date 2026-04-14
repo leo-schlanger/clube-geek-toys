@@ -254,7 +254,10 @@ export function ContractModal({
       toast.loading('Gerando PDF...', { id: 'contract' })
       let pdfBytes: Uint8Array
       try {
-        pdfBytes = await generateContractPDF({ ...contractData, signedAt })
+        pdfBytes = await Promise.race([
+          generateContractPDF({ ...contractData, signedAt }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Tempo esgotado')), 15000)),
+        ])
       } catch (pdfError) {
         logger.error('PDF generation failed:', pdfError)
         toast.error('Erro ao gerar PDF do contrato. Toque em "Finalizar Contrato" para tentar novamente.', {

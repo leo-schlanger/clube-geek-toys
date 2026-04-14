@@ -90,6 +90,16 @@ export default function MemberDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]) // fetchMemberData uses user internally
 
+  // Auto-poll while member status is pending (waiting for webhook activation)
+  useEffect(() => {
+    if (!member || member.status !== 'pending') return
+    const interval = setInterval(() => {
+      fetchMemberData()
+    }, 5000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [member?.status])
+
   async function fetchMemberData() {
     if (!user) return
 
