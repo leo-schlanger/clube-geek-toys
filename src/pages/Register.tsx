@@ -504,8 +504,10 @@ export default function Register() {
   function handleContractSigned(_contractData?: unknown) {
     setShowContractModal(false)
     setContractSigned(true)
-    setStep(3) // Move to payment step
-    toast.success('Contrato assinado! Agora finalize o pagamento.')
+    setStep(3)
+    // Auto-open payment modal so user doesn't need an extra click
+    setShowPaymentModal(true)
+    toast.success('Contrato assinado! Finalizando pagamento...')
   }
 
   /**

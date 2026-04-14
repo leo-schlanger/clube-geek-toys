@@ -257,7 +257,10 @@ export function ContractModal({
         pdfBytes = await generateContractPDF({ ...contractData, signedAt })
       } catch (pdfError) {
         logger.error('PDF generation failed:', pdfError)
-        toast.error('Erro ao gerar PDF do contrato.', { id: 'contract' })
+        toast.error('Erro ao gerar PDF do contrato. Toque em "Finalizar Contrato" para tentar novamente.', {
+          id: 'contract',
+          duration: 8000,
+        })
         setLoading(false)
         return
       }
@@ -269,7 +272,10 @@ export function ContractModal({
         url = result.pdfUrl
       } catch (storeError) {
         logger.error('Contract storage failed:', storeError)
-        toast.error('Erro ao salvar contrato. Verifique sua conexão.', { id: 'contract' })
+        toast.error('Erro ao salvar contrato. Verifique sua conexão e toque em "Finalizar Contrato" para tentar novamente.', {
+          id: 'contract',
+          duration: 8000,
+        })
         setLoading(false)
         return
       }
@@ -296,7 +302,10 @@ export function ContractModal({
   }
 
   async function handleDownload() {
-    if (!signatureImage) return
+    if (!signatureImage) {
+      toast.error('Assine o contrato antes de baixar o PDF.')
+      return
+    }
     try {
       toast.loading('Gerando PDF...', { id: 'pdf' })
       const ipAddress = await getClientIP().catch(() => 'N/A')
@@ -304,15 +313,33 @@ export function ContractModal({
       const documentHash = await generateContractHash({
         memberId, memberName, memberCPF, memberEmail, plan, signedAt, ipAddress,
       }).catch(() => `${Date.now()}`)
-      const pdfBytes = await generateContractPDF({
-        memberId, memberName, memberCPF, memberEmail, memberPhone,
-        plan, paymentType, signatureImage, signedAt, ipAddress,
-        userAgent: getUserAgent(), documentHash,
-      })
-      downloadPDF(pdfBytes, `contrato_${memberName.replace(/\s+/g, '_')}.pdf`)
-      toast.success('PDF baixado!', { id: 'pdf' })
-    } catch {
-      toast.error('Erro ao gerar PDF', { id: 'pdf' })
+
+      let pdfBytes: Uint8Array
+      try {
+        pdfBytes = await generateContractPDF({
+          memberId, memberName, memberCPF, memberEmail, memberPhone,
+          plan, paymentType, signatureImage, signedAt, ipAddress,
+          userAgent: getUserAgent(), documentHash,
+        })
+      } catch (pdfError) {
+        logger.error('PDF generation failed in download:', pdfError)
+        toast.error('Não foi possível gerar o PDF. Tente novamente.', { id: 'pdf', duration: 5000 })
+        return
+      }
+
+      try {
+        downloadPDF(pdfBytes, `contrato_${memberName.replace(/\s+/g, '_')}.pdf`)
+        toast.success('PDF baixado!', { id: 'pdf' })
+      } catch (dlError) {
+        logger.error('PDF download failed:', dlError)
+        toast.error('Erro ao baixar o arquivo. Tente usar outro navegador ou desabilite bloqueador de pop-ups.', {
+          id: 'pdf',
+          duration: 8000,
+        })
+      }
+    } catch (error) {
+      logger.error('Unexpected error in handleDownload:', error)
+      toast.error('Erro inesperado ao gerar PDF. Tente novamente.', { id: 'pdf', duration: 5000 })
     }
   }
 
