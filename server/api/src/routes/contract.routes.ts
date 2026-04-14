@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import crypto from 'crypto';
+import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { verifyMemberOwnership } from '../middleware/ownership.js';
 import multer from 'multer';
@@ -7,6 +8,16 @@ import path from 'path';
 import fs from 'fs';
 import * as contractService from '../services/contract.service.js';
 import { query } from '../config/database.js';
+
+const contractBodySchema = z.object({
+  memberId: z.string().uuid(),
+  memberName: z.string().min(1).max(200),
+  memberCpf: z.string().length(11),
+  memberEmail: z.string().email(),
+  plan: z.enum(['silver', 'gold', 'black']),
+  signedAt: z.string().min(1),
+  signaturePreview: z.string().optional(),
+});
 
 export const contractRouter = Router();
 contractRouter.use(authenticate);
@@ -39,8 +50,13 @@ const upload = multer({
 // POST /contracts — upload contract PDF
 contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
   try {
-    const memberId = req.body.memberId;
-    if (memberId && !await verifyMemberOwnership(req, res, memberId)) return;
+    const parsed = contractBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Dados inválidos', details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+    const memberId = parsed.data.memberId;
+    if (!await verifyMemberOwnership(req, res, memberId)) return;
 
     // Magic-bytes validation: a real PDF starts with "%PDF" (0x25 0x50 0x44 0x46).
     // multer's MIME-type filter can be spoofed by the client; this is the actual content check.

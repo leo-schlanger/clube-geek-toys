@@ -8,9 +8,9 @@ import { PLAN_PRICES } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
 import crypto from 'crypto';
 
-const PIX_KEY = process.env.PIX_KEY || process.env.VITE_PIX_KEY || '574a10c6-9aa6-4bbb-a698-ba3d63cb9613';
-const PIX_MERCHANT_NAME = 'GEEK E TOYS';
-const PIX_MERCHANT_CITY = 'RIO DE JANEIRO';
+const PIX_KEY = env.PIX_KEY || '';
+const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
+const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
 
 const MIN_AMOUNT = 1.00;
 const MAX_AMOUNT = 999.90;
@@ -166,6 +166,9 @@ export async function createPixPayment(data: {
   paymentId: string;
   pixData: PixQRData;
 }> {
+  if (!PIX_KEY) {
+    throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
+  }
   validateAmount(data.amount);
 
   const memberResult = await query(

@@ -14,9 +14,12 @@ const envSchema = z.object({
 
   // Stripe
   STRIPE_SECRET_KEY: z.string().min(1),
-  // Optional in dev/early prod — without it, webhook signature verification is skipped.
-  // MUST be set in production once the Stripe Dashboard webhook endpoint is configured.
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+  // PIX
+  PIX_KEY: z.string().min(1).optional(),
+  PIX_MERCHANT_NAME: z.string().optional(),
+  PIX_MERCHANT_CITY: z.string().optional(),
 
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1),
@@ -29,12 +32,20 @@ const envSchema = z.object({
   // URLs
   FRONTEND_URL: z.string().url(),
   API_URL: z.string().url(),
+
+  // CORS — comma-separated list of additional allowed origins (optional)
+  ALLOWED_ORIGINS: z.string().optional(),
 });
+
+const envSchemaRefined = envSchema.refine(
+  (e) => e.NODE_ENV !== 'production' || (e.STRIPE_WEBHOOK_SECRET && e.STRIPE_WEBHOOK_SECRET.length > 0),
+  { message: 'STRIPE_WEBHOOK_SECRET is required in production', path: ['STRIPE_WEBHOOK_SECRET'] },
+);
 
 export type Env = z.infer<typeof envSchema>;
 
 function loadEnv(): Env {
-  const result = envSchema.safeParse(process.env);
+  const result = envSchemaRefined.safeParse(process.env);
   if (!result.success) {
     console.error('Invalid environment variables:');
     for (const issue of result.error.issues) {

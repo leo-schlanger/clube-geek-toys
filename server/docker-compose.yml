@@ -57,6 +57,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       FRONTEND_URL: ${FRONTEND_URL}
       API_URL: ${API_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
     volumes:
       - uploads:/app/uploads
     expose:
@@ -115,8 +116,8 @@ services:
       umami-db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-umami_secret}@umami-db:5432/umami
-      APP_SECRET: ${UMAMI_APP_SECRET:-replace_me_with_random_string}
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET}
       DISABLE_TELEMETRY: 1
     expose:
       - "3000"
@@ -132,7 +133,7 @@ services:
         max-file: "3"
     environment:
       POSTGRES_USER: umami
-      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami_secret}
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD}
       POSTGRES_DB: umami
     volumes:
       - umami-pgdata:/var/lib/postgresql/data

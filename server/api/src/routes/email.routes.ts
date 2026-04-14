@@ -7,10 +7,17 @@ import * as emailService from '../services/email.service.js';
 
 export const emailRouter = Router();
 
+const VALID_TEMPLATES = [
+  'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
+  'points-expiring', 'subscription-created', 'subscription-payment',
+  'subscription-paused', 'subscription-cancelled', 'subscription-payment-failed',
+  'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
+] as const;
+
 const sendEmailSchema = z.object({
-  template: z.string(),
+  template: z.enum(VALID_TEMPLATES),
   to: z.string().email(),
-  variables: z.record(z.string()).optional(),
+  variables: z.record(z.string().max(500)).optional(),
   member_id: z.string().optional(),
 });
 

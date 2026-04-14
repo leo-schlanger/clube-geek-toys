@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rate-limit.js';
 import * as lgpdService from '../services/lgpd.service.js';
 
 export const lgpdRouter = Router();
@@ -16,7 +17,7 @@ lgpdRouter.get('/export', async (req, res, next) => {
 });
 
 // POST /lgpd/delete-account — anonymize and delete account (LGPD)
-lgpdRouter.post('/delete-account', async (req, res, next) => {
+lgpdRouter.post('/delete-account', authLimiter, async (req, res, next) => {
   try {
     const { password } = req.body;
     if (!password || typeof password !== 'string') {

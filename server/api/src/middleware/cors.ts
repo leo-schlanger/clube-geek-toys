@@ -1,13 +1,18 @@
 import cors from 'cors';
 import { env } from '../config/env.js';
 
+const DEV_ORIGINS = env.NODE_ENV !== 'production'
+  ? ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:80']
+  : [];
+
+const EXTRA_ORIGINS = env.ALLOWED_ORIGINS
+  ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+  : [];
+
 const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:80',
   env.FRONTEND_URL,
-  'https://club.geeketoys.com.br',
-  'https://admin.geeketoys.com.br',
+  ...DEV_ORIGINS,
+  ...EXTRA_ORIGINS,
 ];
 
 export const corsMiddleware = cors({

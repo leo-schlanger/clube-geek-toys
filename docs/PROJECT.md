@@ -50,10 +50,10 @@ Sistema de gestao de clube de assinaturas para a loja Geek & Toys. Permite geren
 
 ### Servicos Externos
 
-| Servico | Uso                       |
-| ------- | ------------------------- |
-| PagBank | Pagamentos (PIX + Cartao) |
-| Resend  | Emails transacionais      |
+| Servico | Uso                  |
+| ------- | -------------------- |
+| Stripe  | Pagamentos (Cartao)  |
+| Resend  | Emails transacionais |
 
 ### Infraestrutura
 
@@ -96,8 +96,8 @@ Sistema de gestao de clube de assinaturas para a loja Geek & Toys. Permite geren
 └──────────────────────────────────────────────────────────────┘
           │                    │
     ┌─────┴──────┐      ┌─────┴──────┐
-    │  PagBank   │      │   Resend   │
-    │ (webhooks) │      │  (emails)  │
+    │  Stripe    │      │   Resend   │
+    │(payments)  │      │  (emails)  │
     └────────────┘      └────────────┘
 ```
 
@@ -293,7 +293,7 @@ clube-geek-toys/
 | expiry_date         | DATE         | Data de vencimento                 |
 | points              | INTEGER      | Saldo de pontos                    |
 | pending_payment     | JSONB        | Pagamento pendente                 |
-| subscription_id     | TEXT         | ID da assinatura PagBank           |
+| subscription_id     | TEXT         | ID da assinatura Stripe            |
 | subscription_status | VARCHAR(20)  | Status da assinatura               |
 | auto_renewal        | BOOLEAN      | Renovacao automatica               |
 | created_at          | TIMESTAMPTZ  | Data de criacao                    |
@@ -307,8 +307,8 @@ clube-geek-toys/
 | amount               | DECIMAL(10,2) | Valor                           |
 | method               | VARCHAR(20)   | pix, credit_card, boleto, cash  |
 | status               | VARCHAR(20)   | pending, paid, failed, refunded |
-| provider_id          | TEXT          | ID no PagBank                   |
-| provider_status      | TEXT          | Status no PagBank               |
+| provider_id          | TEXT          | ID no Stripe                    |
+| provider_status      | TEXT          | Status no Stripe                |
 | reference            | TEXT          | Referencia interna              |
 | paid_at              | TIMESTAMPTZ   | Data do pagamento               |
 | webhook_processed_at | TIMESTAMPTZ   | Quando webhook processou        |
@@ -334,9 +334,9 @@ clube-geek-toys/
 
 | Coluna             | Tipo          | Descricao                              |
 | ------------------ | ------------- | -------------------------------------- |
-| id                 | TEXT (PK)     | ID do PagBank (preapproval)            |
+| id                 | TEXT (PK)     | ID da assinatura Stripe                |
 | member_id          | UUID (FK)     | Referencia members                     |
-| provider_id        | TEXT          | ID no PagBank                          |
+| provider_id        | TEXT          | ID no Stripe                           |
 | status             | VARCHAR(20)   | pending, authorized, paused, cancelled |
 | plan               | VARCHAR(10)   | silver, gold, black                    |
 | frequency_type     | VARCHAR(10)   | months, years                          |
@@ -472,9 +472,9 @@ Exemplo: Compra de R$ 100,00 no plano Gold = 200 pontos
 
 ### Webhooks
 
-| Metodo | Endpoint           | Descricao                 | Auth |
-| ------ | ------------------ | ------------------------- | ---- |
-| POST   | `/webhook/pagbank` | Processa webhooks PagBank | HMAC |
+| Metodo | Endpoint          | Descricao                | Auth              |
+| ------ | ----------------- | ------------------------ | ----------------- |
+| POST   | `/webhook/stripe` | Processa webhooks Stripe | Assinatura Stripe |
 
 ### Email
 
@@ -525,14 +525,14 @@ Enviados via Resend API. Todos logados na tabela `email_logs`.
 | `verify-email`                | Apos registro — link de confirmacao (24h)     | Backend (auto)       |
 | `password-reset`              | Solicitacao de recuperacao de senha (1h)      | Backend (auto)       |
 | `welcome`                     | Apos ativacao do membro                       | Frontend             |
-| `payment-confirmed`           | Pagamento aprovado (PIX ou cartao)            | Webhook PagBank      |
-| `payment-failed`              | Pagamento rejeitado                           | Webhook PagBank      |
+| `payment-confirmed`           | Pagamento aprovado (PIX ou cartao)            | Webhook Stripe       |
+| `payment-failed`              | Pagamento rejeitado                           | Webhook Stripe       |
 | `contract-signed`             | Contrato digital assinado (com PDF anexo)     | Frontend             |
 | `subscription-created`        | Assinatura recorrente criada com sucesso      | Backend (auto)       |
-| `subscription-payment`        | Cobranca recorrente processada                | Webhook PagBank      |
+| `subscription-payment`        | Cobranca recorrente processada                | Webhook Stripe       |
 | `subscription-paused`         | Assinatura pausada pelo membro                | Backend (auto)       |
 | `subscription-cancelled`      | Assinatura cancelada (manual ou 3 falhas)     | Backend/Webhook      |
-| `subscription-payment-failed` | Cobranca recorrente falhou (mostra X/3)       | Webhook PagBank      |
+| `subscription-payment-failed` | Cobranca recorrente falhou (mostra X/3)       | Webhook Stripe       |
 | `renewal-reminder`            | 5-8 dias antes do vencimento (dedup via logs) | Cron diario (6h UTC) |
 | `points-expiring`             | 5-8 dias antes da expiracao de pontos         | Cron diario (6h UTC) |
 
@@ -554,7 +554,7 @@ Em desenvolvimento, use `?subdomain=adm` para simular o admin.
 
 ```env
 VITE_API_URL=https://api.geeketoys.com.br
-VITE_PAGBANK_PUBLIC_KEY=<chave_publica_PagBank>
+VITE_STRIPE_PUBLISHABLE_KEY=<chave_publica_Stripe>
 VITE_PIX_KEY=<chave_PIX>
 VITE_ENVIRONMENT=production
 ```
@@ -568,13 +568,15 @@ POSTGRES_DB=clube_geek_toys
 JWT_SECRET=<secret>
 JWT_REFRESH_SECRET=<secret>
 HMAC_SECRET=<secret>
-PAGBANK_TOKEN=<token>
-PAGBANK_PUBLIC_KEY=<key>
+STRIPE_SECRET_KEY=<sk_live_...>
+STRIPE_WEBHOOK_SECRET=<whsec_...>
+PIX_KEY=<chave_PIX>
 RESEND_API_KEY=<key>
 FROM_EMAIL=Clube Geek & Toys <contato@geeketoys.com.br>
 ADMIN_EMAIL=admin@geeketoys.com.br
 FRONTEND_URL=https://club.geeketoys.com.br
 API_URL=https://api.geeketoys.com.br
+ALLOWED_ORIGINS=https://admin.geeketoys.com.br
 ```
 
 ## Scripts Disponiveis

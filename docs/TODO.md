@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 09 de Abril de 2026
+> **Ultima atualizacao:** 14 de Abril de 2026
 
 ## Legenda
 
@@ -32,10 +32,10 @@
 - [x] **API Express** - Migrado de Cloudflare Workers para Node.js + Express
 - [x] **PostgreSQL** - Migrado de Firestore para PostgreSQL 16
 - [x] **Autenticacao JWT** - JWT customizado (bcrypt 12 rounds + refresh tokens)
-- [x] **PagBank** - PIX + Cartao + Assinaturas recorrentes
+- [x] **Stripe** - Cartao de credito via Stripe Elements + PIX local com QR code
 - [x] **Audit logging** - Registro de acoes criticas (auth, pontos, contratos, email)
 - [x] **Cron jobs** - Expiracao de pontos/membros, lembretes, notificacao de pontos
-- [x] **Rate limiting** - Em todos endpoints criticos incluindo refresh e webhooks
+- [x] **Rate limiting** - Em todos endpoints criticos incluindo refresh, webhooks e LGPD delete
 - [x] **RBAC + Ownership** - Middleware centralizado de verificacao de propriedade
 - [x] **Error tracking local** - error_logs no PostgreSQL + captura global frontend
 - [x] **13 email templates** - Todos conectados (webhook, cron, frontend, backend auto)
@@ -44,10 +44,10 @@
 
 ### Seguranca (Marco-Abril 2026)
 
-- [x] **Validacao Zod** - Schemas rigorosos em todos endpoints
+- [x] **Validacao Zod** - Schemas rigorosos em todos endpoints (incluindo contratos e email templates)
 - [x] **Sanitizacao HTML** - Prevencao XSS em emails
-- [x] **Webhook verification** - Server-to-server via API PagBank + rate limit
-- [x] **Idempotencia** - Key baseada em chargeId (nao status)
+- [x] **Webhook verification** - Assinatura criptografica Stripe (STRIPE_WEBHOOK_SECRET obrigatorio em prod)
+- [x] **Idempotencia** - Key baseada em eventId Stripe
 - [x] **IDOR protection** - Middleware ownership em pontos, pagamentos, contratos
 - [x] **Amount validation** - Rejeicao estrita de valores invalidos
 - [x] **CSP habilitado** - Content Security Policy via Helmet
@@ -60,6 +60,13 @@
 - [x] **PDF hash** - SHA-256 do PDF armazenado para verificacao de integridade
 - [x] **Cookie consent** - Banner com opcoes essencial/analytics
 - [x] **LGPD block active sub** - Impede exclusao com assinatura ativa
+- [x] **PIX key via env** - Removido fallback hardcoded, PIX_KEY obrigatorio via env schema
+- [x] **CORS configuravel** - Dominios de producao via env var ALLOWED_ORIGINS
+- [x] **Dockerfile non-root** - Container API roda como user `node`, nao root
+- [x] **Umami secrets obrigatorios** - Removidos defaults inseguros do docker-compose
+- [x] **Indices otimizados** - subscriptions(status,created_at), audit_logs(user_id)
+- [x] **Health check HTTPS** - CI/CD health check migrado de HTTP para HTTPS
+- [x] **.env.production limpo** - Secrets via GitHub Secrets, nao commitados
 
 ### Assinatura Digital (Abril 2026)
 
@@ -87,8 +94,9 @@
 
 ### Pagamentos (Marco-Abril 2026)
 
-- [x] **Assinaturas recorrentes** - PagBank com transacoes atomicas
-- [x] **Webhooks verificados** - Server-to-server + idempotencia
+- [x] **Stripe Elements** - Pagamento com cartao via Stripe
+- [x] **PIX local** - QR code gerado localmente com confirmacao manual admin
+- [x] **Webhooks Stripe** - Assinatura verificada + idempotencia
 - [x] **Cancelamento automatico** - Apos 3 falhas consecutivas com email
 - [x] **Expiracao automatica** - Cron marca membros expirados diariamente
 - [x] **Calculo correto de expiry** - Mensal +1 mes, anual +1 ano
@@ -106,22 +114,22 @@
 
 ## Pendente
 
-### ALTO - Proximo Sprint
-
-- [ ] **Whitelist PagBank** - Configurar IP da VPS no painel PagBank para webhooks em producao
-
 ### MEDIO - Planejado
 
-- [ ] **Aumentar cobertura de testes** - Meta: 70%
+- [ ] **Aumentar cobertura de testes** - Meta: 70% (atual ~11%)
 - [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
 - [ ] **Settings dinamico** - Permitir editar precos/planos via admin (hoje e code-only)
+- [ ] **Structured logging** - Substituir console.log por logger com niveis (pino/winston)
+- [ ] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze
 
 ### BAIXO - Nice to Have
 
 - [ ] **Storybook** - Documentar componentes UI
 - [ ] **Otimizar bundle** - Tree-shaking mais agressivo
-- [ ] **Image optimization** - Lazy load e compressao
+- [ ] **Image optimization** - Logo VIP 2.3MB PNG → WebP, lazy load
 - [ ] **Notificacoes push** - Lembretes de vencimento e pontos
+- [ ] **ARIA labels** - Melhorar acessibilidade em botoes com apenas icone
+- [ ] **httpOnly cookies** - Migrar JWT tokens de localStorage para cookies seguros
 
 ---
 
@@ -136,7 +144,7 @@
 
 ### Infraestrutura
 
-- [ ] **Redis** - Cache para consultas frequentes
+- [ ] **Redis** - Cache para consultas frequentes + rate limiting cross-instance
 - [ ] **Replica PostgreSQL** - Read replica para relatorios
 - [ ] **Monitoring stack** - Prometheus + Grafana
 
@@ -148,7 +156,6 @@
 2. Soft-delete de usuarios (role → `disabled`, nao deleta)
 3. vendor-charts bundle (435KB) - Lazy loaded via ReportsTab
 4. Erros TypeScript pre-existentes em payments.ts, points.ts, reports.ts (tipos `unknown`)
-5. Logo VIP (2.3MB PNG) - Servida como esta, sem WebP (falta sharp em prod)
 
 ---
 
@@ -171,9 +178,9 @@
 | Nginx          | Docker (VPS) | Incluido           |
 | Umami          | Docker (VPS) | Incluido           |
 | Resend (Email) | SaaS         | Free: 3k/mes       |
-| PagBank        | SaaS         | Taxa por transacao |
+| Stripe         | SaaS         | Taxa por transacao |
 | GitHub Actions | SaaS         | Free tier          |
 
 ---
 
-_Documento atualizado em 09 de Abril de 2026_
+_Documento atualizado em 14 de Abril de 2026_

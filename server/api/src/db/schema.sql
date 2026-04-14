@@ -226,6 +226,7 @@ CREATE INDEX idx_subscriptions_member_id ON subscriptions(member_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 CREATE INDEX idx_subscriptions_member_status ON subscriptions(member_id, status);
 CREATE INDEX idx_subscriptions_provider_id ON subscriptions(provider_id);
+CREATE INDEX idx_subscriptions_status_created ON subscriptions(status, created_at DESC);
 
 -- Subscription Payments
 CREATE INDEX idx_subpayments_subscription ON subscription_payments(subscription_id);
@@ -239,6 +240,7 @@ CREATE INDEX idx_contracts_member_created ON contracts(member_id, created_at DES
 
 -- Audit Logs
 CREATE INDEX idx_audit_member ON audit_logs(member_id);
+CREATE INDEX idx_audit_user_id ON audit_logs(user_id);
 CREATE INDEX idx_audit_timestamp ON audit_logs(timestamp DESC);
 CREATE INDEX idx_audit_action ON audit_logs(action, timestamp DESC);
 

@@ -46,6 +46,16 @@ export async function ensureSchema(): Promise<void> {
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_reason TEXT
     `);
 
+    // ─── Missing indexes for reports and LGPD queries ────────────────────────
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_status_created
+        ON subscriptions(status, created_at DESC)
+    `);
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_audit_user_id
+        ON audit_logs(user_id)
+    `);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

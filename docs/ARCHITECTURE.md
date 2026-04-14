@@ -1,6 +1,6 @@
 # Arquitetura Tecnica - Clube Geek & Toys
 
-> **Ultima atualizacao:** 08 de Abril de 2026
+> **Ultima atualizacao:** 14 de Abril de 2026
 
 ## Visao Geral do Sistema
 
@@ -34,8 +34,8 @@
 └──────────────────────────────────────────────────────────────────────┘
                     │                    │
               ┌─────┴──────┐      ┌─────┴──────┐
-              │  PagBank   │      │   Resend   │
-              │ (webhooks) │      │  (emails)  │
+              │  Stripe    │      │   Resend   │
+              │(payments)  │      │  (emails)  │
               └────────────┘      └────────────┘
 ```
 
@@ -128,7 +128,7 @@ server/api/src/
 │   ├── payment.routes.ts     # PIX, checkout, status
 │   ├── subscription.routes.ts # Assinaturas recorrentes
 │   ├── points.routes.ts      # Pontos (add, redeem, expire)
-│   ├── webhook.routes.ts     # Webhooks PagBank
+│   ├── webhook.routes.ts     # Webhooks Stripe
 │   ├── email.routes.ts       # Envio de emails
 │   ├── contract.routes.ts    # Contratos digitais
 │   ├── report.routes.ts      # Relatorios e metricas
@@ -138,7 +138,7 @@ server/api/src/
 ├── services/
 │   ├── auth.service.ts       # Login, hash, JWT, refresh
 │   ├── member.service.ts     # Logica de membros
-│   ├── payment.service.ts    # Integracao PagBank
+│   ├── payment.service.ts    # Integracao Stripe + PIX
 │   ├── subscription.service.ts
 │   ├── points.service.ts     # Calculo e expiracao de pontos
 │   ├── webhook.service.ts    # Processamento de webhooks
@@ -273,41 +273,40 @@ Response
 - **bcrypt**: 12 rounds para hash de senhas
 - **RBAC**: Middleware verifica `role` do token antes de permitir acesso
 
-## Fluxo de Pagamento (PagBank)
+## Fluxo de Pagamento (Stripe + PIX)
 
-### PIX
+### Cartao de Credito (Stripe)
 
 ```
-┌──────────┐    ┌──────────────┐    ┌─────────────┐
-│ Checkout │───▶│  POST /payment│──▶│  PagBank    │
-│  Modal   │    │  /pix/create │    │  API        │
-└──────────┘    └──────────────┘    └──────┬──────┘
+Frontend (Stripe Elements)
+  → Tokeniza cartao (client-side via Stripe.js)
+  → POST /payment/checkout/create (payment intent)
+  → API cria PaymentIntent no Stripe
+  → Webhook Stripe confirma pagamento (POST /webhook/stripe)
+  → Membro ativado + email de confirmacao
+```
+
+### PIX (QR Code Local)
+
+```
+┌──────────┐    ┌──────────────┐    ┌─────────────────┐
+│ Checkout │───▶│  POST /payment│──▶│ Gera QR Code    │
+│  Modal   │    │  /pix/create │    │ EMV localmente  │
+└──────────┘    └──────────────┘    └──────┬──────────┘
                                            │
                       ┌────────────────────┘
                       ▼
-              ┌──────────────┐    ┌─────────────┐
-              │  QR Code +   │───▶│ Poll status │
-              │  Copia/Cola  │    │ (interval)  │
-              └──────────────┘    └──────┬──────┘
+              ┌──────────────┐    ┌────────────────┐
+              │  QR Code +   │───▶│ Admin confirma │
+              │  Copia/Cola  │    │  manualmente   │
+              └──────────────┘    └──────┬─────────┘
                                          │
                     ┌────────────────────┘
                     ▼
             ┌──────────────┐    ┌─────────────┐
-            │   Webhook    │───▶│  Ativa      │
-            │ POST /webhook│    │  membro     │
-            │  /pagbank    │    │  + email    │
+            │  Confirma    │───▶│  Ativa      │
+            │  pagamento   │    │  membro     │
             └──────────────┘    └─────────────┘
-```
-
-### Cartao de Credito
-
-```
-Frontend (PagBank.js SDK)
-  → Tokeniza cartao (client-side)
-  → POST /payment/checkout/create (token + dados)
-  → API cria cobranca no PagBank
-  → Webhook confirma pagamento
-  → Membro ativado
 ```
 
 ## Sistema de Pontos

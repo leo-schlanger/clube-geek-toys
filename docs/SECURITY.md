@@ -1,6 +1,6 @@
 # Seguranca e Compliance - Clube Geek & Toys
 
-> **Ultima atualizacao:** 08 de Abril de 2026
+> **Ultima atualizacao:** 14 de Abril de 2026
 
 ## Visao Geral
 
@@ -56,17 +56,17 @@ Request → auth.ts (verifica JWT) → role check → route handler
 
 ### Protecao por Endpoint
 
-| Endpoint                | Roles Permitidos                |
-| ----------------------- | ------------------------------- |
-| `POST /auth/login`      | Publico                         |
-| `POST /auth/register`   | Publico                         |
-| `GET /members`          | admin                           |
-| `GET /members/:id`      | admin, seller, owner            |
-| `PUT /members/:id`      | admin, owner (campos limitados) |
-| `POST /points/add`      | admin, seller                   |
-| `GET /reports/*`        | admin                           |
-| `GET /logs`             | admin                           |
-| `POST /webhook/pagbank` | Publico (validado por HMAC)     |
+| Endpoint               | Roles Permitidos                         |
+| ---------------------- | ---------------------------------------- |
+| `POST /auth/login`     | Publico                                  |
+| `POST /auth/register`  | Publico                                  |
+| `GET /members`         | admin                                    |
+| `GET /members/:id`     | admin, seller, owner                     |
+| `PUT /members/:id`     | admin, owner (campos limitados)          |
+| `POST /points/add`     | admin, seller                            |
+| `GET /reports/*`       | admin                                    |
+| `GET /logs`            | admin                                    |
+| `POST /webhook/stripe` | Publico (validado por assinatura Stripe) |
 
 ## 3. Seguranca do Banco de Dados
 
@@ -84,7 +84,7 @@ Request → auth.ts (verifica JWT) → role check → route handler
 - Senhas: apenas hash bcrypt armazenado
 - Refresh tokens: apenas hash armazenado
 - CPF: armazenado sem formatacao (11 digitos)
-- Dados de cartao: nunca armazenados (tokenizacao via PagBank)
+- Dados de cartao: nunca armazenados (tokenizacao via Stripe)
 
 ## 4. Seguranca de Rede
 
@@ -135,22 +135,22 @@ Whitelist de origens permitidas (middleware `cors.ts`):
 
 ## 5. Seguranca de Webhooks
 
-### Verificacao Server-to-Server
+### Verificacao de Assinatura (Stripe)
 
-Webhooks PagBank sao verificados via consulta direta a API PagBank:
+Webhooks Stripe sao verificados via assinatura criptografica:
 
 ```
-Webhook recebido (POST /webhook/pagbank)
+Webhook recebido (POST /webhook/stripe)
   → Rate limit: 60 req/min
-  → Extrai order ID do body
-  → GET /orders/{orderId} na API PagBank (verificacao server-to-server)
-  → Usa dados verificados (nao o body enviado)
-  → Processa pagamento com dados confiáveis
+  → Verifica assinatura com STRIPE_WEBHOOK_SECRET
+  → STRIPE_WEBHOOK_SECRET obrigatorio em producao (env schema)
+  → Em dev sem secret, aceita eventos nao verificados (com log de aviso)
+  → Processa evento (payment_intent.succeeded, subscription.updated, etc.)
 ```
 
 ### Idempotencia
 
-- Webhook key = `pagbank_{orderId}_{chargeId}` (baseado em ID, nao status)
+- Webhook key = `stripe_{eventId}` (baseado no ID do evento Stripe)
 - Tabela `processed_webhooks` evita processamento duplicado
 - INSERT com `ON CONFLICT DO NOTHING`
 
@@ -173,14 +173,15 @@ Admins e sellers fazem bypass das verificacoes de ownership.
 
 Implementado no middleware `rate-limit.ts`:
 
-| Endpoint                | Limite  | Janela |
-| ----------------------- | ------- | ------ |
-| `POST /auth/login`      | 10 req  | 5 min  |
-| `POST /auth/register`   | 10 req  | 5 min  |
-| `POST /auth/refresh`    | 10 req  | 5 min  |
-| `POST /payment/*`       | 10 req  | 1 min  |
-| `POST /webhook/pagbank` | 60 req  | 1 min  |
-| Outros endpoints        | 100 req | 1 min  |
+| Endpoint               | Limite  | Janela |
+| ---------------------- | ------- | ------ |
+| `POST /auth/login`     | 10 req  | 5 min  |
+| `POST /auth/register`  | 10 req  | 5 min  |
+| `POST /auth/refresh`   | 10 req  | 5 min  |
+| `POST /payment/*`      | 10 req  | 1 min  |
+| `POST /webhook/stripe` | 60 req  | 1 min  |
+| `POST /lgpd/delete`    | 10 req  | 5 min  |
+| Outros endpoints       | 100 req | 1 min  |
 
 - Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`
 - Baseado em IP do cliente
@@ -190,8 +191,8 @@ Implementado no middleware `rate-limit.ts`:
 Habilitado via Helmet com diretivas estritas:
 
 - `default-src: 'self'`
-- `script-src: 'self', assets.pagseguro.com.br, accounts.google.com`
-- `connect-src: 'self', api.pagseguro.com, accounts.google.com`
+- `script-src: 'self', js.stripe.com, accounts.google.com`
+- `connect-src: 'self', api.stripe.com, accounts.google.com`
 - `frame-src: accounts.google.com`
 
 ## 9. Validacao de Entrada
@@ -287,7 +288,8 @@ Arquivo `.env` no servidor com:
 - Credenciais PostgreSQL
 - JWT secrets (access + refresh)
 - HMAC secret (webhooks)
-- PagBank token e public key
+- Stripe secret key e webhook secret
+- PIX key (chave PIX do recebedor)
 - Resend API key
 
 **Regras:**
@@ -298,11 +300,13 @@ Arquivo `.env` no servidor com:
 
 ### CI/CD (GitHub Secrets)
 
-| Secret        | Uso                        |
-| ------------- | -------------------------- |
-| `VPS_HOST`    | IP do servidor para deploy |
-| `VPS_USER`    | Usuario SSH                |
-| `VPS_SSH_KEY` | Chave privada SSH          |
+| Secret                        | Uso                          |
+| ----------------------------- | ---------------------------- |
+| `VPS_HOST`                    | IP do servidor para deploy   |
+| `VPS_USER`                    | Usuario SSH                  |
+| `VPS_SSH_KEY`                 | Chave privada SSH            |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave publica Stripe (build) |
+| `VITE_PIX_KEY`                | Chave PIX (build)            |
 
 ### Nunca Commitar
 
@@ -358,7 +362,7 @@ cat backup.sql | docker exec -i clube-geek-postgres psql -U clube_geek clube_gee
 ### Anual
 
 - [ ] Rotacionar JWT secrets
-- [ ] Rotacionar credenciais PagBank
+- [ ] Rotacionar credenciais Stripe
 - [ ] Revisar politica de privacidade
 - [ ] Atualizar sistema operacional da VPS
 - [ ] Revisar regras de firewall
@@ -367,4 +371,4 @@ cat backup.sql | docker exec -i clube-geek-postgres psql -U clube_geek clube_gee
 
 - **Incidentes de Seguranca**: contato@geeketoys.com.br
 - **ANPD (Vazamento de Dados)**: www.gov.br/anpd
-- **PagBank Status**: status.pagseguro.uol.com.br
+- **Stripe Status**: status.stripe.com
