@@ -50,7 +50,6 @@ export async function createSubscription(
       frequency_type: request.frequencyType,
       payer_email: request.payerEmail,
       payer_name: request.payerName || 'Cliente',
-      encrypted_card: request.encryptedCard,
       transaction_amount: amount,
     })
 
@@ -127,10 +126,10 @@ export async function cancelSubscription(subscriptionId: string): Promise<boolea
  */
 export async function updateSubscriptionCard(
   subscriptionId: string,
-  cardToken: string
+  paymentMethodId: string
 ): Promise<boolean> {
   try {
-    const result = await api.put(`/subscription/${subscriptionId}/update-card`, { encrypted_card: cardToken })
+    const result = await api.put(`/subscription/${subscriptionId}/update-payment-method`, { paymentMethodId })
     return !result.error
   } catch (error) {
     paymentLogger.error('Error updating subscription card:', error)
@@ -150,19 +149,29 @@ export async function getSubscriptionById(subscriptionId: string): Promise<Subsc
 }
 
 /**
- * Get subscription by member ID
+ * Get subscription by member ID.
+ * Fetches member profile first to get subscriptionId, then fetches subscription.
  */
-export async function getSubscriptionByMemberId(_memberId: string): Promise<Subscription | null> {
-  // Use the member's subscription_id from their profile
-  return null // Will be fetched via member data
+export async function getSubscriptionByMemberId(memberId: string): Promise<Subscription | null> {
+  try {
+    const memberResult = await api.get<{ subscriptionId?: string }>(`/members/${memberId}`)
+    const subId = memberResult.data?.subscriptionId
+    if (!subId) return null
+    return getSubscriptionFromApi(subId)
+  } catch {
+    return null
+  }
 }
 
 /**
- * Get active subscription by member ID
+ * Get active subscription by member ID.
+ * Returns subscription only if status is 'authorized' or 'pending'.
  */
-export async function getActiveSubscriptionByMemberId(_memberId: string): Promise<Subscription | null> {
-  // Fetch member first to get subscription_id, then fetch subscription
-  return null // Will be fetched via member data
+export async function getActiveSubscriptionByMemberId(memberId: string): Promise<Subscription | null> {
+  const sub = await getSubscriptionByMemberId(memberId)
+  if (!sub) return null
+  if (sub.status === 'authorized' || sub.status === 'pending') return sub
+  return null
 }
 
 /**
@@ -181,13 +190,16 @@ export async function getSubscriptionPayments(
 }
 
 /**
- * Get member payment history (all subscriptions)
+ * Get member payment history (all subscriptions).
+ * Fetches member's subscription, then gets payment history.
  */
 export async function getMemberSubscriptionPayments(
-  _memberId: string,
-  _limitCount = 20
+  memberId: string,
+  limitCount = 20
 ): Promise<SubscriptionPayment[]> {
-  return []
+  const sub = await getSubscriptionByMemberId(memberId)
+  if (!sub) return []
+  return getSubscriptionPayments(sub.id, limitCount)
 }
 
 // ============================================

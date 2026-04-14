@@ -195,7 +195,7 @@ async function handleInvoicePaid(
   await client.query(
     `INSERT INTO subscription_payments (id, subscription_id, member_id, amount, status, provider_payment_id)
      SELECT $1, id, member_id, $2, 'paid', $3
-     FROM subscriptions WHERE stripe_subscription_id = $4
+     FROM subscriptions WHERE provider_id = $4
      ON CONFLICT (id) DO UPDATE SET status = 'paid'`,
     [`sp_${invoice.id}`, amountInReais, invoice.id, subscriptionId]
   );
@@ -203,7 +203,7 @@ async function handleInvoicePaid(
   // Reset failed_payments counter
   await client.query(
     `UPDATE subscriptions SET failed_payments = 0, last_payment_date = NOW()
-     WHERE stripe_subscription_id = $1`,
+     WHERE provider_id = $1`,
     [subscriptionId]
   );
 
@@ -212,7 +212,7 @@ async function handleInvoicePaid(
     `SELECT m.id, m.email, m.full_name, m.plan, m.payment_type, s.id as sub_id
      FROM members m
      JOIN subscriptions s ON m.subscription_id = s.id
-     WHERE s.stripe_subscription_id = $1`,
+     WHERE s.provider_id = $1`,
     [subscriptionId]
   );
 
@@ -282,7 +282,7 @@ async function handleInvoicePaymentFailed(
   // Increment failed_payments
   const result = await client.query(
     `UPDATE subscriptions SET failed_payments = failed_payments + 1
-     WHERE stripe_subscription_id = $1
+     WHERE provider_id = $1
      RETURNING failed_payments, id`,
     [subscriptionId]
   );
@@ -329,7 +329,7 @@ async function handleInvoicePaymentFailed(
   if (failedCount >= 3) {
     await client.query(
       `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW()
-       WHERE stripe_subscription_id = $1`,
+       WHERE provider_id = $1`,
       [subscriptionId]
     );
     await client.query(
@@ -368,7 +368,7 @@ async function handleSubscriptionDeleted(
   // Update subscription record
   await client.query(
     `UPDATE subscriptions SET status = 'cancelled', cancelled_at = NOW()
-     WHERE stripe_subscription_id = $1`,
+     WHERE provider_id = $1`,
     [stripeSubId]
   );
 
@@ -376,7 +376,7 @@ async function handleSubscriptionDeleted(
   const memberResult = await client.query(
     `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE
      FROM subscriptions s
-     WHERE members.subscription_id = s.id AND s.stripe_subscription_id = $1
+     WHERE members.subscription_id = s.id AND s.provider_id = $1
      RETURNING members.id, members.email, members.full_name`,
     [stripeSubId]
   );

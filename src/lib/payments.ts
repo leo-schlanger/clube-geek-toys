@@ -240,9 +240,3 @@ export async function createSubscriptionPayment(
   }
 }
 
-/**
- * @deprecated Use isPaymentConfigured() instead
- */
-export function isPagBankConfigured(): boolean {
-  return isPaymentConfigured()
-}

@@ -8,7 +8,7 @@ import { PLAN_PRICES } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
 import crypto from 'crypto';
 
-const PIX_KEY = process.env.VITE_PIX_KEY || '574a10c6-9aa6-4bbb-a698-ba3d63cb9613';
+const PIX_KEY = process.env.PIX_KEY || process.env.VITE_PIX_KEY || '574a10c6-9aa6-4bbb-a698-ba3d63cb9613';
 const PIX_MERCHANT_NAME = 'GEEK E TOYS';
 const PIX_MERCHANT_CITY = 'RIO DE JANEIRO';
 

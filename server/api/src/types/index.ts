@@ -120,10 +120,11 @@ export interface AuditLog {
 }
 
 // Plan pricing
+// MUST match frontend PLANS in src/types/index.ts
 export const PLAN_PRICES = {
-  silver: { monthly: 29.90, annual: 299.90 },
-  gold: { monthly: 49.90, annual: 499.90 },
-  black: { monthly: 79.90, annual: 799.90 },
+  silver: { monthly: 19.90, annual: 199.90 },
+  gold: { monthly: 39.90, annual: 399.90 },
+  black: { monthly: 49.90, annual: 499.90 },
 } as const;
 
 // Points multiplier by plan

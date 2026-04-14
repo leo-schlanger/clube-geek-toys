@@ -71,7 +71,7 @@ export async function exportUserData(userId: string) {
       role: user.role,
       emailVerified: user.email_verified,
       emailVerifiedAt: user.email_verified_at,
-      googleId: user.google_id,
+      // google_id column does not exist in schema; omitted
       createdAt: user.created_at,
       updatedAt: user.updated_at,
     },
@@ -135,8 +135,7 @@ export async function deleteUserAccount(userId: string, password: string) {
         email = $1,
         password_hash = $2,
         role = 'disabled',
-        refresh_token_hash = NULL,
-        google_id = NULL
+        refresh_token_hash = NULL
        WHERE id = $3`,
       [`deleted_${userId}@redacted`, randomHash, userId]
     );
