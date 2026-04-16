@@ -1,0 +1,121 @@
+# Top 100 K-pop — Playlist inicial Geek E Toys
+# Formato: Artista — Título (uma por linha, travessão U+2014 como separador)
+# Curadoria 2026-04-16 com base em:
+#   - Spotify Wrapped 2025 (top K-pop globally)
+#   - Only Hits K-pop Charts 2026 (semanal)
+#   - Billboard Best K-pop 2025
+#   - Gallup Korea Singers of the Year 2025
+#   - Clássicos históricos (2NE1, Big Bang, Girls' Generation, SHINee, etc.)
+# Regra: max 4 faixas por artista; mix 2026-atual + clássicos atemporais.
+
+# === 2026 FRESH (13) ===
+BTS — Body to Body
+BTS — Hooligan
+IVE — BANG BANG
+BLACKPINK — JUMP
+LE SSERAFIM — SPAGHETTI
+YENA — Catch Catch
+Hearts2Hearts — RUDE!
+ILLIT — NOT CUTE ANYMORE
+Stray Kids — CEREMONY
+BABYMONSTER — WE GO UP
+ENHYPEN — Knife
+TWICE — THIS IS FOR
+NMIXX — Blue Valentine
+
+# === 2025 MEGA-HITS (15) ===
+ROSÉ — APT.
+Jimin — Who
+Jin — Don't Say You Love Me
+JENNIE — like JENNIE
+KATSEYE — Gabriela
+KATSEYE — Gnarly
+LISA — Born Again
+j-hope — Killin' It Girl
+TWICE — TAKEDOWN
+JISOO — earthquake
+aespa — Dirty Work
+JENNIE — ExtraL
+HUNTR/X — Golden
+Jungkook — Seven
+ATEEZ — Adrenaline
+
+# === 4ª geração consolidada 2022-2024 (24) ===
+NewJeans — Super Shy
+NewJeans — Hype Boy
+NewJeans — OMG
+NewJeans — ETA
+IVE — LOVE DIVE
+IVE — After LIKE
+IVE — I AM
+aespa — Supernova
+aespa — Spicy
+aespa — Drama
+LE SSERAFIM — FEARLESS
+LE SSERAFIM — UNFORGIVEN
+LE SSERAFIM — Perfect Night
+Stray Kids — God's Menu
+Stray Kids — MANIAC
+Stray Kids — Chk Chk Boom
+(G)I-DLE — Tomboy
+(G)I-DLE — Queencard
+(G)I-DLE — Nxde
+TXT — Sugar Rush Ride
+TXT — Chasing That Feeling
+ENHYPEN — Bite Me
+ENHYPEN — Fever
+ITZY — LOCO
+
+# === 3ª geração clássicos 2016-2021 (20) ===
+BTS — Dynamite
+BTS — Butter
+BLACKPINK — DDU-DU DDU-DU
+BLACKPINK — How You Like That
+BLACKPINK — Pink Venom
+TWICE — What Is Love?
+TWICE — Fancy
+ITZY — WANNABE
+SEVENTEEN — Very Nice
+SEVENTEEN — HOT
+Red Velvet — Psycho
+Red Velvet — Bad Boy
+NCT 127 — Sticker
+NCT DREAM — Hello Future
+EXO — Love Shot
+EXO — Monster
+MAMAMOO — HIP
+Kiss of Life — Midas Touch
+fromis_9 — Feel Good
+JISOO — EYES CLOSED
+
+# === Solistas (10) ===
+IU — Blueming
+IU — LILAC
+Taeyeon — INVU
+Chungha — Gotta Go
+Sunmi — Tail
+Hwasa — Maria
+JENNIE — SOLO
+Baekhyun — Candy
+G-DRAGON — Crooked
+Zico — Any Song
+
+# === Clássicos atemporais (18) ===
+PSY — Gangnam Style
+Big Bang — Fantastic Baby
+Big Bang — Bang Bang Bang
+Girls' Generation — Gee
+Girls' Generation — I Got a Boy
+2NE1 — I Am the Best
+2NE1 — Fire
+SHINee — Ring Ding Dong
+SHINee — Sherlock
+TVXQ — Mirotic
+Super Junior — Sorry Sorry
+Wonder Girls — Nobody
+f(x) — 4 Walls
+Apink — NoNoNo
+MAMAMOO — Starry Night
+MONSTA X — Shoot Out
+ATEEZ — WONDERLAND
+GOT7 — Lullaby
