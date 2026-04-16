@@ -89,8 +89,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    networks:
+      - default
+      - azuracast
+    # (extra_hosts removido — nginx alcança AzuraCast pelo nome
+    #  do container via azuracast_network.)
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -163,3 +168,9 @@ volumes:
   umami-pgdata:
   certbot-etc:
   certbot-www:
+
+networks:
+  default:
+  azuracast:
+    external: true
+    name: azuracast_network

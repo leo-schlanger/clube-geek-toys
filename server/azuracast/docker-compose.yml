@@ -1,0 +1,94 @@
+services:
+  # ============================================================
+  # AzuraCast — Rádio online (painel + Icecast + Liquidsoap)
+  # ------------------------------------------------------------
+  # Adaptado para coexistir com o nginx do clube-geek-toys:
+  #   - Não sobe nginx-proxy/acme-companion (porta 80/443 já
+  #     ocupadas pelo nginx principal).
+  #   - Web UI escuta em 127.0.0.1:8080 (acessado via reverse
+  #     proxy do nginx do clube em https://radio.geeketoys.com.br).
+  #   - Streams públicas ficam em 0.0.0.0:8000-8046.
+  #   - SFTP (uploads) em 0.0.0.0:2022.
+  # ============================================================
+  azuracast:
+    image: ghcr.io/azuracast/azuracast:latest
+    container_name: azuracast
+    restart: unless-stopped
+    ports:
+      # Painel web NÃO é publicado no host — nginx do clube alcança
+      # o container via azuracast_network (ver seção networks abaixo).
+      # Streams Icecast/Shoutcast (acesso público direto)
+      - "8000:8000"
+      - "8005:8005"
+      - "8006:8006"
+      - "8010:8010"
+      - "8015:8015"
+      - "8016:8016"
+      - "8020:8020"
+      - "8025:8025"
+      - "8026:8026"
+      - "8030:8030"
+      - "8035:8035"
+      - "8036:8036"
+      - "8040:8040"
+      - "8045:8045"
+      - "8046:8046"
+      # SFTP para uploads de biblioteca
+      - "2022:2022"
+    environment:
+      AZURACAST_DC_REVISION: "14"
+      AZURACAST_VERSION: latest
+      AZURACAST_SFTP_PORT: "2022"
+      # Nginx interno do AzuraCast — timeouts generosos pra streaming
+      NGINX_TIMEOUT: "1800"
+      LANG: ${LANG:-pt_BR.UTF-8}
+      TZ: ${TIMEZONE:-America/Sao_Paulo}
+      # Está atrás do nginx do clube
+      AZURACAST_HTTP_PORT: "80"
+      # MariaDB embutido — a imagem :latest exige essas vars
+      # para inicializar o banco no primeiro boot.
+      MYSQL_HOST: localhost
+      MYSQL_PORT: "3306"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-azuracast}
+      MYSQL_USER: ${MYSQL_USER:-azuracast}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD obrigatório no .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD obrigatório no .env}
+    volumes:
+      - azuracast_station_data:/var/azuracast/stations
+      - azuracast_backups:/var/azuracast/backups
+      - azuracast_db_data:/var/lib/mysql
+      - azuracast_www_uploads:/var/azuracast/uploads
+      - azuracast_shoutcast2_install:/var/azuracast/servers/shoutcast2
+      - azuracast_stereo_tool_install:/var/azuracast/servers/stereo_tool
+      - azuracast_www:/var/azuracast/www
+      - azuracast_tmp:/var/azuracast/www_tmp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 3G
+
+volumes:
+  azuracast_station_data:
+  azuracast_backups:
+  azuracast_db_data:
+  azuracast_www_uploads:
+  azuracast_shoutcast2_install:
+  azuracast_stereo_tool_install:
+  azuracast_www:
+  azuracast_tmp:
+
+networks:
+  default:
+    name: azuracast_network
