@@ -45,7 +45,14 @@ const envSchemaRefined = envSchema.refine(
 export type Env = z.infer<typeof envSchema>;
 
 function loadEnv(): Env {
-  const result = envSchemaRefined.safeParse(process.env);
+  // docker-compose expands `${VAR:-}` to an empty string when the variable
+  // is unset. Treat empty strings as absent so `.optional()` fields don't
+  // fail `.min(1)` checks.
+  const cleaned: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    cleaned[k] = v === '' ? undefined : v;
+  }
+  const result = envSchemaRefined.safeParse(cleaned);
   if (!result.success) {
     console.error('Invalid environment variables:');
     for (const issue of result.error.issues) {
