@@ -7,6 +7,7 @@ import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { Check, Crown, Star, Sparkles, ArrowRight, Shield, Zap, Gift, CreditCard } from 'lucide-react'
 import { motion } from 'framer-motion'
+import RadioMiniPlayer from '../components/RadioMiniPlayer'
 
 export default function Subscribe() {
   const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
@@ -367,6 +368,9 @@ export default function Subscribe() {
           <Link to="/privacidade" className="text-muted-foreground hover:text-foreground">Privacidade</Link>
         </p>
       </footer>
+
+      {/* Rádio Geek & Toys — mini-player flutuante (portfólio público) */}
+      <RadioMiniPlayer />
     </div>
   )
 }
