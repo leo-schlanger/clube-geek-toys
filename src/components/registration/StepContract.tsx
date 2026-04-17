@@ -1,13 +1,24 @@
 /**
- * StepContract — Step 4: Contract signing (inline, not modal)
+ * StepContract — Contract signing step (inline, not modal).
  *
- * Refactored from ContractModal.tsx to render inline within the
- * registration stepper instead of as a fixed overlay.
+ * Directly adapted from ContractModal.tsx (which works) with only the
+ * overlay/fixed wrapper removed. All logic, state, effects, and JSX
+ * for the 3 sub-steps (read → sign → confirm) are copied verbatim.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { motion } from 'framer-motion'
 import SignaturePad from 'signature_pad'
+import { Button } from '../ui/button'
+import { Badge } from '../ui/badge'
+import { CONTRACT_SECTIONS, CONTRACT_TITLE, CONTRACT_SUBTITLE } from '../../data/contract-content'
+import { PLANS, type PlanType, type PaymentType, type ContractData } from '../../types'
+import { formatCurrency } from '../../lib/utils'
+import { generateContractPDF, pdfToBase64, downloadPDF } from '../../lib/contract-generator'
+import { storeContract } from '../../lib/contract-storage'
+import { generateContractHash, getClientIP, getUserAgent, formatTimestamp } from '../../lib/signature-utils'
+import { sendContractEmail } from '../../lib/email'
+import { logger } from '../../lib/logger'
+import { toast } from 'sonner'
 import {
   Check,
   RotateCcw,
@@ -18,25 +29,8 @@ import {
   ChevronDown,
   Shield,
 } from 'lucide-react'
-import { toast } from 'sonner'
 
-import { Button } from '../ui/button'
-import { Badge } from '../ui/badge'
-import { Card, CardContent } from '../ui/card'
-import { PLANS, type PlanType, type PaymentType, type ContractData } from '../../types'
-import { formatCurrency } from '../../lib/utils'
-import { generateContractPDF, pdfToBase64, downloadPDF } from '../../lib/contract-generator'
-import { storeContract } from '../../lib/contract-storage'
-import { generateContractHash, getClientIP, getUserAgent, formatTimestamp } from '../../lib/signature-utils'
-import { sendContractEmail } from '../../lib/email'
-import { CONTRACT_SECTIONS, CONTRACT_TITLE, CONTRACT_SUBTITLE } from '../../data/contract-content'
-import { logger } from '../../lib/logger'
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type ContractSubStep = 'read' | 'sign' | 'confirm'
+type ContractStep = 'read' | 'sign' | 'confirm'
 
 interface StepContractProps {
   memberId: string
@@ -50,10 +44,6 @@ interface StepContractProps {
   onBack: () => void
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function StepContract({
   memberId,
   memberName,
@@ -65,7 +55,7 @@ export function StepContract({
   onSigned,
   onBack,
 }: StepContractProps) {
-  const [subStep, setSubStep] = useState<ContractSubStep>('read')
+  const [step, setStep] = useState<ContractStep>('read')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
@@ -75,7 +65,7 @@ export function StepContract({
   const [canvasError, setCanvasError] = useState(false)
   const [scrolledToBottom, setScrolledToBottom] = useState(false)
 
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const checkboxRef = useRef<HTMLLabelElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const canvasContainerRef = useRef<HTMLDivElement>(null)
@@ -83,15 +73,12 @@ export function StepContract({
 
   const planData = PLANS[plan]
   const price = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
-  const canProceed = acceptedTerms && acceptedPrivacy && scrolledToBottom
+  const canProceed = acceptedTerms && acceptedPrivacy
 
-  // -----------------------------------------------------------------------
-  // Scroll tracking (read sub-step)
-  // -----------------------------------------------------------------------
-
+  // Track scroll position in read step
   useEffect(() => {
-    if (subStep !== 'read') return
-    const el = scrollRef.current
+    if (step !== 'read') return
+    const el = contentRef.current
     if (!el) return
 
     const handleScroll = () => {
@@ -100,14 +87,19 @@ export function StepContract({
     }
 
     el.addEventListener('scroll', handleScroll)
-    handleScroll() // check initial (short content)
+    handleScroll()
     return () => el.removeEventListener('scroll', handleScroll)
-  }, [subStep])
+  }, [step])
 
-  // -----------------------------------------------------------------------
-  // Signature pad setup
-  // -----------------------------------------------------------------------
+  // Scroll to top when step changes
+  useEffect(() => {
+    contentRef.current?.scrollTo(0, 0)
+    if (step !== 'sign') {
+      setCanvasReady(false)
+    }
+  }, [step])
 
+  // Setup signature pad
   const setupCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const container = canvasContainerRef.current
@@ -124,11 +116,11 @@ export function StepContract({
     canvas.style.height = `${height}px`
 
     const ctx = canvas.getContext('2d')
-    if (ctx) {
-      ctx.scale(dpr, dpr)
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, width, height)
-    }
+    if (!ctx) return false // Guard: context unavailable
+
+    ctx.scale(dpr, dpr)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, width, height)
 
     if (signaturePadRef.current) {
       signaturePadRef.current.off()
@@ -145,9 +137,9 @@ export function StepContract({
     return true
   }, [])
 
-  // Retry setup with delays
+  // Initialize signature pad when entering sign step
   useEffect(() => {
-    if (subStep !== 'sign') {
+    if (step !== 'sign') {
       if (signaturePadRef.current) {
         signaturePadRef.current.off()
         signaturePadRef.current = null
@@ -170,17 +162,20 @@ export function StepContract({
         timeoutId = setTimeout(trySetup, attempts[attemptIndex])
       } else {
         setCanvasError(true)
-        toast.error('Erro ao carregar area de assinatura. Tente recarregar a pagina.')
+        toast.error('Erro ao carregar área de assinatura. Tente recarregar a página.')
       }
     }
 
     timeoutId = setTimeout(trySetup, attempts[0])
-    return () => clearTimeout(timeoutId)
-  }, [subStep, setupCanvas])
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [step, setupCanvas])
 
   // Handle resize
   useEffect(() => {
-    if (subStep !== 'sign') return
+    if (step !== 'sign') return
 
     const handleResize = () => {
       if (signaturePadRef.current) {
@@ -194,11 +189,7 @@ export function StepContract({
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [subStep, setupCanvas])
-
-  // -----------------------------------------------------------------------
-  // Actions
-  // -----------------------------------------------------------------------
+  }, [step, setupCanvas])
 
   const clearSignature = useCallback(() => {
     if (signaturePadRef.current) {
@@ -209,7 +200,7 @@ export function StepContract({
 
   function confirmSignature() {
     if (!signaturePadRef.current) {
-      toast.error('Area de assinatura nao carregada')
+      toast.error('Área de assinatura não carregada')
       return
     }
     if (signaturePadRef.current.isEmpty()) {
@@ -217,19 +208,13 @@ export function StepContract({
       return
     }
     setSignatureImage(signaturePadRef.current.toDataURL('image/png'))
-    setSubStep('confirm')
+    setStep('confirm')
   }
 
   function handleDisabledContinueClick() {
     if (canProceed) return
-    if (!scrolledToBottom) {
-      const el = scrollRef.current
-      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
-      toast.error('Role ate o final do contrato', { id: 'scroll-hint' })
-      return
-    }
     checkboxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    toast.error('Aceite os termos e a politica de privacidade para continuar', { id: 'accept-terms' })
+    toast.error('Aceite os termos e a política de privacidade para continuar', { id: 'accept-terms' })
   }
 
   async function processContract() {
@@ -243,7 +228,7 @@ export function StepContract({
       try {
         ipAddress = await Promise.race([
           getClientIP(),
-          new Promise<string>((_, reject) => setTimeout(() => reject('timeout'), 3000)),
+          new Promise<string>((_, reject) => setTimeout(() => reject('timeout'), 3000))
         ]) as string
       } catch {
         // Use fallback
@@ -272,11 +257,11 @@ export function StepContract({
       try {
         pdfBytes = await Promise.race([
           generateContractPDF({ ...contractData, signedAt }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Tempo esgotado')), 15000)),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Tempo esgotado')), 30000)),
         ])
       } catch (pdfError) {
         logger.error('PDF generation failed:', pdfError)
-        toast.error('Erro ao gerar PDF do contrato. Tente novamente.', {
+        toast.error('Erro ao gerar PDF do contrato. Toque em "Finalizar Contrato" para tentar novamente.', {
           id: 'contract',
           duration: 8000,
         })
@@ -291,7 +276,7 @@ export function StepContract({
         url = result.pdfUrl
       } catch (storeError) {
         logger.error('Contract storage failed:', storeError)
-        toast.error('Erro ao salvar contrato. Verifique sua conexao e tente novamente.', {
+        toast.error('Erro ao salvar contrato. Verifique sua conexão e tente novamente.', {
           id: 'contract',
           duration: 8000,
         })
@@ -304,7 +289,7 @@ export function StepContract({
 
       // Send email (non-blocking)
       sendContractEmail(
-        memberEmail, memberName, planData.name, signedAt, documentHash, pdfToBase64(pdfBytes),
+        memberEmail, memberName, planData.name, signedAt, documentHash, pdfToBase64(pdfBytes)
       ).catch((emailError) => {
         logger.warn('Contract email failed (non-critical):', emailError)
       })
@@ -342,7 +327,7 @@ export function StepContract({
         })
       } catch (pdfError) {
         logger.error('PDF generation failed in download:', pdfError)
-        toast.error('Nao foi possivel gerar o PDF. Tente novamente.', { id: 'pdf', duration: 5000 })
+        toast.error('Não foi possível gerar o PDF. Tente novamente.', { id: 'pdf', duration: 5000 })
         return
       }
 
@@ -362,50 +347,44 @@ export function StepContract({
     }
   }
 
-  // -----------------------------------------------------------------------
-  // Sub-step progress index (0-based for the bar segments)
-  // -----------------------------------------------------------------------
-
-  const subStepIndex = subStep === 'read' ? 0 : subStep === 'sign' ? 1 : 2
-
-  // -----------------------------------------------------------------------
-  // Render
-  // -----------------------------------------------------------------------
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: 'easeOut' }}
-      className="w-full max-w-2xl mx-auto space-y-6"
-    >
-      {/* Sub-step progress bar */}
-      <div className="flex gap-1">
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
-              i <= subStepIndex ? 'bg-primary' : 'bg-muted'
-            }`}
-          />
-        ))}
+    <div className="relative bg-background rounded-lg border border-border shadow-lg w-full max-w-2xl mx-auto flex flex-col max-h-[85vh]">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b shrink-0">
+        <div>
+          <h2 className="font-bold text-lg">
+            {step === 'read' ? 'Contrato de Adesão' : step === 'sign' ? 'Assinatura Digital' : 'Confirmação'}
+          </h2>
+          <p className="text-sm text-muted-foreground">Passo {step === 'read' ? 1 : step === 'sign' ? 2 : 3} de 3</p>
+        </div>
+        {loading ? (
+          <div className="p-2">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <Badge variant="outline" className="text-xs">Obrigatório</Badge>
+        )}
       </div>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* SUB-STEP: READ                                                     */}
-      {/* ----------------------------------------------------------------- */}
-      {subStep === 'read' && (
-        <Card className="border-border/60">
-          <CardContent className="p-0">
-            {/* Header */}
-            <div className="p-4 sm:p-6 pb-0 text-center space-y-2">
+      {/* Progress */}
+      <div className="flex gap-1 px-4 py-2 shrink-0 bg-muted/30">
+        <div className={`h-1.5 flex-1 rounded-full transition-colors ${step !== undefined ? 'bg-primary' : 'bg-muted'}`} />
+        <div className={`h-1.5 flex-1 rounded-full transition-colors ${step === 'sign' || step === 'confirm' ? 'bg-primary' : 'bg-muted'}`} />
+        <div className={`h-1.5 flex-1 rounded-full transition-colors ${step === 'confirm' ? 'bg-primary' : 'bg-muted'}`} />
+      </div>
+
+      {/* Content - scrollable area */}
+      <div ref={contentRef} className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 min-h-0">
+        {/* STEP 1: READ */}
+        {step === 'read' && (
+          <div className="space-y-4">
+            <div className="text-center">
               <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-36 mx-auto mb-2" />
-              <h3 className="font-bold text-primary text-lg">{CONTRACT_TITLE}</h3>
+              <h3 className="font-bold text-primary">{CONTRACT_TITLE}</h3>
               <p className="text-xs text-muted-foreground">{CONTRACT_SUBTITLE}</p>
             </div>
 
-            {/* Member data summary */}
-            <div className="mx-4 sm:mx-6 mt-4 bg-muted/50 rounded-lg p-3 text-sm">
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
               <p className="font-semibold mb-1">Seus Dados:</p>
               <p>{memberName} &bull; CPF: {memberCPF}</p>
               <p className="break-all">{memberEmail}</p>
@@ -413,128 +392,80 @@ export function StepContract({
               <p className="mt-2 pt-2 border-t">
                 <span className="text-muted-foreground">Plano:</span>{' '}
                 <Badge variant={plan}>{planData.name}</Badge>{' '}
-                ({paymentType === 'monthly' ? 'Mensal' : 'Anual'}) -{' '}
-                <strong>{formatCurrency(price)}</strong>
+                ({paymentType === 'monthly' ? 'Mensal' : 'Anual'}) - <strong>{formatCurrency(price)}</strong>
               </p>
             </div>
 
-            {/* Scrollable contract text */}
-            <div
-              ref={scrollRef}
-              className="max-h-[50vh] overflow-y-auto overscroll-contain mx-4 sm:mx-6 mt-4 pr-2"
-            >
-              <div className="space-y-4 text-sm">
-                {CONTRACT_SECTIONS.map((s, i) => (
-                  <div key={i} className="pb-3 border-b border-border last:border-0">
-                    <h4 className="font-semibold mb-1">{s.title}</h4>
-                    {s.content.map((p, j) => (
-                      <p key={j} className="text-muted-foreground leading-relaxed">{p}</p>
-                    ))}
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-center text-xs text-muted-foreground py-2">— Fim do Regulamento —</p>
-
-              {/* Checkboxes */}
-              <div className="space-y-3 pb-4">
-                <label
-                  ref={checkboxRef}
-                  className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    acceptedTerms
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-primary/40 bg-primary/5 hover:bg-primary/10'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={acceptedTerms}
-                    onChange={(e) => setAcceptedTerms(e.target.checked)}
-                    className="mt-0.5 h-5 w-5 accent-primary cursor-pointer shrink-0"
-                  />
-                  <span className="text-sm font-medium">
-                    Li e concordo com todos os termos do regulamento acima
-                  </span>
-                </label>
-
-                <label
-                  className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                    acceptedPrivacy
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-primary/40 bg-primary/5 hover:bg-primary/10'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={acceptedPrivacy}
-                    onChange={(e) => setAcceptedPrivacy(e.target.checked)}
-                    className="mt-0.5 h-5 w-5 accent-primary cursor-pointer shrink-0"
-                  />
-                  <span className="text-sm font-medium">
-                    Aceito a{' '}
-                    <a href="/privacidade" target="_blank" className="text-primary underline">
-                      Politica de Privacidade
-                    </a>{' '}
-                    e autorizo o tratamento dos meus dados conforme a LGPD
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-4 sm:p-6 pt-4 border-t space-y-2">
-              {!scrolledToBottom && !canProceed && (
-                <button
-                  onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })}
-                  className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
-                >
-                  <ChevronDown className="h-4 w-4 animate-bounce" />
-                  Role ate o final para aceitar os termos
-                </button>
-              )}
-
-              <div className="flex gap-2">
-                <Button variant="outline" className="h-12" onClick={onBack}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Voltar
-                </Button>
-                <div className="flex-1" onClick={!canProceed ? handleDisabledContinueClick : undefined}>
-                  <Button
-                    className="w-full h-12 text-base font-semibold"
-                    disabled={!canProceed}
-                    onClick={() => setSubStep('sign')}
-                  >
-                    Continuar para Assinatura
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
+            <div className="space-y-4 text-sm">
+              {CONTRACT_SECTIONS.map((s, i) => (
+                <div key={i} className="pb-3 border-b border-border last:border-0">
+                  <h4 className="font-semibold mb-1">{s.title}</h4>
+                  {s.content.map((p, j) => (
+                    <p key={j} className="text-muted-foreground leading-relaxed">{p}</p>
+                  ))}
                 </div>
-              </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* ----------------------------------------------------------------- */}
-      {/* SUB-STEP: SIGN                                                     */}
-      {/* ----------------------------------------------------------------- */}
-      {subStep === 'sign' && (
-        <Card className="border-border/60">
-          <CardContent className="p-4 sm:p-6 space-y-4">
+            <p className="text-center text-xs text-muted-foreground py-2">— Fim do Regulamento —</p>
+
+            {/* Checkboxes */}
+            <div className="space-y-3">
+              <label ref={checkboxRef} className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                acceptedTerms
+                  ? 'border-green-500 bg-green-500/10'
+                  : 'border-primary/40 bg-primary/5 hover:bg-primary/10'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={e => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 accent-primary cursor-pointer shrink-0"
+                />
+                <span className="text-sm font-medium">
+                  Li e concordo com todos os termos do regulamento acima
+                </span>
+              </label>
+
+              <label className={`flex items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                acceptedPrivacy
+                  ? 'border-green-500 bg-green-500/10'
+                  : 'border-primary/40 bg-primary/5 hover:bg-primary/10'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={acceptedPrivacy}
+                  onChange={e => setAcceptedPrivacy(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 accent-primary cursor-pointer shrink-0"
+                />
+                <span className="text-sm font-medium">
+                  Aceito a{' '}
+                  <a href="/privacidade" target="_blank" className="text-primary underline">
+                    Política de Privacidade
+                  </a>{' '}
+                  e autorizo o tratamento dos meus dados conforme a LGPD
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 2: SIGN */}
+        {step === 'sign' && (
+          <div className="space-y-4">
             <div className="text-center">
               <h3 className="font-bold text-lg">Desenhe sua Assinatura</h3>
               <p className="text-sm text-muted-foreground">Use o mouse ou toque na tela</p>
             </div>
 
-            {/* Legal notice */}
             <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-xs text-blue-200">
               <Shield className="h-4 w-4 shrink-0 mt-0.5 text-blue-400" />
               <p>
-                Para validade juridica (Lei 14.063/2020), serao registrados: seu endereco IP,
-                informacoes do dispositivo, data/hora e um hash SHA-256 do documento.
+                Para validade jurídica (Lei 14.063/2020), serão registrados: seu endereço IP,
+                informações do dispositivo, data/hora e um hash SHA-256 do documento.
               </p>
             </div>
 
-            {/* Canvas container */}
             <div
               ref={canvasContainerRef}
               className="border-2 border-dashed border-primary/50 rounded-lg bg-white overflow-hidden cursor-crosshair"
@@ -550,14 +481,14 @@ export function StepContract({
             {!canvasReady && !canvasError && (
               <div className="text-center text-sm text-muted-foreground">
                 <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
-                Carregando area de assinatura...
+                Carregando área de assinatura...
               </div>
             )}
 
             {canvasError && (
               <div className="text-center p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
                 <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-2">
-                  Erro ao carregar area de assinatura
+                  Erro ao carregar área de assinatura
                 </p>
                 <Button
                   variant="outline"
@@ -575,36 +506,14 @@ export function StepContract({
             )}
 
             <p className="text-xs text-center text-muted-foreground">
-              Assinatura com validade juridica conforme Lei 14.063/2020
+              Assinatura com validade jurídica conforme Lei 14.063/2020
             </p>
+          </div>
+        )}
 
-            {/* Footer */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setSubStep('read')}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Voltar
-                </Button>
-                <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={clearSignature} disabled={!canvasReady}>
-                  <RotateCcw className="mr-1 h-4 w-4" />
-                  Limpar
-                </Button>
-              </div>
-              <Button className="flex-1 h-12 text-base font-semibold" onClick={confirmSignature} disabled={!canvasReady}>
-                Confirmar Assinatura
-                <Check className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* SUB-STEP: CONFIRM                                                  */}
-      {/* ----------------------------------------------------------------- */}
-      {subStep === 'confirm' && (
-        <Card className="border-border/60">
-          <CardContent className="p-4 sm:p-6 space-y-4">
+        {/* STEP 3: CONFIRM */}
+        {step === 'confirm' && (
+          <div className="space-y-4">
             <div className="text-center">
               <div className="h-14 w-14 mx-auto rounded-full bg-green-500/20 flex items-center justify-center mb-3">
                 <Check className="h-7 w-7 text-green-500" />
@@ -613,7 +522,6 @@ export function StepContract({
               <p className="text-sm text-muted-foreground">Confirme os dados abaixo</p>
             </div>
 
-            {/* Signature preview */}
             {signatureImage && (
               <div className="bg-white border-2 border-border rounded-lg p-4">
                 <p className="text-xs text-center text-muted-foreground mb-2">Sua assinatura:</p>
@@ -621,7 +529,6 @@ export function StepContract({
               </div>
             )}
 
-            {/* Summary */}
             <div className="bg-muted/50 rounded-lg p-4 text-sm space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Nome:</span>
@@ -642,49 +549,97 @@ export function StepContract({
             </div>
 
             <p className="text-xs text-center text-muted-foreground">
-              Documento com validade juridica conforme Lei 14.063/2020
+              Documento com validade jurídica conforme Lei 14.063/2020
             </p>
 
             {pdfUrl && (
-              <a
-                href={pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 text-primary text-sm hover:underline"
-              >
+              <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-primary text-sm hover:underline">
                 <Download className="h-4 w-4" /> Baixar contrato assinado
               </a>
             )}
+          </div>
+        )}
+      </div>
 
-            {/* Footer */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setSubStep('sign')} disabled={loading}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />
-                  Voltar
-                </Button>
-                <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={handleDownload} disabled={loading}>
-                  <Download className="mr-1 h-4 w-4" />
-                  PDF
+      {/* Footer - always visible */}
+      <div className="p-4 sm:p-6 border-t shrink-0 bg-background shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] rounded-b-lg">
+        {step === 'read' && (
+          <div className="space-y-2">
+            {!scrolledToBottom && !canProceed && (
+              <button
+                onClick={() => checkboxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+              >
+                <ChevronDown className="h-4 w-4 animate-bounce" />
+                Role até o final para aceitar os termos
+              </button>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" className="h-12" onClick={onBack}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Voltar
+              </Button>
+              <div className="flex-1" onClick={!canProceed ? handleDisabledContinueClick : undefined}>
+                <Button
+                  className="w-full h-12 text-base font-semibold"
+                  disabled={!canProceed}
+                  onClick={() => setStep('sign')}
+                >
+                  Continuar para Assinatura
+                  <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </div>
-              <Button className="flex-1 h-12 text-base font-semibold" onClick={processContract} disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-5 w-5" />
-                    Finalizar Contrato
-                  </>
-                )}
+            </div>
+          </div>
+        )}
+
+        {step === 'sign' && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setStep('read')}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Voltar
+              </Button>
+              <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={clearSignature} disabled={!canvasReady}>
+                <RotateCcw className="mr-1 h-4 w-4" />
+                Limpar
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-    </motion.div>
+            <Button className="flex-1 h-12 text-base font-semibold" onClick={confirmSignature} disabled={!canvasReady}>
+              Confirmar Assinatura
+              <Check className="ml-2 h-5 w-5" />
+            </Button>
+          </div>
+        )}
+
+        {step === 'confirm' && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setStep('sign')} disabled={loading}>
+                <ArrowLeft className="mr-1 h-4 w-4" />
+                Voltar
+              </Button>
+              <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={handleDownload} disabled={loading}>
+                <Download className="mr-1 h-4 w-4" />
+                PDF
+              </Button>
+            </div>
+            <Button className="flex-1 h-12 text-base font-semibold" onClick={processContract} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-5 w-5" />
+                  Finalizar Contrato
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

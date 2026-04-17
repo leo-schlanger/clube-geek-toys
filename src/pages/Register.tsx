@@ -11,9 +11,11 @@ import { PLANS, type PlanType, type PaymentType, type ContractData } from '../ty
 import { formatCurrency } from '../lib/utils'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, Loader2, AlertTriangle } from 'lucide-react'
 import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
+import { SectionErrorBoundary } from '../components/ui/section-error-boundary'
 
 // Registration step components
 import { RegistrationStepper } from '../components/registration/RegistrationStepper'
@@ -445,17 +447,33 @@ export default function Register() {
 
         {/* Step 2: Contract */}
         {step === 2 && memberData.memberId && (
-          <StepContract
-            memberId={memberData.memberId}
-            memberName={memberData.fullName}
-            memberCPF={memberData.cpf}
-            memberEmail={memberData.email}
-            memberPhone={memberData.phone}
-            plan={selectedPlan}
-            paymentType={paymentType}
-            onSigned={handleContractSigned}
-            onBack={() => setStep(1)}
-          />
+          <SectionErrorBoundary fallbackMessage="Erro ao carregar o contrato. Tente recarregar a pagina.">
+            <StepContract
+              memberId={memberData.memberId}
+              memberName={memberData.fullName}
+              memberCPF={memberData.cpf}
+              memberEmail={memberData.email}
+              memberPhone={memberData.phone}
+              plan={selectedPlan}
+              paymentType={paymentType}
+              onSigned={handleContractSigned}
+              onBack={() => setStep(1)}
+            />
+          </SectionErrorBoundary>
+        )}
+
+        {/* Step 2: Missing member data fallback */}
+        {step === 2 && !memberData.memberId && (
+          <Card className="border-red-500/50 bg-red-500/10">
+            <CardContent className="p-6 text-center space-y-3">
+              <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
+              <p className="text-sm font-medium">Dados do membro nao encontrados.</p>
+              <p className="text-xs text-muted-foreground">Por favor, volte e preencha seus dados novamente.</p>
+              <Button variant="outline" onClick={() => { setStep(1); setAccountCreated(true) }}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para dados
+              </Button>
+            </CardContent>
+          </Card>
         )}
 
         {/* Step 3: Payment */}

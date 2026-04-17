@@ -2,7 +2,7 @@
  * Contract Storage — API-based (PostgreSQL + file storage on VPS)
  */
 
-import { api } from './api-client'
+import { api, getAccessToken, API_URL } from './api-client'
 import type { ContractData, Contract } from '../types'
 
 /**
@@ -19,10 +19,9 @@ export async function uploadContractPDF(
     formData.append('pdf', blob, `contract-${memberId}.pdf`)
     formData.append('memberId', memberId)
 
-    const { getAccessToken, API_URL: apiUrl } = await import('./api-client')
     const token = getAccessToken()
 
-    const response = await fetch(`${apiUrl}/contracts`, {
+    const response = await fetch(`${API_URL}/contracts`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: formData,
@@ -88,7 +87,6 @@ export async function storeContract(
   contractData: ContractData,
   pdfBytes: Uint8Array
 ): Promise<{ contractId: string; pdfUrl: string }> {
-  const { getAccessToken, API_URL: apiUrl } = await import('./api-client')
   const token = getAccessToken()
 
   const blob = new Blob([pdfBytes], { type: 'application/pdf' })
@@ -107,7 +105,7 @@ export async function storeContract(
     formData.append('signaturePreview', contractData.signatureImage.substring(0, 100))
   }
 
-  const response = await fetch(`${apiUrl}/contracts`, {
+  const response = await fetch(`${API_URL}/contracts`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     credentials: 'include',
