@@ -16,8 +16,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { PLANS, type PlanType, type PaymentType } from "../../types"
-import { validateCPF, formatCurrency, cn } from "../../lib/utils"
+import { validateCPF, cn } from "../../lib/utils"
 import {
   fullCPFValidation,
   type CPFValidationResult,
@@ -46,8 +45,6 @@ interface StepPersonalDataProps {
     fullName: string
     cpf: string
     phone: string
-    plan: PlanType
-    paymentType: PaymentType
   }) => void
   onBack: () => void
   loading: boolean
@@ -55,16 +52,12 @@ interface StepPersonalDataProps {
     fullName?: string
     cpf?: string
     phone?: string
-    plan?: PlanType
-    paymentType?: PaymentType
   }
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const PLAN_ORDER: PlanType[] = ["silver", "gold", "black"]
 
 function maskCPF(value: string): string {
   const digits = value.replace(/\D/g, "").slice(0, 11)
@@ -80,13 +73,6 @@ function maskPhone(value: string): string {
   if (digits.length <= 2) return digits
   if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
-}
-
-function annualSavingsPercent(plan: PlanType): number {
-  const p = PLANS[plan]
-  const fullAnnual = p.priceMonthly * 12
-  if (fullAnnual === 0) return 0
-  return Math.round(((fullAnnual - p.priceAnnual) / fullAnnual) * 100)
 }
 
 // ---------------------------------------------------------------------------
@@ -107,13 +93,6 @@ export function StepPersonalData({
   loading,
   defaultValues,
 }: StepPersonalDataProps) {
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>(
-    defaultValues?.plan ?? "gold"
-  )
-  const [paymentType, setPaymentType] = useState<PaymentType>(
-    defaultValues?.paymentType ?? "monthly"
-  )
-
   // CPF async validation state
   const [cpfStatus, setCpfStatus] = useState<
     "idle" | "loading" | "valid" | "warning" | "error"
@@ -240,8 +219,6 @@ export function StepPersonalData({
       fullName: sanitizeName(data.fullName),
       cpf: normalizeCPF(data.cpf),
       phone: normalizePhone(data.phone),
-      plan: selectedPlan,
-      paymentType,
     })
   }
 
@@ -374,86 +351,6 @@ export function StepPersonalData({
           {errors.phone && (
             <p className="text-xs text-red-500">{errors.phone.message}</p>
           )}
-        </div>
-
-        {/* ---- Plan selection ---- */}
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-foreground">
-            Escolha seu plano
-          </label>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {PLAN_ORDER.map((planId) => {
-              const plan = PLANS[planId]
-              const isSelected = selectedPlan === planId
-              const price =
-                paymentType === "monthly"
-                  ? plan.priceMonthly
-                  : plan.priceAnnual
-
-              return (
-                <button
-                  key={planId}
-                  type="button"
-                  onClick={() => setSelectedPlan(planId)}
-                  className={cn(
-                    "rounded-lg border-2 p-4 text-left transition-all",
-                    isSelected
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50"
-                  )}
-                >
-                  <div className="mb-1 text-lg font-bold">{plan.name}</div>
-                  <div className="mb-2 text-xl font-semibold text-primary">
-                    {formatCurrency(price)}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      /{paymentType === "monthly" ? "mes" : "ano"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {plan.benefits[0]}
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* ---- Payment type toggle ---- */}
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-foreground">
-            Frequencia de pagamento
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setPaymentType("monthly")}
-              className={cn(
-                "flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-                paymentType === "monthly"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Mensal
-            </button>
-            <button
-              type="button"
-              onClick={() => setPaymentType("annual")}
-              className={cn(
-                "flex-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors",
-                paymentType === "annual"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Anual
-              {annualSavingsPercent(selectedPlan) > 0 && (
-                <span className="ml-2 rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                  Economize {annualSavingsPercent(selectedPlan)}%
-                </span>
-              )}
-            </button>
-          </div>
         </div>
 
         {/* ---- Footer buttons ---- */}

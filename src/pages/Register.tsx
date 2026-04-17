@@ -19,7 +19,6 @@ import { Card, CardContent } from '../components/ui/card'
 import { RegistrationStepper } from '../components/registration/RegistrationStepper'
 import { StepAccount } from '../components/registration/StepAccount'
 import { StepPersonalData } from '../components/registration/StepPersonalData'
-import { StepEmailVerification } from '../components/registration/StepEmailVerification'
 import { StepContract } from '../components/registration/StepContract'
 import { StepPayment } from '../components/registration/StepPayment'
 
@@ -29,12 +28,17 @@ const DRAFT_KEY = 'clube_geek_register_draft'
 export default function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { signUp, signInWithGoogle, user, sendVerificationEmail, refreshUser, emailVerified } = useAuth()
+  const { signUp, signInWithGoogle, user, sendVerificationEmail, emailVerified } = useAuth()
 
   // ─── State ──────────────────────────────────────────────────────────────────
-  const [step, setStep] = useState(1) // 1=Account, 2=PersonalData, 3=Email, 4=Contract, 5=Payment
+  // 3 steps: 1=Conta+Dados, 2=Contrato, 3=Pagamento
+  // Email verification happens AFTER payment (in dashboard), not during signup.
+  const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
+
+  // Sub-step within step 1: 'account' (email+password) or 'data' (name, CPF, phone)
+  const [accountCreated, setAccountCreated] = useState(false)
 
   // Member data accumulated across steps
   const [memberData, setMemberData] = useState({
@@ -44,12 +48,10 @@ export default function Register() {
     phone: '',
     memberId: '',
   })
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>(
-    (searchParams.get('plano') as PlanType) || 'silver'
-  )
-  const [paymentType, setPaymentType] = useState<PaymentType>(
-    (searchParams.get('tipo') as PaymentType) || 'monthly'
-  )
+
+  // Plan comes from URL (selected on /assinar page) — user does NOT pick again
+  const selectedPlan: PlanType = (searchParams.get('plano') as PlanType) || 'silver'
+  const paymentType: PaymentType = (searchParams.get('tipo') as PaymentType) || 'monthly'
 
   // Flow flags
   const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)
@@ -80,8 +82,6 @@ export default function Register() {
             phone: member.phone || '',
             memberId: member.id,
           })
-          setSelectedPlan(member.plan as PlanType)
-          setPaymentType(member.paymentType as PaymentType)
 
           if (member.status === 'active') {
             navigate('/membro', { replace: true })
@@ -90,29 +90,23 @@ export default function Register() {
 
           const contract = await getMemberContract(member.id)
           if (contract) {
-            completeStep(1); completeStep(2); completeStep(3); completeStep(4)
-            setStep(5)
-          } else if (emailVerified) {
-            completeStep(1); completeStep(2); completeStep(3)
-            setStep(4)
-          } else {
             completeStep(1); completeStep(2)
-            setStep(3)
+            setStep(3) // Go to payment
+          } else {
+            completeStep(1)
+            setStep(2) // Go to contract
           }
         } else if (user) {
-          // User has account but no member record
           setMemberData(prev => ({ ...prev, email: user.email }))
           setAccountAlreadyExists(true)
-          setStep(2) // Skip account creation
-          completeStep(1)
+          setAccountCreated(true) // Skip to personal data sub-step
         }
       } catch (err) {
         logger.debug('No existing member found:', err)
         if (user) {
           setMemberData(prev => ({ ...prev, email: user.email }))
           setAccountAlreadyExists(true)
-          setStep(2)
-          completeStep(1)
+          setAccountCreated(true)
         }
       } finally {
         setInitialCheckDone(true)
@@ -135,20 +129,16 @@ export default function Register() {
     } catch { /* ignore corrupt data */ }
   }, [])
 
-  // Save draft on step 1-2 data changes
   useEffect(() => {
-    if (step > 2 || !memberData.fullName) return
+    if (step > 1 || !memberData.fullName) return
     const timeout = setTimeout(() => {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         fullName: memberData.fullName,
         phone: memberData.phone,
-        plan: selectedPlan,
-        paymentType,
-        step,
       }))
     }, 2000)
     return () => clearTimeout(timeout)
-  }, [memberData.fullName, memberData.phone, selectedPlan, paymentType, step])
+  }, [memberData.fullName, memberData.phone, step])
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function completeStep(n: number) {
@@ -161,8 +151,6 @@ export default function Register() {
       if (raw) {
         const draft = JSON.parse(raw)
         if (draft.fullName) setMemberData(prev => ({ ...prev, fullName: draft.fullName, phone: draft.phone || '' }))
-        if (draft.plan) setSelectedPlan(draft.plan)
-        if (draft.paymentType) setPaymentType(draft.paymentType)
         toast.success('Cadastro em andamento restaurado.')
       }
     } catch { /* ignore */ }
@@ -175,7 +163,7 @@ export default function Register() {
     toast.info('Formulario limpo.')
   }
 
-  // ─── Step handlers ────────────────────────────────────────────────────────
+  // ─── Step 1a: Account creation ────────────────────────────────────────────
 
   const handleAccountCreated = useCallback(async (data: { email: string; password: string }) => {
     if (isSubmittingRef.current) return
@@ -183,7 +171,6 @@ export default function Register() {
     setLoading(true)
 
     try {
-      // Validate email
       toast.loading('Validando email...', { id: 'reg-progress' })
       const emailResult = await validateEmail(data.email)
       if (!emailResult.valid) {
@@ -191,7 +178,6 @@ export default function Register() {
         return
       }
 
-      // Create account
       toast.loading('Criando sua conta...', { id: 'reg-progress' })
       const result = await signUp(data.email, data.password)
       if (!result.success) {
@@ -212,9 +198,11 @@ export default function Register() {
       }
 
       setMemberData(prev => ({ ...prev, email: data.email }))
-      toast.success('Conta criada!', { id: 'reg-progress' })
-      completeStep(1)
-      setStep(2)
+      setAccountCreated(true)
+      toast.success('Conta criada! Agora preencha seus dados.', { id: 'reg-progress' })
+
+      // Send verification email in background (user verifies later)
+      sendVerificationEmail().catch(() => {})
     } catch (error) {
       logger.error('Error creating account:', error)
       toast.error('Erro ao criar conta. Verifique sua conexao.', { id: 'reg-progress' })
@@ -222,7 +210,7 @@ export default function Register() {
       setLoading(false)
       isSubmittingRef.current = false
     }
-  }, [signUp, navigate])
+  }, [signUp, navigate, sendVerificationEmail])
 
   const handleGoogleSuccess = useCallback((data: Record<string, unknown>) => {
     const result = signInWithGoogle(data)
@@ -231,11 +219,10 @@ export default function Register() {
         setMemberData(prev => ({
           ...prev,
           fullName: result.googleName || '',
-          email: data.user?.email || '',
+          email: (data.user as Record<string, unknown>)?.email as string || '',
         }))
+        setAccountCreated(true)
         toast.success('Conta Google conectada! Complete seus dados.')
-        completeStep(1)
-        setStep(2)
       } else {
         toast.success('Bem-vindo de volta!')
         navigate('/membro')
@@ -245,15 +232,16 @@ export default function Register() {
     }
   }, [signInWithGoogle, navigate])
 
+  // ─── Step 1b: Personal data → create member ──────────────────────────────
+
   const handlePersonalDataComplete = useCallback(async (data: {
-    fullName: string; cpf: string; phone: string; plan: PlanType; paymentType: PaymentType
+    fullName: string; cpf: string; phone: string
   }) => {
     if (isSubmittingRef.current) return
     isSubmittingRef.current = true
     setLoading(true)
 
     try {
-      // Check CPF
       toast.loading('Verificando CPF...', { id: 'reg-progress' })
       let isRegistered: boolean
       try {
@@ -271,7 +259,6 @@ export default function Register() {
         return
       }
 
-      // Create member record
       toast.loading('Salvando dados...', { id: 'reg-progress' })
       const userId = user?.id || ''
       let member = null
@@ -285,8 +272,8 @@ export default function Register() {
               email: memberData.email || normalizeEmail(data.fullName),
               cpf: normalizeCPF(data.cpf),
               phone: data.phone,
-              plan: data.plan,
-              paymentType: data.paymentType,
+              plan: selectedPlan,
+              paymentType,
             }),
             new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 5000)),
           ])
@@ -306,26 +293,15 @@ export default function Register() {
           phone: data.phone,
           memberId: member!.id,
         }))
-        setSelectedPlan(data.plan)
-        setPaymentType(data.paymentType)
         localStorage.removeItem(DRAFT_KEY)
-
-        toast.success('Dados salvos! Verifique seu email.', { id: 'reg-progress' })
-
-        // Send verification email (non-blocking)
-        sendVerificationEmail().catch(err => {
-          logger.error('Erro ao enviar email de verificacao:', err)
-          toast.error('Nao foi possivel enviar o email de verificacao. Use o botao "Reenviar" abaixo.', { duration: 6000 })
-        })
-
-        completeStep(2)
-        setStep(3)
+        toast.success('Dados salvos!', { id: 'reg-progress' })
+        completeStep(1)
+        setStep(2) // Go to contract
       } else {
         logger.error('All member creation attempts failed:', lastError)
         toast.error('Erro ao criar seu cadastro. Por favor, tente novamente.', {
           id: 'reg-progress',
           duration: 8000,
-          description: 'Se o problema persistir, entre em contato com o suporte.',
         })
       }
     } catch (error) {
@@ -335,28 +311,17 @@ export default function Register() {
       setLoading(false)
       isSubmittingRef.current = false
     }
-  }, [user, memberData.email, sendVerificationEmail])
+  }, [user, memberData.email, selectedPlan, paymentType])
 
-  const handleEmailVerified = useCallback(() => {
-    completeStep(3)
-    setStep(4)
-  }, [])
-
-  const handleResendVerification = useCallback(async () => {
-    const result = await sendVerificationEmail()
-    if (result.success) {
-      toast.success('Email de verificacao reenviado!')
-    } else {
-      toast.error(result.error || 'Erro ao reenviar email.')
-    }
-    return result
-  }, [sendVerificationEmail])
+  // ─── Step 2: Contract signed ─────────────────────────────────────────────
 
   const handleContractSigned = useCallback((_contractData: ContractData) => {
-    completeStep(4)
-    setStep(5)
+    completeStep(2)
+    setStep(3)
     toast.success('Contrato assinado! Finalizando pagamento...')
   }, [])
+
+  // ─── Step 3: Payment success ─────────────────────────────────────────────
 
   const handlePaymentSuccess = useCallback(() => {
     toast.success('Pagamento recebido! Estamos ativando sua conta...', {
@@ -366,7 +331,7 @@ export default function Register() {
     setTimeout(() => navigate('/membro'), 3000)
   }, [navigate])
 
-  // ─── Loading state while checking existing member ────────────────────────
+  // ─── Loading state ───────────────────────────────────────────────────────
   if (user && !initialCheckDone) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -377,6 +342,16 @@ export default function Register() {
       </div>
     )
   }
+
+  // ─── Step titles ─────────────────────────────────────────────────────────
+  const stepTitle = step === 1
+    ? (accountCreated ? 'Seus Dados' : 'Criar Conta')
+    : step === 2 ? 'Contrato' : 'Pagamento'
+
+  const stepSubtitle = step === 1
+    ? (accountCreated ? 'Preencha seus dados pessoais' : 'Crie sua conta para comecar')
+    : step === 2 ? 'Leia e assine o contrato de adesao'
+    : 'Finalize o pagamento para ativar'
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -397,24 +372,12 @@ export default function Register() {
             <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-48 sm:w-56 mx-auto" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">
-            {step === 1 ? 'Criar Conta' :
-             step === 2 ? 'Seus Dados' :
-             step === 3 ? 'Verificar Email' :
-             step === 4 ? 'Contrato' :
-             'Pagamento'}
+            {stepTitle}
           </h1>
-          <p className="text-muted-foreground mt-2">
-            {step <= 2
-              ? `Complete seu cadastro para ativar o plano ${plan.name}`
-              : step === 3
-              ? 'Confirme seu email para continuar'
-              : step === 4
-              ? 'Leia e assine o contrato de adesao'
-              : 'Finalize o pagamento para ativar seus beneficios'}
-          </p>
+          <p className="text-muted-foreground mt-2">{stepSubtitle}</p>
         </div>
 
-        {/* Stepper */}
+        {/* Stepper — 3 steps */}
         <div className="mb-6">
           <RegistrationStepper currentStep={step} completedSteps={completedSteps} />
         </div>
@@ -435,21 +398,15 @@ export default function Register() {
         </Card>
 
         {/* Draft prompt */}
-        {showDraftPrompt && step <= 2 && (
+        {showDraftPrompt && step === 1 && (
           <Card className="mb-4 border-yellow-500/50 bg-yellow-500/10">
             <CardContent className="p-4">
               <p className="text-sm font-medium mb-2">Encontramos um cadastro em andamento. Deseja continuar?</p>
               <div className="flex gap-2">
-                <button
-                  className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
-                  onClick={loadDraft}
-                >
+                <button className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={loadDraft}>
                   Sim, continuar
                 </button>
-                <button
-                  className="px-3 py-1.5 text-sm font-medium rounded-md border border-border hover:bg-muted"
-                  onClick={discardDraft}
-                >
+                <button className="px-3 py-1.5 text-sm font-medium rounded-md border border-border hover:bg-muted" onClick={discardDraft}>
                   Nao, comecar novo
                 </button>
               </div>
@@ -457,8 +414,8 @@ export default function Register() {
           </Card>
         )}
 
-        {/* Step Content */}
-        {step === 1 && (
+        {/* Step 1: Account + Personal Data */}
+        {step === 1 && !accountCreated && (
           <StepAccount
             onNext={handleAccountCreated}
             onGoogleSuccess={handleGoogleSuccess}
@@ -467,15 +424,14 @@ export default function Register() {
           />
         )}
 
-        {step === 2 && (
+        {step === 1 && accountCreated && (
           <StepPersonalData
             onNext={handlePersonalDataComplete}
             onBack={() => {
               if (accountAlreadyExists) {
-                // Can't go back to account creation if account already exists
                 toast.info('Sua conta ja existe. Complete os dados abaixo.')
               } else {
-                setStep(1)
+                setAccountCreated(false)
               }
             }}
             loading={loading}
@@ -483,23 +439,12 @@ export default function Register() {
               fullName: memberData.fullName,
               cpf: memberData.cpf,
               phone: memberData.phone,
-              plan: selectedPlan,
-              paymentType,
             }}
           />
         )}
 
-        {step === 3 && (
-          <StepEmailVerification
-            email={memberData.email}
-            onVerified={handleEmailVerified}
-            onResend={handleResendVerification}
-            onRefreshUser={refreshUser}
-            emailVerified={emailVerified}
-          />
-        )}
-
-        {step === 4 && memberData.memberId && (
+        {/* Step 2: Contract */}
+        {step === 2 && memberData.memberId && (
           <StepContract
             memberId={memberData.memberId}
             memberName={memberData.fullName}
@@ -509,18 +454,19 @@ export default function Register() {
             plan={selectedPlan}
             paymentType={paymentType}
             onSigned={handleContractSigned}
-            onBack={() => setStep(3)}
+            onBack={() => setStep(1)}
           />
         )}
 
-        {step === 5 && (
+        {/* Step 3: Payment */}
+        {step === 3 && (
           <StepPayment
             plan={selectedPlan}
             paymentType={paymentType}
             memberId={memberData.memberId}
             memberEmail={memberData.email}
             onSuccess={handlePaymentSuccess}
-            onBack={() => setStep(4)}
+            onBack={() => setStep(2)}
           />
         )}
 

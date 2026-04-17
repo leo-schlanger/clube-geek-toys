@@ -3,15 +3,13 @@ import {
   Check,
   CreditCard,
   FileText,
-  MailCheck,
   User,
-  UserCheck,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 interface RegistrationStepperProps {
-  currentStep: number // 1-5
+  currentStep: number // 1-3
   completedSteps: Set<number>
 }
 
@@ -21,9 +19,7 @@ interface StepDef {
 }
 
 const steps: StepDef[] = [
-  { label: "Conta", icon: User },
-  { label: "Dados", icon: UserCheck },
-  { label: "Email", icon: MailCheck },
+  { label: "Cadastro", icon: User },
   { label: "Contrato", icon: FileText },
   { label: "Pagamento", icon: CreditCard },
 ]

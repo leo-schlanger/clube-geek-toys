@@ -6,11 +6,10 @@ import { Badge } from '../components/ui/badge'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { Check, X, Crown, Star, Sparkles, ArrowRight, Shield, Zap, Gift, CreditCard } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import RadioMiniPlayer from '../components/RadioMiniPlayer'
 
 export default function Subscribe() {
-  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null)
   const [paymentType, setPaymentType] = useState<PaymentType>('monthly')
 
   const planIcons = {
@@ -220,7 +219,6 @@ export default function Subscribe() {
         <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
           {(Object.keys(PLANS) as PlanType[]).map((planId, index) => {
             const plan = PLANS[planId]
-            const isSelected = selectedPlan === planId
             const isPopular = planId === 'gold'
 
             return (
@@ -233,11 +231,9 @@ export default function Subscribe() {
                 whileHover={{ scale: 1.03 }}
               >
                 <Card
-                  className={`relative overflow-hidden transition-all duration-300 cursor-pointer flex flex-col h-full group
-                    hover:shadow-lg hover:shadow-primary/10
-                    ${isSelected ? 'ring-2 ring-primary border-glow-primary' : 'hover:border-primary/50'}
-                    ${isPopular ? 'lg:-mt-4 lg:mb-4' : ''}`}
-                  onClick={() => setSelectedPlan(planId)}
+                  className={`relative overflow-hidden transition-all duration-300 flex flex-col h-full group
+                    hover:shadow-lg hover:shadow-primary/10 hover:border-primary/50
+                    ${isPopular ? 'lg:-mt-4 lg:mb-4 ring-2 ring-primary/50' : ''}`}
                 >
                   {/* "Mais Popular" badge — absolute top-right */}
                   {isPopular && (
@@ -309,20 +305,13 @@ export default function Subscribe() {
                   </CardContent>
 
                   <CardFooter className="p-5 sm:p-6 pt-0">
-                    <Button
-                      className={`w-full h-11 font-semibold transition-all ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-black hover:from-yellow-400 hover:to-amber-500'
-                          : ''
-                      }`}
-                      variant={isSelected ? 'default' : 'outline'}
-                    >
-                      {isSelected ? (
-                        <><Check className="mr-2 h-4 w-4" /> Selecionado</>
-                      ) : (
-                        'Selecionar'
-                      )}
-                    </Button>
+                    <Link to={`/cadastro?plano=${planId}&tipo=${paymentType}`} className="w-full">
+                      <Button
+                        className="w-full h-11 font-semibold bg-gradient-to-r from-yellow-500 to-amber-600 text-black hover:from-yellow-400 hover:to-amber-500"
+                      >
+                        ASSINAR <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
                   </CardFooter>
                 </Card>
               </motion.div>
@@ -330,46 +319,6 @@ export default function Subscribe() {
           })}
         </div>
       </section>
-
-      {/* CTA section (visible on larger screens when plan selected) */}
-      <AnimatePresence>
-        {selectedPlan && (
-          <motion.section
-            className="py-6 px-4 sm:px-6 hidden sm:block"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-          >
-            <div className="max-w-lg mx-auto">
-              <Card className="border-primary/50 border-glow-primary bg-gradient-to-br from-card to-card/80">
-                <CardContent className="p-5 sm:p-6">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <p className="font-bold text-lg">
-                        Plano {PLANS[selectedPlan].name}
-                        <span className="text-muted-foreground font-normal text-sm ml-2">
-                          {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
-                        </span>
-                      </p>
-                      <p className="text-2xl font-extrabold text-primary">
-                        {formatCurrency(getPrice(selectedPlan))}
-                        <span className="text-sm font-normal text-muted-foreground">
-                          /{paymentType === 'monthly' ? 'mes' : 'ano'}
-                        </span>
-                      </p>
-                    </div>
-                    <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`}>
-                      <Button size="lg" className="btn-glow font-bold px-8 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black whitespace-nowrap">
-                        ASSINE AGORA <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
 
       {/* Feature Comparison Table */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 border-t border-border/30">
@@ -491,35 +440,6 @@ export default function Subscribe() {
           <Link to="/privacidade" className="text-muted-foreground hover:text-foreground">Privacidade</Link>
         </p>
       </footer>
-
-      {/* Sticky CTA on mobile */}
-      <AnimatePresence>
-        {selectedPlan && (
-          <motion.div
-            className="fixed bottom-0 inset-x-0 z-40 sm:hidden glass border-t border-border/50 p-3"
-            initial={{ y: 80 }}
-            animate={{ y: 0 }}
-            exit={{ y: 80 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-bold truncate">
-                  {PLANS[selectedPlan].name} <span className="text-muted-foreground font-normal text-xs">{paymentType === 'monthly' ? 'Mensal' : 'Anual'}</span>
-                </p>
-                <p className="text-lg font-extrabold text-primary">
-                  {formatCurrency(getPrice(selectedPlan))}
-                </p>
-              </div>
-              <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`}>
-                <Button size="lg" className="btn-glow font-bold px-6 h-11 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black whitespace-nowrap text-sm">
-                  ASSINAR <ArrowRight className="ml-1.5 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Radio Geek & Toys -- mini-player flutuante (portfolio publico) */}
       <RadioMiniPlayer />
