@@ -1,9 +1,12 @@
-import { useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { DataTable, type Column, type FilterConfig } from './DataTable'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { PLANS, type Member, type PlanType } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
+import { api } from '../lib/api-client'
+import { toast } from 'sonner'
+import { useConfirm } from '../hooks/useConfirm'
 import {
   Eye,
   Edit,
@@ -15,6 +18,9 @@ import {
   Plus,
   Mail,
   MoreHorizontal,
+  CheckSquare,
+  Power,
+  PowerOff,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -34,6 +40,7 @@ interface MembersTableProps {
   onActivate: (member: Member) => void
   onCreate: () => void
   onResendEmail?: (member: Member, type: 'verification' | 'welcome' | 'renewal') => void
+  onRefetch?: () => void
 }
 
 // Plan icons (memoized outside component)
@@ -52,10 +59,97 @@ export function MembersTable({
   onActivate,
   onCreate,
   onResendEmail,
+  onRefetch,
 }: MembersTableProps) {
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const confirm = useConfirm()
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === members.length) {
+        return new Set()
+      }
+      return new Set(members.map((m) => m.id))
+    })
+  }, [members])
+
+  const handleBulkStatusChange = useCallback(
+    async (status: 'active' | 'inactive') => {
+      const label = status === 'active' ? 'ativar' : 'desativar'
+      const ok = await confirm({
+        title: `${status === 'active' ? 'Ativar' : 'Desativar'} ${selectedIds.size} membro(s)?`,
+        description: `Tem certeza que deseja ${label} os ${selectedIds.size} membros selecionados?`,
+        confirmText: status === 'active' ? 'Ativar' : 'Desativar',
+        variant: status === 'inactive' ? 'destructive' : 'default',
+      })
+      if (!ok) return
+
+      setBulkLoading(true)
+      let successCount = 0
+      let errorCount = 0
+
+      for (const id of selectedIds) {
+        const result = await api.patch(`/members/${id}`, { status })
+        if (result.error) {
+          errorCount++
+        } else {
+          successCount++
+        }
+      }
+
+      setBulkLoading(false)
+      setSelectedIds(new Set())
+
+      if (errorCount === 0) {
+        toast.success(`${successCount} membro(s) ${status === 'active' ? 'ativado(s)' : 'desativado(s)'} com sucesso`)
+      } else {
+        toast.warning(`${successCount} sucesso, ${errorCount} erro(s)`)
+      }
+
+      onRefetch?.()
+    },
+    [selectedIds, confirm, onRefetch]
+  )
+
+  const handleBulkEmail = useCallback(() => {
+    toast.info('Funcionalidade em desenvolvimento')
+  }, [])
+
   // Table columns configuration
   const columns: Column<Member>[] = useMemo(
     () => [
+      {
+        key: '_select',
+        header: '',
+        width: '40px',
+        className: 'text-center',
+        render: (member) => (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(member.id)}
+            onChange={(e) => {
+              e.stopPropagation()
+              toggleSelect(member.id)
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded border-border cursor-pointer"
+            aria-label={`Selecionar ${member.fullName}`}
+          />
+        ),
+      },
       {
         key: 'fullName',
         header: 'Membro',
@@ -136,7 +230,7 @@ export function MembersTable({
         ),
       },
     ],
-    [onActivate]
+    [onActivate, selectedIds, toggleSelect]
   )
 
   // Filter configuration
@@ -313,6 +407,65 @@ export function MembersTable({
           Novo Membro
         </Button>
       </div>
+
+      {/* Select all + Bulk actions bar */}
+      {members.length > 0 && (
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selectedIds.size === members.length && members.length > 0}
+              ref={(el) => {
+                if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < members.length
+              }}
+              onChange={toggleSelectAll}
+              className="rounded border-border cursor-pointer"
+              aria-label="Selecionar todos"
+            />
+            Selecionar todos
+          </label>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 ml-auto px-4 py-2 bg-muted/60 border rounded-lg animate-in fade-in slide-in-from-bottom-2">
+              <span className="text-sm font-medium flex items-center gap-1.5">
+                <CheckSquare className="h-4 w-4" />
+                {selectedIds.size} selecionado(s)
+              </span>
+              <div className="h-4 w-px bg-border mx-1" />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkLoading}
+                onClick={() => handleBulkStatusChange('active')}
+                className="gap-1.5"
+              >
+                <Power className="h-3.5 w-3.5" />
+                Ativar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkLoading}
+                onClick={() => handleBulkStatusChange('inactive')}
+                className="gap-1.5"
+              >
+                <PowerOff className="h-3.5 w-3.5" />
+                Desativar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={bulkLoading}
+                onClick={handleBulkEmail}
+                className="gap-1.5"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                Email
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Data table */}
       <DataTable

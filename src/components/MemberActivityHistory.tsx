@@ -64,9 +64,11 @@ function formatRelativeTime(dateString: string): string {
 
 interface MemberActivityHistoryProps {
   memberId: string
+  /** Max items to fetch and display. When set, the "show all" toggle is hidden. */
+  limit?: number
 }
 
-export function MemberActivityHistory({ memberId }: MemberActivityHistoryProps) {
+export function MemberActivityHistory({ memberId, limit }: MemberActivityHistoryProps) {
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
@@ -74,14 +76,14 @@ export function MemberActivityHistory({ memberId }: MemberActivityHistoryProps) 
   useEffect(() => {
     async function fetchLogs() {
       setLoading(true)
-      const memberLogs = await getMemberLogs(memberId, 20)
+      const memberLogs = await getMemberLogs(memberId, limit ?? 20)
       setLogs(memberLogs)
       setLoading(false)
     }
     fetchLogs()
-  }, [memberId])
+  }, [memberId, limit])
 
-  const displayedLogs = showAll ? logs : logs.slice(0, 5)
+  const displayedLogs = limit ? logs : (showAll ? logs : logs.slice(0, 5))
 
   if (loading) {
     return (
@@ -162,7 +164,7 @@ export function MemberActivityHistory({ memberId }: MemberActivityHistoryProps) 
               })}
             </div>
 
-            {logs.length > 5 && (
+            {!limit && logs.length > 5 && (
               <Button
                 variant="ghost"
                 size="sm"

@@ -1,66 +1,34 @@
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
-import { QRCodeSVG } from 'qrcode.react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
-import { LoadingPage, Loading } from '../components/ui/loading'
-// Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
-const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
-const UpgradeModal = lazy(() => import('../components/UpgradeModal').then(m => ({ default: m.UpgradeModal })))
-const ProfileEditModal = lazy(() => import('../components/ProfileEditModal').then(m => ({ default: m.ProfileEditModal })))
-import { MemberActivityHistory } from '../components/MemberActivityHistory'
+import { LoadingPage } from '../components/ui/loading'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
-import { SubscriptionManagement } from '../components/SubscriptionManagement'
-import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type PointTransaction, type Subscription } from '../types'
-import { formatCurrency, formatCPF, calculateDaysUntilExpiry, getStatusLabel } from '../lib/utils'
+import { MemberHeroCard } from '../components/member/MemberHeroCard'
+import { DashboardOverviewTab } from '../components/member/DashboardOverviewTab'
+import { DashboardPointsTab } from '../components/member/DashboardPointsTab'
+import { DashboardSubscriptionTab } from '../components/member/DashboardSubscriptionTab'
+import { DashboardHistoryTab } from '../components/member/DashboardHistoryTab'
+import type { Member, PointTransaction, Subscription, Contract } from '../types'
+import { calculateDaysUntilExpiry } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
-import { resendContractEmail } from '../lib/email'
-import type { Contract } from '../types'
-import {
-  getPointsHistory,
-  getExpiringPoints,
-  getRedemptionRules,
-  formatPoints,
-} from '../lib/points'
-import {
-  getActiveSubscriptionByMemberId,
-  getSubscriptionStatusLabel,
-  formatNextPaymentDate,
-} from '../lib/subscriptions'
+import { getPointsHistory, getExpiringPoints } from '../lib/points'
+import { getActiveSubscriptionByMemberId } from '../lib/subscriptions'
 import { toast } from 'sonner'
 import {
-  CreditCard,
-  Calendar,
-  Gift,
-  Star,
-  Crown,
-  Sparkles,
   LogOut,
   Settings,
   RefreshCw,
   AlertTriangle,
-  CheckCircle,
-  Clock,
-  ArrowUp,
-  Share2,
-  User,
-  Mail,
-  Phone,
-  Copy,
-  Coins,
-  TrendingUp,
-  History,
-  ChevronDown,
-  ChevronUp,
-  Edit,
-  Repeat,
-  FileText,
-  Download,
-  Send,
 } from 'lucide-react'
+
+// Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
+const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
+const UpgradeModal = lazy(() => import('../components/UpgradeModal').then(m => ({ default: m.UpgradeModal })))
+const ProfileEditModal = lazy(() => import('../components/ProfileEditModal').then(m => ({ default: m.ProfileEditModal })))
 
 type ModalType = 'renew' | 'upgrade' | 'profile' | null
 
@@ -69,18 +37,11 @@ export default function MemberDashboard() {
   const [member, setMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalType>(null)
-  const [copied, setCopied] = useState(false)
   const [pointsHistory, setPointsHistory] = useState<PointTransaction[]>([])
   const [expiringPoints, setExpiringPoints] = useState<PointTransaction[]>([])
   const [loadingPoints, setLoadingPoints] = useState(false)
-  const [showAllHistory, setShowAllHistory] = useState(false)
-  const [showRedemptionRules, setShowRedemptionRules] = useState(false)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [showSubscription, setShowSubscription] = useState(false)
   const [contract, setContract] = useState<Contract | null>(null)
-  const [resendingContract, setResendingContract] = useState(false)
-  // Distinguishes "no member yet (empty state)" from "API error" — the former offers
-  // to subscribe, the latter offers to retry. They look identical in the user's mind otherwise.
   const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -88,7 +49,7 @@ export default function MemberDashboard() {
       fetchMemberData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]) // fetchMemberData uses user internally
+  }, [user])
 
   // Auto-poll while member status is pending (waiting for webhook activation)
   useEffect(() => {
@@ -124,7 +85,7 @@ export default function MemberDashboard() {
       }
     } catch (error) {
       logger.error('Error fetching member data:', error)
-      setFetchError('Não conseguimos carregar seus dados. Verifique sua conexão e tente novamente.')
+      setFetchError('Nao conseguimos carregar seus dados. Verifique sua conexao e tente novamente.')
       toast.error('Erro ao carregar dados')
     } finally {
       setLoading(false)
@@ -135,101 +96,13 @@ export default function MemberDashboard() {
     setModal(null)
     fetchMemberData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // fetchMemberData is stable
-
-  const copyMemberId = useCallback(() => {
-    if (member) {
-      navigator.clipboard.writeText(member.id)
-      setCopied(true)
-      toast.success('ID copiado!')
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }, [member])
-
-  const shareCard = useCallback(() => {
-    if (navigator.share && member) {
-      navigator.share({
-        title: 'Minha Carteirinha Clube Geek & Toys',
-        text: `Sou membro ${PLANS[member.plan as PlanType].name} do Clube Geek & Toys!`,
-        url: window.location.href,
-      }).catch(() => {
-        // User cancelled or share not supported
-      })
-    } else {
-      copyMemberId()
-    }
-  }, [member, copyMemberId])
-
-  const handleResendContract = useCallback(async () => {
-    if (!contract || !member) return
-
-    setResendingContract(true)
-    try {
-      const result = await resendContractEmail(
-        member.email,
-        contract.memberName,
-        PLANS[contract.plan as PlanType].name,
-        contract.signedAt,
-        contract.documentHash,
-        contract.pdfUrl
-      )
-
-      if (result.success) {
-        toast.success('Contrato enviado para seu email!')
-      } else {
-        toast.error(result.error || 'Erro ao reenviar contrato')
-      }
-    } catch (error) {
-      logger.error('Error resending contract:', error)
-      toast.error('Erro ao reenviar contrato')
-    } finally {
-      setResendingContract(false)
-    }
-  }, [contract, member])
-
-  // Memoized computed values - must be called before any early returns
-  const expiringPointsTotal = useMemo(
-    () => expiringPoints.reduce((sum, t) => sum + t.points, 0),
-    [expiringPoints]
-  )
-  const redemptionRules = useMemo(() => getRedemptionRules(), [])
-  const displayedHistory = useMemo(
-    () => showAllHistory ? pointsHistory : pointsHistory.slice(0, 5),
-    [showAllHistory, pointsHistory]
-  )
-
-  function getTransactionIcon(type: string) {
-    switch (type) {
-      case 'earn':
-        return <TrendingUp className="h-4 w-4 text-green-500" />
-      case 'redeem':
-        return <Gift className="h-4 w-4 text-blue-500" />
-      case 'expire':
-        return <Clock className="h-4 w-4 text-red-500" />
-      default:
-        return <Coins className="h-4 w-4 text-muted-foreground" />
-    }
-  }
-
-  function getTransactionColor(type: string) {
-    switch (type) {
-      case 'earn':
-        return 'text-green-600'
-      case 'redeem':
-        return 'text-blue-600'
-      case 'expire':
-        return 'text-red-600'
-      default:
-        return 'text-muted-foreground'
-    }
-  }
+  }, [])
 
   if (loading) {
     return <LoadingPage />
   }
 
-  // Error state — distinct from "no member" empty state.
-  // Tells the user that something went wrong fetching, with retry as the primary CTA.
+  // Error state
   if (fetchError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -256,7 +129,7 @@ export default function MemberDashboard() {
     )
   }
 
-  // True empty state — user authenticated but has no member record yet.
+  // Empty state — no member record
   if (!member) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -270,7 +143,7 @@ export default function MemberDashboard() {
             </div>
             <CardTitle className="font-heading">Nenhuma assinatura encontrada</CardTitle>
             <CardDescription>
-              Você ainda não possui uma assinatura ativa. Assine agora e comece a aproveitar os benefícios!
+              Voce ainda nao possui uma assinatura ativa. Assine agora e comece a aproveitar os beneficios!
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -287,7 +160,7 @@ export default function MemberDashboard() {
     )
   }
 
-  // Show pending payment screen for members who haven't completed payment
+  // Pending payment screen
   if (member.status === 'pending') {
     return (
       <PendingPaymentScreen
@@ -297,40 +170,9 @@ export default function MemberDashboard() {
     )
   }
 
-  const plan = PLANS[member.plan as PlanType]
-  const multiplier = POINTS_MULTIPLIER[member.plan as PlanType]
   const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
   const isExpired = daysUntilExpiry <= 0
-
-  // QR Code data
-  const qrData = JSON.stringify({
-    id: member.id,
-    cpf: member.cpf,
-    plan: member.plan,
-    status: member.status,
-    expiry: member.expiryDate,
-    v: 1,
-  })
-
-  const planIcons = {
-    silver: <Star className="h-5 w-5" />,
-    gold: <Crown className="h-5 w-5" />,
-    black: <Sparkles className="h-5 w-5" />,
-  }
-
-  const planColors = {
-    silver: 'from-slate-400 to-slate-600',
-    gold: 'from-yellow-400 to-amber-600',
-    black: 'from-gray-700 to-gray-900',
-  }
-
-  const statusColors = {
-    active: 'success',
-    pending: 'warning',
-    inactive: 'destructive',
-    expired: 'destructive',
-  } as const
 
   return (
     <div className="min-h-screen bg-background">
@@ -345,11 +187,7 @@ export default function MemberDashboard() {
             <Button variant="ghost" size="icon" onClick={() => setModal('profile')} title="Editar Perfil">
               <Settings className="h-5 w-5" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={signOut}
-            >
+            <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
@@ -357,7 +195,7 @@ export default function MemberDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Status Alert */}
+        {/* Expiry Alert */}
         {(isExpired || isExpiringSoon) && (
           <div
             className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
@@ -371,16 +209,12 @@ export default function MemberDashboard() {
               {isExpired ? (
                 <>
                   <strong>Sua assinatura expirou!</strong>
-                  <p className="text-sm opacity-80">
-                    Renove agora para continuar aproveitando os benefícios.
-                  </p>
+                  <p className="text-sm opacity-80">Renove agora para continuar aproveitando os beneficios.</p>
                 </>
               ) : (
                 <>
                   <strong>Sua assinatura expira em {daysUntilExpiry} dias</strong>
-                  <p className="text-sm opacity-80">
-                    Renove agora e não perca seus benefícios.
-                  </p>
+                  <p className="text-sm opacity-80">Renove agora e nao perca seus beneficios.</p>
                 </>
               )}
             </div>
@@ -391,523 +225,63 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Digital Card */}
-          <div className="lg:col-span-1">
-            <Card className="overflow-hidden">
-              {/* Card header */}
-              <div className={`p-4 sm:p-6 text-white bg-gradient-to-br ${planColors[member.plan as PlanType]}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-8" />
-                  <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
-                    {planIcons[member.plan as PlanType]}
-                    {plan.name}
-                  </Badge>
-                </div>
-                <h2 className="text-lg sm:text-xl font-bold mb-1">{member.fullName}</h2>
-                <p className="text-sm opacity-80">{formatCPF(member.cpf)}</p>
-              </div>
-
-              <CardContent className="p-4 sm:p-6">
-                {/* QR Code */}
-                <div className="flex justify-center mb-4 sm:mb-6">
-                  <div className="bg-white p-4 rounded-xl shadow-lg">
-                    <QRCodeSVG value={qrData} size={180} level="H" includeMargin />
-                  </div>
-                </div>
-
-                {/* Status */}
-                <div className="text-center mb-4">
-                  <div className="flex items-center justify-center gap-2">
-                    {member.status === 'active' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <Clock className="h-5 w-5 text-yellow-500" />
-                    )}
-                    <Badge variant={statusColors[member.status]}>
-                      {getStatusLabel(member.status)}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Válido até {new Date(member.expiryDate).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-
-                {/* Discounts */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-500">{plan.discountProducts}%</p>
-                    <p className="text-xs text-muted-foreground">em produtos</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-500">{plan.discountServices}%</p>
-                    <p className="text-xs text-muted-foreground">em serviços</p>
-                  </div>
-                </div>
-
-                {/* Card actions */}
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={shareCard}>
-                    <Share2 className="h-4 w-4 mr-1" />
-                    Compartilhar
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1" onClick={copyMemberId}>
-                    {copied ? (
-                      <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4 mr-1" />
-                    )}
-                    {copied ? 'Copiado!' : 'Copiar ID'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Info Cards */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <Coins className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{formatPoints(member.points || 0)}</p>
-                    <p className="text-sm text-muted-foreground">Pontos ({multiplier}x)</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-green-500/10">
-                    <CreditCard className="h-6 w-6 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">
-                      {formatCurrency(
-                        member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {member.paymentType === 'monthly' ? '/mês' : '/ano'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-yellow-500/10">
-                    <Calendar className="h-6 w-6 text-yellow-500" />
-                  </div>
-                  <div>
-                    <p className={`text-2xl font-bold ${daysUntilExpiry <= 0 ? 'text-red-500' : daysUntilExpiry <= 7 ? 'text-yellow-500' : ''}`}>
-                      {daysUntilExpiry > 0 ? daysUntilExpiry : 0}
-                    </p>
-                    <p className="text-sm text-muted-foreground">dias restantes</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Subscription Status Card */}
-            {subscription && (
-              <Card className="hover:shadow-lg transition-shadow border-primary/20">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Repeat className="h-5 w-5 text-primary" />
-                      Assinatura Recorrente
-                    </CardTitle>
-                    <Badge variant={subscription.status === 'authorized' ? 'success' : subscription.status === 'paused' ? 'warning' : 'destructive'}>
-                      {getSubscriptionStatusLabel(subscription.status)}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Próxima cobrança</p>
-                      <p className="font-semibold">
-                        {subscription.status === 'authorized'
-                          ? formatNextPaymentDate(subscription)
-                          : subscription.status === 'paused'
-                          ? 'Pausada'
-                          : 'N/A'}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSubscription(!showSubscription)}
-                    >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Gerenciar
-                      {showSubscription ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
-                    </Button>
-                  </div>
-
-                  {subscription.failedPayments > 0 && (
-                    <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                        {subscription.failedPayments} tentativa(s) de cobrança falharam
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Subscription Management (expandable) */}
-            {showSubscription && subscription && (
-              <SubscriptionManagement
-                memberId={member.id}
-                memberPoints={member.points}
-                onSubscriptionChange={fetchMemberData}
-              />
-            )}
-
-            {/* Points Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Coins className="h-5 w-5" />
-                    Programa de Pontos
-                  </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowRedemptionRules(!showRedemptionRules)}
-                  >
-                    <Gift className="h-4 w-4 mr-1" />
-                    Resgates
-                    {showRedemptionRules ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
-                  </Button>
-                </div>
-                <CardDescription>
-                  Acumule pontos a cada compra e troque por descontos
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Points Info */}
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Coins className="h-5 w-5 text-primary" />
-                      <span className="font-semibold">Saldo Atual</span>
-                    </div>
-                    <p className="text-3xl font-bold text-primary">{formatPoints(member.points || 0)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Você ganha {multiplier}x pontos por real gasto
-                    </p>
-                  </div>
-
-                  {expiringPointsTotal > 0 && (
-                    <div className="flex-1 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="h-5 w-5 text-yellow-600" />
-                        <span className="font-semibold text-yellow-700 dark:text-yellow-400">Expirando em Breve</span>
-                      </div>
-                      <p className="text-3xl font-bold text-yellow-600">{formatPoints(expiringPointsTotal)}</p>
-                      <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                        Nos próximos 30 dias
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Redemption Rules */}
-                {showRedemptionRules && (
-                  <div className="p-4 bg-muted rounded-lg space-y-3 animate-in fade-in slide-in-from-top-2">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <Gift className="h-4 w-4" />
-                      Opções de Resgate
-                    </h4>
-                    <div className="grid sm:grid-cols-3 gap-3">
-                      {redemptionRules.map((rule, index) => {
-                        const isAvailable = (member.points || 0) >= rule.points
-                        return (
-                          <div
-                            key={index}
-                            className={`p-3 rounded-lg border text-center ${
-                              isAvailable
-                                ? 'bg-card border-green-200 dark:border-green-800'
-                                : 'bg-muted/50 border-border opacity-60'
-                            }`}
-                          >
-                            <p className="text-lg font-bold">{rule.description}</p>
-                            <p className="text-sm text-muted-foreground">{formatPoints(rule.points)} pontos</p>
-                            {isAvailable && (
-                              <Badge variant="success" className="mt-2">Disponível</Badge>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Para resgatar seus pontos, apresente sua carteirinha na loja
-                    </p>
-                  </div>
-                )}
-
-                {/* Points History */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <History className="h-4 w-4" />
-                      Extrato de Pontos
-                    </h4>
-                  </div>
-
-                  {loadingPoints ? (
-                    <div className="py-8">
-                      <Loading size="md" text="Carregando histórico..." />
-                    </div>
-                  ) : pointsHistory.length === 0 ? (
-                    <div className="py-8 text-center text-muted-foreground">
-                      <Coins className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                      <p>Nenhuma movimentação de pontos ainda</p>
-                      <p className="text-sm">Faça compras na loja para acumular pontos!</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        {displayedHistory.map((transaction) => (
-                          <div
-                            key={transaction.id}
-                            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              {getTransactionIcon(transaction.type)}
-                              <div>
-                                <p className="text-sm font-medium">{transaction.description}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(transaction.createdAt).toLocaleDateString('pt-BR', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                  {transaction.expiresAt && transaction.type === 'earn' && (
-                                    <> · Expira em {new Date(transaction.expiresAt).toLocaleDateString('pt-BR')}</>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                            <span className={`font-bold ${getTransactionColor(transaction.type)}`}>
-                              {transaction.points > 0 ? '+' : ''}{formatPoints(transaction.points)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {pointsHistory.length > 5 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setShowAllHistory(!showAllHistory)}
-                        >
-                          {showAllHistory ? (
-                            <>
-                              <ChevronUp className="h-4 w-4 mr-1" />
-                              Ver menos
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="h-4 w-4 mr-1" />
-                              Ver mais ({pointsHistory.length - 5} transações)
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Personal data */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
-                    Meus Dados
-                  </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setModal('profile')}>
-                    <Edit className="h-4 w-4 mr-1" />
-                    Editar
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="font-medium">{member.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <Phone className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Telefone</p>
-                      <p className="font-medium">{member.phone}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Membro desde</p>
-                      <p className="font-medium">
-                        {new Date(member.startDate).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <CreditCard className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Tipo de cobrança</p>
-                      <p className="font-medium">
-                        {member.paymentType === 'monthly' ? 'Mensal' : 'Anual'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Contract */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Meu Contrato
-                </CardTitle>
-                <CardDescription>
-                  Seu termo de adesão ao Clube Geek & Toys
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {contract ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <div>
-                        <p className="font-medium text-green-700 dark:text-green-400">Contrato Assinado</p>
-                        <p className="text-sm text-muted-foreground">
-                          Assinado em {new Date(contract.signedAt).toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: 'long',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => window.open(contract.pdfUrl, '_blank')}
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Baixar PDF
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={handleResendContract}
-                        disabled={resendingContract}
-                      >
-                        {resendingContract ? (
-                          <Loading size="sm" />
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4 mr-2" />
-                            Enviar por Email
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground text-center">
-                      Hash: {contract.documentHash.substring(0, 16)}...
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-30" />
-                    <p className="text-muted-foreground">Nenhum contrato encontrado</p>
-                    <p className="text-sm text-muted-foreground">
-                      Entre em contato com o suporte se precisar de uma cópia.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Benefits */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gift className="h-5 w-5" />
-                  Seus Benefícios
-                </CardTitle>
-                <CardDescription>
-                  Plano {plan.name} - Aproveite todas as vantagens
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="grid sm:grid-cols-2 gap-3">
-                  {plan.benefits.map((benefit, index) => (
-                    <li key={index} className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Activity History */}
-            <MemberActivityHistory memberId={member.id} />
-
-            {/* Actions */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Button variant="outline" size="lg" className="w-full" onClick={() => setModal('renew')}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Renovar Assinatura
-              </Button>
-              <Button variant="outline" size="lg" className="w-full" onClick={() => setModal('upgrade')}>
-                <ArrowUp className="h-4 w-4 mr-2" />
-                Fazer Upgrade
-              </Button>
-            </div>
-          </div>
+        {/* Hero Card */}
+        <div className="mb-6">
+          <MemberHeroCard member={member} onEditProfile={() => setModal('profile')} />
         </div>
+
+        {/* Tabbed Content */}
+        <Tabs defaultValue="overview">
+          <TabsList className="w-full justify-start overflow-x-auto">
+            <TabsTrigger value="overview">Visao Geral</TabsTrigger>
+            <TabsTrigger value="points">Pontos</TabsTrigger>
+            <TabsTrigger value="subscription">Assinatura</TabsTrigger>
+            <TabsTrigger value="history">Historico</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            <DashboardOverviewTab
+              member={member}
+              onRenew={() => setModal('renew')}
+              onUpgrade={() => setModal('upgrade')}
+            />
+          </TabsContent>
+
+          <TabsContent value="points">
+            <DashboardPointsTab
+              member={member}
+              pointsHistory={pointsHistory}
+              expiringPoints={expiringPoints}
+              loadingPoints={loadingPoints}
+            />
+          </TabsContent>
+
+          <TabsContent value="subscription">
+            <DashboardSubscriptionTab
+              member={member}
+              subscription={subscription}
+              onSubscriptionChange={fetchMemberData}
+            />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <DashboardHistoryTab
+              member={member}
+              contract={contract}
+              onEditProfile={() => setModal('profile')}
+            />
+          </TabsContent>
+        </Tabs>
       </main>
 
-      {/* Modals — lazy-loaded to keep the initial bundle smaller */}
+      {/* Modals — lazy-loaded */}
       <Suspense fallback={null}>
         {modal === 'renew' && (
           <RenewModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
         )}
-
         {modal === 'upgrade' && (
           <UpgradeModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
         )}
-
         {modal === 'profile' && (
           <ProfileEditModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
         )}

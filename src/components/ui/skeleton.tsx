@@ -1,27 +1,23 @@
-import { cn } from "../../lib/utils"
+import { cn } from '../../lib/utils'
 
-function Skeleton({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("animate-pulse rounded-md bg-muted", className)}
+      className={cn('animate-pulse rounded-md bg-muted', className)}
       {...props}
     />
   )
 }
 
-// Skeleton presets for common use cases
+// Pre-built skeleton variants
 function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={cn("rounded-xl border bg-card p-6 space-y-4", className)}>
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-8 w-8 rounded-full" />
+    <div className={cn('space-y-3', className)}>
+      <Skeleton className="h-32 w-full rounded-xl" />
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
       </div>
-      <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-3 w-20" />
     </div>
   )
 }
@@ -29,29 +25,25 @@ function SkeletonCard({ className }: { className?: string }) {
 function SkeletonTable({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
-        <Skeleton className="h-4 w-8" />
-        <Skeleton className="h-4 flex-1" />
-        <Skeleton className="h-4 w-20" />
-        <Skeleton className="h-4 w-24" />
-      </div>
-      {/* Rows */}
+      <Skeleton className="h-10 w-full" />
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4 p-4 items-center">
-          <Skeleton className="h-4 w-8" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
-          </div>
-          <Skeleton className="h-6 w-16 rounded-full" />
-          <Skeleton className="h-4 w-20" />
-        </div>
+        <Skeleton key={i} className="h-12 w-full" />
       ))}
     </div>
   )
 }
 
+function SkeletonText({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: lines }).map((_, i) => (
+        <Skeleton key={i} className={cn('h-4', i === lines - 1 ? 'w-2/3' : 'w-full')} />
+      ))}
+    </div>
+  )
+}
+
+// Legacy variants kept for backward compatibility
 function SkeletonMemberCard() {
   return (
     <div className="rounded-xl border bg-card p-4 space-y-3">
@@ -80,4 +72,4 @@ function SkeletonStats() {
   )
 }
 
-export { Skeleton, SkeletonCard, SkeletonTable, SkeletonMemberCard, SkeletonStats }
+export { Skeleton, SkeletonCard, SkeletonTable, SkeletonText, SkeletonMemberCard, SkeletonStats }

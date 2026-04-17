@@ -35,6 +35,12 @@ app.use((req, _res, next) => {
   next();
 });
 
+// API version header
+app.use((_req, res, next) => {
+  res.setHeader('X-API-Version', '1');
+  next();
+});
+
 // Global middleware
 app.use(helmet({
   contentSecurityPolicy: {

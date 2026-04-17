@@ -5,8 +5,8 @@ import { Card, CardContent, CardFooter } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import { PLANS, type PlanType, type PaymentType } from '../types'
 import { formatCurrency } from '../lib/utils'
-import { Check, Crown, Star, Sparkles, ArrowRight, Shield, Zap, Gift, CreditCard } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { Check, X, Crown, Star, Sparkles, ArrowRight, Shield, Zap, Gift, CreditCard } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import RadioMiniPlayer from '../components/RadioMiniPlayer'
 
 export default function Subscribe() {
@@ -37,6 +37,38 @@ export default function Subscribe() {
   function getSavings(planId: PlanType) {
     const plan = PLANS[planId]
     return plan.priceMonthly * 12 - plan.priceAnnual
+  }
+
+  function getSavingsPercent(planId: PlanType) {
+    const plan = PLANS[planId]
+    const yearlyAtMonthly = plan.priceMonthly * 12
+    return Math.round(((yearlyAtMonthly - plan.priceAnnual) / yearlyAtMonthly) * 100)
+  }
+
+  // Average savings across all plans for the toggle badge
+  const avgSavingsPercent = Math.round(
+    (Object.keys(PLANS) as PlanType[]).reduce((sum, id) => sum + getSavingsPercent(id), 0) / 3
+  )
+
+  // Feature comparison data
+  const comparisonFeatures: { label: string; key: string }[] = [
+    { label: 'Desconto em produtos', key: 'discountProducts' },
+    { label: 'Desconto em servicos', key: 'discountServices' },
+    { label: 'Acesso antecipado', key: 'earlyAccess' },
+    { label: 'Sorteio mensal', key: 'raffle' },
+    { label: 'Multiplicador de pontos', key: 'pointsMultiplier' },
+  ]
+
+  function getComparisonValue(planId: PlanType, key: string): string | boolean {
+    const plan = PLANS[planId]
+    switch (key) {
+      case 'discountProducts': return `${plan.discountProducts}%`
+      case 'discountServices': return `${plan.discountServices}%`
+      case 'earlyAccess': return planId === 'gold' || planId === 'black'
+      case 'raffle': return planId === 'black'
+      case 'pointsMultiplier': return planId === 'silver' ? '1x' : planId === 'gold' ? '2x' : '3x'
+      default: return false
+    }
   }
 
   return (
@@ -115,7 +147,7 @@ export default function Subscribe() {
             transition={{ duration: 0.5, delay: 0.6 }}
           >
             <span className="text-sm text-muted-foreground">
-              A partir de <strong className="text-primary text-lg">R$ 19,90</strong>/mês
+              A partir de <strong className="text-primary text-lg">R$ 19,90</strong>/mes
             </span>
             <a href="#planos">
               <Button size="lg" className="btn-glow font-bold text-base px-8 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black">
@@ -133,9 +165,9 @@ export default function Subscribe() {
             transition={{ duration: 0.5, delay: 0.8 }}
           >
             <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-500" /> Pagamento seguro</span>
-            <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Ativação imediata</span>
-            <span className="flex items-center gap-1.5"><Gift className="h-3.5 w-3.5 text-purple-400" /> Acúmulo de pontos</span>
-            <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-blue-400" /> PIX ou cartão</span>
+            <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Ativacao imediata</span>
+            <span className="flex items-center gap-1.5"><Gift className="h-3.5 w-3.5 text-purple-400" /> Acumulo de pontos</span>
+            <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-blue-400" /> PIX ou cartao</span>
           </motion.div>
         </div>
       </section>
@@ -145,12 +177,23 @@ export default function Subscribe() {
         <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">Escolha seu plano</h2>
         <p className="text-sm text-muted-foreground mb-6">Cancele quando quiser. Sem fidelidade.</p>
 
-        <div className="inline-flex items-center gap-1 glass border border-border p-1 rounded-full">
+        {/* Pill Toggle */}
+        <div className="inline-flex items-center relative bg-muted rounded-full p-1">
+          {/* Sliding indicator */}
+          <motion.div
+            className="absolute top-1 bottom-1 rounded-full bg-primary shadow-lg"
+            layout
+            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+            style={{
+              left: paymentType === 'monthly' ? '4px' : '50%',
+              right: paymentType === 'annual' ? '4px' : '50%',
+            }}
+          />
           <button
             onClick={() => setPaymentType('monthly')}
-            className={`px-4 sm:px-6 py-2 rounded-full text-sm font-medium transition-all ${
+            className={`relative z-10 px-5 sm:px-7 py-2.5 rounded-full text-sm font-semibold transition-colors ${
               paymentType === 'monthly'
-                ? 'bg-primary text-primary-foreground shadow-md'
+                ? 'text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -158,31 +201,24 @@ export default function Subscribe() {
           </button>
           <button
             onClick={() => setPaymentType('annual')}
-            className={`px-4 sm:px-6 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`relative z-10 px-5 sm:px-7 py-2.5 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${
               paymentType === 'annual'
-                ? 'bg-primary text-primary-foreground shadow-md'
+                ? 'text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             Anual
-            <Badge variant="success" className="text-[10px]">Economize!</Badge>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/20 text-green-400 border border-green-500/30">
+              Economize {avgSavingsPercent}%
+            </span>
           </button>
         </div>
       </section>
 
       {/* Plans Grid */}
       <section className="py-8 sm:py-12 px-4 sm:px-6">
-        <motion.div
-          className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6"
-          initial="hidden"
-          whileInView="show"
-          viewport={{ once: true, margin: '-50px' }}
-          variants={{
-            hidden: { opacity: 0 },
-            show: { opacity: 1, transition: { staggerChildren: 0.12 } },
-          }}
-        >
-          {(Object.keys(PLANS) as PlanType[]).map((planId) => {
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+          {(Object.keys(PLANS) as PlanType[]).map((planId, index) => {
             const plan = PLANS[planId]
             const isSelected = selectedPlan === planId
             const isPopular = planId === 'gold'
@@ -190,17 +226,26 @@ export default function Subscribe() {
             return (
               <motion.div
                 key={planId}
-                variants={{ hidden: { opacity: 0, y: 30 }, show: { opacity: 1, y: 0 } }}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ scale: 1.03 }}
               >
                 <Card
                   className={`relative overflow-hidden transition-all duration-300 cursor-pointer flex flex-col h-full group
-                    ${isSelected ? 'ring-2 ring-primary border-glow-primary scale-[1.02]' : 'hover:border-primary/50'}
+                    hover:shadow-lg hover:shadow-primary/10
+                    ${isSelected ? 'ring-2 ring-primary border-glow-primary' : 'hover:border-primary/50'}
                     ${isPopular ? 'lg:-mt-4 lg:mb-4' : ''}`}
                   onClick={() => setSelectedPlan(planId)}
                 >
+                  {/* "Mais Popular" badge — absolute top-right */}
                   {isPopular && (
-                    <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black text-xs font-bold text-center py-1.5">
-                      MAIS POPULAR
+                    <div className="absolute top-3 right-3 z-10">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-gradient-to-r from-yellow-500 to-amber-500 text-black shadow-lg">
+                        <Crown className="h-3 w-3" />
+                        Mais Popular
+                      </span>
                     </div>
                   )}
 
@@ -215,7 +260,7 @@ export default function Subscribe() {
                         <div className="flex items-center gap-2">
                           <span className="text-green-400 font-semibold text-sm">{plan.discountProducts}% produtos</span>
                           <span className="text-muted-foreground text-xs">|</span>
-                          <span className="text-green-400 font-semibold text-sm">{plan.discountServices}% serviços</span>
+                          <span className="text-green-400 font-semibold text-sm">{plan.discountServices}% servicos</span>
                         </div>
                       </div>
                     </div>
@@ -224,13 +269,13 @@ export default function Subscribe() {
                     <div className="mb-1">
                       <span className="text-3xl sm:text-4xl font-extrabold">{formatCurrency(getPrice(planId))}</span>
                       <span className="text-sm text-muted-foreground ml-1">
-                        /{paymentType === 'monthly' ? 'mês' : 'ano'}
+                        /{paymentType === 'monthly' ? 'mes' : 'ano'}
                       </span>
                     </div>
                     {paymentType === 'annual' && (
                       <div className="space-y-0.5">
                         <p className="text-xs text-muted-foreground">
-                          = {formatCurrency(getMonthlyEquivalent(planId))}/mês
+                          = {formatCurrency(getMonthlyEquivalent(planId))}/mes
                         </p>
                         <Badge variant="success" className="text-[10px]">
                           Economia de {formatCurrency(getSavings(planId))}
@@ -242,8 +287,8 @@ export default function Subscribe() {
                   {/* Benefits */}
                   <CardContent className="px-5 sm:px-6 pb-4 flex-grow">
                     <ul className="space-y-2.5">
-                      {plan.benefits.map((benefit, index) => (
-                        <li key={index} className="flex items-start gap-2.5 text-sm">
+                      {plan.benefits.map((benefit, i) => (
+                        <li key={i} className="flex items-start gap-2.5 text-sm">
                           <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
                           <span className="text-muted-foreground group-hover:text-foreground transition-colors">{benefit}</span>
                         </li>
@@ -283,45 +328,97 @@ export default function Subscribe() {
               </motion.div>
             )
           })}
-        </motion.div>
+        </div>
       </section>
 
-      {/* CTA Sticky */}
-      {selectedPlan && (
-        <motion.section
-          className="py-6 px-4 sm:px-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="max-w-lg mx-auto">
-            <Card className="border-primary/50 border-glow-primary bg-gradient-to-br from-card to-card/80">
-              <CardContent className="p-5 sm:p-6">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div>
-                    <p className="font-bold text-lg">
-                      Plano {PLANS[selectedPlan].name}
-                      <span className="text-muted-foreground font-normal text-sm ml-2">
-                        {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
-                      </span>
-                    </p>
-                    <p className="text-2xl font-extrabold text-primary">
-                      {formatCurrency(getPrice(selectedPlan))}
-                      <span className="text-sm font-normal text-muted-foreground">
-                        /{paymentType === 'monthly' ? 'mês' : 'ano'}
-                      </span>
-                    </p>
+      {/* CTA section (visible on larger screens when plan selected) */}
+      <AnimatePresence>
+        {selectedPlan && (
+          <motion.section
+            className="py-6 px-4 sm:px-6 hidden sm:block"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            <div className="max-w-lg mx-auto">
+              <Card className="border-primary/50 border-glow-primary bg-gradient-to-br from-card to-card/80">
+                <CardContent className="p-5 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <p className="font-bold text-lg">
+                        Plano {PLANS[selectedPlan].name}
+                        <span className="text-muted-foreground font-normal text-sm ml-2">
+                          {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
+                        </span>
+                      </p>
+                      <p className="text-2xl font-extrabold text-primary">
+                        {formatCurrency(getPrice(selectedPlan))}
+                        <span className="text-sm font-normal text-muted-foreground">
+                          /{paymentType === 'monthly' ? 'mes' : 'ano'}
+                        </span>
+                      </p>
+                    </div>
+                    <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`}>
+                      <Button size="lg" className="btn-glow font-bold px-8 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black whitespace-nowrap">
+                        ASSINE AGORA <ArrowRight className="ml-2 h-5 w-5" />
+                      </Button>
+                    </Link>
                   </div>
-                  <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`}>
-                    <Button size="lg" className="btn-glow font-bold px-8 h-12 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black whitespace-nowrap">
-                      ASSINE AGORA <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
+
+      {/* Feature Comparison Table */}
+      <section className="py-12 sm:py-16 px-4 sm:px-6 border-t border-border/30">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">Compare os planos</h2>
+          <div className="overflow-x-auto -mx-4 px-4">
+            <table className="w-full text-sm border-collapse min-w-[480px]">
+              <thead>
+                <tr className="border-b border-border/50">
+                  <th className="text-left py-3 px-3 text-muted-foreground font-medium">Beneficio</th>
+                  {(Object.keys(PLANS) as PlanType[]).map((planId) => (
+                    <th key={planId} className="text-center py-3 px-3 font-semibold">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <div className={`p-1 rounded-md bg-gradient-to-br ${planGradients[planId]} text-black/80`}>
+                          {planId === 'silver' ? <Star className="h-3.5 w-3.5" /> : planId === 'gold' ? <Crown className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        </div>
+                        {PLANS[planId].name}
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {comparisonFeatures.map((feature, i) => (
+                  <tr key={feature.key} className={`border-b border-border/20 ${i % 2 === 0 ? 'bg-muted/20' : ''}`}>
+                    <td className="py-3 px-3 text-muted-foreground">{feature.label}</td>
+                    {(Object.keys(PLANS) as PlanType[]).map((planId) => {
+                      const value = getComparisonValue(planId, feature.key)
+                      return (
+                        <td key={planId} className="text-center py-3 px-3">
+                          {typeof value === 'boolean' ? (
+                            value ? (
+                              <Check className="h-5 w-5 text-green-500 mx-auto" />
+                            ) : (
+                              <X className="h-5 w-5 text-muted-foreground/40 mx-auto" />
+                            )
+                          ) : (
+                            <span className="font-semibold text-foreground">{value}</span>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </motion.section>
-      )}
+        </div>
+      </section>
 
       {/* Features Grid */}
       <section className="py-12 sm:py-16 px-4 sm:px-6 border-t border-border/30">
@@ -329,10 +426,10 @@ export default function Subscribe() {
           <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">Por que ser VIP?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {[
-              { icon: <Gift className="h-6 w-6 text-purple-400" />, title: 'Descontos exclusivos', desc: 'Até 50% de desconto em produtos e serviços da loja' },
+              { icon: <Gift className="h-6 w-6 text-purple-400" />, title: 'Descontos exclusivos', desc: 'Ate 50% de desconto em produtos e servicos da loja' },
               { icon: <Star className="h-6 w-6 text-yellow-400" />, title: 'Programa de pontos', desc: 'Acumule pontos a cada compra e troque por descontos' },
-              { icon: <Shield className="h-6 w-6 text-green-400" />, title: 'Carteirinha digital', desc: 'QR Code exclusivo para identificação na loja' },
-              { icon: <Zap className="h-6 w-6 text-blue-400" />, title: 'Acesso antecipado', desc: 'Seja o primeiro a saber de promoções e lançamentos' },
+              { icon: <Shield className="h-6 w-6 text-green-400" />, title: 'Carteirinha digital', desc: 'QR Code exclusivo para identificacao na loja' },
+              { icon: <Zap className="h-6 w-6 text-blue-400" />, title: 'Acesso antecipado', desc: 'Seja o primeiro a saber de promocoes e lancamentos' },
             ].map((feature, i) => (
               <motion.div
                 key={i}
@@ -353,6 +450,32 @@ export default function Subscribe() {
         </div>
       </section>
 
+      {/* Trust Badges Section */}
+      <section className="py-10 px-4 sm:px-6 border-t border-border/30">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-10">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="p-3 rounded-full bg-green-500/10 border border-green-500/20">
+                <Shield className="h-6 w-6 text-green-500" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Pagamento seguro</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="p-3 rounded-full bg-red-500/10 border border-red-500/20">
+                <X className="h-6 w-6 text-red-400" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Cancele quando quiser</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 text-center">
+              <div className="p-3 rounded-full bg-purple-500/10 border border-purple-500/20">
+                <Gift className="h-6 w-6 text-purple-400" />
+              </div>
+              <span className="text-xs font-medium text-muted-foreground">Pontos desde o 1o dia</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-8 px-4 sm:px-6 text-center border-t border-border/30">
         <div className="flex justify-center mb-4">
@@ -369,7 +492,36 @@ export default function Subscribe() {
         </p>
       </footer>
 
-      {/* Rádio Geek & Toys — mini-player flutuante (portfólio público) */}
+      {/* Sticky CTA on mobile */}
+      <AnimatePresence>
+        {selectedPlan && (
+          <motion.div
+            className="fixed bottom-0 inset-x-0 z-40 sm:hidden glass border-t border-border/50 p-3"
+            initial={{ y: 80 }}
+            animate={{ y: 0 }}
+            exit={{ y: 80 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">
+                  {PLANS[selectedPlan].name} <span className="text-muted-foreground font-normal text-xs">{paymentType === 'monthly' ? 'Mensal' : 'Anual'}</span>
+                </p>
+                <p className="text-lg font-extrabold text-primary">
+                  {formatCurrency(getPrice(selectedPlan))}
+                </p>
+              </div>
+              <Link to={`/cadastro?plano=${selectedPlan}&tipo=${paymentType}`}>
+                <Button size="lg" className="btn-glow font-bold px-6 h-11 rounded-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black whitespace-nowrap text-sm">
+                  ASSINAR <ArrowRight className="ml-1.5 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Radio Geek & Toys -- mini-player flutuante (portfolio publico) */}
       <RadioMiniPlayer />
     </div>
   )

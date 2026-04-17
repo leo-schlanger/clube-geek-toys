@@ -56,6 +56,23 @@ export async function ensureSchema(): Promise<void> {
         ON audit_logs(user_id)
     `);
 
+    // ─── CHECK constraints for enum columns ────────────────────────
+    await query(`DO $$ BEGIN
+      ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('silver','gold','black'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE members ADD CONSTRAINT chk_members_status CHECK (status IN ('active','pending','inactive','expired'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE users ADD CONSTRAINT chk_users_role CHECK (role IN ('member','seller','admin','disabled'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE payments ADD CONSTRAINT chk_payments_method CHECK (method IN ('pix','credit_card','boleto','cash'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE payments ADD CONSTRAINT chk_payments_status CHECK (status IN ('pending','paid','failed','refunded'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

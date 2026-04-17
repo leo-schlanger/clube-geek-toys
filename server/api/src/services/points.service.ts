@@ -188,10 +188,24 @@ export async function redeemPoints(
       throw new AppError(400, 'Apenas membros ativos podem resgatar pontos');
     }
 
-    const currentPoints = memberResult.rows[0].points;
-    if (currentPoints < points) {
-      throw new AppError(400, `Pontos insuficientes. Saldo: ${currentPoints}, necessário: ${points}`);
+    // Real balance excludes expired points (members.points can drift)
+    const balanceResult = await client.query(
+      `SELECT COALESCE(SUM(
+        CASE WHEN type IN ('earn','bonus') AND expired = false THEN points
+             WHEN type = 'redeem' THEN points
+             WHEN type = 'expire' THEN points
+             ELSE 0 END
+      ), 0)::int as real_balance
+      FROM point_transactions
+      WHERE member_id = $1`,
+      [memberId]
+    );
+    const realBalance = balanceResult.rows[0].real_balance;
+    if (realBalance < points) {
+      throw new AppError(400, 'Saldo insuficiente de pontos', 'INSUFFICIENT_POINTS');
     }
+
+    const currentPoints = memberResult.rows[0].points;
 
     const newBalance = currentPoints - points;
 

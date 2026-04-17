@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react'
 import { useRealtimeStats, type StatsTrend } from '../../hooks/useRealtimeStats'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
 import { formatCurrency } from '../../lib/utils'
+import { api } from '../../lib/api-client'
 import {
   Users,
   UserCheck,
@@ -21,6 +23,7 @@ import {
   RefreshCw,
   Calendar,
   Zap,
+  HeartPulse,
 } from 'lucide-react'
 
 interface TrendIndicatorProps {
@@ -146,8 +149,33 @@ function PlanCard({ plan, count, total }: PlanCardProps) {
   )
 }
 
+function useSystemHealth() {
+  const [health, setHealth] = useState<{ ok: boolean; checkedAt: Date | null }>({
+    ok: false,
+    checkedAt: null,
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    const check = async () => {
+      try {
+        const res = await api.get('/health')
+        if (!cancelled) setHealth({ ok: res.data?.status === 'ok', checkedAt: new Date() })
+      } catch {
+        if (!cancelled) setHealth({ ok: false, checkedAt: new Date() })
+      }
+    }
+    check()
+    const id = setInterval(check, 60_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  return health
+}
+
 export function RealtimeMetrics() {
   const { stats, trends, loading, error, lastUpdate } = useRealtimeStats()
+  const health = useSystemHealth()
 
   if (loading) {
     return (
@@ -278,6 +306,33 @@ export function RealtimeMetrics() {
           <PlanCard plan="silver" count={stats.membersByPlan.silver} total={stats.totalMembers} />
           <PlanCard plan="gold" count={stats.membersByPlan.gold} total={stats.totalMembers} />
           <PlanCard plan="black" count={stats.membersByPlan.black} total={stats.totalMembers} />
+        </CardContent>
+      </Card>
+
+      {/* System Health */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${health.ok ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+              <HeartPulse className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={`inline-block h-2.5 w-2.5 rounded-full ${health.ok ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="font-medium text-sm">
+                  {health.ok ? 'API Online' : 'API Offline'}
+                </span>
+              </div>
+              {health.checkedAt && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Verificado em {health.checkedAt.toLocaleTimeString('pt-BR')}
+                </p>
+              )}
+            </div>
+            <Badge variant="outline" className="text-xs">
+              Saude do Sistema
+            </Badge>
+          </div>
         </CardContent>
       </Card>
     </div>

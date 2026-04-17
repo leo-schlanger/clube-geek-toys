@@ -1,241 +1,168 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
-import { sanitizeName, normalizeEmail, normalizePhone, normalizeCPF } from '../lib/sanitize'
-import { validateEmail, type EmailValidationResult } from '../lib/email-validation'
-import { PASSWORD_MIN_LENGTH } from '../lib/password-validation'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
-import { Loading } from '../components/ui/loading'
-import { PaymentModal } from '../components/PaymentModal'
-import { ContractModal } from '../components/ContractModal'
-import { PLANS, type PlanType, type PaymentType } from '../types'
-import { formatCurrency, validateCPF } from '../lib/utils'
+import { normalizeEmail, normalizeCPF } from '../lib/sanitize'
+import { validateEmail } from '../lib/email-validation'
 import { createMember, isCPFRegistered } from '../lib/members'
-import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { getMemberByUserId } from '../lib/members'
+import { getMemberContract } from '../lib/contract-storage'
+import { PLANS, type PlanType, type PaymentType, type ContractData } from '../types'
+import { formatCurrency } from '../lib/utils'
+import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import {
-  User,
-  Mail,
-  Phone,
-  CreditCard,
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Eye,
-  EyeOff,
-  Loader2,
-  CheckCircle,
-  XCircle,
-  HelpCircle,
-  Shield,
-  Trash2,
-  RefreshCw,
-  MailCheck,
-} from 'lucide-react'
-import { GoogleSignInButton } from '../components/GoogleSignInButton'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { Badge } from '../components/ui/badge'
+import { Card, CardContent } from '../components/ui/card'
 
-// Form validation schema — password rules MUST match backend (auth.routes.ts passwordSchema):
-// min 8 chars, 1 uppercase, 1 digit. Centralized in src/lib/password-validation.ts.
-const registerSchema = z.object({
-  fullName: z.string().min(3, 'Nome deve ter pelo menos 3 caracteres'),
-  email: z.string().email('Email inválido'),
-  password: z
-    .string()
-    .min(PASSWORD_MIN_LENGTH, `Senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`)
-    .refine((v) => /[A-Z]/.test(v), 'Senha deve conter pelo menos 1 letra maiúscula')
-    .refine((v) => /[0-9]/.test(v), 'Senha deve conter pelo menos 1 número'),
-  confirmPassword: z.string(),
-  cpf: z.string().refine((val) => validateCPF(val), 'CPF inválido'),
-  phone: z.string().min(10, 'Telefone inválido'),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Senhas não conferem',
-  path: ['confirmPassword'],
-})
+// Registration step components
+import { RegistrationStepper } from '../components/registration/RegistrationStepper'
+import { StepAccount } from '../components/registration/StepAccount'
+import { StepPersonalData } from '../components/registration/StepPersonalData'
+import { StepEmailVerification } from '../components/registration/StepEmailVerification'
+import { StepContract } from '../components/registration/StepContract'
+import { StepPayment } from '../components/registration/StepPayment'
 
-type RegisterFormData = z.infer<typeof registerSchema>
+// ─── Constants ──────────────────────────────────────────────────────────────
+const DRAFT_KEY = 'clube_geek_register_draft'
 
 export default function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { signUp, signInWithGoogle, user, sendVerificationEmail, refreshUser, emailVerified } = useAuth()
-  const [step, setStep] = useState(1)
+
+  // ─── State ──────────────────────────────────────────────────────────────────
+  const [step, setStep] = useState(1) // 1=Account, 2=PersonalData, 3=Email, 4=Contract, 5=Payment
   const [loading, setLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [showContractModal, setShowContractModal] = useState(false)
-  const [contractSigned, setContractSigned] = useState(false)
-  const [createdMemberId, setCreatedMemberId] = useState<string | null>(null)
-  const [memberEmail, setMemberEmail] = useState<string>('')
-  const [memberName, setMemberName] = useState<string>('')
-  const [memberCPF, setMemberCPF] = useState<string>('')
-  const [memberPhone, setMemberPhone] = useState<string>('')
-  const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
-  const [validatingCpf, setValidatingCpf] = useState(false)
-  const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
-  const [validatingEmail, setValidatingEmail] = useState(false)
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set())
 
-  // Email verification state (step between account creation and contract)
-  const [awaitingEmailVerification, setAwaitingEmailVerification] = useState(false)
-  const [verificationCooldown, setVerificationCooldown] = useState(0)
-  const [checkingVerification, setCheckingVerification] = useState(false)
+  // Member data accumulated across steps
+  const [memberData, setMemberData] = useState({
+    email: '',
+    fullName: '',
+    cpf: '',
+    phone: '',
+    memberId: '',
+  })
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>(
+    (searchParams.get('plano') as PlanType) || 'silver'
+  )
+  const [paymentType, setPaymentType] = useState<PaymentType>(
+    (searchParams.get('tipo') as PaymentType) || 'monthly'
+  )
 
-  // Account already exists (user logged in but no member record)
+  // Flow flags
   const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)
+  const [initialCheckDone, setInitialCheckDone] = useState(false)
 
-  // localStorage draft state
-  const DRAFT_KEY = 'clube_geek_register_draft'
-  const [draftLoaded, setDraftLoaded] = useState(false)
+  // Draft state
   const [showDraftPrompt, setShowDraftPrompt] = useState(false)
-  const draftSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const draftCheckedRef = useRef(false)
 
-  // Rate limiting: max attempts for validation
-  const [cpfValidationAttempts, setCpfValidationAttempts] = useState(0)
-  const [emailValidationAttempts, setEmailValidationAttempts] = useState(0)
-  const MAX_VALIDATION_ATTEMPTS = 5
-  const VALIDATION_COOLDOWN_MS = 60000 // 1 minute cooldown after max attempts
-
-  // Get plan from URL params
-  const planParam = searchParams.get('plano') as PlanType || 'silver'
-  const typeParam = searchParams.get('tipo') as PaymentType || 'monthly'
-
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>(planParam)
-  const [paymentType, setPaymentType] = useState<PaymentType>(typeParam)
+  // Double-submit guard
+  const isSubmittingRef = useRef(false)
 
   const plan = PLANS[selectedPlan]
   const price = paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    watch,
-    trigger,
-  } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
-  })
-
-  // Detect returning user: if already authenticated with a member record,
-  // skip form and go to contract/payment step
-  const [initialCheckDone, setInitialCheckDone] = useState(false)
+  // ─── Check for returning user ─────────────────────────────────────────────
   useEffect(() => {
     if (initialCheckDone || !user) return
 
     async function checkExistingMember() {
       try {
-        const { getMemberByUserId } = await import('../lib/members')
         const member = await getMemberByUserId(user!.id)
         if (member) {
-          // User already has a member record
-          setCreatedMemberId(member.id)
-          setMemberEmail(member.email)
-          setMemberName(member.fullName)
-          setMemberCPF(member.cpf)
-          setMemberPhone(member.phone || '')
+          setMemberData({
+            email: member.email,
+            fullName: member.fullName,
+            cpf: member.cpf,
+            phone: member.phone || '',
+            memberId: member.id,
+          })
           setSelectedPlan(member.plan as PlanType)
           setPaymentType(member.paymentType as PaymentType)
 
           if (member.status === 'active') {
-            // Already active — go to dashboard
             navigate('/membro', { replace: true })
             return
           }
 
-          // Check if contract exists
-          const { getMemberContract } = await import('../lib/contract-storage')
           const contract = await getMemberContract(member.id)
-
           if (contract) {
-            // Has contract — go to payment step
-            setContractSigned(true)
-            setStep(3)
+            completeStep(1); completeStep(2); completeStep(3); completeStep(4)
+            setStep(5)
           } else if (emailVerified) {
-            // Email verified, no contract — show contract modal
-            setShowContractModal(true)
-            setStep(3)
+            completeStep(1); completeStep(2); completeStep(3)
+            setStep(4)
           } else {
-            // Email not verified — show verification
-            setAwaitingEmailVerification(true)
+            completeStep(1); completeStep(2)
             setStep(3)
           }
+        } else if (user) {
+          // User has account but no member record
+          setMemberData(prev => ({ ...prev, email: user.email }))
+          setAccountAlreadyExists(true)
+          setStep(2) // Skip account creation
+          completeStep(1)
         }
       } catch (err) {
-        // No member found — user has account but no member
-        // Pre-fill email from auth context so they don't re-enter it
-        if (user) {
-          setValue('email', user.email)
-          // Skip to step 2 (password) since account already exists
-          // Mark that we should skip signUp on submit
-          setAccountAlreadyExists(true)
-        }
         logger.debug('No existing member found:', err)
+        if (user) {
+          setMemberData(prev => ({ ...prev, email: user.email }))
+          setAccountAlreadyExists(true)
+          setStep(2)
+          completeStep(1)
+        }
       } finally {
         setInitialCheckDone(true)
       }
     }
 
     checkExistingMember()
-  }, [user, emailVerified, initialCheckDone, navigate, setValue])
+  }, [user, emailVerified, initialCheckDone, navigate])
 
-  // =========================================================================
-  // Password Strength Meter
-  // =========================================================================
-  const watchedPassword = watch('password', '')
-  const passwordStrength = useMemo(() => {
-    if (!watchedPassword) return { score: 0, label: '', color: '', width: '0%' }
-    let score = 0
-    if (watchedPassword.length >= 8) score++
-    if (/[A-Z]/.test(watchedPassword)) score++
-    if (/[0-9]/.test(watchedPassword)) score++
-    if (/[!@#$%^&*]/.test(watchedPassword)) score++
-    const levels = [
-      { label: '', color: '', width: '0%' },
-      { label: 'Fraca', color: 'bg-red-500', width: '25%' },
-      { label: 'Razoável', color: 'bg-orange-500', width: '50%' },
-      { label: 'Boa', color: 'bg-yellow-500', width: '75%' },
-      { label: 'Forte', color: 'bg-green-500', width: '100%' },
-    ]
-    return { score, ...levels[score] }
-  }, [watchedPassword])
-
-  // =========================================================================
-  // localStorage Auto-save Draft
-  // =========================================================================
-
-  // On mount, check for existing draft
+  // ─── Draft auto-save ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (draftLoaded) return
+    if (draftCheckedRef.current) return
+    draftCheckedRef.current = true
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (raw) {
         const draft = JSON.parse(raw)
-        if (draft && draft.fullName) {
-          setShowDraftPrompt(true)
-        }
+        if (draft?.fullName) setShowDraftPrompt(true)
       }
     } catch { /* ignore corrupt data */ }
-    setDraftLoaded(true)
-  }, [draftLoaded])
+  }, [])
+
+  // Save draft on step 1-2 data changes
+  useEffect(() => {
+    if (step > 2 || !memberData.fullName) return
+    const timeout = setTimeout(() => {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        fullName: memberData.fullName,
+        phone: memberData.phone,
+        plan: selectedPlan,
+        paymentType,
+        step,
+      }))
+    }, 2000)
+    return () => clearTimeout(timeout)
+  }, [memberData.fullName, memberData.phone, selectedPlan, paymentType, step])
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  function completeStep(n: number) {
+    setCompletedSteps(prev => new Set(prev).add(n))
+  }
 
   function loadDraft() {
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (raw) {
         const draft = JSON.parse(raw)
-        if (draft.fullName) setValue('fullName', draft.fullName)
-        if (draft.email) setValue('email', draft.email)
-        if (draft.cpf) setValue('cpf', draft.cpf)
-        if (draft.phone) setValue('phone', draft.phone)
-        if (draft.step) setStep(draft.step)
+        if (draft.fullName) setMemberData(prev => ({ ...prev, fullName: draft.fullName, phone: draft.phone || '' }))
+        if (draft.plan) setSelectedPlan(draft.plan)
+        if (draft.paymentType) setPaymentType(draft.paymentType)
         toast.success('Cadastro em andamento restaurado.')
       }
     } catch { /* ignore */ }
@@ -245,449 +172,201 @@ export default function Register() {
   function discardDraft() {
     localStorage.removeItem(DRAFT_KEY)
     setShowDraftPrompt(false)
-    toast.info('Formulário limpo.')
+    toast.info('Formulario limpo.')
   }
 
-  function clearForm() {
-    localStorage.removeItem(DRAFT_KEY)
-    setValue('fullName', '')
-    setValue('email', '')
-    setValue('cpf', '')
-    setValue('phone', '')
-    setValue('password', '')
-    setValue('confirmPassword', '')
-    setStep(1)
-    toast.info('Formulário limpo.')
-  }
+  // ─── Step handlers ────────────────────────────────────────────────────────
 
-  // Watch fields and debounce-save to localStorage (every 2 seconds)
-  const watchedFields = watch(['fullName', 'phone'])
-  useEffect(() => {
-    // Don't save if we're past the form steps
-    if (step >= 3) return
-    if (!draftLoaded) return
-
-    if (draftSaveTimeoutRef.current) {
-      clearTimeout(draftSaveTimeoutRef.current)
-    }
-
-    draftSaveTimeoutRef.current = setTimeout(() => {
-      const [fullName, phone] = watchedFields
-      // Only save non-sensitive fields (no CPF or email)
-      if (fullName || phone) {
-        const draft = { fullName, phone, step }
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-      }
-    }, 2000)
-
-    return () => {
-      if (draftSaveTimeoutRef.current) {
-        clearTimeout(draftSaveTimeoutRef.current)
-      }
-    }
-  }, [watchedFields, step, draftLoaded])
-
-  // =========================================================================
-  // Email Verification Cooldown Timer
-  // =========================================================================
-  useEffect(() => {
-    if (verificationCooldown <= 0) return
-    const timer = setTimeout(() => setVerificationCooldown(prev => prev - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [verificationCooldown])
-
-  async function handleResendVerification() {
-    setVerificationCooldown(60)
-    const result = await sendVerificationEmail()
-    if (result.success) {
-      toast.success('Email de verificação reenviado!')
-    } else {
-      toast.error(result.error || 'Erro ao reenviar email.')
-    }
-  }
-
-  async function handleCheckVerification() {
-    setCheckingVerification(true)
-    await refreshUser()
-    // After refreshUser, emailVerified from context will update
-    setCheckingVerification(false)
-  }
-
-  // Auto-poll for email verification while awaiting (every 5 seconds)
-  useEffect(() => {
-    if (!awaitingEmailVerification || emailVerified) return
-
-    const interval = setInterval(async () => {
-      await refreshUser()
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [awaitingEmailVerification, emailVerified, refreshUser])
-
-  // Watch for emailVerified becoming true while awaiting
-  useEffect(() => {
-    if (awaitingEmailVerification && emailVerified) {
-      setAwaitingEmailVerification(false)
-      toast.success('Email verificado! Agora assine o contrato.')
-      setShowContractModal(true)
-    }
-  }, [emailVerified, awaitingEmailVerification])
-
-  // Synchronous re-entrancy guard. `loading` state is async and doesn't block double-clicks
-  // that fire in the same tick. A ref does — set it before any awaits, clear in finally.
-  const isSubmittingRef = useRef(false)
-
-  /**
-   * Handle form submission
-   */
-  async function onSubmit(data: RegisterFormData) {
-    // Atomic double-submit protection (synchronous, before any await)
+  const handleAccountCreated = useCallback(async (data: { email: string; password: string }) => {
     if (isSubmittingRef.current) return
     isSubmittingRef.current = true
     setLoading(true)
 
-    // Sanitizar inputs
-    const sanitizedData = {
-      fullName: sanitizeName(data.fullName),
-      email: normalizeEmail(data.email),
-      phone: normalizePhone(data.phone),
-      cpf: normalizeCPF(data.cpf),
-      password: data.password, // Senha não deve ser modificada
-    }
-
-    // Timeout helper
-    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
-      return Promise.race([
-        promise,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs))
-      ])
-    }
-
     try {
-      // 1. Validate email (format, disposable, domain)
-      toast.loading('Etapa 1/4: Validando email...', { id: 'reg-progress' })
-      const emailResult = await validateEmail(sanitizedData.email)
-
+      // Validate email
+      toast.loading('Validando email...', { id: 'reg-progress' })
+      const emailResult = await validateEmail(data.email)
       if (!emailResult.valid) {
-        toast.error(emailResult.error || 'Email inválido', { id: 'reg-progress' })
-        setEmailValidation(emailResult)
-        setLoading(false)
+        toast.error(emailResult.error || 'Email invalido', { id: 'reg-progress' })
         return
       }
 
-      // 2. Check if CPF is already registered (MUST succeed - no silent failures)
-      toast.loading('Etapa 2/4: Verificando CPF...', { id: 'reg-progress' })
+      // Create account
+      toast.loading('Criando sua conta...', { id: 'reg-progress' })
+      const result = await signUp(data.email, data.password)
+      if (!result.success) {
+        if (result.error === 'Email ja cadastrado') {
+          toast.error('Este email ja esta cadastrado.', {
+            id: 'reg-progress',
+            duration: 8000,
+            description: 'Se voce esqueceu a senha, use "Esqueci minha senha" na tela de login.',
+            action: {
+              label: 'Fazer login',
+              onClick: () => navigate(`/login?email=${encodeURIComponent(data.email)}`),
+            },
+          })
+        } else {
+          toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
+        }
+        return
+      }
+
+      setMemberData(prev => ({ ...prev, email: data.email }))
+      toast.success('Conta criada!', { id: 'reg-progress' })
+      completeStep(1)
+      setStep(2)
+    } catch (error) {
+      logger.error('Error creating account:', error)
+      toast.error('Erro ao criar conta. Verifique sua conexao.', { id: 'reg-progress' })
+    } finally {
+      setLoading(false)
+      isSubmittingRef.current = false
+    }
+  }, [signUp, navigate])
+
+  const handleGoogleSuccess = useCallback((data: Record<string, unknown>) => {
+    const result = signInWithGoogle(data)
+    if (result.success) {
+      if (result.isNewUser) {
+        setMemberData(prev => ({
+          ...prev,
+          fullName: result.googleName || '',
+          email: data.user?.email || '',
+        }))
+        toast.success('Conta Google conectada! Complete seus dados.')
+        completeStep(1)
+        setStep(2)
+      } else {
+        toast.success('Bem-vindo de volta!')
+        navigate('/membro')
+      }
+    } else {
+      toast.error(result.error || 'Erro ao autenticar com Google')
+    }
+  }, [signInWithGoogle, navigate])
+
+  const handlePersonalDataComplete = useCallback(async (data: {
+    fullName: string; cpf: string; phone: string; plan: PlanType; paymentType: PaymentType
+  }) => {
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
+    setLoading(true)
+
+    try {
+      // Check CPF
+      toast.loading('Verificando CPF...', { id: 'reg-progress' })
       let isRegistered: boolean
       try {
-        isRegistered = await withTimeout(
-          isCPFRegistered(sanitizedData.cpf),
-          5000,
-          'Tempo esgotado ao verificar CPF.'
-        )
+        isRegistered = await Promise.race([
+          isCPFRegistered(normalizeCPF(data.cpf)),
+          new Promise<boolean>((_, reject) => setTimeout(() => reject('timeout'), 5000)),
+        ]) as boolean
       } catch {
-        // CRITICAL: Do NOT allow registration if CPF check fails
-        // This prevents duplicate accounts when the server is slow
-        toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-progress' })
-        setLoading(false)
+        toast.error('Nao foi possivel verificar o CPF. Tente novamente.', { id: 'reg-progress' })
         return
       }
 
       if (isRegistered) {
-        toast.error('Este CPF já está cadastrado', { id: 'reg-progress' })
-        setLoading(false)
+        toast.error('Este CPF ja esta cadastrado', { id: 'reg-progress' })
         return
       }
 
-      // 3. Create account via API (skip if account already exists from interrupted flow)
-      let userId = user?.id || ''
-      if (!accountAlreadyExists) {
-        toast.loading('Etapa 3/4: Criando sua conta...', { id: 'reg-progress' })
-        const result = await signUp(sanitizedData.email, sanitizedData.password)
-
-        if (!result.success) {
-          // Special-case: email already exists → offer login as inline CTA
-          if (result.error === 'Email já cadastrado') {
-            toast.error('Este email já está cadastrado.', {
-              id: 'reg-progress',
-              duration: 8000,
-              description: 'Se você esqueceu a senha, use "Esqueci minha senha" na tela de login.',
-              action: {
-                label: 'Fazer login',
-                onClick: () => navigate(`/login?email=${encodeURIComponent(sanitizedData.email)}`),
-              },
-            })
-          } else {
-            toast.error(result.error || 'Erro ao criar conta', { id: 'reg-progress' })
-          }
-          setLoading(false)
-          return
-        }
-        userId = result.userId || ''
-      }
-
-      // 4. Create member record with retry logic
-      // JWT tokens already in localStorage — backend uses req.user from JWT
-      toast.loading('Etapa 4/4: Salvando dados...', { id: 'reg-progress' })
-
+      // Create member record
+      toast.loading('Salvando dados...', { id: 'reg-progress' })
+      const userId = user?.id || ''
       let member = null
       let lastError = null
-      const maxRetries = 3
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          member = await withTimeout(
+          member = await Promise.race([
             createMember(userId, {
-              fullName: sanitizedData.fullName,
-              email: sanitizedData.email,
-              cpf: sanitizedData.cpf,
-              phone: sanitizedData.phone,
-              plan: selectedPlan,
-              paymentType: paymentType,
+              fullName: data.fullName,
+              email: memberData.email || normalizeEmail(data.fullName),
+              cpf: normalizeCPF(data.cpf),
+              phone: data.phone,
+              plan: data.plan,
+              paymentType: data.paymentType,
             }),
-            5000,
-            'Salvando dados...'
-          )
+            new Promise<null>((_, reject) => setTimeout(() => reject('timeout'), 5000)),
+          ])
           if (member) break
         } catch (err) {
           lastError = err
-          logger.warn(`Member creation attempt ${attempt}/${maxRetries} failed:`, err)
-          if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-          }
+          logger.warn(`Member creation attempt ${attempt}/3 failed:`, err)
+          if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt))
         }
       }
 
       if (member) {
-        setCreatedMemberId(member.id)
-        setMemberEmail(member.email)
-        setMemberName(sanitizedData.fullName)
-        setMemberCPF(sanitizedData.cpf)
-        setMemberPhone(sanitizedData.phone)
-
-        toast.success('Conta criada! Verifique seu email.', { id: 'reg-progress' })
+        setMemberData(prev => ({
+          ...prev,
+          fullName: data.fullName,
+          cpf: data.cpf,
+          phone: data.phone,
+          memberId: member!.id,
+        }))
+        setSelectedPlan(data.plan)
+        setPaymentType(data.paymentType)
         localStorage.removeItem(DRAFT_KEY)
 
-        sendVerificationEmail().then(result => {
-          if (!result.success) {
-            toast.error('Não foi possível enviar o email de verificação. Use o botão "Reenviar" abaixo.', { duration: 6000 })
-          }
-        }).catch(err => {
-          logger.error('Erro ao enviar email de verificação:', err)
-          toast.error('Não foi possível enviar o email de verificação. Use o botão "Reenviar" abaixo.', { duration: 6000 })
+        toast.success('Dados salvos! Verifique seu email.', { id: 'reg-progress' })
+
+        // Send verification email (non-blocking)
+        sendVerificationEmail().catch(err => {
+          logger.error('Erro ao enviar email de verificacao:', err)
+          toast.error('Nao foi possivel enviar o email de verificacao. Use o botao "Reenviar" abaixo.', { duration: 6000 })
         })
-        setVerificationCooldown(60)
-        setAwaitingEmailVerification(true)
+
+        completeStep(2)
         setStep(3)
       } else {
         logger.error('All member creation attempts failed:', lastError)
         toast.error('Erro ao criar seu cadastro. Por favor, tente novamente.', {
           id: 'reg-progress',
           duration: 8000,
-          description: 'Se o problema persistir, entre em contato com o suporte.'
+          description: 'Se o problema persistir, entre em contato com o suporte.',
         })
-        setLoading(false)
-        return
       }
-
     } catch (error) {
-      logger.error('Error registering:', error)
-      toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-progress' })
+      logger.error('Error in personal data step:', error)
+      toast.error('Erro ao salvar dados. Verifique sua conexao.', { id: 'reg-progress' })
     } finally {
       setLoading(false)
       isSubmittingRef.current = false
     }
-  }
+  }, [user, memberData.email, sendVerificationEmail])
 
-  /**
-   * Handle contract signed - move to payment step
-   */
-  function handleContractSigned(_contractData?: unknown) {
-    setShowContractModal(false)
-    setContractSigned(true)
-    setStep(3)
-    // Auto-open payment modal so user doesn't need an extra click
-    setShowPaymentModal(true)
-    toast.success('Contrato assinado! Finalizando pagamento...')
-  }
-
-  /**
-   * Handle successful payment.
-   *
-   * The frontend deliberately does NOT try to activate the member — that's the webhook's job
-   * (the only role with permission to set member.status, expiry, etc.). The frontend just
-   * navigates to /membro; the MemberDashboard polls for the active state and shows the
-   * PendingPaymentScreen with a clear "INATIVO" banner if the webhook hasn't landed yet.
-   *
-   * Welcome and confirmation emails are also sent server-side by the webhook, so we don't
-   * fire them from the frontend (avoids duplicates).
-   */
-  async function handlePaymentSuccess() {
-    setShowPaymentModal(false)
-    toast.success('Pagamento recebido! Estamos ativando sua conta...', {
-      description: 'A confirmação leva alguns segundos. Sua área de membro abrirá em instantes.',
-      duration: 5000,
-    })
-    // Delay so the webhook usually lands before MemberDashboard fetches.
-    // 3s gives Stripe webhooks enough time in most cases.
-    setTimeout(() => navigate('/membro'), 3000)
-  }
-
-  /**
-   * Format CPF input with mask
-   */
-  function handleCPFChange(e: React.ChangeEvent<HTMLInputElement>) {
-    let value = e.target.value.replace(/\D/g, '')
-    if (value.length > 11) value = value.slice(0, 11)
-
-    const formattedValue = value
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-
-    setValue('cpf', formattedValue)
-  }
-
-  /**
-   * Format phone input with mask
-   */
-  function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
-    let value = e.target.value.replace(/\D/g, '')
-    if (value.length > 11) value = value.slice(0, 11)
-
-    let formattedValue = ''
-    if (value.length <= 10) {
-      formattedValue = value
-        .replace(/(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{4})(\d)/, '$1-$2')
-    } else {
-      formattedValue = value
-        .replace(/(\d{2})(\d)/, '($1) $2')
-        .replace(/(\d{5})(\d)/, '$1-$2')
-    }
-
-    setValue('phone', formattedValue)
-  }
-
-  /**
-   * Validate CPF via Brasil API (com debounce e rate limiting)
-   */
-  const cpfValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const cpfRateLimitResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const handleValidateCPF = useCallback((cpf: string) => {
-    const cleaned = cpf.replace(/\D/g, '')
-
-    // Limpa timeout anterior
-    if (cpfValidationTimeoutRef.current) {
-      clearTimeout(cpfValidationTimeoutRef.current)
-    }
-
-    if (cleaned.length !== 11) {
-      setCpfValidation(null)
-      return
-    }
-
-    // Rate limiting: bloqueia se excedeu tentativas
-    if (cpfValidationAttempts >= MAX_VALIDATION_ATTEMPTS) {
-      setCpfValidation({
-        valid: false,
-        exists: null,
-        message: 'Muitas tentativas. Aguarde 1 minuto.',
-      })
-      return
-    }
-
-    // Debounce de 500ms para evitar chamadas excessivas à API
-    cpfValidationTimeoutRef.current = setTimeout(async () => {
-      setValidatingCpf(true)
-      setCpfValidation(null)
-      setCpfValidationAttempts(prev => prev + 1)
-
-      // Reset rate limit após cooldown
-      if (!cpfRateLimitResetRef.current) {
-        cpfRateLimitResetRef.current = setTimeout(() => {
-          setCpfValidationAttempts(0)
-          cpfRateLimitResetRef.current = null
-        }, VALIDATION_COOLDOWN_MS)
-      }
-
-      const result = await fullCPFValidation(cleaned)
-      setCpfValidation(result)
-      setValidatingCpf(false)
-    }, 500)
-  }, [cpfValidationAttempts])
-
-  /**
-   * Validate Email (formato, domínio e temporário) com rate limiting
-   */
-  const emailValidationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const emailRateLimitResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const handleValidateEmail = useCallback((email: string) => {
-    const trimmed = email.trim()
-
-    // Limpa timeout anterior
-    if (emailValidationTimeoutRef.current) {
-      clearTimeout(emailValidationTimeoutRef.current)
-    }
-
-    // Validação básica de formato antes de chamar API
-    if (!trimmed || !trimmed.includes('@') || trimmed.length < 5) {
-      setEmailValidation(null)
-      return
-    }
-
-    // Rate limiting: bloqueia se excedeu tentativas
-    if (emailValidationAttempts >= MAX_VALIDATION_ATTEMPTS) {
-      setEmailValidation({
-        valid: false,
-        error: 'Muitas tentativas. Aguarde 1 minuto.',
-      })
-      return
-    }
-
-    // Debounce de 500ms para evitar chamadas excessivas
-    emailValidationTimeoutRef.current = setTimeout(async () => {
-      setValidatingEmail(true)
-      setEmailValidation(null)
-      setEmailValidationAttempts(prev => prev + 1)
-
-      // Reset rate limit após cooldown
-      if (!emailRateLimitResetRef.current) {
-        emailRateLimitResetRef.current = setTimeout(() => {
-          setEmailValidationAttempts(0)
-          emailRateLimitResetRef.current = null
-        }, VALIDATION_COOLDOWN_MS)
-      }
-
-      const result = await validateEmail(trimmed)
-      setEmailValidation(result)
-      setValidatingEmail(false)
-    }, 500)
-  }, [emailValidationAttempts])
-
-  // Cleanup dos timeouts no unmount
-  useEffect(() => {
-    return () => {
-      if (cpfValidationTimeoutRef.current) {
-        clearTimeout(cpfValidationTimeoutRef.current)
-      }
-      if (emailValidationTimeoutRef.current) {
-        clearTimeout(emailValidationTimeoutRef.current)
-      }
-      if (cpfRateLimitResetRef.current) {
-        clearTimeout(cpfRateLimitResetRef.current)
-      }
-      if (emailRateLimitResetRef.current) {
-        clearTimeout(emailRateLimitResetRef.current)
-      }
-      if (draftSaveTimeoutRef.current) {
-        clearTimeout(draftSaveTimeoutRef.current)
-      }
-    }
+  const handleEmailVerified = useCallback(() => {
+    completeStep(3)
+    setStep(4)
   }, [])
 
-  // Show loading while checking for existing member
+  const handleResendVerification = useCallback(async () => {
+    const result = await sendVerificationEmail()
+    if (result.success) {
+      toast.success('Email de verificacao reenviado!')
+    } else {
+      toast.error(result.error || 'Erro ao reenviar email.')
+    }
+    return result
+  }, [sendVerificationEmail])
+
+  const handleContractSigned = useCallback((_contractData: ContractData) => {
+    completeStep(4)
+    setStep(5)
+    toast.success('Contrato assinado! Finalizando pagamento...')
+  }, [])
+
+  const handlePaymentSuccess = useCallback(() => {
+    toast.success('Pagamento recebido! Estamos ativando sua conta...', {
+      description: 'A confirmacao leva alguns segundos.',
+      duration: 5000,
+    })
+    setTimeout(() => navigate('/membro'), 3000)
+  }, [navigate])
+
+  // ─── Loading state while checking existing member ────────────────────────
   if (user && !initialCheckDone) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -699,6 +378,7 @@ export default function Register() {
     )
   }
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background py-6 sm:py-8 px-4">
       <motion.div
@@ -708,7 +388,7 @@ export default function Register() {
         transition={{ duration: 0.5 }}
       >
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <Link to="/assinar" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Voltar para planos
@@ -716,64 +396,31 @@ export default function Register() {
           <div className="mb-4">
             <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-48 sm:w-56 mx-auto" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Criar Conta</h1>
+          <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">
+            {step === 1 ? 'Criar Conta' :
+             step === 2 ? 'Seus Dados' :
+             step === 3 ? 'Verificar Email' :
+             step === 4 ? 'Contrato' :
+             'Pagamento'}
+          </h1>
           <p className="text-muted-foreground mt-2">
-            Complete seu cadastro para ativar o plano {plan.name}
+            {step <= 2
+              ? `Complete seu cadastro para ativar o plano ${plan.name}`
+              : step === 3
+              ? 'Confirme seu email para continuar'
+              : step === 4
+              ? 'Leia e assine o contrato de adesao'
+              : 'Finalize o pagamento para ativar seus beneficios'}
           </p>
         </div>
 
-        {/* Progress Steps - 4 passos */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {[
-            { num: 1, label: 'Dados' },
-            { num: 2, label: 'Email' },
-            { num: 3, label: 'Contrato' },
-            { num: 4, label: 'Pagamento' },
-          ].map((s, index) => {
-            // Determina se o passo está completo
-            const isComplete =
-              (s.num === 1 && step >= 3) || // Dados completos when account created
-              (s.num === 2 && !awaitingEmailVerification && step >= 3) || // Email verified
-              (s.num === 3 && contractSigned) || // Contrato assinado
-              (s.num === 4 && false) // Pagamento nunca fica completo (redirect)
-
-            // Determina se o passo está ativo
-            const isActive =
-              (s.num === 1 && step <= 2) ||
-              (s.num === 2 && awaitingEmailVerification) ||
-              (s.num === 3 && step >= 3 && !awaitingEmailVerification && !contractSigned) ||
-              (s.num === 4 && contractSigned)
-
-            return (
-              <div key={s.num} className="flex items-center">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                      isComplete
-                        ? 'bg-primary text-primary-foreground'
-                        : isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    {isComplete ? <Check className="h-4 w-4" /> : s.num}
-                  </div>
-                  <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{s.label}</span>
-                </div>
-                {index < 3 && (
-                  <div
-                    className={`w-8 sm:w-12 h-1 mx-1 transition-colors ${
-                      isComplete ? 'bg-primary' : 'bg-muted'
-                    }`}
-                  />
-                )}
-              </div>
-            )
-          })}
+        {/* Stepper */}
+        <div className="mb-6">
+          <RegistrationStepper currentStep={step} completedSteps={completedSteps} />
         </div>
 
         {/* Plan Summary */}
-        <Card className="mb-6 border-glow-primary bg-primary/5">
+        <Card className="mb-6 border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Badge variant={selectedPlan as 'silver' | 'gold' | 'black'}>
@@ -788,413 +435,98 @@ export default function Register() {
         </Card>
 
         {/* Draft prompt */}
-        {showDraftPrompt && (
+        {showDraftPrompt && step <= 2 && (
           <Card className="mb-4 border-yellow-500/50 bg-yellow-500/10">
             <CardContent className="p-4">
               <p className="text-sm font-medium mb-2">Encontramos um cadastro em andamento. Deseja continuar?</p>
               <div className="flex gap-2">
-                <Button size="sm" variant="default" onClick={loadDraft}>
+                <button
+                  className="px-3 py-1.5 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={loadDraft}
+                >
                   Sim, continuar
-                </Button>
-                <Button size="sm" variant="outline" onClick={discardDraft}>
-                  Não, começar novo
-                </Button>
+                </button>
+                <button
+                  className="px-3 py-1.5 text-sm font-medium rounded-md border border-border hover:bg-muted"
+                  onClick={discardDraft}
+                >
+                  Nao, comecar novo
+                </button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Form Steps */}
-        <AnimatePresence mode="wait">
-          {step < 3 ? (
-            <motion.div
-              key="step-form"
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>{step === 1 ? 'Dados Pessoais' : 'Segurança'}</CardTitle>
-                  <CardDescription>
-                    {step === 1 ? 'Preencha seus dados para começar' : 'Crie uma senha de acesso'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                    {step === 1 && (
-                      <div className="space-y-4">
-                        {/* Google Sign-In for registration */}
-                        <GoogleSignInButton
-                          label="Cadastrar com Google"
-                          disabled={loading}
-                          onSuccess={(data) => {
-                            const result = signInWithGoogle(data)
-                            if (result.success) {
-                              if (result.isNewUser) {
-                                // Pre-fill name and email, skip to CPF/phone step
-                                if (result.googleName) {
-                                  setValue('fullName', result.googleName)
-                                  setMemberName(result.googleName)
-                                }
-                                if (data.user.email) {
-                                  setValue('email', data.user.email)
-                                  setMemberEmail(data.user.email)
-                                }
-                                toast.success('Conta Google conectada! Complete seus dados.')
-                              } else {
-                                // Existing user — redirect to member area
-                                toast.success('Bem-vindo de volta!')
-                                navigate('/membro')
-                              }
-                            } else {
-                              toast.error(result.error || 'Erro ao autenticar com Google')
-                            }
-                          }}
-                          onError={(err) => toast.error(err)}
-                        />
+        {/* Step Content */}
+        {step === 1 && (
+          <StepAccount
+            onNext={handleAccountCreated}
+            onGoogleSuccess={handleGoogleSuccess}
+            loading={loading}
+            defaultEmail={memberData.email}
+          />
+        )}
 
-                        {/* Divider */}
-                        {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
-                          <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                              <span className="w-full border-t" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                              <span className="bg-card px-2 text-muted-foreground">ou preencha manualmente</span>
-                            </div>
-                          </div>
-                        )}
+        {step === 2 && (
+          <StepPersonalData
+            onNext={handlePersonalDataComplete}
+            onBack={() => {
+              if (accountAlreadyExists) {
+                // Can't go back to account creation if account already exists
+                toast.info('Sua conta ja existe. Complete os dados abaixo.')
+              } else {
+                setStep(1)
+              }
+            }}
+            loading={loading}
+            defaultValues={{
+              fullName: memberData.fullName,
+              cpf: memberData.cpf,
+              phone: memberData.phone,
+              plan: selectedPlan,
+              paymentType,
+            }}
+          />
+        )}
 
-                        <div className="space-y-2">
-                          <Label htmlFor="fullName">Nome Completo</Label>
-                          <div className="relative">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id="fullName"
-                              placeholder="Como na sua identidade"
-                              className="pl-10"
-                              {...register('fullName')}
-                            />
-                          </div>
-                          {errors.fullName && <p className="text-xs text-red-500">{errors.fullName.message}</p>}
-                        </div>
+        {step === 3 && (
+          <StepEmailVerification
+            email={memberData.email}
+            onVerified={handleEmailVerified}
+            onResend={handleResendVerification}
+            onRefreshUser={refreshUser}
+            emailVerified={emailVerified}
+          />
+        )}
 
-                        <div className="space-y-2">
-                          <Label htmlFor="email">E-mail</Label>
-                          <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id="email"
-                              type="email"
-                              inputMode="email"
-                              autoComplete="email"
-                              placeholder="seu@email.com"
-                              className={`pl-10 pr-10 ${
-                                emailValidation
-                                  ? emailValidation.valid
-                                    ? 'border-green-500 focus-visible:ring-green-500'
-                                    : 'border-red-500 focus-visible:ring-red-500'
-                                  : ''
-                              }`}
-                              {...register('email')}
-                              onChange={(e) => {
-                                register('email').onChange(e)
-                                setEmailValidation(null)
-                              }}
-                              onBlur={(e) => {
-                                register('email').onBlur(e)
-                                if (e.target.value.trim().length >= 5) {
-                                  handleValidateEmail(e.target.value)
-                                }
-                              }}
-                            />
-                            {/* Validation indicator */}
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              {validatingEmail && (
-                                <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-                              )}
-                              {!validatingEmail && emailValidation && (
-                                emailValidation.valid ? (
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <XCircle className="h-4 w-4 text-red-500" />
-                                )
-                              )}
-                            </div>
-                          </div>
-                          {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
-                          {emailValidation && !errors.email && (
-                            <p className={`text-xs ${emailValidation.valid ? 'text-green-600' : 'text-red-500'}`}>
-                              {emailValidation.valid
-                                ? (emailValidation.warnings?.length ? emailValidation.warnings[0] : 'Email válido')
-                                : emailValidation.error}
-                            </p>
-                          )}
-                        </div>
+        {step === 4 && memberData.memberId && (
+          <StepContract
+            memberId={memberData.memberId}
+            memberName={memberData.fullName}
+            memberCPF={memberData.cpf}
+            memberEmail={memberData.email}
+            memberPhone={memberData.phone}
+            plan={selectedPlan}
+            paymentType={paymentType}
+            onSigned={handleContractSigned}
+            onBack={() => setStep(3)}
+          />
+        )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="cpf">CPF</Label>
-                            <div className="relative">
-                              <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                id="cpf"
-                                inputMode="numeric"
-                                autoComplete="off"
-                                placeholder="000.000.000-00"
-                                className={`pl-10 pr-10 ${
-                                  cpfValidation
-                                    ? cpfValidation.valid
-                                      ? 'border-green-500 focus-visible:ring-green-500'
-                                      : 'border-red-500 focus-visible:ring-red-500'
-                                    : ''
-                                }`}
-                                {...register('cpf')}
-                                onChange={(e) => {
-                                  handleCPFChange(e)
-                                  setCpfValidation(null)
-                                }}
-                                onBlur={(e) => {
-                                  if (e.target.value.replace(/\D/g, '').length === 11) {
-                                    handleValidateCPF(e.target.value)
-                                  }
-                                }}
-                              />
-                              {/* Validation indicator */}
-                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                {validatingCpf && (
-                                  <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-                                )}
-                                {!validatingCpf && cpfValidation && (
-                                  cpfValidation.valid ? (
-                                    cpfValidation.exists === true ? (
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                    ) : cpfValidation.exists === null ? (
-                                      <HelpCircle className="h-4 w-4 text-yellow-500" />
-                                    ) : (
-                                      <XCircle className="h-4 w-4 text-red-500" />
-                                    )
-                                  ) : (
-                                    <XCircle className="h-4 w-4 text-red-500" />
-                                  )
-                                )}
-                              </div>
-                            </div>
-                            {errors.cpf && <p className="text-xs text-red-500">{errors.cpf.message}</p>}
-                            {cpfValidation && !errors.cpf && (
-                              <p className={`text-xs ${
-                                cpfValidation.valid
-                                  ? cpfValidation.exists === true
-                                    ? 'text-green-600'
-                                    : 'text-yellow-600'
-                                  : 'text-red-500'
-                              }`}>
-                                {cpfValidation.message}
-                              </p>
-                            )}
-                          </div>
+        {step === 5 && (
+          <StepPayment
+            plan={selectedPlan}
+            paymentType={paymentType}
+            memberId={memberData.memberId}
+            memberEmail={memberData.email}
+            onSuccess={handlePaymentSuccess}
+            onBack={() => setStep(4)}
+          />
+        )}
 
-                          <div className="space-y-2">
-                            <Label htmlFor="phone">Telefone</Label>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                id="phone"
-                                inputMode="tel"
-                                autoComplete="tel"
-                                placeholder="(21) 99999-9999"
-                                className="pl-10"
-                                {...register('phone')}
-                                onChange={handlePhoneChange}
-                              />
-                            </div>
-                            {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
-                          </div>
-                        </div>
-
-                        <Button type="button" className="w-full" onClick={async () => {
-                          const valid = await trigger(['fullName', 'email', 'cpf', 'phone'])
-                          if (valid) setStep(2)
-                        }}>
-                          Próximo Passo <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                        <button
-                          type="button"
-                          className="w-full text-center text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 mt-2"
-                          onClick={clearForm}
-                        >
-                          <Trash2 className="h-3 w-3" /> Limpar formulário
-                        </button>
-                      </div>
-                    )}
-
-                    {step === 2 && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="password">Senha</Label>
-                          <div className="relative">
-                            <Input
-                              id="password"
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder={`No mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
-                              {...register('password')}
-                            />
-                            <button
-                              type="button"
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                              onClick={() => setShowPassword(!showPassword)}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                          {errors.password && <p className="text-xs text-red-500">{errors.password.message}</p>}
-                          {/* Password Strength Meter */}
-                          {watchedPassword && (
-                            <div className="space-y-1">
-                              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`}
-                                  style={{ width: passwordStrength.width }}
-                                />
-                              </div>
-                              {passwordStrength.label && (
-                                <div className="flex items-center gap-1">
-                                  <Shield className="h-3 w-3 text-muted-foreground" />
-                                  <span className={`text-xs ${
-                                    passwordStrength.score <= 1 ? 'text-red-500' :
-                                    passwordStrength.score === 2 ? 'text-orange-500' :
-                                    passwordStrength.score === 3 ? 'text-yellow-600' :
-                                    'text-green-600'
-                                  }`}>
-                                    {passwordStrength.label}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                          <Input
-                            id="confirmPassword"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="Repita sua senha"
-                            {...register('confirmPassword')}
-                          />
-                          {errors.confirmPassword && <p className="text-xs text-red-500">{errors.confirmPassword.message}</p>}
-                        </div>
-
-                        <div className="flex gap-3">
-                          <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(1)}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
-                          </Button>
-                          <Button type="submit" className="flex-1" disabled={loading}>
-                            {loading ? <Loading size="sm" /> : 'Criar Conta'}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </form>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ) : awaitingEmailVerification ? (
-            <motion.div
-              key="step-email-verify"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="text-center p-6">
-                <CardHeader>
-                  <div className="mx-auto mb-4 w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                    <MailCheck className="h-8 w-8 text-primary" />
-                  </div>
-                  <CardTitle>Verifique seu email</CardTitle>
-                  <CardDescription>
-                    Enviamos um email de verificação para <span className="font-medium text-foreground">{memberEmail}</span>.
-                    Verifique sua caixa de entrada (e spam) e clique no link de verificação.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button
-                    className="w-full"
-                    onClick={handleCheckVerification}
-                    disabled={checkingVerification}
-                  >
-                    {checkingVerification ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando...</>
-                    ) : (
-                      <><CheckCircle className="mr-2 h-4 w-4" /> Já verifiquei</>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleResendVerification}
-                    disabled={verificationCooldown > 0}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    {verificationCooldown > 0
-                      ? `Reenviar email (${verificationCooldown}s)`
-                      : 'Reenviar email'}
-                  </Button>
-                  <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Verificando automaticamente a cada 5 segundos...
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="step-payment"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="text-center p-6">
-                <CardHeader>
-                  <CardTitle>Quase lá!</CardTitle>
-                  <CardDescription>
-                    {contractSigned
-                      ? 'Contrato assinado! Agora finalize o pagamento para ativar seus benefícios.'
-                      : 'Sua conta foi criada. Agora finalize o pagamento para ativar seus benefícios.'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {contractSigned && (
-                    <div className="flex items-center justify-center gap-2 text-sm text-green-600 bg-green-500/10 rounded-lg p-3">
-                      <Check className="h-4 w-4" />
-                      <span>Contrato assinado digitalmente</span>
-                    </div>
-                  )}
-                  <p className="text-muted-foreground text-sm">
-                    Pagamento processado de forma segura via Stripe.
-                  </p>
-                  <Button
-                    className="w-full h-12 text-lg"
-                    onClick={() => setShowPaymentModal(true)}
-                    disabled={!contractSigned}
-                  >
-                    Finalizar Pagamento
-                  </Button>
-                  {!contractSigned && (
-                    <p className="text-xs text-muted-foreground">
-                      Você precisa assinar o contrato antes de prosseguir com o pagamento.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        {/* Footer links */}
         <p className="text-center text-muted-foreground mt-8 text-sm">
-          Já tem uma conta? <Link to="/login" className="text-primary hover:underline font-medium">Fazer Login</Link>
+          Ja tem uma conta? <Link to="/login" className="text-primary hover:underline font-medium">Fazer Login</Link>
         </p>
 
         <div className="mt-8 flex justify-center gap-4 text-xs text-muted-foreground/60">
@@ -1203,34 +535,6 @@ export default function Register() {
           <Link to="/privacidade" className="hover:text-foreground hover:underline">Privacidade</Link>
         </div>
       </motion.div>
-
-      {showContractModal && createdMemberId && (
-        <ContractModal
-          memberId={createdMemberId}
-          memberName={memberName}
-          memberCPF={memberCPF}
-          memberEmail={memberEmail}
-          memberPhone={memberPhone}
-          plan={selectedPlan}
-          paymentType={paymentType}
-          onClose={() => {
-            // Don't allow closing without signing
-            toast.error('Você precisa assinar o contrato para continuar')
-          }}
-          onSigned={handleContractSigned}
-        />
-      )}
-
-      {showPaymentModal && (
-        <PaymentModal
-          plan={selectedPlan}
-          paymentType={paymentType}
-          memberId={createdMemberId || undefined}
-          memberEmail={memberEmail || undefined}
-          onClose={() => setShowPaymentModal(false)}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
     </div>
   )
 }

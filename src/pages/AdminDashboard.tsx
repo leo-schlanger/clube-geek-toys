@@ -463,6 +463,7 @@ export default function AdminDashboard() {
                 onActivate={handleQuickActivate}
                 onCreate={() => openModal('create')}
                 onResendEmail={handleResendEmail}
+                onRefetch={() => fetchData(true)}
               />
             )}
             {activeTab === 'users' && (

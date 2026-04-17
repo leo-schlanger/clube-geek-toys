@@ -5,7 +5,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Badge } from '../ui/badge'
 import { toast } from 'sonner'
-import { Save, RotateCcw, Star, Crown, Sparkles, AlertTriangle, Loader2 } from 'lucide-react'
+import { Save, RotateCcw, Star, Crown, Sparkles, AlertTriangle, Loader2, Database } from 'lucide-react'
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 
 interface SettingsState {
@@ -267,6 +267,23 @@ export function SettingsTab() {
           Salvar Configurações
         </Button>
       </div>
+
+      {/* Backup Info */}
+      <Card className="border-muted bg-muted/30">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2 text-muted-foreground">
+            <Database className="h-4 w-4" />
+            Backups
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>Backups automaticos diarios as 03:00 (BRT)</li>
+            <li>Retencao: 7 dias</li>
+            <li>Local: <code className="text-xs bg-muted px-1 py-0.5 rounded">/opt/clube-geek-toys/backups/</code></li>
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   )
 }

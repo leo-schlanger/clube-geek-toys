@@ -11,6 +11,7 @@ interface MembersTabProps {
   onActivate: (member: Member) => void
   onCreate: () => void
   onResendEmail?: (member: Member, type: 'verification' | 'welcome' | 'renewal') => void
+  onRefetch?: () => void
 }
 
 export function MembersTab({
@@ -22,6 +23,7 @@ export function MembersTab({
   onActivate,
   onCreate,
   onResendEmail,
+  onRefetch,
 }: MembersTabProps) {
   return (
     <Card>
@@ -35,6 +37,7 @@ export function MembersTab({
           onActivate={onActivate}
           onCreate={onCreate}
           onResendEmail={onResendEmail}
+          onRefetch={onRefetch}
         />
       </CardContent>
     </Card>
