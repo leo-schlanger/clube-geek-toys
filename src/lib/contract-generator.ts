@@ -46,16 +46,27 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
   const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-  // Try to embed logo
-  let logoImage: Awaited<ReturnType<typeof pdfDoc.embedJpg>> | null = null
+  // Try to embed logo (JPG first, fallback to PNG)
+  let logoImage: Awaited<ReturnType<typeof pdfDoc.embedJpg>> | Awaited<ReturnType<typeof pdfDoc.embedPng>> | null = null
   try {
     const logoResponse = await fetch('/logo.jpg')
     if (logoResponse.ok) {
       const logoBytes = await logoResponse.arrayBuffer()
       logoImage = await pdfDoc.embedJpg(logoBytes)
     }
-  } catch (error) {
-    logger.warn('Failed to load logo for PDF:', error)
+  } catch {
+    // JPG failed, try PNG
+  }
+  if (!logoImage) {
+    try {
+      const pngResponse = await fetch('/logo-vip.png')
+      if (pngResponse.ok) {
+        const pngBytes = await pngResponse.arrayBuffer()
+        logoImage = await pdfDoc.embedPng(pngBytes)
+      }
+    } catch {
+      logger.warn('Failed to load any logo for PDF')
+    }
   }
 
   // Embed signature image
@@ -92,33 +103,44 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
     color = TEXT_COLOR,
     lineHeight = 1.4
   ): number {
-    const words = text.split(' ')
-    let line = ''
-    const lines: string[] = []
+    // Split by explicit newlines first, then word-wrap each paragraph
+    const paragraphs = text.split('\n')
 
-    for (const word of words) {
-      const testLine = line ? `${line} ${word}` : word
-      const testWidth = font.widthOfTextAtSize(testLine, fontSize)
-
-      if (testWidth > CONTENT_WIDTH) {
-        if (line) lines.push(line)
-        line = word
-      } else {
-        line = testLine
+    for (const paragraph of paragraphs) {
+      if (paragraph.trim() === '') {
+        // Empty line → add spacing
+        yPosition -= fontSize * lineHeight * 0.5
+        continue
       }
-    }
-    if (line) lines.push(line)
 
-    for (const l of lines) {
-      checkNewPage(fontSize * lineHeight + 5)
-      currentPage.drawText(l, {
-        x: MARGIN,
-        y: yPosition,
-        size: fontSize,
-        font,
-        color,
-      })
-      yPosition -= fontSize * lineHeight
+      const words = paragraph.split(' ')
+      let line = ''
+      const lines: string[] = []
+
+      for (const word of words) {
+        const testLine = line ? `${line} ${word}` : word
+        const testWidth = font.widthOfTextAtSize(testLine, fontSize)
+
+        if (testWidth > CONTENT_WIDTH) {
+          if (line) lines.push(line)
+          line = word
+        } else {
+          line = testLine
+        }
+      }
+      if (line) lines.push(line)
+
+      for (const l of lines) {
+        checkNewPage(fontSize * lineHeight + 5)
+        currentPage.drawText(l, {
+          x: MARGIN,
+          y: yPosition,
+          size: fontSize,
+          font,
+          color,
+        })
+        yPosition -= fontSize * lineHeight
+      }
     }
 
     return yPosition
