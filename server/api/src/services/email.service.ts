@@ -165,7 +165,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Verifique seu e-mail — Clube Geek & Toys',
       preheader: 'Clique para confirmar seu e-mail e ativar sua conta.',
       body: `
-        <h2 style="color:#e94560;margin:0 0 12px">Confirme seu e-mail</h2>
+        <h2 style="color:#d4a520;margin:0 0 12px">Confirme seu e-mail</h2>
         <p>Olá, <strong>${name}</strong>!</p>
         <p>Você criou uma conta no <strong>Clube Geek & Toys</strong>. Para prosseguir, confirme seu endereço de e-mail clicando no botão abaixo.</p>
         ${infoBox('⏳ Este link expira em <strong>24 horas</strong>.<br>Se você não criou esta conta, ignore este e-mail.')}`,
@@ -176,7 +176,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Redefinição de senha — Clube Geek & Toys',
       preheader: 'Você solicitou a redefinição da sua senha.',
       body: `
-        <h2 style="color:#e94560;margin:0 0 12px">Redefinir sua senha</h2>
+        <h2 style="color:#d4a520;margin:0 0 12px">Redefinir sua senha</h2>
         <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
         <p>Clique no botão abaixo para escolher uma nova senha:</p>
         ${infoBox('⏳ Este link expira em <strong>1 hora</strong>.<br>Se você não solicitou isso, pode ignorar este e-mail com segurança — sua conta permanece protegida.')}`,
@@ -188,7 +188,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Bem-vindo ao Clube Geek & Toys! 🎮',
       preheader: `${name}, sua conta está pronta. Veja o que te espera!`,
       body: `
-        <h2 style="color:#e94560;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
+        <h2 style="color:#d4a520;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
         <p>Sua conta no <strong>Clube Geek & Toys</strong> foi criada com sucesso. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>
         ${featureList([
@@ -322,7 +322,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       body: `
         <h2 style="color:#fbbf24;margin:0 0 12px">Pontos expirando! ⭐</h2>
         <p>Olá, <strong>${name}</strong>!</p>
-        <p>Você tem <strong style="color:#e94560;font-size:20px">${v.points || '0'} pontos</strong> que expiram em <strong>${v.expiry_date || 'breve'}</strong>.</p>
+        <p>Você tem <strong style="color:#d4a520;font-size:20px">${v.points || '0'} pontos</strong> que expiram em <strong>${v.expiry_date || 'breve'}</strong>.</p>
         <p>Visite a loja e use seus pontos antes que expirem!</p>
         ${infoBox('💡 Seus pontos podem ser trocados por descontos e produtos exclusivos na loja.')}`,
       cta: { text: 'Ver Meus Pontos', url: `${frontendUrl}/minha-conta` },
@@ -373,7 +373,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
   const ctaHtml = tmpl.cta
     ? `<div style="text-align:center;margin:28px 0 8px">
-        <a href="${tmpl.cta.url}" style="display:inline-block;background:linear-gradient(135deg,#e94560,#c73e54);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:0.3px;box-shadow:0 4px 14px rgba(233,69,96,0.35)">${tmpl.cta.text}</a>
+        <a href="${tmpl.cta.url}" style="display:inline-block;background:linear-gradient(135deg,#d4a520,#b8860b);color:#000000;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:0.3px;box-shadow:0 4px 14px rgba(212,165,32,0.35)">${tmpl.cta.text}</a>
        </div>`
     : '';
 
@@ -395,7 +395,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     <!-- Header -->
     <div style="text-align:center;padding:28px 0 20px">
       <div style="display:inline-block;padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#16213e,#1a2744)">
-        <h1 style="margin:0;font-size:24px;letter-spacing:2px"><span style="color:#e94560">GEEK</span><span style="color:#ffffff;opacity:0.6">&amp;</span><span style="color:#ffffff">TOYS</span></h1>
+        <h1 style="margin:0;font-size:24px;letter-spacing:2px"><span style="color:#d4a520">GEEK</span><span style="color:#ffffff;opacity:0.6">&amp;</span><span style="color:#ffffff">TOYS</span></h1>
         <p style="margin:4px 0 0;font-size:10px;color:#64748b;letter-spacing:3px;text-transform:uppercase">Clube de Vantagens</p>
       </div>
     </div>
@@ -412,9 +412,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       <p style="margin:4px 0">CNPJ: 00.000.000/0001-00 &bull; geeketoys.com.br</p>
       <p style="margin:4px 0">Este é um e-mail transacional enviado automaticamente.</p>
       <p style="margin:8px 0 0">
-        <a href="${frontendUrl}" style="color:#e94560;text-decoration:none">Site</a>
+        <a href="${frontendUrl}" style="color:#d4a520;text-decoration:none">Site</a>
         &nbsp;&bull;&nbsp;
-        <a href="${frontendUrl}/minha-conta" style="color:#e94560;text-decoration:none">Minha Conta</a>
+        <a href="${frontendUrl}/minha-conta" style="color:#d4a520;text-decoration:none">Minha Conta</a>
       </p>
     </div>
   </div>
