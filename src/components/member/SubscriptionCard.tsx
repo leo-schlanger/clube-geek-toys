@@ -4,10 +4,7 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { SubscriptionManagement } from '../SubscriptionManagement'
 import type { Member, Subscription } from '../../types'
-import {
-  getSubscriptionStatusLabel,
-  formatNextPaymentDate,
-} from '../../lib/subscriptions'
+import { getSubscriptionStatusLabel, formatNextPaymentDate } from '../../lib/subscriptions'
 import {
   Repeat,
   Settings,
@@ -17,27 +14,23 @@ import {
   CreditCard,
 } from 'lucide-react'
 
-interface DashboardSubscriptionTabProps {
+interface SubscriptionCardProps {
   member: Member
   subscription: Subscription | null
   onSubscriptionChange: () => void
 }
 
-export function DashboardSubscriptionTab({
-  member,
-  subscription,
-  onSubscriptionChange,
-}: DashboardSubscriptionTabProps) {
+export function SubscriptionCard({ member, subscription, onSubscriptionChange }: SubscriptionCardProps) {
   const [showManagement, setShowManagement] = useState(false)
 
   if (!subscription) {
     return (
       <Card>
-        <CardContent className="py-12 text-center">
-          <CreditCard className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-          <p className="text-muted-foreground font-medium">Nenhuma assinatura recorrente ativa</p>
+        <CardContent className="py-8 text-center">
+          <CreditCard className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-30" />
+          <p className="text-muted-foreground font-medium">Sem assinatura recorrente</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Sua assinatura atual e avulsa (pagamento unico).
+            Sua assinatura é avulsa (pagamento único).
           </p>
         </CardContent>
       </Card>
@@ -45,8 +38,7 @@ export function DashboardSubscriptionTab({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Subscription Status Card */}
+    <div className="space-y-4">
       <Card className="border-primary/20">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -67,11 +59,11 @@ export function DashboardSubscriptionTab({
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Proxima cobranca</p>
-              <p className="font-semibold">
+              <p className="text-xs text-muted-foreground">Próxima cobrança</p>
+              <p className="font-semibold text-sm">
                 {subscription.status === 'authorized'
                   ? formatNextPaymentDate(subscription)
                   : subscription.status === 'paused'
@@ -80,8 +72,8 @@ export function DashboardSubscriptionTab({
               </p>
             </div>
             <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">Ultimo pagamento</p>
-              <p className="font-semibold">
+              <p className="text-xs text-muted-foreground">Último pagamento</p>
+              <p className="font-semibold text-sm">
                 {subscription.lastPaymentDate
                   ? new Date(subscription.lastPaymentDate).toLocaleDateString('pt-BR')
                   : 'N/A'}
@@ -99,10 +91,10 @@ export function DashboardSubscriptionTab({
           )}
 
           {subscription.failedPayments > 0 && (
-            <div className="flex items-center gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                {subscription.failedPayments} tentativa(s) de cobranca falharam
+            <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <span className="text-sm text-warning">
+                {subscription.failedPayments} tentativa(s) de cobrança falharam
               </span>
             </div>
           )}
@@ -119,7 +111,6 @@ export function DashboardSubscriptionTab({
         </CardContent>
       </Card>
 
-      {/* Subscription Management (expandable) */}
       {showManagement && (
         <SubscriptionManagement
           memberId={member.id}

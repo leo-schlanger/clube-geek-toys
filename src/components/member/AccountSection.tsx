@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { Button } from '../ui/button'
 import { Loading } from '../ui/loading'
-import { MemberActivityHistory } from '../MemberActivityHistory'
 import { PLANS, type Member, type PlanType } from '../../types'
 import type { Contract } from '../../types'
 import { resendContractEmail } from '../../lib/email'
@@ -21,13 +20,13 @@ import {
   Edit,
 } from 'lucide-react'
 
-interface DashboardHistoryTabProps {
+interface AccountSectionProps {
   member: Member
   contract: Contract | null
   onEditProfile: () => void
 }
 
-export function DashboardHistoryTab({ member, contract, onEditProfile }: DashboardHistoryTabProps) {
+export function AccountSection({ member, contract, onEditProfile }: AccountSectionProps) {
   const [resendingContract, setResendingContract] = useState(false)
   const plan = PLANS[member.plan as PlanType]
 
@@ -60,7 +59,7 @@ export function DashboardHistoryTab({ member, contract, onEditProfile }: Dashboa
 
   return (
     <div className="space-y-6">
-      {/* Personal data */}
+      {/* Personal Data */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -75,35 +74,35 @@ export function DashboardHistoryTab({ member, contract, onEditProfile }: Dashboa
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <Mail className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Email</p>
-                <p className="font-medium">{member.email}</p>
+              <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-muted-foreground uppercase">Email</p>
+                <p className="text-sm font-medium truncate">{member.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <Phone className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Telefone</p>
-                <p className="font-medium">{member.phone}</p>
+              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-muted-foreground uppercase">Telefone</p>
+                <p className="text-sm font-medium">{member.phone}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Membro desde</p>
-                <p className="font-medium">
+              <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-muted-foreground uppercase">Membro desde</p>
+                <p className="text-sm font-medium">
                   {new Date(member.startDate).toLocaleDateString('pt-BR')}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <CreditCard className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Tipo de cobranca</p>
-                <p className="font-medium">
+              <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] text-muted-foreground uppercase">Cobrança</p>
+                <p className="text-sm font-medium">
                   {member.paymentType === 'monthly' ? 'Mensal' : 'Anual'}
                 </p>
               </div>
@@ -120,23 +119,21 @@ export function DashboardHistoryTab({ member, contract, onEditProfile }: Dashboa
             Meu Contrato
           </CardTitle>
           <CardDescription>
-            Seu termo de adesao ao Clube Geek & Toys
+            Seu termo de adesão ao Clube Geek & Toys
           </CardDescription>
         </CardHeader>
         <CardContent>
           {contract ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-500" />
+                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                 <div>
-                  <p className="font-medium text-green-700 dark:text-green-400">Contrato Assinado</p>
+                  <p className="font-medium text-green-400">Contrato Assinado</p>
                   <p className="text-sm text-muted-foreground">
                     Assinado em {new Date(contract.signedAt).toLocaleDateString('pt-BR', {
                       day: '2-digit',
                       month: 'long',
                       year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
                     })}
                   </p>
                 </div>
@@ -168,24 +165,18 @@ export function DashboardHistoryTab({ member, contract, onEditProfile }: Dashboa
                   )}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Hash: {contract.documentHash.substring(0, 16)}...
-              </p>
             </div>
           ) : (
             <div className="text-center py-4">
-              <FileText className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-30" />
+              <FileText className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-30" />
               <p className="text-muted-foreground">Nenhum contrato encontrado</p>
               <p className="text-sm text-muted-foreground">
-                Entre em contato com o suporte se precisar de uma copia.
+                Entre em contato com o suporte se precisar de uma cópia.
               </p>
             </div>
           )}
         </CardContent>
       </Card>
-
-      {/* Full Activity Log */}
-      <MemberActivityHistory memberId={member.id} />
     </div>
   )
 }

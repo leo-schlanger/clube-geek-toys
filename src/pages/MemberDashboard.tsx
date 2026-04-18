@@ -4,14 +4,18 @@ import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { LoadingPage } from '../components/ui/loading'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs'
 import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
-import { MemberHeroCard } from '../components/member/MemberHeroCard'
-import { DashboardOverviewTab } from '../components/member/DashboardOverviewTab'
-import { DashboardPointsTab } from '../components/member/DashboardPointsTab'
-import { DashboardSubscriptionTab } from '../components/member/DashboardSubscriptionTab'
-import { DashboardHistoryTab } from '../components/member/DashboardHistoryTab'
-import type { Member, PointTransaction, Subscription, Contract } from '../types'
+import { MembershipCard } from '../components/member/MembershipCard'
+import { DiscountStrip } from '../components/member/DiscountStrip'
+import { PointsSummaryBar } from '../components/member/PointsSummaryBar'
+import { QuickActions } from '../components/member/QuickActions'
+import { OnboardingGuide } from '../components/member/OnboardingGuide'
+import { BenefitsSection } from '../components/member/BenefitsSection'
+import { SubscriptionCard } from '../components/member/SubscriptionCard'
+import { PointsSection } from '../components/member/PointsSection'
+import { AccountSection } from '../components/member/AccountSection'
+import { MemberActivityHistory } from '../components/MemberActivityHistory'
+import type { Member, PlanType, PointTransaction, Subscription, Contract } from '../types'
 import { calculateDaysUntilExpiry } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
@@ -86,7 +90,7 @@ export default function MemberDashboard() {
       }
     } catch (error) {
       logger.error('Error fetching member data:', error)
-      setFetchError('Nao conseguimos carregar seus dados. Verifique sua conexao e tente novamente.')
+      setFetchError('Não conseguimos carregar seus dados. Verifique sua conexão e tente novamente.')
       toast.error('Erro ao carregar dados')
     } finally {
       setLoading(false)
@@ -144,7 +148,7 @@ export default function MemberDashboard() {
             </div>
             <CardTitle className="font-heading">Nenhuma assinatura encontrada</CardTitle>
             <CardDescription>
-              Voce ainda nao possui uma assinatura ativa. Assine agora e comece a aproveitar os beneficios!
+              Você ainda não possui uma assinatura ativa. Assine agora e comece a aproveitar os benefícios!
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -176,41 +180,40 @@ export default function MemberDashboard() {
   const isExpired = daysUntilExpiry <= 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-8">
       {/* Header */}
       <header className="glass border-b border-border sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-10" />
-            <span className="text-lg font-heading font-bold text-foreground">Clube Geek & Toys</span>
+            <span className="text-lg font-heading font-bold text-foreground hidden sm:block">Clube Geek & Toys</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => setModal('profile')} title="Editar Perfil">
               <Settings className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={signOut}>
+            <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Email Verification Banner */}
         {!emailVerified && (
-          <div className="mb-6 p-4 rounded-lg bg-blue-500/15 border border-blue-500/40 flex items-center gap-3">
-            <Mail className="h-5 w-5 text-blue-400 flex-shrink-0" />
+          <div className="p-4 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3">
+            <Mail className="h-5 w-5 text-primary shrink-0" />
             <div className="flex-1">
-              <p className="text-sm text-blue-200">
-                <strong>Verifique seu email</strong> — Confirme seu email para garantir acesso completo a sua conta.
+              <p className="text-sm">
+                <strong>Verifique seu email</strong> — Confirme para garantir acesso completo à sua conta.
               </p>
             </div>
             <Button
-              variant="outline"
               size="sm"
               onClick={async () => {
                 const result = await sendVerificationEmail()
-                if (result.success) toast.success('Email de verificacao enviado!')
+                if (result.success) toast.success('Email de verificação enviado!')
                 else toast.error(result.error || 'Erro ao enviar email')
               }}
             >
@@ -222,80 +225,79 @@ export default function MemberDashboard() {
         {/* Expiry Alert */}
         {(isExpired || isExpiringSoon) && (
           <div
-            className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+            className={`p-4 rounded-xl flex items-center gap-3 ${
               isExpired
-                ? 'bg-red-500/20 border border-red-500/50 text-red-200'
-                : 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-200'
+                ? 'bg-destructive/15 border-2 border-destructive/50'
+                : 'bg-warning/15 border-2 border-warning/50'
             }`}
           >
-            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+            <AlertTriangle className={`h-5 w-5 shrink-0 ${isExpired ? 'text-destructive animate-pulse' : 'text-warning'}`} />
             <div className="flex-1">
               {isExpired ? (
                 <>
                   <strong>Sua assinatura expirou!</strong>
-                  <p className="text-sm opacity-80">Renove agora para continuar aproveitando os beneficios.</p>
+                  <p className="text-sm opacity-80">Renove agora para continuar aproveitando os benefícios.</p>
                 </>
               ) : (
                 <>
-                  <strong>Sua assinatura expira em {daysUntilExpiry} dias</strong>
-                  <p className="text-sm opacity-80">Renove agora e nao perca seus beneficios.</p>
+                  <strong>Faltam {daysUntilExpiry} dias para expirar</strong>
+                  <p className="text-sm opacity-80">Renove agora e não perca seus benefícios.</p>
                 </>
               )}
             </div>
-            <Button variant="warning" size="sm" onClick={() => setModal('renew')}>
+            <Button variant="warning" size="sm" className="btn-glow shrink-0" onClick={() => setModal('renew')}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Renovar
             </Button>
           </div>
         )}
 
-        {/* Hero Card */}
-        <div className="mb-6">
-          <MemberHeroCard member={member} onEditProfile={() => setModal('profile')} />
-        </div>
+        {/* ═══ 1. Carteirinha Digital ═══ */}
+        <MembershipCard member={member} />
 
-        {/* Tabbed Content */}
-        <Tabs defaultValue="overview">
-          <TabsList className="w-full justify-start overflow-x-auto">
-            <TabsTrigger value="overview">Visao Geral</TabsTrigger>
-            <TabsTrigger value="points">Pontos</TabsTrigger>
-            <TabsTrigger value="subscription">Assinatura</TabsTrigger>
-            <TabsTrigger value="history">Historico</TabsTrigger>
-          </TabsList>
+        {/* ═══ 2. Faixa de Descontos ═══ */}
+        <DiscountStrip plan={member.plan as PlanType} />
 
-          <TabsContent value="overview">
-            <DashboardOverviewTab
-              member={member}
-              onRenew={() => setModal('renew')}
-              onUpgrade={() => setModal('upgrade')}
-            />
-          </TabsContent>
+        {/* ═══ 3. Barra de Pontos ═══ */}
+        <PointsSummaryBar member={member} expiringPoints={expiringPoints} />
 
-          <TabsContent value="points">
-            <DashboardPointsTab
-              member={member}
-              pointsHistory={pointsHistory}
-              expiringPoints={expiringPoints}
-              loadingPoints={loadingPoints}
-            />
-          </TabsContent>
+        {/* ═══ 4. Ações Rápidas ═══ */}
+        <QuickActions
+          member={member}
+          onRenew={() => setModal('renew')}
+          onUpgrade={() => setModal('upgrade')}
+          onEditProfile={() => setModal('profile')}
+        />
 
-          <TabsContent value="subscription">
-            <DashboardSubscriptionTab
-              member={member}
-              subscription={subscription}
-              onSubscriptionChange={fetchMemberData}
-            />
-          </TabsContent>
+        {/* ═══ 5. Guia de Boas-vindas ═══ */}
+        <OnboardingGuide memberStartDate={member.startDate} />
 
-          <TabsContent value="history">
-            <DashboardHistoryTab
-              member={member}
-              contract={contract}
-              onEditProfile={() => setModal('profile')}
-            />
-          </TabsContent>
-        </Tabs>
+        {/* ═══ 6. Benefícios ═══ */}
+        <BenefitsSection plan={member.plan as PlanType} onUpgrade={() => setModal('upgrade')} />
+
+        {/* ═══ 7. Assinatura ═══ */}
+        <SubscriptionCard
+          member={member}
+          subscription={subscription}
+          onSubscriptionChange={fetchMemberData}
+        />
+
+        {/* ═══ 8. Pontos (Resgate + Extrato) ═══ */}
+        <PointsSection
+          member={member}
+          pointsHistory={pointsHistory}
+          loadingPoints={loadingPoints}
+        />
+
+        {/* ═══ 9. Dados + Contrato ═══ */}
+        <AccountSection
+          member={member}
+          contract={contract}
+          onEditProfile={() => setModal('profile')}
+        />
+
+        {/* ═══ 10. Atividades Recentes ═══ */}
+        <MemberActivityHistory memberId={member.id} limit={5} />
       </main>
 
       {/* Modals — lazy-loaded */}
