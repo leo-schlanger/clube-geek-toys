@@ -438,7 +438,10 @@ export function createPDFBlob(pdfBytes: Uint8Array): Blob {
 }
 
 /**
- * Trigger PDF download in browser
+ * Trigger PDF download in browser.
+ * Delays URL.revokeObjectURL — revoking immediately after click() causes the
+ * download to fail on many mobile browsers because the browser hasn't started
+ * reading the blob yet.
  */
 export function downloadPDF(pdfBytes: Uint8Array, filename: string): void {
   const blob = createPDFBlob(pdfBytes)
@@ -446,8 +449,12 @@ export function downloadPDF(pdfBytes: Uint8Array, filename: string): void {
   const link = document.createElement('a')
   link.href = url
   link.download = filename
+  link.style.display = 'none'
   document.body.appendChild(link)
   link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  // Delay cleanup — browser needs time to start the download
+  setTimeout(() => {
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }, 5000)
 }

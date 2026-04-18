@@ -270,26 +270,29 @@ export function StepContract({
       }
 
       toast.loading('Enviando contrato...', { id: 'contract' })
-      let url: string
+      let url = ''
       try {
         const result = await storeContract(contractData, pdfBytes)
         url = result.pdfUrl
       } catch (storeError) {
-        logger.error('Contract storage failed:', storeError)
-        toast.error('Erro ao salvar contrato. Verifique sua conexão e tente novamente.', {
+        // Storage failed, but the user already signed — don't block registration.
+        // They can proceed to payment. The contract can be re-stored later.
+        logger.error('Contract storage failed (non-blocking):', storeError)
+        toast.warning('Contrato assinado, mas houve um problema ao salvar no servidor. Prossiga com o pagamento.', {
           id: 'contract',
           duration: 8000,
         })
-        setLoading(false)
-        return
       }
 
-      setPdfUrl(url)
-      contractData.pdfUrl = url
+      if (url) {
+        setPdfUrl(url)
+        contractData.pdfUrl = url
+      }
 
-      // Send email (non-blocking)
+      // Send contract email with PDF attachment (non-blocking)
+      const pdfBase64 = pdfToBase64(pdfBytes)
       sendContractEmail(
-        memberEmail, memberName, planData.name, signedAt, documentHash, pdfToBase64(pdfBytes)
+        memberEmail, memberName, planData.name, signedAt, documentHash, pdfBase64
       ).catch((emailError) => {
         logger.warn('Contract email failed (non-critical):', emailError)
       })

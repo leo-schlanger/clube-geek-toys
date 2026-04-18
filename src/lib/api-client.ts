@@ -111,7 +111,7 @@ async function fetchWithRetry(
 
 let refreshPromise: Promise<boolean> | null = null
 
-async function tryRefreshToken(): Promise<boolean> {
+export async function tryRefreshToken(): Promise<boolean> {
   // Prevent concurrent refresh attempts
   if (refreshPromise) return refreshPromise
 

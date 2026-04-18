@@ -2,7 +2,7 @@
  * Contract Storage — API-based (PostgreSQL + file storage on VPS)
  */
 
-import { api, getAccessToken, API_URL } from './api-client'
+import { api, getAccessToken, tryRefreshToken, API_URL } from './api-client'
 import type { ContractData, Contract } from '../types'
 
 /**
@@ -16,8 +16,8 @@ export async function uploadContractPDF(
   try {
     const blob = new Blob([pdfBytes], { type: 'application/pdf' })
     const formData = new FormData()
-    formData.append('pdf', blob, `contract-${memberId}.pdf`)
     formData.append('memberId', memberId)
+    formData.append('pdf', blob, `contract-${memberId}.pdf`)
 
     const token = getAccessToken()
 
@@ -87,11 +87,10 @@ export async function storeContract(
   contractData: ContractData,
   pdfBytes: Uint8Array
 ): Promise<{ contractId: string; pdfUrl: string }> {
-  const token = getAccessToken()
-
   const blob = new Blob([pdfBytes], { type: 'application/pdf' })
   const formData = new FormData()
-  formData.append('pdf', blob, `contract-${contractData.memberId}.pdf`)
+  // IMPORTANT: Text fields MUST come before the file so multer's destination
+  // callback can read req.body.memberId when deciding where to store the file.
   formData.append('memberId', contractData.memberId)
   formData.append('memberName', contractData.memberName)
   formData.append('memberCpf', contractData.memberCPF)
@@ -104,13 +103,27 @@ export async function storeContract(
   if (contractData.signatureImage) {
     formData.append('signaturePreview', contractData.signatureImage.substring(0, 100))
   }
+  // File must be appended LAST so text fields are available in multer callbacks
+  formData.append('pdf', blob, `contract-${contractData.memberId}.pdf`)
 
-  const response = await fetch(`${API_URL}/contracts`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'include',
-    body: formData,
-  })
+  const doUpload = (token: string | null) =>
+    fetch(`${API_URL}/contracts`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+      body: formData,
+    })
+
+  let response = await doUpload(getAccessToken())
+
+  // Token may have expired while the user was reading/signing the contract.
+  // Refresh and retry once on 401.
+  if (response.status === 401) {
+    const refreshed = await tryRefreshToken()
+    if (refreshed) {
+      response = await doUpload(getAccessToken())
+    }
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}))

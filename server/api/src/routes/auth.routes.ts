@@ -30,12 +30,16 @@ function parseCookies(req: Request): Record<string, string> {
 /**
  * Set refresh token as httpOnly cookie. The cookie is scoped to /auth so it's only
  * sent on auth-related requests, minimizing exposure.
+ *
+ * sameSite: 'lax' is required because frontend (club.geeketoys.com.br) and API
+ * (api.geeketoys.com.br) are different origins. 'strict' prevents the cookie from
+ * being sent on cross-origin requests between subdomains.
  */
 function setRefreshCookie(res: Response, refreshToken: string) {
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     path: '/auth',
     maxAge: REFRESH_COOKIE_MAX_AGE_MS,
   });

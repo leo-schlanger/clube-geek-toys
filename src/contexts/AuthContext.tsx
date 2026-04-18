@@ -43,7 +43,7 @@ interface AuthContextType {
   error: string | null
   emailVerified: boolean
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string; userId?: string }>
+  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; userId?: string }>
   signInWithGoogle: (data: {
     accessToken: string
     refreshToken: string
@@ -162,12 +162,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await api.post('/auth/register', { email, password }, { skipAuth: true })
 
       if (result.error) {
-        const errorMessages: Record<string, string> = {
-          'Email já cadastrado': 'Email já cadastrado',
-        }
+        // Use error codes (stable) instead of error messages (locale-dependent, may have accents)
+        const isEmailTaken = result.code === 'EMAIL_ALREADY_EXISTS' || result.status === 409
         return {
           success: false,
-          error: errorMessages[result.error] || result.error || 'Erro ao criar conta',
+          error: isEmailTaken ? 'Email já cadastrado' : (result.error || 'Erro ao criar conta'),
+          code: result.code,
         }
       }
 

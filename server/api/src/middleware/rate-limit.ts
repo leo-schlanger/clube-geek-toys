@@ -10,10 +10,20 @@ export const defaultLimiter = rateLimit({
 
 export const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 10,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas tentativas. Aguarde 5 minutos.' },
+});
+
+// Separate limiter for public lookup endpoints (CPF check, etc.)
+// that should NOT share the auth rate limit pool.
+export const publicLookupLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas consultas. Aguarde um momento.' },
 });
 
 export const paymentLimiter = rateLimit({

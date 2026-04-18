@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
-import { normalizeEmail, normalizeCPF } from '../lib/sanitize'
+import { normalizeCPF } from '../lib/sanitize'
 import { validateEmail } from '../lib/email-validation'
 import { createMember, isCPFRegistered } from '../lib/members'
 import { getMemberByUserId } from '../lib/members'
@@ -30,7 +30,7 @@ const DRAFT_KEY = 'clube_geek_register_draft'
 export default function Register() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { signUp, signInWithGoogle, user, sendVerificationEmail, emailVerified } = useAuth()
+  const { signUp, signInWithGoogle, user, emailVerified } = useAuth()
 
   // ─── State ──────────────────────────────────────────────────────────────────
   // 3 steps: 1=Conta+Dados, 2=Contrato, 3=Pagamento
@@ -183,7 +183,8 @@ export default function Register() {
       toast.loading('Criando sua conta...', { id: 'reg-progress' })
       const result = await signUp(data.email, data.password)
       if (!result.success) {
-        if (result.error === 'Email ja cadastrado') {
+        // Use error code (stable) instead of comparing translated error strings
+        if (result.code === 'EMAIL_ALREADY_EXISTS') {
           toast.error('Este email ja esta cadastrado.', {
             id: 'reg-progress',
             duration: 8000,
@@ -203,8 +204,8 @@ export default function Register() {
       setAccountCreated(true)
       toast.success('Conta criada! Agora preencha seus dados.', { id: 'reg-progress' })
 
-      // Send verification email in background (user verifies later)
-      sendVerificationEmail().catch(() => {})
+      // Backend register() already sends verification email — no need to call again.
+      // Calling sendVerificationEmail() here would duplicate the email AND waste a rate-limit token.
     } catch (error) {
       logger.error('Error creating account:', error)
       toast.error('Erro ao criar conta. Verifique sua conexao.', { id: 'reg-progress' })
@@ -212,7 +213,7 @@ export default function Register() {
       setLoading(false)
       isSubmittingRef.current = false
     }
-  }, [signUp, navigate, sendVerificationEmail])
+  }, [signUp, navigate])
 
   const handleGoogleSuccess = useCallback((data: Record<string, unknown>) => {
     const result = signInWithGoogle(data)
@@ -263,6 +264,12 @@ export default function Register() {
 
       toast.loading('Salvando dados...', { id: 'reg-progress' })
       const userId = user?.id || ''
+      const memberEmail = memberData.email || user?.email || ''
+      if (!memberEmail) {
+        toast.error('Email nao encontrado. Volte e crie sua conta novamente.', { id: 'reg-progress' })
+        return
+      }
+
       let member = null
       let lastError = null
 
@@ -271,7 +278,7 @@ export default function Register() {
           member = await Promise.race([
             createMember(userId, {
               fullName: data.fullName,
-              email: memberData.email || normalizeEmail(data.fullName),
+              email: memberEmail,
               cpf: normalizeCPF(data.cpf),
               phone: data.phone,
               plan: selectedPlan,
