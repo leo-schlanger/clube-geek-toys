@@ -192,16 +192,16 @@ export function MembersTable({
             </Badge>
             {member.status === 'pending' && (
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
+                variant="success"
+                size="sm"
+                className="h-7 text-xs"
                 onClick={(e) => {
                   e.stopPropagation()
                   onActivate(member)
                 }}
-                title="Ativar membro"
               >
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                Ativar
               </Button>
             )}
           </div>

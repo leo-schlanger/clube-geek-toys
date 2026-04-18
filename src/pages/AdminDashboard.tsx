@@ -421,28 +421,43 @@ export default function AdminDashboard() {
               {/* Pending PIX Payments Alert */}
               {pendingMembers.length > 0 && (
                 <Card className="border-2 border-yellow-500/60 bg-yellow-500/10">
-                  <CardContent className="p-4 lg:p-6">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="h-6 w-6 text-yellow-500 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <h3 className="font-bold text-lg text-yellow-200">
-                            {pendingMembers.length} pagamento{pendingMembers.length > 1 ? 's' : ''} pendente{pendingMembers.length > 1 ? 's' : ''}
-                          </h3>
-                          <p className="text-sm text-yellow-200/80 mt-1">
-                            {pendingMembers.map(m => m.fullName).join(', ')} — Verifique o extrato bancario e ative.
-                          </p>
-                        </div>
+                  <CardContent className="p-4 lg:p-6 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="font-bold text-lg text-yellow-200">
+                          {pendingMembers.length} pagamento{pendingMembers.length > 1 ? 's' : ''} aguardando confirmação
+                        </h3>
+                        <p className="text-sm text-yellow-200/80 mt-1">
+                          Verifique o extrato bancário. Se o PIX foi recebido, clique em <strong>Confirmar Pagamento</strong>.
+                        </p>
                       </div>
-                      <Button
-                        variant="warning"
-                        size="lg"
-                        onClick={() => setActiveTab('members')}
-                        className="w-full sm:w-auto"
-                      >
-                        <Users className="h-5 w-5 mr-2" />
-                        Ver Pendentes
-                      </Button>
+                    </div>
+
+                    {/* Direct activation buttons for each pending member */}
+                    <div className="space-y-2">
+                      {pendingMembers.map(m => {
+                        const planData = PLANS[m.plan as PlanType]
+                        const expectedAmount = m.paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+                        return (
+                          <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-yellow-500/10 rounded-lg">
+                            <div className="min-w-0">
+                              <p className="font-semibold truncate">{m.fullName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {planData.name} · {formatCurrency(expectedAmount)}
+                              </p>
+                            </div>
+                            <Button
+                              variant="warning"
+                              size="sm"
+                              className="shrink-0"
+                              onClick={() => handleQuickActivate(m)}
+                            >
+                              Confirmar Pagamento
+                            </Button>
+                          </div>
+                        )
+                      })}
                     </div>
                   </CardContent>
                 </Card>
@@ -475,22 +490,22 @@ export default function AdminDashboard() {
               </Suspense>
 
               {/* Quick Links */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setActiveTab('members')}>
-                  <Users className="h-5 w-5" />
-                  <span className="text-xs">Ver Membros</span>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" className="h-auto py-5 flex-col gap-2" onClick={() => setActiveTab('members')}>
+                  <Users className="h-6 w-6" />
+                  <span className="text-sm font-medium">Ver Membros</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setActiveTab('points')}>
-                  <Star className="h-5 w-5" />
-                  <span className="text-xs">Ranking Pontos</span>
+                <Button variant="outline" className="h-auto py-5 flex-col gap-2" onClick={() => setActiveTab('points')}>
+                  <Star className="h-6 w-6" />
+                  <span className="text-sm font-medium">Ranking de Pontos</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setActiveTab('reports')}>
-                  <TrendingUp className="h-5 w-5" />
-                  <span className="text-xs">Relatórios</span>
+                <Button variant="outline" className="h-auto py-5 flex-col gap-2" onClick={() => setActiveTab('reports')}>
+                  <TrendingUp className="h-6 w-6" />
+                  <span className="text-sm font-medium">Relatórios</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-4 flex-col gap-2" onClick={() => setActiveTab('settings')}>
-                  <CreditCard className="h-5 w-5" />
-                  <span className="text-xs">Configurações</span>
+                <Button variant="outline" className="h-auto py-5 flex-col gap-2" onClick={() => setActiveTab('settings')}>
+                  <CreditCard className="h-6 w-6" />
+                  <span className="text-sm font-medium">Configurações</span>
                 </Button>
               </div>
             </div>

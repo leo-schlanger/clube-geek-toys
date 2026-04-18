@@ -125,8 +125,8 @@ export function LogsTab({
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
-                <CardTitle>Historico de Atividade</CardTitle>
-                <CardDescription>Acompanhe as ultimas acoes registradas no sistema</CardDescription>
+                <CardTitle>Histórico de Atividade</CardTitle>
+                <CardDescription>Acompanhe as últimas ações registradas no sistema</CardDescription>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <Input

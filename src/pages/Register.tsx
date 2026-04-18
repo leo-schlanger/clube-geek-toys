@@ -356,7 +356,7 @@ export default function Register() {
 
   const stepSubtitle = step === 1
     ? (accountCreated ? 'Preencha seus dados pessoais' : 'Crie sua conta para comecar')
-    : step === 2 ? 'Leia e assine o contrato de adesao'
+    : step === 2 ? 'Leia e assine o contrato de adesão'
     : 'Finalize o pagamento para ativar'
 
   // ─── Render ───────────────────────────────────────────────────────────────

@@ -263,21 +263,24 @@ export function RealtimeMetrics() {
       {/* Secondary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Pendentes"
+          title="Aguardando Ativação"
           value={stats.pendingMembers}
+          subtitle={stats.pendingMembers > 0 ? 'Verifique o extrato e ative' : 'Nenhum pendente'}
           icon={<Clock className="h-5 w-5" />}
           colorClass="text-yellow-500"
+          highlight={stats.pendingMembers > 0}
         />
         <StatCard
-          title="Expirados"
+          title="Membros Expirados"
           value={stats.expiredMembers}
+          subtitle={stats.expiredMembers > 0 ? 'Precisam renovar' : 'Todos em dia'}
           icon={<UserX className="h-5 w-5" />}
           colorClass="text-red-500"
         />
         <StatCard
           title="Novos Hoje"
           value={stats.newMembersToday}
-          subtitle={`${stats.newMembersThisWeek} esta semana`}
+          subtitle={`${stats.newMembersThisWeek} nesta semana`}
           icon={<Calendar className="h-5 w-5" />}
           colorClass="text-purple-500"
           highlight={stats.newMembersToday > 0}
@@ -285,7 +288,7 @@ export function RealtimeMetrics() {
         <StatCard
           title="Pontos Hoje"
           value={`+${stats.pointsEarnedToday}`}
-          subtitle={`-${stats.pointsRedeemedToday} resgatados`}
+          subtitle={`${stats.pointsRedeemedToday} resgatados`}
           icon={<Coins className="h-5 w-5" />}
           colorClass="text-amber-500"
         />
@@ -330,7 +333,7 @@ export function RealtimeMetrics() {
               )}
             </div>
             <Badge variant="outline" className="text-xs">
-              Saude do Sistema
+              Saúde do Sistema
             </Badge>
           </div>
         </CardContent>

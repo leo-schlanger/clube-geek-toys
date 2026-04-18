@@ -165,13 +165,13 @@ export function ChurnMetrics({ data, loading }: ChurnMetricsProps) {
               'bg-red-500'
             }`} />
             <span className="text-sm font-medium">
-              {metrics.avgRate < 2 ? 'Saude Excelente' :
-               metrics.avgRate < 5 ? 'Atencao Necessaria' :
-               'Churn Alto - Acoes Urgentes'}
+              {metrics.avgRate < 2 ? 'Saúde Excelente' :
+               metrics.avgRate < 5 ? 'Atenção Necessária' :
+               'Churn Alto - Ações Urgentes'}
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {metrics.avgRate < 2 ? 'A taxa de churn esta dentro do esperado. Continue monitorando.' :
+            {metrics.avgRate < 2 ? 'A taxa de churn está dentro do esperado. Continue monitorando.' :
              metrics.avgRate < 5 ? 'A taxa de churn esta moderada. Considere acoes de retencao.' :
              'A taxa de churn esta alta. Recomendado analisar causas e implementar estrategias de retencao.'}
           </p>
