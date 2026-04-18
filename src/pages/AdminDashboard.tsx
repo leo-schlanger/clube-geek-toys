@@ -36,6 +36,7 @@ import {
   Star,
   RefreshCw,
   ShoppingCart,
+  AlertCircle,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -234,11 +235,9 @@ export default function AdminDashboard() {
   }, [fetchData])
 
   const handleQuickActivate = useCallback(async (member: Member) => {
-    // Calcular valor esperado do pagamento
     const plan = PLANS[member.plan as PlanType]
     const expectedAmount = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
 
-    // Confirmação com verificação de pagamento obrigatória
     const confirmed = confirm(
       `⚠️ VERIFICAÇÃO DE PAGAMENTO OBRIGATÓRIA\n\n` +
       `Antes de ativar, confirme que o pagamento foi recebido:\n\n` +
@@ -253,8 +252,22 @@ export default function AdminDashboard() {
     if (!confirmed) return
 
     try {
-      await updateMember(member.id, { status: 'active' })
-      toast.success('Membro ativado com sucesso')
+      // Find pending PIX payment for this member and confirm it via the proper endpoint.
+      // This sets payment status to 'paid', calculates expiry dates, and sends confirmation email.
+      const payments = await api.get<{ id: string; status: string; method: string }[]>(
+        `/payments?member_id=${member.id}&status=pending&limit=1`
+      )
+      const pendingPayment = (payments.data || []).find(p => p.method === 'pix')
+
+      if (pendingPayment) {
+        const result = await api.post(`/payments/${pendingPayment.id}/confirm`)
+        if (result.error) throw new Error(result.error)
+        toast.success('Pagamento PIX confirmado e membro ativado!')
+      } else {
+        // No pending PIX payment found — activate directly (manual/admin override)
+        await updateMember(member.id, { status: 'active' })
+        toast.success('Membro ativado manualmente')
+      }
       fetchData(true)
     } catch (error) {
       logger.error('Error activating member:', error)
@@ -401,8 +414,40 @@ export default function AdminDashboard() {
           </div>
 
           {/* Dashboard Content */}
-          {activeTab === 'dashboard' && (
+          {activeTab === 'dashboard' && (() => {
+            const pendingMembers = members.filter(m => m.status === 'pending')
+            return (
             <div className="space-y-6">
+              {/* Pending PIX Payments Alert */}
+              {pendingMembers.length > 0 && (
+                <Card className="border-2 border-yellow-500/60 bg-yellow-500/10">
+                  <CardContent className="p-4 lg:p-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-6 w-6 text-yellow-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h3 className="font-bold text-lg text-yellow-200">
+                            {pendingMembers.length} pagamento{pendingMembers.length > 1 ? 's' : ''} pendente{pendingMembers.length > 1 ? 's' : ''}
+                          </h3>
+                          <p className="text-sm text-yellow-200/80 mt-1">
+                            {pendingMembers.map(m => m.fullName).join(', ')} — Verifique o extrato bancario e ative.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="warning"
+                        size="lg"
+                        onClick={() => setActiveTab('members')}
+                        className="w-full sm:w-auto"
+                      >
+                        <Users className="h-5 w-5 mr-2" />
+                        Ver Pendentes
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Quick Action - PDV */}
               <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
                 <CardContent className="p-4 lg:p-6">
@@ -449,7 +494,8 @@ export default function AdminDashboard() {
                 </Button>
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Other Tabs */}
           <Suspense fallback={<TabLoadingFallback />}>

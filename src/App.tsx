@@ -212,7 +212,7 @@ function MemberRoutes() {
       <Route
         path="/membro"
         element={
-          <ProtectedRoute allowedRoles={['member']}>
+          <ProtectedRoute allowedRoles={['member']} requireEmailVerification={false}>
             <MemberDashboard />
           </ProtectedRoute>
         }

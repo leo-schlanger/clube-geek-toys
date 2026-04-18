@@ -333,11 +333,8 @@ export default function Register() {
   // ─── Step 3: Payment success ─────────────────────────────────────────────
 
   const handlePaymentSuccess = useCallback(() => {
-    toast.success('Pagamento recebido! Estamos ativando sua conta...', {
-      description: 'A confirmacao leva alguns segundos.',
-      duration: 5000,
-    })
-    setTimeout(() => navigate('/membro'), 3000)
+    toast.success('Pagamento recebido! Redirecionando...', { duration: 3000 })
+    navigate('/membro')
   }, [navigate])
 
   // ─── Loading state ───────────────────────────────────────────────────────

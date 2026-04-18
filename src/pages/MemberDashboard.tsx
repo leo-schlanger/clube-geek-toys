@@ -23,6 +23,7 @@ import {
   Settings,
   RefreshCw,
   AlertTriangle,
+  Mail,
 } from 'lucide-react'
 
 // Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
@@ -33,7 +34,7 @@ const ProfileEditModal = lazy(() => import('../components/ProfileEditModal').the
 type ModalType = 'renew' | 'upgrade' | 'profile' | null
 
 export default function MemberDashboard() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, emailVerified, sendVerificationEmail } = useAuth()
   const [member, setMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalType>(null)
@@ -195,6 +196,29 @@ export default function MemberDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
+        {/* Email Verification Banner */}
+        {!emailVerified && (
+          <div className="mb-6 p-4 rounded-lg bg-blue-500/15 border border-blue-500/40 flex items-center gap-3">
+            <Mail className="h-5 w-5 text-blue-400 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-blue-200">
+                <strong>Verifique seu email</strong> — Confirme seu email para garantir acesso completo a sua conta.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const result = await sendVerificationEmail()
+                if (result.success) toast.success('Email de verificacao enviado!')
+                else toast.error(result.error || 'Erro ao enviar email')
+              }}
+            >
+              Reenviar
+            </Button>
+          </div>
+        )}
+
         {/* Expiry Alert */}
         {(isExpired || isExpiringSoon) && (
           <div
