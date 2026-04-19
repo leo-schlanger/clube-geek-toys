@@ -272,7 +272,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Sua assinatura foi pausada conforme solicitado. Enquanto pausada:</p>
         ${featureList([
           '❌ Não haverá cobranças no seu cartão',
-          '⚠️ Benefícios do plano ficam suspensos',
+          '✅ Seus benefícios continuam válidos até o vencimento',
           '✅ Você pode reativar a qualquer momento',
         ])}`,
       cta: { text: 'Reativar Assinatura', url: `${frontendUrl}/membro` },
@@ -398,6 +398,11 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
        </div>`
     : '';
 
+  const siteUrl = 'https://geeketoys.com.br';
+  const clubUrl = frontendUrl;
+  const logoUrl = `${siteUrl}/logo.jpg`;
+  const whatsappUrl = 'https://wa.me/5521985464666';
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -413,30 +418,58 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
   <div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${tmpl.preheader}${'&nbsp;&zwnj;'.repeat(20)}</div>
 
   <div style="max-width:600px;margin:0 auto;padding:16px">
-    <!-- Header -->
-    <div style="text-align:center;padding:28px 0 20px">
-      <div style="display:inline-block;padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#16213e,#1a2744)">
-        <h1 style="margin:0;font-size:24px;letter-spacing:2px"><span style="color:#d4a520">GEEK</span><span style="color:#ffffff;opacity:0.6">&amp;</span><span style="color:#ffffff">TOYS</span></h1>
-        <p style="margin:4px 0 0;font-size:10px;color:#64748b;letter-spacing:3px;text-transform:uppercase">Clube de Vantagens</p>
+    <!-- Header with Logo -->
+    <div style="text-align:center;padding:24px 0 16px">
+      <a href="${siteUrl}" style="text-decoration:none">
+        <img src="${logoUrl}" alt="Geek &amp; Toys" width="80" height="80" style="display:inline-block;width:80px;height:80px;border-radius:16px;border:2px solid rgba(212,165,32,0.3)" />
+      </a>
+      <div style="margin-top:12px">
+        <a href="${siteUrl}" style="text-decoration:none;font-size:22px;letter-spacing:2px;font-weight:800">
+          <span style="color:#d4a520">GEEK</span><span style="color:#ffffff;opacity:0.5">&amp;</span><span style="color:#ffffff">TOYS</span>
+        </a>
+        <p style="margin:2px 0 0;font-size:10px;color:#d4a520;letter-spacing:3px;text-transform:uppercase;font-weight:600">Clube de Vantagens</p>
       </div>
     </div>
 
+    <!-- Gold Accent Line -->
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#d4a520,transparent);margin:0 40px 16px"></div>
+
     <!-- Content Card -->
-    <div style="background:#16213e;border-radius:16px;padding:28px 24px;border:1px solid rgba(255,255,255,0.06);color:#e2e8f0;line-height:1.7;font-size:15px">
+    <div style="background:linear-gradient(180deg,#16213e,#141e33);border-radius:16px;padding:28px 24px;border:1px solid rgba(212,165,32,0.12);color:#e2e8f0;line-height:1.7;font-size:15px">
       ${tmpl.body}
       ${ctaHtml}
     </div>
 
     <!-- Footer -->
-    <div style="text-align:center;padding:24px 16px;color:#64748b;font-size:11px;line-height:1.6">
-      <p style="margin:0;font-weight:600;color:#94a3b8">Geek &amp; Toys LTDA</p>
-      <p style="margin:4px 0">CNPJ: 00.000.000/0001-00 &bull; geeketoys.com.br</p>
-      <p style="margin:4px 0">Este é um e-mail transacional enviado automaticamente.</p>
-      <p style="margin:8px 0 0">
-        <a href="${frontendUrl}" style="color:#d4a520;text-decoration:none">Site</a>
-        &nbsp;&bull;&nbsp;
-        <a href="${frontendUrl}/membro" style="color:#d4a520;text-decoration:none">Minha Conta</a>
-      </p>
+    <div style="padding:24px 16px 8px">
+      <!-- Divider -->
+      <div style="height:1px;background:rgba(212,165,32,0.15);margin-bottom:20px"></div>
+
+      <!-- Social Links -->
+      <div style="text-align:center;margin-bottom:16px">
+        <a href="https://www.instagram.com/geeketoys/" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#d4a520;text-decoration:none;font-size:16px;margin:0 4px" title="Instagram">&#9737;</a>
+        <a href="https://www.facebook.com/geeketoyscolection/" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#d4a520;text-decoration:none;font-size:16px;margin:0 4px" title="Facebook">f</a>
+        <a href="https://www.tiktok.com/@geeketoys" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#d4a520;text-decoration:none;font-size:16px;margin:0 4px" title="TikTok">&#9835;</a>
+        <a href="${whatsappUrl}" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#25d366;text-decoration:none;font-size:16px;margin:0 4px" title="WhatsApp">&#9742;</a>
+      </div>
+
+      <!-- Site Links -->
+      <div style="text-align:center;margin-bottom:14px">
+        <a href="${siteUrl}" style="color:#d4a520;text-decoration:none;font-size:12px;font-weight:600">Loja Online</a>
+        <span style="color:#334155;margin:0 8px">&bull;</span>
+        <a href="${clubUrl}/membro" style="color:#d4a520;text-decoration:none;font-size:12px;font-weight:600">Minha Conta</a>
+        <span style="color:#334155;margin:0 8px">&bull;</span>
+        <a href="${whatsappUrl}" style="color:#d4a520;text-decoration:none;font-size:12px;font-weight:600">WhatsApp</a>
+      </div>
+
+      <!-- Company Info -->
+      <div style="text-align:center;color:#475569;font-size:10px;line-height:1.6">
+        <p style="margin:0;font-weight:600;color:#64748b">Geek &amp; Toys &mdash; Pioneiros do Funko Pop no Brasil</p>
+        <p style="margin:3px 0">CNPJ: 52.846.344/0001-10</p>
+        <p style="margin:3px 0">R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ</p>
+        <p style="margin:3px 0">(21) 98546-4666 &bull; geeketoys.com.br</p>
+        <p style="margin:8px 0 0;color:#334155">Este e-mail foi enviado automaticamente. N&atilde;o responda.</p>
+      </div>
     </div>
   </div>
 </body>
