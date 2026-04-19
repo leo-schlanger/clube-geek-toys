@@ -218,6 +218,7 @@ export async function createPixPayment(data: {
       payment_id: paymentId,
       admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
     },
+    member_id: data.memberId,
   }).catch((err) => console.error('[PIX] Failed to notify admin:', err));
 
   return { paymentId, pixData };

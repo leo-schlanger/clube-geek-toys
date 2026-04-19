@@ -239,13 +239,25 @@ async function expireMembers() {
   if (result.rowCount && result.rowCount > 0) {
     console.log(`[CRON] Expired ${result.rowCount} members`);
 
-    // Log each expiration in audit_logs
     for (const member of result.rows) {
+      // Audit log
       await query(
         `INSERT INTO audit_logs (action, member_id, details)
          VALUES ('member_expired', $1, '{"reason":"expiry_date_passed","auto":true}')`,
         [member.id]
       ).catch(() => {});
+
+      // Notify member (fetch plan for email)
+      const planResult = await query('SELECT plan FROM members WHERE id = $1', [member.id]);
+      sendTemplateEmail({
+        template: 'member-expired',
+        to: member.email,
+        variables: {
+          name: member.full_name,
+          plan: planResult.rows[0]?.plan || '',
+        },
+        member_id: member.id,
+      }).catch((err) => console.error(`[CRON] Failed to send expiry email to ${member.email}:`, err));
     }
   } else {
     console.log('[CRON] No members to expire');

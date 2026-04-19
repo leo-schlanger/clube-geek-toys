@@ -16,7 +16,8 @@ const RESEND_API_URL = 'https://api.resend.com/emails';
 const AVAILABLE_TEMPLATES = [
   'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
   'points-expiring', 'subscription-created', 'subscription-payment',
-  'subscription-paused', 'subscription-cancelled', 'subscription-payment-failed',
+  'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
+  'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
   'admin-new-member',
 ];
@@ -188,10 +189,10 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // ─── ONBOARDING ─────────────────────────────────────
     'welcome': {
       subject: 'Bem-vindo ao Clube Geek & Toys! 🎮',
-      preheader: `${name}, sua conta está pronta. Veja o que te espera!`,
+      preheader: `${name}, você agora é membro ${v.plan || ''} do clube!`,
       body: `
         <h2 style="color:#d4a520;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
-        <p>Sua conta no <strong>Clube Geek & Toys</strong> foi criada com sucesso. Você agora faz parte da nossa comunidade geek!</p>
+        <p>Sua conta no <strong>Clube Geek & Toys</strong> foi ativada com sucesso${v.plan ? ` no plano <strong>${v.plan}</strong>` : ''}. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>
         ${featureList([
           '🏷️ Descontos exclusivos em produtos e serviços',
@@ -199,7 +200,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           '🎁 Resgate de prêmios e benefícios',
           '📋 Carteirinha digital com QR Code',
         ])}`,
-      cta: { text: 'Acessar Minha Conta', url: `${frontendUrl}/login` },
+      cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
     },
 
     // ─── PAGAMENTOS ─────────────────────────────────────
@@ -278,6 +279,17 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Reativar Assinatura', url: `${frontendUrl}/membro` },
     },
 
+    'subscription-resumed': {
+      subject: 'Assinatura reativada — Clube Geek & Toys',
+      preheader: `${name}, sua assinatura foi reativada com sucesso!`,
+      body: `
+        <h2 style="color:#4ade80;margin:0 0 12px">Assinatura reativada! ▶️</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Sua assinatura foi reativada com sucesso. As cobranças automáticas foram retomadas e todos os benefícios do seu plano estão ativos.</p>
+        ${infoBox('✅ Seus descontos e pontos voltam a valer normalmente.<br>💳 A próxima cobrança será feita automaticamente.')}`,
+      cta: { text: 'Ver Minha Conta', url: `${frontendUrl}/membro` },
+    },
+
     'subscription-cancelled': {
       subject: 'Assinatura cancelada — Clube Geek & Toys',
       preheader: 'Sua assinatura foi cancelada. Sentiremos sua falta!',
@@ -315,6 +327,22 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           '⭐ Acúmulo de pontos',
           '🎮 Acesso a eventos especiais',
         ])}`,
+      cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
+    },
+
+    'member-expired': {
+      subject: 'Sua assinatura expirou — Clube Geek & Toys',
+      preheader: `${name}, sua assinatura expirou. Renove para continuar aproveitando os benefícios!`,
+      body: `
+        <h2 style="color:#f87171;margin:0 0 12px">Assinatura expirada</h2>
+        <p>Olá, <strong>${name}</strong>.</p>
+        <p>Sua assinatura do plano <strong>${v.plan || ''}</strong> expirou. Enquanto inativa, você não poderá aproveitar os benefícios do clube:</p>
+        ${featureList([
+          '❌ Descontos em produtos e serviços suspensos',
+          '❌ Acúmulo de pontos pausado',
+          '✅ Seus pontos acumulados continuam válidos até a data de expiração',
+        ])}
+        <p>Renove agora e volte a aproveitar tudo!</p>`,
       cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
     },
 

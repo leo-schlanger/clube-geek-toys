@@ -10,7 +10,8 @@ export const emailRouter = Router();
 const VALID_TEMPLATES = [
   'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
   'points-expiring', 'subscription-created', 'subscription-payment',
-  'subscription-paused', 'subscription-cancelled', 'subscription-payment-failed',
+  'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
+  'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
   'admin-new-member',
 ] as const;

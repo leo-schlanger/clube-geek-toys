@@ -304,6 +304,21 @@ export async function resumeSubscription(id: string) {
     stripeSubscriptionId: sub.provider_id,
   }).catch(() => {});
 
+  // Email notification (outside transaction, non-blocking)
+  const memberResult = await query(
+    'SELECT full_name, email, id FROM members WHERE subscription_id = $1',
+    [id],
+  );
+  if (memberResult.rows.length > 0) {
+    const member = memberResult.rows[0];
+    sendTemplateEmail({
+      template: 'subscription-resumed',
+      to: member.email,
+      variables: { name: member.full_name },
+      member_id: member.id,
+    }).catch((err: unknown) => console.error('[SUBSCRIPTION] Email error:', err));
+  }
+
   return mapSubscriptionRow(resultRow);
 }
 
