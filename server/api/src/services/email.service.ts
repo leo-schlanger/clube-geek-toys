@@ -18,6 +18,7 @@ const AVAILABLE_TEMPLATES = [
   'points-expiring', 'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-cancelled', 'subscription-payment-failed',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
+  'admin-new-member',
 ];
 
 export function getAvailableTemplates() {
@@ -121,8 +122,9 @@ export async function sendContractEmail(data: {
     }),
   });
 
-  // Send copy to admin if configured
-  if (data.admin_email) {
+  // Send copy to admin (use explicit admin_email or fallback to env.ADMIN_EMAIL)
+  const adminRecipient = data.admin_email || env.ADMIN_EMAIL;
+  if (adminRecipient && adminRecipient !== data.to) {
     await fetch(RESEND_API_URL, {
       method: 'POST',
       headers: {
@@ -131,7 +133,7 @@ export async function sendContractEmail(data: {
       },
       body: JSON.stringify({
         from: env.FROM_EMAIL,
-        to: [data.admin_email],
+        to: [adminRecipient],
         subject: `[Cópia] ${subject}`,
         html,
         attachments,
@@ -214,7 +216,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ...(v.expiry_date ? [['Válido até', v.expiry_date]] : []),
         ])}
         <p style="margin-top:16px">Sua carteirinha digital já está disponível!</p>`,
-      cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
     },
 
     'payment-failed': {
@@ -225,7 +227,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Olá, <strong>${name}</strong>.</p>
         <p>Infelizmente seu pagamento não foi aprovado. Isso pode acontecer por diversos motivos, como limite insuficiente ou dados incorretos.</p>
         ${infoBox('💡 <strong>O que fazer:</strong><br>• Verifique o limite do seu cartão<br>• Confira se os dados estão corretos<br>• Tente outro método de pagamento (PIX)')}`,
-      cta: { text: 'Tentar Novamente', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Tentar Novamente', url: `${frontendUrl}/membro` },
     },
 
     // ─── ASSINATURA ─────────────────────────────────────
@@ -242,7 +244,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Cartão', `•••• ${v.card_last_four || '****'}`],
         ])}
         ${infoBox('💳 A cobrança será feita automaticamente no cartão cadastrado.<br>📅 Você pode pausar ou cancelar a qualquer momento.')}`,
-      cta: { text: 'Gerenciar Assinatura', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Gerenciar Assinatura', url: `${frontendUrl}/membro` },
     },
 
     'subscription-payment': {
@@ -258,7 +260,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Próxima cobrança', v.next_payment || '—'],
         ])}
         <p style="margin-top:12px">Sua assinatura continua ativa. Obrigado pela confiança!</p>`,
-      cta: { text: 'Ver Minha Conta', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Ver Minha Conta', url: `${frontendUrl}/membro` },
     },
 
     'subscription-paused': {
@@ -273,7 +275,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           '⚠️ Benefícios do plano ficam suspensos',
           '✅ Você pode reativar a qualquer momento',
         ])}`,
-      cta: { text: 'Reativar Assinatura', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Reativar Assinatura', url: `${frontendUrl}/membro` },
     },
 
     'subscription-cancelled': {
@@ -296,7 +298,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Olá, <strong>${name}</strong>.</p>
         <p>Não foi possível processar sua cobrança recorrente de <strong>R$ ${v.amount || '0,00'}</strong>.</p>
         ${infoBox(`⚠️ <strong>Tentativa ${v.failed_count || '?'} de 3.</strong><br>Após 3 falhas consecutivas, a assinatura será cancelada automaticamente.<br><br>💡 Verifique se seu cartão está válido e com limite disponível.`)}`,
-      cta: { text: 'Atualizar Cartão', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Atualizar Cartão', url: `${frontendUrl}/membro` },
     },
 
     // ─── RENOVAÇÃO / PONTOS ─────────────────────────────
@@ -313,7 +315,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           '⭐ Acúmulo de pontos',
           '🎮 Acesso a eventos especiais',
         ])}`,
-      cta: { text: 'Renovar Agora', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
     },
 
     'points-expiring': {
@@ -325,7 +327,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Você tem <strong style="color:#d4a520;font-size:20px">${v.points || '0'} pontos</strong> que expiram em <strong>${v.expiry_date || 'breve'}</strong>.</p>
         <p>Visite a loja e use seus pontos antes que expirem!</p>
         ${infoBox('💡 Seus pontos podem ser trocados por descontos e produtos exclusivos na loja.')}`,
-      cta: { text: 'Ver Meus Pontos', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Ver Meus Pontos', url: `${frontendUrl}/membro` },
     },
 
     // ─── CONTRATO ───────────────────────────────────────
@@ -342,7 +344,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Hash do documento', `<span style="font-family:monospace;font-size:11px;word-break:break-all">${v.hash || '—'}</span>`],
         ])}
         <p style="margin-top:12px;font-size:13px;color:#94a3b8">O PDF do contrato está anexado a este e-mail. Guarde-o para seus registros.</p>`,
-      cta: { text: 'Acessar Minha Conta', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Acessar Minha Conta', url: `${frontendUrl}/membro` },
     },
 
     // ─── ADMIN: PIX PENDENTE ────────────────────────────
@@ -362,6 +364,25 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Verifique no extrato bancário se o PIX com o TX ID acima foi recebido<br>2. Acesse o painel admin e confirme o pagamento<br>3. O membro será ativado automaticamente após a confirmação')}`,
       cta: { text: 'Abrir Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
+    },
+
+    // ─── ADMIN: NOVO MEMBRO CADASTRADO ─────────────────
+    'admin-new-member': {
+      subject: '👤 Novo membro cadastrado — Clube Geek & Toys',
+      preheader: `${v.member_name || 'Novo membro'} se cadastrou no plano ${v.plan || ''}.`,
+      body: `
+        <h2 style="color:#3b82f6;margin:0 0 12px">Novo membro cadastrado 👤</h2>
+        <p>Um novo membro completou o cadastro no clube.</p>
+        ${dataTable([
+          ['Nome', escapeHtml(v.member_name || '—')],
+          ['Email', v.member_email || '—'],
+          ['CPF', v.member_cpf || '—'],
+          ['Telefone', v.member_phone || '—'],
+          ['Plano', v.plan || '—'],
+          ['Pagamento', v.payment_type || '—'],
+        ])}
+        <p style="margin-top:12px;font-size:13px;color:#94a3b8">O membro está aguardando pagamento para ativação.</p>`,
+      cta: { text: 'Ver no Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
     },
   };
 
@@ -414,7 +435,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       <p style="margin:8px 0 0">
         <a href="${frontendUrl}" style="color:#d4a520;text-decoration:none">Site</a>
         &nbsp;&bull;&nbsp;
-        <a href="${frontendUrl}/minha-conta" style="color:#d4a520;text-decoration:none">Minha Conta</a>
+        <a href="${frontendUrl}/membro" style="color:#d4a520;text-decoration:none">Minha Conta</a>
       </p>
     </div>
   </div>

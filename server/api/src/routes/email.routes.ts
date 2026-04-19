@@ -12,6 +12,7 @@ const VALID_TEMPLATES = [
   'points-expiring', 'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-cancelled', 'subscription-payment-failed',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
+  'admin-new-member',
 ] as const;
 
 const sendEmailSchema = z.object({

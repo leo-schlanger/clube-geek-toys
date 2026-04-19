@@ -41,6 +41,7 @@ interface PaymentModalProps {
   paymentType: PaymentType
   memberEmail?: string
   memberId?: string
+  memberName?: string
   initialPendingPayment?: PendingPaymentInfo
   onClose: () => void
   onSuccess: () => void
@@ -53,6 +54,7 @@ export function PaymentModal({
   paymentType,
   memberEmail = 'cliente@email.com',
   memberId = 'temp_member',
+  memberName = 'Membro',
   initialPendingPayment,
   onClose,
   onSuccess,
@@ -211,7 +213,7 @@ export function PaymentModal({
           plan,
           frequency_type: paymentType === 'monthly' ? 'months' : 'years',
           payer_email: memberEmail,
-          payer_name: 'Membro',
+          payer_name: memberName,
           transaction_amount: amount,
         })
         if (res.error) throw new Error(res.error)
@@ -221,7 +223,7 @@ export function PaymentModal({
           amount,
           description: `Clube Geek & Toys - Plano ${planData.name}`,
           payer_email: memberEmail,
-          payer_name: 'Membro',
+          payer_name: memberName,
           external_reference: memberId,
         })
         if (res.error) throw new Error(res.error)
@@ -316,7 +318,7 @@ export function PaymentModal({
                 <Button variant="outline" size="lg" onClick={handlePixPayment} disabled={loading} className="h-auto py-4 flex-col gap-2">
                   <QrCode className="h-6 w-6 text-green-500" />
                   <span>PIX</span>
-                  <span className="text-xs text-muted-foreground">Aprovação instantânea*</span>
+                  <span className="text-xs text-muted-foreground">QR Code na hora</span>
                 </Button>
                 <Button variant="outline" size="lg" onClick={handleCardPayment} disabled={loading} className="h-auto py-4 flex-col gap-2">
                   <CreditCard className="h-6 w-6 text-blue-500" />
@@ -324,7 +326,7 @@ export function PaymentModal({
                   <span className="text-xs text-muted-foreground">Crédito</span>
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center">*PIX: confirmação pelo admin após verificar o pagamento</p>
+              <p className="text-[10px] text-muted-foreground text-center">PIX: ativação após nossa equipe confirmar o recebimento (geralmente em minutos)</p>
               {loading && <div className="flex justify-center"><Loading size="lg" /></div>}
             </div>
           )}

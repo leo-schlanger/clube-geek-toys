@@ -25,6 +25,8 @@ function getTransactionIcon(type: string) {
   switch (type) {
     case 'earn':
       return <TrendingUp className="h-4 w-4 text-green-500" />
+    case 'bonus':
+      return <Gift className="h-4 w-4 text-yellow-500" />
     case 'redeem':
       return <Gift className="h-4 w-4 text-blue-500" />
     case 'expire':
@@ -38,6 +40,8 @@ function getTransactionColor(type: string) {
   switch (type) {
     case 'earn':
       return 'text-green-500'
+    case 'bonus':
+      return 'text-yellow-500'
     case 'redeem':
       return 'text-blue-500'
     case 'expire':

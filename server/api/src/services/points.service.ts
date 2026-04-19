@@ -11,20 +11,41 @@ export async function getPointsHistory(memberId: string, limit: number) {
   return result.rows.map(mapPointRow);
 }
 
-export async function getExpiringPoints(memberId: string) {
+export async function getExpiringPoints(memberId: string, withinDays = 30) {
   const result = await query(
     `SELECT * FROM point_transactions
-     WHERE member_id = $1 AND type = 'earn' AND expired = FALSE AND expires_at IS NOT NULL
+     WHERE member_id = $1 AND type = 'earn' AND expired = FALSE
+       AND expires_at IS NOT NULL
+       AND expires_at >= CURRENT_DATE
+       AND expires_at <= CURRENT_DATE + ($2::int * INTERVAL '1 day')
      ORDER BY expires_at ASC`,
-    [memberId]
+    [memberId, withinDays]
   );
   return result.rows.map(mapPointRow);
 }
 
 export async function getBalance(memberId: string) {
-  const result = await query('SELECT points FROM members WHERE id = $1', [memberId]);
+  const result = await query('SELECT id FROM members WHERE id = $1', [memberId]);
   if (result.rows.length === 0) throw new AppError(404, 'Membro não encontrado');
-  return { points: result.rows[0].points };
+
+  // Calculate real balance from transactions, excluding earn points past expiration date
+  // (cron may not have processed them yet today)
+  const balanceResult = await query(
+    `SELECT COALESCE(SUM(
+      CASE
+        WHEN type = 'earn' AND expired = false AND (expires_at IS NULL OR expires_at >= CURRENT_DATE) THEN points
+        WHEN type = 'bonus' THEN points
+        WHEN type = 'redeem' THEN points
+        WHEN type = 'expire' THEN points
+        ELSE 0
+      END
+    ), 0)::int as real_balance
+    FROM point_transactions
+    WHERE member_id = $1`,
+    [memberId]
+  );
+
+  return { points: Math.max(0, balanceResult.rows[0].real_balance) };
 }
 
 export async function earnPoints(
@@ -188,26 +209,28 @@ export async function redeemPoints(
       throw new AppError(400, 'Apenas membros ativos podem resgatar pontos');
     }
 
-    // Real balance excludes expired points (members.points can drift)
+    // Real balance: excludes expired AND past-expiration-date points (cron may not have run yet today)
     const balanceResult = await client.query(
       `SELECT COALESCE(SUM(
-        CASE WHEN type IN ('earn','bonus') AND expired = false THEN points
-             WHEN type = 'redeem' THEN points
-             WHEN type = 'expire' THEN points
-             ELSE 0 END
+        CASE
+          WHEN type = 'earn' AND expired = false AND (expires_at IS NULL OR expires_at >= CURRENT_DATE) THEN points
+          WHEN type = 'bonus' THEN points
+          WHEN type = 'redeem' THEN points
+          WHEN type = 'expire' THEN points
+          ELSE 0
+        END
       ), 0)::int as real_balance
       FROM point_transactions
       WHERE member_id = $1`,
       [memberId]
     );
-    const realBalance = balanceResult.rows[0].real_balance;
+    const realBalance = Math.max(0, balanceResult.rows[0].real_balance);
     if (realBalance < points) {
       throw new AppError(400, 'Saldo insuficiente de pontos', 'INSUFFICIENT_POINTS');
     }
 
-    const currentPoints = memberResult.rows[0].points;
-
-    const newBalance = currentPoints - points;
+    // Use realBalance (not members.points which can drift) for the new balance
+    const newBalance = realBalance - points;
 
     const txResult = await client.query(
       `INSERT INTO point_transactions (member_id, type, points, balance, description, created_by)

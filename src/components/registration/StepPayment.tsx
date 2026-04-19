@@ -47,6 +47,7 @@ interface StepPaymentProps {
   paymentType: PaymentType
   memberId: string
   memberEmail: string
+  memberName: string
   onSuccess: () => void
   onBack: () => void
 }
@@ -68,6 +69,7 @@ export function StepPayment({
   paymentType,
   memberId,
   memberEmail,
+  memberName,
   onSuccess,
   onBack,
 }: StepPaymentProps) {
@@ -206,7 +208,7 @@ export function StepPayment({
           plan,
           frequency_type: paymentType === 'monthly' ? 'months' : 'years',
           payer_email: memberEmail,
-          payer_name: 'Membro',
+          payer_name: memberName,
           transaction_amount: amount,
         })
         if (res.error) throw new Error(res.error)
@@ -216,7 +218,7 @@ export function StepPayment({
           amount,
           description: `Clube Geek & Toys - Plano ${planData.name}`,
           payer_email: memberEmail,
-          payer_name: 'Membro',
+          payer_name: memberName,
           external_reference: memberId,
         })
         if (res.error) throw new Error(res.error)
@@ -348,7 +350,7 @@ export function StepPayment({
             >
               <QrCode className="h-8 w-8 text-green-500" />
               <span className="font-medium">PIX</span>
-              <span className="text-xs text-muted-foreground">Aprovacao instantanea*</span>
+              <span className="text-xs text-muted-foreground">QR Code na hora</span>
             </Button>
             <Button
               variant="outline"
@@ -363,7 +365,7 @@ export function StepPayment({
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center">
-            *PIX: confirmacao pelo admin apos verificar o pagamento
+            PIX: ativacao apos nossa equipe confirmar o recebimento (geralmente em minutos)
           </p>
           {loading && (
             <div className="flex justify-center py-2">

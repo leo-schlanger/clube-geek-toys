@@ -26,6 +26,11 @@ export function initCronJobs() {
     } catch (err) {
       console.error('[CRON] Expire members error:', err);
     }
+    try {
+      await reconcilePointsBalances();
+    } catch (err) {
+      console.error('[CRON] Reconcile balances error:', err);
+    }
 
     // Record cron execution for health monitoring
     await query(
@@ -182,14 +187,52 @@ async function sendPointsExpiringNotifications() {
   console.log(`[CRON] Sent ${sent} points-expiring notifications`);
 }
 
+async function reconcilePointsBalances() {
+  // Fix any drift between members.points and the sum of point_transactions.
+  // Runs after expirePoints so expired points are already processed.
+  const result = await query(
+    `UPDATE members SET points = sub.calculated
+     FROM (
+       SELECT m.id, m.points as stored,
+              GREATEST(0, COALESCE(SUM(pt.points), 0)::int) as calculated
+       FROM members m
+       LEFT JOIN point_transactions pt ON pt.member_id = m.id
+       GROUP BY m.id, m.points
+       HAVING m.points != GREATEST(0, COALESCE(SUM(pt.points), 0)::int)
+     ) sub
+     WHERE members.id = sub.id
+     RETURNING members.id, sub.stored, sub.calculated`
+  );
+
+  if (result.rowCount && result.rowCount > 0) {
+    console.log(`[CRON] Reconciled ${result.rowCount} member point balances`);
+    for (const row of result.rows) {
+      await query(
+        `INSERT INTO audit_logs (action, member_id, details)
+         VALUES ('points_reconciled', $1, $2)`,
+        [row.id, JSON.stringify({ stored: row.stored, calculated: row.calculated })]
+      ).catch(() => {});
+    }
+  } else {
+    console.log('[CRON] All point balances in sync');
+  }
+}
+
 async function expireMembers() {
-  // Mark active members as expired when their expiry_date has passed
+  // Mark active members as expired when their expiry_date has passed.
+  // Includes:
+  // - One-time payers (auto_renewal = FALSE)
+  // - Paused subscriptions (auto_renewal = TRUE but subscription_status = 'paused')
+  // - Cancelled subscriptions (auto_renewal = FALSE, caught by first condition)
+  // Excludes:
+  // - Active subscriptions (auto_renewal = TRUE and subscription_status != 'paused')
+  //   because Stripe will continue charging and extending expiry automatically
   const result = await query(
     `UPDATE members SET status = 'expired'
      WHERE status = 'active'
        AND expiry_date IS NOT NULL
        AND expiry_date < CURRENT_DATE
-       AND auto_renewal = FALSE
+       AND (auto_renewal = FALSE OR subscription_status = 'paused')
      RETURNING id, full_name, email`
   );
 

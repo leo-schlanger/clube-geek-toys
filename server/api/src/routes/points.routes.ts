@@ -36,11 +36,12 @@ pointsRouter.get('/:memberId/history', async (req, res, next) => {
   }
 });
 
-// GET /points/:memberId/expiring
+// GET /points/:memberId/expiring?days=30
 pointsRouter.get('/:memberId/expiring', async (req, res, next) => {
   try {
     if (!await verifyMemberOwnership(req, res, req.params.memberId)) return;
-    const result = await pointsService.getExpiringPoints(req.params.memberId as string);
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 180);
+    const result = await pointsService.getExpiringPoints(req.params.memberId as string, days);
     res.json(result);
   } catch (err) {
     next(err);

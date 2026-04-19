@@ -284,7 +284,7 @@ export async function confirmPixPayment(opts: {
         ]
       );
 
-      // Send confirmation email to member
+      // Send confirmation + welcome emails to member
       const memberData = await query(
         'SELECT full_name, email, plan FROM members WHERE id = $1',
         [payment.memberId]
@@ -302,6 +302,16 @@ export async function confirmPixPayment(opts: {
           },
           member_id: payment.memberId as string,
         }).catch((err: unknown) => console.error('[PIX] Confirmation email error:', err));
+
+        // Welcome email on first activation
+        if (member.status !== 'active') {
+          sendTemplateEmail({
+            template: 'welcome',
+            to: m.email as string,
+            variables: { name: m.full_name as string, plan: m.plan as string },
+            member_id: payment.memberId as string,
+          }).catch((err: unknown) => console.error('[PIX] Welcome email error:', err));
+        }
       }
     }
   }
@@ -383,9 +393,14 @@ export async function createCardPayment(data: {
 // ─── Payment status ──────────────────────────────────────────────────────────
 
 /**
- * Retrieve a PaymentIntent from Stripe and return mapped status info.
+ * Retrieve payment status.
+ *
+ * For Stripe PaymentIntents (IDs starting with "pi_"), queries Stripe API.
+ * For local payments (PIX — UUID format), queries our payments table directly.
+ * This is critical because PIX QR codes are generated locally, not via Stripe,
+ * so the frontend polling needs a DB-based status check.
  */
-export async function getPaymentStatus(paymentIntentId: string): Promise<{
+export async function getPaymentStatus(paymentId: string): Promise<{
   id: string;
   status: string;
   mapped_status: string;
@@ -393,16 +408,38 @@ export async function getPaymentStatus(paymentIntentId: string): Promise<{
   currency: string;
   paymentMethod: string | null;
 }> {
-  const stripe = getStripe();
-  const pi = await stripe.paymentIntents.retrieve(paymentIntentId);
+  // Stripe PaymentIntent IDs always start with "pi_"
+  if (paymentId.startsWith('pi_')) {
+    const stripe = getStripe();
+    const pi = await stripe.paymentIntents.retrieve(paymentId);
+    return {
+      id: pi.id,
+      status: pi.status,
+      mapped_status: mapStripePaymentStatus(pi.status),
+      amount: pi.amount / 100,
+      currency: pi.currency,
+      paymentMethod: pi.payment_method_types?.[0] || null,
+    };
+  }
 
+  // Local payment (PIX) — check our database
+  const result = await query(
+    `SELECT id, amount, status, method FROM payments WHERE id = $1`,
+    [paymentId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new AppError(404, 'Pagamento não encontrado.', 'PAYMENT_NOT_FOUND');
+  }
+
+  const row = result.rows[0];
   return {
-    id: pi.id,
-    status: pi.status,
-    mapped_status: mapStripePaymentStatus(pi.status),
-    amount: pi.amount / 100,
-    currency: pi.currency,
-    paymentMethod: pi.payment_method_types?.[0] || null,
+    id: row.id,
+    status: row.status,
+    mapped_status: row.status, // already in our internal format
+    amount: parseFloat(row.amount),
+    currency: 'brl',
+    paymentMethod: row.method || null,
   };
 }
 

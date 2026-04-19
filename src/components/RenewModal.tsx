@@ -39,27 +39,16 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
   async function handlePaymentSuccess() {
     setShowPayment(false)
 
-    // Calculate new expiry date
-    const newExpiry = new Date()
-    if (paymentType === 'annual') {
-      newExpiry.setFullYear(newExpiry.getFullYear() + 1)
-    } else {
-      newExpiry.setMonth(newExpiry.getMonth() + 1)
+    // Update payment type if changed (e.g. monthly → annual).
+    // Status and expiryDate are set by the backend via webhook (card) or admin confirm (PIX).
+    // We must NOT override them here — the backend's activateMember logic correctly extends
+    // from current expiry (preserving remaining days), while frontend would calculate from today.
+    if (paymentType !== member.paymentType) {
+      await updateMember(member.id, { paymentType })
     }
 
-    // Update member
-    const success = await updateMember(member.id, {
-      status: 'active',
-      paymentType: paymentType,
-      expiryDate: newExpiry.toISOString().split('T')[0],
-    })
-
-    if (success) {
-      toast.success('Assinatura renovada com sucesso!')
-      onSuccess()
-    } else {
-      toast.error('Erro ao atualizar assinatura')
-    }
+    toast.success('Pagamento processado! Sua assinatura será atualizada em instantes.')
+    onSuccess()
   }
 
   if (showPayment) {
@@ -67,6 +56,9 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
       <PaymentModal
         plan={member.plan as PlanType}
         paymentType={paymentType}
+        memberId={member.id}
+        memberEmail={member.email}
+        memberName={member.fullName}
         onClose={() => setShowPayment(false)}
         onSuccess={handlePaymentSuccess}
       />

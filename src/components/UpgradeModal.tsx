@@ -53,20 +53,11 @@ export function UpgradeModal({ member, onClose, onSuccess }: UpgradeModalProps) 
 
     setShowPayment(false)
 
-    // Calculate new expiry date
-    const newExpiry = new Date()
-    if (paymentType === 'annual') {
-      newExpiry.setFullYear(newExpiry.getFullYear() + 1)
-    } else {
-      newExpiry.setMonth(newExpiry.getMonth() + 1)
-    }
-
-    // Update member with new plan
+    // Update plan (and payment type if changed). Status and expiryDate are set by the
+    // backend via webhook (card) or admin confirm (PIX) — we must not override them here.
     const success = await updateMember(member.id, {
       plan: selectedPlan,
-      status: 'active',
       paymentType: paymentType,
-      expiryDate: newExpiry.toISOString().split('T')[0],
     })
 
     if (success) {
@@ -82,6 +73,9 @@ export function UpgradeModal({ member, onClose, onSuccess }: UpgradeModalProps) 
       <PaymentModal
         plan={selectedPlan}
         paymentType={paymentType}
+        memberId={member.id}
+        memberEmail={member.email}
+        memberName={member.fullName}
         onClose={() => setShowPayment(false)}
         onSuccess={handlePaymentSuccess}
       />

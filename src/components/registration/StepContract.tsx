@@ -32,6 +32,12 @@ import {
 
 type ContractStep = 'read' | 'sign' | 'confirm'
 
+function formatCPF(cpf: string): string {
+  const digits = cpf.replace(/\D/g, '')
+  if (digits.length !== 11) return cpf
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+}
+
 interface StepContractProps {
   memberId: string
   memberName: string
@@ -389,7 +395,7 @@ export function StepContract({
 
             <div className="bg-muted/50 rounded-lg p-3 text-sm">
               <p className="font-semibold mb-1">Seus Dados:</p>
-              <p>{memberName} &bull; CPF: {memberCPF}</p>
+              <p>{memberName} &bull; CPF: {formatCPF(memberCPF)}</p>
               <p className="break-all">{memberEmail}</p>
               <p>{memberPhone}</p>
               <p className="mt-2 pt-2 border-t">
@@ -539,7 +545,7 @@ export function StepContract({
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">CPF:</span>
-                <span className="font-medium">{memberCPF}</span>
+                <span className="font-medium">{formatCPF(memberCPF)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Plano:</span>

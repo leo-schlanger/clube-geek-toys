@@ -487,6 +487,7 @@ export default function Register() {
             paymentType={paymentType}
             memberId={memberData.memberId}
             memberEmail={memberData.email}
+            memberName={memberData.fullName}
             onSuccess={handlePaymentSuccess}
             onBack={() => setStep(2)}
           />

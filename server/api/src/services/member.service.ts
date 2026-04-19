@@ -1,7 +1,9 @@
 import pg from 'pg';
 import { query } from '../config/database.js';
+import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { auditLog, diffObjects } from '../utils/audit.js';
+import { sendTemplateEmail } from './email.service.js';
 import type { Member } from '../types/index.js';
 
 function mapMemberRow(row: pg.QueryResultRow): Member {
@@ -134,6 +136,24 @@ export async function createMember(
      RETURNING *`,
     [userId, data.cpf, data.fullName, data.email, data.phone || null, data.plan, data.paymentType]
   );
+
+  // Notify admin about new registration (non-blocking)
+  if (env.ADMIN_EMAIL) {
+    const paymentLabel = data.paymentType === 'monthly' ? 'Mensal' : 'Anual';
+    sendTemplateEmail({
+      template: 'admin-new-member',
+      to: env.ADMIN_EMAIL,
+      variables: {
+        member_name: data.fullName,
+        member_email: data.email,
+        member_cpf: data.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+        member_phone: data.phone || '—',
+        plan: data.plan,
+        payment_type: paymentLabel,
+        admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
+      },
+    }).catch((err) => console.error('[MEMBER] Admin notification error:', err));
+  }
 
   return mapMemberRow(result.rows[0]);
 }

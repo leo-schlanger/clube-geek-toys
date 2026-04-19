@@ -375,7 +375,7 @@ export function SubscriptionManagement({
                 </p>
                 <p className="text-sm text-orange-600/80 dark:text-orange-400/80">
                   Você não será cobrado enquanto a assinatura estiver pausada.
-                  Seus benefícios também estão suspensos.
+                  Seus benefícios continuam válidos até o vencimento da assinatura.
                 </p>
               </div>
             </div>
@@ -541,7 +541,7 @@ export function SubscriptionManagement({
             </DialogTitle>
             <DialogDescription className="text-base">
               {confirmAction === 'pause' && (
-                'Ao pausar sua assinatura, você não será cobrado e seus benefícios serão suspensos. Você pode reativar a qualquer momento.'
+                'Ao pausar sua assinatura, você não será cobrado. Seus benefícios continuam válidos até o vencimento. Você pode reativar a qualquer momento.'
               )}
               {confirmAction === 'resume' && (
                 'Ao reativar sua assinatura, você voltará a ser cobrado e terá acesso a todos os benefícios do seu plano.'

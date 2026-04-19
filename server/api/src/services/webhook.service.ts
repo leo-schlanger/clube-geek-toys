@@ -447,7 +447,7 @@ async function activateMember(
     member.id,
   );
 
-  // Queue confirmation email — sent after COMMIT
+  // Queue confirmation + welcome emails — sent after COMMIT
   const memberResult = await client.query(
     'SELECT id, email, full_name, plan FROM members WHERE id = $1',
     [member.id]
@@ -465,5 +465,15 @@ async function activateMember(
       },
       member_id: m.id,
     });
+
+    // Send welcome email on first activation only
+    if (beforeStatus !== 'active') {
+      pendingEmails.push({
+        template: 'welcome',
+        to: m.email,
+        variables: { name: m.full_name, plan: m.plan },
+        member_id: m.id,
+      });
+    }
   }
 }
