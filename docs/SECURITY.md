@@ -1,128 +1,187 @@
-# Seguranca e Compliance - Clube Geek & Toys
+# Segurança — Clube Geek & Toys
 
-> **Ultima atualizacao:** 14 de Abril de 2026
+> **Última atualização:** 19 de Abril de 2026
 
-## Visao Geral
+## 1. Visão Geral de Segurança
 
-Este documento descreve as medidas de seguranca implementadas na plataforma Clube Geek & Toys, hospedada em VPS propria com Docker.
+A plataforma adota uma postura de **defesa em profundidade**:
 
-## 1. Autenticacao (JWT + bcrypt)
+- **Validação em duas camadas**: toda entrada é validada no cliente (React Hook Form + Zod) e novamente no servidor (middleware Zod), impedindo que dados malformados cheguem à lógica de negócio.
+- **Princípio do menor privilégio (RBAC)**: cada role possui acesso estritamente ao que precisa. Nenhum endpoint depende apenas de autenticação — sempre há verificação de role e, quando aplicável, de ownership.
+- **Zero trust**: toda entrada é tratada como potencialmente maliciosa, todo token é verificado criptograficamente, toda operação sensível é auditada.
+
+## 2. Autenticação
 
 ### Hash de Senhas
 
-- **bcrypt** com 12 rounds de salt
-- Senhas nunca armazenadas em texto puro
-- Hash armazenado na coluna `password_hash` da tabela `users`
+- Algoritmo: **bcrypt** com **12 rounds** de salt
+- Requisitos mínimos: 8 caracteres, pelo menos 1 maiúscula e 1 número
+- Senhas nunca armazenadas em texto puro — apenas o hash bcrypt na coluna `password_hash`
 
-### Tokens JWT
+### Tokens de Acesso e Refresh
 
-| Token   | Expiracao | Armazenamento      | Uso                       |
-| ------- | --------- | ------------------ | ------------------------- |
-| Access  | 15 min    | Memoria (frontend) | Autenticacao de requests  |
-| Refresh | 7 dias    | localStorage       | Renovacao do access token |
+| Token   | Tipo                                  | Expiração  | Armazenamento      |
+| ------- | ------------------------------------- | ---------- | ------------------ |
+| Access  | JWT HS256 (`{ userId, email, role }`) | 15 minutos | Memória (frontend) |
+| Refresh | 64 bytes random hex                   | 30 dias    | Cookie httpOnly    |
 
-- **Access token**: Payload `{ userId, email, role }`, assinado com `JWT_SECRET`
-- **Refresh token**: Assinado com `JWT_REFRESH_SECRET`, hash armazenado no banco
-- Rotacao de refresh token a cada renovacao
-- Invalidacao ao fazer logout (limpa hash do banco)
+**Refresh token — detalhes:**
+
+- Armazenado no banco como **hash SHA-256** (o valor em texto nunca é persistido)
+- Cookie configurado com `sameSite: lax`, `secure: true` em produção, `path: /auth`, `maxAge: 30 dias`
+- **Rotação obrigatória**: a cada refresh, o token antigo é invalidado e um novo é emitido
+- Invalidação no logout (hash removido do banco)
 
 ### Fluxo de Refresh
 
 1. Access token expira (15 min)
-2. Frontend envia refresh token para `POST /auth/refresh`
-3. API valida refresh token contra hash no banco
+2. Frontend envia cookie com refresh token para `POST /auth/refresh`
+3. API valida refresh token contra hash SHA-256 no banco
 4. Gera novo access token + novo refresh token
-5. Antigo refresh token invalidado
+5. Token antigo invalidado imediatamente
 
-## 2. Autorizacao (RBAC)
+### Verificação de Email
 
-### Roles (Papeis)
+- **Detecção de email descartável**: 400+ domínios bloqueados (lista mantida em código)
+- **Verificação DNS MX**: confirma que o domínio do email possui registros MX válidos
+- **Token de verificação**: HMAC, expiração de 24h, uso único (tabela `consumed_verification_tokens`)
 
-| Role     | Acesso                                   |
-| -------- | ---------------------------------------- |
-| `member` | Dashboard pessoal, pontos, contratos     |
-| `seller` | PDV, verificar membros, adicionar pontos |
-| `admin`  | Painel completo, gestao de usuarios      |
+### Reset de Senha
 
-### Middleware de Autorizacao
+- Token HMAC com expiração de 1 hora
+- Uso único — consumido após utilização
+
+### Google OAuth
+
+- Verificação via endpoint `tokeninfo` do Google
+- Validação de `audience` para garantir que o token foi emitido para nossa aplicação
+
+## 3. Autorização (RBAC)
+
+### Permissões por Role
+
+| Role       | Permissões                                                                                                                                             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `member`   | Perfil próprio, pagamentos próprios, histórico de pontos próprio, gerenciamento da própria assinatura                                                  |
+| `seller`   | Tudo de member + verificar qualquer membro, adicionar/resgatar pontos, visualizar detalhes de membros                                                  |
+| `admin`    | Tudo de seller + pontos bônus, confirmar/estornar pagamentos, gerenciar membros, alterar planos/status, visualizar relatórios, gerenciamento de emails |
+| `disabled` | Todo acesso bloqueado                                                                                                                                  |
+
+### Cadeia de Middlewares
 
 ```
-Request → auth.ts (verifica JWT) → role check → route handler
+Request → authenticate → requireRole → verifyMemberOwnership → handler
 ```
 
-- Middleware `requireAuth` valida o token JWT em todas as rotas protegidas
-- Middleware `requireRole(['admin'])` verifica se o role do usuario esta na lista permitida
-- Frontend usa `ProtectedRoute` para proteger rotas por role
+- `authenticate`: valida JWT e extrai `userId`, `email`, `role`
+- `requireRole`: verifica se o role do usuário está na lista permitida
+- `verifyMemberOwnership`: garante que o membro só acesse seus próprios recursos (admins e sellers fazem bypass)
 
-### Protecao por Endpoint
+## 4. Validação de Input
 
-| Endpoint               | Roles Permitidos                         |
-| ---------------------- | ---------------------------------------- |
-| `POST /auth/login`     | Publico                                  |
-| `POST /auth/register`  | Publico                                  |
-| `GET /members`         | admin                                    |
-| `GET /members/:id`     | admin, seller, owner                     |
-| `PUT /members/:id`     | admin, owner (campos limitados)          |
-| `POST /points/add`     | admin, seller                            |
-| `GET /reports/*`       | admin                                    |
-| `GET /logs`            | admin                                    |
-| `POST /webhook/stripe` | Publico (validado por assinatura Stripe) |
+### Zod Schemas
 
-## 3. Seguranca do Banco de Dados
+Todos os endpoints validam entrada com schemas Zod (request body, params e query):
 
-### PostgreSQL
+- Middleware `validate` encapsula Zod e retorna **400** com erros por campo
+- Frontend: React Hook Form + Zod resolver (validação espelhada)
 
-- **Acesso restrito**: Porta 5432 vinculada apenas a `127.0.0.1` (nao acessivel externamente)
-- **Parametrized queries**: Todas as queries usam placeholders `$1, $2, ...` (prevencao de SQL injection)
-- **CHECK constraints**: Campos enum validados no banco (role, status, plan, method)
-- **Foreign keys**: Integridade referencial com ON DELETE CASCADE/SET NULL
-- **Tabelas imutaveis**: `point_transactions`, `audit_logs`, `email_logs` nao permitem UPDATE/DELETE via aplicacao
-- **UUID** como primary keys (nao sequencial, nao previsivel)
+### Validações Específicas
 
-### Dados Sensiveis
+| Campo             | Validação                                                                    |
+| ----------------- | ---------------------------------------------------------------------------- |
+| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco |
+| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX     |
+| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                 |
+| Valores numéricos | Validados contra `PLAN_PRICES` (whitelist server-side)                       |
+
+### Sanitização
+
+- **sanitizeName**: remove tags `<script>`, URIs `javascript:`, event handlers, caracteres de controle
+- **escapeHtml**: aplicado em todas as variáveis interpoladas em templates de email
+- **Remoção de caracteres de controle** em campos de texto
+
+## 5. Rate Limiting
+
+Implementado via middleware `rate-limit.ts`, baseado em IP do cliente:
+
+| Limiter               | Limite  | Janela | Endpoints                        |
+| --------------------- | ------- | ------ | -------------------------------- |
+| `authLimiter`         | 20 req  | 5 min  | Register, login, refresh, logout |
+| `publicLookupLimiter` | 15 req  | 1 min  | Verificação de CPF existente     |
+| `paymentLimiter`      | 10 req  | 1 min  | Operações de pagamento           |
+| `emailLimiter`        | 5 req   | 5 min  | Envio de emails                  |
+| `webhookLimiter`      | 60 req  | 1 min  | Webhooks do Stripe               |
+| `defaultLimiter`      | 100 req | 1 min  | Demais endpoints                 |
+
+Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`.
+
+## 6. Segurança de Pagamentos
+
+### Stripe (Cartão de Crédito)
+
+- **PCI DSS compliant**: tokenização client-side via Stripe Elements
+- **Nenhum dado de cartão toca nosso servidor** — apenas tokens e IDs do Stripe
+- `PaymentIntent` criado no servidor, confirmado no cliente
+- Webhook verificado com **HMAC-SHA256** via Stripe SDK (`constructEvent`)
+- `STRIPE_WEBHOOK_SECRET` obrigatório em produção (validado pelo schema Zod de env)
+
+### Idempotência de Webhooks
+
+- Chave: `stripe_{eventId}`
+- Tabela `processed_webhooks` com `INSERT ... ON CONFLICT DO NOTHING`
+- Impede processamento duplicado de qualquer evento
+
+### PIX
+
+- QR code gerado localmente (padrão EMV)
+- Confirmação manual pelo admin no dashboard
+- Prevenção de pagamento duplicado: `findRecentPayment` (janela de 7 dias)
+
+### Validação de Valores
+
+- Valor do pagamento validado contra `PLAN_PRICES` (whitelist server-side)
+- Não é possível criar pagamento com valor arbitrário
+
+## 7. Segurança do Contrato Digital
+
+Em conformidade com a **Lei 14.063/2020** (assinatura eletrônica):
+
+| Aspecto              | Implementação                                               |
+| -------------------- | ----------------------------------------------------------- |
+| Metadados capturados | IP do cliente, user-agent, timestamp                        |
+| Hash do documento    | SHA-256 dos dados do membro + conteúdo do contrato          |
+| Hash do PDF          | SHA-256 do arquivo PDF gerado                               |
+| Contratos ativos     | Apenas 1 por membro (anteriores marcados como `superseded`) |
+| Validação de upload  | Magic bytes do PDF verificados (impede upload de não-PDF)   |
+| Limite de arquivo    | 5 MB máximo                                                 |
+
+## 8. Segurança do Banco de Dados
+
+### Prevenção de SQL Injection
+
+- **Queries parametrizadas** em toda a aplicação (driver `pg` com placeholders `$1`, `$2`, ...)
+- Sem ORM — SQL direto, sem vetores de injection via query builders
+
+### Integridade de Dados
+
+| Mecanismo                                | Uso                                            |
+| ---------------------------------------- | ---------------------------------------------- |
+| Row-level locking (`FOR UPDATE`)         | Operações de saldo de pontos                   |
+| `SKIP LOCKED`                            | Cron jobs (impede processamento duplo)         |
+| Transações (`BEGIN`/`COMMIT`/`ROLLBACK`) | Todas as operações compostas                   |
+| UUID como primary keys                   | Não-sequenciais, não-previsíveis               |
+| `CHECK` constraints                      | Campos enum (status, role, plan, method, type) |
+| Cascading deletes                        | Onde apropriado para integridade referencial   |
+
+### Dados Sensíveis
 
 - Senhas: apenas hash bcrypt armazenado
-- Refresh tokens: apenas hash armazenado
-- CPF: armazenado sem formatacao (11 digitos)
-- Dados de cartao: nunca armazenados (tokenizacao via Stripe)
+- Refresh tokens: apenas hash SHA-256 armazenado
+- Dados de cartão: nunca armazenados (tokenização via Stripe)
+- CPF: armazenado sem formatação (11 dígitos), mascarado na UI
 
-## 4. Seguranca de Rede
-
-### Firewall (UFW)
-
-Apenas 3 portas abertas na VPS:
-
-| Porta | Protocolo | Servico                    |
-| ----- | --------- | -------------------------- |
-| 22    | TCP       | SSH                        |
-| 80    | TCP       | HTTP (redirect para HTTPS) |
-| 443   | TCP       | HTTPS                      |
-
-### SSH
-
-- Acesso apenas por chave publica (senha desabilitada)
-- Root login desabilitado
-- Recomendacao: usar usuario dedicado com sudo
-
-### SSL/TLS
-
-- Certificados Let's Encrypt via Certbot
-- Renovacao automatica (container certbot)
-- HTTP Strict Transport Security (HSTS) habilitado
-- Redirect automatico HTTP -> HTTPS
-
-### Headers de Seguranca (Nginx)
-
-Configurados em `shared-headers.conf`, aplicados a todos os dominios:
-
-```
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-X-XSS-Protection: 1; mode=block
-Referrer-Policy: strict-origin-when-cross-origin
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-Content-Security-Policy: default-src 'self'; ...
-```
+## 9. CORS e Headers
 
 ### CORS
 
@@ -130,245 +189,140 @@ Whitelist de origens permitidas (middleware `cors.ts`):
 
 - `https://club.geeketoys.com.br`
 - `https://admin.geeketoys.com.br`
-- `https://adm.geeketoys.com.br`
-- `localhost` (apenas desenvolvimento)
+- `localhost` apenas em desenvolvimento
 
-## 5. Seguranca de Webhooks
+### Headers de Segurança
 
-### Verificacao de Assinatura (Stripe)
+- **Helmet.js** para headers de segurança padrão
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
 
-Webhooks Stripe sao verificados via assinatura criptografica:
+## 10. Segurança de Rede (Docker)
 
-```
-Webhook recebido (POST /webhook/stripe)
-  → Rate limit: 60 req/min
-  → Verifica assinatura com STRIPE_WEBHOOK_SECRET
-  → STRIPE_WEBHOOK_SECRET obrigatorio em producao (env schema)
-  → Em dev sem secret, aceita eventos nao verificados (com log de aviso)
-  → Processa evento (payment_intent.succeeded, subscription.updated, etc.)
-```
+| Camada       | Configuração                                                            |
+| ------------ | ----------------------------------------------------------------------- |
+| API          | Não exposta diretamente — acessível apenas via nginx (proxy reverso)    |
+| PostgreSQL   | Porta não exposta ao host — acessível apenas pela rede Docker interna   |
+| Nginx        | `client_max_body_size 15MB`                                             |
+| SSL/TLS      | Let's Encrypt com renovação automática (Certbot)                        |
+| Health check | Usa `127.0.0.1` (não `localhost`, para evitar resolução IPv6 no Alpine) |
 
-### Idempotencia
+### Firewall (UFW)
 
-- Webhook key = `stripe_{eventId}` (baseado no ID do evento Stripe)
-- Tabela `processed_webhooks` evita processamento duplicado
-- INSERT com `ON CONFLICT DO NOTHING`
+Apenas portas essenciais abertas: SSH (22), HTTP (80), HTTPS (443).
 
-## 6. Controle de Acesso (IDOR Protection)
+### SSH
 
-### Middleware de Ownership
+- Acesso apenas por chave pública (autenticação por senha desabilitada)
+- Root login desabilitado
 
-Middleware centralizado (`middleware/ownership.ts`) aplicado em:
+## 11. Auditoria
 
-- `GET /points/:memberId/*` — membros so veem seus proprios pontos
-- `POST /pix/create`, `POST /checkout/create` — valida que external_reference pertence ao user
-- `GET /payments` — membros so veem seus proprios pagamentos
-- `POST /contracts` — valida ownership do memberId
-- `GET /contracts/:memberId/*` — valida ownership
-- `GET /subscription/:id/*` — valida ownership
+### Tabela `audit_logs`
 
-Admins e sellers fazem bypass das verificacoes de ownership.
+Estrutura: `action`, `member_id`, `user_id`, `details` (JSONB), `timestamp`.
 
-## 7. Rate Limiting
+Logs são **imutáveis** (INSERT only, sem UPDATE/DELETE).
 
-Implementado no middleware `rate-limit.ts`:
+### Eventos de Segurança
 
-| Endpoint               | Limite  | Janela |
-| ---------------------- | ------- | ------ |
-| `POST /auth/login`     | 10 req  | 5 min  |
-| `POST /auth/register`  | 10 req  | 5 min  |
-| `POST /auth/refresh`   | 10 req  | 5 min  |
-| `POST /payment/*`      | 10 req  | 1 min  |
-| `POST /webhook/stripe` | 60 req  | 1 min  |
-| `POST /lgpd/delete`    | 10 req  | 5 min  |
-| Outros endpoints       | 100 req | 1 min  |
+- `login`, `register`, `email_verified`, `login_failed` (com motivo)
 
-- Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`
-- Baseado em IP do cliente
+### Eventos de Pagamento
 
-## 8. Content Security Policy (CSP)
+- `created`, `received`, `failed`, `confirmed`, `refunded`
 
-Habilitado via Helmet com diretivas estritas:
+### Eventos de Assinatura
 
-- `default-src: 'self'`
-- `script-src: 'self', js.stripe.com, accounts.google.com`
-- `connect-src: 'self', api.stripe.com, accounts.google.com`
-- `frame-src: accounts.google.com`
+- `created`, `paused`, `resumed`, `cancelled`
 
-## 9. Validacao de Entrada
+### Eventos de Membros
 
-### Zod Schemas
+- `activated`, `expired`, `updated` (com diff antes/depois)
 
-Todos os endpoints validam entrada com schemas Zod:
+### Eventos de Pontos
 
-- Limites de tamanho em todos os campos (email: max 254 chars, nome: max 200 chars)
-- Validacao de formato (email, CPF com checksum Modulo 11, UUID)
-- Enums validados (plan, method, role)
-- Valores numericos com limites (amount deve corresponder a preco de plano)
-- Senhas: minimo 8 caracteres, 1 maiuscula, 1 numero
+- `earn`, `bonus`, `redeem`, `expired`, `reconciled`
 
-### Sanitizacao
+### Logs Especializados
 
-- HTML escapado em templates de email (prevencao XSS)
-- Path sanitization para uploads (prevencao path traversal)
-- CPF validado com algoritmo completo
+| Tabela       | Campos-chave                                          |
+| ------------ | ----------------------------------------------------- |
+| `email_logs` | template, recipient, status, resend_id, error_message |
+| `error_logs` | message, stack, context, severity, source             |
 
-## 8. Audit Logging
+## 12. LGPD (Lei Geral de Proteção de Dados)
 
-### Eventos Registrados
+### Princípios Aplicados
 
-| Acao                     | Quem registra |
-| ------------------------ | ------------- |
-| `user_login`             | Sistema       |
-| `user_login_failed`      | Sistema       |
-| `member_created`         | Sistema       |
-| `member_updated`         | Admin/Owner   |
-| `member_activated`       | Sistema       |
-| `points_added`           | Seller/Admin  |
-| `points_redeemed`        | Seller/Admin  |
-| `points_expired`         | Cron          |
-| `payment_created`        | Sistema       |
-| `payment_confirmed`      | Webhook       |
-| `contract_signed`        | Membro        |
-| `subscription_created`   | Sistema       |
-| `subscription_cancelled` | Admin/Membro  |
-| `role_changed`           | Admin         |
-
-### Dados do Log
-
-```json
-{
-  "action": "member_activated",
-  "member_id": "uuid",
-  "user_id": "uuid",
-  "details": { "plan": "gold", "payment_id": "uuid" },
-  "timestamp": "2026-04-07T10:00:00Z"
-}
-```
-
-- Logs sao imutaveis (INSERT only, sem UPDATE/DELETE)
-- Acessiveis apenas para admins via `GET /logs`
-
-## 9. Protecao de Dados (LGPD)
-
-### Dados Coletados
-
-- Nome, email, CPF, telefone (cadastro)
-- Endereco IP, user agent (contratos e logs de auth)
-- Dados de navegacao (Umami Analytics - anonimizado)
-
-### Tempo de Retencao
-
-| Dado              | Periodo                  |
-| ----------------- | ------------------------ |
-| Cadastro          | 5 anos apos cancelamento |
-| Pagamentos        | 5 anos (fiscal)          |
-| Contratos         | 10 anos                  |
-| Logs de auditoria | 2 anos                   |
-| Logs de email     | 1 ano                    |
+| Princípio            | Implementação                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| Minimização de dados | Apenas dados essenciais coletados (nome, email, CPF, telefone)                             |
+| Consentimento        | Checkbox explícito durante o cadastro                                                      |
+| Finalidade           | Dados utilizados exclusivamente para operações do clube                                    |
+| Mascaramento         | CPF exibido como `***.***.789-00` na interface                                             |
+| Não compartilhamento | Dados não compartilhados com terceiros (exceto Stripe para pagamentos e Resend para email) |
 
 ### Direitos do Titular
 
-- Acesso, correcao, exclusao dos dados pessoais
-- Portabilidade, revogacao de consentimento
-- Contato: contato@geeketoys.com.br
+- **Acesso**: membro pode visualizar todos os seus dados
+- **Portabilidade**: contrato em PDF disponível para download
+- **Retenção**: logs de auditoria mantidos para fins de compliance
+- **Comunicação**: apenas emails transacionais (sem marketing sem consentimento)
 
 ### Analytics (Umami)
 
-- Self-hosted (dados nao saem da VPS)
-- Anonimizado por padrao (sem cookies, sem tracking pessoal)
+- Self-hosted (dados não saem da infraestrutura própria)
+- Anonimizado por padrão (sem cookies de rastreamento, sem tracking pessoal)
 - Conformidade LGPD/GDPR nativa
 
-## 10. Gestao de Secrets
+## 13. Proteção contra Ataques Comuns
 
-### Servidor (server/.env)
+| Ataque               | Mitigação                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **XSS**              | `sanitizeName` remove tags script, URIs `javascript:`, event handlers. Templates de email escapam variáveis com `escapeHtml()` |
+| **CSRF**             | Cookies com `sameSite: lax` + header `Authorization` para chamadas à API                                                       |
+| **SQL Injection**    | Queries parametrizadas exclusivamente (placeholders `$1`, `$2`)                                                                |
+| **Brute force**      | Rate limiting + hashing lento com bcrypt                                                                                       |
+| **Token replay**     | Tokens de verificação de uso único, rotação de refresh token                                                                   |
+| **Webhook replay**   | Idempotência via tabela `processed_webhooks`                                                                                   |
+| **Upload malicioso** | Validação de magic bytes, limite de tamanho, restrição de tipo                                                                 |
+| **Enumeração**       | Verificação de CPF retorna apenas booleano (sem dados do membro); erro de login não revela se email existe                     |
 
-Arquivo `.env` no servidor com:
+## 14. Gestão de Secrets
 
-- Credenciais PostgreSQL
-- JWT secrets (access + refresh)
-- HMAC secret (webhooks)
-- Stripe secret key e webhook secret
-- PIX key (chave PIX do recebedor)
-- Resend API key
+### Princípios
 
-**Regras:**
+- **Todos os secrets em variáveis de ambiente** — nunca no código-fonte
+- Repositório é **público** — nenhum dado sensível commitado
 
-- `.env` nunca commitado (listado no `.gitignore`)
-- Criado manualmente na VPS
-- Permissoes restritas (`chmod 600`)
+### Arquivos Protegidos
+
+| Arquivo                                 | Status                                                 |
+| --------------------------------------- | ------------------------------------------------------ |
+| `.env`, `.env.local`, `.env.production` | Listados no `.gitignore`                               |
+| `CLAUDE.local.md`                       | Listado no `.gitignore` (dados operacionais sensíveis) |
+| Chaves SSH (`*.pem`, `*.key`)           | Nunca commitadas                                       |
+| Backups do banco                        | Nunca commitados                                       |
+
+### Secrets de Produção
+
+- Armazenados no arquivo `.env` da VPS (permissões `chmod 600`)
+- Criados manualmente no servidor
 
 ### CI/CD (GitHub Secrets)
 
-| Secret                        | Uso                          |
-| ----------------------------- | ---------------------------- |
-| `VPS_HOST`                    | IP do servidor para deploy   |
-| `VPS_USER`                    | Usuario SSH                  |
-| `VPS_SSH_KEY`                 | Chave privada SSH            |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave publica Stripe (build) |
-| `VITE_PIX_KEY`                | Chave PIX (build)            |
+| Secret                        | Uso                                      |
+| ----------------------------- | ---------------------------------------- |
+| `VPS_HOST`                    | Endereço do servidor para deploy         |
+| `VPS_USER`                    | Usuário SSH                              |
+| `VPS_SSH_KEY`                 | Chave privada SSH                        |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave pública Stripe (injetada no build) |
+| `VITE_PIX_KEY`                | Chave PIX (injetada no build)            |
 
-### Nunca Commitar
+## Contatos
 
-- `.env`, `.env.local`, `.env.production`
-- Chaves SSH (`*.pem`, `*.key`)
-- Tokens de acesso
-- Backups do banco de dados
-
-## 11. Backup e Recuperacao
-
-### Backup do PostgreSQL
-
-```bash
-# Backup manual
-docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys > backup.sql
-
-# Backup comprimido
-docker exec clube-geek-postgres pg_dump -U clube_geek clube_geek_toys | gzip > backup.sql.gz
-```
-
-### Restauracao
-
-```bash
-cat backup.sql | docker exec -i clube-geek-postgres psql -U clube_geek clube_geek_toys
-```
-
-### Retencao
-
-- Backups diarios: 7 dias
-- Backups semanais: 4 semanas
-- Backups mensais: 12 meses
-
-## 12. Checklist de Seguranca
-
-### Deploy
-
-- [ ] Verificar `.gitignore` inclui `.env`
-- [ ] Rodar `npm audit` sem vulnerabilidades criticas
-- [ ] Confirmar firewall (UFW) com apenas portas 22, 80, 443
-- [ ] Verificar certificados SSL validos
-- [ ] Testar rate limiting
-- [ ] Confirmar CORS em producao
-- [ ] Confirmar health check passando
-
-### Manutencao Mensal
-
-- [ ] Revisar dependencias com `npm audit`
-- [ ] Verificar logs de auditoria para atividades suspeitas
-- [ ] Confirmar backups automaticos funcionando
-- [ ] Revisar acessos de usuarios admin
-- [ ] Atualizar imagens Docker (`docker compose pull`)
-
-### Anual
-
-- [ ] Rotacionar JWT secrets
-- [ ] Rotacionar credenciais Stripe
-- [ ] Revisar politica de privacidade
-- [ ] Atualizar sistema operacional da VPS
-- [ ] Revisar regras de firewall
-
-## 13. Contatos de Emergencia
-
-- **Incidentes de Seguranca**: contato@geeketoys.com.br
-- **ANPD (Vazamento de Dados)**: www.gov.br/anpd
-- **Stripe Status**: status.stripe.com
+- **Incidentes de segurança**: contato@geeketoys.com.br
+- **ANPD (vazamento de dados)**: www.gov.br/anpd
+- **Status do Stripe**: status.stripe.com

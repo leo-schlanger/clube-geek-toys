@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 14 de Abril de 2026
+> **Ultima atualizacao:** 19 de Abril de 2026
 
 ## Legenda
 
@@ -13,6 +13,59 @@
 ---
 
 ## Concluido
+
+### Auditoria de Cadastro (Abril 2026)
+
+- [x] **Fix PIX polling** - Corrigido polling que chamava Stripe API com UUID local, nunca detectava confirmacao de pagamento
+- [x] **Email de boas-vindas na ativacao** - Template existia mas nunca era disparado; agora envia na primeira ativacao do membro
+- [x] **Fix URLs nos emails** - CTA corrigido de /minha-conta para /membro
+- [x] **Fix label PIX enganoso** - Removido "aprovacao instantanea" (PIX requer confirmacao manual admin)
+- [x] **Notificacao admin novo membro** - Template admin-new-member enviado automaticamente no cadastro
+- [x] **Copia do contrato para admin** - Email de contrato enviado automaticamente para admin (fallback env.ADMIN_EMAIL)
+- [x] **Mascara de CPF no contrato** - CPF formatado com mascara (XXX.XXX.XXX-XX) na revisao do contrato
+- [x] **Nome real no Stripe** - Pagamentos agora enviam nome real do membro (antes era hardcoded 'Membro')
+
+### Auditoria de Pontos (Abril 2026)
+
+- [x] **Fix redeemPoints com pontos expirados** - Corrigido resgate permitindo pontos expirados mas nao processados pelo cron
+- [x] **Fix newBalance com drift** - Corrigido calculo usando members.points (drifted) em vez do saldo real calculado
+- [x] **Fix getBalance retornando valor stale** - Agora calcula a partir das transacoes excluindo expiradas
+- [x] **Fix getExpiringPoints** - Corrigido retorno de TODAS as transacoes earn; agora filtra pela janela de 30 dias
+- [x] **Reconciliacao diaria no cron** - Adicionado reconcilePointsBalances ao cron diario
+- [x] **Estilo bonus no historico** - Icone amarelo para transacoes do tipo bonus no historico de pontos
+- [x] **Fix export CSV** - Corrigido escaping para nomes com virgulas
+
+### Auditoria de Planos (Abril 2026)
+
+- [x] **Fix RenewModal/UpgradeModal** - Corrigido memberId nao passado ao PaymentModal (era 'temp_member', resultava em 403)
+- [x] **Remover override de expiry no frontend** - Renovacao agora deixa webhook calcular corretamente, preservando dias restantes
+- [x] **Fix assinaturas pausadas nao expirando** - Cron agora inclui subscription_status='paused'
+- [x] **Fix mensagem de pausa** - Corrigido de "beneficios suspensos" para "validos ate vencimento"
+
+### Auditoria de Emails (Abril 2026)
+
+- [x] **Redesign de 17 templates** - Todos os templates com logo, CNPJ real, links sociais e branding
+- [x] **Template member-expired** - Email enviado quando cron expira um membro
+- [x] **Template subscription-resumed** - Email enviado ao retomar assinatura
+- [x] **Welcome email com nome do plano** - Email de boas-vindas agora inclui o nome do plano
+- [x] **Fix admin-pix-pending** - Corrigido member_id ausente para rastreamento de log de email
+
+### Carteirinha Digital (Abril 2026)
+
+- [x] **Redesign carteirinha digital** - Estetica de cartao fisico com visual premium
+- [x] **Gradientes metalicos por tier** - Silver, Gold e Black com gradientes distintos
+- [x] **Smart chip e icone contactless** - Elementos visuais de cartao moderno
+- [x] **Shimmer holografico** - Efeito de brilho holografico animado
+- [x] **Numero do membro formato cartao** - Formatado no padrao de cartao de credito
+- [x] **Textura circuit board** - Textura geek no fundo do cartao
+- [x] **Flip 3D com animacao** - Animacao cubic-bezier para virar o cartao
+- [x] **Verso com tarja magnetica e QR code** - QR code com glow do tier correspondente
+
+### Documentacao (Abril 2026)
+
+- [x] **Reescrita completa da documentacao** - README.md, ARCHITECTURE.md, PROJECT.md, SECURITY.md, DEPLOY.md
+- [x] **Remocao de referencias PagBank** - Todas as referencias substituidas por Stripe
+- [x] **Fluxos documentados end-to-end** - Todos os fluxos do sistema documentados
 
 ### Infraestrutura (Abril 2026)
 
@@ -118,9 +171,11 @@
 
 - [ ] **Aumentar cobertura de testes** - Meta: 70% (atual ~11%)
 - [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
-- [ ] **Settings dinamico** - Permitir editar precos/planos via admin (hoje e code-only)
-- [ ] **Structured logging** - Substituir console.log por logger com niveis (pino/winston)
+- [ ] **Settings/preferencias do membro** - Permitir editar preferencias pessoais e notificacoes
+- [ ] **Structured logging** - Substituir console.log por logger com niveis (Pino/Winston)
 - [ ] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze
+- [ ] **Upgrade de plano com proration** - calculateUpgradeCharge existe mas nao esta integrado nas rotas
+- [ ] **Fluxo de atualizar metodo de pagamento** - Atualmente requer cancelar e re-assinar
 
 ### BAIXO - Nice to Have
 
@@ -183,4 +238,4 @@
 
 ---
 
-_Documento atualizado em 14 de Abril de 2026_
+_Documento atualizado em 19 de Abril de 2026_

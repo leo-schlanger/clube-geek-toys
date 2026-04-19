@@ -1,513 +1,417 @@
-# Clube Geek & Toys - Documentacao do Projeto
+# Clube Geek & Toys — Documentacao do Projeto
 
-> **Ultima atualizacao:** 08 de Abril de 2026
+> **Ultima atualizacao:** 19 de Abril de 2026
 
-## Visao Geral
+## 1. Dados da Empresa
 
-Sistema de gestao de clube de assinaturas para a loja Geek & Toys. Permite gerenciar membros, planos de assinatura, pontos de fidelidade e pagamentos.
+| Campo             | Valor                                                            |
+| ----------------- | ---------------------------------------------------------------- |
+| **Razao Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda           |
+| **Nome Fantasia** | Geek & Toys                                                      |
+| **CNPJ**          | 52.846.344/0001-10                                               |
+| **Endereco**      | R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ |
+| **CEP**           | 22011-001                                                        |
+| **Telefone**      | (21) 98546-4666                                                  |
+| **Email**         | geeketoys@gmail.com                                              |
+| **Site**          | geeketoys.com.br                                                 |
 
-## Dados da Empresa
+## 2. Visao do Produto
 
-| Campo             | Valor                                                  |
-| ----------------- | ------------------------------------------------------ |
-| **Razao Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda |
-| **Nome Fantasia** | Geek & Toys                                            |
-| **CNPJ**          | 52.846.344/0001-10                                     |
-| **Endereco**      | Rua Barata Ribeiro, 181, Loja J - Copacabana, RJ       |
-| **CEP**           | 22.011-001                                             |
-| **Situacao**      | ATIVA                                                  |
+Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam um plano e recebem descontos exclusivos, acumulam pontos de fidelidade em cada compra e possuem uma carteirinha digital com QR Code.
 
-## Stack Tecnologica
+### Planos de Assinatura
 
-### Frontend
+| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Servicos | Multiplicador de Pontos |
+| ------ | -------- | --------- | -------------- | -------------- | ----------------------- |
+| Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x                      |
+| Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                      |
+| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x                      |
 
-| Tecnologia      | Uso                     |
-| --------------- | ----------------------- |
-| React 19        | UI Framework            |
-| TypeScript      | Tipagem estatica        |
-| Vite 7          | Build tool              |
-| TailwindCSS 3   | Estilizacao             |
-| React Router 7  | Roteamento SPA          |
-| TanStack Query  | Cache e estado servidor |
-| React Hook Form | Formularios             |
-| Zod             | Validacao de schemas    |
-| Framer Motion   | Animacoes               |
-| Lucide React    | Icones                  |
-| Sonner          | Notificacoes toast      |
+**Calculo de pontos:** `pontos = valor_compra * multiplicador_plano`. Exemplo: compra de R$ 100,00 no plano Gold = 200 pontos.
 
-### Backend
+## 3. Modulos do Sistema
 
-| Tecnologia    | Uso                       |
-| ------------- | ------------------------- |
-| Node.js 20    | Runtime                   |
-| Express       | Framework HTTP            |
-| PostgreSQL 16 | Banco de dados relacional |
-| bcrypt        | Hash de senhas            |
-| jsonwebtoken  | Autenticacao JWT          |
-| node-cron     | Tarefas agendadas         |
-| Zod           | Validacao de entrada      |
-| pg            | Driver PostgreSQL         |
+### 3.1 Modulo Membro
 
-### Servicos Externos
+Cadastro em etapas (stepper), dashboard com carteirinha digital, historico de pontos, gestao de assinatura e renovacao/upgrade de plano. Fluxo completo: criacao de conta, verificacao de email, dados pessoais, assinatura de contrato digital e pagamento.
 
-| Servico | Uso                  |
-| ------- | -------------------- |
-| Stripe  | Pagamentos (Cartao)  |
-| Resend  | Emails transacionais |
+### 3.2 Modulo Admin
 
-### Infraestrutura
+Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), sistema de pontos (bonus, historico), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn, pontos), gestao de usuarios e roles, e configuracoes do sistema.
 
-| Servico          | Uso                       |
-| ---------------- | ------------------------- |
-| VPS Ubuntu 24.04 | Servidor de producao      |
-| Docker           | Containerizacao           |
-| Nginx            | Reverse proxy + SSL + SPA |
-| Let's Encrypt    | Certificados SSL          |
-| Umami            | Analytics (self-hosted)   |
-| GitHub Actions   | CI/CD automatico          |
+### 3.3 Modulo PDV (Ponto de Venda)
 
-## Arquitetura
+Verificacao de membros por CPF ou QR Code, visualizacao de desconto aplicavel, registro de compra com acumulo automatico de pontos, e resgate de pontos.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    VPS (Docker)                               │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │                 Nginx (80/443)                          │  │
-│  │  Reverse proxy + SSL + Security headers                │  │
-│  └──────┬──────────┬──────────┬──────────────────────────┘  │
-│         │          │          │                              │
-│    club/admin   api.*    analytics.*                         │
-│      (SPA)                                                   │
-│         │          │          │                              │
-│    ┌────┴───┐ ┌────┴─────┐ ┌─┴──────┐                      │
-│    │ Static │ │ Express  │ │ Umami  │                      │
-│    │ Files  │ │  :3001   │ │ :3000  │                      │
-│    └────────┘ └────┬─────┘ └────┬───┘                      │
-│                    │            │                            │
-│              ┌─────┴──────┐ ┌───┴─────┐                     │
-│              │ PostgreSQL │ │umami-db │                     │
-│              │   :5432    │ │ :5433   │                     │
-│              └────────────┘ └─────────┘                     │
-│                                                              │
-│  ┌──────────┐                                                │
-│  │ Certbot  │ Renovacao SSL automatica                      │
-│  └──────────┘                                                │
-└──────────────────────────────────────────────────────────────┘
-          │                    │
-    ┌─────┴──────┐      ┌─────┴──────┐
-    │  Stripe    │      │   Resend   │
-    │(payments)  │      │  (emails)  │
-    └────────────┘      └────────────┘
-```
+### 3.4 Modulo Pagamento
 
-## Estrutura de Diretorios
+Pagamento avulso via cartao de credito (Stripe PaymentIntent) e PIX local (QR Code gerado no servidor). Assinaturas recorrentes via Stripe Subscription. Confirmacao manual de PIX pelo admin. Protecao contra pagamentos duplicados.
 
-```
-clube-geek-toys/
-├── server/                      # Backend (roda na VPS)
-│   ├── api/
-│   │   ├── src/
-│   │   │   ├── index.ts         # Entrypoint Express + cron
-│   │   │   ├── config/          # Configuracoes (DB, constantes)
-│   │   │   ├── db/
-│   │   │   │   ├── schema.sql   # Schema PostgreSQL completo
-│   │   │   │   ├── migrations/  # Migrations incrementais
-│   │   │   │   └── seed-admin.ts
-│   │   │   ├── middleware/
-│   │   │   │   ├── auth.ts      # JWT + RBAC
-│   │   │   │   ├── cors.ts      # CORS whitelist
-│   │   │   │   ├── rate-limit.ts
-│   │   │   │   ├── validate.ts  # Zod validation
-│   │   │   │   └── error-handler.ts
-│   │   │   ├── routes/
-│   │   │   │   ├── auth.routes.ts
-│   │   │   │   ├── member.routes.ts
-│   │   │   │   ├── payment.routes.ts
-│   │   │   │   ├── subscription.routes.ts
-│   │   │   │   ├── points.routes.ts
-│   │   │   │   ├── webhook.routes.ts
-│   │   │   │   ├── email.routes.ts
-│   │   │   │   ├── contract.routes.ts
-│   │   │   │   ├── report.routes.ts
-│   │   │   │   ├── log.routes.ts
-│   │   │   │   ├── user.routes.ts
-│   │   │   │   └── health.routes.ts
-│   │   │   ├── services/
-│   │   │   │   ├── auth.service.ts
-│   │   │   │   ├── member.service.ts
-│   │   │   │   ├── payment.service.ts
-│   │   │   │   ├── subscription.service.ts
-│   │   │   │   ├── points.service.ts
-│   │   │   │   ├── webhook.service.ts
-│   │   │   │   ├── email.service.ts
-│   │   │   │   ├── contract.service.ts
-│   │   │   │   ├── report.service.ts
-│   │   │   │   ├── log.service.ts
-│   │   │   │   └── cron.service.ts
-│   │   │   ├── types/
-│   │   │   └── utils/
-│   │   └── Dockerfile
-│   ├── nginx/
-│   │   ├── nginx.conf
-│   │   ├── conf.d/              # Server blocks por dominio
-│   │   └── shared-headers.conf  # Security headers
-│   ├── scripts/
-│   ├── docker-compose.yml       # Producao
-│   ├── docker-compose.dev.yml   # Desenvolvimento
-│   └── .env.example
-│
-├── src/                         # Frontend React
-│   ├── App.tsx                  # Router + providers
-│   ├── contexts/
-│   │   └── AuthContext.tsx      # JWT auth context
-│   ├── pages/
-│   │   ├── Subscribe.tsx        # Landing page
-│   │   ├── Register.tsx         # Cadastro
-│   │   ├── Login.tsx            # Login
-│   │   ├── ForgotPassword.tsx   # Recuperar senha
-│   │   ├── MemberDashboard.tsx  # Area do membro
-│   │   ├── AdminDashboard.tsx   # Painel admin
-│   │   ├── PDV.tsx              # Ponto de venda
-│   │   ├── PaymentResult.tsx    # Resultado pagamento
-│   │   ├── TermsOfUse.tsx       # Termos de uso
-│   │   └── PrivacyPolicy.tsx    # Politica de privacidade
-│   ├── components/
-│   │   ├── ui/                  # Componentes base (shadcn)
-│   │   ├── admin/               # Tabs admin (lazy loaded)
-│   │   │   ├── MembersTab.tsx
-│   │   │   ├── PointsTab.tsx
-│   │   │   ├── UsersTab.tsx
-│   │   │   ├── LogsTab.tsx
-│   │   │   ├── ReportsTab.tsx
-│   │   │   └── SettingsTab.tsx
-│   │   ├── reports/             # Graficos (lazy loaded)
-│   │   ├── PaymentModal.tsx
-│   │   ├── ContractModal.tsx
-│   │   ├── MemberModal.tsx
-│   │   ├── QRScanner.tsx
-│   │   └── SubscriptionManagement.tsx
-│   ├── lib/
-│   │   ├── api-client.ts        # Cliente HTTP (fetch + JWT)
-│   │   ├── members.ts           # CRUD membros
-│   │   ├── payments.ts          # Integracao pagamentos
-│   │   ├── points.ts            # Sistema de pontos
-│   │   ├── subscriptions.ts     # Assinaturas
-│   │   ├── reports.ts           # Relatorios
-│   │   ├── email.ts             # Envio de emails
-│   │   ├── logs.ts              # Audit logs
-│   │   └── utils.ts             # Utilitarios
-│   ├── hooks/                   # Custom hooks
-│   └── types/                   # Tipos TypeScript
-│
-├── .github/workflows/
-│   └── deploy.yml               # CI/CD GitHub Actions
-│
-├── docs/
-│   ├── PROJECT.md               # Este arquivo
-│   ├── ARCHITECTURE.md          # Arquitetura tecnica
-│   ├── SECURITY.md              # Seguranca e LGPD
-│   └── TODO.md                  # Roadmap
-│
-├── DEPLOY.md                    # Guia de deploy
-└── .env.example                 # Variaveis frontend
-```
+### 3.5 Modulo Contrato
 
-## Sistema de Roles
+Assinatura digital de contrato conforme Lei 14.063/2020. Geracao de PDF no frontend, upload via multipart/form-data com validacao de magic bytes, hash SHA-256 do documento, armazenamento no servidor e envio por email com PDF anexo.
 
-### Tipos de Usuario
+### 3.6 Modulo Email (17 templates)
 
-| Role     | Acesso         | Descricao                           |
-| -------- | -------------- | ----------------------------------- |
-| `admin`  | Total          | Administrador do sistema            |
-| `seller` | PDV            | Vendedor - acesso ao ponto de venda |
-| `member` | Area do membro | Assinante do clube                  |
+Envio de emails transacionais via Resend API com templates HTML responsivos, branding da empresa, preheader text, CTAs e footer padronizado. Todos os envios sao registrados na tabela `email_logs`.
 
-### Fluxo de Autenticacao
+### 3.7 Modulo Radio
 
-```
-┌─────────────────┐
-│   Login Page    │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  POST /auth/    │
-│     login       │
-│  (bcrypt check) │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Gera JWT:      │
-│  - access (15m) │
-│  - refresh (7d) │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Frontend salva │
-│  tokens         │
-│  AuthContext     │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Redirect:      │
-│  admin  → /admin│
-│  seller → /pdv  │
-│  member → /membro│
-└─────────────────┘
-```
+Radio online via AzuraCast (stack independente). Player integrado no site institucional (`geeketoys.com.br`). Scripts de automacao para download, upload e gestao de playlists.
 
-## Modelo de Dados (PostgreSQL)
+### 3.8 Modulo Analytics
 
-### Tabela: `users`
+Umami self-hosted para rastreamento de uso sem cookies de terceiros.
 
-| Coluna             | Tipo         | Descricao             |
-| ------------------ | ------------ | --------------------- |
-| id                 | UUID (PK)    | ID unico              |
-| email              | VARCHAR(254) | Email unico           |
-| password_hash      | VARCHAR(255) | Hash bcrypt           |
-| role               | VARCHAR(20)  | member, seller, admin |
-| email_verified     | BOOLEAN      | Email verificado?     |
-| email_verified_at  | TIMESTAMPTZ  | Data de verificacao   |
-| refresh_token_hash | VARCHAR(255) | Hash do refresh token |
-| created_at         | TIMESTAMPTZ  | Data de criacao       |
-| updated_at         | TIMESTAMPTZ  | Ultima atualizacao    |
+## 4. Modelos de Dados (PostgreSQL)
 
-### Tabela: `members`
+### 4.1 Tabela `users`
 
-| Coluna              | Tipo         | Descricao                          |
-| ------------------- | ------------ | ---------------------------------- |
-| id                  | UUID (PK)    | ID unico                           |
-| user_id             | UUID (FK)    | Referencia users                   |
-| cpf                 | VARCHAR(11)  | CPF (unico)                        |
-| full_name           | VARCHAR(200) | Nome completo                      |
-| email               | VARCHAR(254) | Email                              |
-| phone               | VARCHAR(20)  | Telefone                           |
-| plan                | VARCHAR(10)  | silver, gold, black                |
-| status              | VARCHAR(20)  | active, pending, inactive, expired |
-| payment_type        | VARCHAR(10)  | monthly, annual                    |
-| start_date          | DATE         | Data de inicio                     |
-| expiry_date         | DATE         | Data de vencimento                 |
-| points              | INTEGER      | Saldo de pontos                    |
-| pending_payment     | JSONB        | Pagamento pendente                 |
-| subscription_id     | TEXT         | ID da assinatura Stripe            |
-| subscription_status | VARCHAR(20)  | Status da assinatura               |
-| auto_renewal        | BOOLEAN      | Renovacao automatica               |
-| created_at          | TIMESTAMPTZ  | Data de criacao                    |
+| Coluna             | Tipo         | Restricoes / Notas                                                          |
+| ------------------ | ------------ | --------------------------------------------------------------------------- |
+| id                 | UUID         | PK, DEFAULT uuid_generate_v4()                                              |
+| email              | VARCHAR(254) | NOT NULL, UNIQUE                                                            |
+| password_hash      | VARCHAR(255) | NOT NULL (bcrypt)                                                           |
+| role               | VARCHAR(20)  | NOT NULL, DEFAULT 'member', CHECK IN ('member','seller','admin','disabled') |
+| email_verified     | BOOLEAN      | NOT NULL, DEFAULT FALSE                                                     |
+| email_verified_at  | TIMESTAMPTZ  | Nullable                                                                    |
+| refresh_token_hash | VARCHAR(255) | Nullable                                                                    |
+| created_at         | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                     |
+| updated_at         | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                            |
 
-### Tabela: `payments`
+### 4.2 Tabela `members`
 
-| Coluna               | Tipo          | Descricao                       |
-| -------------------- | ------------- | ------------------------------- |
-| id                   | UUID (PK)     | ID unico                        |
-| member_id            | UUID (FK)     | Referencia members              |
-| amount               | DECIMAL(10,2) | Valor                           |
-| method               | VARCHAR(20)   | pix, credit_card, boleto, cash  |
-| status               | VARCHAR(20)   | pending, paid, failed, refunded |
-| provider_id          | TEXT          | ID no Stripe                    |
-| provider_status      | TEXT          | Status no Stripe                |
-| reference            | TEXT          | Referencia interna              |
-| paid_at              | TIMESTAMPTZ   | Data do pagamento               |
-| webhook_processed_at | TIMESTAMPTZ   | Quando webhook processou        |
-| created_at           | TIMESTAMPTZ   | Data de criacao                 |
+| Coluna               | Tipo         | Restricoes / Notas                                                              |
+| -------------------- | ------------ | ------------------------------------------------------------------------------- |
+| id                   | UUID         | PK, DEFAULT uuid_generate_v4()                                                  |
+| user_id              | UUID         | FK → users(id) ON DELETE CASCADE, NOT NULL, UNIQUE                              |
+| cpf                  | VARCHAR(11)  | NOT NULL, UNIQUE                                                                |
+| full_name            | VARCHAR(200) | NOT NULL                                                                        |
+| email                | VARCHAR(254) | NOT NULL                                                                        |
+| phone                | VARCHAR(20)  | Nullable                                                                        |
+| photo_url            | TEXT         | Nullable                                                                        |
+| plan                 | VARCHAR(10)  | NOT NULL, CHECK IN ('silver','gold','black')                                    |
+| status               | VARCHAR(20)  | NOT NULL, DEFAULT 'pending', CHECK IN ('active','pending','inactive','expired') |
+| payment_type         | VARCHAR(10)  | NOT NULL, CHECK IN ('monthly','annual')                                         |
+| start_date           | DATE         | Nullable                                                                        |
+| expiry_date          | DATE         | Nullable                                                                        |
+| points               | INTEGER      | NOT NULL, DEFAULT 0, CHECK >= 0                                                 |
+| pending_payment      | JSONB        | Nullable, dados do pagamento pendente                                           |
+| subscription_id      | TEXT         | Nullable, ID da assinatura Stripe                                               |
+| subscription_status  | VARCHAR(20)  | Nullable                                                                        |
+| auto_renewal         | BOOLEAN      | DEFAULT FALSE                                                                   |
+| activated_at         | TIMESTAMPTZ  | Nullable                                                                        |
+| activated_by_payment | TEXT         | Nullable, ID do pagamento que ativou                                            |
+| stripe_customer_id   | TEXT         | Nullable                                                                        |
+| created_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                         |
+| updated_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                                |
 
-### Tabela: `point_transactions`
+### 4.3 Tabela `payments`
 
-| Coluna         | Tipo          | Descricao                   |
-| -------------- | ------------- | --------------------------- |
-| id             | UUID (PK)     | ID unico                    |
-| member_id      | UUID (FK)     | Referencia members          |
-| type           | VARCHAR(10)   | earn, redeem, expire, bonus |
-| points         | INTEGER       | Quantidade de pontos        |
-| balance        | INTEGER       | Saldo apos transacao        |
-| description    | TEXT          | Descricao                   |
-| purchase_value | DECIMAL(10,2) | Valor da compra (se earn)   |
-| expires_at     | DATE          | Data de expiracao           |
-| expired        | BOOLEAN       | Ja expirou?                 |
-| created_by     | UUID (FK)     | Quem adicionou              |
-| created_at     | TIMESTAMPTZ   | Data da transacao           |
+| Coluna               | Tipo          | Restricoes / Notas                                                           |
+| -------------------- | ------------- | ---------------------------------------------------------------------------- |
+| id                   | UUID          | PK, DEFAULT uuid_generate_v4()                                               |
+| member_id            | UUID          | FK → members(id) ON DELETE SET NULL, Nullable                                |
+| amount               | DECIMAL(10,2) | NOT NULL                                                                     |
+| method               | VARCHAR(20)   | NOT NULL, CHECK IN ('pix','credit_card','boleto','cash')                     |
+| status               | VARCHAR(20)   | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','paid','failed','refunded') |
+| provider_id          | TEXT          | Nullable, ID no Stripe                                                       |
+| provider_status      | TEXT          | Nullable, status no Stripe                                                   |
+| reference            | TEXT          | Nullable, referencia interna                                                 |
+| paid_at              | TIMESTAMPTZ   | Nullable                                                                     |
+| webhook_processed_at | TIMESTAMPTZ   | Nullable                                                                     |
+| refund_reason        | TEXT          | Nullable (adicionado via ensure-schema)                                      |
+| created_at           | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                                                      |
+| updated_at           | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger                             |
 
-### Tabela: `subscriptions`
+### 4.4 Tabela `subscriptions`
 
-| Coluna             | Tipo          | Descricao                              |
-| ------------------ | ------------- | -------------------------------------- |
-| id                 | TEXT (PK)     | ID da assinatura Stripe                |
-| member_id          | UUID (FK)     | Referencia members                     |
-| provider_id        | TEXT          | ID no Stripe                           |
-| status             | VARCHAR(20)   | pending, authorized, paused, cancelled |
-| plan               | VARCHAR(10)   | silver, gold, black                    |
-| frequency_type     | VARCHAR(10)   | months, years                          |
-| transaction_amount | DECIMAL(10,2) | Valor da cobranca                      |
-| next_payment_date  | TIMESTAMPTZ   | Proxima cobranca                       |
-| last_payment_date  | TIMESTAMPTZ   | Ultima cobranca                        |
-| failed_payments    | INTEGER       | Falhas consecutivas (max 3)            |
-| card_last_four     | VARCHAR(4)    | Ultimos 4 digitos                      |
-| card_brand         | VARCHAR(50)   | Bandeira do cartao                     |
-| payer_email        | VARCHAR(254)  | Email do pagador                       |
-| created_at         | TIMESTAMPTZ   | Data de criacao                        |
+| Coluna             | Tipo          | Restricoes / Notas                                                                  |
+| ------------------ | ------------- | ----------------------------------------------------------------------------------- |
+| id                 | TEXT          | PK                                                                                  |
+| member_id          | UUID          | FK → members(id) ON DELETE CASCADE, NOT NULL                                        |
+| provider_id        | TEXT          | NOT NULL, ID no Stripe                                                              |
+| status             | VARCHAR(20)   | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','authorized','paused','cancelled') |
+| plan               | VARCHAR(10)   | NOT NULL                                                                            |
+| frequency_type     | VARCHAR(10)   | NOT NULL, CHECK IN ('months','years')                                               |
+| transaction_amount | DECIMAL(10,2) | NOT NULL                                                                            |
+| next_payment_date  | TIMESTAMPTZ   | Nullable                                                                            |
+| last_payment_date  | TIMESTAMPTZ   | Nullable                                                                            |
+| failed_payments    | INTEGER       | NOT NULL, DEFAULT 0                                                                 |
+| card_last_four     | VARCHAR(4)    | Nullable                                                                            |
+| card_brand         | VARCHAR(50)   | Nullable                                                                            |
+| payer_email        | VARCHAR(254)  | Nullable                                                                            |
+| created_at         | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                                                             |
+| cancelled_at       | TIMESTAMPTZ   | Nullable                                                                            |
+| paused_at          | TIMESTAMPTZ   | Nullable                                                                            |
 
-### Tabela: `contracts`
+### 4.5 Tabela `subscription_payments`
 
-| Coluna            | Tipo         | Descricao                     |
-| ----------------- | ------------ | ----------------------------- |
-| id                | TEXT (PK)    | ID do contrato                |
-| member_id         | UUID (FK)    | Referencia members            |
-| member_name       | VARCHAR(200) | Nome no momento da assinatura |
-| member_cpf        | VARCHAR(11)  | CPF                           |
-| member_email      | VARCHAR(254) | Email                         |
-| plan              | VARCHAR(10)  | Plano                         |
-| signature_preview | TEXT         | Preview da assinatura         |
-| signed_at         | TIMESTAMPTZ  | Data da assinatura            |
-| ip_address        | VARCHAR(45)  | IP do signatario              |
-| user_agent        | TEXT         | User agent do navegador       |
-| document_hash     | VARCHAR(64)  | Hash SHA-256 do documento     |
-| pdf_url           | TEXT         | URL do PDF                    |
-| status            | VARCHAR(20)  | active, superseded            |
+| Coluna              | Tipo          | Restricoes / Notas                                 |
+| ------------------- | ------------- | -------------------------------------------------- |
+| id                  | TEXT          | PK                                                 |
+| subscription_id     | TEXT          | FK → subscriptions(id) ON DELETE CASCADE, NOT NULL |
+| member_id           | UUID          | FK → members(id) ON DELETE CASCADE, NOT NULL       |
+| amount              | DECIMAL(10,2) | NOT NULL                                           |
+| status              | VARCHAR(20)   | NOT NULL                                           |
+| payment_date        | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                            |
+| provider_payment_id | TEXT          | Nullable                                           |
+| failure_reason      | TEXT          | Nullable                                           |
 
-### Tabela: `audit_logs`
+### 4.6 Tabela `point_transactions`
 
-| Coluna    | Tipo         | Descricao            |
-| --------- | ------------ | -------------------- |
-| id        | UUID (PK)    | ID unico             |
-| action    | VARCHAR(100) | Acao realizada       |
-| member_id | UUID (FK)    | Membro afetado       |
-| user_id   | UUID (FK)    | Usuario que realizou |
-| details   | JSONB        | Detalhes adicionais  |
-| timestamp | TIMESTAMPTZ  | Data/hora            |
+| Coluna         | Tipo          | Restricoes / Notas                                    |
+| -------------- | ------------- | ----------------------------------------------------- |
+| id             | UUID          | PK, DEFAULT uuid_generate_v4()                        |
+| member_id      | UUID          | FK → members(id) ON DELETE CASCADE, NOT NULL          |
+| type           | VARCHAR(10)   | NOT NULL, CHECK IN ('earn','redeem','expire','bonus') |
+| points         | INTEGER       | NOT NULL                                              |
+| balance        | INTEGER       | NOT NULL, saldo apos a transacao                      |
+| description    | TEXT          | Nullable                                              |
+| purchase_value | DECIMAL(10,2) | Nullable, valor da compra (quando type = 'earn')      |
+| expires_at     | DATE          | Nullable                                              |
+| expired        | BOOLEAN       | DEFAULT FALSE                                         |
+| is_promotion   | BOOLEAN       | DEFAULT FALSE                                         |
+| created_by     | UUID          | FK → users(id), Nullable                              |
+| created_at     | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                               |
 
-### Tabela: `email_logs`
+### 4.7 Tabela `contracts`
 
-| Coluna        | Tipo         | Descricao                    |
-| ------------- | ------------ | ---------------------------- |
-| id            | UUID (PK)    | ID unico                     |
-| member_id     | UUID (FK)    | Membro destinatario          |
-| template      | VARCHAR(50)  | Nome do template             |
-| recipient     | VARCHAR(254) | Email destinatario           |
-| status        | VARCHAR(20)  | sent, failed                 |
-| resend_id     | TEXT         | ID no Resend                 |
-| error_message | TEXT         | Mensagem de erro (se falhou) |
-| sent_at       | TIMESTAMPTZ  | Data de envio                |
+| Coluna            | Tipo         | Restricoes / Notas                                                     |
+| ----------------- | ------------ | ---------------------------------------------------------------------- |
+| id                | TEXT         | PK                                                                     |
+| member_id         | UUID         | FK → members(id) ON DELETE CASCADE, NOT NULL                           |
+| member_name       | VARCHAR(200) | NOT NULL                                                               |
+| member_cpf        | VARCHAR(11)  | NOT NULL                                                               |
+| member_email      | VARCHAR(254) | NOT NULL                                                               |
+| plan              | VARCHAR(10)  | NOT NULL                                                               |
+| signature_preview | TEXT         | Nullable                                                               |
+| signed_at         | TIMESTAMPTZ  | NOT NULL                                                               |
+| ip_address        | VARCHAR(45)  | Nullable                                                               |
+| user_agent        | TEXT         | Nullable                                                               |
+| document_hash     | VARCHAR(64)  | Nullable, SHA-256 do conteudo                                          |
+| pdf_url           | TEXT         | Nullable                                                               |
+| pdf_path          | TEXT         | Nullable, caminho no filesystem do servidor                            |
+| pdf_hash          | VARCHAR(64)  | Nullable, SHA-256 do arquivo PDF                                       |
+| status            | VARCHAR(20)  | NOT NULL, DEFAULT 'active', CHECK IN ('active','superseded','revoked') |
+| created_at        | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                |
 
-### Tabela: `processed_webhooks`
+### 4.8 Tabela `audit_logs`
 
-| Coluna       | Tipo        | Descricao                   |
-| ------------ | ----------- | --------------------------- |
-| webhook_key  | TEXT (PK)   | Chave unica de idempotencia |
-| type         | TEXT        | Tipo do webhook             |
-| action       | TEXT        | Acao do webhook             |
-| data_id      | TEXT        | ID do recurso               |
-| processed_at | TIMESTAMPTZ | Data de processamento       |
+| Coluna    | Tipo         | Restricoes / Notas                            |
+| --------- | ------------ | --------------------------------------------- |
+| id        | UUID         | PK, DEFAULT uuid_generate_v4()                |
+| action    | VARCHAR(100) | NOT NULL                                      |
+| member_id | UUID         | FK → members(id) ON DELETE SET NULL, Nullable |
+| user_id   | UUID         | FK → users(id) ON DELETE SET NULL, Nullable   |
+| details   | JSONB        | Nullable                                      |
+| timestamp | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                       |
 
-## Planos de Assinatura
+### 4.9 Tabela `email_logs`
 
-| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Servicos | Multiplicador Pontos |
-| ------ | -------- | --------- | -------------- | -------------- | -------------------- |
-| Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x                   |
-| Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                   |
-| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x                   |
+| Coluna        | Tipo         | Restricoes / Notas                            |
+| ------------- | ------------ | --------------------------------------------- |
+| id            | UUID         | PK, DEFAULT uuid_generate_v4()                |
+| member_id     | UUID         | FK → members(id) ON DELETE SET NULL, Nullable |
+| template      | VARCHAR(50)  | NOT NULL                                      |
+| recipient     | VARCHAR(254) | NOT NULL                                      |
+| status        | VARCHAR(20)  | NOT NULL (sent, failed)                       |
+| resend_id     | TEXT         | Nullable, ID no Resend                        |
+| error_message | TEXT         | Nullable                                      |
+| sent_at       | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                       |
 
-### Calculo de Pontos
+### 4.10 Tabela `processed_webhooks`
 
-```
-pontos = valor_compra * multiplicador_plano
-```
+| Coluna       | Tipo        | Restricoes / Notas        |
+| ------------ | ----------- | ------------------------- |
+| webhook_key  | TEXT        | PK, chave de idempotencia |
+| type         | TEXT        | Nullable                  |
+| action       | TEXT        | Nullable                  |
+| data_id      | TEXT        | Nullable                  |
+| request_id   | TEXT        | Nullable                  |
+| processed_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW()   |
 
-Exemplo: Compra de R$ 100,00 no plano Gold = 200 pontos
+### 4.11 Tabela `consumed_verification_tokens`
 
-## Endpoints da API
+| Coluna      | Tipo        | Restricoes / Notas                         |
+| ----------- | ----------- | ------------------------------------------ |
+| token_hash  | TEXT        | PK, SHA-256 do token                       |
+| user_id     | UUID        | FK → users(id) ON DELETE CASCADE, NOT NULL |
+| consumed_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW()                    |
+
+### 4.12 Tabela `error_logs`
+
+| Coluna     | Tipo        | Restricoes / Notas                                                             |
+| ---------- | ----------- | ------------------------------------------------------------------------------ |
+| id         | UUID        | PK, DEFAULT uuid_generate_v4()                                                 |
+| severity   | VARCHAR(10) | NOT NULL, DEFAULT 'error', CHECK IN ('debug','info','warning','error','fatal') |
+| message    | TEXT        | NOT NULL                                                                       |
+| stack      | TEXT        | Nullable                                                                       |
+| source     | VARCHAR(10) | NOT NULL, DEFAULT 'frontend', CHECK IN ('frontend','backend')                  |
+| context    | JSONB       | DEFAULT '{}'                                                                   |
+| user_id    | UUID        | FK → users(id) ON DELETE SET NULL, Nullable                                    |
+| url        | TEXT        | Nullable                                                                       |
+| user_agent | TEXT        | Nullable                                                                       |
+| ip_address | VARCHAR(45) | Nullable                                                                       |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT NOW()                                                        |
+
+### 4.13 Tabela `config`
+
+| Coluna     | Tipo         | Restricoes / Notas      |
+| ---------- | ------------ | ----------------------- |
+| key        | VARCHAR(100) | PK                      |
+| value      | JSONB        | NOT NULL                |
+| updated_at | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW() |
+
+### Triggers
+
+- `tr_users_updated_at` — atualiza `updated_at` automaticamente em UPDATE na tabela `users`.
+- `tr_members_updated_at` — atualiza `updated_at` automaticamente em UPDATE na tabela `members`.
+- `tr_payments_updated_at` — atualiza `updated_at` automaticamente em UPDATE na tabela `payments`.
+
+## 5. Endpoints da API
 
 **Base URL:** `https://api.geeketoys.com.br`
 
-### Autenticacao
+### Auth (`/auth`)
 
-| Metodo | Endpoint                        | Descricao                   | Auth    |
-| ------ | ------------------------------- | --------------------------- | ------- |
-| POST   | `/auth/register`                | Cadastro de novo usuario    | Publico |
-| POST   | `/auth/login`                   | Login                       | Publico |
-| POST   | `/auth/refresh`                 | Renovar access token        | Refresh |
-| POST   | `/auth/logout`                  | Logout (invalida refresh)   | JWT     |
-| POST   | `/auth/send-verification-email` | Envia email de verificacao  | JWT     |
-| POST   | `/auth/verify-email`            | Valida token de verificacao | Publico |
-| POST   | `/auth/send-password-reset`     | Envia email reset de senha  | Publico |
+| Metodo | Endpoint                        | Descricao                            | Auth    |
+| ------ | ------------------------------- | ------------------------------------ | ------- |
+| POST   | `/auth/register`                | Cadastro de novo usuario             | Publico |
+| POST   | `/auth/login`                   | Login (retorna access + refresh)     | Publico |
+| POST   | `/auth/refresh`                 | Renovar access token via cookie/body | Refresh |
+| POST   | `/auth/logout`                  | Logout (invalida refresh token)      | JWT     |
+| POST   | `/auth/send-verification-email` | Envia email de verificacao           | Publico |
+| POST   | `/auth/verify-email`            | Valida token de verificacao de email | Publico |
+| POST   | `/auth/send-password-reset`     | Envia email de reset de senha        | Publico |
+| POST   | `/auth/reset-password`          | Redefine senha com token             | Publico |
+| POST   | `/auth/google`                  | Login/registro via Google OAuth      | Publico |
+| GET    | `/auth/me`                      | Dados do usuario autenticado         | JWT     |
+| PATCH  | `/auth/update-profile`          | Atualiza email/senha do usuario      | JWT     |
 
-### Membros
+### Members (`/members`)
 
-| Metodo | Endpoint       | Descricao        | Auth               |
-| ------ | -------------- | ---------------- | ------------------ |
-| GET    | `/members`     | Listar membros   | admin              |
-| GET    | `/members/:id` | Buscar membro    | admin/seller/owner |
-| POST   | `/members`     | Criar membro     | JWT                |
-| PUT    | `/members/:id` | Atualizar membro | admin/owner        |
-| DELETE | `/members/:id` | Remover membro   | admin              |
+| Metodo | Endpoint                    | Descricao                                 | Auth                   |
+| ------ | --------------------------- | ----------------------------------------- | ---------------------- |
+| GET    | `/members/cpf-exists/:cpf`  | Verifica se CPF ja esta cadastrado        | Publico (rate-limited) |
+| GET    | `/members`                  | Lista membros (paginacao, filtros, busca) | admin/seller           |
+| GET    | `/members/me`               | Perfil do membro autenticado              | JWT                    |
+| GET    | `/members/count`            | Total de membros                          | admin/seller           |
+| GET    | `/members/by-cpf/:cpf`      | Busca membro por CPF                      | admin/seller           |
+| GET    | `/members/:id`              | Detalhes do membro                        | admin/seller/owner     |
+| GET    | `/members/:id/payments`     | Pagamentos do membro                      | admin/seller           |
+| GET    | `/members/:id/subscription` | Assinatura do membro                      | admin/seller           |
+| POST   | `/members`                  | Criar perfil de membro                    | JWT                    |
+| PATCH  | `/members/:id`              | Atualizar dados do membro                 | admin/seller/owner     |
 
-### Pagamentos
+### Payments (`/pix`, `/checkout`, `/payment`, `/payments`)
 
-| Metodo | Endpoint                   | Descricao                    | Auth |
-| ------ | -------------------------- | ---------------------------- | ---- |
-| POST   | `/payment/pix/create`      | Gera QR Code PIX             | JWT  |
-| POST   | `/payment/checkout/create` | Cria pagamento cartao        | JWT  |
-| GET    | `/payment/status/:id`      | Verifica status de pagamento | JWT  |
+O mesmo router e montado em quatro prefixos para compatibilidade.
 
-### Assinaturas
+| Metodo | Endpoint                     | Descricao                            | Auth  |
+| ------ | ---------------------------- | ------------------------------------ | ----- |
+| POST   | `/pix/create`                | Gera QR Code PIX local               | JWT   |
+| POST   | `/checkout/card/create`      | Cria PaymentIntent Stripe (cartao)   | JWT   |
+| POST   | `/payments/:id/confirm`      | Admin confirma pagamento PIX manual  | admin |
+| POST   | `/payments/:id/refund`       | Admin realiza estorno                | admin |
+| GET    | `/payments`                  | Lista pagamentos (filtra por membro) | JWT   |
+| GET    | `/payment/status/:paymentId` | Consulta status no Stripe            | JWT   |
 
-| Metodo | Endpoint                        | Descricao              | Auth |
-| ------ | ------------------------------- | ---------------------- | ---- |
-| POST   | `/subscription/create`          | Cria assinatura        | JWT  |
-| GET    | `/subscription/:id`             | Detalhes da assinatura | JWT  |
-| PUT    | `/subscription/:id/pause`       | Pausa assinatura       | JWT  |
-| PUT    | `/subscription/:id/resume`      | Reativa assinatura     | JWT  |
-| PUT    | `/subscription/:id/cancel`      | Cancela assinatura     | JWT  |
-| PUT    | `/subscription/:id/update-card` | Atualiza cartao        | JWT  |
+### Subscriptions (`/subscription`)
 
-### Pontos
+| Metodo | Endpoint                                  | Descricao                    | Auth |
+| ------ | ----------------------------------------- | ---------------------------- | ---- |
+| POST   | `/subscription/create`                    | Cria assinatura Stripe       | JWT  |
+| GET    | `/subscription/:id`                       | Detalhes da assinatura       | JWT  |
+| PUT    | `/subscription/:id/pause`                 | Pausa assinatura             | JWT  |
+| PUT    | `/subscription/:id/resume`                | Reativa assinatura           | JWT  |
+| PUT    | `/subscription/:id/cancel`                | Cancela assinatura           | JWT  |
+| GET    | `/subscription/:id/payments`              | Pagamentos da assinatura     | JWT  |
+| PUT    | `/subscription/:id/update-payment-method` | Atualiza metodo de pagamento | JWT  |
 
-| Metodo | Endpoint            | Descricao           | Auth               |
-| ------ | ------------------- | ------------------- | ------------------ |
-| POST   | `/points/add`       | Adicionar pontos    | admin/seller       |
-| POST   | `/points/redeem`    | Resgatar pontos     | admin/seller       |
-| GET    | `/points/:memberId` | Historico de pontos | admin/seller/owner |
+### Points (`/points`)
 
-### Webhooks
+| Metodo | Endpoint                     | Descricao                          | Auth         |
+| ------ | ---------------------------- | ---------------------------------- | ------------ |
+| GET    | `/points/:memberId/balance`  | Saldo de pontos                    | JWT/owner    |
+| GET    | `/points/:memberId/history`  | Historico de transacoes            | JWT/owner    |
+| GET    | `/points/:memberId/expiring` | Pontos proximos de expirar         | JWT/owner    |
+| POST   | `/points/:memberId/earn`     | Registrar compra (acumular pontos) | seller/admin |
+| POST   | `/points/:memberId/bonus`    | Adicionar pontos bonus             | admin        |
+| POST   | `/points/:memberId/redeem`   | Resgatar pontos                    | seller/admin |
 
-| Metodo | Endpoint          | Descricao                | Auth              |
-| ------ | ----------------- | ------------------------ | ----------------- |
-| POST   | `/webhook/stripe` | Processa webhooks Stripe | Assinatura Stripe |
+### Contracts (`/contracts`)
 
-### Email
+| Metodo | Endpoint                        | Descricao                                        | Auth      |
+| ------ | ------------------------------- | ------------------------------------------------ | --------- |
+| POST   | `/contracts`                    | Upload de contrato (multipart/form-data com PDF) | JWT/owner |
+| GET    | `/contracts/:memberId`          | Contrato ativo do membro                         | JWT/owner |
+| GET    | `/contracts/:memberId/history`  | Historico de contratos                           | JWT/owner |
+| GET    | `/contracts/:contractId/verify` | Verificar integridade (hash SHA-256)             | JWT/owner |
+| POST   | `/contracts/:contractId/revoke` | Revogar contrato                                 | JWT/owner |
 
-| Metodo | Endpoint      | Descricao              | Auth |
-| ------ | ------------- | ---------------------- | ---- |
-| POST   | `/email/send` | Envia email (template) | JWT  |
+### Email (`/email`)
 
-### Contratos
+| Metodo | Endpoint               | Descricao                             | Auth |
+| ------ | ---------------------- | ------------------------------------- | ---- |
+| POST   | `/email/send`          | Envia email por template              | JWT  |
+| POST   | `/email/send-contract` | Envia contrato assinado com PDF anexo | JWT  |
+| GET    | `/email/templates`     | Lista templates disponiveis           | JWT  |
 
-| Metodo | Endpoint              | Descricao                 | Auth |
-| ------ | --------------------- | ------------------------- | ---- |
-| POST   | `/contract/create`    | Criar contrato digital    | JWT  |
-| GET    | `/contract/:memberId` | Buscar contrato do membro | JWT  |
+### Webhook (`/webhook`)
 
-### Relatorios
+| Metodo | Endpoint           | Descricao                    | Auth             |
+| ------ | ------------------ | ---------------------------- | ---------------- |
+| POST   | `/webhook/stripe`  | Processa eventos do Stripe   | Signature Stripe |
+| POST   | `/webhook/pagbank` | Retorna 410 Gone (deprecado) | -                |
 
-| Metodo | Endpoint           | Descricao        | Auth  |
-| ------ | ------------------ | ---------------- | ----- |
-| GET    | `/reports/daily`   | Relatorio diario | admin |
-| GET    | `/reports/monthly` | Relatorio mensal | admin |
+### Reports (`/reports`)
 
-### Usuarios (Admin)
+| Metodo | Endpoint                   | Descricao                             | Auth  |
+| ------ | -------------------------- | ------------------------------------- | ----- |
+| GET    | `/reports/daily`           | Relatorio diario                      | admin |
+| GET    | `/reports/monthly`         | Relatorio mensal (parametro `months`) | admin |
+| GET    | `/reports/churn`           | Churn por mes (expired + cancelled)   | admin |
+| GET    | `/reports/points-overview` | Pontos ganhos vs resgatados por mes   | admin |
+| GET    | `/reports/today-revenue`   | Receita do dia                        | admin |
+| GET    | `/reports/realtime-stats`  | Metricas em tempo real                | admin |
 
-| Metodo | Endpoint          | Descricao       | Auth  |
-| ------ | ----------------- | --------------- | ----- |
-| GET    | `/users`          | Listar usuarios | admin |
-| PUT    | `/users/:id/role` | Alterar role    | admin |
+### Logs (`/logs`)
 
-### Logs
+| Metodo | Endpoint             | Descricao                 | Auth                   |
+| ------ | -------------------- | ------------------------- | ---------------------- |
+| POST   | `/logs/errors`       | Registra erro do frontend | Publico (rate-limited) |
+| GET    | `/logs/audit`        | Lista audit logs          | admin                  |
+| GET    | `/logs/email`        | Lista email logs          | admin                  |
+| GET    | `/logs/errors`       | Lista error logs          | admin                  |
+| GET    | `/logs/errors/stats` | Estatisticas de erros     | admin                  |
 
-| Metodo | Endpoint | Descricao         | Auth  |
-| ------ | -------- | ----------------- | ----- |
-| GET    | `/logs`  | Listar audit logs | admin |
+### Users (`/users`)
+
+| Metodo | Endpoint          | Descricao               | Auth  |
+| ------ | ----------------- | ----------------------- | ----- |
+| GET    | `/users`          | Lista todos os usuarios | admin |
+| PATCH  | `/users/:id/role` | Altera role do usuario  | admin |
+
+### Audit (`/audit`)
+
+| Metodo | Endpoint        | Descricao                            | Auth  |
+| ------ | --------------- | ------------------------------------ | ----- |
+| POST   | `/audit/export` | Registra auditoria de exportacao CSV | admin |
+
+### Settings (`/settings`)
+
+| Metodo | Endpoint    | Descricao                      | Auth  |
+| ------ | ----------- | ------------------------------ | ----- |
+| GET    | `/settings` | Lista configuracoes + catalogo | admin |
+| PATCH  | `/settings` | Atualiza configuracoes em lote | admin |
+
+### LGPD (`/lgpd`)
+
+| Metodo | Endpoint               | Descricao                                | Auth |
+| ------ | ---------------------- | ---------------------------------------- | ---- |
+| GET    | `/lgpd/export`         | Exporta todos os dados do usuario (LGPD) | JWT  |
+| POST   | `/lgpd/delete-account` | Anonimiza e exclui conta (requer senha)  | JWT  |
 
 ### Health
 
@@ -515,85 +419,295 @@ Exemplo: Compra de R$ 100,00 no plano Gold = 200 pontos
 | ------ | --------- | --------------------- | ------- |
 | GET    | `/health` | Status da API + banco | Publico |
 
-## Templates de Email
+## 6. Templates de Email (17)
 
-13 templates HTML responsivos com branding, preheader text, CTAs e footer com dados da empresa.
-Enviados via Resend API. Todos logados na tabela `email_logs`.
+| Template                      | Assunto                         | Trigger                                    | Variaveis principais                                                    | Destinatario |
+| ----------------------------- | ------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------- | ------------ |
+| `verify-email`                | Verifique seu e-mail            | Backend (auto, apos registro)              | name, verify_url                                                        | Membro       |
+| `password-reset`              | Redefinicao de senha            | Backend (auto, solicitacao do membro)      | name, reset_url                                                         | Membro       |
+| `welcome`                     | Bem-vindo ao Clube Geek & Toys! | Frontend (apos ativacao)                   | name, plan                                                              | Membro       |
+| `payment-confirmed`           | Pagamento confirmado            | Webhook Stripe / Admin confirma PIX        | name, amount, plan, expiry_date                                         | Membro       |
+| `payment-failed`              | Pagamento nao aprovado          | Webhook Stripe                             | name                                                                    | Membro       |
+| `subscription-created`        | Assinatura ativada              | Backend (auto)                             | name, plan, amount, card_last_four                                      | Membro       |
+| `subscription-payment`        | Cobranca recorrente processada  | Webhook Stripe                             | name, amount, plan, next_payment                                        | Membro       |
+| `subscription-paused`         | Assinatura pausada              | Backend (auto)                             | name                                                                    | Membro       |
+| `subscription-resumed`        | Assinatura reativada            | Backend (auto)                             | name                                                                    | Membro       |
+| `subscription-cancelled`      | Assinatura cancelada            | Backend / Webhook (3 falhas)               | name                                                                    | Membro       |
+| `subscription-payment-failed` | Falha na cobranca recorrente    | Webhook Stripe                             | name, amount, failed_count                                              | Membro       |
+| `renewal-reminder`            | Sua assinatura expira em breve  | Cron diario (6h UTC, dedup via email_logs) | name, plan, expiry_date                                                 | Membro       |
+| `member-expired`              | Sua assinatura expirou          | Cron diario                                | name, plan                                                              | Membro       |
+| `points-expiring`             | Seus pontos expiram em breve    | Cron diario (6h UTC, dedup via email_logs) | name, points, expiry_date                                               | Membro       |
+| `contract-signed`             | Contrato assinado               | Frontend (apos assinatura digital)         | name, plan, signed_at, hash                                             | Membro       |
+| `admin-pix-pending`           | PIX pendente de confirmacao     | Backend (auto, apos criacao de PIX)        | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
+| `admin-new-member`            | Novo membro cadastrado          | Backend (auto, apos cadastro)              | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
 
-| Template                      | Quando enviado                                | Trigger              |
-| ----------------------------- | --------------------------------------------- | -------------------- |
-| `verify-email`                | Apos registro — link de confirmacao (24h)     | Backend (auto)       |
-| `password-reset`              | Solicitacao de recuperacao de senha (1h)      | Backend (auto)       |
-| `welcome`                     | Apos ativacao do membro                       | Frontend             |
-| `payment-confirmed`           | Pagamento aprovado (PIX ou cartao)            | Webhook Stripe       |
-| `payment-failed`              | Pagamento rejeitado                           | Webhook Stripe       |
-| `contract-signed`             | Contrato digital assinado (com PDF anexo)     | Frontend             |
-| `subscription-created`        | Assinatura recorrente criada com sucesso      | Backend (auto)       |
-| `subscription-payment`        | Cobranca recorrente processada                | Webhook Stripe       |
-| `subscription-paused`         | Assinatura pausada pelo membro                | Backend (auto)       |
-| `subscription-cancelled`      | Assinatura cancelada (manual ou 3 falhas)     | Backend/Webhook      |
-| `subscription-payment-failed` | Cobranca recorrente falhou (mostra X/3)       | Webhook Stripe       |
-| `renewal-reminder`            | 5-8 dias antes do vencimento (dedup via logs) | Cron diario (6h UTC) |
-| `points-expiring`             | 5-8 dias antes da expiracao de pontos         | Cron diario (6h UTC) |
+## 7. Roles e Permissoes
 
-## Subdominios
+| Role       | Acesso                                                                                                                                                              |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `member`   | Proprio perfil, proprios pagamentos, proprios pontos (saldo/historico/expirando), propria assinatura, proprio contrato, exportar dados (LGPD), excluir conta        |
+| `seller`   | Verificar membros (CPF/QR), listar membros, ver detalhes de membro, registrar compra (acumular pontos), resgatar pontos                                             |
+| `admin`    | Tudo de seller + bonus de pontos, confirmar PIX, estornar pagamento, gerenciar roles, relatorios, logs (audit/email/erro), configuracoes do sistema, exportar dados |
+| `disabled` | Bloqueado — nao pode fazer login                                                                                                                                    |
 
-| Subdominio                   | Interface      | Roles Permitidos |
-| ---------------------------- | -------------- | ---------------- |
-| `club.geeketoys.com.br`      | Area do Membro | member           |
-| `admin.geeketoys.com.br`     | Painel Admin   | admin, seller    |
-| `adm.geeketoys.com.br`       | Painel Admin   | admin, seller    |
-| `api.geeketoys.com.br`       | API Express    | -                |
-| `analytics.geeketoys.com.br` | Umami          | -                |
+### Fluxo de Autenticacao
 
-Em desenvolvimento, use `?subdomain=adm` para simular o admin.
+- **Access token:** JWT com expiracao de 15 minutos.
+- **Refresh token:** JWT com expiracao de 30 dias, armazenado como cookie httpOnly (`cgt_refresh`, path `/auth`, sameSite `lax`). Fallback para body (legado).
+- **Senha:** bcrypt, minimo 8 caracteres, 1 maiuscula, 1 numero.
+- **Redirect apos login:** `admin` → `/admin`, `seller` → `/pdv`, `member` → `/membro`.
 
-## Variaveis de Ambiente
+## 8. Variaveis de Ambiente
 
-### Frontend (.env)
+### Backend — Obrigatorias
 
-```env
-VITE_API_URL=https://api.geeketoys.com.br
-VITE_STRIPE_PUBLISHABLE_KEY=<chave_publica_Stripe>
-VITE_PIX_KEY=<chave_PIX>
-VITE_ENVIRONMENT=production
+| Variavel             | Tipo   | Descricao                                 |
+| -------------------- | ------ | ----------------------------------------- |
+| `DATABASE_URL`       | string | URL de conexao PostgreSQL                 |
+| `JWT_SECRET`         | string | Secret para access tokens (min 32 chars)  |
+| `JWT_REFRESH_SECRET` | string | Secret para refresh tokens (min 32 chars) |
+| `HMAC_SECRET`        | string | Secret para tokens HMAC (min 32 chars)    |
+| `STRIPE_SECRET_KEY`  | string | Chave secreta do Stripe                   |
+| `RESEND_API_KEY`     | string | Chave da API Resend                       |
+| `FRONTEND_URL`       | string | URL do SPA de membros (com https)         |
+| `API_URL`            | string | URL publica da API (com https)            |
+
+### Backend — Opcionais
+
+| Variavel                | Tipo   | Default                                        | Descricao                                       |
+| ----------------------- | ------ | ---------------------------------------------- | ----------------------------------------------- |
+| `NODE_ENV`              | string | `development`                                  | Ambiente (development, production, test)        |
+| `PORT`                  | number | `3001`                                         | Porta do servidor Express                       |
+| `STRIPE_WEBHOOK_SECRET` | string | -                                              | Secret do webhook Stripe (obrigatorio em prod)  |
+| `PIX_KEY`               | string | -                                              | Chave PIX para geracao de QR Code               |
+| `PIX_MERCHANT_NAME`     | string | -                                              | Nome do comerciante no PIX                      |
+| `PIX_MERCHANT_CITY`     | string | -                                              | Cidade do comerciante no PIX                    |
+| `GOOGLE_CLIENT_ID`      | string | -                                              | Client ID do Google OAuth                       |
+| `FROM_EMAIL`            | string | `Clube Geek & Toys <contato@geeketoys.com.br>` | Remetente dos emails                            |
+| `ADMIN_EMAIL`           | string | `admin@geeketoys.com.br`                       | Email que recebe notificacoes admin             |
+| `ALLOWED_ORIGINS`       | string | -                                              | Origens CORS adicionais (separadas por virgula) |
+
+### Frontend (`.env`)
+
+| Variavel                      | Descricao                      |
+| ----------------------------- | ------------------------------ |
+| `VITE_API_URL`                | URL da API                     |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave publica do Stripe        |
+| `VITE_PIX_KEY`                | Chave PIX (exibida no QR Code) |
+| `VITE_ENVIRONMENT`            | Ambiente (production, etc.)    |
+
+## 9. Estrutura de Diretorios
+
+```
+clube-geek-toys/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml                   # CI/CD GitHub Actions
+│
+├── docs/
+│   ├── ARCHITECTURE.md                  # Diagrama e decisoes
+│   ├── PROJECT.md                       # Este arquivo
+│   ├── RADIO.md                         # Operacao da radio AzuraCast
+│   ├── SECURITY.md                      # Seguranca e LGPD
+│   └── TODO.md                          # Roadmap e tarefas
+│
+├── scripts/
+│   └── radio/
+│       ├── download-batch.py            # Download yt-dlp em lote
+│       ├── upload-to-vps.sh             # Upload de musicas para VPS
+│       ├── playlist-attach.sh           # Associar musicas a playlists
+│       └── kpop-top100.txt              # Lista de referencia
+│
+├── server/                              # Backend (roda na VPS em Docker)
+│   ├── api/
+│   │   ├── Dockerfile
+│   │   └── src/
+│   │       ├── index.ts                 # Entrypoint Express + cron
+│   │       ├── config/
+│   │       │   ├── database.ts          # Pool PostgreSQL (pg)
+│   │       │   └── env.ts               # Validacao Zod das env vars
+│   │       ├── db/
+│   │       │   ├── schema.sql           # Schema PostgreSQL completo
+│   │       │   ├── ensure-schema.ts     # Sync automatico de schema
+│   │       │   ├── seed-admin.ts        # Seed do usuario admin
+│   │       │   └── migrations/          # Migrations incrementais
+│   │       │       ├── 002-pagbank-migration.sql
+│   │       │       ├── 003-restructure.sql
+│   │       │       ├── 004-wave1-hardening.sql
+│   │       │       └── 005-stripe-migration.sql
+│   │       ├── middleware/
+│   │       │   ├── auth.ts              # JWT + RBAC (authenticate, requireRole)
+│   │       │   ├── cors.ts              # CORS whitelist
+│   │       │   ├── error-handler.ts     # Error handler global
+│   │       │   ├── ownership.ts         # Verificacao de propriedade de recurso
+│   │       │   ├── rate-limit.ts        # Rate limiters por tipo
+│   │       │   └── validate.ts          # Validacao Zod de request body
+│   │       ├── routes/
+│   │       │   ├── auth.routes.ts
+│   │       │   ├── member.routes.ts
+│   │       │   ├── payment.routes.ts
+│   │       │   ├── subscription.routes.ts
+│   │       │   ├── points.routes.ts
+│   │       │   ├── contract.routes.ts
+│   │       │   ├── email.routes.ts
+│   │       │   ├── webhook.routes.ts
+│   │       │   ├── report.routes.ts
+│   │       │   ├── log.routes.ts
+│   │       │   ├── audit.routes.ts
+│   │       │   ├── user.routes.ts
+│   │       │   ├── settings.routes.ts
+│   │       │   ├── lgpd.routes.ts
+│   │       │   └── health.routes.ts
+│   │       ├── services/
+│   │       │   ├── auth.service.ts
+│   │       │   ├── member.service.ts
+│   │       │   ├── payment.service.ts
+│   │       │   ├── subscription.service.ts
+│   │       │   ├── points.service.ts
+│   │       │   ├── contract.service.ts
+│   │       │   ├── email.service.ts     # 17 templates HTML
+│   │       │   ├── webhook.service.ts
+│   │       │   ├── report.service.ts
+│   │       │   ├── log.service.ts
+│   │       │   ├── lgpd.service.ts
+│   │       │   ├── settings.service.ts
+│   │       │   └── cron.service.ts      # Jobs agendados (renovacao, pontos)
+│   │       ├── types/
+│   │       │   └── index.ts
+│   │       └── utils/
+│   │           ├── audit.ts             # Helper de audit log
+│   │           ├── cpf.ts               # Validacao de CPF
+│   │           ├── disposable-emails.ts # Lista de emails descartaveis
+│   │           ├── hmac.ts              # HMAC para tokens
+│   │           ├── pix.ts              # Geracao de QR Code PIX (BR Code)
+│   │           └── stripe.ts            # Helpers Stripe SDK
+│   │
+│   ├── nginx/
+│   │   ├── nginx.conf                   # Configuracao principal
+│   │   ├── shared-headers.conf          # Security headers compartilhados
+│   │   ├── certbot/                     # Dados Let's Encrypt
+│   │   ├── ssl/                         # Certificados
+│   │   └── conf.d/
+│   │       ├── default.conf             # Server blocks por dominio (prod)
+│   │       └── dev.conf                 # Server blocks (dev)
+│   │
+│   ├── azuracast/
+│   │   ├── docker-compose.yml           # Stack da radio (fonte-verdade)
+│   │   └── README.md
+│   │
+│   ├── scripts/
+│   │   ├── backup-postgres.sh
+│   │   ├── build-frontend.sh
+│   │   ├── health-check.sh
+│   │   └── restore-postgres.sh
+│   │
+│   ├── docker-compose.yml               # Producao
+│   ├── docker-compose.dev.yml           # Desenvolvimento
+│   └── .env.example
+│
+├── src/                                 # Frontend React SPA
+│   ├── App.tsx                          # Router + providers
+│   ├── contexts/
+│   │   └── AuthContext.tsx              # JWT auth context
+│   ├── pages/
+│   │   ├── Subscribe.tsx                # Landing page
+│   │   ├── Register.tsx                 # Cadastro (stepper)
+│   │   ├── Login.tsx                    # Login
+│   │   ├── AdminLogin.tsx               # Login admin separado
+│   │   ├── ForgotPassword.tsx           # Recuperar senha
+│   │   ├── VerifyEmail.tsx              # Verificacao de email
+│   │   ├── MemberDashboard.tsx          # Area do membro (carteirinha, pontos)
+│   │   ├── AdminDashboard.tsx           # Painel admin (tabs lazy-loaded)
+│   │   ├── PDV.tsx                      # Ponto de venda
+│   │   ├── PaymentResult.tsx            # Resultado do pagamento
+│   │   ├── TermsOfUse.tsx              # Termos de uso
+│   │   └── PrivacyPolicy.tsx            # Politica de privacidade
+│   ├── components/
+│   │   ├── ui/                          # Componentes base (shadcn-style)
+│   │   │   ├── button.tsx, card.tsx, dialog.tsx, input.tsx, label.tsx
+│   │   │   ├── tabs.tsx, sheet.tsx, skeleton.tsx, badge.tsx
+│   │   │   ├── dropdown-menu.tsx, pagination.tsx, progress.tsx
+│   │   │   ├── form-feedback.tsx, loading.tsx, lazy-image.tsx
+│   │   │   ├── offline-banner.tsx, skip-link.tsx
+│   │   │   ├── section-error-boundary.tsx, success-animation.tsx
+│   │   │   └── *.test.tsx
+│   │   ├── admin/                       # Tabs admin (lazy loaded)
+│   │   │   ├── AdminSidebar.tsx
+│   │   │   ├── MembersTab.tsx, PointsTab.tsx, UsersTab.tsx
+│   │   │   ├── LogsTab.tsx, ReportsTab.tsx, SettingsTab.tsx
+│   │   │   └── RealtimeMetrics.tsx
+│   │   ├── member/                      # Componentes do dashboard membro
+│   │   │   ├── MembershipCard.tsx, PointsSection.tsx
+│   │   │   ├── AccountSection.tsx, BenefitsSection.tsx
+│   │   │   ├── SubscriptionCard.tsx, DiscountStrip.tsx
+│   │   │   ├── OnboardingGuide.tsx, PointsSummaryBar.tsx
+│   │   │   └── QuickActions.tsx
+│   │   ├── registration/                # Stepper de cadastro
+│   │   │   ├── RegistrationStepper.tsx
+│   │   │   ├── StepAccount.tsx, StepPersonalData.tsx
+│   │   │   ├── StepEmailVerification.tsx
+│   │   │   ├── StepContract.tsx, StepPayment.tsx
+│   │   │   └── ...
+│   │   ├── reports/                     # Graficos (lazy loaded)
+│   │   │   ├── RevenueChart.tsx, MembersChart.tsx
+│   │   │   ├── PointsChart.tsx, ChurnMetrics.tsx
+│   │   │   └── ReportFilters.tsx
+│   │   ├── ContractModal.tsx, PaymentModal.tsx
+│   │   ├── MemberModal.tsx, UserModal.tsx, ProfileEditModal.tsx
+│   │   ├── RenewModal.tsx, UpgradeModal.tsx
+│   │   ├── StripePaymentForm.tsx
+│   │   ├── SubscriptionManagement.tsx
+│   │   ├── QRScanner.tsx, RadioMiniPlayer.tsx
+│   │   ├── MembersTable.tsx, MemberFilters.tsx
+│   │   ├── MemberActivityHistory.tsx, VirtualTable.tsx
+│   │   ├── DataTable.tsx, PendingPaymentScreen.tsx
+│   │   ├── CookieConsent.tsx, ErrorBoundary.tsx
+│   │   └── GoogleSignInButton.tsx
+│   ├── hooks/
+│   │   ├── useMembers.ts, usePoints.ts
+│   │   ├── useRealtimeStats.ts, useNowPlaying.ts
+│   │   ├── useDebounce.ts, useIdleTimer.ts
+│   │   ├── useConfirm.tsx, useUrlFilters.ts
+│   │   ├── useKeyboardShortcuts.ts, useOnlineStatus.ts
+│   │   └── *.test.ts
+│   ├── lib/
+│   │   ├── api-client.ts                # Cliente HTTP (fetch + JWT auto-refresh)
+│   │   ├── members.ts, payments.ts, points.ts
+│   │   ├── subscriptions.ts, email.ts, reports.ts
+│   │   ├── logs.ts, settings.ts, stripe.ts
+│   │   ├── contract-generator.ts        # Gera PDF do contrato
+│   │   ├── contract-storage.ts
+│   │   ├── analytics.ts, error-tracking.ts, logger.ts
+│   │   ├── cpf-validation.ts, email-validation.ts
+│   │   ├── password-validation.ts, sanitize.ts
+│   │   ├── rate-limit.ts, retry.ts
+│   │   ├── signature-utils.ts, subdomain.ts
+│   │   ├── constants.ts, utils.ts
+│   │   └── *.test.ts
+│   └── types/
+│       └── index.ts
+│
+├── CLAUDE.md                            # Guia operacional para Claude Code
+├── DEPLOY.md                            # Guia de deploy na VPS
+├── README.md                            # Visao geral do produto
+├── index.html
+├── package.json
+├── vite.config.ts
+├── vitest.config.ts
+├── tailwind.config.js
+├── postcss.config.js
+├── eslint.config.js
+├── commitlint.config.js
+├── tsconfig.json, tsconfig.app.json, tsconfig.node.json
+└── .env.example
 ```
 
-### Backend (server/.env)
+## 10. Redes Sociais
 
-```env
-POSTGRES_USER=clube_geek
-POSTGRES_PASSWORD=<senha>
-POSTGRES_DB=clube_geek_toys
-JWT_SECRET=<secret>
-JWT_REFRESH_SECRET=<secret>
-HMAC_SECRET=<secret>
-STRIPE_SECRET_KEY=<sk_live_...>
-STRIPE_WEBHOOK_SECRET=<whsec_...>
-PIX_KEY=<chave_PIX>
-RESEND_API_KEY=<key>
-FROM_EMAIL=Clube Geek & Toys <contato@geeketoys.com.br>
-ADMIN_EMAIL=admin@geeketoys.com.br
-FRONTEND_URL=https://club.geeketoys.com.br
-API_URL=https://api.geeketoys.com.br
-ALLOWED_ORIGINS=https://admin.geeketoys.com.br
-```
-
-## Scripts Disponiveis
-
-```bash
-# Frontend
-npm run dev              # Desenvolvimento local
-npm run build            # Build de producao
-npm run preview          # Preview do build
-npm run lint             # Verificar codigo
-npm run test             # Rodar testes
-npm run test:coverage    # Cobertura de testes
-
-# Backend (Docker)
-cd server
-docker compose up -d             # Subir todos os servicos
-docker compose down              # Parar servicos
-docker compose logs -f api       # Logs da API
-docker compose build --no-cache api  # Rebuild API
-```
+| Plataforma | Link                                    |
+| ---------- | --------------------------------------- |
+| Instagram  | https://instagram.com/geeketoys         |
+| Facebook   | https://facebook.com/geeketoyscolection |
+| TikTok     | https://tiktok.com/@geeketoys           |
+| WhatsApp   | https://wa.me/5521985464666             |
+| Shopee     | https://shopee.com.br/geeketoys         |
