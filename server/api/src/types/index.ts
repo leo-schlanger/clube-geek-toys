@@ -41,6 +41,7 @@ export interface Member {
   autoRenewal: boolean;
   activatedAt: string | null;
   activatedByPayment: string | null;
+  paymentCount: number;
   createdAt: string;
   updatedAt: string;
 }

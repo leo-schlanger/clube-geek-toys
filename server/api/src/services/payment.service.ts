@@ -275,7 +275,7 @@ export async function confirmPixPayment(opts: {
       await query(
         `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
          activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
-         auto_renewal = FALSE
+         auto_renewal = FALSE, payment_count = payment_count + 1
          WHERE id = $4`,
         [
           now.toISOString().split('T')[0],

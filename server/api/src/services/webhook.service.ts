@@ -224,9 +224,10 @@ async function handleInvoicePaid(
   const member = memberResult.rows[0];
   const interval = member.payment_type === 'annual' ? '1 year' : '1 month';
 
-  // Extend member expiry
+  // Extend member expiry and increment payment count
   await client.query(
-    `UPDATE members SET expiry_date = expiry_date + $2::interval, status = 'active'
+    `UPDATE members SET expiry_date = expiry_date + $2::interval, status = 'active',
+     payment_count = payment_count + 1
      WHERE id = $1`,
     [member.id, interval]
   );
@@ -430,7 +431,8 @@ async function activateMember(
 
   await client.query(
     `UPDATE members SET status = 'active', start_date = $1, expiry_date = $2,
-     activated_at = NOW(), activated_by_payment = $3, pending_payment = NULL
+     activated_at = NOW(), activated_by_payment = $3, pending_payment = NULL,
+     payment_count = payment_count + 1
      WHERE id = $4 AND status != 'active'`,
     [now.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], paymentRef, member.id]
   );

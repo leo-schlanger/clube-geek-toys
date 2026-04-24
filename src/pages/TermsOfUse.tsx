@@ -76,6 +76,7 @@ export default function TermsOfUse() {
                             <h2 className="text-2xl font-semibold text-foreground">6. Limitação de Responsabilidade</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Os descontos são válidos apenas durante a vigência da assinatura e conforme disponibilidade.</li>
+                                <li>No Plano Black, o desconto em serviços (50%) passa a vigorar somente após a confirmação do 2º (segundo) pagamento da assinatura. O desconto em produtos (20%) é válido desde o primeiro pagamento.</li>
                                 <li>Não nos responsabilizamos por indisponibilidades temporárias do sistema por motivos técnicos ou de força maior.</li>
                                 <li>O programa de pontos está sujeito às regras específicas descritas no contrato de adesão.</li>
                                 <li>Esta limitação não se aplica a direitos garantidos pelo Código de Defesa do Consumidor.</li>

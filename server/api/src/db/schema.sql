@@ -43,6 +43,7 @@ CREATE TABLE members (
   activated_at TIMESTAMPTZ,
   activated_by_payment TEXT,
   stripe_customer_id TEXT,
+  payment_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

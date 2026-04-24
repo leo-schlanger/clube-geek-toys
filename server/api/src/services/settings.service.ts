@@ -35,7 +35,7 @@ export const SETTINGS_CATALOGUE: SettingDefinition[] = [
   { key: 'plan.gold.discount_products',     default: 10, type: 'number', description: 'Desconto Gold em produtos (%)' },
   { key: 'plan.gold.discount_services',     default: 15, type: 'number', description: 'Desconto Gold em serviços (%)' },
   { key: 'plan.black.discount_products',    default: 15, type: 'number', description: 'Desconto Black em produtos (%)' },
-  { key: 'plan.black.discount_services',    default: 20, type: 'number', description: 'Desconto Black em serviços (%)' },
+  { key: 'plan.black.discount_services',    default: 20, type: 'number', description: 'Desconto Black em serviços (%) — válido a partir do 2º pagamento' },
 
   // Points
   { key: 'points.multiplier_silver',  default: 1,   type: 'number', description: 'Multiplicador de pontos Silver' },

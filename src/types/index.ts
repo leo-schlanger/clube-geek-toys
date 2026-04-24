@@ -48,6 +48,7 @@ export interface Member {
   expiryDate: string
   points: number
   pendingPayment?: PendingPaymentInfo // PIX payment waiting for confirmation
+  paymentCount: number
   createdAt: string
   updatedAt: string
 }
@@ -126,7 +127,7 @@ export const PLANS: Record<PlanType, Plan> = {
     discountServices: 50,
     benefits: [
       '20% de desconto em todos os produtos',
-      '50% de desconto em serviços (xerox, impressão, plastificação, revelação)',
+      '50% de desconto em serviços (xerox, impressão, plastificação, revelação) — a partir do 2º pagamento',
       'Participação em sorteio mensal',
     ],
     color: '#1f2937',

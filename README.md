@@ -27,7 +27,9 @@ A plataforma inclui:
 | ---------- | -------- | --------- | -------------- | -------------- | ----------------------- |
 | **Silver** | R$ 19,90 | R$ 199,90 | 10%            | 25%            | 1x                      |
 | **Gold**   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                      |
-| **Black**  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x                      |
+| **Black**  | R$ 49,90 | R$ 499,90 | 20%            | 50%\*          | 3x                      |
+
+> \* No plano Black, o desconto em servicos passa a valer a partir do 2o pagamento.
 
 ---
 

@@ -256,7 +256,7 @@ export default function MemberDashboard() {
         <MembershipCard member={member} />
 
         {/* ═══ 2. Faixa de Descontos ═══ */}
-        <DiscountStrip plan={member.plan as PlanType} />
+        <DiscountStrip plan={member.plan as PlanType} paymentCount={member.paymentCount ?? 0} />
 
         {/* ═══ 3. Barra de Pontos ═══ */}
         <PointsSummaryBar member={member} expiringPoints={expiringPoints} />
@@ -273,7 +273,7 @@ export default function MemberDashboard() {
         <OnboardingGuide memberStartDate={member.startDate} />
 
         {/* ═══ 6. Benefícios ═══ */}
-        <BenefitsSection plan={member.plan as PlanType} onUpgrade={() => setModal('upgrade')} />
+        <BenefitsSection plan={member.plan as PlanType} paymentCount={member.paymentCount ?? 0} onUpgrade={() => setModal('upgrade')} />
 
         {/* ═══ 7. Assinatura ═══ */}
         <SubscriptionCard

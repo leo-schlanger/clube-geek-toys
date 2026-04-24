@@ -22,7 +22,7 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
     content: [
       'PLANO SILVER: 10% de desconto em todos os produtos da loja e 25% de desconto em cópias e serviços.',
       'PLANO GOLD: 15% de desconto em todos os produtos da loja, 35% de desconto em serviços e acesso antecipado a promoções.',
-      'PLANO BLACK: 20% de desconto em todos os produtos da loja, 50% de desconto em serviços (xerox, impressão, plastificação, revelação de fotos) e participação em sorteio mensal.',
+      'PLANO BLACK: 20% de desconto em todos os produtos da loja, 50% de desconto em serviços (xerox, impressão, plastificação, revelação de fotos) e participação em sorteio mensal. O desconto em serviços do Plano Black passa a vigorar somente após a confirmação do 2º (segundo) pagamento da assinatura.',
       'Os benefícios são válidos apenas durante a vigência da assinatura e não são cumulativos com outras promoções, salvo indicação expressa.',
     ],
   },

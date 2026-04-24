@@ -10,7 +10,7 @@ import { Loading } from '../components/ui/loading'
 import { QRScanner } from '../components/QRScanner'
 import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type RedemptionRule } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
-import { getMemberByCPF, isMemberActive } from '../lib/members'
+import { getMemberByCPF, isMemberActive, getMemberDiscount } from '../lib/members'
 import {
   addPoints,
   redeemPoints,
@@ -440,24 +440,29 @@ export default function PDV() {
                     <>
                       <hr />
                       {/* Discounts */}
-                      <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                        <div className="text-center">
-                          <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                            {PLANS[result.member.plan as PlanType].discountProducts}%
-                          </p>
-                          <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
-                            Desconto em Produtos
-                          </p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                            {PLANS[result.member.plan as PlanType].discountServices}%
-                          </p>
-                          <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
-                            Desconto em Serviços
-                          </p>
-                        </div>
-                      </div>
+                      {(() => {
+                        const discount = getMemberDiscount(result.member.plan as PlanType, result.member.paymentCount ?? 0)
+                        return (
+                          <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                            <div className="text-center">
+                              <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                                {discount.products}%
+                              </p>
+                              <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
+                                Desconto em Produtos
+                              </p>
+                            </div>
+                            <div className="text-center">
+                              <p className={`text-2xl sm:text-3xl font-bold ${discount.serviceDiscountLocked ? 'text-yellow-600' : 'text-green-600'}`}>
+                                {discount.serviceDiscountLocked ? `${PLANS[result.member.plan as PlanType].discountServices}%` : `${discount.services}%`}
+                              </p>
+                              <p className={`text-xs sm:text-sm ${discount.serviceDiscountLocked ? 'text-yellow-700 dark:text-yellow-300' : 'text-green-700 dark:text-green-300'}`}>
+                                {discount.serviceDiscountLocked ? 'Serviços (libera no 2º pgto)' : 'Desconto em Serviços'}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       <hr />
 

@@ -1,16 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { PLANS, type PlanType } from '../../types'
-import { CheckCircle, ArrowUp, Gift } from 'lucide-react'
+import { CheckCircle, ArrowUp, Gift, Info } from 'lucide-react'
 
 interface BenefitsSectionProps {
   plan: PlanType
+  paymentCount?: number
   onUpgrade: () => void
 }
 
-export function BenefitsSection({ plan, onUpgrade }: BenefitsSectionProps) {
+export function BenefitsSection({ plan, paymentCount = 0, onUpgrade }: BenefitsSectionProps) {
   const planData = PLANS[plan]
   const isMaxPlan = plan === 'black'
+  const serviceDiscountLocked = plan === 'black' && paymentCount < 2
 
   return (
     <Card>
@@ -32,6 +34,15 @@ export function BenefitsSection({ plan, onUpgrade }: BenefitsSectionProps) {
             </li>
           ))}
         </ul>
+
+        {serviceDiscountLocked && (
+          <div className="flex items-start gap-2 p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg border border-yellow-500/30">
+            <Info className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+              O desconto de 50% em serviços será ativado automaticamente após o seu 2º pagamento.
+            </p>
+          </div>
+        )}
 
         {!isMaxPlan && (
           <Button variant="outline" className="w-full" onClick={onUpgrade}>

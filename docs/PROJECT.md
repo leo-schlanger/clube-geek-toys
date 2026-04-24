@@ -25,7 +25,9 @@ Clube de vantagens digital para loja fisica e online de produtos geek, coleciona
 | ------ | -------- | --------- | -------------- | -------------- | ----------------------- |
 | Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x                      |
 | Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                      |
-| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%            | 3x                      |
+| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%\*          | 3x                      |
+
+> \* No plano Black, o desconto em servicos passa a valer a partir do 2o pagamento.
 
 **Calculo de pontos:** `pontos = valor_compra * multiplicador_plano`. Exemplo: compra de R$ 100,00 no plano Gold = 200 pontos.
 
@@ -81,30 +83,31 @@ Umami self-hosted para rastreamento de uso sem cookies de terceiros.
 
 ### 4.2 Tabela `members`
 
-| Coluna               | Tipo         | Restricoes / Notas                                                              |
-| -------------------- | ------------ | ------------------------------------------------------------------------------- |
-| id                   | UUID         | PK, DEFAULT uuid_generate_v4()                                                  |
-| user_id              | UUID         | FK → users(id) ON DELETE CASCADE, NOT NULL, UNIQUE                              |
-| cpf                  | VARCHAR(11)  | NOT NULL, UNIQUE                                                                |
-| full_name            | VARCHAR(200) | NOT NULL                                                                        |
-| email                | VARCHAR(254) | NOT NULL                                                                        |
-| phone                | VARCHAR(20)  | Nullable                                                                        |
-| photo_url            | TEXT         | Nullable                                                                        |
-| plan                 | VARCHAR(10)  | NOT NULL, CHECK IN ('silver','gold','black')                                    |
-| status               | VARCHAR(20)  | NOT NULL, DEFAULT 'pending', CHECK IN ('active','pending','inactive','expired') |
-| payment_type         | VARCHAR(10)  | NOT NULL, CHECK IN ('monthly','annual')                                         |
-| start_date           | DATE         | Nullable                                                                        |
-| expiry_date          | DATE         | Nullable                                                                        |
-| points               | INTEGER      | NOT NULL, DEFAULT 0, CHECK >= 0                                                 |
-| pending_payment      | JSONB        | Nullable, dados do pagamento pendente                                           |
-| subscription_id      | TEXT         | Nullable, ID da assinatura Stripe                                               |
-| subscription_status  | VARCHAR(20)  | Nullable                                                                        |
-| auto_renewal         | BOOLEAN      | DEFAULT FALSE                                                                   |
-| activated_at         | TIMESTAMPTZ  | Nullable                                                                        |
-| activated_by_payment | TEXT         | Nullable, ID do pagamento que ativou                                            |
-| stripe_customer_id   | TEXT         | Nullable                                                                        |
-| created_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                         |
-| updated_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                                |
+| Coluna               | Tipo         | Restricoes / Notas                                                                             |
+| -------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| id                   | UUID         | PK, DEFAULT uuid_generate_v4()                                                                 |
+| user_id              | UUID         | FK → users(id) ON DELETE CASCADE, NOT NULL, UNIQUE                                             |
+| cpf                  | VARCHAR(11)  | NOT NULL, UNIQUE                                                                               |
+| full_name            | VARCHAR(200) | NOT NULL                                                                                       |
+| email                | VARCHAR(254) | NOT NULL                                                                                       |
+| phone                | VARCHAR(20)  | Nullable                                                                                       |
+| photo_url            | TEXT         | Nullable                                                                                       |
+| plan                 | VARCHAR(10)  | NOT NULL, CHECK IN ('silver','gold','black')                                                   |
+| status               | VARCHAR(20)  | NOT NULL, DEFAULT 'pending', CHECK IN ('active','pending','inactive','expired')                |
+| payment_type         | VARCHAR(10)  | NOT NULL, CHECK IN ('monthly','annual')                                                        |
+| start_date           | DATE         | Nullable                                                                                       |
+| expiry_date          | DATE         | Nullable                                                                                       |
+| points               | INTEGER      | NOT NULL, DEFAULT 0, CHECK >= 0                                                                |
+| pending_payment      | JSONB        | Nullable, dados do pagamento pendente                                                          |
+| subscription_id      | TEXT         | Nullable, ID da assinatura Stripe                                                              |
+| subscription_status  | VARCHAR(20)  | Nullable                                                                                       |
+| auto_renewal         | BOOLEAN      | DEFAULT FALSE                                                                                  |
+| activated_at         | TIMESTAMPTZ  | Nullable                                                                                       |
+| activated_by_payment | TEXT         | Nullable, ID do pagamento que ativou                                                           |
+| stripe_customer_id   | TEXT         | Nullable                                                                                       |
+| payment_count        | INTEGER      | NOT NULL, DEFAULT 0. Contagem de pagamentos confirmados (Black: desc. servicos a partir do 2o) |
+| created_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                                        |
+| updated_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                                               |
 
 ### 4.3 Tabela `payments`
 

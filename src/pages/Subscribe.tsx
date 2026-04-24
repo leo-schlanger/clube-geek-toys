@@ -256,7 +256,7 @@ export default function Subscribe() {
                         <div className="flex items-center gap-2">
                           <span className="text-green-400 font-semibold text-sm">{plan.discountProducts}% produtos</span>
                           <span className="text-muted-foreground text-xs">|</span>
-                          <span className="text-green-400 font-semibold text-sm">{plan.discountServices}% servicos</span>
+                          <span className="text-green-400 font-semibold text-sm">{plan.discountServices}% servicos{planId === 'black' ? '*' : ''}</span>
                         </div>
                       </div>
                     </div>
@@ -366,6 +366,9 @@ export default function Subscribe() {
               </tbody>
             </table>
           </div>
+          <p className="text-xs text-muted-foreground mt-4 text-center">
+            * No plano Black, o desconto em servicos passa a valer a partir do 2º pagamento.
+          </p>
         </div>
       </section>
 
@@ -375,7 +378,7 @@ export default function Subscribe() {
           <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">Por que ser VIP?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {[
-              { icon: <Gift className="h-6 w-6 text-purple-400" />, title: 'Descontos exclusivos', desc: 'Ate 50% de desconto em produtos e servicos da loja' },
+              { icon: <Gift className="h-6 w-6 text-purple-400" />, title: 'Descontos exclusivos', desc: 'Ate 20% em produtos e 50% em servicos da loja' },
               { icon: <Star className="h-6 w-6 text-yellow-400" />, title: 'Programa de pontos', desc: 'Acumule pontos a cada compra e troque por descontos' },
               { icon: <Shield className="h-6 w-6 text-green-400" />, title: 'Carteirinha digital', desc: 'QR Code exclusivo para identificacao na loja' },
               { icon: <Zap className="h-6 w-6 text-blue-400" />, title: 'Acesso antecipado', desc: 'Seja o primeiro a saber de promocoes e lancamentos' },

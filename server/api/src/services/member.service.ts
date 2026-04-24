@@ -27,6 +27,7 @@ function mapMemberRow(row: pg.QueryResultRow): Member {
     autoRenewal: row.auto_renewal,
     activatedAt: row.activated_at,
     activatedByPayment: row.activated_by_payment,
+    paymentCount: row.payment_count ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
