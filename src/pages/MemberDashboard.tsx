@@ -10,6 +10,7 @@ import { DiscountStrip } from '../components/member/DiscountStrip'
 import { PointsSummaryBar } from '../components/member/PointsSummaryBar'
 import { QuickActions } from '../components/member/QuickActions'
 import { OnboardingGuide } from '../components/member/OnboardingGuide'
+import { WelcomeCelebration } from '../components/member/WelcomeCelebration'
 import { BenefitsSection } from '../components/member/BenefitsSection'
 import { SubscriptionCard } from '../components/member/SubscriptionCard'
 import { PointsSection } from '../components/member/PointsSection'
@@ -269,7 +270,10 @@ export default function MemberDashboard() {
           onEditProfile={() => setModal('profile')}
         />
 
-        {/* ═══ 5. Guia de Boas-vindas ═══ */}
+        {/* ═══ 5. Celebração de Boas-vindas (primeiro acesso) ═══ */}
+        <WelcomeCelebration memberName={member.fullName} memberId={member.id} />
+
+        {/* ═══ 6. Guia de Boas-vindas ═══ */}
         <OnboardingGuide memberStartDate={member.startDate} />
 
         {/* ═══ 6. Benefícios ═══ */}

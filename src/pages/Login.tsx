@@ -30,7 +30,7 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lockoutTime, setLockoutTime] = useState(0)
 
-  const { user, role, loading, error, emailVerified, signIn, signInWithGoogle } = useAuth()
+  const { user, role, loading, error, signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
   // Countdown do lockout
@@ -64,15 +64,10 @@ export default function Login() {
   // Redirecionar quando autenticado com role
   useEffect(() => {
     if (!loading && user && role) {
-      // Membros com email não verificado retomam o cadastro
-      if (role === 'member' && !emailVerified) {
-        navigate('/cadastro', { replace: true })
-        return
-      }
       const path = getLoginRedirectPath(role, getAppMode())
       navigate(path, { replace: true })
     }
-  }, [loading, user, role, emailVerified, navigate])
+  }, [loading, user, role, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
