@@ -91,6 +91,7 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
 
   // Rate limiting state
   const rateLimitRef = useRef<number[]>([])
+  const abortRef = useRef<AbortController | null>(null)
 
   const {
     register,
@@ -128,14 +129,21 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
     }
     rateLimitRef.current.push(now)
 
+    // Cancel previous in-flight validation
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setEmailValidating(true)
     try {
       const result = await validateEmail(email)
+      if (controller.signal.aborted) return
       setEmailValidation(result)
     } catch {
+      if (controller.signal.aborted) return
       setEmailValidation(null)
     } finally {
-      setEmailValidating(false)
+      if (!controller.signal.aborted) setEmailValidating(false)
     }
   }, [])
 

@@ -126,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleLogout = () => {
       clearTokens()
       setAuthState(null)
+      toast.warning('Sessão expirada. Faça login novamente.', { duration: 5000 })
     }
     window.addEventListener('auth:logout', handleLogout)
 

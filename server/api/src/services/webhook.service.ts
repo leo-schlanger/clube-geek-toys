@@ -412,7 +412,7 @@ async function activateMember(
 ): Promise<void> {
   // Snapshot member for audit
   const memberLookup = await client.query(
-    'SELECT id, payment_type, status FROM members WHERE id = $1 FOR UPDATE',
+    'SELECT id, payment_type, status, expiry_date FROM members WHERE id = $1 FOR UPDATE',
     [memberId]
   );
   if (memberLookup.rows.length === 0) return;
@@ -420,9 +420,14 @@ async function activateMember(
   const member = memberLookup.rows[0];
   const beforeStatus = member.status;
   const now = new Date();
-  const expiryDate = new Date(now);
 
-  // Calendar-correct expiry: setMonth/setFullYear preserves day-of-month.
+  // For renewals: extend from current expiry so member doesn't lose remaining days.
+  // For new activations (pending/expired): start from today.
+  const currentExpiry = member.expiry_date ? new Date(member.expiry_date) : null;
+  const isRenewal = member.status === 'active' && currentExpiry && currentExpiry > now;
+  const baseDate = isRenewal ? currentExpiry : now;
+
+  const expiryDate = new Date(baseDate);
   if (member.payment_type === 'annual') {
     expiryDate.setFullYear(expiryDate.getFullYear() + 1);
   } else {
@@ -430,10 +435,10 @@ async function activateMember(
   }
 
   await client.query(
-    `UPDATE members SET status = 'active', start_date = $1, expiry_date = $2,
-     activated_at = NOW(), activated_by_payment = $3, pending_payment = NULL,
+    `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
+     activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
      payment_count = payment_count + 1
-     WHERE id = $4 AND status != 'active'`,
+     WHERE id = $4`,
     [now.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], paymentRef, member.id]
   );
 

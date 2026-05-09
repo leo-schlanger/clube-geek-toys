@@ -58,7 +58,7 @@ interface StepPaymentProps {
 
 const PIX_TIMEOUT_SECONDS = 30 * 60
 const POLL_INTERVAL_MS = 5_000
-const MAX_POLL_COUNT = 180
+const MAX_POLL_COUNT = (PIX_TIMEOUT_SECONDS * 1000) / POLL_INTERVAL_MS // 360 = match timer
 
 // ---------------------------------------------------------------------------
 // Component
