@@ -18,6 +18,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { GoogleSignInButton } from '../GoogleSignInButton'
+import { Turnstile } from '../Turnstile'
 import { validateEmail, type EmailValidationResult } from '../../lib/email-validation'
 import { PASSWORD_MIN_LENGTH } from '../../lib/password-validation'
 
@@ -47,7 +48,7 @@ type FormValues = z.infer<typeof schema>
 // ---------------------------------------------------------------------------
 
 interface StepAccountProps {
-  onNext: (data: { email: string; password: string }) => void
+  onNext: (data: { email: string; password: string; turnstileToken?: string }) => void
   onGoogleSuccess: (data: Record<string, unknown>) => void
   loading: boolean
   defaultEmail?: string
@@ -83,11 +84,14 @@ const passwordRules: PasswordRule[] = [
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
+const TURNSTILE_ENABLED = !!import.meta.env.VITE_TURNSTILE_SITE_KEY
+
 export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: StepAccountProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [emailValidation, setEmailValidation] = useState<EmailValidationResult | null>(null)
   const [emailValidating, setEmailValidating] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   // Rate limiting state
   const rateLimitRef = useRef<number[]>([])
@@ -152,7 +156,10 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
   // -----------------------------------------------------------------------
 
   const onSubmit = (data: FormValues) => {
-    onNext({ email: data.email, password: data.password })
+    if (TURNSTILE_ENABLED && !turnstileToken) {
+      return // Turnstile not yet verified
+    }
+    onNext({ email: data.email, password: data.password, turnstileToken: turnstileToken || undefined })
   }
 
   // -----------------------------------------------------------------------
@@ -327,8 +334,15 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
               )}
             </div>
 
+            {/* Turnstile CAPTCHA */}
+            <Turnstile
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
+
             {/* Submit */}
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            <Button type="submit" className="w-full" size="lg" disabled={loading || (TURNSTILE_ENABLED && !turnstileToken)}>
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

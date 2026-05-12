@@ -51,9 +51,28 @@ export default function Register() {
     memberId: '',
   })
 
-  // Plan comes from URL (selected on /assinar page) — user does NOT pick again
-  const selectedPlan: PlanType = (searchParams.get('plano') as PlanType) || 'silver'
-  const paymentType: PaymentType = (searchParams.get('tipo') as PaymentType) || 'monthly'
+  // Plan comes from URL (selected on /assinar page) — user does NOT pick again.
+  // Validate params: reject bogus values and redirect back to plan selection.
+  const rawPlan = searchParams.get('plano')
+  const rawType = searchParams.get('tipo')
+  const VALID_PLANS: PlanType[] = ['silver', 'gold', 'black']
+  const VALID_TYPES: PaymentType[] = ['monthly', 'annual']
+
+  const selectedPlan: PlanType = VALID_PLANS.includes(rawPlan as PlanType)
+    ? (rawPlan as PlanType) : 'silver'
+  const paymentType: PaymentType = VALID_TYPES.includes(rawType as PaymentType)
+    ? (rawType as PaymentType) : 'monthly'
+
+  // Redirect to plan selection if params are invalid (user typed URL manually)
+  useEffect(() => {
+    if (rawPlan && !VALID_PLANS.includes(rawPlan as PlanType)) {
+      toast.error('Plano invalido. Escolha um plano abaixo.')
+      navigate('/assinar', { replace: true })
+    } else if (rawType && !VALID_TYPES.includes(rawType as PaymentType)) {
+      toast.error('Tipo de pagamento invalido. Escolha um plano abaixo.')
+      navigate('/assinar', { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Flow flags
   const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)
@@ -137,10 +156,11 @@ export default function Register() {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         fullName: memberData.fullName,
         phone: memberData.phone,
+        cpf: memberData.cpf,
       }))
     }, 2000)
     return () => clearTimeout(timeout)
-  }, [memberData.fullName, memberData.phone, step])
+  }, [memberData.fullName, memberData.phone, memberData.cpf, step])
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   function completeStep(n: number) {
@@ -152,7 +172,12 @@ export default function Register() {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (raw) {
         const draft = JSON.parse(raw)
-        if (draft.fullName) setMemberData(prev => ({ ...prev, fullName: draft.fullName, phone: draft.phone || '' }))
+        if (draft.fullName) setMemberData(prev => ({
+          ...prev,
+          fullName: draft.fullName,
+          phone: draft.phone || '',
+          cpf: draft.cpf || '',
+        }))
         toast.success('Cadastro em andamento restaurado.')
       }
     } catch { /* ignore */ }
@@ -167,7 +192,7 @@ export default function Register() {
 
   // ─── Step 1a: Account creation ────────────────────────────────────────────
 
-  const handleAccountCreated = useCallback(async (data: { email: string; password: string }) => {
+  const handleAccountCreated = useCallback(async (data: { email: string; password: string; turnstileToken?: string }) => {
     if (isSubmittingRef.current) return
     isSubmittingRef.current = true
     setLoading(true)
@@ -181,7 +206,7 @@ export default function Register() {
       }
 
       toast.loading('Criando sua conta...', { id: 'reg-progress' })
-      const result = await signUp(data.email, data.password)
+      const result = await signUp(data.email, data.password, data.turnstileToken)
       if (!result.success) {
         // Use error code (stable) instead of comparing translated error strings
         if (result.code === 'EMAIL_ALREADY_EXISTS') {
@@ -226,6 +251,9 @@ export default function Register() {
         }))
         setAccountCreated(true)
         toast.success('Conta Google conectada! Complete seus dados.')
+        toast.info('Dica: voce pode criar uma senha para login sem Google em "Esqueci minha senha" a qualquer momento.', {
+          duration: 8000,
+        })
       } else {
         toast.success('Bem-vindo de volta!')
         navigate('/membro')

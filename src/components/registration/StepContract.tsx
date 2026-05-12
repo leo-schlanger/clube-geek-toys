@@ -277,17 +277,30 @@ export function StepContract({
 
       toast.loading('Enviando contrato...', { id: 'contract' })
       let url = ''
-      try {
-        const result = await storeContract(contractData, pdfBytes)
-        url = result.pdfUrl
-      } catch (storeError) {
-        // Storage failed, but the user already signed — don't block registration.
-        // They can proceed to payment. The contract can be re-stored later.
-        logger.error('Contract storage failed (non-blocking):', storeError)
-        toast.warning('Contrato assinado, mas houve um problema ao salvar no servidor. Prossiga com o pagamento.', {
+      const MAX_STORE_ATTEMPTS = 3
+      let storeSuccess = false
+      for (let attempt = 1; attempt <= MAX_STORE_ATTEMPTS; attempt++) {
+        try {
+          const result = await storeContract(contractData, pdfBytes)
+          url = result.pdfUrl
+          storeSuccess = true
+          break
+        } catch (storeError) {
+          logger.error(`Contract storage attempt ${attempt}/${MAX_STORE_ATTEMPTS} failed:`, storeError)
+          if (attempt < MAX_STORE_ATTEMPTS) {
+            toast.loading(`Reenviando contrato (tentativa ${attempt + 1}/${MAX_STORE_ATTEMPTS})...`, { id: 'contract' })
+            await new Promise(r => setTimeout(r, 1000 * attempt))
+          }
+        }
+      }
+
+      if (!storeSuccess) {
+        toast.error('Nao foi possivel salvar o contrato no servidor. Tente novamente.', {
           id: 'contract',
           duration: 8000,
         })
+        setLoading(false)
+        return
       }
 
       if (url) {

@@ -38,7 +38,38 @@ function generateTokens(user: { id: string; email: string; role: string }) {
   return { accessToken, refreshToken };
 }
 
-export async function register(data: { email: string; password: string; name?: string; ip?: string }) {
+async function verifyTurnstileToken(token: string, ip?: string): Promise<boolean> {
+  if (!env.TURNSTILE_SECRET_KEY) return true; // Skip if not configured
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret: env.TURNSTILE_SECRET_KEY,
+        response: token,
+        ...(ip ? { remoteip: ip } : {}),
+      }),
+    });
+    const result = await response.json() as { success: boolean };
+    return result.success;
+  } catch (err) {
+    console.error('[AUTH] Turnstile verification failed:', err);
+    return false;
+  }
+}
+
+export async function register(data: { email: string; password: string; name?: string; ip?: string; turnstileToken?: string }) {
+  // Verify Turnstile CAPTCHA if configured
+  if (env.TURNSTILE_SECRET_KEY) {
+    if (!data.turnstileToken) {
+      throw new AppError(400, 'Verificação de segurança obrigatória', 'CAPTCHA_REQUIRED');
+    }
+    const valid = await verifyTurnstileToken(data.turnstileToken, data.ip);
+    if (!valid) {
+      throw new AppError(400, 'Verificação de segurança falhou. Tente novamente.', 'CAPTCHA_FAILED');
+    }
+  }
+
   const normalizedEmail = data.email.toLowerCase().trim();
 
   // Defense-in-depth: reject disposable email providers (frontend also blocks).
@@ -144,12 +175,27 @@ export async function login(data: { email: string; password: string; ip?: string
   };
 }
 
+const REFRESH_GRACE_PERIOD_MS = 30_000; // 30 seconds
+
 export async function refresh(refreshToken: string) {
   const hash = hashSha256(refreshToken);
-  const result = await query<UserRow>(
+
+  // Check current token first
+  let result = await query<UserRow>(
     'SELECT id, email, role, email_verified FROM users WHERE refresh_token_hash = $1',
     [hash]
   );
+
+  // Grace period: accept previous token if rotation happened < 30s ago.
+  // This prevents race conditions when multiple tabs refresh simultaneously.
+  if (result.rows.length === 0) {
+    result = await query<UserRow>(
+      `SELECT id, email, role, email_verified FROM users
+       WHERE prev_refresh_token_hash = $1
+         AND refresh_rotated_at > NOW() - INTERVAL '${REFRESH_GRACE_PERIOD_MS} milliseconds'`,
+      [hash]
+    );
+  }
 
   if (result.rows.length === 0) {
     throw new AppError(401, 'Refresh token inválido');
@@ -158,11 +204,15 @@ export async function refresh(refreshToken: string) {
   const user = result.rows[0];
   const tokens = generateTokens(user);
 
-  // Rotate refresh token
-  await query('UPDATE users SET refresh_token_hash = $1 WHERE id = $2', [
-    hashSha256(tokens.refreshToken),
-    user.id,
-  ]);
+  // Rotate refresh token, keep previous for grace period
+  await query(
+    `UPDATE users SET
+       prev_refresh_token_hash = refresh_token_hash,
+       refresh_token_hash = $1,
+       refresh_rotated_at = NOW()
+     WHERE id = $2`,
+    [hashSha256(tokens.refreshToken), user.id]
+  );
 
   return {
     accessToken: tokens.accessToken,
@@ -177,7 +227,10 @@ export async function refresh(refreshToken: string) {
 }
 
 export async function logout(userId: string) {
-  await query('UPDATE users SET refresh_token_hash = NULL WHERE id = $1', [userId]);
+  await query(
+    'UPDATE users SET refresh_token_hash = NULL, prev_refresh_token_hash = NULL WHERE id = $1',
+    [userId]
+  );
 }
 
 export async function getMe(userId: string) {
@@ -324,7 +377,7 @@ export async function updateProfile(userId: string, data: { email?: string; curr
       throw new AppError(401, 'Senha atual incorreta');
     }
     const newHash = await bcrypt.hash(data.newPassword, BCRYPT_ROUNDS);
-    await query('UPDATE users SET password_hash = $1, refresh_token_hash = NULL WHERE id = $2', [newHash, userId]);
+    await query('UPDATE users SET password_hash = $1, refresh_token_hash = NULL, prev_refresh_token_hash = NULL WHERE id = $2', [newHash, userId]);
   }
 
   // Email change
@@ -483,7 +536,7 @@ export async function resetPassword(token: string, newPassword: string) {
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
   const result = await query(
-    'UPDATE users SET password_hash = $1, refresh_token_hash = NULL WHERE email = $2 RETURNING id',
+    'UPDATE users SET password_hash = $1, refresh_token_hash = NULL, prev_refresh_token_hash = NULL WHERE email = $2 RETURNING id',
     [passwordHash, payload.email]
   );
 

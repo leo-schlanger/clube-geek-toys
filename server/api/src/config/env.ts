@@ -29,6 +29,9 @@ const envSchema = z.object({
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),
 
+  // Cloudflare Turnstile (CAPTCHA)
+  TURNSTILE_SECRET_KEY: z.string().optional(),
+
   // URLs
   FRONTEND_URL: z.string().url(),
   API_URL: z.string().url(),

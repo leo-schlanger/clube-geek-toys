@@ -43,7 +43,7 @@ interface AuthContextType {
   error: string | null
   emailVerified: boolean
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; userId?: string }>
+  signUp: (email: string, password: string, turnstileToken?: string) => Promise<{ success: boolean; error?: string; code?: string; userId?: string }>
   signInWithGoogle: (data: {
     accessToken: string
     refreshToken: string
@@ -157,10 +157,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   // Register
-  async function signUp(email: string, password: string) {
+  async function signUp(email: string, password: string, turnstileToken?: string) {
     try {
       setError(null)
-      const result = await api.post('/auth/register', { email, password }, { skipAuth: true })
+      const body: Record<string, string> = { email, password }
+      if (turnstileToken) body.turnstileToken = turnstileToken
+      const result = await api.post('/auth/register', body, { skipAuth: true })
 
       if (result.error) {
         // Use error codes (stable) instead of error messages (locale-dependent, may have accents)

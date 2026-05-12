@@ -160,6 +160,9 @@
     <!-- Analytics: loaded dynamically AFTER cookie consent (see src/lib/analytics.ts).
          Removed from index.html to comply with LGPD Art. 7º — no tracking before consent. -->
 
+    <!-- Cloudflare Turnstile (CAPTCHA) — loaded async, only used on registration -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+
     <!-- DNS Prefetch / Preconnect -->
     <link rel="dns-prefetch" href="https://api.geeketoys.com.br" />
     <link rel="preconnect" href="https://api.geeketoys.com.br" crossorigin />

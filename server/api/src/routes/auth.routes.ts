@@ -57,6 +57,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: passwordSchema,
   name: z.string().optional(),
+  turnstileToken: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -103,6 +104,7 @@ authRouter.post('/register', authLimiter, validate(registerSchema), async (req, 
     next(err);
   }
 });
+
 
 authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, next) => {
   try {
