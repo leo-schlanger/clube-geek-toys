@@ -84,8 +84,8 @@ export function MembershipCard({ member }: MembershipCardProps) {
     e.stopPropagation()
     if (navigator.share) {
       navigator.share({
-        title: 'Minha Carteirinha Clube Geek & Toys',
-        text: `Sou membro ${plan.name} do Clube Geek & Toys!`,
+        title: 'Minha Carteirinha Clube GeekPop & Toys',
+        text: `Sou membro ${plan.name} do Clube GeekPop & Toys!`,
         url: window.location.href,
       }).catch(() => {})
     } else {
@@ -151,7 +151,7 @@ export function MembershipCard({ member }: MembershipCardProps) {
                 <div className="flex items-center gap-2">
                   <img
                     src="/logo-vip.png"
-                    alt="Clube Geek & Toys"
+                    alt="Clube GeekPop & Toys"
                     className="h-7 sm:h-8 drop-shadow-lg"
                   />
                 </div>

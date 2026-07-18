@@ -22,7 +22,7 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
     if (!visible || firedRef.current) return
     firedRef.current = true
 
-    const colors = ['#d4a520', '#ffd700', '#ff6b35', '#8b5cf6', '#06b6d4']
+    const colors = ['#ec4899', '#f72585', '#f5c518', '#ffffff', '#8b5cf6']
 
     // Burst from the left
     confetti({ particleCount: 80, spread: 70, origin: { x: 0.15, y: 0.6 }, colors })
@@ -101,7 +101,7 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
             transition={{ delay: 0.45 }}
             className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto"
           >
-            Sua conta no Clube Geek & Toys está ativa!
+            Sua conta no Clube GeekPop & Toys está ativa!
             Aproveite descontos exclusivos, acumule pontos e resgate recompensas incríveis.
           </motion.p>
 

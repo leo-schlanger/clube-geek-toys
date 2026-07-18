@@ -16,7 +16,7 @@
 
 ### Plano Unico + Loja E-commerce (branch `feat/single-plan-and-store`)
 
-- [x] **Plano unico anual** - Descontinuados os tiers Silver/Gold/Black e a opcao mensal; agora um unico plano "Clube Geek & Toys" (R$ 149,99/ano)
+- [x] **Plano unico anual** - Descontinuados os tiers Silver/Gold/Black e a opcao mensal; agora um unico plano "Clube GeekPop & Toys" (R$ 149,99/ano)
 - [x] **Beneficio simplificado** - 15% de desconto em qualquer produto + brinde especial + entrada gratuita em eventos participantes
 - [x] **Remocao do sistema de pontos** - Removidos `point_transactions`, `members.points`, `points.service`/`points.routes`, PointsTab/PointsSection/PointsChart, resgate, expiracao e multiplicadores
 - [x] **PDV simplificado** - Agora e apenas verificacao de membro (CPF/QR) exibindo status + 15%; nao registra mais compras nem pontos
@@ -72,7 +72,7 @@
 ### Carteirinha Digital (Abril 2026)
 
 - [x] **Redesign carteirinha digital** - Estetica de cartao fisico com visual premium
-- [x] **Gradiente metalico da carteirinha** - Visual metalico premium do Clube Geek & Toys
+- [x] **Gradiente metalico da carteirinha** - Visual metalico premium do Clube GeekPop & Toys
 - [x] **Smart chip e icone contactless** - Elementos visuais de cartao moderno
 - [x] **Shimmer holografico** - Efeito de brilho holografico animado
 - [x] **Numero do membro formato cartao** - Formatado no padrao de cartao de credito

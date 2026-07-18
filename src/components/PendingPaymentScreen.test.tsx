@@ -135,7 +135,7 @@ describe('PendingPaymentScreen', () => {
     render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     })
   })
 
@@ -159,7 +159,7 @@ describe('PendingPaymentScreen', () => {
     render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Plano Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Plano Clube GeekPop & Toys')).toBeInTheDocument()
       expect(screen.getByText('Joao Da Silva')).toBeInTheDocument()
       expect(screen.getByText('joao@test.com')).toBeInTheDocument()
     })
@@ -460,7 +460,7 @@ describe('PendingPaymentScreen', () => {
     render(<PendingPaymentScreen member={member} onPaymentSuccess={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Plano Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Plano Clube GeekPop & Toys')).toBeInTheDocument()
     })
   })
 

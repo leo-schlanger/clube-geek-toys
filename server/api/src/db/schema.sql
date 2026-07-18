@@ -1,4 +1,4 @@
--- Clube Geek & Toys - PostgreSQL Schema
+-- Clube GeekPop & Toys - PostgreSQL Schema
 -- Migrated from Firestore collections
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

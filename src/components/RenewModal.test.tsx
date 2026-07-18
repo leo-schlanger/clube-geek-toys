@@ -87,7 +87,7 @@ describe('RenewModal', () => {
   it('renders title and plan name', () => {
     renderModal()
     expect(screen.getByText('Renovar Assinatura')).toBeInTheDocument()
-    expect(screen.getAllByText(/Clube Geek & Toys/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/Clube GeekPop & Toys/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders plan benefits', () => {

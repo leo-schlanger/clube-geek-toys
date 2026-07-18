@@ -167,7 +167,7 @@ describe('MemberDashboard', () => {
   it('renders header with logo text', async () => {
     render(<MemberDashboard />)
     await waitFor(() => {
-      expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     })
   })
 

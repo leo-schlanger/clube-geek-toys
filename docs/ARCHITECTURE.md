@@ -1,10 +1,10 @@
-# Arquitetura Tecnica - Clube Geek & Toys
+# Arquitetura Tecnica - Clube GeekPop & Toys
 
 > **Ultima atualizacao:** 19 de Abril de 2026
 
 ## 1. Visao Geral do Sistema
 
-O Clube Geek & Toys opera duas stacks independentes compartilhando a mesma VPS:
+O Clube GeekPop & Toys opera duas stacks independentes compartilhando a mesma VPS:
 
 | Stack               | Diretorio na VPS        | Proposito                                                                  |
 | ------------------- | ----------------------- | -------------------------------------------------------------------------- |
@@ -190,7 +190,7 @@ O cadastro e dividido em 3 etapas sequenciais. O usuario pode interromper e reto
 1. Criar conta com email + senha **ou** Google OAuth
 2. Verificar email (link HMAC com validade de 24h)
 3. Preencher dados pessoais: nome completo, CPF (validado), telefone
-4. Confirmar a assinatura do plano unico anual (Clube Geek & Toys, R$ 149,99/ano) — sem selecao de tier nem de frequencia
+4. Confirmar a assinatura do plano unico anual (Clube GeekPop & Toys, R$ 149,99/ano) — sem selecao de tier nem de frequencia
 
 ### Etapa 2: Contrato Digital
 
@@ -462,7 +462,7 @@ A carteirinha digital e renderizada inteiramente no frontend com proporcoes de c
 
 ### Frente
 
-- Gradiente metalico do Clube Geek & Toys
+- Gradiente metalico do Clube GeekPop & Toys
 - Icone de chip inteligente (smart chip)
 - Icone de pagamento contactless (NFC)
 - Efeito holografico com shimmer animado (CSS)

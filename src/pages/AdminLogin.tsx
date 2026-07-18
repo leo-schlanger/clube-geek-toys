@@ -117,11 +117,11 @@ export default function AdminLogin() {
       <Card className="w-full max-w-md border-border bg-card/80 backdrop-blur">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <img src="/logo.jpg" alt="Geek & Toys" className="h-16 rounded mx-auto" />
+            <img src="/logo.jpg" alt="GeekPop & Toys" className="h-16 rounded mx-auto" />
           </div>
           <CardTitle className="text-2xl font-heading gradient-text">Painel Administrativo</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Geek & Toys - Acesso Restrito
+            GeekPop & Toys - Acesso Restrito
           </CardDescription>
         </CardHeader>
 

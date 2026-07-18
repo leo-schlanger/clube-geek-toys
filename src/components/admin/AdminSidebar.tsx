@@ -180,9 +180,9 @@ export function AdminSidebar({ activeTab, onTabChange, onSignOut }: AdminSidebar
               <SheetContent side="left" className="w-72 p-0">
                 <SheetHeader className="p-4 border-b border-border">
                   <div className="flex items-center gap-3">
-                    <img src="/logo.jpg" alt="Geek & Toys" className="h-10 w-10 rounded" />
+                    <img src="/logo.jpg" alt="GeekPop & Toys" className="h-10 w-10 rounded" />
                     <div>
-                      <SheetTitle className="text-left text-sm">Clube Geek & Toys</SheetTitle>
+                      <SheetTitle className="text-left text-sm">Clube GeekPop & Toys</SheetTitle>
                       <p className="text-xs text-muted-foreground">Admin</p>
                     </div>
                   </div>
@@ -197,7 +197,7 @@ export function AdminSidebar({ activeTab, onTabChange, onSignOut }: AdminSidebar
                 />
               </SheetContent>
             </Sheet>
-            <img src="/logo.jpg" alt="Geek & Toys" className="h-8 rounded" />
+            <img src="/logo.jpg" alt="GeekPop & Toys" className="h-8 rounded" />
             <span className="font-heading font-bold text-sm">Admin</span>
           </div>
 
@@ -214,9 +214,9 @@ export function AdminSidebar({ activeTab, onTabChange, onSignOut }: AdminSidebar
       <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-64 bg-card border-r border-border flex-col z-50">
         {/* Logo */}
         <div className="p-4 border-b border-border flex items-center gap-3">
-          <img src="/logo.jpg" alt="Geek & Toys" className="h-10 w-10 rounded" />
+          <img src="/logo.jpg" alt="GeekPop & Toys" className="h-10 w-10 rounded" />
           <div>
-            <h1 className="font-heading font-bold text-sm">Clube Geek & Toys</h1>
+            <h1 className="font-heading font-bold text-sm">Clube GeekPop & Toys</h1>
             <p className="text-xs text-muted-foreground">Admin</p>
           </div>
         </div>

@@ -135,7 +135,7 @@ describe('Login', () => {
 
   it('renders the branding heading', () => {
     render(<Login />)
-    expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
   })
 
   it('renders the card title and description', () => {

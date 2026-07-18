@@ -165,18 +165,18 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── AUTH ────────────────────────────────────────────
     'verify-email': {
-      subject: 'Verifique seu e-mail — Clube Geek & Toys',
+      subject: 'Verifique seu e-mail — Clube GeekPop & Toys',
       preheader: 'Clique para confirmar seu e-mail e ativar sua conta.',
       body: `
         <h2 style="color:#d4a520;margin:0 0 12px">Confirme seu e-mail</h2>
         <p>Olá, <strong>${name}</strong>!</p>
-        <p>Você criou uma conta no <strong>Clube Geek & Toys</strong>. Para prosseguir, confirme seu endereço de e-mail clicando no botão abaixo.</p>
+        <p>Você criou uma conta no <strong>Clube GeekPop & Toys</strong>. Para prosseguir, confirme seu endereço de e-mail clicando no botão abaixo.</p>
         ${infoBox('⏳ Este link expira em <strong>24 horas</strong>.<br>Se você não criou esta conta, ignore este e-mail.')}`,
       cta: { text: 'Confirmar E-mail', url: v.verify_url || '#' },
     },
 
     'password-reset': {
-      subject: 'Redefinição de senha — Clube Geek & Toys',
+      subject: 'Redefinição de senha — Clube GeekPop & Toys',
       preheader: 'Você solicitou a redefinição da sua senha.',
       body: `
         <h2 style="color:#d4a520;margin:0 0 12px">Redefinir sua senha</h2>
@@ -188,11 +188,11 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── ONBOARDING ─────────────────────────────────────
     'welcome': {
-      subject: 'Bem-vindo ao Clube Geek & Toys! 🎮',
+      subject: 'Bem-vindo ao Clube GeekPop & Toys! 🎮',
       preheader: `${name}, você agora é membro ${v.plan || ''} do clube!`,
       body: `
         <h2 style="color:#d4a520;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
-        <p>Sua conta no <strong>Clube Geek & Toys</strong> foi ativada com sucesso${v.plan ? ` no plano <strong>${v.plan}</strong>` : ''}. Você agora faz parte da nossa comunidade geek!</p>
+        <p>Sua conta no <strong>Clube GeekPop & Toys</strong> foi ativada com sucesso${v.plan ? ` no plano <strong>${v.plan}</strong>` : ''}. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>
         ${featureList([
           '🏷️ Descontos exclusivos em produtos e serviços',
@@ -205,7 +205,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── PAGAMENTOS ─────────────────────────────────────
     'payment-confirmed': {
-      subject: 'Pagamento confirmado — Clube Geek & Toys',
+      subject: 'Pagamento confirmado — Clube GeekPop & Toys',
       preheader: `Seu pagamento de R$ ${v.amount || '0,00'} foi aprovado.`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Pagamento confirmado! ✅</h2>
@@ -221,7 +221,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'order-confirmed': {
-      subject: 'Pedido confirmado — Loja Geek & Toys',
+      subject: 'Pedido confirmado — Loja GeekPop & Toys',
       preheader: `Recebemos o pagamento do seu pedido #${v.order_number || ''}.`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Pedido confirmado! 🛍️</h2>
@@ -236,7 +236,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'payment-failed': {
-      subject: 'Pagamento não aprovado — Clube Geek & Toys',
+      subject: 'Pagamento não aprovado — Clube GeekPop & Toys',
       preheader: 'Houve um problema com seu pagamento. Veja como resolver.',
       body: `
         <h2 style="color:#f87171;margin:0 0 12px">Pagamento não aprovado</h2>
@@ -248,7 +248,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── ASSINATURA ─────────────────────────────────────
     'subscription-created': {
-      subject: 'Assinatura ativada — Clube Geek & Toys',
+      subject: 'Assinatura ativada — Clube GeekPop & Toys',
       preheader: `${name}, sua assinatura do plano ${v.plan || ''} está ativa!`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Assinatura ativada! 🎉</h2>
@@ -264,7 +264,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'subscription-payment': {
-      subject: 'Cobrança recorrente processada — Clube Geek & Toys',
+      subject: 'Cobrança recorrente processada — Clube GeekPop & Toys',
       preheader: `Cobrança de R$ ${v.amount || '0,00'} processada com sucesso.`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Cobrança processada ✅</h2>
@@ -280,7 +280,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'subscription-paused': {
-      subject: 'Assinatura pausada — Clube Geek & Toys',
+      subject: 'Assinatura pausada — Clube GeekPop & Toys',
       preheader: 'Sua assinatura foi pausada. Reative quando quiser.',
       body: `
         <h2 style="color:#fbbf24;margin:0 0 12px">Assinatura pausada ⏸️</h2>
@@ -295,7 +295,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'subscription-resumed': {
-      subject: 'Assinatura reativada — Clube Geek & Toys',
+      subject: 'Assinatura reativada — Clube GeekPop & Toys',
       preheader: `${name}, sua assinatura foi reativada com sucesso!`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Assinatura reativada! ▶️</h2>
@@ -306,7 +306,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'subscription-cancelled': {
-      subject: 'Assinatura cancelada — Clube Geek & Toys',
+      subject: 'Assinatura cancelada — Clube GeekPop & Toys',
       preheader: 'Sua assinatura foi cancelada. Sentiremos sua falta!',
       body: `
         <h2 style="color:#f87171;margin:0 0 12px">Assinatura cancelada</h2>
@@ -318,7 +318,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'subscription-payment-failed': {
-      subject: 'Falha na cobrança recorrente — Clube Geek & Toys',
+      subject: 'Falha na cobrança recorrente — Clube GeekPop & Toys',
       preheader: 'Não conseguimos processar sua cobrança. Atualize seu cartão.',
       body: `
         <h2 style="color:#f87171;margin:0 0 12px">Falha na cobrança recorrente</h2>
@@ -330,7 +330,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── RENOVAÇÃO / PONTOS ─────────────────────────────
     'renewal-reminder': {
-      subject: 'Sua assinatura expira em breve — Clube Geek & Toys',
+      subject: 'Sua assinatura expira em breve — Clube GeekPop & Toys',
       preheader: `${name}, renove para continuar aproveitando os benefícios!`,
       body: `
         <h2 style="color:#fbbf24;margin:0 0 12px">Sua assinatura expira em breve ⚠️</h2>
@@ -346,7 +346,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     'member-expired': {
-      subject: 'Sua assinatura expirou — Clube Geek & Toys',
+      subject: 'Sua assinatura expirou — Clube GeekPop & Toys',
       preheader: `${name}, sua assinatura expirou. Renove para continuar aproveitando os benefícios!`,
       body: `
         <h2 style="color:#f87171;margin:0 0 12px">Assinatura expirada</h2>
@@ -363,7 +363,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── CONTRATO ───────────────────────────────────────
     'contract-signed': {
-      subject: 'Contrato assinado — Clube Geek & Toys',
+      subject: 'Contrato assinado — Clube GeekPop & Toys',
       preheader: `${name}, seu contrato do plano ${v.plan || ''} foi assinado digitalmente.`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Contrato assinado com sucesso! 📋</h2>
@@ -380,7 +380,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── ADMIN: PIX PENDENTE ────────────────────────────
     'admin-pix-pending': {
-      subject: '🔔 PIX pendente de confirmação — Clube Geek & Toys',
+      subject: '🔔 PIX pendente de confirmação — Clube GeekPop & Toys',
       preheader: `Novo pagamento PIX de R$ ${v.amount || '0,00'} aguardando confirmação.`,
       body: `
         <h2 style="color:#f59e0b;margin:0 0 12px">Pagamento PIX pendente 🔔</h2>
@@ -399,7 +399,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     // ─── ADMIN: NOVO MEMBRO CADASTRADO ─────────────────
     'admin-new-member': {
-      subject: '👤 Novo membro cadastrado — Clube Geek & Toys',
+      subject: '👤 Novo membro cadastrado — Clube GeekPop & Toys',
       preheader: `${v.member_name || 'Novo membro'} se cadastrou no plano ${v.plan || ''}.`,
       body: `
         <h2 style="color:#3b82f6;margin:0 0 12px">Novo membro cadastrado 👤</h2>
@@ -418,7 +418,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
   };
 
   const tmpl = templates[template] || {
-    subject: `Clube Geek & Toys — ${template}`,
+    subject: `Clube GeekPop & Toys — ${template}`,
     preheader: '',
     body: `<p>Template: ${template}</p>`,
   };

@@ -89,7 +89,7 @@ function RequestResetForm() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-48 sm:w-56 mx-auto" />
+            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-48 sm:w-56 mx-auto" />
           </div>
           <CardTitle className="text-2xl font-heading">Recuperar Senha</CardTitle>
           <CardDescription>
@@ -261,7 +261,7 @@ function ResetPasswordForm({ token }: { token: string }) {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
-            <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-48 sm:w-56 mx-auto" />
+            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-48 sm:w-56 mx-auto" />
           </div>
           <CardTitle className="text-2xl font-heading">Nova Senha</CardTitle>
           <CardDescription>

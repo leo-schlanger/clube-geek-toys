@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Dark theme matching main Geek & Toys site */
+    /* Dark theme matching main GeekPop & Toys site */
     --background: 0 0% 5.1%;
     --foreground: 0 0% 96.1%;
 
@@ -14,9 +14,9 @@
     --popover: 240 33% 11.4%;
     --popover-foreground: 0 0% 96.1%;
 
-    /* Gold primary - matching main site */
-    --primary: 45 85% 55%;
-    --primary-foreground: 0 0% 5%;
+    /* Pink primary (GeekPop) with gold accent */
+    --primary: 330 81% 60%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 240 33% 11.4%;
     --secondary-foreground: 0 0% 96.1%;
@@ -24,15 +24,15 @@
     --muted: 240 10% 20%;
     --muted-foreground: 240 10% 69%;
 
-    --accent: 45 100% 65%;
+    --accent: 45 90% 55%;
     --accent-foreground: 0 0% 5%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 45 30% 25%;
-    --input: 45 20% 15%;
-    --ring: 45 85% 55%;
+    --border: 330 18% 24%;
+    --input: 330 15% 15%;
+    --ring: 330 81% 60%;
 
     --radius: 0.75rem;
 
@@ -89,14 +89,14 @@
 @layer utilities {
   .text-glow-primary {
     text-shadow:
-      0 0 20px hsl(45 85% 55% / 0.6),
-      0 0 40px hsl(45 85% 55% / 0.3);
+      0 0 20px hsl(330 81% 60% / 0.6),
+      0 0 40px hsl(330 81% 60% / 0.3);
   }
 
   .border-glow-primary {
     box-shadow:
-      0 0 15px hsl(45 85% 55% / 0.3),
-      inset 0 0 15px hsl(45 85% 55% / 0.05);
+      0 0 15px hsl(330 81% 60% / 0.3),
+      inset 0 0 15px hsl(330 81% 60% / 0.05);
   }
 
   .hover-glow-primary {
@@ -106,8 +106,8 @@
   }
   .hover-glow-primary:hover {
     box-shadow:
-      0 0 25px hsl(45 85% 55% / 0.5),
-      0 0 50px hsl(45 85% 55% / 0.2);
+      0 0 25px hsl(330 81% 60% / 0.5),
+      0 0 50px hsl(330 81% 60% / 0.2);
     transform: translateY(-2px);
   }
 
@@ -118,9 +118,9 @@
   }
 }
 
-/* Gradient text - gold theme */
+/* Gradient text - pink → gold (GeekPop) */
 .gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-amber-500;
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-pink-500 to-amber-400;
 }
 
 /* Card glow effect */
@@ -129,7 +129,7 @@
 }
 
 .card-glow:hover {
-  box-shadow: 0 0 30px hsl(45 85% 55% / 0.2);
+  box-shadow: 0 0 30px hsl(330 81% 60% / 0.2);
 }
 
 /* QR Code container */
@@ -192,7 +192,7 @@
   transform: translate(-50%, -50%);
   background: radial-gradient(
     circle,
-    hsl(45 85% 55% / 0.12) 0%,
+    hsl(330 81% 60% / 0.12) 0%,
     transparent 70%
   );
   pointer-events: none;
@@ -207,7 +207,7 @@
   width: 200%;
   height: 200%;
   background: repeating-conic-gradient(
-    hsl(45 85% 55% / 0.03) 0deg 1deg,
+    hsl(330 81% 60% / 0.03) 0deg 1deg,
     transparent 1deg 60deg
   );
   animation: hero-rotate 120s linear infinite;
@@ -247,11 +247,11 @@
 .text-shimmer {
   background: linear-gradient(
     90deg,
-    hsl(45 85% 55%) 0%,
+    hsl(330 81% 60%) 0%,
     hsl(45 100% 75%) 25%,
-    hsl(45 85% 55%) 50%,
+    hsl(330 81% 60%) 50%,
     hsl(45 100% 75%) 75%,
-    hsl(45 85% 55%) 100%
+    hsl(330 81% 60%) 100%
   );
   background-size: 200% auto;
   background-clip: text;
@@ -264,13 +264,13 @@
   0%,
   100% {
     box-shadow:
-      0 0 20px hsl(45 85% 55% / 0.4),
-      0 0 60px hsl(45 85% 55% / 0.1);
+      0 0 20px hsl(330 81% 60% / 0.4),
+      0 0 60px hsl(330 81% 60% / 0.1);
   }
   50% {
     box-shadow:
-      0 0 30px hsl(45 85% 55% / 0.6),
-      0 0 80px hsl(45 85% 55% / 0.2);
+      0 0 30px hsl(330 81% 60% / 0.6),
+      0 0 80px hsl(330 81% 60% / 0.2);
   }
 }
 

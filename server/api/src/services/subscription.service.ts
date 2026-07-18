@@ -109,7 +109,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
         price_data: {
           currency: 'brl',
           product_data: {
-            name: `Clube Geek & Toys - Plano ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}`,
+            name: `Clube GeekPop & Toys - Plano ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}`,
           },
           unit_amount: Math.round(data.transaction_amount * 100),
           recurring: { interval: interval as 'month' | 'year' },

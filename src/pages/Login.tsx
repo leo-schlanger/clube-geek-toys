@@ -145,11 +145,11 @@ export default function Login() {
         >
           <img
             src="/logo-vip.png"
-            alt="Clube Geek & Toys VIP"
+            alt="Clube GeekPop & Toys"
             className="w-40 md:w-64 mb-6"
           />
           <h1 className="text-2xl md:text-3xl font-heading gradient-text mb-2">
-            Clube Geek & Toys
+            Clube GeekPop & Toys
           </h1>
           <p className="text-muted-foreground text-sm md:text-base mb-8">
             Seu clube de vantagens geek

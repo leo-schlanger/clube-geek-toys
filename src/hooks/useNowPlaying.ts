@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 /**
- * Hook leve pra consumir o "agora tocando" da Rádio Geek & Toys (AzuraCast).
+ * Hook leve pra consumir o "agora tocando" da Rádio GeekPop & Toys (AzuraCast).
  *
  * Usa o endpoint estático (`nowplaying_static`), que é um JSON cacheado
  * servido direto pelo nginx da rádio — ~10x mais leve que o dinâmico e

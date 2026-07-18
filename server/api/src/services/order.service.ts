@@ -178,7 +178,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       amount: Math.round(order.total * 100),
       currency: 'brl',
       payment_method_types: ['card'],
-      description: `Pedido #${order.orderNumber} - Loja Geek & Toys`,
+      description: `Pedido #${order.orderNumber} - Loja GeekPop & Toys`,
       receipt_email: order.customerEmail,
       metadata: {
         kind: 'shop_order',

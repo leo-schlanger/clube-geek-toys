@@ -126,7 +126,7 @@ describe('StepPayment', () => {
     vi.useRealTimers()
     render(<StepPayment {...defaultProps} />)
 
-    expect(screen.getAllByText('Clube Geek & Toys').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/assinatura anual/i)).toBeInTheDocument()
     expect(screen.getByText(/149,99/)).toBeInTheDocument()
     expect(screen.getByText(/pagamento seguro via stripe/i)).toBeInTheDocument()

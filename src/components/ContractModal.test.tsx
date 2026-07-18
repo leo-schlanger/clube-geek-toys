@@ -75,12 +75,12 @@ vi.mock('../lib/email', () => ({
 
 // Mock contract content
 vi.mock('../data/contract-content', () => ({
-  CONTRACT_TITLE: 'CLUBE GEEK & TOYS VIP',
+  CONTRACT_TITLE: 'CLUBE GEEKPOP & TOYS',
   CONTRACT_SUBTITLE: 'REGULAMENTO E TERMO DE ADESÃO',
   CONTRACT_SECTIONS: [
     {
       title: '1. SOBRE O CLUBE',
-      content: ['O CLUBE GEEK & TOYS VIP é um programa de fidelidade.'],
+      content: ['O CLUBE GEEKPOP & TOYS é um programa de fidelidade.'],
     },
     {
       title: '2. PLANOS',
@@ -124,7 +124,7 @@ describe('ContractModal', () => {
   describe('step 1: read contract', () => {
     it('renders the contract title', () => {
       render(<ContractModal {...defaultProps} />)
-      expect(screen.getByText('CLUBE GEEK & TOYS VIP')).toBeInTheDocument()
+      expect(screen.getByText('CLUBE GEEKPOP & TOYS')).toBeInTheDocument()
     })
 
     it('renders the contract subtitle', () => {
@@ -148,7 +148,7 @@ describe('ContractModal', () => {
 
     it('renders the single club plan badge', () => {
       render(<ContractModal {...defaultProps} />)
-      expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     })
 
     it('shows the annual payment type', () => {
@@ -329,7 +329,7 @@ describe('ContractModal', () => {
 
     it('always shows the single club plan (no Silver/Gold/Black)', () => {
       render(<ContractModal {...defaultProps} />)
-      expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
       expect(screen.queryByText('Silver')).not.toBeInTheDocument()
       expect(screen.queryByText('Gold')).not.toBeInTheDocument()
       expect(screen.queryByText('Black')).not.toBeInTheDocument()

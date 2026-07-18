@@ -1,4 +1,4 @@
-# Clube Geek & Toys — Documentacao do Projeto
+# Clube GeekPop & Toys — Documentacao do Projeto
 
 > **Ultima atualizacao:** 19 de Abril de 2026
 
@@ -7,7 +7,7 @@
 | Campo             | Valor                                                            |
 | ----------------- | ---------------------------------------------------------------- |
 | **Razao Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda           |
-| **Nome Fantasia** | Geek & Toys                                                      |
+| **Nome Fantasia** | GeekPop & Toys                                                   |
 | **CNPJ**          | 52.846.344/0001-10                                               |
 | **Endereco**      | R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ |
 | **CEP**           | 22011-001                                                        |
@@ -23,9 +23,9 @@ Clube de vantagens digital para loja fisica e online de produtos geek, coleciona
 
 Um unico plano anual, sem opcao mensal e sem tiers (Silver/Gold/Black foram descontinuados).
 
-| Plano             | Anual     | Beneficios                                                                                                               |
-| ----------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Clube Geek & Toys | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
+| Plano                | Anual     | Beneficios                                                                                                               |
+| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Clube GeekPop & Toys | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
 
 O desconto de 15% do membro na loja online e aplicado **server-side** no checkout (nunca confiando no cliente), registrado em `orders.discount_reason = 'member_15'`.
 
@@ -500,25 +500,25 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ## 6. Templates de Email (17)
 
-| Template                      | Assunto                         | Trigger                                     | Variaveis principais                                                    | Destinatario |
-| ----------------------------- | ------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- | ------------ |
-| `verify-email`                | Verifique seu e-mail            | Backend (auto, apos registro)               | name, verify_url                                                        | Membro       |
-| `password-reset`              | Redefinicao de senha            | Backend (auto, solicitacao do membro)       | name, reset_url                                                         | Membro       |
-| `welcome`                     | Bem-vindo ao Clube Geek & Toys! | Frontend (apos ativacao)                    | name, plan                                                              | Membro       |
-| `payment-confirmed`           | Pagamento confirmado            | Webhook Stripe / Admin confirma PIX         | name, amount, plan, expiry_date                                         | Membro       |
-| `payment-failed`              | Pagamento nao aprovado          | Webhook Stripe                              | name                                                                    | Membro       |
-| `subscription-created`        | Assinatura ativada              | Backend (auto)                              | name, plan, amount, card_last_four                                      | Membro       |
-| `subscription-payment`        | Cobranca recorrente processada  | Webhook Stripe                              | name, amount, plan, next_payment                                        | Membro       |
-| `subscription-paused`         | Assinatura pausada              | Backend (auto)                              | name                                                                    | Membro       |
-| `subscription-resumed`        | Assinatura reativada            | Backend (auto)                              | name                                                                    | Membro       |
-| `subscription-cancelled`      | Assinatura cancelada            | Backend / Webhook (3 falhas)                | name                                                                    | Membro       |
-| `subscription-payment-failed` | Falha na cobranca recorrente    | Webhook Stripe                              | name, amount, failed_count                                              | Membro       |
-| `renewal-reminder`            | Sua assinatura expira em breve  | Cron diario (6h UTC, dedup via email_logs)  | name, plan, expiry_date                                                 | Membro       |
-| `member-expired`              | Sua assinatura expirou          | Cron diario                                 | name, plan                                                              | Membro       |
-| `order-confirmed`             | Pedido confirmado               | Webhook Stripe / Admin confirma PIX de loja | name, order_number, total                                               | Cliente      |
-| `contract-signed`             | Contrato assinado               | Frontend (apos assinatura digital)          | name, plan, signed_at, hash                                             | Membro       |
-| `admin-pix-pending`           | PIX pendente de confirmacao     | Backend (auto, apos criacao de PIX)         | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
-| `admin-new-member`            | Novo membro cadastrado          | Backend (auto, apos cadastro)               | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
+| Template                      | Assunto                            | Trigger                                     | Variaveis principais                                                    | Destinatario |
+| ----------------------------- | ---------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- | ------------ |
+| `verify-email`                | Verifique seu e-mail               | Backend (auto, apos registro)               | name, verify_url                                                        | Membro       |
+| `password-reset`              | Redefinicao de senha               | Backend (auto, solicitacao do membro)       | name, reset_url                                                         | Membro       |
+| `welcome`                     | Bem-vindo ao Clube GeekPop & Toys! | Frontend (apos ativacao)                    | name, plan                                                              | Membro       |
+| `payment-confirmed`           | Pagamento confirmado               | Webhook Stripe / Admin confirma PIX         | name, amount, plan, expiry_date                                         | Membro       |
+| `payment-failed`              | Pagamento nao aprovado             | Webhook Stripe                              | name                                                                    | Membro       |
+| `subscription-created`        | Assinatura ativada                 | Backend (auto)                              | name, plan, amount, card_last_four                                      | Membro       |
+| `subscription-payment`        | Cobranca recorrente processada     | Webhook Stripe                              | name, amount, plan, next_payment                                        | Membro       |
+| `subscription-paused`         | Assinatura pausada                 | Backend (auto)                              | name                                                                    | Membro       |
+| `subscription-resumed`        | Assinatura reativada               | Backend (auto)                              | name                                                                    | Membro       |
+| `subscription-cancelled`      | Assinatura cancelada               | Backend / Webhook (3 falhas)                | name                                                                    | Membro       |
+| `subscription-payment-failed` | Falha na cobranca recorrente       | Webhook Stripe                              | name, amount, failed_count                                              | Membro       |
+| `renewal-reminder`            | Sua assinatura expira em breve     | Cron diario (6h UTC, dedup via email_logs)  | name, plan, expiry_date                                                 | Membro       |
+| `member-expired`              | Sua assinatura expirou             | Cron diario                                 | name, plan                                                              | Membro       |
+| `order-confirmed`             | Pedido confirmado                  | Webhook Stripe / Admin confirma PIX de loja | name, order_number, total                                               | Cliente      |
+| `contract-signed`             | Contrato assinado                  | Frontend (apos assinatura digital)          | name, plan, signed_at, hash                                             | Membro       |
+| `admin-pix-pending`           | PIX pendente de confirmacao        | Backend (auto, apos criacao de PIX)         | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
+| `admin-new-member`            | Novo membro cadastrado             | Backend (auto, apos cadastro)               | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
 
 ## 7. Roles e Permissoes
 
@@ -553,18 +553,18 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Backend — Opcionais
 
-| Variavel                | Tipo   | Default                                        | Descricao                                       |
-| ----------------------- | ------ | ---------------------------------------------- | ----------------------------------------------- |
-| `NODE_ENV`              | string | `development`                                  | Ambiente (development, production, test)        |
-| `PORT`                  | number | `3001`                                         | Porta do servidor Express                       |
-| `STRIPE_WEBHOOK_SECRET` | string | -                                              | Secret do webhook Stripe (obrigatorio em prod)  |
-| `PIX_KEY`               | string | -                                              | Chave PIX para geracao de QR Code               |
-| `PIX_MERCHANT_NAME`     | string | -                                              | Nome do comerciante no PIX                      |
-| `PIX_MERCHANT_CITY`     | string | -                                              | Cidade do comerciante no PIX                    |
-| `GOOGLE_CLIENT_ID`      | string | -                                              | Client ID do Google OAuth                       |
-| `FROM_EMAIL`            | string | `Clube Geek & Toys <contato@geeketoys.com.br>` | Remetente dos emails                            |
-| `ADMIN_EMAIL`           | string | `admin@geeketoys.com.br`                       | Email que recebe notificacoes admin             |
-| `ALLOWED_ORIGINS`       | string | -                                              | Origens CORS adicionais (separadas por virgula) |
+| Variavel                | Tipo   | Default                                           | Descricao                                       |
+| ----------------------- | ------ | ------------------------------------------------- | ----------------------------------------------- |
+| `NODE_ENV`              | string | `development`                                     | Ambiente (development, production, test)        |
+| `PORT`                  | number | `3001`                                            | Porta do servidor Express                       |
+| `STRIPE_WEBHOOK_SECRET` | string | -                                                 | Secret do webhook Stripe (obrigatorio em prod)  |
+| `PIX_KEY`               | string | -                                                 | Chave PIX para geracao de QR Code               |
+| `PIX_MERCHANT_NAME`     | string | -                                                 | Nome do comerciante no PIX                      |
+| `PIX_MERCHANT_CITY`     | string | -                                                 | Cidade do comerciante no PIX                    |
+| `GOOGLE_CLIENT_ID`      | string | -                                                 | Client ID do Google OAuth                       |
+| `FROM_EMAIL`            | string | `Clube GeekPop & Toys <contato@geeketoys.com.br>` | Remetente dos emails                            |
+| `ADMIN_EMAIL`           | string | `admin@geeketoys.com.br`                          | Email que recebe notificacoes admin             |
+| `ALLOWED_ORIGINS`       | string | -                                                 | Origens CORS adicionais (separadas por virgula) |
 
 ### Frontend (`.env`)
 

@@ -1,5 +1,5 @@
 // ============================================
-// CLUBE GEEK & TOYS - TYPE DEFINITIONS
+// CLUBE GEEKPOP & TOYS - TYPE DEFINITIONS
 // ============================================
 
 // Plano único do clube
@@ -87,7 +87,7 @@ export interface Plan {
 // Plano único e anual do clube.
 export const CLUB_PLAN: Plan = {
   id: 'club',
-  name: 'Clube Geek & Toys',
+  name: 'Clube GeekPop & Toys',
   price: 149.99,
   discount: 15,
   benefits: [

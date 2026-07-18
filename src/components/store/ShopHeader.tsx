@@ -53,9 +53,9 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
           {/* Logo */}
           <Link to="/" className="flex shrink-0 items-center gap-2">
-            <img src="/logo-vip.png" alt="Clube Geek & Toys" className="h-9 w-auto" />
+            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-9 w-auto" />
             <span className="hidden text-sm font-heading font-semibold sm:inline">
-              Loja Geek & Toys
+              Loja GeekPop & Toys
             </span>
           </Link>
 

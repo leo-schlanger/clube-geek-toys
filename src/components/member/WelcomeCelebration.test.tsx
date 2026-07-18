@@ -60,7 +60,7 @@ describe('WelcomeCelebration', () => {
 
   it('renders description text', () => {
     render(<WelcomeCelebration memberName="Carlos" memberId="m-1" />)
-    expect(screen.getByText(/Sua conta no Clube Geek & Toys está ativa!/)).toBeInTheDocument()
+    expect(screen.getByText(/Sua conta no Clube GeekPop & Toys está ativa!/)).toBeInTheDocument()
   })
 
   it('renders the action button', () => {

@@ -23,7 +23,7 @@ const envSchema = z.object({
 
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1),
-  FROM_EMAIL: z.string().default('Clube Geek & Toys <contato@geeketoys.com.br>'),
+  FROM_EMAIL: z.string().default('Clube GeekPop & Toys <contato@geeketoys.com.br>'),
   ADMIN_EMAIL: z.string().email().default('admin@geeketoys.com.br'),
 
   // Google OAuth

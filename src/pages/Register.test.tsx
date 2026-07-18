@@ -178,7 +178,7 @@ describe('Register', () => {
 
   it('renders plan summary badge with the single club plan (annual)', () => {
     render(<Register />)
-    expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     expect(screen.getByText('Anual')).toBeInTheDocument()
   })
 
@@ -187,7 +187,7 @@ describe('Register', () => {
     mockSearchParamsMap.set('plano', 'gold')
     mockSearchParamsMap.set('tipo', 'monthly')
     render(<Register />)
-    expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     expect(screen.getByText('Anual')).toBeInTheDocument()
     expect(screen.queryByText('Mensal')).not.toBeInTheDocument()
   })
@@ -251,7 +251,7 @@ describe('Register', () => {
   it('shows the club plan even when plano param is missing', () => {
     mockSearchParamsMap.delete('plano')
     render(<Register />)
-    expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
   })
 
   // ─── Draft prompt ───────────────────────────────────────────

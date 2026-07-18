@@ -20,7 +20,7 @@ export default function PrivacyPolicy() {
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Controlador dos Dados</h2>
                             <p><strong>N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA</strong></p>
-                            <p>Nome Fantasia: <strong>GEEK & TOYS</strong></p>
+                            <p>Nome Fantasia: <strong>GEEKPOP & TOYS</strong></p>
                             <p>CNPJ: 52.846.344/0001-10</p>
                             <p>Endereço: Rua Barata Ribeiro, 181, Loja J - Copacabana, Rio de Janeiro - RJ, CEP 22.011-001</p>
                             <p>Encarregado de Dados (DPO): <a href="mailto:contato@geeketoys.com.br" className="text-primary hover:underline">contato@geeketoys.com.br</a></p>

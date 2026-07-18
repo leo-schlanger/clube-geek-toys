@@ -161,7 +161,7 @@ describe('SubscriptionManagement', () => {
     render(<SubscriptionManagement memberId="member-1" />)
 
     await waitFor(() => {
-      expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+      expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     })
     expect(screen.getByText('**** 1234')).toBeInTheDocument()
     expect(screen.getByText('Anual')).toBeInTheDocument()

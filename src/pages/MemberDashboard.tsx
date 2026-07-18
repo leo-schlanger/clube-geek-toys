@@ -129,7 +129,7 @@ export default function MemberDashboard() {
         <Card className="max-w-md text-center">
           <CardHeader>
             <div className="mx-auto mb-4">
-              <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-40 mx-auto" />
+              <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-40 mx-auto" />
             </div>
             <div className="mx-auto mb-4 p-4 bg-warning/20 rounded-full w-fit">
               <AlertTriangle className="h-12 w-12 text-warning" />
@@ -173,8 +173,8 @@ export default function MemberDashboard() {
       <header className="glass border-b border-border sticky top-0 z-40">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-10" />
-            <span className="text-lg font-heading font-bold text-foreground hidden sm:block">Clube Geek & Toys</span>
+            <img src="/logo-vip.png" alt="GeekPop & Toys" className="h-10" />
+            <span className="text-lg font-heading font-bold text-foreground hidden sm:block">Clube GeekPop & Toys</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => setModal('profile')} title="Editar Perfil">

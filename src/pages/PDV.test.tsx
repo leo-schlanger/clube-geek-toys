@@ -109,7 +109,7 @@ describe('PDV', () => {
 
   it('renders the PDV header', () => {
     render(<PDV />)
-    expect(screen.getByText('PDV - Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('PDV - Clube GeekPop & Toys')).toBeInTheDocument()
     expect(screen.getByText('Verificação de membros')).toBeInTheDocument()
   })
 
@@ -187,7 +187,7 @@ describe('PDV', () => {
     fireEvent.submit(screen.getByPlaceholderText('Digite o CPF...').closest('form')!)
 
     await waitFor(() => {
-      expect(screen.getByText(/Clube Geek & Toys/)).toBeInTheDocument()
+      expect(screen.getByText(/Clube GeekPop & Toys/)).toBeInTheDocument()
     })
   })
 

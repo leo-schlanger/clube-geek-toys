@@ -216,7 +216,7 @@ describe('Payments API client', () => {
 
       expect(mockedApi.post).toHaveBeenCalledWith('/checkout/card/create', {
         amount: 149.99,
-        description: 'Clube Geek & Toys - Plano Clube Geek & Toys',
+        description: 'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
         external_reference: 'member-1',

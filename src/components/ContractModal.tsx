@@ -391,7 +391,7 @@ export function ContractModal({
             {step === 'read' && (
               <div className="space-y-4">
                 <div className="text-center">
-                  <img src="/logo-vip.png" alt="Clube Geek & Toys VIP" className="w-36 mx-auto mb-2" />
+                  <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-36 mx-auto mb-2" />
                   <h3 className="font-bold text-primary">{CONTRACT_TITLE}</h3>
                   <p className="text-xs text-muted-foreground">{CONTRACT_SUBTITLE}</p>
                 </div>

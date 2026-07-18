@@ -73,7 +73,7 @@ export function buildPriceData(plan: string, paymentType: string, amount: number
   return {
     currency: 'brl' as const,
     product_data: {
-      name: `Clube Geek & Toys - Plano ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
+      name: `Clube GeekPop & Toys - Plano ${plan.charAt(0).toUpperCase() + plan.slice(1)}`,
     },
     unit_amount: Math.round(amount * 100),
     recurring: {

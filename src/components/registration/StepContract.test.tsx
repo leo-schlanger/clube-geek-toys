@@ -25,7 +25,7 @@ vi.mock('../../data/contract-content', () => ({
     { title: 'Clausula 1', content: ['Texto da clausula 1.'] },
     { title: 'Clausula 2', content: ['Texto da clausula 2.'] },
   ],
-  CONTRACT_TITLE: 'CLUBE GEEK & TOYS VIP',
+  CONTRACT_TITLE: 'CLUBE GEEKPOP & TOYS',
   CONTRACT_SUBTITLE: 'REGULAMENTO E TERMO DE ADESAO',
 }))
 
@@ -187,7 +187,7 @@ describe('StepContract', () => {
     it('renders contract title and subtitle', () => {
       render(<StepContract {...defaultProps} />)
 
-      expect(screen.getByText('CLUBE GEEK & TOYS VIP')).toBeInTheDocument()
+      expect(screen.getByText('CLUBE GEEKPOP & TOYS')).toBeInTheDocument()
       expect(screen.getByText('REGULAMENTO E TERMO DE ADESAO')).toBeInTheDocument()
     })
 
@@ -211,7 +211,7 @@ describe('StepContract', () => {
     it('renders plan badge with price', () => {
       render(<StepContract {...defaultProps} />)
 
-      expect(screen.getAllByText('Clube Geek & Toys').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
       expect(screen.getByText(/anual/i)).toBeInTheDocument()
       expect(screen.getByText(/149,99/)).toBeInTheDocument()
     })
@@ -392,7 +392,7 @@ describe('StepContract', () => {
 
       expect(screen.getByText('Joao Silva')).toBeInTheDocument()
       expect(screen.getByText(/123\.456\.789-01/)).toBeInTheDocument()
-      expect(screen.getAllByText('Clube Geek & Toys').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
     })
 
     it('has finalizar contrato button', async () => {

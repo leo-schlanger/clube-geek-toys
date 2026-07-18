@@ -108,7 +108,7 @@ describe('Subscribe', () => {
 
   it('renders the club plan name and discount', () => {
     render(<Subscribe />)
-    expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     // "15% em qualquer produto" aparece no card do plano e no hero
     expect(screen.getAllByText('15% em qualquer produto').length).toBeGreaterThanOrEqual(1)
   })
@@ -185,7 +185,7 @@ describe('Subscribe', () => {
 
   it('renders the footer with copyright', () => {
     render(<Subscribe />)
-    expect(screen.getByText(/2026 Geek & Toys/)).toBeInTheDocument()
+    expect(screen.getByText(/2026 GeekPop & Toys/)).toBeInTheDocument()
   })
 
   it('renders Termos and Privacidade links in footer', () => {

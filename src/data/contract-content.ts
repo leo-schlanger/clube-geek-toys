@@ -1,5 +1,5 @@
 /**
- * Contract Content - Regulamento do Clube Geek & Toys
+ * Contract Content - Regulamento do Clube GeekPop & Toys
  * Estruturado para geração de PDF com pdf-lib
  */
 
@@ -10,9 +10,9 @@ export interface ContractSection {
 
 export const CONTRACT_SECTIONS: ContractSection[] = [
   {
-    title: '1. SOBRE O CLUBE GEEK & TOYS',
+    title: '1. SOBRE O CLUBE GEEKPOP & TOYS',
     content: [
-      'O CLUBE GEEK & TOYS VIP é um programa de fidelidade exclusivo da loja GEEK & TOYS, destinado a oferecer vantagens, descontos e benefícios especiais aos seus membros.',
+      'O CLUBE GEEKPOP & TOYS é um programa de fidelidade exclusivo da loja GEEKPOP & TOYS, destinado a oferecer vantagens, descontos e benefícios especiais aos seus membros.',
       'A participação no Clube é voluntária e requer a adesão ao plano anual do Clube, mediante pagamento da anuidade correspondente.',
       'O Clube reserva-se o direito de modificar, suspender ou encerrar o programa a qualquer momento, mediante comunicação prévia de 30 (trinta) dias aos membros, por e-mail.',
     ],
@@ -20,8 +20,8 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
   {
     title: '2. PLANO E BENEFÍCIOS',
     content: [
-      'O Clube Geek & Toys possui um único plano, de vigência anual, no valor vigente no momento da adesão.',
-      'BENEFÍCIO PRINCIPAL: 15% (quinze por cento) de desconto em qualquer produto, válido tanto na loja física quanto na loja online do Clube Geek & Toys.',
+      'O Clube GeekPop & Toys possui um único plano, de vigência anual, no valor vigente no momento da adesão.',
+      'BENEFÍCIO PRINCIPAL: 15% (quinze por cento) de desconto em qualquer produto, válido tanto na loja física quanto na loja online do Clube GeekPop & Toys.',
       'BENEFÍCIOS ADICIONAIS: brinde especial de boas-vindas e entrada gratuita nos eventos participantes promovidos ou apoiados pela loja.',
       'Os benefícios são válidos apenas durante a vigência da assinatura e não são cumulativos com outras promoções, salvo indicação expressa.',
     ],
@@ -89,9 +89,9 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
   },
 ]
 
-export const CONTRACT_TITLE = 'CLUBE GEEK & TOYS VIP'
+export const CONTRACT_TITLE = 'CLUBE GEEKPOP & TOYS'
 export const CONTRACT_SUBTITLE = 'REGULAMENTO E TERMO DE ADESÃO'
 
-export const CONTRACT_DECLARATION = `Declaro que li integralmente o presente Regulamento e Termo de Adesão do Clube Geek & Toys VIP, compreendi todas as suas cláusulas e condições, e manifesto minha livre e espontânea concordância com todos os termos aqui estabelecidos.
+export const CONTRACT_DECLARATION = `Declaro que li integralmente o presente Regulamento e Termo de Adesão do Clube GeekPop & Toys, compreendi todas as suas cláusulas e condições, e manifesto minha livre e espontânea concordância com todos os termos aqui estabelecidos.
 
 Declaro ainda que as informações por mim fornecidas são verdadeiras e que estou ciente de que a falsidade nas declarações pode acarretar o cancelamento da minha participação no Clube, sem direito a reembolso.`

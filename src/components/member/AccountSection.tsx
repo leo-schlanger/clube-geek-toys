@@ -117,7 +117,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
             Meu Contrato
           </CardTitle>
           <CardDescription>
-            Seu termo de adesão ao Clube Geek & Toys
+            Seu termo de adesão ao Clube GeekPop & Toys
           </CardDescription>
         </CardHeader>
         <CardContent>

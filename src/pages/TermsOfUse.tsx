@@ -20,13 +20,13 @@ export default function TermsOfUse() {
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Identificação</h2>
                             <p><strong>N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA</strong></p>
-                            <p>Nome Fantasia: <strong>GEEK & TOYS</strong></p>
+                            <p>Nome Fantasia: <strong>GEEKPOP & TOYS</strong></p>
                             <p>CNPJ: 52.846.344/0001-10</p>
                             <p>Endereço: Rua Barata Ribeiro, 181, Loja J - Copacabana, Rio de Janeiro - RJ, CEP 22.011-001</p>
                             <p>E-mail: <a href="mailto:contato@geeketoys.com.br" className="text-primary hover:underline">contato@geeketoys.com.br</a></p>
                         </section>
 
-                        <p>Ao utilizar os sites da <strong>Geek & Toys</strong> e o <strong>Clube de Vantagens</strong>, você concorda com os seguintes termos, elaborados em conformidade com o Código de Defesa do Consumidor (Lei nº 8.078/90) e demais legislações aplicáveis:</p>
+                        <p>Ao utilizar os sites da <strong>GeekPop & Toys</strong> e o <strong>Clube de Vantagens</strong>, você concorda com os seguintes termos, elaborados em conformidade com o Código de Defesa do Consumidor (Lei nº 8.078/90) e demais legislações aplicáveis:</p>
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">1. O Clube de Vantagens</h2>
@@ -85,7 +85,7 @@ export default function TermsOfUse() {
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">7. Propriedade Intelectual</h2>
-                            <p>Todo o conteúdo (logos, textos, imagens, software) é propriedade da Geek & Toys ou de seus licenciadores, protegido pela Lei de Direitos Autorais (Lei nº 9.610/98). É proibida a reprodução sem autorização expressa.</p>
+                            <p>Todo o conteúdo (logos, textos, imagens, software) é propriedade da GeekPop & Toys ou de seus licenciadores, protegido pela Lei de Direitos Autorais (Lei nº 9.610/98). É proibida a reprodução sem autorização expressa.</p>
                         </section>
 
                         <section className="space-y-3">

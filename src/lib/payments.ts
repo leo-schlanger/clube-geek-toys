@@ -147,7 +147,7 @@ export async function createCardPayment(
       status?: string
     }>('/checkout/card/create', {
       amount,
-      description: `Clube Geek & Toys - Plano ${planName}`,
+      description: `Clube GeekPop & Toys - Plano ${planName}`,
       payer_email: payerEmail,
       payer_name: payerName,
       external_reference: memberId,

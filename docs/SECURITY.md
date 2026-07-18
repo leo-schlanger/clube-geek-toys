@@ -1,4 +1,4 @@
-# Segurança — Clube Geek & Toys
+# Segurança — Clube GeekPop & Toys
 
 > **Última atualização:** 19 de Abril de 2026
 

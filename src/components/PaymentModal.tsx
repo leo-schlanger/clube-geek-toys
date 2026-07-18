@@ -166,7 +166,7 @@ export function PaymentModal({
     try {
       const pix = await generatePixPayment(
         amount,
-        `Clube Geek & Toys - Plano ${planData.name}`,
+        `Clube GeekPop & Toys - Plano ${planData.name}`,
         memberEmail,
         memberId
       )
@@ -220,7 +220,7 @@ export function PaymentModal({
       } else {
         const res = await api.post<{ clientSecret: string; paymentIntentId: string }>('/checkout/card/create', {
           amount,
-          description: `Clube Geek & Toys - Plano ${planData.name}`,
+          description: `Clube GeekPop & Toys - Plano ${planData.name}`,
           payer_email: memberEmail,
           payer_name: memberName,
           external_reference: memberId,

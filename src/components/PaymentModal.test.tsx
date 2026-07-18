@@ -98,7 +98,7 @@ describe('PaymentModal', () => {
   it('renders with plan name and price', () => {
     renderModal()
     expect(screen.getByText('Pagamento')).toBeInTheDocument()
-    expect(screen.getAllByText(/Clube Geek & Toys/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/Clube GeekPop & Toys/).length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText(/149,99/).length).toBeGreaterThanOrEqual(1)
   })
 
@@ -174,7 +174,7 @@ describe('PaymentModal', () => {
     })
     expect(mockGeneratePixPayment).toHaveBeenCalledWith(
       149.99,
-      'Clube Geek & Toys - Plano Clube Geek & Toys',
+      'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
       'test@example.com',
       'member-123'
     )

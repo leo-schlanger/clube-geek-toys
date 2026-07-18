@@ -1,6 +1,6 @@
-# Clube Geek & Toys
+# Clube GeekPop & Toys
 
-Plataforma completa de clube de vantagens para a loja **Geek & Toys** -- cadastro, assinatura digital, pagamentos recorrentes, carteirinha digital, PDV, loja e-commerce propria e painel administrativo.
+Plataforma completa de clube de vantagens para a loja **GeekPop & Toys** -- cadastro, assinatura digital, pagamentos recorrentes, carteirinha digital, PDV, loja e-commerce propria e painel administrativo.
 
 > **Stack**: React 19 + Vite | Node.js + Express | PostgreSQL | Stripe | Docker | Nginx | AzuraCast
 
@@ -8,7 +8,7 @@ Plataforma completa de clube de vantagens para a loja **Geek & Toys** -- cadastr
 
 ## Sobre o Projeto
 
-A **Geek & Toys** e uma loja em Copacabana, Rio de Janeiro, pioneira do Funko Pop no Brasil, com mais de 15 anos de atuacao no mercado geek. O **Clube Geek & Toys** e o programa de fidelidade digital da loja, oferecendo desconto exclusivo em qualquer produto, brinde especial e entrada gratuita em eventos participantes.
+A **GeekPop & Toys** e uma loja em Copacabana, Rio de Janeiro, pioneira do Funko Pop no Brasil, com mais de 15 anos de atuacao no mercado geek. O **Clube GeekPop & Toys** e o programa de fidelidade digital da loja, oferecendo desconto exclusivo em qualquer produto, brinde especial e entrada gratuita em eventos participantes.
 
 A plataforma inclui:
 
@@ -25,9 +25,9 @@ A plataforma inclui:
 
 Um unico plano anual, sem opcao mensal e sem tiers.
 
-| Plano                 | Anual     | Beneficios                                                                                                               |
-| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Clube Geek & Toys** | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
+| Plano                    | Anual     | Beneficios                                                                                                               |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Clube GeekPop & Toys** | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
 
 ---
 
@@ -254,11 +254,11 @@ Detalhes completos em `scripts/radio/README.md`.
 
 ## Contato
 
-**Geek & Toys** -- Copacabana, Rio de Janeiro, RJ
+**GeekPop & Toys** -- Copacabana, Rio de Janeiro, RJ
 
 - Site: [geeketoys.com.br](https://geeketoys.com.br)
 - Instagram: [@gaborratoys](https://instagram.com/gaborratoys)
-- Facebook: [Geek & Toys Collection](https://facebook.com/geekandtoyscollection)
+- Facebook: [GeekPop & Toys Collection](https://facebook.com/geekandtoyscollection)
 - TikTok: [@gaborratoys](https://tiktok.com/@gaborratoys)
 - WhatsApp: [Contato](https://wa.me/5521972524776)
 
@@ -266,4 +266,4 @@ Detalhes completos em `scripts/radio/README.md`.
 
 ## Licenca
 
-Este repositorio e **proprietario**. O codigo e publicado para fins de portfolio e referencia tecnica. Todos os direitos reservados a Geek & Toys.
+Este repositorio e **proprietario**. O codigo e publicado para fins de portfolio e referencia tecnica. Todos os direitos reservados a GeekPop & Toys.

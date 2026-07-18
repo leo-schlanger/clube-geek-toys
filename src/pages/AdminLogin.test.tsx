@@ -96,7 +96,7 @@ describe('AdminLogin', () => {
 
   it('renders the description text', () => {
     render(<AdminLogin />)
-    expect(screen.getByText('Geek & Toys - Acesso Restrito')).toBeInTheDocument()
+    expect(screen.getByText('GeekPop & Toys - Acesso Restrito')).toBeInTheDocument()
   })
 
   it('renders the footer text', () => {

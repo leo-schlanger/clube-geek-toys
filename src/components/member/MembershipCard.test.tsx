@@ -49,7 +49,7 @@ describe('MembershipCard', () => {
 
   it('renders the club plan badge', () => {
     render(<MembershipCard member={createMember()} />)
-    expect(screen.getByText('Clube Geek & Toys')).toBeInTheDocument()
+    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
   })
 
   it('displays formatted expiry date', () => {

@@ -21,7 +21,7 @@ describe('PLANS', () => {
 describe('CLUB_PLAN', () => {
   it('deve ter id e nome corretos', () => {
     expect(CLUB_PLAN.id).toBe('club')
-    expect(CLUB_PLAN.name).toBe('Clube Geek & Toys')
+    expect(CLUB_PLAN.name).toBe('Clube GeekPop & Toys')
   })
 
   it('deve ter preço anual de 149.99', () => {
