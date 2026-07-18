@@ -5,7 +5,22 @@
 
 import { logger } from './logger'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+/**
+ * Resolve the API base URL for the current host. The club runs on two mirror
+ * domains (geeketoys.com.br and geekpoptoys.com.br); the SPA must talk to the API
+ * on the SAME registrable domain it was served from so requests stay same-site
+ * (cookies ride, no cross-domain CORS). Falls back to VITE_API_URL on localhost.
+ */
+function resolveApiUrl(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host.endsWith('geekpoptoys.com.br')) return 'https://api.geekpoptoys.com.br'
+    if (host.endsWith('geeketoys.com.br')) return 'https://api.geeketoys.com.br'
+  }
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001'
+}
+
+const API_URL = resolveApiUrl()
 const DEFAULT_TIMEOUT = 15000
 const MAX_RETRIES = 3
 const BASE_DELAY = 1000

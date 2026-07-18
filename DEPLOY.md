@@ -197,6 +197,10 @@ O nginx atua como reverse proxy central:
 
 ### Emissão inicial
 
+O clube roda em **dois domínios espelho**: `geeketoys.com.br` e `geekpoptoys.com.br`.
+Os mesmos subdomínios (club, admin/adm, shop, api, analytics, radio) valem para os dois,
+e o certificado SAN único cobre ambos.
+
 ```bash
 docker compose run --rm certbot certonly \
   --webroot -w /var/www/certbot \
@@ -206,13 +210,20 @@ docker compose run --rm certbot certonly \
   -d shop.geeketoys.com.br \
   -d api.geeketoys.com.br \
   -d analytics.geeketoys.com.br \
-  -d radio.geeketoys.com.br
+  -d radio.geeketoys.com.br \
+  -d club.geekpoptoys.com.br \
+  -d admin.geekpoptoys.com.br \
+  -d adm.geekpoptoys.com.br \
+  -d shop.geekpoptoys.com.br \
+  -d api.geekpoptoys.com.br \
+  -d analytics.geekpoptoys.com.br \
+  -d radio.geekpoptoys.com.br
 ```
 
-### Adicionar um subdomínio ao cert existente (ex.: `shop`)
+### Adicionar um subdomínio/domínio ao cert existente
 
-Use `--expand` para incluir um novo domínio mantendo os já emitidos. Pré-requisito:
-o registro DNS `A/CNAME` de `shop.geeketoys.com.br` já apontando para a VPS.
+Use `--expand` para incluir novos domínios mantendo os já emitidos. Pré-requisito: os
+registros DNS `A/CNAME` (ex.: `*.geekpoptoys.com.br`) já apontando para a VPS.
 
 ```bash
 docker compose run --rm certbot certonly --webroot -w /var/www/certbot --expand \
@@ -222,9 +233,16 @@ docker compose run --rm certbot certonly --webroot -w /var/www/certbot --expand 
   -d shop.geeketoys.com.br \
   -d api.geeketoys.com.br \
   -d analytics.geeketoys.com.br \
-  -d radio.geeketoys.com.br
+  -d radio.geeketoys.com.br \
+  -d club.geekpoptoys.com.br \
+  -d admin.geekpoptoys.com.br \
+  -d adm.geekpoptoys.com.br \
+  -d shop.geekpoptoys.com.br \
+  -d api.geekpoptoys.com.br \
+  -d analytics.geekpoptoys.com.br \
+  -d radio.geekpoptoys.com.br
 
-# recarrega o nginx do clube com o server block novo + cert atualizado
+# recarrega o nginx do clube com os server blocks + cert atualizado
 docker compose up -d --force-recreate nginx
 ```
 

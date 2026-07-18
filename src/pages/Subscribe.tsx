@@ -3,11 +3,13 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardFooter } from '../components/ui/card'
 import { CLUB_PLAN } from '../types'
 import { formatCurrency } from '../lib/utils'
+import { getShopUrl } from '../lib/subdomain'
 import { Check, X, Sparkles, ArrowRight, Shield, Zap, Gift, CreditCard, ShoppingBag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import RadioMiniPlayer from '../components/RadioMiniPlayer'
 
 export default function Subscribe() {
+  const shopUrl = getShopUrl()
   const extraBenefits = [
     'Carteirinha digital com QR Code',
     'Desconto válido na loja física e online',
@@ -23,7 +25,7 @@ export default function Subscribe() {
             <img src="/logo-vip.png" alt="Geek & Toys VIP" className="h-10 sm:h-12" />
           </Link>
           <div className="flex items-center gap-3">
-            <a href="https://shop.geeketoys.com.br" target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground hidden sm:inline transition-colors">
+            <a href={shopUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground hidden sm:inline transition-colors">
               Visite a loja
             </a>
             <Link to="/login">
@@ -229,7 +231,7 @@ export default function Subscribe() {
         <p className="text-xs text-muted-foreground mb-1">club.geeketoys.com.br</p>
         <p className="text-muted-foreground text-xs">&copy; 2026 Geek & Toys. Todos os direitos reservados.</p>
         <p className="mt-3 text-xs flex flex-wrap justify-center gap-3">
-          <a href="https://shop.geeketoys.com.br" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+          <a href={shopUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             Visite a loja
           </a>
           <Link to="/termos" className="text-muted-foreground hover:text-foreground">Termos</Link>
