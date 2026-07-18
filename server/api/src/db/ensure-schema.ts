@@ -62,26 +62,33 @@ export async function ensureSchema(): Promise<void> {
     `);
 
     // ─── Single-plan migration (008) — collapse plans to 'club', drop points ────
-    // Safe on a fresh model (no real members). Normalize data first, then drop the
-    // legacy inline CHECK constraints, the points column and the point_transactions table.
-    await query(`UPDATE members SET plan = 'club' WHERE plan <> 'club'`);
-    await query(`UPDATE members SET payment_type = 'annual' WHERE payment_type <> 'annual'`);
-    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_plan_check`);
-    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_plan`);
-    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_payment_type_check`);
-    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_points_non_negative`);
-    await query(`DROP TABLE IF EXISTS point_transactions CASCADE`);
-    await query(`ALTER TABLE members DROP COLUMN IF EXISTS points`);
-    await query(`ALTER TABLE members ALTER COLUMN plan SET DEFAULT 'club'`);
-    await query(`ALTER TABLE members ALTER COLUMN payment_type SET DEFAULT 'annual'`);
+    // Wrapped in its own try/catch so a failure here can NEVER skip later blocks
+    // (e.g. the shop tables). Order matters: DROP the legacy CHECK constraints
+    // BEFORE normalizing plan→'club', otherwise the UPDATE violates the old
+    // `plan IN ('silver','gold','black')` constraint and the whole sync aborts.
+    try {
+      await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_plan_check`);
+      await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_plan`);
+      await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_payment_type_check`);
+      await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_payment_type`);
+      await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_points_non_negative`);
+      await query(`UPDATE members SET plan = 'club' WHERE plan <> 'club'`);
+      await query(`UPDATE members SET payment_type = 'annual' WHERE payment_type <> 'annual'`);
+      await query(`DROP TABLE IF EXISTS point_transactions CASCADE`);
+      await query(`ALTER TABLE members DROP COLUMN IF EXISTS points`);
+      await query(`ALTER TABLE members ALTER COLUMN plan SET DEFAULT 'club'`);
+      await query(`ALTER TABLE members ALTER COLUMN payment_type SET DEFAULT 'annual'`);
+      await query(`DO $$ BEGIN
+        ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('club'));
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      await query(`DO $$ BEGIN
+        ALTER TABLE members ADD CONSTRAINT chk_members_payment_type CHECK (payment_type IN ('annual'));
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    } catch (err) {
+      console.error('[SCHEMA] single-plan migration block failed (non-fatal):', err);
+    }
 
     // ─── CHECK constraints for enum columns ────────────────────────
-    await query(`DO $$ BEGIN
-      ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('club'));
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-    await query(`DO $$ BEGIN
-      ALTER TABLE members ADD CONSTRAINT chk_members_payment_type CHECK (payment_type IN ('annual'));
-    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     await query(`DO $$ BEGIN
       ALTER TABLE members ADD CONSTRAINT chk_members_status CHECK (status IN ('active','pending','inactive','expired'));
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);

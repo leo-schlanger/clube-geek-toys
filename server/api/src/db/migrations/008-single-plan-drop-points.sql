@@ -11,15 +11,17 @@
 
 BEGIN;
 
--- 1. Normalize any existing rows to the new model.
-UPDATE members SET plan = 'club' WHERE plan <> 'club';
-UPDATE members SET payment_type = 'annual' WHERE payment_type <> 'annual';
-
--- 2. Drop legacy CHECK constraints (inline names from schema.sql + previously named ones).
+-- 1. Drop legacy CHECK constraints FIRST (inline names from schema.sql + previously named
+-- ones). Must come before the normalize UPDATE, else `plan='club'` violates the old
+-- `plan IN ('silver','gold','black')` constraint and the whole migration aborts.
 ALTER TABLE members DROP CONSTRAINT IF EXISTS members_plan_check;
 ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_plan;
 ALTER TABLE members DROP CONSTRAINT IF EXISTS members_payment_type_check;
 ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_points_non_negative;
+
+-- 2. Normalize any existing rows to the new model.
+UPDATE members SET plan = 'club' WHERE plan <> 'club';
+UPDATE members SET payment_type = 'annual' WHERE payment_type <> 'annual';
 
 -- 3. Remove the points system.
 DROP TABLE IF EXISTS point_transactions CASCADE;
