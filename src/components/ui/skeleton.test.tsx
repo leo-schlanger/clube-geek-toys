@@ -23,10 +23,14 @@ describe('Skeleton', () => {
 })
 
 describe('SkeletonCard', () => {
-  it('should render card skeleton', () => {
+  it('should render card skeleton with inner elements', () => {
     const { container } = render(<SkeletonCard />)
+    expect(container.firstChild).toHaveClass('space-y-3')
+    // Has a rounded-xl skeleton inside
     expect(container.querySelector('.rounded-xl')).toBeInTheDocument()
-    expect(container.querySelector('.border')).toBeInTheDocument()
+    // Has pulse animations
+    const pulses = container.querySelectorAll('.animate-pulse')
+    expect(pulses.length).toBeGreaterThanOrEqual(2)
   })
 
   it('should apply custom className', () => {
@@ -38,15 +42,16 @@ describe('SkeletonCard', () => {
 describe('SkeletonTable', () => {
   it('should render table skeleton with default 5 rows', () => {
     const { container } = render(<SkeletonTable />)
-    // Header + 5 rows = 6 items with flex gap-4
-    const rows = container.querySelectorAll('.flex.gap-4')
-    expect(rows.length).toBe(6) // 1 header + 5 rows
+    // 1 header skeleton + 5 row skeletons = 6 animate-pulse divs
+    const skeletons = container.querySelectorAll('.animate-pulse')
+    expect(skeletons.length).toBe(6)
   })
 
   it('should render custom number of rows', () => {
     const { container } = render(<SkeletonTable rows={3} />)
-    const rows = container.querySelectorAll('.flex.gap-4')
-    expect(rows.length).toBe(4) // 1 header + 3 rows
+    // 1 header + 3 rows = 4 animate-pulse divs
+    const skeletons = container.querySelectorAll('.animate-pulse')
+    expect(skeletons.length).toBe(4)
   })
 })
 
@@ -61,7 +66,8 @@ describe('SkeletonMemberCard', () => {
 describe('SkeletonStats', () => {
   it('should render 4 skeleton cards', () => {
     const { container } = render(<SkeletonStats />)
-    const cards = container.querySelectorAll('.rounded-xl.border')
+    // 4 SkeletonCard, each has space-y-3 wrapper
+    const cards = container.querySelectorAll('.space-y-3')
     expect(cards.length).toBe(4)
   })
 
