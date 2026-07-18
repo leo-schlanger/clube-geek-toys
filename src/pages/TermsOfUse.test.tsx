@@ -78,9 +78,9 @@ describe('TermsOfUse', () => {
     expect(matches.length).toBeGreaterThan(0)
   })
 
-  it('mentions plan types', () => {
+  it('mentions the single annual club plan', () => {
     renderPage()
-    expect(screen.getByText(/Silver, Gold ou Black/)).toBeInTheDocument()
+    expect(screen.getByText(/plano único de assinatura anual/i)).toBeInTheDocument()
   })
 
   it('mentions right of withdrawal (7 days)', () => {
@@ -93,8 +93,8 @@ describe('TermsOfUse', () => {
     expect(screen.getByText(/Stripe/)).toBeInTheDocument()
   })
 
-  it('mentions Black plan service discount rule', () => {
+  it('mentions the 15% product discount benefit', () => {
     renderPage()
-    expect(screen.getByText(/2º.*pagamento/i)).toBeInTheDocument()
+    expect(screen.getByText(/15% de desconto em qualquer produto/i)).toBeInTheDocument()
   })
 })

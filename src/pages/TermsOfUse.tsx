@@ -30,7 +30,7 @@ export default function TermsOfUse() {
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">1. O Clube de Vantagens</h2>
-                            <p>O Clube oferece descontos exclusivos em nossa loja física e online, brindes e acessos antecipados, dependendo do plano escolhido (Silver, Gold ou Black). Os benefícios específicos de cada plano estão detalhados na página de assinatura e no contrato de adesão.</p>
+                            <p>O Clube oferece um plano único de assinatura anual com descontos exclusivos em nossa loja física e online, brindes e acessos antecipados. Os benefícios estão detalhados na página de assinatura e no contrato de adesão.</p>
                         </section>
 
                         <section className="space-y-3">
@@ -45,7 +45,7 @@ export default function TermsOfUse() {
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">3. Assinaturas e Pagamentos</h2>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li>As assinaturas podem ser mensais ou anuais com renovação automática.</li>
+                                <li>A assinatura é anual, com renovação automática.</li>
                                 <li><strong>Direito de Arrependimento (Art. 49, CDC):</strong> O consumidor pode desistir da contratação no prazo de 7 (sete) dias a contar da assinatura, com reembolso integral dos valores pagos.</li>
                                 <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas não gera estorno de períodos já pagos.</li>
                                 <li>Os pagamentos são processados de forma segura via Stripe (PIX ou cartão de crédito).</li>
@@ -57,8 +57,8 @@ export default function TermsOfUse() {
                             <h2 className="text-2xl font-semibold text-foreground">4. Cancelamento e Rescisão</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>O cancelamento pode ser solicitado a qualquer momento pela área do membro ou por e-mail.</li>
-                                <li>Planos mensais não possuem fidelidade mínima.</li>
-                                <li>Planos anuais, após o período de arrependimento, não são reembolsáveis.</li>
+                                <li>A assinatura anual não possui fidelidade além do período já pago; o direito de arrependimento é de 7 (sete) dias a contar da assinatura.</li>
+                                <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas o período anual já pago não é reembolsável.</li>
                                 <li>Reservamo-nos o direito de cancelar assinaturas em caso de fraude, uso indevido ou violação destes termos.</li>
                             </ul>
                         </section>
@@ -76,9 +76,8 @@ export default function TermsOfUse() {
                             <h2 className="text-2xl font-semibold text-foreground">6. Limitação de Responsabilidade</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Os descontos são válidos apenas durante a vigência da assinatura e conforme disponibilidade.</li>
-                                <li>No Plano Black, o desconto em serviços (50%) passa a vigorar somente após a confirmação do 2º (segundo) pagamento da assinatura. O desconto em produtos (20%) é válido desde o primeiro pagamento.</li>
+                                <li>Os benefícios do plano incluem 15% de desconto em qualquer produto (loja física e online), brinde especial e entrada gratuita em eventos participantes.</li>
                                 <li>Não nos responsabilizamos por indisponibilidades temporárias do sistema por motivos técnicos ou de força maior.</li>
-                                <li>O programa de pontos está sujeito às regras específicas descritas no contrato de adesão.</li>
                                 <li>Esta limitação não se aplica a direitos garantidos pelo Código de Defesa do Consumidor.</li>
                             </ul>
                         </section>

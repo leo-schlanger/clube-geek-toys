@@ -26,8 +26,6 @@ function filtersToParams(filters: MemberFiltersState): URLSearchParams {
   if (filters.plans.length) params.set('plans', filters.plans.join(','))
   if (filters.expiryFrom) params.set('expiryFrom', filters.expiryFrom)
   if (filters.expiryTo) params.set('expiryTo', filters.expiryTo)
-  if (filters.pointsMin) params.set('pointsMin', filters.pointsMin)
-  if (filters.pointsMax) params.set('pointsMax', filters.pointsMax)
   if (filters.createdFrom) params.set('createdFrom', filters.createdFrom)
   if (filters.createdTo) params.set('createdTo', filters.createdTo)
   if (filters.sortBy !== 'name') params.set('sortBy', filters.sortBy)
@@ -52,8 +50,6 @@ function paramsToFilters(
     plans: (params.get('plans')?.split(',').filter(Boolean) || defaults.plans) as MemberFiltersState['plans'],
     expiryFrom: params.get('expiryFrom') || defaults.expiryFrom,
     expiryTo: params.get('expiryTo') || defaults.expiryTo,
-    pointsMin: params.get('pointsMin') || defaults.pointsMin,
-    pointsMax: params.get('pointsMax') || defaults.pointsMax,
     createdFrom: params.get('createdFrom') || defaults.createdFrom,
     createdTo: params.get('createdTo') || defaults.createdTo,
     sortBy: (params.get('sortBy') as MemberFiltersState['sortBy']) || defaults.sortBy,
@@ -103,7 +99,6 @@ export function useUrlFilters(defaultFilters: MemberFiltersState): UseUrlFilters
     if (filters.status.length) count++
     if (filters.plans.length) count++
     if (filters.expiryFrom || filters.expiryTo) count++
-    if (filters.pointsMin || filters.pointsMax) count++
     if (filters.createdFrom || filters.createdTo) count++
     if (filters.sortBy !== defaultFilters.sortBy) count++
     if (filters.sortOrder !== defaultFilters.sortOrder) count++

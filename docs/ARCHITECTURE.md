@@ -657,7 +657,7 @@ Loja (migration 009):
                               └──────────────┘
 ```
 
-**Total: 17 tabelas** (o sistema de pontos foi removido na migration 008; as tabelas da loja `categories`/`products`/`orders`/`order_items` foram adicionadas na migration 009)
+**Total: 16 tabelas** (o sistema de pontos foi removido na migration 008; as tabelas da loja `categories`/`products`/`orders`/`order_items` foram adicionadas na migration 009)
 
 ### Recursos do PostgreSQL
 

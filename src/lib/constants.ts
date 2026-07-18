@@ -15,7 +15,6 @@ export const TABLES = {
   MEMBERS: 'members',
   USERS: 'users',
   PAYMENTS: 'payments',
-  POINTS: 'point_transactions',
   AUDIT_LOGS: 'audit_logs',
   SUBSCRIPTIONS: 'subscriptions',
   SUBSCRIPTION_PAYMENTS: 'subscription_payments',
@@ -65,10 +64,6 @@ export const LIMITS = {
   INITIAL_RETRY_DELAY: 1000,
   /** Máximo de logs para exibir */
   MAX_LOGS_DISPLAY: 50,
-  /** Máximo de pontos por transação */
-  MAX_POINTS_PER_TRANSACTION: 10000,
-  /** Dias para expiração de pontos */
-  POINTS_EXPIRATION_DAYS: 365,
 } as const
 
 // =============================================================================

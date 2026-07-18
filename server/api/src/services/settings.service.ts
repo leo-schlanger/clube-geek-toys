@@ -4,7 +4,7 @@ import { auditLog } from '../utils/audit.js';
 /**
  * Settings persisted in the `config` table (key/JSONB pairs).
  *
- * Pattern: each setting key is a dotted path like `pricing.silver_monthly` and the value is
+ * Pattern: each setting key is a dotted path like `pricing.club_annual` and the value is
  * stored as JSONB. Defaults are returned when a key is missing, so the system keeps working
  * even before any explicit configuration has been saved.
  */

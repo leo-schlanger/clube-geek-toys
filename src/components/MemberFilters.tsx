@@ -19,11 +19,9 @@ export interface MemberFiltersState {
   plans: PlanType[]
   expiryFrom: string
   expiryTo: string
-  pointsMin: string
-  pointsMax: string
   createdFrom: string
   createdTo: string
-  sortBy: 'name' | 'points' | 'expiry' | 'created'
+  sortBy: 'name' | 'expiry' | 'created'
   sortOrder: 'asc' | 'desc'
 }
 
@@ -53,8 +51,6 @@ export const DEFAULT_FILTERS: MemberFiltersState = {
   plans: [],
   expiryFrom: '',
   expiryTo: '',
-  pointsMin: '',
-  pointsMax: '',
   createdFrom: '',
   createdTo: '',
   sortBy: 'name',
@@ -245,8 +241,6 @@ export function countActiveFilters(filters: MemberFiltersState): number {
   if (filters.plans.length > 0) count++
   if (filters.expiryFrom) count++
   if (filters.expiryTo) count++
-  if (filters.pointsMin) count++
-  if (filters.pointsMax) count++
   if (filters.createdFrom) count++
   if (filters.createdTo) count++
   if (filters.sortBy !== 'name' || filters.sortOrder !== 'asc') count++

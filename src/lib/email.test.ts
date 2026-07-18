@@ -33,7 +33,6 @@ import {
   sendPaymentConfirmedEmail,
   sendPaymentFailedEmail,
   sendRenewalReminderEmail,
-  sendPointsExpiringEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendContractEmail,
@@ -179,40 +178,6 @@ describe('Email API client', () => {
         member_id: 'member-1',
       })
       expect(result.success).toBe(true)
-    })
-  })
-
-  // ---- sendPointsExpiringEmail ----
-
-  describe('sendPointsExpiringEmail', () => {
-    it('should POST /email/send with points-expiring template', async () => {
-      mockedApi.post.mockResolvedValue({ data: { message: 'sent' }, status: 200 })
-
-      const result = await sendPointsExpiringEmail(
-        'user@test.com', 'Carlos', 500, '2026-08-01T00:00:00Z', 'member-1'
-      )
-
-      expect(mockedApi.post).toHaveBeenCalledWith('/email/send', {
-        template: 'points-expiring',
-        to: 'user@test.com',
-        variables: {
-          name: 'Carlos',
-          points: '500',
-          expiry_date: new Date('2026-08-01T00:00:00Z').toLocaleDateString('pt-BR'),
-        },
-        member_id: 'member-1',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('should convert points number to string', async () => {
-      mockedApi.post.mockResolvedValue({ data: {}, status: 200 })
-
-      await sendPointsExpiringEmail('a@b.com', 'X', 1234, '2026-08-01')
-
-      const call = mockedApi.post.mock.calls[0]
-      const variables = call[1]?.variables as Record<string, string>
-      expect(variables.points).toBe('1234')
     })
   })
 

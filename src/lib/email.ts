@@ -2,7 +2,7 @@
  * Email client — sends emails via Express API (Resend)
  *
  * IMPORTANT: Variable names must match backend templates (English names):
- * name, amount, plan, expiry_date, points, verify_url, reset_url, etc.
+ * name, amount, plan, expiry_date, verify_url, reset_url, etc.
  */
 
 import { api } from './api-client'
@@ -102,24 +102,6 @@ export async function sendRenewalReminderEmail(
     variables: {
       name,
       expiry_date: new Date(expiryDate).toLocaleDateString('pt-BR'),
-    },
-    memberId,
-  })
-}
-
-/**
- * Send points expiring email
- */
-export async function sendPointsExpiringEmail(
-  email: string, name: string, points: number, expirationDate: string, memberId?: string
-): Promise<EmailResponse> {
-  return sendEmail({
-    template: 'points-expiring',
-    to: email,
-    variables: {
-      name,
-      points: points.toString(),
-      expiry_date: new Date(expirationDate).toLocaleDateString('pt-BR'),
     },
     memberId,
   })

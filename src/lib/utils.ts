@@ -101,38 +101,6 @@ export function getStatusLabel(status: string): string {
 }
 
 /**
- * Get plan label
- */
-export function getPlanLabel(plan: string): string {
-  switch (plan) {
-    case 'silver':
-      return 'Silver'
-    case 'gold':
-      return 'Gold'
-    case 'black':
-      return 'Black'
-    default:
-      return plan
-  }
-}
-
-/**
- * Get plan discount percentage
- */
-export function getPlanDiscount(plan: string): number {
-  switch (plan) {
-    case 'silver':
-      return 10
-    case 'gold':
-      return 15
-    case 'black':
-      return 20
-    default:
-      return 0
-  }
-}
-
-/**
  * Calculate days until expiry date
  */
 export function calculateDaysUntilExpiry(expiryDate: Date): number {

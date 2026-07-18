@@ -1,4 +1,4 @@
-# Deploy — Clube Geek & Toys
+# Deploy — Clube GeekPop & Toys
 
 > Guia completo de deploy e operação em produção.
 
@@ -113,7 +113,7 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 # Email (Resend)
 RESEND_API_KEY=re_...
-FROM_EMAIL=Clube Geek & Toys <contato@geeketoys.com.br>
+FROM_EMAIL=GeekPop & Toys <contato@geeketoys.com.br>
 ADMIN_EMAIL=geeketoys@gmail.com
 
 # URLs

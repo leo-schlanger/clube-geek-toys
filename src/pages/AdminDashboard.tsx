@@ -466,7 +466,7 @@ export default function AdminDashboard() {
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                       <h3 className="font-bold text-lg">Ponto de Venda (PDV)</h3>
-                      <p className="text-sm opacity-90">Registre compras e dê pontos aos membros</p>
+                      <p className="text-sm opacity-90">Verifique membros e o desconto do clube</p>
                     </div>
                     <Button
                       variant="secondary"

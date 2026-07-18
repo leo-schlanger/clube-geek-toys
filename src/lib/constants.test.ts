@@ -16,7 +16,6 @@ describe('TABLES', () => {
     expect(TABLES.MEMBERS).toBe('members')
     expect(TABLES.USERS).toBe('users')
     expect(TABLES.PAYMENTS).toBe('payments')
-    expect(TABLES.POINTS).toBe('point_transactions')
     expect(TABLES.AUDIT_LOGS).toBe('audit_logs')
   })
 })
@@ -47,8 +46,6 @@ describe('LIMITS', () => {
     expect(LIMITS.MAX_RETRIES).toBe(3)
     expect(LIMITS.INITIAL_RETRY_DELAY).toBe(1000)
     expect(LIMITS.MAX_LOGS_DISPLAY).toBe(50)
-    expect(LIMITS.MAX_POINTS_PER_TRANSACTION).toBe(10000)
-    expect(LIMITS.POINTS_EXPIRATION_DAYS).toBe(365)
   })
 })
 

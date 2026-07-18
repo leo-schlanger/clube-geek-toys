@@ -7,8 +7,6 @@ import {
   validateCPF,
   getStatusColor,
   getStatusLabel,
-  getPlanLabel,
-  getPlanDiscount,
   calculateDaysUntilExpiry,
   isExpired,
   formatDate,
@@ -233,54 +231,6 @@ describe('getStatusLabel', () => {
 
   it('should return empty string for empty string', () => {
     expect(getStatusLabel('')).toBe('')
-  })
-})
-
-// ── getPlanLabel ─────────────────────────────────────────────────
-
-describe('getPlanLabel', () => {
-  it('should return Silver', () => {
-    expect(getPlanLabel('silver')).toBe('Silver')
-  })
-
-  it('should return Gold', () => {
-    expect(getPlanLabel('gold')).toBe('Gold')
-  })
-
-  it('should return Black', () => {
-    expect(getPlanLabel('black')).toBe('Black')
-  })
-
-  it('should return the plan itself for unknown plan', () => {
-    expect(getPlanLabel('unknown')).toBe('unknown')
-  })
-
-  it('should return empty string for empty string', () => {
-    expect(getPlanLabel('')).toBe('')
-  })
-})
-
-// ── getPlanDiscount ──────────────────────────────────────────────
-
-describe('getPlanDiscount', () => {
-  it('should return 10 for silver', () => {
-    expect(getPlanDiscount('silver')).toBe(10)
-  })
-
-  it('should return 15 for gold', () => {
-    expect(getPlanDiscount('gold')).toBe(15)
-  })
-
-  it('should return 20 for black', () => {
-    expect(getPlanDiscount('black')).toBe(20)
-  })
-
-  it('should return 0 for unknown plan', () => {
-    expect(getPlanDiscount('unknown')).toBe(0)
-  })
-
-  it('should return 0 for empty string', () => {
-    expect(getPlanDiscount('')).toBe(0)
   })
 })
 

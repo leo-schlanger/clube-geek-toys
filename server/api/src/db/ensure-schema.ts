@@ -46,7 +46,7 @@ export async function ensureSchema(): Promise<void> {
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_reason TEXT
     `);
 
-    // ─── Payment count — Black plan service discount requires 2nd payment ────
+    // ─── Payment count — contador de pagamentos (usado em relatórios/webhook) ────
     await query(`
       ALTER TABLE members ADD COLUMN IF NOT EXISTS payment_count INTEGER NOT NULL DEFAULT 0
     `);

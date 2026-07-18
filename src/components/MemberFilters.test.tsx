@@ -284,15 +284,6 @@ describe('countActiveFilters', () => {
     expect(countActiveFilters(filters)).toBe(2)
   })
 
-  it('should count each points field separately', () => {
-    const filters = {
-      ...DEFAULT_FILTERS,
-      pointsMin: '100',
-      pointsMax: '500',
-    }
-    expect(countActiveFilters(filters)).toBe(2)
-  })
-
   it('should count created date fields', () => {
     const filters = {
       ...DEFAULT_FILTERS,
@@ -303,12 +294,12 @@ describe('countActiveFilters', () => {
   })
 
   it('should count non-default sort as 1', () => {
-    expect(countActiveFilters({ ...DEFAULT_FILTERS, sortBy: 'points' })).toBe(1)
+    expect(countActiveFilters({ ...DEFAULT_FILTERS, sortBy: 'expiry' })).toBe(1)
     expect(countActiveFilters({ ...DEFAULT_FILTERS, sortOrder: 'desc' })).toBe(1)
   })
 
   it('should not double-count sort when both sortBy and sortOrder differ', () => {
-    expect(countActiveFilters({ ...DEFAULT_FILTERS, sortBy: 'points', sortOrder: 'desc' })).toBe(1)
+    expect(countActiveFilters({ ...DEFAULT_FILTERS, sortBy: 'expiry', sortOrder: 'desc' })).toBe(1)
   })
 
   it('should count all filters combined', () => {
@@ -318,16 +309,14 @@ describe('countActiveFilters', () => {
       plans: ['gold'],
       expiryFrom: '2025-01-01',
       expiryTo: '2025-12-31',
-      pointsMin: '0',
-      pointsMax: '100',
       createdFrom: '2024-01-01',
       createdTo: '2024-12-31',
-      sortBy: 'points',
+      sortBy: 'expiry',
       sortOrder: 'desc',
     }
     // search(1) + status(1) + plans(1) + expiryFrom(1) + expiryTo(1)
-    // + pointsMin(1) + pointsMax(1) + createdFrom(1) + createdTo(1) + sort(1)
-    expect(countActiveFilters(filters)).toBe(10)
+    // + createdFrom(1) + createdTo(1) + sort(1)
+    expect(countActiveFilters(filters)).toBe(8)
   })
 })
 
@@ -339,8 +328,6 @@ describe('DEFAULT_FILTERS', () => {
     expect(DEFAULT_FILTERS.plans).toEqual([])
     expect(DEFAULT_FILTERS.expiryFrom).toBe('')
     expect(DEFAULT_FILTERS.expiryTo).toBe('')
-    expect(DEFAULT_FILTERS.pointsMin).toBe('')
-    expect(DEFAULT_FILTERS.pointsMax).toBe('')
     expect(DEFAULT_FILTERS.createdFrom).toBe('')
     expect(DEFAULT_FILTERS.createdTo).toBe('')
     expect(DEFAULT_FILTERS.sortBy).toBe('name')

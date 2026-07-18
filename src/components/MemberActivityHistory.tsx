@@ -13,8 +13,6 @@ import {
   CreditCard,
   CheckCircle,
   XCircle,
-  Coins,
-  Gift,
   FileText,
 } from 'lucide-react'
 import { getMemberLogs, type AuditLog } from '../lib/logs'
@@ -27,9 +25,6 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; icon: typeof
   payment_created: { label: 'Pagamento Iniciado', color: 'text-blue-500', icon: CreditCard },
   payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-500', icon: CheckCircle },
   payment_failed: { label: 'Pagamento Falhou', color: 'text-red-500', icon: XCircle },
-  points_added: { label: 'Pontos Recebidos', color: 'text-purple-500', icon: Coins },
-  bonus_points_added: { label: 'Pontos Bônus', color: 'text-purple-500', icon: Gift },
-  points_redeemed: { label: 'Pontos Resgatados', color: 'text-blue-500', icon: Gift },
 }
 
 function getActionConfig(action: string) {

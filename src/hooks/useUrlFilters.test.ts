@@ -17,8 +17,6 @@ const defaultFilters: MemberFiltersState = {
   plans: [],
   expiryFrom: '',
   expiryTo: '',
-  pointsMin: '',
-  pointsMax: '',
   createdFrom: '',
   createdTo: '',
   sortBy: 'name',
@@ -75,22 +73,12 @@ describe('useUrlFilters', () => {
     expect(result.current.activeFiltersCount).toBe(1) // Expiry range counts as one
   })
 
-  it('should parse points range filters', () => {
-    currentParams = new URLSearchParams('pointsMin=100&pointsMax=500')
-
-    const { result } = renderHook(() => useUrlFilters(defaultFilters))
-
-    expect(result.current.filters.pointsMin).toBe('100')
-    expect(result.current.filters.pointsMax).toBe('500')
-    expect(result.current.activeFiltersCount).toBe(1) // Points range counts as one
-  })
-
   it('should parse sortBy and sortOrder', () => {
-    currentParams = new URLSearchParams('sortBy=points&sortOrder=desc')
+    currentParams = new URLSearchParams('sortBy=expiry&sortOrder=desc')
 
     const { result } = renderHook(() => useUrlFilters(defaultFilters))
 
-    expect(result.current.filters.sortBy).toBe('points')
+    expect(result.current.filters.sortBy).toBe('expiry')
     expect(result.current.filters.sortOrder).toBe('desc')
     expect(result.current.activeFiltersCount).toBe(2) // sortBy and sortOrder each count
   })
@@ -104,7 +92,7 @@ describe('useUrlFilters', () => {
   })
 
   it('should count multiple active filters', () => {
-    currentParams = new URLSearchParams('search=test&status=active&plans=gold&sortBy=points')
+    currentParams = new URLSearchParams('search=test&status=active&plans=gold&sortBy=expiry')
 
     const { result } = renderHook(() => useUrlFilters(defaultFilters))
 
@@ -120,7 +108,7 @@ describe('useUrlFilters', () => {
         ...defaultFilters,
         search: 'test',
         status: ['active'],
-        sortBy: 'points',
+        sortBy: 'expiry',
       })
     })
 
@@ -129,7 +117,7 @@ describe('useUrlFilters', () => {
     const calledParams = mockSetSearchParams.mock.calls[0][0] as URLSearchParams
     expect(calledParams.get('search')).toBe('test')
     expect(calledParams.get('status')).toBe('active')
-    expect(calledParams.get('sortBy')).toBe('points')
+    expect(calledParams.get('sortBy')).toBe('expiry')
     // Default values should not be set
     expect(calledParams.has('sortOrder')).toBe(false)
   })

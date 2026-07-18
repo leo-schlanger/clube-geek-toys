@@ -195,9 +195,8 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Sua conta no <strong>Clube GeekPop & Toys</strong> foi ativada com sucesso${v.plan ? ` no plano <strong>${v.plan}</strong>` : ''}. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>
         ${featureList([
-          '🏷️ Descontos exclusivos em produtos e serviços',
-          '⭐ Acúmulo de pontos a cada compra',
-          '🎁 Resgate de prêmios e benefícios',
+          '🏷️ 15% de desconto em qualquer produto',
+          '🎁 Brinde especial + eventos',
           '📋 Carteirinha digital com QR Code',
         ])}`,
       cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
@@ -301,7 +300,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <h2 style="color:#4ade80;margin:0 0 12px">Assinatura reativada! ▶️</h2>
         <p>Olá, <strong>${name}</strong>!</p>
         <p>Sua assinatura foi reativada com sucesso. As cobranças automáticas foram retomadas e todos os benefícios do seu plano estão ativos.</p>
-        ${infoBox('✅ Seus descontos e pontos voltam a valer normalmente.<br>💳 A próxima cobrança será feita automaticamente.')}`,
+        ${infoBox('✅ Seus benefícios voltam a valer normalmente.<br>💳 A próxima cobrança será feita automaticamente.')}`,
       cta: { text: 'Ver Minha Conta', url: `${frontendUrl}/membro` },
     },
 
@@ -312,8 +311,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <h2 style="color:#f87171;margin:0 0 12px">Assinatura cancelada</h2>
         <p>Olá, <strong>${name}</strong>.</p>
         <p>Sua assinatura foi cancelada. Sentiremos sua falta!</p>
-        <p>Lembre-se: você pode voltar a qualquer momento e reassinar para aproveitar todos os benefícios do clube.</p>
-        ${infoBox('💡 Seus pontos acumulados continuam válidos até a data de expiração.')}`,
+        <p>Lembre-se: você pode voltar a qualquer momento e reassinar para aproveitar todos os benefícios do clube.</p>`,
       cta: { text: 'Voltar ao Clube', url: frontendUrl },
     },
 
@@ -328,7 +326,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Atualizar Cartão', url: `${frontendUrl}/membro` },
     },
 
-    // ─── RENOVAÇÃO / PONTOS ─────────────────────────────
+    // ─── RENOVAÇÃO ──────────────────────────────────────
     'renewal-reminder': {
       subject: 'Sua assinatura expira em breve — Clube GeekPop & Toys',
       preheader: `${name}, renove para continuar aproveitando os benefícios!`,
@@ -338,8 +336,8 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Sua assinatura do plano <strong>${v.plan || ''}</strong> expira em <strong>${v.expiry_date || 'alguns dias'}</strong>.</p>
         <p>Renove agora para não perder seus benefícios:</p>
         ${featureList([
-          '🏷️ Descontos exclusivos',
-          '⭐ Acúmulo de pontos',
+          '🏷️ 15% de desconto em qualquer produto',
+          '🎁 Brinde especial',
           '🎮 Acesso a eventos especiais',
         ])}`,
       cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
@@ -353,9 +351,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Olá, <strong>${name}</strong>.</p>
         <p>Sua assinatura do plano <strong>${v.plan || ''}</strong> expirou. Enquanto inativa, você não poderá aproveitar os benefícios do clube:</p>
         ${featureList([
-          '❌ Descontos em produtos e serviços suspensos',
-          '❌ Acúmulo de pontos pausado',
-          '✅ Seus pontos acumulados continuam válidos até a data de expiração',
+          '❌ Desconto do clube suspenso enquanto a assinatura estiver inativa',
         ])}
         <p>Renove agora e volte a aproveitar tudo!</p>`,
       cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },

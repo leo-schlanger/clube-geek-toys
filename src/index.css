@@ -163,19 +163,6 @@
   backdrop-filter: blur(4px);
 }
 
-/* Plan card styles */
-.plan-silver {
-  background: linear-gradient(135deg, #94a3b8, #64748b);
-}
-
-.plan-gold {
-  background: linear-gradient(135deg, #fbbf24, #d97706);
-}
-
-.plan-black {
-  background: linear-gradient(135deg, #374151, #111827);
-}
-
 /* Hero background effects */
 .hero-glow {
   position: relative;

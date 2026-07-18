@@ -722,7 +722,7 @@ describe('AdminDashboard', () => {
   it('displays PDV card description', async () => {
     render(<AdminDashboard />)
     await waitFor(() => {
-      expect(screen.getByText('Registre compras e dê pontos aos membros')).toBeInTheDocument()
+      expect(screen.getByText('Verifique membros e o desconto do clube')).toBeInTheDocument()
     })
   })
 
