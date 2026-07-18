@@ -6,10 +6,10 @@
 
 O Clube Geek & Toys opera duas stacks independentes compartilhando a mesma VPS:
 
-| Stack               | Diretorio na VPS        | Proposito                                                 |
-| ------------------- | ----------------------- | --------------------------------------------------------- |
-| **Clube SaaS**      | `/opt/clube-geek-toys/` | Plataforma de assinatura, PDV, admin, carteirinha digital |
-| **Radio AzuraCast** | `/opt/azuracast/`       | Radio online com painel de gestao e streaming             |
+| Stack               | Diretorio na VPS        | Proposito                                                                  |
+| ------------------- | ----------------------- | -------------------------------------------------------------------------- |
+| **Clube SaaS**      | `/opt/clube-geek-toys/` | Plataforma de assinatura, loja e-commerce, PDV, admin, carteirinha digital |
+| **Radio AzuraCast** | `/opt/azuracast/`       | Radio online com painel de gestao e streaming                              |
 
 Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse proxy e faz terminacao SSL (Let's Encrypt) para todos os dominios. O certificado unico cobre todos os subdominios via SAN.
 
@@ -19,8 +19,9 @@ Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse prox
                            │                                              │
   club.*  ─────────┐       │  ┌──────────────────────────────────────┐    │
   admin.* ─────────┤       │  │         Nginx (80/443)               │    │
-  adm.*   ─────────┤──────►│  │  SSL termination + Reverse Proxy     │    │
-  api.*   ─────────┤       │  │  Security headers (HSTS, nosniff)    │    │
+  adm.*   ─────────┤       │  │  SSL termination + Reverse Proxy     │    │
+  shop.*  ─────────┤──────►│  │  Security headers (HSTS, nosniff)    │    │
+  api.*   ─────────┤       │  │  (mesmo bundle SPA; getAppMode())    │    │
   analytics.* ─────┤       │  └──┬──────┬──────┬──────┬──────────────┘    │
   radio.* ─────────┘       │     │      │      │      │                   │
                            │     ▼      ▼      ▼      ▼                   │
@@ -189,7 +190,7 @@ O cadastro e dividido em 3 etapas sequenciais. O usuario pode interromper e reto
 1. Criar conta com email + senha **ou** Google OAuth
 2. Verificar email (link HMAC com validade de 24h)
 3. Preencher dados pessoais: nome completo, CPF (validado), telefone
-4. Selecionar plano (Silver / Gold / Black) e frequencia (mensal / anual)
+4. Confirmar a assinatura do plano unico anual (Clube Geek & Toys, R$ 149,99/ano) — sem selecao de tier nem de frequencia
 
 ### Etapa 2: Contrato Digital
 
@@ -311,7 +312,7 @@ PIX nao usa Stripe (indisponivel no Brasil para PIX via Stripe). O QR Code e ger
      │                           │  extend expiry_date          │
      │                           │  email: subscription-payment │
      │                           │                              │
-     │                           │  (recorrencia mensal/anual)  │
+     │                           │  (recorrencia anual)         │
      │                           │  webhook: invoice.paid       │
      │                           │◄─────────────────────────────│
      │                           │  extend expiry_date          │
@@ -333,54 +334,58 @@ PIX nao usa Stripe (indisponivel no Brasil para PIX via Stripe). O QR Code e ger
 
 ---
 
-## 7. Sistema de Pontos
+## 7. Loja E-commerce (`shop.geeketoys.com.br`)
 
-### Acumulo
+A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em runtime por `getAppMode()` (`src/lib/subdomain.ts`): `shop.*` renderiza a loja, `admin.*`/`adm.*` renderiza o admin, e o restante renderiza a area de membro. Em desenvolvimento, `?subdomain=shop` forca o modo loja no localhost.
+
+### Fluxo de compra
 
 ```
-pontos = floor(valorCompra * multiplicador)
-
-Multiplicadores por plano:
-  Silver: 1x  |  Gold: 2x  |  Black: 3x
+  Loja (shop.*)                    API                          Stripe / Admin
+  ─────────────                ────────                       ────────────────
+     │                            │                              │
+     │  Catalogo publico          │  GET /products               │
+     │───────────────────────────►│  GET /products/:slug         │
+     │                            │                              │
+     │  Carrinho (localStorage)   │                              │
+     │  CartContext               │                              │
+     │                            │                              │
+     │  POST /orders (checkout)   │                              │
+     │───────────────────────────►│  createOrder():              │
+     │                            │   • resolve membro ativo      │
+     │                            │   • aplica 15% server-side    │
+     │                            │     (discount_reason=member_15)│
+     │                            │   • cria PaymentIntent/PIX     │
+     │   { order, clientSecret }  │     (metadata.kind=shop_order) │
+     │◄───────────────────────────│                              │
+     │                            │                              │
+     │  Cartao: confirm (Stripe)  │  webhook: payment_intent.    │
+     │  PIX: exibe QR + polling   │           succeeded          │
+     │                            │◄─────────────────────────────│
+     │                            │  marca pedido paid + baixa    │
+     │                            │  estoque + email order-confirmed│
+     │                            │                              │
+     │  PIX de loja:              │  POST /orders/:id/confirm-pix│
+     │                            │◄──────────────────── Admin ──│
 ```
 
-- Apenas membros com status `active` podem acumular pontos
-- Compras promocionais: `isPromotion = true` gera transacao de **0 pontos** (registrada para auditoria)
-- Transacao de tipo `earn` com campo `purchase_value` para rastreio do valor original
+### Desconto de membro (server-side)
 
-### Expiracao
+O desconto de **15%** so e aplicado quando ha um membro **ativo** autenticado no checkout. O backend nunca confia no valor enviado pelo cliente:
 
-- **Validade:** 6 meses a partir da data de acumulo (`expires_at`)
-- **Cron diario:** marca transacoes `earn` expiradas como `expired = TRUE`, cria transacao `expire` com pontos negativos, recalcula saldo
-- **Notificacao:** email `points-expiring` enviado 5-8 dias antes da expiracao
+- `order.service` resolve o `member_id` do usuario autenticado e verifica `status = 'active'` e `expiry_date >= CURRENT_DATE`
+- Se valido, calcula `discount = subtotal * 0.15` e grava `discount_reason = 'member_15'`; caso contrario, `discount = 0`
+- Constante `MEMBER_SHOP_DISCOUNT = 0.15` em `server/api/src/types/index.ts`
 
-### Resgate
+### Estoque
 
-Faixas fixas validadas server-side (tabela `REDEMPTION_RULES`):
+- Produtos sao travados (`SELECT ... FOR UPDATE`) durante a criacao do pedido para validar disponibilidade
+- O estoque so e **baixado apos a confirmacao do pagamento** (webhook `payment_intent.succeeded` ou confirmacao manual de PIX), via `decrementStockForOrder()`
+- Se o pagamento falha, o pedido de loja e cancelado e o estoque nunca e decrementado
 
-| Pontos | Desconto  |
-| ------ | --------- |
-| 500    | R$ 25,00  |
-| 800    | R$ 50,00  |
-| 1.500  | R$ 100,00 |
+### Imagens de produto
 
-### Calculo de Saldo Real
-
-O saldo real e sempre calculado a partir das transacoes, excluindo pontos `earn` com `expires_at < hoje` mesmo que o cron ainda nao tenha processado:
-
-```sql
-SUM(CASE
-  WHEN type = 'earn' AND expired = false AND (expires_at IS NULL OR expires_at >= CURRENT_DATE) THEN points
-  WHEN type = 'bonus' THEN points
-  WHEN type = 'redeem' THEN points   -- valores negativos
-  WHEN type = 'expire' THEN points   -- valores negativos
-  ELSE 0
-END)
-```
-
-### Reconciliacao
-
-O cron `reconcilePointsBalances` corrige drift entre `members.points` (cache desnormalizado) e a soma real das transacoes. Registra divergencias no `audit_logs`.
+Imagens sao enviadas por `POST /products/:id/images` (multipart) e armazenadas no volume `/uploads`, servidas publicamente pelo nginx via `api.geeketoys.com.br`.
 
 ---
 
@@ -407,7 +412,7 @@ O cron `reconcilePointsBalances` corrige drift entre `members.points` (cache des
 
 | Transicao                        | Condicao                                | Comportamento                                                                            |
 | -------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (30d ou 365d)                                 |
+| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+365d, plano anual)                          |
 | `active` -> `active` (renovacao) | Pagamento enquanto ainda ativo          | Estende `expiry_date` a partir da data de expiracao atual (nao perde dias restantes)     |
 | `active` -> `expired`            | `expiry_date < hoje` + cron diario      | Marca `status = 'expired'`, envia email `member-expired`                                 |
 | `expired` -> `active`            | Novo pagamento                          | Fresh start: `expiry_date` calculado a partir de hoje                                    |
@@ -457,7 +462,7 @@ A carteirinha digital e renderizada inteiramente no frontend com proporcoes de c
 
 ### Frente
 
-- Gradiente metalico por tier (Silver, Gold, Black)
+- Gradiente metalico do Clube Geek & Toys
 - Icone de chip inteligente (smart chip)
 - Icone de pagamento contactless (NFC)
 - Efeito holografico com shimmer animado (CSS)
@@ -471,7 +476,7 @@ A carteirinha digital e renderizada inteiramente no frontend com proporcoes de c
     "v": 1,
     "id": "uuid",
     "name": "Nome Completo",
-    "plan": "gold",
+    "plan": "club",
     "status": "active",
     "expiry": "2027-04-19"
   }
@@ -503,14 +508,14 @@ Todos os emails usam a API do **Resend** com templates HTML inline renderizados 
 | 11  | `subscription-payment-failed` | Falha na cobranca recorrente (`invoice.payment_failed`)           |
 | 12  | `renewal-reminder`            | Cron: 5-8 dias antes da expiracao (apenas `auto_renewal = FALSE`) |
 | 13  | `member-expired`              | Cron: membro marcado como expirado                                |
-| 14  | `points-expiring`             | Cron: pontos que expiram em 5-8 dias                              |
+| 14  | `order-confirmed`             | Pedido de loja pago (webhook ou confirmacao manual de PIX)        |
 | 15  | `contract-signed`             | Apos assinatura do contrato digital — PDF anexado                 |
 | 16  | `admin-pix-pending`           | Pagamento PIX gerado — notifica admin para confirmacao manual     |
 | 17  | `admin-new-member`            | Novo membro completou cadastro                                    |
 
 ### Deduplicacao
 
-Emails de cron (templates 12-14) usam query `NOT EXISTS` contra `email_logs` para evitar envio duplicado dentro de uma janela de 5-7 dias.
+Emails de cron (templates 12-13) usam query `NOT EXISTS` contra `email_logs` para evitar envio duplicado dentro de uma janela de 5-7 dias.
 
 ---
 
@@ -518,13 +523,10 @@ Emails de cron (templates 12-14) usam query `NOT EXISTS` contra `email_logs` par
 
 Todos executados sequencialmente pelo `node-cron` dentro do container da API. Cada job e independente — falha em um nao impede execucao dos demais.
 
-| #   | Job                               | Descricao                                                                                                                                                                                        |
-| --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | `expirePoints`                    | Marca transacoes `earn` vencidas como `expired = TRUE`, cria transacao `expire` com pontos negativos, atualiza `members.points`. Usa `FOR UPDATE SKIP LOCKED` para evitar double-processing.     |
-| 2   | `sendRenewalReminders`            | Envia `renewal-reminder` para membros ativos com `expiry_date` entre 5-8 dias no futuro e `auto_renewal = FALSE`. Deduplicado via `email_logs`.                                                  |
-| 3   | `sendPointsExpiringNotifications` | Envia `points-expiring` para membros com pontos `earn` nao expirados vencendo em 5-8 dias. Agrupado por membro (`SUM`). Deduplicado via `email_logs`.                                            |
-| 4   | `expireMembers`                   | Marca `active` -> `expired` para membros com `expiry_date < hoje` **e** (`auto_renewal = FALSE` **ou** `subscription_status = 'paused'`). Nao expira assinaturas ativas. Envia `member-expired`. |
-| 5   | `reconcilePointsBalances`         | Compara `members.points` com `SUM(point_transactions.points)`. Corrige divergencias e registra em `audit_logs`.                                                                                  |
+| #   | Job                    | Descricao                                                                                                                                                                                        |
+| --- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | `sendRenewalReminders` | Envia `renewal-reminder` para membros ativos com `expiry_date` entre 5-8 dias no futuro e `auto_renewal = FALSE`. Deduplicado via `email_logs`.                                                  |
+| 2   | `expireMembers`        | Marca `active` -> `expired` para membros com `expiry_date < hoje` **e** (`auto_renewal = FALSE` **ou** `subscription_status = 'paused'`). Nao expira assinaturas ativas. Envia `member-expired`. |
 
 Apos todos os jobs, registra `last_cron_run` na tabela `config` para monitoramento de saude.
 
@@ -543,63 +545,87 @@ Apos todos os jobs, registra `last_cron_run` na tabela `config` para monitoramen
 │ password_hash│     │ full_name    │     │ amount           │
 │ role (enum)  │     │ email        │     │ method (enum)    │
 │ email_verified│    │ phone        │     │ status (enum)    │
-│ refresh_token│     │ plan (enum)  │     │ provider_id      │
+│ refresh_token│     │ plan ('club')│     │ provider_id      │
 │  _hash       │     │ status (enum)│     │ provider_status  │
 │ created_at   │     │ payment_type │     │ reference        │
 │ updated_at   │     │ start_date   │     │ paid_at          │
 └──────────────┘     │ expiry_date  │     │ webhook_processed│
-                     │ points       │     │  _at             │
-                     │ pending_     │     │ created_at       │
-                     │  payment     │     │ updated_at       │
-                     │  (JSONB)     │     └──────────────────┘
-                     │ subscription_│
+                     │ pending_     │     │  _at             │
+                     │  payment     │     │ created_at       │
+                     │  (JSONB)     │     │ updated_at       │
+                     │ subscription_│     └──────────────────┘
                      │  id          │
                      │ auto_renewal │
                      │ stripe_      │
                      │  customer_id │
+                     │ payment_count│
                      │ activated_at │
                      │ created_at   │
                      │ updated_at   │
                      └──────┬──────┘
                             │
-             ┌──────────────┼──────────────┐
-             │              │              │
-  ┌──────────┴───┐ ┌───────┴──────┐ ┌─────┴─────────┐
-  │ point_       │ │subscriptions │ │  contracts    │
-  │ transactions │ ├──────────────┤ ├───────────────┤
-  ├──────────────┤ │ id (TEXT PK) │ │ id (TEXT PK)  │
-  │ id (UUID PK) │ │ member_id FK │ │ member_id FK  │
-  │ member_id FK │ │ provider_id  │ │ member_name   │
-  │ type (enum)  │ │ status (enum)│ │ member_cpf    │
-  │ points       │ │ plan         │ │ member_email  │
-  │ balance      │ │ frequency_   │ │ plan          │
-  │ description  │ │  type (enum) │ │ signature_    │
-  │ purchase_    │ │ transaction_ │ │  preview      │
-  │  value       │ │  amount      │ │ signed_at     │
-  │ expires_at   │ │ failed_      │ │ ip_address    │
-  │ expired      │ │  payments    │ │ user_agent    │
-  │ is_promotion │ │ card_last_   │ │ document_hash │
-  │ created_by FK│ │  four        │ │ pdf_url       │
-  │ created_at   │ │ card_brand   │ │ pdf_path      │
-  └──────────────┘ │ payer_email  │ │ pdf_hash      │
-                   │ created_at   │ │ status (enum) │
-                   │ cancelled_at │ │ created_at    │
-                   │ paused_at    │ └───────────────┘
-                   └──────┬──────┘
-                          │
-                ┌─────────┴──────────┐
-                │subscription_       │
-                │ payments           │
-                ├────────────────────┤
-                │ id (TEXT PK)       │
-                │ subscription_id FK │
-                │ member_id FK       │
-                │ amount             │
-                │ status             │
-                │ payment_date       │
-                │ provider_payment_id│
-                │ failure_reason     │
-                └────────────────────┘
+                   ┌────────┴────────┐
+                   │                 │
+            ┌──────┴───────┐  ┌──────┴────────┐
+            │subscriptions │  │  contracts    │
+            ├──────────────┤  ├───────────────┤
+            │ id (TEXT PK) │  │ id (TEXT PK)  │
+            │ member_id FK │  │ member_id FK  │
+            │ provider_id  │  │ member_name   │
+            │ status (enum)│  │ member_cpf    │
+            │ plan         │  │ member_email  │
+            │ frequency_   │  │ plan          │
+            │  type (enum) │  │ signature_    │
+            │ transaction_ │  │  preview      │
+            │  amount      │  │ signed_at     │
+            │ failed_      │  │ ip_address    │
+            │  payments    │  │ user_agent    │
+            │ card_last_   │  │ document_hash │
+            │  four        │  │ pdf_url       │
+            │ card_brand   │  │ pdf_path      │
+            │ payer_email  │  │ pdf_hash      │
+            │ created_at   │  │ status (enum) │
+            │ cancelled_at │  │ created_at    │
+            │ paused_at    │  └───────────────┘
+            └──────┬──────┘
+                   │
+         ┌─────────┴──────────┐
+         │subscription_       │
+         │ payments           │
+         ├────────────────────┤
+         │ id (TEXT PK)       │
+         │ subscription_id FK │
+         │ member_id FK       │
+         │ amount             │
+         │ status             │
+         │ payment_date       │
+         │ provider_payment_id│
+         │ failure_reason     │
+         └────────────────────┘
+
+Loja (migration 009):
+
+┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
+│  categories  │     │    products      │     │     orders       │     │   order_items    │
+├──────────────┤     ├──────────────────┤     ├──────────────────┤     ├──────────────────┤
+│ id (UUID PK) │◄────│ id (UUID PK)     │◄────│ id (UUID PK)     │◄────│ id (UUID PK)     │
+│ name         │     │ category_id (FK) │     │ order_number     │     │ order_id (FK)    │
+│ slug (UQ)    │     │ name             │     │ member_id (FK)   │     │ product_id (FK)  │
+│ description  │     │ slug (UQ)        │     │ customer_name    │     │ product_name     │
+│ active       │     │ price            │     │ customer_email   │     │ product_slug     │
+│ sort_order   │     │ compare_at_price │     │ subtotal         │     │ unit_price       │
+│ created_at   │     │ images (JSONB)   │     │ discount         │     │ quantity         │
+│ updated_at   │     │ stock            │     │ discount_reason  │     │ line_total       │
+└──────────────┘     │ sku              │     │ total            │     │ image_url        │
+                     │ active           │     │ status (enum)    │     └──────────────────┘
+                     │ featured         │     │ payment_method   │
+                     │ created_at       │     │ stripe_payment_  │
+                     │ updated_at       │     │  intent_id       │
+                     └──────────────────┘     │ pix_txid         │
+                                              │ paid_at          │
+                                              │ created_at       │
+                                              │ updated_at       │
+                                              └──────────────────┘
 
 ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐
 │  audit_logs  │  │  email_logs  │  │processed_webhooks │
@@ -631,7 +657,7 @@ Apos todos os jobs, registra `last_cron_run` na tabela `config` para monitoramen
                               └──────────────┘
 ```
 
-**Total: 14 tabelas**
+**Total: 17 tabelas** (o sistema de pontos foi removido na migration 008; as tabelas da loja `categories`/`products`/`orders`/`order_items` foram adicionadas na migration 009)
 
 ### Recursos do PostgreSQL
 
@@ -639,7 +665,7 @@ Apos todos os jobs, registra `last_cron_run` na tabela `config` para monitoramen
 - **CHECK constraints** em campos enum (`role`, `status`, `plan`, `method`, `type`, etc.)
 - **Foreign keys** com `ON DELETE CASCADE` ou `ON DELETE SET NULL`
 - **Indices otimizados** para queries frequentes (compostos, parciais, DESC para paginacao)
-- **Triggers** `update_updated_at()` para auto-update de `updated_at` em `users`, `members`, `payments`
+- **Triggers** `update_updated_at()` para auto-update de `updated_at` em `users`, `members`, `payments`, `categories`, `products`, `orders`
 - **JSONB** para dados flexiveis (`details`, `pending_payment`, `context`, `value`)
 - **Queries parametrizadas** em todos os acessos ($1, $2...) — prevencao de SQL injection
 
@@ -745,13 +771,13 @@ Acionado automaticamente no push para `master` via GitHub Actions (`.github/work
 
 ### Eventos processados
 
-| Evento Stripe                   | Handler                        | Acao                                                                              |
-| ------------------------------- | ------------------------------ | --------------------------------------------------------------------------------- |
-| `payment_intent.succeeded`      | `handlePaymentIntentSucceeded` | Marca pagamento como `paid`, ativa membro, emails                                 |
-| `payment_intent.payment_failed` | `handlePaymentIntentFailed`    | Marca pagamento como `failed`, email `payment-failed`                             |
-| `invoice.paid`                  | `handleInvoicePaid`            | Registra pagamento da assinatura, estende `expiry_date`, reseta `failed_payments` |
-| `invoice.payment_failed`        | `handleInvoicePaymentFailed`   | Incrementa `failed_payments`, cancela apos 3 falhas                               |
-| `customer.subscription.deleted` | `handleSubscriptionDeleted`    | Marca assinatura como cancelada                                                   |
+| Evento Stripe                   | Handler                        | Acao                                                                                                                                                                   |
+| ------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `payment_intent.succeeded`      | `handlePaymentIntentSucceeded` | Assinatura: marca pagamento `paid`, ativa membro, emails. Pedido de loja (`metadata.kind = 'shop_order'`): marca pedido `paid`, baixa estoque, email `order-confirmed` |
+| `payment_intent.payment_failed` | `handlePaymentIntentFailed`    | Assinatura: marca pagamento `failed`, email `payment-failed`. Pedido de loja: cancela o pedido (estoque nunca foi decrementado)                                        |
+| `invoice.paid`                  | `handleInvoicePaid`            | Registra pagamento da assinatura, estende `expiry_date`, reseta `failed_payments`                                                                                      |
+| `invoice.payment_failed`        | `handleInvoicePaymentFailed`   | Incrementa `failed_payments`, cancela apos 3 falhas                                                                                                                    |
+| `customer.subscription.deleted` | `handleSubscriptionDeleted`    | Marca assinatura como cancelada                                                                                                                                        |
 
 ### Idempotencia
 

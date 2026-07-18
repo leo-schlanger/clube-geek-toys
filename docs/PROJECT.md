@@ -17,51 +17,53 @@
 
 ## 2. Visao do Produto
 
-Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam um plano e recebem descontos exclusivos, acumulam pontos de fidelidade em cada compra e possuem uma carteirinha digital com QR Code.
+Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano anual e recebem desconto exclusivo em qualquer produto, brinde especial, entrada gratuita em eventos participantes e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
 
-### Planos de Assinatura
+### Plano de Assinatura
 
-| Plano  | Mensal   | Anual     | Desc. Produtos | Desc. Servicos | Multiplicador de Pontos |
-| ------ | -------- | --------- | -------------- | -------------- | ----------------------- |
-| Silver | R$ 19,90 | R$ 199,90 | 10%            | 20%            | 1x                      |
-| Gold   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                      |
-| Black  | R$ 49,90 | R$ 499,90 | 20%            | 50%\*          | 3x                      |
+Um unico plano anual, sem opcao mensal e sem tiers (Silver/Gold/Black foram descontinuados).
 
-> \* No plano Black, o desconto em servicos passa a valer a partir do 2o pagamento.
+| Plano             | Anual     | Beneficios                                                                                                               |
+| ----------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Clube Geek & Toys | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
 
-**Calculo de pontos:** `pontos = valor_compra * multiplicador_plano`. Exemplo: compra de R$ 100,00 no plano Gold = 200 pontos.
+O desconto de 15% do membro na loja online e aplicado **server-side** no checkout (nunca confiando no cliente), registrado em `orders.discount_reason = 'member_15'`.
 
 ## 3. Modulos do Sistema
 
 ### 3.1 Modulo Membro
 
-Cadastro em etapas (stepper), dashboard com carteirinha digital, historico de pontos, gestao de assinatura e renovacao/upgrade de plano. Fluxo completo: criacao de conta, verificacao de email, dados pessoais, assinatura de contrato digital e pagamento.
+Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renovacao da assinatura anual. Fluxo completo: criacao de conta, verificacao de email, dados pessoais, assinatura de contrato digital e pagamento. Como ha um unico plano, nao ha selecao de tier nem de frequencia.
 
 ### 3.2 Modulo Admin
 
-Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), sistema de pontos (bonus, historico), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn, pontos), gestao de usuarios e roles, e configuracoes do sistema.
+Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, estoque, imagens; aba **Pedidos** — listagem, status, confirmacao de PIX de loja), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
 
 ### 3.3 Modulo PDV (Ponto de Venda)
 
-Verificacao de membros por CPF ou QR Code, visualizacao de desconto aplicavel, registro de compra com acumulo automatico de pontos, e resgate de pontos.
+Verificacao de membros por CPF ou QR Code e visualizacao do status do membro e do desconto de 15% aplicavel. E apenas verificacao — o PDV nao registra compras nem pontos.
 
-### 3.4 Modulo Pagamento
+### 3.4 Modulo Loja (E-commerce)
 
-Pagamento avulso via cartao de credito (Stripe PaymentIntent) e PIX local (QR Code gerado no servidor). Assinaturas recorrentes via Stripe Subscription. Confirmacao manual de PIX pelo admin. Protecao contra pagamentos duplicados.
+Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, busca, paginas de produto), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`.
 
-### 3.5 Modulo Contrato
+### 3.5 Modulo Pagamento
+
+Pagamento avulso via cartao de credito (Stripe PaymentIntent) e PIX local (QR Code gerado no servidor). Assinaturas recorrentes via Stripe Subscription. Pedidos de loja usam o mesmo motor de pagamento (metadata `kind = 'shop_order'`). Confirmacao manual de PIX pelo admin. Protecao contra pagamentos duplicados.
+
+### 3.6 Modulo Contrato
 
 Assinatura digital de contrato conforme Lei 14.063/2020. Geracao de PDF no frontend, upload via multipart/form-data com validacao de magic bytes, hash SHA-256 do documento, armazenamento no servidor e envio por email com PDF anexo.
 
-### 3.6 Modulo Email (17 templates)
+### 3.7 Modulo Email
 
 Envio de emails transacionais via Resend API com templates HTML responsivos, branding da empresa, preheader text, CTAs e footer padronizado. Todos os envios sao registrados na tabela `email_logs`.
 
-### 3.7 Modulo Radio
+### 3.8 Modulo Radio
 
 Radio online via AzuraCast (stack independente). Player integrado no site institucional (`geeketoys.com.br`). Scripts de automacao para download, upload e gestao de playlists.
 
-### 3.8 Modulo Analytics
+### 3.9 Modulo Analytics
 
 Umami self-hosted para rastreamento de uso sem cookies de terceiros.
 
@@ -83,31 +85,30 @@ Umami self-hosted para rastreamento de uso sem cookies de terceiros.
 
 ### 4.2 Tabela `members`
 
-| Coluna               | Tipo         | Restricoes / Notas                                                                             |
-| -------------------- | ------------ | ---------------------------------------------------------------------------------------------- |
-| id                   | UUID         | PK, DEFAULT uuid_generate_v4()                                                                 |
-| user_id              | UUID         | FK → users(id) ON DELETE CASCADE, NOT NULL, UNIQUE                                             |
-| cpf                  | VARCHAR(11)  | NOT NULL, UNIQUE                                                                               |
-| full_name            | VARCHAR(200) | NOT NULL                                                                                       |
-| email                | VARCHAR(254) | NOT NULL                                                                                       |
-| phone                | VARCHAR(20)  | Nullable                                                                                       |
-| photo_url            | TEXT         | Nullable                                                                                       |
-| plan                 | VARCHAR(10)  | NOT NULL, CHECK IN ('silver','gold','black')                                                   |
-| status               | VARCHAR(20)  | NOT NULL, DEFAULT 'pending', CHECK IN ('active','pending','inactive','expired')                |
-| payment_type         | VARCHAR(10)  | NOT NULL, CHECK IN ('monthly','annual')                                                        |
-| start_date           | DATE         | Nullable                                                                                       |
-| expiry_date          | DATE         | Nullable                                                                                       |
-| points               | INTEGER      | NOT NULL, DEFAULT 0, CHECK >= 0                                                                |
-| pending_payment      | JSONB        | Nullable, dados do pagamento pendente                                                          |
-| subscription_id      | TEXT         | Nullable, ID da assinatura Stripe                                                              |
-| subscription_status  | VARCHAR(20)  | Nullable                                                                                       |
-| auto_renewal         | BOOLEAN      | DEFAULT FALSE                                                                                  |
-| activated_at         | TIMESTAMPTZ  | Nullable                                                                                       |
-| activated_by_payment | TEXT         | Nullable, ID do pagamento que ativou                                                           |
-| stripe_customer_id   | TEXT         | Nullable                                                                                       |
-| payment_count        | INTEGER      | NOT NULL, DEFAULT 0. Contagem de pagamentos confirmados (Black: desc. servicos a partir do 2o) |
-| created_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                                        |
-| updated_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                                               |
+| Coluna               | Tipo         | Restricoes / Notas                                                              |
+| -------------------- | ------------ | ------------------------------------------------------------------------------- |
+| id                   | UUID         | PK, DEFAULT uuid_generate_v4()                                                  |
+| user_id              | UUID         | FK → users(id) ON DELETE CASCADE, NOT NULL, UNIQUE                              |
+| cpf                  | VARCHAR(11)  | NOT NULL, UNIQUE                                                                |
+| full_name            | VARCHAR(200) | NOT NULL                                                                        |
+| email                | VARCHAR(254) | NOT NULL                                                                        |
+| phone                | VARCHAR(20)  | Nullable                                                                        |
+| photo_url            | TEXT         | Nullable                                                                        |
+| plan                 | VARCHAR(10)  | NOT NULL, DEFAULT 'club', CHECK IN ('club')                                     |
+| status               | VARCHAR(20)  | NOT NULL, DEFAULT 'pending', CHECK IN ('active','pending','inactive','expired') |
+| payment_type         | VARCHAR(10)  | NOT NULL, DEFAULT 'annual', CHECK IN ('annual')                                 |
+| start_date           | DATE         | Nullable                                                                        |
+| expiry_date          | DATE         | Nullable                                                                        |
+| pending_payment      | JSONB        | Nullable, dados do pagamento pendente                                           |
+| subscription_id      | TEXT         | Nullable, ID da assinatura Stripe                                               |
+| subscription_status  | VARCHAR(20)  | Nullable                                                                        |
+| auto_renewal         | BOOLEAN      | DEFAULT FALSE                                                                   |
+| activated_at         | TIMESTAMPTZ  | Nullable                                                                        |
+| activated_by_payment | TEXT         | Nullable, ID do pagamento que ativou                                            |
+| stripe_customer_id   | TEXT         | Nullable                                                                        |
+| payment_count        | INTEGER      | NOT NULL, DEFAULT 0. Contagem de pagamentos confirmados                         |
+| created_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                         |
+| updated_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                                |
 
 ### 4.3 Tabela `payments`
 
@@ -161,22 +162,81 @@ Umami self-hosted para rastreamento de uso sem cookies de terceiros.
 | provider_payment_id | TEXT          | Nullable                                           |
 | failure_reason      | TEXT          | Nullable                                           |
 
-### 4.6 Tabela `point_transactions`
+> **Nota:** o sistema de pontos foi removido (migration 008). Nao existe mais a tabela `point_transactions` nem a coluna `members.points`.
 
-| Coluna         | Tipo          | Restricoes / Notas                                    |
-| -------------- | ------------- | ----------------------------------------------------- |
-| id             | UUID          | PK, DEFAULT uuid_generate_v4()                        |
-| member_id      | UUID          | FK → members(id) ON DELETE CASCADE, NOT NULL          |
-| type           | VARCHAR(10)   | NOT NULL, CHECK IN ('earn','redeem','expire','bonus') |
-| points         | INTEGER       | NOT NULL                                              |
-| balance        | INTEGER       | NOT NULL, saldo apos a transacao                      |
-| description    | TEXT          | Nullable                                              |
-| purchase_value | DECIMAL(10,2) | Nullable, valor da compra (quando type = 'earn')      |
-| expires_at     | DATE          | Nullable                                              |
-| expired        | BOOLEAN       | DEFAULT FALSE                                         |
-| is_promotion   | BOOLEAN       | DEFAULT FALSE                                         |
-| created_by     | UUID          | FK → users(id), Nullable                              |
-| created_at     | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                               |
+### 4.6 Tabelas da Loja (migration 009)
+
+As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
+
+#### `categories`
+
+| Coluna      | Tipo         | Restricoes / Notas                               |
+| ----------- | ------------ | ------------------------------------------------ |
+| id          | UUID         | PK, DEFAULT uuid_generate_v4()                   |
+| name        | VARCHAR(120) | NOT NULL                                         |
+| slug        | VARCHAR(140) | NOT NULL, UNIQUE                                 |
+| description | TEXT         | Nullable                                         |
+| active      | BOOLEAN      | NOT NULL, DEFAULT TRUE                           |
+| sort_order  | INTEGER      | NOT NULL, DEFAULT 0                              |
+| created_at  | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                          |
+| updated_at  | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger |
+
+#### `products`
+
+| Coluna           | Tipo          | Restricoes / Notas                               |
+| ---------------- | ------------- | ------------------------------------------------ |
+| id               | UUID          | PK, DEFAULT uuid_generate_v4()                   |
+| name             | VARCHAR(200)  | NOT NULL                                         |
+| slug             | VARCHAR(220)  | NOT NULL, UNIQUE                                 |
+| description      | TEXT          | Nullable                                         |
+| price            | DECIMAL(10,2) | NOT NULL, CHECK >= 0                             |
+| compare_at_price | DECIMAL(10,2) | Nullable, CHECK >= 0 (preco "de/por")            |
+| category_id      | UUID          | FK → categories(id) ON DELETE SET NULL, Nullable |
+| images           | JSONB         | NOT NULL, DEFAULT '[]' (URLs em `/uploads`)      |
+| stock            | INTEGER       | NOT NULL, DEFAULT 0, CHECK >= 0                  |
+| sku              | VARCHAR(60)   | Nullable                                         |
+| active           | BOOLEAN       | NOT NULL, DEFAULT TRUE                           |
+| featured         | BOOLEAN       | NOT NULL, DEFAULT FALSE                          |
+| created_at       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                          |
+| updated_at       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger |
+
+#### `orders`
+
+| Coluna                   | Tipo          | Restricoes / Notas                                                                                                 |
+| ------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| id                       | UUID          | PK, DEFAULT uuid_generate_v4()                                                                                     |
+| order_number             | SERIAL        | Numero sequencial legivel do pedido                                                                                |
+| member_id                | UUID          | FK → members(id) ON DELETE SET NULL, Nullable (pedido pode ser de nao-membro)                                      |
+| customer_name            | VARCHAR(200)  | NOT NULL                                                                                                           |
+| customer_email           | VARCHAR(254)  | NOT NULL                                                                                                           |
+| customer_phone           | VARCHAR(20)   | Nullable                                                                                                           |
+| shipping_address         | JSONB         | Nullable                                                                                                           |
+| subtotal                 | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                               |
+| discount                 | DECIMAL(10,2) | NOT NULL, DEFAULT 0, CHECK >= 0                                                                                    |
+| discount_reason          | VARCHAR(40)   | Nullable, `'member_15'` quando o desconto de membro foi aplicado                                                   |
+| shipping_cost            | DECIMAL(10,2) | NOT NULL, DEFAULT 0, CHECK >= 0                                                                                    |
+| total                    | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                               |
+| status                   | VARCHAR(20)   | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','paid','processing','shipped','delivered','cancelled','refunded') |
+| payment_method           | VARCHAR(20)   | Nullable, CHECK IN ('pix','credit_card')                                                                           |
+| stripe_payment_intent_id | TEXT          | Nullable                                                                                                           |
+| pix_txid                 | TEXT          | Nullable                                                                                                           |
+| paid_at                  | TIMESTAMPTZ   | Nullable                                                                                                           |
+| created_at               | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                                                                                            |
+| updated_at               | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger                                                                   |
+
+#### `order_items`
+
+| Coluna       | Tipo          | Restricoes / Notas                             |
+| ------------ | ------------- | ---------------------------------------------- |
+| id           | UUID          | PK, DEFAULT uuid_generate_v4()                 |
+| order_id     | UUID          | FK → orders(id) ON DELETE CASCADE, NOT NULL    |
+| product_id   | UUID          | FK → products(id) ON DELETE SET NULL, Nullable |
+| product_name | VARCHAR(200)  | NOT NULL (snapshot no momento da compra)       |
+| product_slug | VARCHAR(220)  | Nullable                                       |
+| unit_price   | DECIMAL(10,2) | NOT NULL, CHECK >= 0                           |
+| quantity     | INTEGER       | NOT NULL, CHECK > 0                            |
+| line_total   | DECIMAL(10,2) | NOT NULL, CHECK >= 0                           |
+| image_url    | TEXT          | Nullable                                       |
 
 ### 4.7 Tabela `contracts`
 
@@ -271,6 +331,7 @@ Umami self-hosted para rastreamento de uso sem cookies de terceiros.
 - `tr_users_updated_at` — atualiza `updated_at` automaticamente em UPDATE na tabela `users`.
 - `tr_members_updated_at` — atualiza `updated_at` automaticamente em UPDATE na tabela `members`.
 - `tr_payments_updated_at` — atualiza `updated_at` automaticamente em UPDATE na tabela `payments`.
+- `tr_categories_updated_at`, `tr_products_updated_at`, `tr_orders_updated_at` — auto-update de `updated_at` nas tabelas da loja.
 
 ## 5. Endpoints da API
 
@@ -332,16 +393,32 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 | GET    | `/subscription/:id/payments`              | Pagamentos da assinatura     | JWT  |
 | PUT    | `/subscription/:id/update-payment-method` | Atualiza metodo de pagamento | JWT  |
 
-### Points (`/points`)
+### Products (`/products`)
 
-| Metodo | Endpoint                     | Descricao                          | Auth         |
-| ------ | ---------------------------- | ---------------------------------- | ------------ |
-| GET    | `/points/:memberId/balance`  | Saldo de pontos                    | JWT/owner    |
-| GET    | `/points/:memberId/history`  | Historico de transacoes            | JWT/owner    |
-| GET    | `/points/:memberId/expiring` | Pontos proximos de expirar         | JWT/owner    |
-| POST   | `/points/:memberId/earn`     | Registrar compra (acumular pontos) | seller/admin |
-| POST   | `/points/:memberId/bonus`    | Adicionar pontos bonus             | admin        |
-| POST   | `/points/:memberId/redeem`   | Resgatar pontos                    | seller/admin |
+| Metodo | Endpoint                   | Descricao                                    | Auth    |
+| ------ | -------------------------- | -------------------------------------------- | ------- |
+| GET    | `/products/categories`     | Lista categorias ativas                      | Publico |
+| GET    | `/products`                | Catalogo publico (filtros, busca, paginacao) | Publico |
+| GET    | `/products/:slug`          | Detalhe de um produto                        | Publico |
+| POST   | `/products/categories`     | Cria categoria                               | admin   |
+| PATCH  | `/products/categories/:id` | Atualiza categoria                           | admin   |
+| DELETE | `/products/categories/:id` | Remove categoria                             | admin   |
+| POST   | `/products`                | Cria produto                                 | admin   |
+| PATCH  | `/products/:id`            | Atualiza produto                             | admin   |
+| DELETE | `/products/:id`            | Remove produto                               | admin   |
+| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart)     | admin   |
+
+### Orders (`/orders`)
+
+| Metodo | Endpoint                  | Descricao                                                     | Auth                 |
+| ------ | ------------------------- | ------------------------------------------------------------- | -------------------- |
+| POST   | `/orders`                 | Cria pedido (checkout; desconto de 15% resolvido server-side) | Publico/JWT opcional |
+| GET    | `/orders/:id/status`      | Consulta status do pedido (polling)                           | Publico              |
+| GET    | `/orders`                 | Lista pedidos (filtros, paginacao)                            | admin                |
+| GET    | `/orders/:id`             | Detalhe de um pedido                                          | admin                |
+| PATCH  | `/orders/:id/status`      | Atualiza status (processing/shipped/...)                      | admin                |
+| POST   | `/orders/:id/confirm-pix` | Confirma manualmente um PIX de loja                           | admin                |
+| POST   | `/orders/:id/refund`      | Estorna pedido pago                                           | admin                |
 
 ### Contracts (`/contracts`)
 
@@ -363,21 +440,20 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Webhook (`/webhook`)
 
-| Metodo | Endpoint           | Descricao                    | Auth             |
-| ------ | ------------------ | ---------------------------- | ---------------- |
-| POST   | `/webhook/stripe`  | Processa eventos do Stripe   | Signature Stripe |
-| POST   | `/webhook/pagbank` | Retorna 410 Gone (deprecado) | -                |
+| Metodo | Endpoint           | Descricao                                                                                                                           | Auth             |
+| ------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| POST   | `/webhook/stripe`  | Processa eventos do Stripe (assinatura e pedidos de loja via `metadata.kind = 'shop_order'`, que confirma o pedido e baixa estoque) | Signature Stripe |
+| POST   | `/webhook/pagbank` | Retorna 410 Gone (deprecado)                                                                                                        | -                |
 
 ### Reports (`/reports`)
 
-| Metodo | Endpoint                   | Descricao                             | Auth  |
-| ------ | -------------------------- | ------------------------------------- | ----- |
-| GET    | `/reports/daily`           | Relatorio diario                      | admin |
-| GET    | `/reports/monthly`         | Relatorio mensal (parametro `months`) | admin |
-| GET    | `/reports/churn`           | Churn por mes (expired + cancelled)   | admin |
-| GET    | `/reports/points-overview` | Pontos ganhos vs resgatados por mes   | admin |
-| GET    | `/reports/today-revenue`   | Receita do dia                        | admin |
-| GET    | `/reports/realtime-stats`  | Metricas em tempo real                | admin |
+| Metodo | Endpoint                  | Descricao                             | Auth  |
+| ------ | ------------------------- | ------------------------------------- | ----- |
+| GET    | `/reports/daily`          | Relatorio diario                      | admin |
+| GET    | `/reports/monthly`        | Relatorio mensal (parametro `months`) | admin |
+| GET    | `/reports/churn`          | Churn por mes (expired + cancelled)   | admin |
+| GET    | `/reports/today-revenue`  | Receita do dia                        | admin |
+| GET    | `/reports/realtime-stats` | Metricas em tempo real                | admin |
 
 ### Logs (`/logs`)
 
@@ -424,34 +500,34 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ## 6. Templates de Email (17)
 
-| Template                      | Assunto                         | Trigger                                    | Variaveis principais                                                    | Destinatario |
-| ----------------------------- | ------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------- | ------------ |
-| `verify-email`                | Verifique seu e-mail            | Backend (auto, apos registro)              | name, verify_url                                                        | Membro       |
-| `password-reset`              | Redefinicao de senha            | Backend (auto, solicitacao do membro)      | name, reset_url                                                         | Membro       |
-| `welcome`                     | Bem-vindo ao Clube Geek & Toys! | Frontend (apos ativacao)                   | name, plan                                                              | Membro       |
-| `payment-confirmed`           | Pagamento confirmado            | Webhook Stripe / Admin confirma PIX        | name, amount, plan, expiry_date                                         | Membro       |
-| `payment-failed`              | Pagamento nao aprovado          | Webhook Stripe                             | name                                                                    | Membro       |
-| `subscription-created`        | Assinatura ativada              | Backend (auto)                             | name, plan, amount, card_last_four                                      | Membro       |
-| `subscription-payment`        | Cobranca recorrente processada  | Webhook Stripe                             | name, amount, plan, next_payment                                        | Membro       |
-| `subscription-paused`         | Assinatura pausada              | Backend (auto)                             | name                                                                    | Membro       |
-| `subscription-resumed`        | Assinatura reativada            | Backend (auto)                             | name                                                                    | Membro       |
-| `subscription-cancelled`      | Assinatura cancelada            | Backend / Webhook (3 falhas)               | name                                                                    | Membro       |
-| `subscription-payment-failed` | Falha na cobranca recorrente    | Webhook Stripe                             | name, amount, failed_count                                              | Membro       |
-| `renewal-reminder`            | Sua assinatura expira em breve  | Cron diario (6h UTC, dedup via email_logs) | name, plan, expiry_date                                                 | Membro       |
-| `member-expired`              | Sua assinatura expirou          | Cron diario                                | name, plan                                                              | Membro       |
-| `points-expiring`             | Seus pontos expiram em breve    | Cron diario (6h UTC, dedup via email_logs) | name, points, expiry_date                                               | Membro       |
-| `contract-signed`             | Contrato assinado               | Frontend (apos assinatura digital)         | name, plan, signed_at, hash                                             | Membro       |
-| `admin-pix-pending`           | PIX pendente de confirmacao     | Backend (auto, apos criacao de PIX)        | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
-| `admin-new-member`            | Novo membro cadastrado          | Backend (auto, apos cadastro)              | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
+| Template                      | Assunto                         | Trigger                                     | Variaveis principais                                                    | Destinatario |
+| ----------------------------- | ------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- | ------------ |
+| `verify-email`                | Verifique seu e-mail            | Backend (auto, apos registro)               | name, verify_url                                                        | Membro       |
+| `password-reset`              | Redefinicao de senha            | Backend (auto, solicitacao do membro)       | name, reset_url                                                         | Membro       |
+| `welcome`                     | Bem-vindo ao Clube Geek & Toys! | Frontend (apos ativacao)                    | name, plan                                                              | Membro       |
+| `payment-confirmed`           | Pagamento confirmado            | Webhook Stripe / Admin confirma PIX         | name, amount, plan, expiry_date                                         | Membro       |
+| `payment-failed`              | Pagamento nao aprovado          | Webhook Stripe                              | name                                                                    | Membro       |
+| `subscription-created`        | Assinatura ativada              | Backend (auto)                              | name, plan, amount, card_last_four                                      | Membro       |
+| `subscription-payment`        | Cobranca recorrente processada  | Webhook Stripe                              | name, amount, plan, next_payment                                        | Membro       |
+| `subscription-paused`         | Assinatura pausada              | Backend (auto)                              | name                                                                    | Membro       |
+| `subscription-resumed`        | Assinatura reativada            | Backend (auto)                              | name                                                                    | Membro       |
+| `subscription-cancelled`      | Assinatura cancelada            | Backend / Webhook (3 falhas)                | name                                                                    | Membro       |
+| `subscription-payment-failed` | Falha na cobranca recorrente    | Webhook Stripe                              | name, amount, failed_count                                              | Membro       |
+| `renewal-reminder`            | Sua assinatura expira em breve  | Cron diario (6h UTC, dedup via email_logs)  | name, plan, expiry_date                                                 | Membro       |
+| `member-expired`              | Sua assinatura expirou          | Cron diario                                 | name, plan                                                              | Membro       |
+| `order-confirmed`             | Pedido confirmado               | Webhook Stripe / Admin confirma PIX de loja | name, order_number, total                                               | Cliente      |
+| `contract-signed`             | Contrato assinado               | Frontend (apos assinatura digital)          | name, plan, signed_at, hash                                             | Membro       |
+| `admin-pix-pending`           | PIX pendente de confirmacao     | Backend (auto, apos criacao de PIX)         | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
+| `admin-new-member`            | Novo membro cadastrado          | Backend (auto, apos cadastro)               | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
 
 ## 7. Roles e Permissoes
 
-| Role       | Acesso                                                                                                                                                              |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `member`   | Proprio perfil, proprios pagamentos, proprios pontos (saldo/historico/expirando), propria assinatura, proprio contrato, exportar dados (LGPD), excluir conta        |
-| `seller`   | Verificar membros (CPF/QR), listar membros, ver detalhes de membro, registrar compra (acumular pontos), resgatar pontos                                             |
-| `admin`    | Tudo de seller + bonus de pontos, confirmar PIX, estornar pagamento, gerenciar roles, relatorios, logs (audit/email/erro), configuracoes do sistema, exportar dados |
-| `disabled` | Bloqueado — nao pode fazer login                                                                                                                                    |
+| Role       | Acesso                                                                                                                                                                                                          |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `member`   | Proprio perfil, proprios pagamentos, propria assinatura, proprio contrato, exportar dados (LGPD), excluir conta                                                                                                 |
+| `seller`   | Verificar membros (CPF/QR) no PDV, listar membros, ver detalhes de membro                                                                                                                                       |
+| `admin`    | Tudo de seller + confirmar PIX (assinatura e loja), estornar pagamento, gerenciar produtos/categorias e pedidos, gerenciar roles, relatorios, logs (audit/email/erro), configuracoes do sistema, exportar dados |
+| `disabled` | Bloqueado — nao pode fazer login                                                                                                                                                                                |
 
 ### Fluxo de Autenticacao
 
@@ -537,7 +613,11 @@ clube-geek-toys/
 │   │       │       ├── 002-pagbank-migration.sql
 │   │       │       ├── 003-restructure.sql
 │   │       │       ├── 004-wave1-hardening.sql
-│   │       │       └── 005-stripe-migration.sql
+│   │       │       ├── 005-stripe-migration.sql
+│   │       │       ├── 006-payment-count.sql
+│   │       │       ├── 007-refresh-token-grace.sql
+│   │       │       ├── 008-single-plan-drop-points.sql  # Colapsa plano p/ 'club' + dropa pontos
+│   │       │       └── 009-shop.sql                      # Tabelas da loja (categories/products/orders/order_items)
 │   │       ├── middleware/
 │   │       │   ├── auth.ts              # JWT + RBAC (authenticate, requireRole)
 │   │       │   ├── cors.ts              # CORS whitelist
@@ -550,7 +630,8 @@ clube-geek-toys/
 │   │       │   ├── member.routes.ts
 │   │       │   ├── payment.routes.ts
 │   │       │   ├── subscription.routes.ts
-│   │       │   ├── points.routes.ts
+│   │       │   ├── product.routes.ts    # Catalogo + admin de produtos/categorias
+│   │       │   ├── order.routes.ts      # Checkout + admin de pedidos
 │   │       │   ├── contract.routes.ts
 │   │       │   ├── email.routes.ts
 │   │       │   ├── webhook.routes.ts
@@ -566,15 +647,16 @@ clube-geek-toys/
 │   │       │   ├── member.service.ts
 │   │       │   ├── payment.service.ts
 │   │       │   ├── subscription.service.ts
-│   │       │   ├── points.service.ts
+│   │       │   ├── product.service.ts   # Catalogo, estoque, imagens
+│   │       │   ├── order.service.ts     # Pedidos, desconto de membro, baixa de estoque
 │   │       │   ├── contract.service.ts
 │   │       │   ├── email.service.ts     # 17 templates HTML
-│   │       │   ├── webhook.service.ts
+│   │       │   ├── webhook.service.ts   # Assinatura + pedidos de loja (shop_order)
 │   │       │   ├── report.service.ts
 │   │       │   ├── log.service.ts
 │   │       │   ├── lgpd.service.ts
 │   │       │   ├── settings.service.ts
-│   │       │   └── cron.service.ts      # Jobs agendados (renovacao, pontos)
+│   │       │   └── cron.service.ts      # Jobs agendados (renovacao/expiracao)
 │   │       ├── types/
 │   │       │   └── index.ts
 │   │       └── utils/
@@ -611,7 +693,8 @@ clube-geek-toys/
 ├── src/                                 # Frontend React SPA
 │   ├── App.tsx                          # Router + providers
 │   ├── contexts/
-│   │   └── AuthContext.tsx              # JWT auth context
+│   │   ├── AuthContext.tsx              # JWT auth context
+│   │   └── CartContext.tsx             # Carrinho da loja (localStorage)
 │   ├── pages/
 │   │   ├── Subscribe.tsx                # Landing page
 │   │   ├── Register.tsx                 # Cadastro (stepper)
@@ -619,10 +702,15 @@ clube-geek-toys/
 │   │   ├── AdminLogin.tsx               # Login admin separado
 │   │   ├── ForgotPassword.tsx           # Recuperar senha
 │   │   ├── VerifyEmail.tsx              # Verificacao de email
-│   │   ├── MemberDashboard.tsx          # Area do membro (carteirinha, pontos)
+│   │   ├── MemberDashboard.tsx          # Area do membro (carteirinha)
 │   │   ├── AdminDashboard.tsx           # Painel admin (tabs lazy-loaded)
-│   │   ├── PDV.tsx                      # Ponto de venda
+│   │   ├── PDV.tsx                      # Ponto de venda (verificacao de membro)
 │   │   ├── PaymentResult.tsx            # Resultado do pagamento
+│   │   ├── shop/                        # Paginas da loja (shop.geeketoys.com.br)
+│   │   │   ├── ShopHome.tsx, ProductDetail.tsx
+│   │   │   ├── Cart.tsx, ShopCheckout.tsx
+│   │   │   ├── OrderConfirmation.tsx
+│   │   │   └── ShopLogin.tsx
 │   │   ├── TermsOfUse.tsx              # Termos de uso
 │   │   └── PrivacyPolicy.tsx            # Politica de privacidade
 │   ├── components/
@@ -636,14 +724,21 @@ clube-geek-toys/
 │   │   │   └── *.test.tsx
 │   │   ├── admin/                       # Tabs admin (lazy loaded)
 │   │   │   ├── AdminSidebar.tsx
-│   │   │   ├── MembersTab.tsx, PointsTab.tsx, UsersTab.tsx
+│   │   │   ├── MembersTab.tsx, UsersTab.tsx
+│   │   │   ├── ProductsTab.tsx, ProductModal.tsx        # Gestao da loja
+│   │   │   ├── OrdersTab.tsx, OrderDetailModal.tsx      # Pedidos da loja
 │   │   │   ├── LogsTab.tsx, ReportsTab.tsx, SettingsTab.tsx
 │   │   │   └── RealtimeMetrics.tsx
+│   │   ├── store/                       # Componentes da loja
+│   │   │   ├── ShopHeader.tsx, CategoryNav.tsx
+│   │   │   ├── ProductCard.tsx, ProductGrid.tsx
+│   │   │   ├── CartDrawer.tsx, MemberDiscountBadge.tsx
+│   │   │   └── useShopMember.ts
 │   │   ├── member/                      # Componentes do dashboard membro
-│   │   │   ├── MembershipCard.tsx, PointsSection.tsx
+│   │   │   ├── MembershipCard.tsx
 │   │   │   ├── AccountSection.tsx, BenefitsSection.tsx
 │   │   │   ├── SubscriptionCard.tsx, DiscountStrip.tsx
-│   │   │   ├── OnboardingGuide.tsx, PointsSummaryBar.tsx
+│   │   │   ├── OnboardingGuide.tsx
 │   │   │   └── QuickActions.tsx
 │   │   ├── registration/                # Stepper de cadastro
 │   │   │   ├── RegistrationStepper.tsx
@@ -653,7 +748,7 @@ clube-geek-toys/
 │   │   │   └── ...
 │   │   ├── reports/                     # Graficos (lazy loaded)
 │   │   │   ├── RevenueChart.tsx, MembersChart.tsx
-│   │   │   ├── PointsChart.tsx, ChurnMetrics.tsx
+│   │   │   ├── ChurnMetrics.tsx
 │   │   │   └── ReportFilters.tsx
 │   │   ├── ContractModal.tsx, PaymentModal.tsx
 │   │   ├── MemberModal.tsx, UserModal.tsx, ProfileEditModal.tsx
@@ -667,7 +762,7 @@ clube-geek-toys/
 │   │   ├── CookieConsent.tsx, ErrorBoundary.tsx
 │   │   └── GoogleSignInButton.tsx
 │   ├── hooks/
-│   │   ├── useMembers.ts, usePoints.ts
+│   │   ├── useMembers.ts
 │   │   ├── useRealtimeStats.ts, useNowPlaying.ts
 │   │   ├── useDebounce.ts, useIdleTimer.ts
 │   │   ├── useConfirm.tsx, useUrlFilters.ts
@@ -675,7 +770,8 @@ clube-geek-toys/
 │   │   └── *.test.ts
 │   ├── lib/
 │   │   ├── api-client.ts                # Cliente HTTP (fetch + JWT auto-refresh)
-│   │   ├── members.ts, payments.ts, points.ts
+│   │   ├── members.ts, payments.ts
+│   │   ├── products.ts, orders.ts       # Loja (catalogo e pedidos)
 │   │   ├── subscriptions.ts, email.ts, reports.ts
 │   │   ├── logs.ts, settings.ts, stripe.ts
 │   │   ├── contract-generator.ts        # Gera PDF do contrato

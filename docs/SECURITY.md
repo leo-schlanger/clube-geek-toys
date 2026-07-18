@@ -60,12 +60,12 @@ A plataforma adota uma postura de **defesa em profundidade**:
 
 ### Permissões por Role
 
-| Role       | Permissões                                                                                                                                             |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `member`   | Perfil próprio, pagamentos próprios, histórico de pontos próprio, gerenciamento da própria assinatura                                                  |
-| `seller`   | Tudo de member + verificar qualquer membro, adicionar/resgatar pontos, visualizar detalhes de membros                                                  |
-| `admin`    | Tudo de seller + pontos bônus, confirmar/estornar pagamentos, gerenciar membros, alterar planos/status, visualizar relatórios, gerenciamento de emails |
-| `disabled` | Todo acesso bloqueado                                                                                                                                  |
+| Role       | Permissões                                                                                                                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `member`   | Perfil próprio, pagamentos próprios, gerenciamento da própria assinatura, pedidos próprios da loja                                                                                             |
+| `seller`   | Tudo de member + verificar qualquer membro (CPF/QR) no PDV, visualizar detalhes de membros                                                                                                     |
+| `admin`    | Tudo de seller + confirmar/estornar pagamentos (assinatura e loja), gerenciar membros, alterar status, gerenciar produtos/categorias e pedidos, visualizar relatórios, gerenciamento de emails |
+| `disabled` | Todo acesso bloqueado                                                                                                                                                                          |
 
 ### Cadeia de Middlewares
 
@@ -88,12 +88,12 @@ Todos os endpoints validam entrada com schemas Zod (request body, params e query
 
 ### Validações Específicas
 
-| Campo             | Validação                                                                    |
-| ----------------- | ---------------------------------------------------------------------------- |
-| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco |
-| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX     |
-| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                 |
-| Valores numéricos | Validados contra `PLAN_PRICES` (whitelist server-side)                       |
+| Campo             | Validação                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco                                                      |
+| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX                                                          |
+| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                                                                      |
+| Valores numéricos | Assinatura: validada contra `CLUB_PLAN_PRICE` (R$ 149,99). Loja: totais recalculados server-side a partir dos preços dos produtos |
 
 ### Sanitização
 
@@ -135,13 +135,19 @@ Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`.
 ### PIX
 
 - QR code gerado localmente (padrão EMV)
-- Confirmação manual pelo admin no dashboard
+- Confirmação manual pelo admin no dashboard (assinatura e pedidos de loja)
 - Prevenção de pagamento duplicado: `findRecentPayment` (janela de 7 dias)
 
 ### Validação de Valores
 
-- Valor do pagamento validado contra `PLAN_PRICES` (whitelist server-side)
-- Não é possível criar pagamento com valor arbitrário
+- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 149,99) — não é possível criar pagamento com valor arbitrário
+- Loja: subtotal, desconto e total são **recalculados no servidor** a partir dos preços dos produtos travados no banco (`SELECT ... FOR UPDATE`); o valor enviado pelo cliente nunca é usado
+
+### Desconto de Membro na Loja (server-side)
+
+- O desconto de **15%** só é aplicado quando há um membro `active` autenticado no checkout (`expiry_date >= CURRENT_DATE`)
+- O backend resolve o `member_id` a partir do token — nunca confia em flag/valor enviado pelo cliente
+- Aplicação registrada em `orders.discount_reason = 'member_15'` (constante `MEMBER_SHOP_DISCOUNT = 0.15`)
 
 ## 7. Segurança do Contrato Digital
 
@@ -165,14 +171,13 @@ Em conformidade com a **Lei 14.063/2020** (assinatura eletrônica):
 
 ### Integridade de Dados
 
-| Mecanismo                                | Uso                                            |
-| ---------------------------------------- | ---------------------------------------------- |
-| Row-level locking (`FOR UPDATE`)         | Operações de saldo de pontos                   |
-| `SKIP LOCKED`                            | Cron jobs (impede processamento duplo)         |
-| Transações (`BEGIN`/`COMMIT`/`ROLLBACK`) | Todas as operações compostas                   |
-| UUID como primary keys                   | Não-sequenciais, não-previsíveis               |
-| `CHECK` constraints                      | Campos enum (status, role, plan, method, type) |
-| Cascading deletes                        | Onde apropriado para integridade referencial   |
+| Mecanismo                                | Uso                                                           |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| Row-level locking (`FOR UPDATE`)         | Checkout da loja (trava produtos, valida e baixa estoque)     |
+| Transações (`BEGIN`/`COMMIT`/`ROLLBACK`) | Todas as operações compostas                                  |
+| UUID como primary keys                   | Não-sequenciais, não-previsíveis                              |
+| `CHECK` constraints                      | Campos enum (status, role, plan, method, order status, stock) |
+| Cascading deletes                        | Onde apropriado para integridade referencial                  |
 
 ### Dados Sensíveis
 
@@ -189,6 +194,7 @@ Whitelist de origens permitidas (middleware `cors.ts`):
 
 - `https://club.geeketoys.com.br`
 - `https://admin.geeketoys.com.br`
+- `https://shop.geeketoys.com.br`
 - `localhost` apenas em desenvolvimento
 
 ### Headers de Segurança
@@ -241,9 +247,9 @@ Logs são **imutáveis** (INSERT only, sem UPDATE/DELETE).
 
 - `activated`, `expired`, `updated` (com diff antes/depois)
 
-### Eventos de Pontos
+### Eventos da Loja
 
-- `earn`, `bonus`, `redeem`, `expired`, `reconciled`
+- `order_created`, `order_paid`, `order_status_changed`, `order_refunded`, `product_created`, `product_updated`
 
 ### Logs Especializados
 

@@ -1,6 +1,6 @@
 # Clube Geek & Toys
 
-Plataforma completa de clube de vantagens para a loja **Geek & Toys** -- cadastro, assinatura digital, pagamentos recorrentes, carteirinha digital, PDV, sistema de pontos e painel administrativo.
+Plataforma completa de clube de vantagens para a loja **Geek & Toys** -- cadastro, assinatura digital, pagamentos recorrentes, carteirinha digital, PDV, loja e-commerce propria e painel administrativo.
 
 > **Stack**: React 19 + Vite | Node.js + Express | PostgreSQL | Stripe | Docker | Nginx | AzuraCast
 
@@ -8,28 +8,26 @@ Plataforma completa de clube de vantagens para a loja **Geek & Toys** -- cadastr
 
 ## Sobre o Projeto
 
-A **Geek & Toys** e uma loja em Copacabana, Rio de Janeiro, pioneira do Funko Pop no Brasil, com mais de 15 anos de atuacao no mercado geek. O **Clube Geek & Toys** e o programa de fidelidade digital da loja, oferecendo descontos exclusivos, acumulo de pontos e beneficios progressivos para membros.
+A **Geek & Toys** e uma loja em Copacabana, Rio de Janeiro, pioneira do Funko Pop no Brasil, com mais de 15 anos de atuacao no mercado geek. O **Clube Geek & Toys** e o programa de fidelidade digital da loja, oferecendo desconto exclusivo em qualquer produto, brinde especial e entrada gratuita em eventos participantes.
 
 A plataforma inclui:
 
-- **Tres planos de assinatura** (Silver, Gold, Black) com descontos crescentes
+- **Plano unico anual** com desconto exclusivo e beneficios para membros
 - **Contrato digital** com validade juridica (Lei 14.063/2020)
-- **Carteirinha digital premium** com QR Code e design metalico por plano
-- **Sistema de pontos** com acumulo, resgate e expiracao automatica
-- **PDV integrado** para verificacao e aplicacao de descontos na loja fisica
+- **Carteirinha digital premium** com QR Code e design metalico
+- **Loja e-commerce propria** em `shop.geeketoys.com.br` com desconto de membro aplicado no checkout
+- **PDV integrado** para verificacao de membro e aplicacao de desconto na loja fisica
 - **Radio online** via AzuraCast em `radio.geeketoys.com.br`
 
 ---
 
-## Planos e Precos
+## Plano e Preco
 
-| Plano      | Mensal   | Anual     | Desc. Produtos | Desc. Servicos | Multiplicador de Pontos |
-| ---------- | -------- | --------- | -------------- | -------------- | ----------------------- |
-| **Silver** | R$ 19,90 | R$ 199,90 | 10%            | 25%            | 1x                      |
-| **Gold**   | R$ 39,90 | R$ 399,90 | 15%            | 35%            | 2x                      |
-| **Black**  | R$ 49,90 | R$ 499,90 | 20%            | 50%\*          | 3x                      |
+Um unico plano anual, sem opcao mensal e sem tiers.
 
-> \* No plano Black, o desconto em servicos passa a valer a partir do 2o pagamento.
+| Plano                 | Anual     | Beneficios                                                                                                               |
+| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Clube Geek & Toys** | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
 
 ---
 
@@ -37,7 +35,7 @@ A plataforma inclui:
 
 ### Cadastro e Assinatura
 
-Wizard de 3 etapas: criacao de conta, assinatura de contrato digital e pagamento. O membro escolhe o plano, assina eletronicamente e paga na mesma sessao.
+Wizard de 3 etapas: criacao de conta, assinatura de contrato digital e pagamento. Como ha um unico plano anual, nao ha selecao de tier nem de frequencia — o membro assina eletronicamente e paga na mesma sessao.
 
 ### Contrato Digital
 
@@ -50,26 +48,29 @@ Assinatura eletronica com validade juridica conforme a Lei 14.063/2020. Cada con
 
 ### Assinatura Recorrente
 
-Gerenciada pelo Stripe Subscriptions. Suporte a pausa, retomada, upgrade de plano e cancelamento. Webhooks processam eventos de cobranca automaticamente.
+Gerenciada pelo Stripe Subscriptions. Suporte a pausa, retomada e cancelamento da assinatura anual. Webhooks processam eventos de cobranca automaticamente.
 
 ### Carteirinha Digital
 
-Cartao premium com visual metalico, chip decorativo, shimmer holografico animado, QR Code de verificacao e gradientes exclusivos por plano (prata, dourado, obsidiana).
+Cartao premium com visual metalico, chip decorativo, shimmer holografico animado e QR Code de verificacao.
 
-### Sistema de Pontos
+### Loja E-commerce Propria
 
-- Acumulo automatico por compra (multiplicador depende do plano)
-- Resgate por desconto: 500 pts (Silver), 800 pts (Gold), 1500 pts (Black)
-- Expiracao automatica apos 6 meses de inatividade
-- Reconciliacao automatica de saldo via cron job
+Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`):
+
+- Catalogo publico com categorias, busca e paginas de produto
+- Carrinho persistido em `localStorage` (`CartContext`)
+- Checkout com cartao (Stripe) ou PIX local
+- **Desconto de 15% do membro aplicado server-side no checkout** (`discount_reason = 'member_15'`) — nunca confiando no valor enviado pelo cliente
+- Webhook confirma o pagamento e baixa o estoque automaticamente; PIX de loja e confirmado manualmente pelo admin
 
 ### PDV (Ponto de Venda)
 
 Interface para vendedores na loja fisica:
 
 - Verificacao de membro por CPF ou QR Code da carteirinha
-- Visualizacao do plano ativo, descontos disponiveis e saldo de pontos
-- Registro de compra com aplicacao de desconto e acumulo de pontos
+- Visualizacao do status do membro e do desconto de 15% aplicavel
+- Apenas verificacao — o PDV nao registra pontos nem compras
 
 ### Admin Dashboard
 
@@ -77,8 +78,8 @@ Painel completo de gestao:
 
 - Visao geral com metricas (membros ativos, receita, churn)
 - Gestao de membros (busca, filtros, edicao, ativacao/desativacao)
-- Confirmacao de pagamentos PIX pendentes
-- Gestao de pontos (adicionar, remover, historico)
+- Confirmacao de pagamentos PIX pendentes (assinatura e loja)
+- Gestao da loja: aba **Produtos** (catalogo, estoque, imagens) e aba **Pedidos**
 - Logs de acoes do sistema
 - Exportacao CSV
 
@@ -92,12 +93,11 @@ Umami self-hosted em `analytics.geeketoys.com.br` para metricas de uso sem rastr
 
 ### Emails Transacionais
 
-17 templates via Resend API cobrindo todo o ciclo de vida:
+Templates via Resend API cobrindo todo o ciclo de vida:
 
 - Verificacao de email e recuperacao de senha
 - Confirmacao de pagamento (cartao e PIX)
 - Contrato digital assinado (PDF anexo)
-- Movimentacao de pontos (acumulo e resgate)
 - Eventos de assinatura (ativacao, renovacao, cancelamento, pausa)
 - Notificacoes administrativas (PIX pendente, novos membros)
 
@@ -105,10 +105,8 @@ Umami self-hosted em `analytics.geeketoys.com.br` para metricas de uso sem rastr
 
 Tarefas automaticas diarias (6h UTC):
 
-- Expiracao de pontos inativos ha 6+ meses
 - Expiracao de membros com assinatura vencida
 - Lembretes de renovacao proxima do vencimento
-- Reconciliacao de saldo de pontos
 
 ---
 
@@ -128,13 +126,14 @@ Tarefas automaticas diarias (6h UTC):
 
 ### Dominios
 
-| Dominio                      | Servico           |
-| ---------------------------- | ----------------- |
-| `club.geeketoys.com.br`      | SPA membros       |
-| `admin.geeketoys.com.br`     | SPA admin         |
-| `api.geeketoys.com.br`       | API Express       |
-| `analytics.geeketoys.com.br` | Umami Analytics   |
-| `radio.geeketoys.com.br`     | AzuraCast (radio) |
+| Dominio                      | Servico                                                               |
+| ---------------------------- | --------------------------------------------------------------------- |
+| `club.geeketoys.com.br`      | SPA membros                                                           |
+| `admin.geeketoys.com.br`     | SPA admin                                                             |
+| `shop.geeketoys.com.br`      | SPA loja (mesmo bundle Vite; subdominio detectado por `getAppMode()`) |
+| `api.geeketoys.com.br`       | API Express (serve tambem `/uploads` de imagens de produto)           |
+| `analytics.geeketoys.com.br` | Umami Analytics                                                       |
+| `radio.geeketoys.com.br`     | AzuraCast (radio)                                                     |
 
 ---
 
@@ -142,12 +141,12 @@ Tarefas automaticas diarias (6h UTC):
 
 ```
 clube-geek-toys/
-├── src/                    # Frontend React (SPA membros + admin)
-│   ├── components/         # Componentes (ui/, admin/, reports/)
-│   ├── pages/              # Paginas da aplicacao
-│   ├── contexts/           # React Contexts (Auth)
+├── src/                    # Frontend React (SPA membros + admin + loja)
+│   ├── components/         # Componentes (ui/, admin/, reports/, store/)
+│   ├── pages/              # Paginas da aplicacao (inclui pages/shop/)
+│   ├── contexts/           # React Contexts (Auth, Cart)
 │   ├── hooks/              # Custom hooks
-│   ├── lib/                # Servicos, API client, utilitarios
+│   ├── lib/                # Servicos, API client, utilitarios (products, orders)
 │   └── types/              # Tipos TypeScript
 ├── server/                 # Backend + infra
 │   ├── api/                # Express API (routes, services, middleware, db)
