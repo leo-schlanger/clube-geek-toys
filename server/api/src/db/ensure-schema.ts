@@ -61,9 +61,26 @@ export async function ensureSchema(): Promise<void> {
         ON audit_logs(user_id)
     `);
 
+    // ─── Single-plan migration (008) — collapse plans to 'club', drop points ────
+    // Safe on a fresh model (no real members). Normalize data first, then drop the
+    // legacy inline CHECK constraints, the points column and the point_transactions table.
+    await query(`UPDATE members SET plan = 'club' WHERE plan <> 'club'`);
+    await query(`UPDATE members SET payment_type = 'annual' WHERE payment_type <> 'annual'`);
+    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_plan_check`);
+    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_plan`);
+    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_payment_type_check`);
+    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_points_non_negative`);
+    await query(`DROP TABLE IF EXISTS point_transactions CASCADE`);
+    await query(`ALTER TABLE members DROP COLUMN IF EXISTS points`);
+    await query(`ALTER TABLE members ALTER COLUMN plan SET DEFAULT 'club'`);
+    await query(`ALTER TABLE members ALTER COLUMN payment_type SET DEFAULT 'annual'`);
+
     // ─── CHECK constraints for enum columns ────────────────────────
     await query(`DO $$ BEGIN
-      ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('silver','gold','black'));
+      ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('club'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE members ADD CONSTRAINT chk_members_payment_type CHECK (payment_type IN ('annual'));
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     await query(`DO $$ BEGIN
       ALTER TABLE members ADD CONSTRAINT chk_members_status CHECK (status IN ('active','pending','inactive','expired'));
@@ -76,6 +93,94 @@ export async function ensureSchema(): Promise<void> {
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     await query(`DO $$ BEGIN
       ALTER TABLE payments ADD CONSTRAINT chk_payments_status CHECK (status IN ('pending','paid','failed','refunded'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+    // ─── Shop / e-commerce (migration 009) ───────────────────────────────────
+    await query(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(120) NOT NULL,
+        slug VARCHAR(140) NOT NULL UNIQUE,
+        description TEXT,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(200) NOT NULL,
+        slug VARCHAR(220) NOT NULL UNIQUE,
+        description TEXT,
+        price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+        compare_at_price DECIMAL(10,2) CHECK (compare_at_price >= 0),
+        category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+        images JSONB NOT NULL DEFAULT '[]',
+        stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+        sku VARCHAR(60),
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        featured BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        order_number SERIAL,
+        member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        customer_name VARCHAR(200) NOT NULL,
+        customer_email VARCHAR(254) NOT NULL,
+        customer_phone VARCHAR(20),
+        shipping_address JSONB,
+        subtotal DECIMAL(10,2) NOT NULL CHECK (subtotal >= 0),
+        discount DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
+        discount_reason VARCHAR(40),
+        shipping_cost DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
+        total DECIMAL(10,2) NOT NULL CHECK (total >= 0),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending','paid','processing','shipped','delivered','cancelled','refunded')),
+        payment_method VARCHAR(20) CHECK (payment_method IN ('pix','credit_card')),
+        stripe_payment_intent_id TEXT,
+        pix_txid TEXT,
+        paid_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+        product_name VARCHAR(200) NOT NULL,
+        product_slug VARCHAR(220),
+        unit_price DECIMAL(10,2) NOT NULL CHECK (unit_price >= 0),
+        quantity INTEGER NOT NULL CHECK (quantity > 0),
+        line_total DECIMAL(10,2) NOT NULL CHECK (line_total >= 0),
+        image_url TEXT
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_products_active ON products(active) WHERE active = TRUE`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_products_featured ON products(featured) WHERE featured = TRUE`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_products_created ON products(created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_categories_active ON categories(active) WHERE active = TRUE`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_member ON orders(member_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_pi ON orders(stripe_payment_intent_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_products_updated_at BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
 
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);

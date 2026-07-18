@@ -1,11 +1,9 @@
 import { useState, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { PLANS, type Member, type PlanType } from '../../types'
+import { PLANS, CLUB_PLAN, type Member, type PlanType } from '../../types'
 import { formatCPF, getStatusLabel } from '../../lib/utils'
 import { toast } from 'sonner'
 import {
-  Star,
-  Crown,
   Sparkles,
   Copy,
   Share2,
@@ -17,12 +15,10 @@ import {
 // ─── Plan Visuals ──────────────────────────────────────────────────────────────
 
 const planIcons: Record<PlanType, React.ReactNode> = {
-  silver: <Star className="h-3.5 w-3.5" />,
-  gold: <Crown className="h-3.5 w-3.5" />,
-  black: <Sparkles className="h-3.5 w-3.5" />,
+  club: <Sparkles className="h-3.5 w-3.5" />,
 }
 
-/** Metallic gradients mimicking real card finishes */
+/** Geek gradient finish for the single club card */
 const planStyles: Record<PlanType, {
   bg: string
   chip: string
@@ -31,29 +27,13 @@ const planStyles: Record<PlanType, {
   text: string
   mutedText: string
 }> = {
-  silver: {
-    bg: 'linear-gradient(135deg, #5a6577 0%, #8695a8 15%, #6b7a8d 35%, #94a3b8 50%, #6b7a8d 65%, #8695a8 85%, #5a6577 100%)',
-    chip: 'linear-gradient(135deg, #b8c4d0, #dde4ea, #a8b8c8)',
-    accent: '#c0cfe0',
-    glow: 'rgba(148, 163, 184, 0.3)',
-    text: '#ffffff',
-    mutedText: 'rgba(255,255,255,0.6)',
-  },
-  gold: {
-    bg: 'linear-gradient(135deg, #8b6914 0%, #d4a520 15%, #b8860b 30%, #e8c54a 50%, #b8860b 70%, #d4a520 85%, #8b6914 100%)',
-    chip: 'linear-gradient(135deg, #e8c54a, #fff1c1, #d4a520)',
-    accent: '#f5d061',
-    glow: 'rgba(212, 165, 32, 0.4)',
-    text: '#1a1000',
-    mutedText: 'rgba(26,16,0,0.55)',
-  },
-  black: {
-    bg: 'linear-gradient(135deg, #0a0a0a 0%, #2a2a2a 15%, #111111 35%, #333333 50%, #111111 65%, #2a2a2a 85%, #0a0a0a 100%)',
-    chip: 'linear-gradient(135deg, #d4a520, #f5e6a3, #d4a520)',
-    accent: '#d4a520',
-    glow: 'rgba(212, 165, 32, 0.25)',
-    text: '#f0f0f0',
-    mutedText: 'rgba(240,240,240,0.5)',
+  club: {
+    bg: 'linear-gradient(135deg, #150a2e 0%, #3b1d70 15%, #241145 35%, #6d28d9 50%, #241145 65%, #3b1d70 85%, #150a2e 100%)',
+    chip: 'linear-gradient(135deg, #c4b5fd, #ede9fe, #a78bfa)',
+    accent: '#c4b5fd',
+    glow: 'rgba(124, 58, 237, 0.35)',
+    text: '#f5f3ff',
+    mutedText: 'rgba(245,243,255,0.55)',
   },
 }
 
@@ -222,9 +202,7 @@ export function MembershipCard({ member }: MembershipCardProps) {
                   className="text-base sm:text-lg font-mono tracking-[0.18em] font-semibold"
                   style={{
                     color: style.text,
-                    textShadow: member.plan === 'gold'
-                      ? '0 1px 1px rgba(0,0,0,0.2)'
-                      : '0 1px 2px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.08)',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.4), 0 0 8px rgba(255,255,255,0.08)',
                   }}
                 >
                   {formatMemberNumber(member.id)}
@@ -244,9 +222,7 @@ export function MembershipCard({ member }: MembershipCardProps) {
                     className="text-sm sm:text-base font-bold truncate uppercase tracking-wide"
                     style={{
                       color: style.text,
-                      textShadow: member.plan === 'gold'
-                        ? '0 1px 1px rgba(0,0,0,0.15)'
-                        : '0 1px 2px rgba(0,0,0,0.3)',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.3)',
                     }}
                   >
                     {member.fullName}
@@ -317,27 +293,17 @@ export function MembershipCard({ member }: MembershipCardProps) {
                 Apresente na loja para aplicar seus descontos
               </p>
 
-              {/* Discount badges */}
-              <div className="flex gap-2 w-full">
+              {/* Discount badge */}
+              <div className="w-full">
                 <div
-                  className="flex-1 text-center py-1.5 rounded-lg"
+                  className="text-center py-1.5 rounded-lg"
                   style={{
                     background: 'rgba(74, 222, 128, 0.1)',
                     border: '1px solid rgba(74, 222, 128, 0.25)',
                   }}
                 >
-                  <span className="text-sm font-bold text-green-400">{plan.discountProducts}%</span>
-                  <span className="text-[9px] text-green-400/70 ml-1">produtos</span>
-                </div>
-                <div
-                  className="flex-1 text-center py-1.5 rounded-lg"
-                  style={{
-                    background: 'rgba(74, 222, 128, 0.1)',
-                    border: '1px solid rgba(74, 222, 128, 0.25)',
-                  }}
-                >
-                  <span className="text-sm font-bold text-green-400">{plan.discountServices}%</span>
-                  <span className="text-[9px] text-green-400/70 ml-1">serviços</span>
+                  <span className="text-sm font-bold text-green-400">{CLUB_PLAN.discount}%</span>
+                  <span className="text-[9px] text-green-400/70 ml-1">em qualquer produto</span>
                 </div>
               </div>
 

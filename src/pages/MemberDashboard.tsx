@@ -7,20 +7,17 @@ import { LoadingPage } from '../components/ui/loading'
 import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
 import { MembershipCard } from '../components/member/MembershipCard'
 import { DiscountStrip } from '../components/member/DiscountStrip'
-import { PointsSummaryBar } from '../components/member/PointsSummaryBar'
 import { QuickActions } from '../components/member/QuickActions'
 import { OnboardingGuide } from '../components/member/OnboardingGuide'
 import { WelcomeCelebration } from '../components/member/WelcomeCelebration'
 import { BenefitsSection } from '../components/member/BenefitsSection'
 import { SubscriptionCard } from '../components/member/SubscriptionCard'
-import { PointsSection } from '../components/member/PointsSection'
 import { AccountSection } from '../components/member/AccountSection'
 import { MemberActivityHistory } from '../components/MemberActivityHistory'
-import type { Member, PlanType, PointTransaction, Subscription, Contract } from '../types'
+import type { Member, Subscription, Contract } from '../types'
 import { calculateDaysUntilExpiry } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
-import { getPointsHistory, getExpiringPoints } from '../lib/points'
 import { getActiveSubscriptionByMemberId } from '../lib/subscriptions'
 import { toast } from 'sonner'
 import {
@@ -33,19 +30,15 @@ import {
 
 // Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
 const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
-const UpgradeModal = lazy(() => import('../components/UpgradeModal').then(m => ({ default: m.UpgradeModal })))
 const ProfileEditModal = lazy(() => import('../components/ProfileEditModal').then(m => ({ default: m.ProfileEditModal })))
 
-type ModalType = 'renew' | 'upgrade' | 'profile' | null
+type ModalType = 'renew' | 'profile' | null
 
 export default function MemberDashboard() {
   const { user, signOut, emailVerified, sendVerificationEmail } = useAuth()
   const [member, setMember] = useState<Member | null>(null)
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<ModalType>(null)
-  const [pointsHistory, setPointsHistory] = useState<PointTransaction[]>([])
-  const [expiringPoints, setExpiringPoints] = useState<PointTransaction[]>([])
-  const [loadingPoints, setLoadingPoints] = useState(false)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [contract, setContract] = useState<Contract | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -76,18 +69,12 @@ export default function MemberDashboard() {
       setMember(memberData)
 
       if (memberData) {
-        setLoadingPoints(true)
-        const [history, expiring, sub, memberContract] = await Promise.all([
-          getPointsHistory(memberData.id, 20),
-          getExpiringPoints(memberData.id),
+        const [sub, memberContract] = await Promise.all([
           getActiveSubscriptionByMemberId(memberData.id),
           getMemberContract(memberData.id),
         ])
-        setPointsHistory(history)
-        setExpiringPoints(expiring)
         setSubscription(sub)
         setContract(memberContract)
-        setLoadingPoints(false)
       }
     } catch (error) {
       logger.error('Error fetching member data:', error)
@@ -256,28 +243,24 @@ export default function MemberDashboard() {
         {/* ═══ 1. Carteirinha Digital ═══ */}
         <MembershipCard member={member} />
 
-        {/* ═══ 2. Faixa de Descontos ═══ */}
-        <DiscountStrip plan={member.plan as PlanType} paymentCount={member.paymentCount ?? 0} />
+        {/* ═══ 2. Faixa de Desconto ═══ */}
+        <DiscountStrip />
 
-        {/* ═══ 3. Barra de Pontos ═══ */}
-        <PointsSummaryBar member={member} expiringPoints={expiringPoints} />
-
-        {/* ═══ 4. Ações Rápidas ═══ */}
+        {/* ═══ 3. Ações Rápidas ═══ */}
         <QuickActions
           member={member}
           onRenew={() => setModal('renew')}
-          onUpgrade={() => setModal('upgrade')}
           onEditProfile={() => setModal('profile')}
         />
 
-        {/* ═══ 5. Celebração de Boas-vindas (primeiro acesso) ═══ */}
+        {/* ═══ 4. Celebração de Boas-vindas (primeiro acesso) ═══ */}
         <WelcomeCelebration memberName={member.fullName} memberId={member.id} />
 
-        {/* ═══ 6. Guia de Boas-vindas ═══ */}
+        {/* ═══ 5. Guia de Boas-vindas ═══ */}
         <OnboardingGuide memberStartDate={member.startDate} />
 
         {/* ═══ 6. Benefícios ═══ */}
-        <BenefitsSection plan={member.plan as PlanType} paymentCount={member.paymentCount ?? 0} onUpgrade={() => setModal('upgrade')} />
+        <BenefitsSection />
 
         {/* ═══ 7. Assinatura ═══ */}
         <SubscriptionCard
@@ -286,21 +269,14 @@ export default function MemberDashboard() {
           onSubscriptionChange={fetchMemberData}
         />
 
-        {/* ═══ 8. Pontos (Resgate + Extrato) ═══ */}
-        <PointsSection
-          member={member}
-          pointsHistory={pointsHistory}
-          loadingPoints={loadingPoints}
-        />
-
-        {/* ═══ 9. Dados + Contrato ═══ */}
+        {/* ═══ 8. Dados + Contrato ═══ */}
         <AccountSection
           member={member}
           contract={contract}
           onEditProfile={() => setModal('profile')}
         />
 
-        {/* ═══ 10. Atividades Recentes ═══ */}
+        {/* ═══ 9. Atividades Recentes ═══ */}
         <MemberActivityHistory memberId={member.id} limit={5} />
       </main>
 
@@ -308,9 +284,6 @@ export default function MemberDashboard() {
       <Suspense fallback={null}>
         {modal === 'renew' && (
           <RenewModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
-        )}
-        {modal === 'upgrade' && (
-          <UpgradeModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />
         )}
         {modal === 'profile' && (
           <ProfileEditModal member={member} onClose={() => setModal(null)} onSuccess={handleModalSuccess} />

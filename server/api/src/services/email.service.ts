@@ -15,11 +15,11 @@ const RESEND_API_URL = 'https://api.resend.com/emails';
 
 const AVAILABLE_TEMPLATES = [
   'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
-  'points-expiring', 'subscription-created', 'subscription-payment',
+  'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
-  'admin-new-member',
+  'admin-new-member', 'order-confirmed',
 ];
 
 export function getAvailableTemplates() {
@@ -220,6 +220,21 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
     },
 
+    'order-confirmed': {
+      subject: 'Pedido confirmado — Loja Geek & Toys',
+      preheader: `Recebemos o pagamento do seu pedido #${v.order_number || ''}.`,
+      body: `
+        <h2 style="color:#4ade80;margin:0 0 12px">Pedido confirmado! 🛍️</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Recebemos o pagamento do seu pedido. Já estamos preparando tudo com carinho.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Total', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
+        ])}
+        <p style="margin-top:16px">Você receberá novidades sobre o envio em breve.</p>`,
+      cta: { text: 'Continuar comprando', url: 'https://shop.geeketoys.com.br' },
+    },
+
     'payment-failed': {
       subject: 'Pagamento não aprovado — Clube Geek & Toys',
       preheader: 'Houve um problema com seu pagamento. Veja como resolver.',
@@ -344,18 +359,6 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         <p>Renove agora e volte a aproveitar tudo!</p>`,
       cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
-    },
-
-    'points-expiring': {
-      subject: 'Seus pontos expiram em breve — Clube Geek & Toys',
-      preheader: `${name}, você tem ${v.points || ''} pontos que vão expirar!`,
-      body: `
-        <h2 style="color:#fbbf24;margin:0 0 12px">Pontos expirando! ⭐</h2>
-        <p>Olá, <strong>${name}</strong>!</p>
-        <p>Você tem <strong style="color:#d4a520;font-size:20px">${v.points || '0'} pontos</strong> que expiram em <strong>${v.expiry_date || 'breve'}</strong>.</p>
-        <p>Visite a loja e use seus pontos antes que expirem!</p>
-        ${infoBox('💡 Seus pontos podem ser trocados por descontos e produtos exclusivos na loja.')}`,
-      cta: { text: 'Ver Meus Pontos', url: `${frontendUrl}/membro` },
     },
 
     // ─── CONTRATO ───────────────────────────────────────

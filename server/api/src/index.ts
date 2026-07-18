@@ -14,13 +14,14 @@ import { paymentRouter } from './routes/payment.routes.js';
 import { subscriptionRouter } from './routes/subscription.routes.js';
 import { webhookRouter } from './routes/webhook.routes.js';
 import { emailRouter } from './routes/email.routes.js';
-import { pointsRouter } from './routes/points.routes.js';
 import { contractRouter } from './routes/contract.routes.js';
 import { reportRouter } from './routes/report.routes.js';
 import { logRouter } from './routes/log.routes.js';
 import { lgpdRouter } from './routes/lgpd.routes.js';
 import { settingsRouter } from './routes/settings.routes.js';
 import { auditRouter } from './routes/audit.routes.js';
+import { productRouter } from './routes/product.routes.js';
+import { orderRouter } from './routes/order.routes.js';
 import { initCronJobs } from './services/cron.service.js';
 import { ensureSchema } from './db/ensure-schema.js';
 
@@ -76,13 +77,14 @@ app.use('/payments', paymentRouter);
 app.use('/subscription', subscriptionRouter);
 app.use('/webhook', webhookRouter);
 app.use('/email', emailRouter);
-app.use('/points', pointsRouter);
 app.use('/contracts', contractRouter);
 app.use('/reports', reportRouter);
 app.use('/logs', logRouter);
 app.use('/lgpd', lgpdRouter);
 app.use('/settings', settingsRouter);
 app.use('/audit', auditRouter);
+app.use('/products', productRouter);
+app.use('/orders', orderRouter);
 app.use('/cron', reportRouter); // cron endpoints share admin auth pattern
 
 // Error handler

@@ -18,12 +18,8 @@ const badgeVariants = cva(
           "border-transparent bg-green-500 text-white",
         warning:
           "border-transparent bg-yellow-500 text-white",
-        silver:
-          "border-transparent bg-slate-400 text-white",
-        gold:
-          "border-transparent bg-yellow-400 text-gray-900",
-        black:
-          "border-transparent bg-gray-800 text-white",
+        club:
+          "border-transparent bg-violet-600 text-white",
       },
     },
     defaultVariants: {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
-import { QrCode, Coins, Gift, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { QrCode, ShoppingBag, Gift, ChevronDown, ChevronUp, X } from 'lucide-react'
 
 const DISMISS_KEY = 'clube_geek_onboarding_dismissed'
 
@@ -30,17 +30,17 @@ export function OnboardingGuide({ memberStartDate }: OnboardingGuideProps) {
     {
       icon: <QrCode className="h-5 w-5 text-primary" />,
       title: 'Mostre sua carteirinha',
-      description: 'Toque no cartão acima para ver o QR Code. Apresente na loja para receber seus descontos.',
+      description: 'Toque no cartão acima para ver o QR Code. Apresente na loja física para receber seu desconto.',
     },
     {
-      icon: <Coins className="h-5 w-5 text-primary" />,
-      title: 'Acumule pontos',
-      description: 'A cada compra na loja, você ganha pontos automaticamente pelo seu multiplicador.',
+      icon: <ShoppingBag className="h-5 w-5 text-primary" />,
+      title: 'Ganhe 15% em qualquer produto',
+      description: 'Seu desconto de membro vale na loja física e na loja online — em toda a sua compra.',
     },
     {
       icon: <Gift className="h-5 w-5 text-primary" />,
-      title: 'Resgate recompensas',
-      description: 'Quando tiver pontos suficientes, troque por descontos na loja.',
+      title: 'Brinde e eventos',
+      description: 'Retire seu brinde especial e entre de graça nos eventos participantes.',
     },
   ]
 

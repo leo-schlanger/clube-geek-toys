@@ -30,7 +30,7 @@ import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { StripePaymentForm } from '../StripePaymentForm'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../../lib/payments'
-import { PLANS, type PlanType, type PaymentType } from '../../types'
+import { CLUB_PLAN, type PlanType, type PaymentType } from '../../types'
 import { formatCurrency } from '../../lib/utils'
 import { savePendingPayment, clearPendingPayment } from '../../lib/members'
 import { api } from '../../lib/api-client'
@@ -66,7 +66,6 @@ const MAX_POLL_COUNT = (PIX_TIMEOUT_SECONDS * 1000) / POLL_INTERVAL_MS // 360 = 
 
 export function StepPayment({
   plan,
-  paymentType,
   memberId,
   memberEmail,
   memberName,
@@ -85,8 +84,8 @@ export function StepPayment({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const planData = PLANS[plan]
-  const amount = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+  const planData = CLUB_PLAN
+  const amount = planData.price
 
   // Cleanup intervals on unmount
   useEffect(() => {
@@ -206,7 +205,7 @@ export function StepPayment({
         const res = await api.post<{ clientSecret: string; id: string }>('/subscription/create', {
           member_id: memberId,
           plan,
-          frequency_type: paymentType === 'monthly' ? 'months' : 'years',
+          frequency_type: 'years',
           payer_email: memberEmail,
           payer_name: memberName,
           transaction_amount: amount,
@@ -235,7 +234,7 @@ export function StepPayment({
     } finally {
       setLoading(false)
     }
-  }, [mode, memberId, plan, paymentType, amount, memberEmail, planData.name])
+  }, [mode, memberId, plan, amount, memberEmail, planData.name])
 
   // ─── Success handler ───────────────────────────────────────────────────────
 
@@ -278,10 +277,10 @@ export function StepPayment({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <p className="font-semibold text-lg">{planData.name}</p>
-                <Badge variant="outline">{planData.name}</Badge>
+                <Badge variant="club">Anual</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
+                Assinatura anual
               </p>
             </div>
             <p className="text-2xl font-bold">{formatCurrency(amount)}</p>
@@ -472,7 +471,7 @@ export function StepPayment({
             amount={amount}
             submitLabel={
               mode === 'subscription'
-                ? `Assinar por ${formatCurrency(amount)}/${paymentType === 'monthly' ? 'mes' : 'ano'}`
+                ? `Assinar por ${formatCurrency(amount)}/ano`
                 : undefined
             }
           />

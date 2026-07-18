@@ -21,27 +21,11 @@ export interface SettingDefinition {
  * the admin Settings tab without further code changes.
  */
 export const SETTINGS_CATALOGUE: SettingDefinition[] = [
-  // Pricing — values must match what the frontend PLANS constant exposes initially.
-  { key: 'pricing.silver_monthly',  default: 19.90,  type: 'number', description: 'Plano Silver mensal (R$)' },
-  { key: 'pricing.silver_annual',   default: 199.00, type: 'number', description: 'Plano Silver anual (R$)' },
-  { key: 'pricing.gold_monthly',    default: 39.90,  type: 'number', description: 'Plano Gold mensal (R$)' },
-  { key: 'pricing.gold_annual',     default: 399.00, type: 'number', description: 'Plano Gold anual (R$)' },
-  { key: 'pricing.black_monthly',   default: 79.90,  type: 'number', description: 'Plano Black mensal (R$)' },
-  { key: 'pricing.black_annual',    default: 799.00, type: 'number', description: 'Plano Black anual (R$)' },
+  // Plano único anual — deve bater com CLUB_PLAN.price no frontend.
+  { key: 'pricing.club_annual', default: 149.99, type: 'number', description: 'Plano do Clube — anual (R$)' },
 
-  // Plan benefits
-  { key: 'plan.silver.discount_products',   default: 5,  type: 'number', description: 'Desconto Silver em produtos (%)' },
-  { key: 'plan.silver.discount_services',   default: 10, type: 'number', description: 'Desconto Silver em serviços (%)' },
-  { key: 'plan.gold.discount_products',     default: 10, type: 'number', description: 'Desconto Gold em produtos (%)' },
-  { key: 'plan.gold.discount_services',     default: 15, type: 'number', description: 'Desconto Gold em serviços (%)' },
-  { key: 'plan.black.discount_products',    default: 15, type: 'number', description: 'Desconto Black em produtos (%)' },
-  { key: 'plan.black.discount_services',    default: 20, type: 'number', description: 'Desconto Black em serviços (%) — válido a partir do 2º pagamento' },
-
-  // Points
-  { key: 'points.multiplier_silver',  default: 1,   type: 'number', description: 'Multiplicador de pontos Silver' },
-  { key: 'points.multiplier_gold',    default: 1.5, type: 'number', description: 'Multiplicador de pontos Gold' },
-  { key: 'points.multiplier_black',   default: 2,   type: 'number', description: 'Multiplicador de pontos Black' },
-  { key: 'points.expiry_days',        default: 365, type: 'number', description: 'Dias até expiração de pontos' },
+  // Benefício do membro — desconto único em qualquer produto.
+  { key: 'plan.club.discount_products', default: 15, type: 'number', description: 'Desconto do membro em produtos (%)' },
 
   // Payment guards
   { key: 'payment.duplicate_window_days', default: 7, type: 'number', description: 'Janela em dias para bloquear pagamentos duplicados' },

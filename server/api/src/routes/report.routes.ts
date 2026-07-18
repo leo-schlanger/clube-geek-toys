@@ -38,16 +38,6 @@ reportRouter.get('/churn', async (_req, res, next) => {
   }
 });
 
-// GET /reports/points-overview — points earned vs redeemed by month
-reportRouter.get('/points-overview', async (_req, res, next) => {
-  try {
-    const result = await reportService.getPointsOverview();
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
-
 // GET /reports/today-revenue — sum of paid payments today
 reportRouter.get('/today-revenue', async (_req, res, next) => {
   try {

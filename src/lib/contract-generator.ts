@@ -5,7 +5,7 @@
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { CONTRACT_SECTIONS, CONTRACT_TITLE, CONTRACT_SUBTITLE, CONTRACT_DECLARATION } from '../data/contract-content'
-import { PLANS, type PlanType, type PaymentType } from '../types'
+import { CLUB_PLAN, type PlanType, type PaymentType } from '../types'
 import { formatDateExtensive } from './signature-utils'
 import { logger } from './logger'
 
@@ -252,17 +252,14 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
   })
 
   // Member data
-  const planInfo = PLANS[params.plan]
-  const price = params.paymentType === 'monthly' ? planInfo.priceMonthly : planInfo.priceAnnual
-  const priceFormatted = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const paymentLabel = params.paymentType === 'monthly' ? 'Mensal' : 'Anual'
+  const priceFormatted = CLUB_PLAN.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   const dataLines = [
     `Nome: ${params.memberName}`,
     `CPF: ${params.memberCPF}`,
     `E-mail: ${params.memberEmail}`,
     `Telefone: ${params.memberPhone}`,
-    `Plano: ${planInfo.name} (${paymentLabel}) - ${priceFormatted}`,
+    `Plano: ${CLUB_PLAN.name} (Anual) - ${priceFormatted}`,
   ]
 
   let dataY = yPosition - 5

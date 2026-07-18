@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { query, getClient } from '../config/database.js';
+import { query } from '../config/database.js';
 import { sendTemplateEmail } from './email.service.js';
 
 export function initCronJobs() {
@@ -7,29 +7,14 @@ export function initCronJobs() {
   cron.schedule('0 6 * * *', async () => {
     console.log('[CRON] Running daily jobs...');
     try {
-      await expirePoints();
-    } catch (err) {
-      console.error('[CRON] Expire points error:', err);
-    }
-    try {
       await sendRenewalReminders();
     } catch (err) {
       console.error('[CRON] Renewal reminders error:', err);
     }
     try {
-      await sendPointsExpiringNotifications();
-    } catch (err) {
-      console.error('[CRON] Points expiring notifications error:', err);
-    }
-    try {
       await expireMembers();
     } catch (err) {
       console.error('[CRON] Expire members error:', err);
-    }
-    try {
-      await reconcilePointsBalances();
-    } catch (err) {
-      console.error('[CRON] Reconcile balances error:', err);
     }
 
     // Record cron execution for health monitoring
@@ -42,68 +27,6 @@ export function initCronJobs() {
   });
 
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
-}
-
-async function expirePoints() {
-  const today = new Date().toISOString().split('T')[0];
-
-  const client = await getClient();
-  try {
-    await client.query('BEGIN');
-
-    // Find and lock expired earn transactions (SKIP LOCKED prevents double-processing)
-    const expiredTxs = await client.query(
-      `SELECT id, member_id, points FROM point_transactions
-       WHERE type = 'earn' AND expired = FALSE AND expires_at IS NOT NULL AND expires_at < $1
-       FOR UPDATE SKIP LOCKED`,
-      [today]
-    );
-
-    if (expiredTxs.rows.length === 0) {
-      await client.query('COMMIT');
-      console.log('[CRON] No points to expire');
-      return;
-    }
-
-    for (const tx of expiredTxs.rows) {
-      // Mark as expired
-      await client.query('UPDATE point_transactions SET expired = TRUE WHERE id = $1', [tx.id]);
-
-      // Get and lock current balance
-      const memberResult = await client.query(
-        'SELECT points FROM members WHERE id = $1 FOR UPDATE',
-        [tx.member_id]
-      );
-      if (memberResult.rows.length === 0) continue;
-
-      const newBalance = Math.max(0, memberResult.rows[0].points - tx.points);
-
-      // Create expire transaction
-      await client.query(
-        `INSERT INTO point_transactions (member_id, type, points, balance, description)
-         VALUES ($1, 'expire', $2, $3, 'Pontos expirados')`,
-        [tx.member_id, -tx.points, newBalance]
-      );
-
-      // Update member balance
-      await client.query('UPDATE members SET points = $1 WHERE id = $2', [newBalance, tx.member_id]);
-
-      // Audit log
-      await client.query(
-        `INSERT INTO audit_logs (action, member_id, details)
-         VALUES ('points_expired', $1, $2)`,
-        [tx.member_id, JSON.stringify({ transactionId: tx.id, pointsExpired: tx.points, newBalance })]
-      );
-    }
-
-    await client.query('COMMIT');
-    console.log(`[CRON] Expired ${expiredTxs.rows.length} point transactions`);
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
 }
 
 async function sendRenewalReminders() {
@@ -143,79 +66,6 @@ async function sendRenewalReminders() {
   }
 
   console.log(`[CRON] Sent ${sent} renewal reminders`);
-}
-
-async function sendPointsExpiringNotifications() {
-  // Notify members whose points expire in 5-8 days (dedup via email_logs)
-  const result = await query(
-    `SELECT m.id, m.full_name, m.email,
-            SUM(pt.points) as expiring_points,
-            MIN(pt.expires_at) as earliest_expiry
-     FROM point_transactions pt
-     JOIN members m ON m.id = pt.member_id
-     WHERE pt.type = 'earn' AND pt.expired = FALSE
-       AND pt.expires_at BETWEEN CURRENT_DATE + INTERVAL '5 days' AND CURRENT_DATE + INTERVAL '8 days'
-       AND NOT EXISTS (
-         SELECT 1 FROM email_logs el
-         WHERE el.member_id = m.id
-           AND el.template = 'points-expiring'
-           AND el.sent_at > CURRENT_DATE - INTERVAL '7 days'
-       )
-     GROUP BY m.id, m.full_name, m.email
-     HAVING SUM(pt.points) > 0`
-  );
-
-  let sent = 0;
-  for (const row of result.rows) {
-    try {
-      await sendTemplateEmail({
-        template: 'points-expiring',
-        to: row.email,
-        variables: {
-          name: row.full_name,
-          points: String(row.expiring_points),
-          expiry_date: new Date(row.earliest_expiry).toLocaleDateString('pt-BR'),
-        },
-        member_id: row.id,
-      });
-      sent++;
-    } catch (err) {
-      console.error(`[CRON] Failed to send points-expiring to ${row.email}:`, err);
-    }
-  }
-
-  console.log(`[CRON] Sent ${sent} points-expiring notifications`);
-}
-
-async function reconcilePointsBalances() {
-  // Fix any drift between members.points and the sum of point_transactions.
-  // Runs after expirePoints so expired points are already processed.
-  const result = await query(
-    `UPDATE members SET points = sub.calculated
-     FROM (
-       SELECT m.id, m.points as stored,
-              GREATEST(0, COALESCE(SUM(pt.points), 0)::int) as calculated
-       FROM members m
-       LEFT JOIN point_transactions pt ON pt.member_id = m.id
-       GROUP BY m.id, m.points
-       HAVING m.points != GREATEST(0, COALESCE(SUM(pt.points), 0)::int)
-     ) sub
-     WHERE members.id = sub.id
-     RETURNING members.id, sub.stored, sub.calculated`
-  );
-
-  if (result.rowCount && result.rowCount > 0) {
-    console.log(`[CRON] Reconciled ${result.rowCount} member point balances`);
-    for (const row of result.rows) {
-      await query(
-        `INSERT INTO audit_logs (action, member_id, details)
-         VALUES ('points_reconciled', $1, $2)`,
-        [row.id, JSON.stringify({ stored: row.stored, calculated: row.calculated })]
-      ).catch(() => {});
-    }
-  } else {
-    console.log('[CRON] All point balances in sync');
-  }
 }
 
 async function expireMembers() {

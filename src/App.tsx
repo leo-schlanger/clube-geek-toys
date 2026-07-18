@@ -9,6 +9,7 @@ import { OfflineBanner } from './components/ui/offline-banner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { CookieConsent } from './components/CookieConsent'
 import { ConfirmProvider } from './hooks/useConfirm'
+import { CartProvider } from './contexts/CartContext'
 import { getAppMode } from './lib/subdomain'
 
 // Lazy loaded pages - Member Area
@@ -26,6 +27,14 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const PDV = lazy(() => import('./pages/PDV'))
+
+// Lazy loaded pages - Shop (shop.geeketoys.com.br)
+const ShopHome = lazy(() => import('./pages/shop/ShopHome'))
+const ProductDetail = lazy(() => import('./pages/shop/ProductDetail'))
+const Cart = lazy(() => import('./pages/shop/Cart'))
+const ShopCheckout = lazy(() => import('./pages/shop/ShopCheckout'))
+const OrderConfirmation = lazy(() => import('./pages/shop/OrderConfirmation'))
+const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -245,11 +254,34 @@ function MemberRoutes() {
 }
 
 /**
+ * Rotas da Loja (shop.geeketoys.com.br) — públicas, com carrinho.
+ */
+function ShopRoutes() {
+  return (
+    <CartProvider>
+      <Routes>
+        <Route path="/" element={<ShopHome />} />
+        <Route path="/categoria/:slug" element={<ShopHome />} />
+        <Route path="/produto/:slug" element={<ProductDetail />} />
+        <Route path="/carrinho" element={<Cart />} />
+        <Route path="/checkout" element={<ShopCheckout />} />
+        <Route path="/pedido/:id" element={<OrderConfirmation />} />
+        <Route path="/entrar" element={<ShopLogin />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </CartProvider>
+  )
+}
+
+/**
  * App Routes
  */
 function AppRoutes() {
   if (APP_MODE === 'admin') {
     return <AdminRoutes />
+  }
+  if (APP_MODE === 'shop') {
+    return <ShopRoutes />
   }
   return <MemberRoutes />
 }

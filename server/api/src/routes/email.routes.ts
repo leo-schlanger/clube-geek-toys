@@ -9,11 +9,11 @@ export const emailRouter = Router();
 
 const VALID_TEMPLATES = [
   'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
-  'points-expiring', 'subscription-created', 'subscription-payment',
+  'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
-  'admin-new-member',
+  'admin-new-member', 'order-confirmed',
 ] as const;
 
 const sendEmailSchema = z.object({

@@ -14,7 +14,7 @@ const contractBodySchema = z.object({
   memberName: z.string().min(1).max(200),
   memberCpf: z.string().length(11),
   memberEmail: z.string().email(),
-  plan: z.enum(['silver', 'gold', 'black']),
+  plan: z.enum(['club']).default('club'),
   signedAt: z.string().min(1),
   signaturePreview: z.string().optional(),
 });

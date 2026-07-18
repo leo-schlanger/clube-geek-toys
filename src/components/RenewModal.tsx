@@ -1,16 +1,12 @@
 import { useState } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
-import { Badge } from './ui/badge'
 import { PaymentModal } from './PaymentModal'
-import { PLANS, type Member, type PlanType, type PaymentType } from '../types'
+import { CLUB_PLAN, type Member } from '../types'
 import { formatCurrency } from '../lib/utils'
-import { updateMember } from '../lib/members'
 import { toast } from 'sonner'
 import {
   X,
-  Star,
-  Crown,
   Sparkles,
   Check,
   ArrowRight,
@@ -24,29 +20,12 @@ interface RenewModalProps {
 }
 
 export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
-  const [paymentType, setPaymentType] = useState<PaymentType>(member.paymentType)
   const [showPayment, setShowPayment] = useState(false)
 
-  const plan = PLANS[member.plan as PlanType]
-  const price = paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
-
-  const planIcons = {
-    silver: <Star className="h-5 w-5" />,
-    gold: <Crown className="h-5 w-5" />,
-    black: <Sparkles className="h-5 w-5" />,
-  }
-
-  async function handlePaymentSuccess() {
+  function handlePaymentSuccess() {
     setShowPayment(false)
-
-    // Update payment type if changed (e.g. monthly → annual).
-    // Status and expiryDate are set by the backend via webhook (card) or admin confirm (PIX).
-    // We must NOT override them here — the backend's activateMember logic correctly extends
-    // from current expiry (preserving remaining days), while frontend would calculate from today.
-    if (paymentType !== member.paymentType) {
-      await updateMember(member.id, { paymentType })
-    }
-
+    // Status and expiryDate are set by the backend via webhook (card) or admin confirm (PIX),
+    // which correctly extends from the current expiry — we must not override them here.
     toast.success('Pagamento processado! Sua assinatura será atualizada em instantes.')
     onSuccess()
   }
@@ -54,8 +33,8 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
   if (showPayment) {
     return (
       <PaymentModal
-        plan={member.plan as PlanType}
-        paymentType={paymentType}
+        plan="club"
+        paymentType="annual"
         memberId={member.id}
         memberEmail={member.email}
         memberName={member.fullName}
@@ -80,79 +59,35 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
             <CardTitle>Renovar Assinatura</CardTitle>
           </div>
           <CardDescription>
-            Renove seu plano {plan.name} e continue aproveitando os benefícios
+            Renove seu {CLUB_PLAN.name} por mais 1 ano e continue aproveitando os benefícios
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Current plan */}
-          <div className="p-4 bg-muted rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {planIcons[member.plan as PlanType]}
-                <span className="font-semibold">Plano {plan.name}</span>
-              </div>
-              <Badge variant={member.plan as 'silver' | 'gold' | 'black'}>
-                Atual
-              </Badge>
+          {/* Plan card */}
+          <div className="p-4 bg-muted rounded-lg space-y-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <span className="font-semibold">{CLUB_PLAN.name}</span>
             </div>
-            <div className="mt-2 text-sm text-muted-foreground">
-              {plan.discountProducts}% em produtos · {plan.discountServices}% em serviços
-            </div>
-          </div>
-
-          {/* Payment type selection */}
-          <div className="space-y-3">
-            <p className="font-medium">Escolha o período:</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setPaymentType('monthly')}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  paymentType === 'monthly'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <p className="font-semibold">Mensal</p>
-                <p className="text-xl font-bold text-primary">
-                  {formatCurrency(plan.priceMonthly)}
-                </p>
-                <p className="text-xs text-muted-foreground">por mês</p>
-                {paymentType === 'monthly' && (
-                  <Check className="h-4 w-4 text-primary mx-auto mt-2" />
-                )}
-              </button>
-              <button
-                onClick={() => setPaymentType('annual')}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  paymentType === 'annual'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <p className="font-semibold">Anual</p>
-                <p className="text-xl font-bold text-primary">
-                  {formatCurrency(plan.priceAnnual)}
-                </p>
-                <p className="text-xs text-muted-foreground">por ano</p>
-                <Badge variant="success" className="mt-1">
-                  Economize {formatCurrency(plan.priceMonthly * 12 - plan.priceAnnual)}
-                </Badge>
-                {paymentType === 'annual' && (
-                  <Check className="h-4 w-4 text-primary mx-auto mt-2" />
-                )}
-              </button>
-            </div>
+            <ul className="space-y-1.5">
+              {CLUB_PLAN.benefits.map((benefit, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                  {benefit}
+                </li>
+              ))}
+            </ul>
           </div>
 
           {/* Summary */}
           <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
             <div className="flex items-center justify-between">
               <span className="text-sm">Total a pagar:</span>
-              <span className="text-2xl font-bold">{formatCurrency(price)}</span>
+              <span className="text-2xl font-bold">{formatCurrency(CLUB_PLAN.price)}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Sua assinatura será renovada por {paymentType === 'monthly' ? '1 mês' : '1 ano'}
+              Sua assinatura será renovada por 1 ano
             </p>
           </div>
 

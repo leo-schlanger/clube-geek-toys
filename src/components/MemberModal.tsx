@@ -11,12 +11,11 @@ import { Label } from './ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type MemberStatus, type RedemptionRule } from '../types'
+import { PLANS, type Member, type MemberStatus, type MemberWithSubscription } from '../types'
 import { createMember, updateMember, activateMember } from '../lib/members'
 import { api } from '../lib/api-client'
 import { formatCurrency, formatCPF, validateCPF, getStatusLabel } from '../lib/utils'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
-import { addPoints, redeemPoints, getRedemptionRules, formatPoints } from '../lib/points'
 import { toast } from 'sonner'
 import {
   X,
@@ -26,17 +25,11 @@ import {
   CreditCard,
   Calendar,
   Star,
-  Crown,
-  Sparkles,
-  Check,
   AlertTriangle,
   CheckCircle,
   XCircle,
   HelpCircle,
   Loader2,
-  Coins,
-  Plus,
-  Gift,
   ChevronDown,
   ChevronUp,
   Receipt,
@@ -54,8 +47,8 @@ const memberSchema = z.object({
   email: z.string().email('Email inválido'),
   cpf: z.string().refine((val) => validateCPF(val), 'CPF inválido'),
   phone: z.string().min(10, 'Telefone inválido'),
-  plan: z.enum(['silver', 'gold', 'black']),
-  paymentType: z.enum(['monthly', 'annual']),
+  plan: z.literal('club'),
+  paymentType: z.literal('annual'),
   status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
 })
 
@@ -72,11 +65,6 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
   const [loading, setLoading] = useState(false)
   const [cpfValidation, setCpfValidation] = useState<CPFValidationResult | null>(null)
   const [validatingCpf, setValidatingCpf] = useState(false)
-  const [showPointsManager, setShowPointsManager] = useState(false)
-  const [pointsAction, setPointsAction] = useState<'add' | 'redeem'>('add')
-  const [purchaseValue, setPurchaseValue] = useState('')
-  const [isPromotion, setIsPromotion] = useState(false)
-  const [processingPoints, setProcessingPoints] = useState(false)
   const [localMember, setLocalMember] = useState<Member | null>(member || null)
 
   // Admin detail sections state
@@ -115,14 +103,12 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       email: member?.email || '',
       cpf: member?.cpf ? formatCPF(member.cpf) : '',
       phone: member?.phone || '',
-      plan: member?.plan || 'silver',
-      paymentType: member?.paymentType || 'monthly',
+      plan: 'club',
+      paymentType: 'annual',
       status: member?.status || 'pending',
     },
   })
 
-  const selectedPlan = watch('plan')
-  const paymentType = watch('paymentType')
   const selectedStatus = watch('status')
 
   useEffect(() => {
@@ -153,7 +139,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       .finally(() => setPaymentsLoading(false))
 
     // Fetch subscription (only if member has subscriptionId)
-    if (member.subscriptionId) {
+    if ((member as MemberWithSubscription).subscriptionId) {
       setSubscriptionLoading(true)
       api.get<Record<string, unknown>>(`/members/${member.id}/subscription`)
         .then((res) => { setSubscription((res.data as Record<string, unknown>) || null) })
@@ -167,7 +153,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       .then((res) => { setContract((res.data as Record<string, unknown>) || null) })
       .catch(() => { setContract(null) })
       .finally(() => setContractLoading(false))
-  }, [isViewMode, member?.id, member?.subscriptionId])
+  }, [isViewMode, member?.id, member])
 
   async function handleSubscriptionAction(action: 'pause' | 'resume' | 'cancel') {
     if (!subscription) return
@@ -227,69 +213,6 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
     esc: onClose,
     'ctrl+s': handleSaveShortcut,
   })
-
-  // Points calculations
-  const multiplier = localMember ? POINTS_MULTIPLIER[localMember.plan as PlanType] : 1
-  const previewPoints = purchaseValue && !isPromotion
-    ? Math.floor(parseFloat(purchaseValue.replace(',', '.') || '0') * multiplier)
-    : 0
-  const redemptionRules = getRedemptionRules()
-
-  /**
-   * Handle adding points
-   */
-  async function handleAddPoints() {
-    if (!localMember || !purchaseValue) return
-
-    const value = parseFloat(purchaseValue.replace(',', '.'))
-    if (isNaN(value) || value <= 0) {
-      toast.error('Valor de compra inválido')
-      return
-    }
-
-    setProcessingPoints(true)
-    const response = await addPoints(localMember.id, value, isPromotion, 'admin')
-
-    if (response.success) {
-      toast.success(response.message)
-      setLocalMember({
-        ...localMember,
-        points: (localMember.points || 0) + response.pointsAdded,
-      })
-      setPurchaseValue('')
-      setIsPromotion(false)
-    } else {
-      toast.error(response.message)
-    }
-    setProcessingPoints(false)
-  }
-
-  /**
-   * Handle redeeming points
-   */
-  async function handleRedeemPoints(rule: RedemptionRule) {
-    if (!localMember) return
-
-    setProcessingPoints(true)
-    const response = await redeemPoints(localMember.id, rule, 'admin')
-
-    if (response.success) {
-      toast.success(response.message)
-      setLocalMember({
-        ...localMember,
-        points: (localMember.points || 0) - rule.points,
-      })
-    } else {
-      toast.error(response.message)
-    }
-    setProcessingPoints(false)
-  }
-
-  const planIcons = {
-    silver: <Star className="h-4 w-4" />,
-    gold: <Crown className="h-4 w-4" />,
-    black: <Sparkles className="h-4 w-4" />,
-  }
 
   async function onSubmit(data: MemberFormData) {
     setLoading(true)
@@ -432,9 +355,9 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
             {member && (
               <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div className="flex items-center gap-3">
-                  <Badge variant={member.plan as 'silver' | 'gold' | 'black'}>
-                    {planIcons[member.plan as PlanType]}
-                    {PLANS[member.plan as PlanType].name}
+                  <Badge variant="club" className="gap-1">
+                    <Star className="h-4 w-4" />
+                    {PLANS[member.plan].name}
                   </Badge>
                   <Badge
                     variant={
@@ -580,77 +503,22 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
               </div>
             </div>
 
-            {/* Plan selection */}
+            {/* Plan (único e anual) */}
             <div className="space-y-3">
               <Label>Plano</Label>
-              <div className="grid grid-cols-3 gap-3">
-                {(Object.keys(PLANS) as PlanType[]).map((planId) => {
-                  const plan = PLANS[planId]
-                  const isSelected = selectedPlan === planId
-
-                  return (
-                    <button
-                      key={planId}
-                      type="button"
-                      disabled={isViewMode}
-                      onClick={() => setValue('plan', planId)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        isSelected
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      } ${isViewMode ? 'cursor-default' : 'cursor-pointer'}`}
-                    >
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        {planIcons[planId]}
-                        <span className="font-semibold">{plan.name}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {plan.discountProducts}% produtos
-                      </p>
-                      {isSelected && (
-                        <Check className="h-4 w-4 text-primary mx-auto mt-2" />
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Payment type */}
-            <div className="space-y-3">
-              <Label>Tipo de Cobrança</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  disabled={isViewMode}
-                  onClick={() => setValue('paymentType', 'monthly')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    paymentType === 'monthly'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  } ${isViewMode ? 'cursor-default' : 'cursor-pointer'}`}
-                >
-                  <p className="font-semibold">Mensal</p>
+              <div className="p-4 rounded-lg border-2 border-primary bg-primary/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-primary" />
+                    <span className="font-semibold">{PLANS.club.name} — Anual</span>
+                  </div>
                   <p className="text-lg font-bold text-primary">
-                    {formatCurrency(PLANS[selectedPlan].priceMonthly)}
+                    {formatCurrency(PLANS.club.price)}
                   </p>
-                </button>
-                <button
-                  type="button"
-                  disabled={isViewMode}
-                  onClick={() => setValue('paymentType', 'annual')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    paymentType === 'annual'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  } ${isViewMode ? 'cursor-default' : 'cursor-pointer'}`}
-                >
-                  <p className="font-semibold">Anual</p>
-                  <p className="text-lg font-bold text-primary">
-                    {formatCurrency(PLANS[selectedPlan].priceAnnual)}
-                  </p>
-                  <Badge variant="success" className="mt-1">Economia!</Badge>
-                </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {PLANS.club.discount}% de desconto em qualquer produto
+                </p>
               </div>
             </div>
 
@@ -687,10 +555,6 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                 <h4 className="font-semibold">Informações Adicionais</h4>
                 <div className="grid sm:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Pontos:</span>
-                    <span className="ml-2 font-bold text-primary">{formatPoints(localMember.points || 0)}</span>
-                  </div>
-                  <div>
                     <span className="text-muted-foreground">Membro desde:</span>
                     <span className="ml-2 font-medium">
                       {new Date(localMember.startDate).toLocaleDateString('pt-BR')}
@@ -707,151 +571,6 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                     <span className="ml-2 font-medium font-mono text-xs">{localMember.id}</span>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Points Management (view mode only) */}
-            {isViewMode && localMember && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Coins className="h-5 w-5 text-primary" />
-                    Gestão de Pontos
-                  </h4>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPointsManager(!showPointsManager)}
-                  >
-                    {showPointsManager ? 'Fechar' : 'Gerenciar'}
-                  </Button>
-                </div>
-
-                {showPointsManager && (
-                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 space-y-4">
-                    {/* Action Tabs */}
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={pointsAction === 'add' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setPointsAction('add')}
-                        className="flex-1"
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Adicionar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={pointsAction === 'redeem' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setPointsAction('redeem')}
-                        className="flex-1"
-                      >
-                        <Gift className="h-4 w-4 mr-1" />
-                        Resgatar
-                      </Button>
-                    </div>
-
-                    {/* Add Points */}
-                    {pointsAction === 'add' && (
-                      <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                          Multiplicador do plano {PLANS[localMember.plan as PlanType].name}: <strong>{multiplier}x</strong>
-                        </p>
-
-                        {/* Promotion Checkbox */}
-                        <label className="flex items-center gap-2 text-sm cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isPromotion}
-                            onChange={(e) => setIsPromotion(e.target.checked)}
-                            className="rounded border-border"
-                          />
-                          <span>Compra em promoção (sem pontos)</span>
-                        </label>
-
-                        {/* Value Input */}
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                              R$
-                            </span>
-                            <Input
-                              type="text"
-                              placeholder="0,00"
-                              value={purchaseValue}
-                              onChange={(e) => setPurchaseValue(e.target.value)}
-                              disabled={processingPoints}
-                              className="pl-10"
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            onClick={handleAddPoints}
-                            disabled={processingPoints || !purchaseValue}
-                          >
-                            {processingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Adicionar'}
-                          </Button>
-                        </div>
-
-                        {/* Preview */}
-                        {purchaseValue && parseFloat(purchaseValue.replace(',', '.')) > 0 && (
-                          <div className={`text-sm p-2 rounded ${isPromotion ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
-                            {isPromotion ? (
-                              <span className="text-yellow-700 dark:text-yellow-300">Compra promocional: 0 pontos</span>
-                            ) : (
-                              <span className="text-green-700 dark:text-green-300">
-                                Será adicionado: <strong>+{formatPoints(previewPoints)} pontos</strong>
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Redeem Points */}
-                    {pointsAction === 'redeem' && (
-                      <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                          Saldo atual: <strong>{formatPoints(localMember.points || 0)} pontos</strong>
-                        </p>
-
-                        <div className="grid gap-2">
-                          {redemptionRules.map((rule, index) => {
-                            const canRedeem = (localMember.points || 0) >= rule.points
-                            return (
-                              <div
-                                key={index}
-                                className={`flex items-center justify-between p-3 rounded-lg border ${
-                                  canRedeem
-                                    ? 'bg-card border-primary/30'
-                                    : 'bg-muted/50 border-border opacity-50'
-                                }`}
-                              >
-                                <div>
-                                  <p className="font-medium">{rule.description}</p>
-                                  <p className="text-sm text-muted-foreground">
-                                    {formatPoints(rule.points)} pontos
-                                  </p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={!canRedeem || processingPoints}
-                                  onClick={() => handleRedeemPoints(rule)}
-                                >
-                                  {processingPoints ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Resgatar'}
-                                </Button>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
 
@@ -919,7 +638,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
             )}
 
             {/* Subscription (view mode only, if member has subscriptionId) */}
-            {isViewMode && localMember && localMember.subscriptionId && (
+            {isViewMode && localMember && (localMember as MemberWithSubscription).subscriptionId && (
               <Card>
                 <button
                   type="button"

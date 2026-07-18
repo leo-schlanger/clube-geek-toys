@@ -1,5 +1,6 @@
 import { api } from './api-client'
-import type { Member, MemberFormData, PlanType, PendingPaymentInfo } from '../types'
+import { CLUB_PLAN } from '../types'
+import type { Member, MemberFormData, PendingPaymentInfo } from '../types'
 
 export interface PaginatedResult<T> {
   data: T[]
@@ -125,22 +126,10 @@ export function isMemberActive(member: Member): boolean {
 }
 
 /**
- * Retorna percentuais de desconto baseado no plano.
- * Para o plano Black, o desconto em serviços só vale a partir do 2º pagamento.
+ * Desconto do membro do clube: 15% em qualquer produto.
  */
-export function getMemberDiscount(plan: PlanType, paymentCount = 0): { products: number; services: number; serviceDiscountLocked: boolean } {
-  switch (plan) {
-    case 'silver':
-      return { products: 10, services: 25, serviceDiscountLocked: false }
-    case 'gold':
-      return { products: 15, services: 35, serviceDiscountLocked: false }
-    case 'black': {
-      const locked = paymentCount < 2
-      return { products: 20, services: locked ? 0 : 50, serviceDiscountLocked: locked }
-    }
-    default:
-      return { products: 0, services: 0, serviceDiscountLocked: false }
-  }
+export function getMemberDiscount(): number {
+  return CLUB_PLAN.discount
 }
 
 /**

@@ -9,7 +9,7 @@ import { Skeleton, SkeletonStats } from '../components/ui/skeleton'
 import { MemberModal } from '../components/MemberModal'
 import { UserModal } from '../components/UserModal'
 import { AdminSidebar, type AdminTab } from '../components/admin/AdminSidebar'
-import { PLANS, type Member, type PlanType } from '../types'
+import { CLUB_PLAN, PLANS, type Member, type PlanType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
 import { getRecentLogs, type AuditLog } from '../lib/logs'
@@ -17,11 +17,9 @@ import {
   getMonthlyReport,
   getRevenueByPlan,
   getChurnRate,
-  getPointsOverview,
   type MonthlyReportData,
   type PlanDistribution,
   type ChurnData,
-  type PointsOverview,
 } from '../lib/reports'
 import { toast } from 'sonner'
 import {
@@ -33,7 +31,6 @@ import {
   Users,
   CreditCard,
   TrendingUp,
-  Star,
   RefreshCw,
   ShoppingCart,
   AlertCircle,
@@ -42,10 +39,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 
 // Lazy load tab components for code splitting
 const MembersTab = lazy(() => import('../components/admin/MembersTab').then(m => ({ default: m.MembersTab })))
+const ProductsTab = lazy(() => import('../components/admin/ProductsTab').then(m => ({ default: m.ProductsTab })))
+const OrdersTab = lazy(() => import('../components/admin/OrdersTab').then(m => ({ default: m.OrdersTab })))
 const UsersTab = lazy(() => import('../components/admin/UsersTab').then(m => ({ default: m.UsersTab })))
 const LogsTab = lazy(() => import('../components/admin/LogsTab').then(m => ({ default: m.LogsTab })))
 const ReportsTab = lazy(() => import('../components/admin/ReportsTab').then(m => ({ default: m.ReportsTab })))
-const PointsTab = lazy(() => import('../components/admin/PointsTab').then(m => ({ default: m.PointsTab })))
 const SettingsTab = lazy(() => import('../components/admin/SettingsTab').then(m => ({ default: m.SettingsTab })))
 const RealtimeMetrics = lazy(() => import('../components/admin/RealtimeMetrics').then(m => ({ default: m.RealtimeMetrics })))
 
@@ -61,7 +59,7 @@ function TabLoadingFallback() {
   )
 }
 
-const VALID_TABS: AdminTab[] = ['dashboard', 'members', 'users', 'points', 'reports', 'logs', 'settings']
+const VALID_TABS: AdminTab[] = ['dashboard', 'members', 'products', 'orders', 'users', 'reports', 'logs', 'settings']
 
 function isValidTab(t: string | null): t is AdminTab {
   return !!t && (VALID_TABS as string[]).includes(t)
@@ -101,7 +99,6 @@ export default function AdminDashboard() {
   const [monthlyReportData, setMonthlyReportData] = useState<MonthlyReportData[]>([])
   const [planDistribution, setPlanDistribution] = useState<PlanDistribution[]>([])
   const [churnData, setChurnData] = useState<ChurnData[]>([])
-  const [pointsOverviewData, setPointsOverviewData] = useState<PointsOverview[]>([])
   const [loadingReports, setLoadingReports] = useState(false)
 
   // Modal state
@@ -129,17 +126,15 @@ export default function AdminDashboard() {
   const fetchReports = useCallback(async () => {
     setLoadingReports(true)
     try {
-      const [monthly, plans, churn, points] = await Promise.all([
+      const [monthly, plans, churn] = await Promise.all([
         getMonthlyReport(reportPeriod),
         getRevenueByPlan(),
         getChurnRate(reportPeriod),
-        getPointsOverview(Math.min(reportPeriod, 6)),
       ])
 
       setMonthlyReportData(monthly)
       setPlanDistribution(plans)
       setChurnData(churn)
-      setPointsOverviewData(points)
     } catch (error) {
       logger.error('Error fetching reports:', error)
       toast.error('Erro ao carregar relatórios')
@@ -236,7 +231,7 @@ export default function AdminDashboard() {
 
   const handleQuickActivate = useCallback(async (member: Member) => {
     const plan = PLANS[member.plan as PlanType]
-    const expectedAmount = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
+    const expectedAmount = CLUB_PLAN.price
 
     const confirmed = confirm(
       `⚠️ VERIFICAÇÃO DE PAGAMENTO OBRIGATÓRIA\n\n` +
@@ -244,7 +239,7 @@ export default function AdminDashboard() {
       `Membro: ${member.fullName}\n` +
       `CPF: ${member.cpf}\n` +
       `Plano: ${plan.name}\n` +
-      `Tipo: ${member.paymentType === 'monthly' ? 'Mensal' : 'Anual'}\n` +
+      `Tipo: Anual\n` +
       `Valor esperado: ${formatCurrency(expectedAmount)}\n\n` +
       `Clique em OK apenas se você VERIFICOU o pagamento.`
     )
@@ -323,7 +318,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="mt-4 space-y-2">
-            {Array.from({ length: 7 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-10 w-full rounded-lg" />
             ))}
           </div>
@@ -386,7 +381,8 @@ export default function AdminDashboard() {
               <h1 className="text-xl lg:text-2xl font-bold">
                 {activeTab === 'dashboard' && 'Dashboard'}
                 {activeTab === 'members' && 'Membros'}
-                {activeTab === 'points' && 'Pontos'}
+                {activeTab === 'products' && 'Produtos'}
+                {activeTab === 'orders' && 'Pedidos'}
                 {activeTab === 'users' && 'Usuários'}
                 {activeTab === 'logs' && 'Logs de Auditoria'}
                 {activeTab === 'reports' && 'Relatórios'}
@@ -395,7 +391,8 @@ export default function AdminDashboard() {
               <p className="text-sm text-muted-foreground">
                 {activeTab === 'dashboard' && 'Visão geral do sistema'}
                 {activeTab === 'members' && 'Gerencie os membros do clube'}
-                {activeTab === 'points' && 'Ranking de pontos dos membros'}
+                {activeTab === 'products' && 'Gerencie o catálogo da loja'}
+                {activeTab === 'orders' && 'Acompanhe e gerencie os pedidos'}
                 {activeTab === 'users' && 'Gerencie usuários do sistema'}
                 {activeTab === 'logs' && 'Histórico de ações no sistema'}
                 {activeTab === 'reports' && 'Métricas e análises'}
@@ -438,7 +435,7 @@ export default function AdminDashboard() {
                     <div className="space-y-2">
                       {pendingMembers.map(m => {
                         const planData = PLANS[m.plan as PlanType]
-                        const expectedAmount = m.paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+                        const expectedAmount = CLUB_PLAN.price
                         return (
                           <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-yellow-500/10 rounded-lg">
                             <div className="min-w-0">
@@ -495,10 +492,6 @@ export default function AdminDashboard() {
                   <Users className="h-6 w-6" />
                   <span className="text-sm font-medium">Ver Membros</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-5 flex-col gap-2" onClick={() => setActiveTab('points')}>
-                  <Star className="h-6 w-6" />
-                  <span className="text-sm font-medium">Ranking de Pontos</span>
-                </Button>
                 <Button variant="outline" className="h-auto py-5 flex-col gap-2" onClick={() => setActiveTab('reports')}>
                   <TrendingUp className="h-6 w-6" />
                   <span className="text-sm font-medium">Relatórios</span>
@@ -527,6 +520,8 @@ export default function AdminDashboard() {
                 onRefetch={() => fetchData(true)}
               />
             )}
+            {activeTab === 'products' && <ProductsTab />}
+            {activeTab === 'orders' && <OrdersTab />}
             {activeTab === 'users' && (
               <UsersTab
                 users={systemUsers}
@@ -550,14 +545,10 @@ export default function AdminDashboard() {
                 monthlyReportData={monthlyReportData}
                 planDistribution={planDistribution}
                 churnData={churnData}
-                pointsOverviewData={pointsOverviewData}
                 loadingReports={loadingReports}
                 onPeriodChange={setReportPeriod}
                 onRefresh={fetchReports}
               />
-            )}
-            {activeTab === 'points' && (
-              <PointsTab members={members} onRefresh={() => fetchData(true)} />
             )}
             {activeTab === 'settings' && (
               <SettingsTab />

@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { getClient } from '../config/database.js';
 import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
+import { decrementStockForOrder } from './order.service.js';
 
 /**
  * Email job collected during transaction processing — sent AFTER commit.
@@ -98,6 +99,12 @@ async function handlePaymentIntentSucceeded(
   paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
 ): Promise<void> {
+  // Shop orders are a separate flow — don't touch member activation.
+  if (paymentIntent.metadata?.kind === 'shop_order') {
+    await handleShopOrderPaid(client, paymentIntent, pendingEmails);
+    return;
+  }
+
   const memberId = paymentIntent.metadata?.memberId;
   const amountInReais = paymentIntent.amount / 100;
 
@@ -124,6 +131,49 @@ async function handlePaymentIntentSucceeded(
   );
 }
 
+// ─── shop order paid ─────────────────────────────────────────────────────────
+
+async function handleShopOrderPaid(
+  client: pg.PoolClient,
+  paymentIntent: Stripe.PaymentIntent,
+  pendingEmails: PendingEmail[],
+): Promise<void> {
+  // Idempotent: only the first successful webhook flips 'pending' → 'paid'.
+  const updated = await client.query(
+    `UPDATE orders SET status = 'paid', paid_at = NOW(), payment_method = 'credit_card'
+     WHERE stripe_payment_intent_id = $1 AND status = 'pending'
+     RETURNING id, order_number, customer_name, customer_email, total`,
+    [paymentIntent.id]
+  );
+
+  if (updated.rows.length === 0) {
+    // Already processed or order not found — nothing to do.
+    return;
+  }
+
+  const order = updated.rows[0];
+
+  // Decrement stock now that payment is confirmed.
+  await decrementStockForOrder(client, order.id);
+
+  pendingEmails.push({
+    template: 'order-confirmed',
+    to: order.customer_email,
+    variables: {
+      name: order.customer_name,
+      order_number: String(order.order_number),
+      total: parseFloat(order.total).toFixed(2).replace('.', ','),
+    },
+  });
+
+  await auditLog('order.paid', null, {
+    orderId: order.id,
+    orderNumber: order.order_number,
+    paymentIntentId: paymentIntent.id,
+    amount: paymentIntent.amount / 100,
+  });
+}
+
 // ─── payment_intent.payment_failed ───────────────────────────────────────────
 
 async function handlePaymentIntentFailed(
@@ -131,6 +181,16 @@ async function handlePaymentIntentFailed(
   paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
 ): Promise<void> {
+  // Shop order failed — cancel it (stock was never decremented).
+  if (paymentIntent.metadata?.kind === 'shop_order') {
+    await client.query(
+      `UPDATE orders SET status = 'cancelled' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+      [paymentIntent.id]
+    );
+    await auditLog('order.payment_failed', null, { paymentIntentId: paymentIntent.id, orderId: paymentIntent.metadata?.orderId });
+    return;
+  }
+
   const memberId = paymentIntent.metadata?.memberId;
 
   // Update payment record

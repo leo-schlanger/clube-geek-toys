@@ -114,7 +114,6 @@ export function SubscriptionCard({ member, subscription, onSubscriptionChange }:
       {showManagement && (
         <SubscriptionManagement
           memberId={member.id}
-          memberPoints={member.points}
           onSubscriptionChange={onSubscriptionChange}
         />
       )}

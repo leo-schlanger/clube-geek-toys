@@ -32,12 +32,11 @@ CREATE TABLE members (
   email VARCHAR(254) NOT NULL,
   phone VARCHAR(20),
   photo_url TEXT,
-  plan VARCHAR(10) NOT NULL CHECK (plan IN ('silver', 'gold', 'black')),
+  plan VARCHAR(10) NOT NULL DEFAULT 'club' CHECK (plan IN ('club')),
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'inactive', 'expired')),
-  payment_type VARCHAR(10) NOT NULL CHECK (payment_type IN ('monthly', 'annual')),
+  payment_type VARCHAR(10) NOT NULL DEFAULT 'annual' CHECK (payment_type IN ('annual')),
   start_date DATE,
   expiry_date DATE,
-  points INTEGER NOT NULL DEFAULT 0 CHECK (points >= 0),
   pending_payment JSONB,
   subscription_id TEXT,
   subscription_status VARCHAR(20),
@@ -64,22 +63,6 @@ CREATE TABLE payments (
   webhook_processed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Point Transactions
-CREATE TABLE point_transactions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  member_id UUID NOT NULL REFERENCES members(id) ON DELETE CASCADE,
-  type VARCHAR(10) NOT NULL CHECK (type IN ('earn', 'redeem', 'expire', 'bonus')),
-  points INTEGER NOT NULL,
-  balance INTEGER NOT NULL,
-  description TEXT,
-  purchase_value DECIMAL(10,2),
-  expires_at DATE,
-  expired BOOLEAN DEFAULT FALSE,
-  is_promotion BOOLEAN DEFAULT FALSE,
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Subscriptions (ID = Mercado Pago preapproval_id)
@@ -218,12 +201,6 @@ CREATE INDEX idx_payments_provider_id ON payments(provider_id);
 CREATE INDEX idx_payments_member_created ON payments(member_id, created_at DESC);
 CREATE INDEX idx_payments_status_paid ON payments(status, paid_at DESC);
 
--- Point Transactions
-CREATE INDEX idx_points_member_id ON point_transactions(member_id);
-CREATE INDEX idx_points_member_created ON point_transactions(member_id, created_at DESC);
-CREATE INDEX idx_points_member_type ON point_transactions(member_id, type);
-CREATE INDEX idx_points_expires ON point_transactions(expires_at) WHERE type = 'earn' AND expired = FALSE;
-
 -- Subscriptions
 CREATE INDEX idx_subscriptions_member_id ON subscriptions(member_id);
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
@@ -277,3 +254,90 @@ CREATE TRIGGER tr_members_updated_at
 
 CREATE TRIGGER tr_payments_updated_at
   BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ============================================
+-- SHOP / E-COMMERCE (shop.geeketoys.com.br)
+-- ============================================
+
+CREATE TABLE categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(120) NOT NULL,
+  slug VARCHAR(140) NOT NULL UNIQUE,
+  description TEXT,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE products (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(200) NOT NULL,
+  slug VARCHAR(220) NOT NULL UNIQUE,
+  description TEXT,
+  price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
+  compare_at_price DECIMAL(10,2) CHECK (compare_at_price >= 0),   -- preço "de" (riscado)
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  images JSONB NOT NULL DEFAULT '[]',                              -- array de URLs
+  stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+  sku VARCHAR(60),
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  featured BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_number SERIAL,                                             -- número curto humano
+  member_id UUID REFERENCES members(id) ON DELETE SET NULL,        -- nullable: compra de convidado
+  customer_name VARCHAR(200) NOT NULL,
+  customer_email VARCHAR(254) NOT NULL,
+  customer_phone VARCHAR(20),
+  shipping_address JSONB,
+  subtotal DECIMAL(10,2) NOT NULL CHECK (subtotal >= 0),
+  discount DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
+  discount_reason VARCHAR(40),                                     -- 'member_15' quando aplicável
+  shipping_cost DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
+  total DECIMAL(10,2) NOT NULL CHECK (total >= 0),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','paid','processing','shipped','delivered','cancelled','refunded')),
+  payment_method VARCHAR(20) CHECK (payment_method IN ('pix','credit_card')),
+  stripe_payment_intent_id TEXT,
+  pix_txid TEXT,
+  paid_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id) ON DELETE SET NULL,
+  -- snapshot imutável do produto no momento da compra
+  product_name VARCHAR(200) NOT NULL,
+  product_slug VARCHAR(220),
+  unit_price DECIMAL(10,2) NOT NULL CHECK (unit_price >= 0),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  line_total DECIMAL(10,2) NOT NULL CHECK (line_total >= 0),
+  image_url TEXT
+);
+
+-- Shop indexes
+CREATE INDEX idx_products_active ON products(active) WHERE active = TRUE;
+CREATE INDEX idx_products_category ON products(category_id);
+CREATE INDEX idx_products_featured ON products(featured) WHERE featured = TRUE;
+CREATE INDEX idx_products_created ON products(created_at DESC);
+CREATE INDEX idx_categories_active ON categories(active) WHERE active = TRUE;
+CREATE INDEX idx_orders_member ON orders(member_id);
+CREATE INDEX idx_orders_status ON orders(status, created_at DESC);
+CREATE INDEX idx_orders_pi ON orders(stripe_payment_intent_id);
+CREATE INDEX idx_orders_created ON orders(created_at DESC);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+
+CREATE TRIGGER tr_categories_updated_at
+  BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER tr_products_updated_at
+  BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+CREATE TRIGGER tr_orders_updated_at
+  BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at();

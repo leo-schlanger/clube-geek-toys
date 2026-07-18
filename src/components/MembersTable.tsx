@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { DataTable, type Column, type FilterConfig } from './DataTable'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
-import { PLANS, type Member, type PlanType } from '../types'
+import { PLANS, type Member } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
 import { api } from '../lib/api-client'
 import { toast } from 'sonner'
@@ -13,8 +13,6 @@ import {
   UserX,
   CheckCircle,
   Star,
-  Crown,
-  Sparkles,
   Plus,
   Mail,
   MoreHorizontal,
@@ -41,13 +39,6 @@ interface MembersTableProps {
   onCreate: () => void
   onResendEmail?: (member: Member, type: 'verification' | 'welcome' | 'renewal') => void
   onRefetch?: () => void
-}
-
-// Plan icons (memoized outside component)
-const PLAN_ICONS: Record<PlanType, React.ReactNode> = {
-  silver: <Star className="h-4 w-4" />,
-  gold: <Crown className="h-4 w-4" />,
-  black: <Sparkles className="h-4 w-4" />,
 }
 
 export function MembersTable({
@@ -167,9 +158,9 @@ export function MembersTable({
         header: 'Plano',
         sortable: true,
         render: (member) => (
-          <Badge variant={member.plan as 'silver' | 'gold' | 'black'} className="gap-1">
-            {PLAN_ICONS[member.plan as PlanType]}
-            {PLANS[member.plan as PlanType].name}
+          <Badge variant="club" className="gap-1">
+            <Star className="h-4 w-4" />
+            {PLANS[member.plan].name}
           </Badge>
         ),
       },
@@ -220,15 +211,6 @@ export function MembersTable({
           )
         },
       },
-      {
-        key: 'points',
-        header: 'Pontos',
-        sortable: true,
-        className: 'text-right',
-        render: (member) => (
-          <span className="font-medium tabular-nums">{member.points.toLocaleString('pt-BR')}</span>
-        ),
-      },
     ],
     [onActivate, selectedIds, toggleSelect]
   )
@@ -248,24 +230,9 @@ export function MembersTable({
         ],
       },
       {
-        key: 'plan',
-        label: 'Plano',
-        type: 'multiselect',
-        options: [
-          { value: 'silver', label: 'Silver', icon: <Star className="h-3 w-3" /> },
-          { value: 'gold', label: 'Gold', icon: <Crown className="h-3 w-3" /> },
-          { value: 'black', label: 'Black', icon: <Sparkles className="h-3 w-3" /> },
-        ],
-      },
-      {
         key: 'expiryDate',
         label: 'Validade',
         type: 'daterange',
-      },
-      {
-        key: 'points',
-        label: 'Pontos',
-        type: 'numberrange',
       },
     ],
     []
@@ -358,16 +325,15 @@ export function MembersTable({
 
   // Export data function
   const exportData = useCallback((items: Member[]) => {
-    const headers = ['Nome', 'Email', 'CPF', 'Telefone', 'Plano', 'Status', 'Validade', 'Pontos']
+    const headers = ['Nome', 'Email', 'CPF', 'Telefone', 'Plano', 'Status', 'Validade']
     const rows = items.map((m) => [
       m.fullName,
       m.email,
       formatCPF(m.cpf),
       m.phone,
-      PLANS[m.plan as PlanType].name,
+      PLANS[m.plan].name,
       getStatusLabel(m.status),
       new Date(m.expiryDate).toLocaleDateString('pt-BR'),
-      m.points.toString(),
     ])
     return [headers, ...rows]
   }, [])

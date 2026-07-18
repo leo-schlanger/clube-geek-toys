@@ -10,7 +10,7 @@ import { api, API_URL } from './api-client'
 import { paymentLogger } from './logger'
 import { isStripeConfigured } from './stripe'
 import type { Payment, PaymentStatus, PlanType, PaymentType } from '../types'
-import { PLANS } from '../types'
+import { CLUB_PLAN, PLANS } from '../types'
 
 // ============================================
 // CONFIGURATION
@@ -24,9 +24,9 @@ export function isPaymentConfigured(): boolean {
 // CALCULATIONS
 // ============================================
 
-export function calculatePlanPrice(plan: PlanType, paymentType: PaymentType): number {
-  const planData = PLANS[plan]
-  return paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+export function calculatePlanPrice(_plan: PlanType, _paymentType: PaymentType): number {
+  // Plano único e anual: preço fixo do clube.
+  return CLUB_PLAN.price
 }
 
 // ============================================
@@ -218,7 +218,7 @@ export async function createSubscriptionPayment(
     }>('/subscription/create', {
       member_id: memberId,
       plan,
-      frequency_type: paymentType === 'monthly' ? 'months' : 'years',
+      frequency_type: 'years',
       payer_email: payerEmail,
       payer_name: payerName,
       transaction_amount: amount,

@@ -60,7 +60,7 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
                         Desativado
                       </Badge>
                     ) : (
-                      <Badge variant={user.role === 'admin' ? 'black' : user.role === 'seller' ? 'gold' : 'silver'}>
+                      <Badge variant={user.role === 'admin' ? 'club' : user.role === 'seller' ? 'default' : 'secondary'}>
                         {user.role === 'admin' && <Shield className="h-3 w-3 mr-1 inline" />}
                         {user.role}
                       </Badge>

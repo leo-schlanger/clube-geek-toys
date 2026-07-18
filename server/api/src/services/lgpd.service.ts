@@ -41,11 +41,6 @@ export async function exportUserData(userId: string) {
     ? await query(`SELECT * FROM payments WHERE member_id = $1 ORDER BY created_at DESC`, [memberId])
     : { rows: [] };
 
-  // Point transactions
-  const pointsResult = memberId
-    ? await query(`SELECT * FROM point_transactions WHERE member_id = $1 ORDER BY created_at DESC`, [memberId])
-    : { rows: [] };
-
   // Subscriptions
   const subscriptionsResult = memberId
     ? await query(`SELECT * FROM subscriptions WHERE member_id = $1 ORDER BY created_at DESC`, [memberId])
@@ -78,7 +73,6 @@ export async function exportUserData(userId: string) {
     member: memberResult.rows[0] || null,
     contracts: contractsResult.rows,
     payments: paymentsResult.rows,
-    pointTransactions: pointsResult.rows,
     subscriptions: subscriptionsResult.rows,
     auditLogs: auditResult.rows,
     emailLogs: emailResult.rows,

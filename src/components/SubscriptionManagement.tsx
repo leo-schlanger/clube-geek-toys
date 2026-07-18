@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from './ui/dialog'
-import { PLANS, type Subscription, type SubscriptionPayment, type PlanType } from '../types'
+import { CLUB_PLAN, type Subscription, type SubscriptionPayment } from '../types'
 import { formatCurrency } from '../lib/utils'
 import {
   getSubscriptionByMemberId,
@@ -54,8 +54,6 @@ import {
 
 interface SubscriptionManagementProps {
   memberId: string
-  /** Used to warn about points loss in the cancel confirmation. */
-  memberPoints?: number
   onSubscriptionChange?: () => void
 }
 
@@ -63,7 +61,6 @@ type ConfirmAction = 'pause' | 'resume' | 'cancel' | null
 
 export function SubscriptionManagement({
   memberId,
-  memberPoints,
   onSubscriptionChange,
 }: SubscriptionManagementProps) {
   const [subscription, setSubscription] = useState<Subscription | null>(null)
@@ -219,35 +216,22 @@ export function SubscriptionManagement({
     )
   }
 
-  const planData = PLANS[subscription.plan as PlanType]
+  const planData = CLUB_PLAN
   const statusBadgeVariant = getSubscriptionStatusBadge(subscription.status)
-
-  // Get plan-specific gradient colors
-  const getPlanGradient = () => {
-    switch (subscription.plan) {
-      case 'black':
-        return 'from-zinc-800 to-zinc-900'
-      case 'gold':
-        return 'from-yellow-600 to-amber-700'
-      case 'silver':
-      default:
-        return 'from-slate-400 to-slate-500'
-    }
-  }
 
   return (
     <>
       <Card className="overflow-hidden">
         {/* Plan Header Banner */}
-        <div className={`bg-gradient-to-r ${getPlanGradient()} p-4 text-white`}>
+        <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-4 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                <span className="text-xl">{planData?.icon || '✨'}</span>
+                <span className="text-xl">{planData.icon}</span>
               </div>
               <div>
                 <h3 className="font-bold text-lg">
-                  Plano {planData?.name || subscription.plan}
+                  {planData.name}
                 </h3>
                 <p className="text-white/80 text-sm">
                   {formatCurrency(subscription.transactionAmount)}/{getFrequencyLabel(subscription.frequencyType).toLowerCase()}
@@ -560,14 +544,6 @@ export function SubscriptionManagement({
                   Você perderá acesso a todos os benefícios imediatamente após o cancelamento.
                 </p>
               </div>
-              {typeof memberPoints === 'number' && memberPoints > 0 && (
-                <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-orange-700 dark:text-orange-300">
-                    Atenção: seus <strong>{memberPoints.toLocaleString('pt-BR')} pontos acumulados serão perdidos</strong> após o cancelamento.
-                  </p>
-                </div>
-              )}
             </div>
           )}
 

@@ -1,6 +1,6 @@
 import { api } from './api-client'
 import { paymentLogger } from './logger'
-import { PLANS } from '../types'
+import { CLUB_PLAN } from '../types'
 import type {
   Subscription,
   SubscriptionPayment,
@@ -18,11 +18,11 @@ import type {
  * Calculate subscription price based on plan and frequency
  */
 export function calculateSubscriptionPrice(
-  plan: PlanType,
-  frequencyType: SubscriptionFrequencyType
+  _plan: PlanType,
+  _frequencyType: SubscriptionFrequencyType
 ): number {
-  const planData = PLANS[plan]
-  return frequencyType === 'months' ? planData.priceMonthly : planData.priceAnnual
+  // Plano único e anual: preço fixo do clube.
+  return CLUB_PLAN.price
 }
 
 // ============================================

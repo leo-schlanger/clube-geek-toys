@@ -34,20 +34,19 @@ const createMemberSchema = z.object({
   fullName: z.string().min(3).max(200),
   email: z.string().email(),
   phone: z.string().optional(),
-  plan: z.enum(['silver', 'gold', 'black']),
-  paymentType: z.enum(['monthly', 'annual']),
+  plan: z.enum(['club']).default('club'),
+  paymentType: z.enum(['annual']).default('annual'),
 });
 
 const updateMemberSchema = z.object({
   fullName: z.string().min(3).max(200).optional(),
   phone: z.string().optional(),
   photoUrl: z.string().optional(),
-  plan: z.enum(['silver', 'gold', 'black']).optional(),
+  plan: z.enum(['club']).optional(),
   status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
-  paymentType: z.enum(['monthly', 'annual']).optional(),
+  paymentType: z.enum(['annual']).optional(),
   startDate: z.string().optional(),
   expiryDate: z.string().optional(),
-  points: z.number().optional(),
   pendingPayment: z.any().optional(),
   subscriptionId: z.string().nullable().optional(),
   subscriptionStatus: z.string().nullable().optional(),
@@ -59,12 +58,12 @@ const updateMemberSchema = z.object({
 // Validated query schema for member list
 const listQuerySchema = z.object({
   status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
-  plan: z.enum(['silver', 'gold', 'black']).optional(),
-  paymentType: z.enum(['monthly', 'annual']).optional(),
+  plan: z.enum(['club']).optional(),
+  paymentType: z.enum(['annual']).optional(),
   search: z.string().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  sort: z.enum(['created_at', 'full_name', 'expiry_date', 'points']).default('created_at'),
+  sort: z.enum(['created_at', 'full_name', 'expiry_date']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 

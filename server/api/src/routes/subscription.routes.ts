@@ -14,8 +14,8 @@ subscriptionRouter.use(authenticate);
 // No `encrypted_card` needed — Stripe Elements handles tokenization client-side.
 const createSchema = z.object({
   member_id: z.string().uuid(),
-  plan: z.enum(['silver', 'gold', 'black']),
-  frequency_type: z.enum(['months', 'years']),
+  plan: z.enum(['club']).default('club'),
+  frequency_type: z.enum(['months', 'years']).default('years'),
   payer_email: z.string().email(),
   payer_name: z.string().min(1),
   transaction_amount: z.number().positive(),

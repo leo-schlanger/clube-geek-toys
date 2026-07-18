@@ -4,7 +4,7 @@ import { getStripe, getOrCreateCustomer, mapStripePaymentStatus } from '../utils
 import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
 import { sendTemplateEmail } from './email.service.js';
 import { AppError } from '../middleware/error-handler.js';
-import { PLAN_PRICES } from '../types/index.js';
+import { CLUB_PLAN_PRICE } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
 import crypto from 'crypto';
 
@@ -23,8 +23,7 @@ function validateAmount(amount: number): void {
       'AMOUNT_OUT_OF_RANGE',
     );
   }
-  const validPrices: number[] = Object.values(PLAN_PRICES).flatMap((p) => [p.monthly, p.annual]);
-  const matchesPrice = validPrices.some((p) => Math.abs(p - amount) < 0.01);
+  const matchesPrice = Math.abs(CLUB_PLAN_PRICE - amount) < 0.01;
   if (!matchesPrice) {
     throw new AppError(400, `Valor inválido: R$${amount.toFixed(2)}`, 'INVALID_AMOUNT');
   }

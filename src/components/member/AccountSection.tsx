@@ -102,9 +102,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
               <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <p className="text-[10px] text-muted-foreground uppercase">Cobrança</p>
-                <p className="text-sm font-medium">
-                  {member.paymentType === 'monthly' ? 'Mensal' : 'Anual'}
-                </p>
+                <p className="text-sm font-medium">Anual</p>
               </div>
             </div>
           </div>

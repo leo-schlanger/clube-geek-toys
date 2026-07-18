@@ -1,18 +1,17 @@
 import { Button } from '../ui/button'
 import { type Member } from '../../types'
 import { calculateDaysUntilExpiry } from '../../lib/utils'
-import { RefreshCw, ArrowUp, Settings } from 'lucide-react'
+import { getShopUrl } from '../../lib/subdomain'
+import { RefreshCw, Settings, ShoppingBag } from 'lucide-react'
 
 interface QuickActionsProps {
   member: Member
   onRenew: () => void
-  onUpgrade: () => void
   onEditProfile: () => void
 }
 
-export function QuickActions({ member, onRenew, onUpgrade, onEditProfile }: QuickActionsProps) {
+export function QuickActions({ member, onRenew, onEditProfile }: QuickActionsProps) {
   const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
-  const isMaxPlan = member.plan === 'black'
   const needsRenewal = daysUntilExpiry <= 30
 
   return (
@@ -38,27 +37,17 @@ export function QuickActions({ member, onRenew, onUpgrade, onEditProfile }: Quic
         </Button>
       )}
 
-      {!isMaxPlan ? (
-        <Button
-          variant="outline"
-          size="lg"
-          className="w-full h-14 text-base"
-          onClick={onUpgrade}
-        >
-          <ArrowUp className="h-5 w-5 mr-2" />
-          Fazer Upgrade
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="lg"
-          className="w-full h-14 text-base"
-          onClick={onRenew}
-        >
-          <RefreshCw className="h-5 w-5 mr-2" />
-          Renovar
-        </Button>
-      )}
+      <Button
+        variant="outline"
+        size="lg"
+        className="w-full h-14 text-base"
+        asChild
+      >
+        <a href={getShopUrl()}>
+          <ShoppingBag className="h-5 w-5 mr-2" />
+          Ir para a loja
+        </a>
+      </Button>
     </div>
   )
 }

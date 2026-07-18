@@ -7,9 +7,6 @@ import {
   Filter,
   X,
   Calendar,
-  Star,
-  Crown,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   RotateCcw,
@@ -44,15 +41,8 @@ const STATUS_OPTIONS = [
   { value: 'expired', label: 'Expirado', color: 'bg-red-500' },
 ]
 
-const PLAN_OPTIONS: { value: PlanType; label: string; icon: React.ReactNode }[] = [
-  { value: 'silver', label: 'Silver', icon: <Star className="h-4 w-4" /> },
-  { value: 'gold', label: 'Gold', icon: <Crown className="h-4 w-4" /> },
-  { value: 'black', label: 'Black', icon: <Sparkles className="h-4 w-4" /> },
-]
-
 const SORT_OPTIONS = [
   { value: 'name', label: 'Nome' },
-  { value: 'points', label: 'Pontos' },
   { value: 'expiry', label: 'Validade' },
   { value: 'created', label: 'Data de Cadastro' },
 ]
@@ -81,11 +71,11 @@ export function MemberFilters({ filters, onChange, onReset, activeFiltersCount }
     onChange({ ...filters, [key]: value })
   }
 
-  const toggleArrayFilter = <K extends 'status' | 'plans'>(
-    key: K,
-    value: MemberFiltersState[K][number]
+  const toggleArrayFilter = (
+    key: 'status',
+    value: string
   ) => {
-    const current = filters[key] as string[]
+    const current = filters[key]
     const updated = current.includes(value)
       ? current.filter((v) => v !== value)
       : [...current, value]
@@ -160,25 +150,6 @@ export function MemberFilters({ filters, onChange, onReset, activeFiltersCount }
         ))}
       </div>
 
-      {/* Quick plan filters */}
-      <div className="flex flex-wrap gap-2">
-        <span className="text-sm text-muted-foreground self-center mr-2">Planos:</span>
-        {PLAN_OPTIONS.map((plan) => (
-          <button
-            key={plan.value}
-            onClick={() => toggleArrayFilter('plans', plan.value)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              filters.plans.includes(plan.value)
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80 text-foreground'
-            }`}
-          >
-            {plan.icon}
-            {plan.label}
-          </button>
-        ))}
-      </div>
-
       {/* Advanced filters */}
       {showAdvanced && (
         <div className="pt-4 border-t space-y-4 animate-in fade-in slide-in-from-top-2">
@@ -204,26 +175,6 @@ export function MemberFilters({ filters, onChange, onReset, activeFiltersCount }
                 type="date"
                 value={filters.expiryTo}
                 onChange={(e) => updateFilter('expiryTo', e.target.value)}
-              />
-            </div>
-
-            {/* Points range */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Pontos (mínimo)</label>
-              <Input
-                type="number"
-                placeholder="0"
-                value={filters.pointsMin}
-                onChange={(e) => updateFilter('pointsMin', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Pontos (máximo)</label>
-              <Input
-                type="number"
-                placeholder="Sem limite"
-                value={filters.pointsMax}
-                onChange={(e) => updateFilter('pointsMax', e.target.value)}
               />
             </div>
 

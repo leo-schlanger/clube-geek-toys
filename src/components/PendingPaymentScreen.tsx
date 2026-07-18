@@ -18,8 +18,6 @@ import {
   CreditCard,
   AlertTriangle,
   LogOut,
-  Star,
-  Crown,
   Sparkles,
   CheckCircle,
   XCircle,
@@ -45,7 +43,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   const [hasPendingPayment, setHasPendingPayment] = useState(!!member.pendingPayment)
 
   const plan = PLANS[member.plan as PlanType]
-  const price = member.paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
+  const price = plan.price
   const isConfigured = isPaymentConfigured()
 
   // Check for contract and previous pending payment on mount
@@ -104,26 +102,18 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   }
 
   const planIcons = {
-    silver: <Star className="h-6 w-6" />,
-    gold: <Crown className="h-6 w-6" />,
-    black: <Sparkles className="h-6 w-6" />,
+    club: <Sparkles className="h-6 w-6" />,
   }
 
   const planColors = {
-    silver: 'from-slate-400 to-slate-600',
-    gold: 'from-yellow-400 to-amber-600',
-    black: 'from-gray-700 to-gray-900',
+    club: 'from-violet-500 to-purple-700',
   }
 
   async function handlePaymentSuccess() {
     // Calculate new expiry date
     const now = new Date()
     const newExpiry = new Date(now)
-    if (member.paymentType === 'monthly') {
-      newExpiry.setMonth(newExpiry.getMonth() + 1)
-    } else {
-      newExpiry.setFullYear(newExpiry.getFullYear() + 1)
-    }
+    newExpiry.setFullYear(newExpiry.getFullYear() + 1)
 
     // Update member status to active
     const success = await updateMember(member.id, {
@@ -195,7 +185,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
             </h2>
             <p className="text-sm text-red-100/90 mt-1">
               Sua assinatura está <strong>INATIVA</strong> até a confirmação do pagamento.
-              Você <strong>não pode usar os benefícios</strong> (descontos, pontos, brindes) enquanto o pagamento estiver pendente.
+              Você <strong>não pode usar os benefícios</strong> (descontos, brindes) enquanto o pagamento estiver pendente.
             </p>
           </div>
         </div>
@@ -232,14 +222,14 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                   <div>
                     <p className="font-bold text-lg">Plano {plan.name}</p>
                     <p className="text-sm opacity-80">
-                      {member.paymentType === 'monthly' ? 'Mensal' : 'Anual'}
+                      Anual
                     </p>
                   </div>
                 </div>
                 <div className="text-2xl font-bold">
                   {formatCurrency(price)}
                   <span className="text-sm font-normal opacity-80">
-                    /{member.paymentType === 'monthly' ? 'mês' : 'ano'}
+                    /ano
                   </span>
                 </div>
               </div>
@@ -437,7 +427,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
       {showPayment && (
         <PaymentModal
           plan={member.plan as PlanType}
-          paymentType={member.paymentType as 'monthly' | 'annual'}
+          paymentType={member.paymentType}
           memberEmail={member.email}
           memberId={member.id}
           initialPendingPayment={hasPendingPayment ? member.pendingPayment : undefined}
@@ -455,7 +445,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
           memberEmail={member.email}
           memberPhone={member.phone}
           plan={member.plan as PlanType}
-          paymentType={member.paymentType as 'monthly' | 'annual'}
+          paymentType={member.paymentType}
           onClose={() => setShowContract(false)}
           onSigned={handleContractSigned}
         />

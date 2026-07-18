@@ -20,7 +20,6 @@ function mapMemberRow(row: pg.QueryResultRow): Member {
     paymentType: row.payment_type,
     startDate: row.start_date,
     expiryDate: row.expiry_date,
-    points: row.points,
     pendingPayment: row.pending_payment,
     subscriptionId: row.subscription_id,
     subscriptionStatus: row.subscription_status,
@@ -40,7 +39,7 @@ export async function listMembers(opts: {
   search?: string;
   page: number;
   limit: number;
-  sort?: 'created_at' | 'full_name' | 'expiry_date' | 'points';
+  sort?: 'created_at' | 'full_name' | 'expiry_date';
   order?: 'asc' | 'desc';
 }) {
   const conditions: string[] = [];
@@ -71,7 +70,7 @@ export async function listMembers(opts: {
   const page = Math.max(1, opts.page || 1);
   const offset = (page - 1) * limit;
 
-  const sortColumn = ['created_at', 'full_name', 'expiry_date', 'points'].includes(opts.sort || '') ? opts.sort : 'created_at';
+  const sortColumn = ['created_at', 'full_name', 'expiry_date'].includes(opts.sort || '') ? opts.sort : 'created_at';
   const sortOrder = opts.order === 'asc' ? 'ASC' : 'DESC';
 
   const [dataResult, countResult] = await Promise.all([
@@ -170,7 +169,7 @@ export async function updateMember(
   const memberAllowedFields = ['fullName', 'phone', 'photoUrl', 'pendingPayment'];
   const adminFields = [
     'fullName', 'phone', 'photoUrl', 'plan', 'status', 'paymentType',
-    'startDate', 'expiryDate', 'points', 'pendingPayment',
+    'startDate', 'expiryDate', 'pendingPayment',
     'subscriptionId', 'subscriptionStatus', 'autoRenewal',
     'activatedAt', 'activatedByPayment',
   ];
@@ -187,7 +186,6 @@ export async function updateMember(
     paymentType: 'payment_type',
     startDate: 'start_date',
     expiryDate: 'expiry_date',
-    points: 'points',
     pendingPayment: 'pending_payment',
     subscriptionId: 'subscription_id',
     subscriptionStatus: 'subscription_status',

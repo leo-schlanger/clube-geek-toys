@@ -5,7 +5,7 @@
  * to show different interfaces for admin vs members
  */
 
-export type AppMode = 'admin' | 'member'
+export type AppMode = 'admin' | 'member' | 'shop'
 
 /**
  * Get the current subdomain from the hostname
@@ -38,10 +38,43 @@ export function isAdminSubdomain(): boolean {
 }
 
 /**
+ * Check if running on the store subdomain (shop.geeketoys.com.br)
+ */
+export function isShopSubdomain(): boolean {
+  return getSubdomain() === 'shop'
+}
+
+/**
  * Get the current app mode based on subdomain
  */
 export function getAppMode(): AppMode {
-  return isAdminSubdomain() ? 'admin' : 'member'
+  if (isAdminSubdomain()) return 'admin'
+  if (isShopSubdomain()) return 'shop'
+  return 'member'
+}
+
+/**
+ * URL absoluta da loja (shop.geeketoys.com.br em produção; ?subdomain=shop no localhost).
+ */
+export function getShopUrl(): string {
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+  const port = window.location.port ? `:${window.location.port}` : ''
+
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `${protocol}//${hostname}${port}?subdomain=shop`
+  }
+
+  const parts = hostname.split('.')
+  if (parts.length >= 2) {
+    const currentSub = parts[0].toLowerCase()
+    if (['adm', 'admin', 'club', 'shop', 'www'].includes(currentSub)) {
+      parts[0] = 'shop'
+    } else {
+      parts.unshift('shop')
+    }
+  }
+  return `${protocol}//${parts.join('.')}${port}`
 }
 
 /**

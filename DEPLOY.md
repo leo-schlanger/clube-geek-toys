@@ -203,9 +203,29 @@ docker compose run --rm certbot certonly \
   -d club.geeketoys.com.br \
   -d admin.geeketoys.com.br \
   -d adm.geeketoys.com.br \
+  -d shop.geeketoys.com.br \
   -d api.geeketoys.com.br \
   -d analytics.geeketoys.com.br \
   -d radio.geeketoys.com.br
+```
+
+### Adicionar um subdomínio ao cert existente (ex.: `shop`)
+
+Use `--expand` para incluir um novo domínio mantendo os já emitidos. Pré-requisito:
+o registro DNS `A/CNAME` de `shop.geeketoys.com.br` já apontando para a VPS.
+
+```bash
+docker compose run --rm certbot certonly --webroot -w /var/www/certbot --expand \
+  -d club.geeketoys.com.br \
+  -d admin.geeketoys.com.br \
+  -d adm.geeketoys.com.br \
+  -d shop.geeketoys.com.br \
+  -d api.geeketoys.com.br \
+  -d analytics.geeketoys.com.br \
+  -d radio.geeketoys.com.br
+
+# recarrega o nginx do clube com o server block novo + cert atualizado
+docker compose up -d --force-recreate nginx
 ```
 
 ### Verificar renovação

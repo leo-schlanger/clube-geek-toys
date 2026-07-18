@@ -1,5 +1,4 @@
 export { RevenueChart } from './RevenueChart'
 export { MembersChart } from './MembersChart'
-export { PointsChart } from './PointsChart'
 export { ChurnMetrics } from './ChurnMetrics'
 export { ReportFilters } from './ReportFilters'

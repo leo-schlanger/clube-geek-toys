@@ -1,12 +1,11 @@
 // Shared types — mirrors frontend src/types/index.ts
 
-export type PlanType = 'silver' | 'gold' | 'black';
+export type PlanType = 'club';
 export type MemberStatus = 'active' | 'pending' | 'inactive' | 'expired';
-export type PaymentType = 'monthly' | 'annual';
+export type PaymentType = 'annual';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'pix' | 'credit_card' | 'boleto' | 'cash';
 export type UserRole = 'member' | 'seller' | 'admin' | 'disabled';
-export type PointTransactionType = 'earn' | 'redeem' | 'expire' | 'bonus';
 export type SubscriptionStatus = 'pending' | 'authorized' | 'paused' | 'cancelled';
 export type SubscriptionFrequencyType = 'months' | 'years';
 export type ContractStatus = 'active' | 'superseded';
@@ -34,7 +33,6 @@ export interface Member {
   paymentType: PaymentType;
   startDate: string | null;
   expiryDate: string | null;
-  points: number;
   pendingPayment: Record<string, unknown> | null;
   subscriptionId: string | null;
   subscriptionStatus: string | null;
@@ -56,21 +54,6 @@ export interface Payment {
   providerStatus: string | null;
   reference: string | null;
   paidAt: string | null;
-  createdAt: string;
-}
-
-export interface PointTransaction {
-  id: string;
-  memberId: string;
-  type: PointTransactionType;
-  points: number;
-  balance: number;
-  description: string | null;
-  purchaseValue: number | null;
-  expiresAt: string | null;
-  expired: boolean;
-  isPromotion: boolean;
-  createdBy: string | null;
   createdAt: string;
 }
 
@@ -120,27 +103,78 @@ export interface AuditLog {
   timestamp: string;
 }
 
-// Plan pricing
-// MUST match frontend PLANS in src/types/index.ts
-export const PLAN_PRICES = {
-  silver: { monthly: 19.90, annual: 199.90 },
-  gold: { monthly: 39.90, annual: 399.90 },
-  black: { monthly: 49.90, annual: 499.90 },
-} as const;
+// Preço do plano único anual do clube (BRL).
+// MUST match frontend CLUB_PLAN.price in src/types/index.ts
+export const CLUB_PLAN_PRICE = 149.99;
 
-// Points multiplier by plan
-export const POINTS_MULTIPLIER = {
-  silver: 1,
-  gold: 2,
-  black: 3,
-} as const;
+// Desconto do membro ativo na loja (fração). Aplicado server-side no checkout.
+export const MEMBER_SHOP_DISCOUNT = 0.15;
 
-// Points expiration in months
-export const POINTS_EXPIRY_MONTHS = 6;
+// ─── Shop / e-commerce ────────────────────────────────────────────────────────
 
-// Valid redemption rules (enforced server-side)
-export const REDEMPTION_RULES = [
-  { points: 500, value: 25, description: 'R$ 25 de desconto' },
-  { points: 800, value: 50, description: 'R$ 50 de desconto' },
-  { points: 1500, value: 100, description: 'R$ 100 de desconto' },
-] as const;
+export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
+export type OrderPaymentMethod = 'pix' | 'credit_card';
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  categoryId: string | null;
+  categoryName?: string | null;
+  images: string[];
+  stock: number;
+  sku: string | null;
+  active: boolean;
+  featured: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  productId: string | null;
+  productName: string;
+  productSlug: string | null;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+  imageUrl: string | null;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: number;
+  memberId: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string | null;
+  shippingAddress: Record<string, unknown> | null;
+  subtotal: number;
+  discount: number;
+  discountReason: string | null;
+  shippingCost: number;
+  total: number;
+  status: OrderStatus;
+  paymentMethod: OrderPaymentMethod | null;
+  stripePaymentIntentId: string | null;
+  pixTxid: string | null;
+  paidAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: OrderItem[];
+}

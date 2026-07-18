@@ -8,15 +8,8 @@ export interface RealtimeStats {
   expiredMembers: number
   monthlyRevenue: number
   todayRevenue: number
-  membersByPlan: {
-    silver: number
-    gold: number
-    black: number
-  }
   newMembersToday: number
   newMembersThisWeek: number
-  pointsEarnedToday: number
-  pointsRedeemedToday: number
 }
 
 export interface StatsTrend {
@@ -45,11 +38,8 @@ const initialStats: RealtimeStats = {
   expiredMembers: 0,
   monthlyRevenue: 0,
   todayRevenue: 0,
-  membersByPlan: { silver: 0, gold: 0, black: 0 },
   newMembersToday: 0,
   newMembersThisWeek: 0,
-  pointsEarnedToday: 0,
-  pointsRedeemedToday: 0,
 }
 
 function calculateTrend(current: number, previous: number): StatsTrend {
@@ -94,10 +84,12 @@ export function useRealtimeStats(): RealtimeStatsResult {
           return
         }
 
-        const data = result.data
+        const data = (result.data ?? {}) as {
+          members?: Record<string, number>
+          payments?: Record<string, number>
+        }
         const members = data.members || {}
         const payments = data.payments || {}
-        const pointsToday = data.pointsToday || {}
 
         const newStats: RealtimeStats = {
           totalMembers: members.total || 0,
@@ -106,15 +98,8 @@ export function useRealtimeStats(): RealtimeStatsResult {
           expiredMembers: (members.expired || 0) + (members.inactive || 0),
           monthlyRevenue: payments.month_revenue || 0,
           todayRevenue: payments.today_revenue || 0,
-          membersByPlan: {
-            silver: members.silver || 0,
-            gold: members.gold || 0,
-            black: members.black || 0,
-          },
           newMembersToday: members.new_today || 0,
           newMembersThisWeek: members.new_this_week || 0,
-          pointsEarnedToday: pointsToday.earned || 0,
-          pointsRedeemedToday: pointsToday.redeemed || 0,
         }
 
         if (previousStatsRef.current) {

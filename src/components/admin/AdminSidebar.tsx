@@ -11,12 +11,13 @@ import {
 import {
   LayoutDashboard,
   Users,
-  Star,
   UserCog,
   FileText,
   BarChart3,
   Settings,
   ShoppingCart,
+  Package,
+  ClipboardList,
   LogOut,
   Menu,
 } from 'lucide-react'
@@ -24,7 +25,7 @@ import { useState } from 'react'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
 
-export type AdminTab = 'dashboard' | 'members' | 'points' | 'users' | 'logs' | 'reports' | 'settings'
+export type AdminTab = 'dashboard' | 'members' | 'products' | 'orders' | 'users' | 'logs' | 'reports' | 'settings'
 
 interface AdminSidebarProps {
   activeTab: AdminTab
@@ -35,7 +36,8 @@ interface AdminSidebarProps {
 const menuItems: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'members', label: 'Membros', icon: Users },
-  { id: 'points', label: 'Pontos', icon: Star },
+  { id: 'products', label: 'Produtos', icon: Package },
+  { id: 'orders', label: 'Pedidos', icon: ClipboardList },
   { id: 'users', label: 'Usuários', icon: UserCog },
   { id: 'logs', label: 'Logs', icon: FileText },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },

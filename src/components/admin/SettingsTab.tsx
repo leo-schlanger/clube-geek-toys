@@ -1,31 +1,15 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { Badge } from '../ui/badge'
 import { toast } from 'sonner'
-import { Save, RotateCcw, Star, Crown, Sparkles, AlertTriangle, Loader2, Database } from 'lucide-react'
+import { Save, RotateCcw, AlertTriangle, Loader2, Database } from 'lucide-react'
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 
 interface SettingsState {
   values: Record<string, unknown>
   catalogue: SettingDefinition[]
-}
-
-const PLAN_KEYS = ['silver', 'gold', 'black'] as const
-type PlanKey = typeof PLAN_KEYS[number]
-
-const planIcons: Record<PlanKey, ReactNode> = {
-  silver: <Star className="h-5 w-5" />,
-  gold: <Crown className="h-5 w-5" />,
-  black: <Sparkles className="h-5 w-5" />,
-}
-
-const planColors: Record<PlanKey, string> = {
-  silver: 'from-slate-400 to-slate-600',
-  gold: 'from-yellow-400 to-yellow-600',
-  black: 'from-violet-600 to-purple-800',
 }
 
 export function SettingsTab() {
@@ -127,108 +111,33 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Plans Configuration */}
+      {/* Plan Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Configuração de Planos</CardTitle>
-          <CardDescription>Defina preços e descontos de cada plano</CardDescription>
+          <CardTitle>Configuração do Plano</CardTitle>
+          <CardDescription>Defina o preço anual e o desconto do clube</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-3 gap-6">
-            {PLAN_KEYS.map((planKey) => (
-              <div
-                key={planKey}
-                className={`rounded-xl bg-gradient-to-br ${planColors[planKey]} p-[1px]`}
-              >
-                <div className="bg-card rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-2 text-foreground">
-                    {planIcons[planKey]}
-                    <span className="font-bold capitalize">{planKey}</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-xs">Preço Mensal (R$)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={num(`pricing.${planKey}_monthly`)}
-                        onChange={(e) => setValue(`pricing.${planKey}_monthly`, parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Preço Anual (R$)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={num(`pricing.${planKey}_annual`)}
-                        onChange={(e) => setValue(`pricing.${planKey}_annual`, parseFloat(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Desconto Produtos (%)</Label>
-                      <Input
-                        type="number"
-                        value={num(`plan.${planKey}.discount_products`)}
-                        onChange={(e) => setValue(`plan.${planKey}.discount_products`, parseInt(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs">Desconto Serviços (%)</Label>
-                      <Input
-                        type="number"
-                        value={num(`plan.${planKey}.discount_services`)}
-                        onChange={(e) => setValue(`plan.${planKey}.discount_services`, parseInt(e.target.value) || 0)}
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Points */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Multiplicadores de Pontos</CardTitle>
-          <CardDescription>Quantos pontos cada plano ganha por real gasto</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-4">
-            {PLAN_KEYS.map((planKey) => (
-              <div key={planKey} className="flex items-center gap-3 p-4 bg-muted rounded-lg">
-                <Badge variant={planKey} className="gap-1">
-                  {planIcons[planKey]}
-                  {planKey}
-                </Badge>
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    value={num(`points.multiplier_${planKey}`)}
-                    onChange={(e) => setValue(`points.multiplier_${planKey}`, parseFloat(e.target.value) || 0)}
-                    className="w-24"
-                  />
-                </div>
-                <span className="text-sm text-muted-foreground">pts/R$</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4">
-            <Label className="text-xs">Dias até expiração de pontos</Label>
-            <Input
-              type="number"
-              value={num('points.expiry_days')}
-              onChange={(e) => setValue('points.expiry_days', parseInt(e.target.value) || 0)}
-              className="mt-1 max-w-xs"
-            />
+          <div className="grid md:grid-cols-2 gap-6 max-w-xl">
+            <div>
+              <Label className="text-xs">Preço Anual (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={num('pricing.club_annual')}
+                onChange={(e) => setValue('pricing.club_annual', parseFloat(e.target.value) || 0)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Desconto em Produtos (%)</Label>
+              <Input
+                type="number"
+                value={num('plan.club.discount_products')}
+                onChange={(e) => setValue('plan.club.discount_products', parseInt(e.target.value) || 0)}
+                className="mt-1"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

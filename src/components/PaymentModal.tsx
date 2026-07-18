@@ -14,7 +14,7 @@ import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { StripePaymentForm } from './StripePaymentForm'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../lib/payments'
-import { PLANS, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
+import { CLUB_PLAN, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { savePendingPayment, clearPendingPayment } from '../lib/members'
 import { api } from '../lib/api-client'
@@ -51,7 +51,6 @@ interface PaymentModalProps {
 
 export function PaymentModal({
   plan,
-  paymentType,
   memberEmail = 'cliente@email.com',
   memberId = 'temp_member',
   memberName = 'Membro',
@@ -72,8 +71,8 @@ export function PaymentModal({
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const planData = PLANS[plan]
-  const amount = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+  const planData = CLUB_PLAN
+  const amount = CLUB_PLAN.price
 
   useEffect(() => {
     return () => {
@@ -211,7 +210,7 @@ export function PaymentModal({
         const res = await api.post<{ clientSecret: string; id: string }>('/subscription/create', {
           member_id: memberId,
           plan,
-          frequency_type: paymentType === 'monthly' ? 'months' : 'years',
+          frequency_type: 'years',
           payer_email: memberEmail,
           payer_name: memberName,
           transaction_amount: amount,
@@ -240,7 +239,7 @@ export function PaymentModal({
     } finally {
       setLoading(false)
     }
-  }, [mode, memberId, plan, paymentType, amount, memberEmail, planData.name])
+  }, [mode, memberId, plan, amount, memberEmail, planData.name])
 
   function handlePaymentSuccess() {
     if (memberId !== 'temp_member') clearPendingPayment(memberId).catch(() => {})
@@ -261,7 +260,7 @@ export function PaymentModal({
             Pagamento
           </CardTitle>
           <CardDescription>
-            Plano {planData.name} — {formatCurrency(amount)}{paymentType === 'monthly' ? '/mês' : '/ano'}
+            Plano {planData.name} — {formatCurrency(amount)}/ano
           </CardDescription>
         </CardHeader>
 
@@ -293,7 +292,7 @@ export function PaymentModal({
             <div>
               <p className="font-medium">{planData.name}</p>
               <p className="text-sm text-muted-foreground">
-                {mode === 'subscription' ? 'Recorrente' : 'Pagamento único'} · {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
+                {mode === 'subscription' ? 'Recorrente' : 'Pagamento único'} · Anual
               </p>
             </div>
             <Badge variant="default" className="text-lg px-3 py-1">{formatCurrency(amount)}</Badge>
@@ -402,7 +401,7 @@ export function PaymentModal({
               onCancel={() => { setMethod(null); setClientSecret(null); setError(null) }}
               amount={amount}
               submitLabel={mode === 'subscription'
-                ? `Assinar por ${formatCurrency(amount)}/${paymentType === 'monthly' ? 'mês' : 'ano'}`
+                ? `Assinar por ${formatCurrency(amount)}/ano`
                 : undefined
               }
             />

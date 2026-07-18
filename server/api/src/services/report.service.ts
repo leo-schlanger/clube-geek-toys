@@ -3,7 +3,7 @@ import { query } from '../config/database.js';
 export async function getDailyReport() {
   const today = new Date().toISOString().split('T')[0];
 
-  const [revenue, members, points] = await Promise.all([
+  const [revenue, members] = await Promise.all([
     query(
       `SELECT COALESCE(SUM(amount), 0)::float as total, COUNT(*)::int as count
        FROM payments WHERE status = 'paid' AND paid_at::date = $1`,
@@ -13,18 +13,8 @@ export async function getDailyReport() {
       `SELECT
          COUNT(*)::int as total,
          COUNT(*) FILTER (WHERE status = 'active')::int as active,
-         COUNT(*) FILTER (WHERE created_at::date = $1)::int as new_today,
-         COUNT(*) FILTER (WHERE plan = 'silver')::int as silver,
-         COUNT(*) FILTER (WHERE plan = 'gold')::int as gold,
-         COUNT(*) FILTER (WHERE plan = 'black')::int as black
+         COUNT(*) FILTER (WHERE created_at::date = $1)::int as new_today
        FROM members`,
-      [today]
-    ),
-    query(
-      `SELECT
-         COALESCE(SUM(points) FILTER (WHERE type = 'earn'), 0)::int as earned,
-         COALESCE(SUM(ABS(points)) FILTER (WHERE type = 'redeem'), 0)::int as redeemed
-       FROM point_transactions WHERE created_at::date = $1`,
       [today]
     ),
   ]);
@@ -33,7 +23,6 @@ export async function getDailyReport() {
     date: today,
     revenue: { total: revenue.rows[0].total, paymentCount: revenue.rows[0].count },
     members: members.rows[0],
-    points: points.rows[0],
   };
 }
 
@@ -79,25 +68,6 @@ export async function getChurnReport() {
   }));
 }
 
-export async function getPointsOverview() {
-  const result = await query(
-    `SELECT
-       TO_CHAR(created_at, 'YYYY-MM') as month,
-       COALESCE(SUM(points) FILTER (WHERE type = 'earn'), 0)::int as earned,
-       COALESCE(SUM(ABS(points)) FILTER (WHERE type = 'redeem'), 0)::int as redeemed
-     FROM point_transactions
-     WHERE created_at >= NOW() - INTERVAL '3 months'
-     GROUP BY TO_CHAR(created_at, 'YYYY-MM')
-     ORDER BY month DESC`
-  );
-
-  return result.rows.map((row) => ({
-    month: row.month,
-    earned: row.earned,
-    redeemed: row.redeemed,
-  }));
-}
-
 export async function getTodayRevenue() {
   const result = await query(
     `SELECT COALESCE(SUM(amount), 0)::float as total, COUNT(*)::int as count
@@ -118,7 +88,7 @@ export async function getRealtimeStats() {
   const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).toISOString();
   const startOfDay = new Date().toISOString().split('T')[0];
 
-  const [members, payments, pointsToday] = await Promise.all([
+  const [members, payments] = await Promise.all([
     query(`
       SELECT
         COUNT(*)::int as total,
@@ -126,9 +96,6 @@ export async function getRealtimeStats() {
         COUNT(*) FILTER (WHERE status = 'pending')::int as pending,
         COUNT(*) FILTER (WHERE status = 'expired')::int as expired,
         COUNT(*) FILTER (WHERE status = 'inactive')::int as inactive,
-        COUNT(*) FILTER (WHERE plan = 'silver' AND status = 'active')::int as silver,
-        COUNT(*) FILTER (WHERE plan = 'gold' AND status = 'active')::int as gold,
-        COUNT(*) FILTER (WHERE plan = 'black' AND status = 'active')::int as black,
         COUNT(*) FILTER (WHERE created_at::date = $1)::int as new_today,
         COUNT(*) FILTER (WHERE created_at >= $2)::int as new_this_week
       FROM members`,
@@ -142,20 +109,11 @@ export async function getRealtimeStats() {
       WHERE status = 'paid' AND paid_at >= $1`,
       [startOfMonth]
     ),
-    query(`
-      SELECT
-        COALESCE(SUM(points) FILTER (WHERE type = 'earn'), 0)::int as earned,
-        COALESCE(SUM(ABS(points)) FILTER (WHERE type = 'redeem'), 0)::int as redeemed
-      FROM point_transactions
-      WHERE created_at::date = $1`,
-      [startOfDay]
-    ),
   ]);
 
   return {
     members: members.rows[0],
     payments: payments.rows[0],
-    pointsToday: pointsToday.rows[0],
     timestamp: new Date().toISOString(),
   };
 }

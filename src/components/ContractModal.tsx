@@ -7,7 +7,7 @@ import SignaturePad from 'signature_pad'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { CONTRACT_SECTIONS, CONTRACT_TITLE, CONTRACT_SUBTITLE } from '../data/contract-content'
-import { PLANS, type PlanType, type PaymentType, type ContractData } from '../types'
+import { CLUB_PLAN, type PlanType, type PaymentType, type ContractData } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { generateContractPDF, pdfToBase64, downloadPDF } from '../lib/contract-generator'
 import { storeContract } from '../lib/contract-storage'
@@ -68,8 +68,7 @@ export function ContractModal({
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const signaturePadRef = useRef<SignaturePad | null>(null)
 
-  const planData = PLANS[plan]
-  const price = paymentType === 'monthly' ? planData.priceMonthly : planData.priceAnnual
+  const price = CLUB_PLAN.price
   const canProceed = acceptedTerms && acceptedPrivacy
 
   // Track scroll position in read step
@@ -288,7 +287,7 @@ export function ContractModal({
 
       // Send email (non-blocking)
       sendContractEmail(
-        memberEmail, memberName, planData.name, signedAt, documentHash, pdfToBase64(pdfBytes)
+        memberEmail, memberName, CLUB_PLAN.name, signedAt, documentHash, pdfToBase64(pdfBytes)
       ).catch((emailError) => {
         logger.warn('Contract email failed (non-critical):', emailError)
       })
@@ -404,8 +403,8 @@ export function ContractModal({
                   <p>{memberPhone}</p>
                   <p className="mt-2 pt-2 border-t">
                     <span className="text-muted-foreground">Plano:</span>{' '}
-                    <Badge variant={plan}>{planData.name}</Badge>{' '}
-                    ({paymentType === 'monthly' ? 'Mensal' : 'Anual'}) - <strong>{formatCurrency(price)}</strong>
+                    <Badge variant="club">{CLUB_PLAN.name}</Badge>{' '}
+                    (Anual) - <strong>{formatCurrency(price)}</strong>
                   </p>
                 </div>
 
@@ -554,7 +553,7 @@ export function ContractModal({
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Plano:</span>
-                    <Badge variant={plan}>{planData.name}</Badge>
+                    <Badge variant="club">{CLUB_PLAN.name}</Badge>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Data/Hora:</span>

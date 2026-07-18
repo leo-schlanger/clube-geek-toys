@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { normalizeCPF } from '../lib/sanitize'
@@ -7,7 +7,7 @@ import { validateEmail } from '../lib/email-validation'
 import { createMember, isCPFRegistered } from '../lib/members'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
-import { PLANS, type PlanType, type PaymentType, type ContractData } from '../types'
+import { CLUB_PLAN, type PlanType, type PaymentType, type ContractData } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -29,7 +29,6 @@ const DRAFT_KEY = 'clube_geek_register_draft'
 
 export default function Register() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { signUp, signInWithGoogle, user, emailVerified } = useAuth()
 
   // ─── State ──────────────────────────────────────────────────────────────────
@@ -51,28 +50,10 @@ export default function Register() {
     memberId: '',
   })
 
-  // Plan comes from URL (selected on /assinar page) — user does NOT pick again.
-  // Validate params: reject bogus values and redirect back to plan selection.
-  const rawPlan = searchParams.get('plano')
-  const rawType = searchParams.get('tipo')
-  const VALID_PLANS: PlanType[] = ['silver', 'gold', 'black']
-  const VALID_TYPES: PaymentType[] = ['monthly', 'annual']
-
-  const selectedPlan: PlanType = VALID_PLANS.includes(rawPlan as PlanType)
-    ? (rawPlan as PlanType) : 'silver'
-  const paymentType: PaymentType = VALID_TYPES.includes(rawType as PaymentType)
-    ? (rawType as PaymentType) : 'monthly'
-
-  // Redirect to plan selection if params are invalid (user typed URL manually)
-  useEffect(() => {
-    if (rawPlan && !VALID_PLANS.includes(rawPlan as PlanType)) {
-      toast.error('Plano invalido. Escolha um plano abaixo.')
-      navigate('/assinar', { replace: true })
-    } else if (rawType && !VALID_TYPES.includes(rawType as PaymentType)) {
-      toast.error('Tipo de pagamento invalido. Escolha um plano abaixo.')
-      navigate('/assinar', { replace: true })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // O clube tem plano único e anual. Os params legados (?plano=...&tipo=...)
+  // ainda são lidos por compatibilidade, mas normalizados para 'club'/'annual'.
+  const selectedPlan: PlanType = 'club'
+  const paymentType: PaymentType = 'annual'
 
   // Flow flags
   const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)
@@ -85,8 +66,8 @@ export default function Register() {
   // Double-submit guard
   const isSubmittingRef = useRef(false)
 
-  const plan = PLANS[selectedPlan]
-  const price = paymentType === 'monthly' ? plan.priceMonthly : plan.priceAnnual
+  const plan = CLUB_PLAN
+  const price = plan.price
 
   // ─── Check for returning user ─────────────────────────────────────────────
   useEffect(() => {
@@ -420,11 +401,11 @@ export default function Register() {
         <Card className="mb-6 border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Badge variant={selectedPlan as 'silver' | 'gold' | 'black'}>
+              <Badge variant="club">
                 {plan.name}
               </Badge>
               <span className="text-sm text-muted-foreground">
-                {paymentType === 'monthly' ? 'Mensal' : 'Anual'}
+                Anual
               </span>
             </div>
             <span className="text-lg font-bold">{formatCurrency(price)}</span>

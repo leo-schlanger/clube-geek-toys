@@ -8,18 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/badge'
 import { Loading } from '../components/ui/loading'
 import { QRScanner } from '../components/QRScanner'
-import { PLANS, POINTS_MULTIPLIER, type Member, type PlanType, type RedemptionRule } from '../types'
+import { CLUB_PLAN, type Member } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
-import { getMemberByCPF, isMemberActive, getMemberDiscount } from '../lib/members'
-import {
-  addPoints,
-  redeemPoints,
-  getRedemptionRules,
-  getAvailableRedemptions,
-  getExpiringPoints,
-  formatPoints,
-} from '../lib/points'
-import { toast } from 'sonner'
+import { getMemberByCPF, isMemberActive } from '../lib/members'
 
 // Schema de validação para QR Code do membro
 const qrCodeSchema = z.object({
@@ -39,10 +30,6 @@ import {
   User,
   RefreshCw,
   LogOut,
-  Gift,
-  Tag,
-  Coins,
-  Clock,
   Percent,
 } from 'lucide-react'
 
@@ -53,93 +40,12 @@ interface VerificationResult {
 }
 
 export default function PDV() {
-  const { user, signOut } = useAuth()
+  const { signOut } = useAuth()
   const [mode, setMode] = useState<'scanner' | 'search'>('search')
   const [showScanner, setShowScanner] = useState(false)
   const [cpfSearch, setCpfSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<VerificationResult | null>(null)
-  const [purchaseValue, setPurchaseValue] = useState('')
-  const [isPromotion, setIsPromotion] = useState(false)
-  const [addingPoints, setAddingPoints] = useState(false)
-  const [showRedemption, setShowRedemption] = useState(false)
-  const [redeemingPoints, setRedeemingPoints] = useState(false)
-  const [expiringPointsCount, setExpiringPointsCount] = useState(0)
-
-  /**
-   * Handle adding points
-   */
-  async function handleAddPoints() {
-    if (!result?.member || !purchaseValue) return
-
-    const value = parseFloat(purchaseValue.replace(',', '.'))
-    if (isNaN(value) || value <= 0) {
-      toast.error('Valor de compra inválido')
-      return
-    }
-
-    setAddingPoints(true)
-    try {
-      const response = await addPoints(result.member.id, value, isPromotion, user?.uid)
-
-      if (response.success) {
-        if (isPromotion) {
-          toast.info(response.message)
-        } else {
-          toast.success(response.message)
-          // Update local member data
-          setResult({
-            ...result,
-            member: {
-              ...result.member,
-              points: (result.member.points || 0) + response.pointsAdded,
-            },
-          })
-        }
-        setPurchaseValue('')
-        setIsPromotion(false)
-      } else {
-        toast.error(response.message)
-      }
-    } catch (error) {
-      logger.error('Error adding points:', error)
-      toast.error('Erro ao adicionar pontos. Tente novamente.')
-    } finally {
-      setAddingPoints(false)
-    }
-  }
-
-  /**
-   * Handle redeeming points
-   */
-  async function handleRedeemPoints(rule: RedemptionRule) {
-    if (!result?.member) return
-
-    setRedeemingPoints(true)
-    try {
-      const response = await redeemPoints(result.member.id, rule, user?.uid)
-
-      if (response.success) {
-        toast.success(response.message)
-        // Update local member data
-        setResult({
-          ...result,
-          member: {
-            ...result.member,
-            points: (result.member.points || 0) - rule.points,
-          },
-        })
-        setShowRedemption(false)
-      } else {
-        toast.error(response.message)
-      }
-    } catch (error) {
-      logger.error('Error redeeming points:', error)
-      toast.error('Erro ao resgatar pontos. Tente novamente.')
-    } finally {
-      setRedeemingPoints(false)
-    }
-  }
 
   /**
    * Handle QR Code scan
@@ -209,7 +115,6 @@ export default function PDV() {
 
   /**
    * Verify member by CPF
-   * Optimized: non-blocking expiring points check
    */
   async function verifyMember(cpf: string) {
     try {
@@ -227,7 +132,6 @@ export default function PDV() {
       const isActive = isMemberActive(member)
       const isExpired = new Date(member.expiryDate) < new Date()
 
-      // Set result immediately (fast path)
       setResult({
         member,
         isValid: isActive,
@@ -237,19 +141,6 @@ export default function PDV() {
             ? 'Assinatura expirada - desconto não disponível'
             : 'Assinatura pendente - desconto não disponível',
       })
-
-      // Check expiring points in background (non-blocking)
-      if (isActive && member.points > 0) {
-        getExpiringPoints(member.id).then((expiring) => {
-          const expiringTotal = expiring.reduce((sum, t) => sum + t.points, 0)
-          setExpiringPointsCount(expiringTotal)
-        }).catch(() => {
-          // Ignore errors for non-critical data
-          setExpiringPointsCount(0)
-        })
-      } else {
-        setExpiringPointsCount(0)
-      }
     } catch (error) {
       logger.error('Error verifying member:', error)
       setResult({
@@ -266,19 +157,7 @@ export default function PDV() {
   function resetVerification() {
     setResult(null)
     setCpfSearch('')
-    setPurchaseValue('')
-    setIsPromotion(false)
-    setShowRedemption(false)
-    setExpiringPointsCount(0)
   }
-
-  const multiplier = result?.member ? POINTS_MULTIPLIER[result.member.plan as PlanType] : 1
-  const previewPoints = purchaseValue && !isPromotion
-    ? Math.floor(parseFloat(purchaseValue.replace(',', '.') || '0') * multiplier)
-    : 0
-  const availableRedemptions = result?.member
-    ? getAvailableRedemptions(result.member.points || 0)
-    : []
 
   return (
     <div className="min-h-screen bg-background">
@@ -404,18 +283,8 @@ export default function PDV() {
                       <h3 className="text-lg font-bold">{result.member.fullName}</h3>
                       <p className="text-sm text-muted-foreground">{formatCPF(result.member.cpf)}</p>
                     </div>
-                    <Badge
-                      variant={
-                        result.member.plan === 'silver'
-                          ? 'silver'
-                          : result.member.plan === 'gold'
-                            ? 'gold'
-                            : 'black'
-                      }
-                      className="ml-auto"
-                    >
-                      {PLANS[result.member.plan as PlanType].icon}{' '}
-                      {PLANS[result.member.plan as PlanType].name}
+                    <Badge variant="club" className="ml-auto">
+                      {CLUB_PLAN.icon} {CLUB_PLAN.name}
                     </Badge>
                   </div>
 
@@ -439,188 +308,17 @@ export default function PDV() {
                   {result.isValid && (
                     <>
                       <hr />
-                      {/* Discounts */}
-                      {(() => {
-                        const discount = getMemberDiscount(result.member.plan as PlanType, result.member.paymentCount ?? 0)
-                        return (
-                          <div className="grid grid-cols-2 gap-2 sm:gap-4 p-3 sm:p-4 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                            <div className="text-center">
-                              <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                                {discount.products}%
-                              </p>
-                              <p className="text-xs sm:text-sm text-green-700 dark:text-green-300">
-                                Desconto em Produtos
-                              </p>
-                            </div>
-                            <div className="text-center">
-                              <p className={`text-2xl sm:text-3xl font-bold ${discount.serviceDiscountLocked ? 'text-yellow-600' : 'text-green-600'}`}>
-                                {discount.serviceDiscountLocked ? `${PLANS[result.member.plan as PlanType].discountServices}%` : `${discount.services}%`}
-                              </p>
-                              <p className={`text-xs sm:text-sm ${discount.serviceDiscountLocked ? 'text-yellow-700 dark:text-yellow-300' : 'text-green-700 dark:text-green-300'}`}>
-                                {discount.serviceDiscountLocked ? 'Serviços (libera no 2º pgto)' : 'Desconto em Serviços'}
-                              </p>
-                            </div>
-                          </div>
-                        )
-                      })()}
-
-                      <hr />
-
-                      {/* Points Summary */}
-                      <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
-                        <div className="flex items-center gap-3">
-                          <Coins className="h-6 w-6 text-primary" />
-                          <div>
-                            <p className="font-bold text-lg">{formatPoints(result.member.points || 0)} pontos</p>
-                            <p className="text-xs text-muted-foreground">
-                              Multiplicador {PLANS[result.member.plan as PlanType].name}: {multiplier}x
-                            </p>
-                          </div>
+                      {/* Discount Highlight */}
+                      <div className="flex flex-col items-center justify-center gap-2 p-6 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
+                        <div className="flex items-center gap-2 text-green-600">
+                          <Percent className="h-8 w-8" />
+                          <span className="text-4xl sm:text-5xl font-bold">
+                            {CLUB_PLAN.discount}%
+                          </span>
                         </div>
-                        {availableRedemptions.length > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowRedemption(!showRedemption)}
-                          >
-                            <Gift className="h-4 w-4 mr-1" />
-                            Resgatar
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Expiring Points Warning */}
-                      {expiringPointsCount > 0 && (
-                        <div className="flex items-center gap-2 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg border border-yellow-500/30">
-                          <Clock className="h-5 w-5 text-yellow-600" />
-                          <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                            <strong>{formatPoints(expiringPointsCount)} pontos</strong> expiram nos próximos 30 dias
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Redemption Panel */}
-                      {showRedemption && availableRedemptions.length > 0 && (
-                        <div className="space-y-3 p-4 bg-muted rounded-lg">
-                          <h4 className="font-semibold flex items-center gap-2">
-                            <Gift className="h-5 w-5 text-primary" />
-                            Resgatar Pontos
-                          </h4>
-                          <div className="grid gap-2">
-                            {getRedemptionRules().map((rule, index) => {
-                              const isAvailable = (result.member?.points || 0) >= rule.points
-                              return (
-                                <div
-                                  key={index}
-                                  className={`flex items-center justify-between p-3 rounded-lg border ${
-                                    isAvailable
-                                      ? 'bg-card border-primary/30'
-                                      : 'bg-muted/50 border-border opacity-50'
-                                  }`}
-                                >
-                                  <div>
-                                    <p className="font-medium">{rule.description}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {formatPoints(rule.points)} pontos
-                                    </p>
-                                  </div>
-                                  <Button
-                                    size="sm"
-                                    disabled={!isAvailable || redeemingPoints}
-                                    onClick={() => handleRedeemPoints(rule)}
-                                  >
-                                    {redeemingPoints ? <Loading size="sm" /> : 'Resgatar'}
-                                  </Button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <hr />
-
-                      {/* Add Points */}
-                      <div className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <Coins className="h-5 w-5 text-primary" />
-                          <h4 className="font-semibold">Adicionar Pontos de Fidelidade</h4>
-                        </div>
-
-                        {/* Promotion Checkbox */}
-                        <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:bg-muted/50 transition-colors">
-                          <input
-                            type="checkbox"
-                            checked={isPromotion}
-                            onChange={(e) => setIsPromotion(e.target.checked)}
-                            className="w-5 h-5 rounded border-border text-primary focus:ring-primary"
-                          />
-                          <div className="flex items-center gap-2">
-                            <Tag className="h-5 w-5 text-orange-500" />
-                            <div>
-                              <p className="font-medium">Compra em Promoção</p>
-                              <p className="text-xs text-muted-foreground">
-                                Pontos não acumulam em compras promocionais
-                              </p>
-                            </div>
-                          </div>
-                        </label>
-
-                        {/* Purchase Value Input */}
-                        <div className="flex flex-col gap-2">
-                          <div className="flex gap-2">
-                            <div className="relative flex-1">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                                R$
-                              </span>
-                              <Input
-                                type="text"
-                                placeholder="0,00"
-                                value={purchaseValue}
-                                onChange={(e) => setPurchaseValue(e.target.value)}
-                                disabled={addingPoints}
-                                className="pl-10"
-                              />
-                            </div>
-                            <Button
-                              onClick={handleAddPoints}
-                              disabled={addingPoints || !purchaseValue}
-                              className="whitespace-nowrap"
-                            >
-                              {addingPoints ? <Loading size="sm" /> : 'Registrar'}
-                            </Button>
-                          </div>
-
-                          {/* Points Preview */}
-                          {purchaseValue && parseFloat(purchaseValue.replace(',', '.')) > 0 && (
-                            <div className={`flex items-center justify-between text-sm p-3 rounded-lg border animate-in fade-in slide-in-from-top-1 ${
-                              isPromotion
-                                ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
-                                : 'bg-primary/5 border-primary/20'
-                            }`}>
-                              {isPromotion ? (
-                                <>
-                                  <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
-                                    <Percent className="h-4 w-4" />
-                                    <span>Compra em promoção</span>
-                                  </div>
-                                  <span className="font-bold text-orange-600 dark:text-orange-400">
-                                    0 pontos
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="text-muted-foreground">
-                                    Base: {Math.floor(parseFloat(purchaseValue.replace(',', '.')))} pts x {multiplier}
-                                  </span>
-                                  <span className="font-bold text-primary">
-                                    +{formatPoints(previewPoints)} pontos
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <p className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">
+                          de desconto em qualquer produto
+                        </p>
                       </div>
                     </>
                   )}
@@ -629,7 +327,7 @@ export default function PDV() {
                     <div className="flex items-center gap-2 p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
                       <AlertTriangle className="h-5 w-5 text-yellow-600" />
                       <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                        Cliente precisa renovar a assinatura para usar os descontos e acumular pontos
+                        Cliente precisa renovar a assinatura para usar o desconto
                       </p>
                     </div>
                   )}
