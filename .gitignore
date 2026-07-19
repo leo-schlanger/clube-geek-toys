@@ -3,6 +3,14 @@
 CLAUDE.md
 CLAUDE.local.md
 
+# Playwright (E2E) — mantém specs/config, ignora artefatos
+e2e/.out/
+e2e/screenshots/
+test-results/
+playwright-report/
+.playwright/
+.e2e-creds.env
+
 # Environment variables (CRITICAL - never commit)
 .env
 .env.local
