@@ -201,8 +201,14 @@ O clube roda em **dois domínios espelho**: `geeketoys.com.br` e `geekpoptoys.co
 Os mesmos subdomínios (club, admin/adm, shop, api, analytics, radio) valem para os dois,
 e o certificado SAN único cobre ambos.
 
+> **Importante — `--entrypoint certbot`**: o serviço `certbot` no compose tem um
+> entrypoint próprio (loop `certbot renew; sleep 12h`). Sem sobrescrever o
+> entrypoint, `docker compose run certbot certonly ...` ignora o `certonly` e cai
+> no loop de renovação (o comando "trava" indefinidamente). Sempre passe
+> `-T --entrypoint certbot` para emitir/expandir manualmente.
+
 ```bash
-docker compose run --rm certbot certonly \
+docker compose run --rm -T --entrypoint certbot certbot certonly \
   --webroot -w /var/www/certbot \
   -d club.geeketoys.com.br \
   -d admin.geeketoys.com.br \
@@ -226,7 +232,8 @@ Use `--expand` para incluir novos domínios mantendo os já emitidos. Pré-requi
 registros DNS `A/CNAME` (ex.: `*.geekpoptoys.com.br`) já apontando para a VPS.
 
 ```bash
-docker compose run --rm certbot certonly --webroot -w /var/www/certbot --expand \
+docker compose run --rm -T --entrypoint certbot certbot certonly --webroot -w /var/www/certbot --expand \
+  --cert-name club.geeketoys.com.br \
   -d club.geeketoys.com.br \
   -d admin.geeketoys.com.br \
   -d adm.geeketoys.com.br \
@@ -242,14 +249,14 @@ docker compose run --rm certbot certonly --webroot -w /var/www/certbot --expand 
   -d analytics.geekpoptoys.com.br \
   -d radio.geekpoptoys.com.br
 
-# recarrega o nginx do clube com os server blocks + cert atualizado
-docker compose up -d --force-recreate nginx
+# recarrega o nginx do clube com o cert atualizado (graceful, sem downtime)
+docker exec clube-geek-nginx nginx -t && docker exec clube-geek-nginx nginx -s reload
 ```
 
 ### Verificar renovação
 
 ```bash
-certbot renew --dry-run
+docker compose run --rm -T --entrypoint certbot certbot renew --dry-run
 ```
 
 ---

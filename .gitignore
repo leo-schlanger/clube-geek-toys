@@ -6,6 +6,7 @@ CLAUDE.local.md
 # Playwright (E2E) — mantém specs/config, ignora artefatos
 e2e/.out/
 e2e/screenshots/
+e2e/tutorial/
 test-results/
 playwright-report/
 .playwright/
