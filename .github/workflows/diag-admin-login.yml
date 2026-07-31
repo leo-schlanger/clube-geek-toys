@@ -87,8 +87,9 @@ jobs:
           docker exec clube-geek-api sh -c 'printf "FRONTEND_URL=%s\nAPI_URL=%s\nNODE_ENV=%s\nADMIN_EMAIL=%s\n" "$FRONTEND_URL" "$API_URL" "$NODE_ENV" "$ADMIN_EMAIL"'
 
           echo "===== STAFF USERS + COUNTS + AUTH AUDIT ====="
-          docker cp /tmp/diag-admin-probe.js clube-geek-api:/tmp/diag-admin-probe.js
-          docker exec -w /app clube-geek-api node /tmp/diag-admin-probe.js
+          docker cp /tmp/diag-admin-probe.js clube-geek-api:/app/diag-admin-probe.js
+          docker exec clube-geek-api node /app/diag-admin-probe.js
+          docker exec clube-geek-api rm -f /app/diag-admin-probe.js || true
 
           echo "===== API LOGS (filtered) ====="
           docker logs clube-geek-api --tail 300 2>&1 | grep -iE 'auth|login|error|CORS|JWT|401|403|rate|Invalid env' | tail -80 || true
