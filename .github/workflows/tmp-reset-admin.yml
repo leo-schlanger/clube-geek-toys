@@ -1,0 +1,38 @@
+name: Tmp Reset Admin
+
+on:
+  workflow_dispatch:
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Reset password hash for geeketoys@gmail.com
+        run: |
+          cat > /tmp/reset-admin.sql <<'SQL'
+          UPDATE users
+          SET password_hash = '$2b$12$5gvwsefTfQc.w9aFE94ajOdfW1v/EsDfUVy/s..e341ZFC51MZTPe',
+              refresh_token_hash = NULL,
+              prev_refresh_token_hash = NULL
+          WHERE email = 'geeketoys@gmail.com' AND role = 'admin'
+          RETURNING email, role, email_verified, length(password_hash) AS pw_hash_len;
+          SQL
+
+          scp -i ~/.ssh/deploy_key /tmp/reset-admin.sql ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/reset-admin.sql
+
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s <<'REMOTE'
+          set -euo pipefail
+          docker cp /tmp/reset-admin.sql clube-geek-postgres:/tmp/reset-admin.sql
+          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -f /tmp/reset-admin.sql'
+          rm -f /tmp/reset-admin.sql
+          docker exec clube-geek-postgres rm -f /tmp/reset-admin.sql || true
+          echo RESET_OK
+          REMOTE
