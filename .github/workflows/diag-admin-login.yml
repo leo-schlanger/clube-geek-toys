@@ -15,57 +15,66 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Diagnose containers + admin users + recent auth
+      - name: Run VPS diagnostics
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s << 'REMOTE'
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'REMOTE'
           set -euo pipefail
           echo "===== HOST / TIME ====="
-          hostname
-          date -u
+          hostname; date -u
 
-          echo "===== DOCKER PS (clube) ====="
+          echo "===== DOCKER PS ====="
           cd /opt/clube-geek-toys/server
-          docker compose ps || docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+          docker compose ps || true
+          docker ps --format "table {{.Names}}\t{{.Status}}" || true
 
-          echo "===== API HEALTH (internal) ====="
+          echo "===== API HEALTH ====="
           docker exec clube-geek-api wget -qO- http://localhost:3001/health || true
+          echo
 
-          echo "===== ADMIN / SELLER USERS (no secrets) ====="
-          docker exec clube-geek-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
-            "SELECT id, email, role, email_verified, created_at,\n                    (refresh_token_hash IS NOT NULL) AS has_refresh,\n                    length(password_hash) AS pw_hash_len\n             FROM users\n             WHERE role IN ('admin','seller','disabled')\n             ORDER BY role, email;" \
-            2>/dev/null || \
-          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id, email, role, email_verified, created_at, (refresh_token_hash IS NOT NULL) AS has_refresh, length(password_hash) AS pw_hash_len FROM users WHERE role IN (\"admin\",\"seller\",\"disabled\") ORDER BY role, email;"' 2>/dev/null || \
-          docker exec clube-geek-postgres sh -c 'source /dev/null; env | grep -i POSTGRES || true; ls /; psql --help | head -2'
+          echo "===== FRONTEND_URL / API_URL / ADMIN_EMAIL ====="
+          docker exec clube-geek-api sh -c 'printf "FRONTEND_URL=%s\nAPI_URL=%s\nNODE_ENV=%s\nADMIN_EMAIL=%s\n" "$FRONTEND_URL" "$API_URL" "$NODE_ENV" "$ADMIN_EMAIL"'
 
-          # Prefer reading env from compose container
-          echo "===== USERS VIA API CONTAINER ENV ====="
-          docker exec clube-geek-api sh -c '
-            node -e "
-              const {Client}=require(\"pg\");
-              const c=new Client({connectionString:process.env.DATABASE_URL});
-              (async()=>{
-                await c.connect();
-                const r=await c.query(\"`SELECT email, role, email_verified, created_at, (refresh_token_hash IS NOT NULL) AS has_refresh, length(password_hash) AS pw_hash_len FROM users WHERE role IN (\'admin\',\'seller\',\'disabled\') ORDER BY role, email`\");
-                console.table(r.rows);
-                const a=await c.query(\"`SELECT action, user_id, details, created_at FROM audit_logs WHERE action LIKE \'auth.%\' ORDER BY created_at DESC LIMIT 20`\");
-                console.log(\"===== RECENT AUTH AUDIT =====\");
-                console.table(a.rows);
-                const t=await c.query(\"`SELECT count(*)::int AS total_users, count(*) FILTER (WHERE role=\'admin\')::int AS admins, count(*) FILTER (WHERE role=\'seller\')::int AS sellers, count(*) FILTER (WHERE role=\'member\')::int AS members, count(*) FILTER (WHERE role=\'disabled\')::int AS disabled FROM users`\");
-                console.log(\"===== USER COUNTS =====\");
-                console.table(t.rows);
-                await c.end();
-              })().catch(e=>{console.error(e); process.exit(1);});
-            "
-          ' || echo "node/pg probe failed"
+          echo "===== STAFF USERS + COUNTS + AUTH AUDIT ====="
+          docker exec clube-geek-api node <<'NODE'
+          const { Client } = require('pg');
+          (async () => {
+            const c = new Client({ connectionString: process.env.DATABASE_URL });
+            await c.connect();
+            const staff = await c.query(`
+              SELECT email, role, email_verified, created_at,
+                     (refresh_token_hash IS NOT NULL) AS has_refresh,
+                     length(password_hash) AS pw_hash_len
+              FROM users
+              WHERE role IN ('admin','seller','disabled')
+              ORDER BY role, email`);
+            console.log('STAFF:');
+            console.log(JSON.stringify(staff.rows, null, 2));
 
-          echo "===== API LOGS (last 80 lines, auth-ish) ====="
-          docker logs clube-geek-api --tail 200 2>&1 | grep -iE 'auth|login|error|CORS|JWT|401|403|rate' | tail -80 || docker logs clube-geek-api --tail 40 2>&1 || true
+            const counts = await c.query(`
+              SELECT count(*)::int AS total,
+                     count(*) FILTER (WHERE role='admin')::int AS admins,
+                     count(*) FILTER (WHERE role='seller')::int AS sellers,
+                     count(*) FILTER (WHERE role='member')::int AS members,
+                     count(*) FILTER (WHERE role='disabled')::int AS disabled
+              FROM users`);
+            console.log('COUNTS:');
+            console.log(JSON.stringify(counts.rows[0], null, 2));
 
-          echo "===== ENV KEYS (names only) ====="
-          docker exec clube-geek-api sh -c 'env | cut -d= -f1 | sort'
+            const audit = await c.query(`
+              SELECT action, user_id, details, created_at
+              FROM audit_logs
+              WHERE action LIKE 'auth.%'
+              ORDER BY created_at DESC
+              LIMIT 25`);
+            console.log('AUTH_AUDIT:');
+            console.log(JSON.stringify(audit.rows, null, 2));
 
-          echo "===== FRONTEND_URL / API_URL ====="
-          docker exec clube-geek-api sh -c 'echo FRONTEND_URL=$FRONTEND_URL; echo API_URL=$API_URL; echo NODE_ENV=$NODE_ENV; echo ADMIN_EMAIL=$ADMIN_EMAIL'
+            await c.end();
+          })().catch((e) => { console.error(e); process.exit(1); });
+          NODE
+
+          echo "===== API LOGS (filtered) ====="
+          docker logs clube-geek-api --tail 300 2>&1 | grep -iE 'auth|login|error|CORS|JWT|401|403|rate|Invalid env' | tail -100 || true
 
           echo "===== DONE ====="
           REMOTE
