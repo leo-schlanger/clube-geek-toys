@@ -17,6 +17,44 @@ jobs:
 
       - name: Run VPS diagnostics
         run: |
+          cat > /tmp/diag-admin.sql <<'SQL'
+          \pset pager off
+          \echo '===== STAFF USERS ====='
+          SELECT email, role, email_verified, created_at,
+                 (refresh_token_hash IS NOT NULL) AS has_refresh,
+                 length(password_hash) AS pw_hash_len
+          FROM users
+          WHERE role IN ('admin','seller','disabled')
+          ORDER BY role, email;
+
+          \echo '===== USER COUNTS ====='
+          SELECT count(*)::int AS total,
+                 count(*) FILTER (WHERE role = 'admin')::int AS admins,
+                 count(*) FILTER (WHERE role = 'seller')::int AS sellers,
+                 count(*) FILTER (WHERE role = 'member')::int AS members,
+                 count(*) FILTER (WHERE role = 'disabled')::int AS disabled
+          FROM users;
+
+          \echo '===== KNOWN EMAILS ====='
+          SELECT email, role, email_verified
+          FROM users
+          WHERE email IN (
+            'geeketoys@gmail.com',
+            'claude-e2e@geeketoys.com.br',
+            'admin@geeketoys.com.br',
+            'leoschlanger@gmail.com'
+          );
+
+          \echo '===== AUTH AUDIT (last 25) ====='
+          SELECT action, user_id, details, created_at
+          FROM audit_logs
+          WHERE action LIKE 'auth.%'
+          ORDER BY created_at DESC
+          LIMIT 25;
+          SQL
+
+          scp -i ~/.ssh/deploy_key /tmp/diag-admin.sql ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/diag-admin.sql
+
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s <<'REMOTE'
           set -euo pipefail
           echo "===== HOST / TIME ====="
@@ -33,40 +71,9 @@ jobs:
           echo "===== ENV ====="
           docker exec clube-geek-api sh -c 'printf "FRONTEND_URL=%s\nAPI_URL=%s\nNODE_ENV=%s\nADMIN_EMAIL=%s\n" "$FRONTEND_URL" "$API_URL" "$NODE_ENV" "$ADMIN_EMAIL"'
 
-          echo "===== STAFF USERS ====="
-          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "
-            SELECT email, role, email_verified, created_at,
-                   (refresh_token_hash IS NOT NULL) AS has_refresh,
-                   length(password_hash) AS pw_hash_len
-            FROM users
-            WHERE role IN ('\''admin'\'','\''seller'\'','\''disabled'\'');
-          "'
-
-          echo "===== USER COUNTS ====="
-          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "
-            SELECT count(*)::int AS total,
-                   count(*) FILTER (WHERE role = '\''admin'\'\'')::int AS admins,
-                   count(*) FILTER (WHERE role = '\''seller'\'\'')::int AS sellers,
-                   count(*) FILTER (WHERE role = '\''member'\'\'')::int AS members,
-                   count(*) FILTER (WHERE role = '\''disabled'\'\'')::int AS disabled
-            FROM users;
-          "'
-
-          echo "===== KNOWN EMAILS ====="
-          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "
-            SELECT email, role, email_verified
-            FROM users
-            WHERE email IN ('\''geeketoys@gmail.com'\'','\''claude-e2e@geeketoys.com.br'\'','\''admin@geeketoys.com.br'\'','\''leoschlanger@gmail.com'\'');
-          "'
-
-          echo "===== AUTH AUDIT (last 25) ====="
-          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off -c "
-            SELECT action, user_id, details, created_at
-            FROM audit_logs
-            WHERE action LIKE '\''auth.%'\'\''
-            ORDER BY created_at DESC
-            LIMIT 25;
-          "' || echo "(audit_logs query failed — table may differ)"
+          echo "===== SQL PROBE ====="
+          docker cp /tmp/diag-admin.sql clube-geek-postgres:/tmp/diag-admin.sql
+          docker exec clube-geek-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /tmp/diag-admin.sql'
 
           echo "===== API LOGS (filtered) ====="
           docker logs clube-geek-api --tail 300 2>&1 | grep -iE 'auth|login|error|CORS|JWT|401|403|rate|Invalid env' | tail -80 || true
