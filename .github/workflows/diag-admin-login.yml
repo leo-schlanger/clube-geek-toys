@@ -17,7 +17,7 @@ jobs:
 
       - name: Run VPS diagnostics
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'bash -s' <<'REMOTE'
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} bash -s <<'REMOTE'
           set -euo pipefail
           echo "===== HOST / TIME ====="
           hostname; date -u
@@ -25,56 +25,43 @@ jobs:
           echo "===== DOCKER PS ====="
           cd /opt/clube-geek-toys/server
           docker compose ps || true
-          docker ps --format "table {{.Names}}\t{{.Status}}" || true
 
           echo "===== API HEALTH ====="
           docker exec clube-geek-api wget -qO- http://localhost:3001/health || true
           echo
 
-          echo "===== FRONTEND_URL / API_URL / ADMIN_EMAIL ====="
+          echo "===== ENV ====="
           docker exec clube-geek-api sh -c 'printf "FRONTEND_URL=%s\nAPI_URL=%s\nNODE_ENV=%s\nADMIN_EMAIL=%s\n" "$FRONTEND_URL" "$API_URL" "$NODE_ENV" "$ADMIN_EMAIL"'
 
           echo "===== STAFF USERS + COUNTS + AUTH AUDIT ====="
-          docker exec clube-geek-api node <<'NODE'
-          const { Client } = require('pg');
+          docker exec -i clube-geek-api node -e '
+          const { Client } = require("pg");
           (async () => {
             const c = new Client({ connectionString: process.env.DATABASE_URL });
             await c.connect();
-            const staff = await c.query(`
-              SELECT email, role, email_verified, created_at,
-                     (refresh_token_hash IS NOT NULL) AS has_refresh,
-                     length(password_hash) AS pw_hash_len
-              FROM users
-              WHERE role IN ('admin','seller','disabled')
-              ORDER BY role, email`);
-            console.log('STAFF:');
+            const staff = await c.query("SELECT email, role, email_verified, created_at, (refresh_token_hash IS NOT NULL) AS has_refresh, length(password_hash) AS pw_hash_len FROM users WHERE role IN (\x27admin\x27,\x27seller\x27,\x27disabled\x27) ORDER BY role, email");
+            console.log("STAFF:");
             console.log(JSON.stringify(staff.rows, null, 2));
-
-            const counts = await c.query(`
-              SELECT count(*)::int AS total,
-                     count(*) FILTER (WHERE role='admin')::int AS admins,
-                     count(*) FILTER (WHERE role='seller')::int AS sellers,
-                     count(*) FILTER (WHERE role='member')::int AS members,
-                     count(*) FILTER (WHERE role='disabled')::int AS disabled
-              FROM users`);
-            console.log('COUNTS:');
+            const counts = await c.query("SELECT count(*)::int AS total, count(*) FILTER (WHERE role=\x27admin\x27)::int AS admins, count(*) FILTER (WHERE role=\x27seller\x27)::int AS sellers, count(*) FILTER (WHERE role=\x27member\x27)::int AS members, count(*) FILTER (WHERE role=\x27disabled\x27)::int AS disabled FROM users");
+            console.log("COUNTS:");
             console.log(JSON.stringify(counts.rows[0], null, 2));
-
-            const audit = await c.query(`
-              SELECT action, user_id, details, created_at
-              FROM audit_logs
-              WHERE action LIKE 'auth.%'
-              ORDER BY created_at DESC
-              LIMIT 25`);
-            console.log('AUTH_AUDIT:');
-            console.log(JSON.stringify(audit.rows, null, 2));
-
+            try {
+              const audit = await c.query("SELECT action, user_id, details, created_at FROM audit_logs WHERE action LIKE \x27auth.%\x27 ORDER BY created_at DESC LIMIT 25");
+              console.log("AUTH_AUDIT:");
+              console.log(JSON.stringify(audit.rows, null, 2));
+            } catch (e) {
+              console.log("AUTH_AUDIT_ERROR:", e.message);
+            }
+            // also show any users matching known admin-ish emails
+            const known = await c.query("SELECT email, role, email_verified FROM users WHERE email = ANY($1)", [["geeketoys@gmail.com","claude-e2e@geeketoys.com.br","admin@geeketoys.com.br","leoschlanger@gmail.com"]]);
+            console.log("KNOWN_EMAILS:");
+            console.log(JSON.stringify(known.rows, null, 2));
             await c.end();
-          })().catch((e) => { console.error(e); process.exit(1); });
-          NODE
+          })().catch((e) => { console.error("PROBE_FAIL", e); process.exit(1); });
+          '
 
           echo "===== API LOGS (filtered) ====="
-          docker logs clube-geek-api --tail 300 2>&1 | grep -iE 'auth|login|error|CORS|JWT|401|403|rate|Invalid env' | tail -100 || true
+          docker logs clube-geek-api --tail 300 2>&1 | grep -iE 'auth|login|error|CORS|JWT|401|403|rate|Invalid env' | tail -80 || true
 
           echo "===== DONE ====="
           REMOTE
