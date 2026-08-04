@@ -223,7 +223,7 @@ export function SubscriptionManagement({
     <>
       <Card className="overflow-hidden">
         {/* Plan Header Banner */}
-        <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-4 text-white">
+        <div className="bg-gradient-to-r from-primary to-primary/80 p-4 text-primary-foreground">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">

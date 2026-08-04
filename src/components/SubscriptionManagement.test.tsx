@@ -177,7 +177,7 @@ describe('SubscriptionManagement', () => {
     const { container } = render(<SubscriptionManagement memberId="m1" />)
 
     await waitFor(() => {
-      const gradient = container.querySelector('.from-violet-600')
+      const gradient = container.querySelector('.from-primary')
       expect(gradient).toBeInTheDocument()
     })
   })

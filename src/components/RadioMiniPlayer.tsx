@@ -276,7 +276,7 @@ export default function RadioMiniPlayer() {
                           className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all ${
                             isPlaying
                               ? 'bg-white/0 group-hover:bg-gradient-to-r group-hover:from-yellow-500 group-hover:to-amber-600 text-transparent group-hover:text-black'
-                              : 'bg-gradient-to-r from-pink-500 to-fuchsia-600 text-black'
+                              : 'bg-gradient-to-r from-primary to-accent text-primary-foreground'
                           }`}
                         >
                           {isPlaying ? (
@@ -374,7 +374,7 @@ export default function RadioMiniPlayer() {
               className="pointer-events-auto flex items-center gap-2 px-3 py-2.5 glass rounded-full border border-primary/40 shadow-lg shadow-black/30 hover:border-primary/80 hover:shadow-primary/20 transition-all group"
               aria-label="Abrir player da rádio"
             >
-              <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-fuchsia-600 text-black shadow-md">
+              <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-md">
                 {isPlaying ? (
                   <Pause className="w-4 h-4" fill="currentColor" />
                 ) : (

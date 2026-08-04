@@ -168,7 +168,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Verifique seu e-mail — Clube GeekPop & Toys',
       preheader: 'Clique para confirmar seu e-mail e ativar sua conta.',
       body: `
-        <h2 style="color:#d4a520;margin:0 0 12px">Confirme seu e-mail</h2>
+        <h2 style="color:#F04080;margin:0 0 12px">Confirme seu e-mail</h2>
         <p>Olá, <strong>${name}</strong>!</p>
         <p>Você criou uma conta no <strong>Clube GeekPop & Toys</strong>. Para prosseguir, confirme seu endereço de e-mail clicando no botão abaixo.</p>
         ${infoBox('⏳ Este link expira em <strong>24 horas</strong>.<br>Se você não criou esta conta, ignore este e-mail.')}`,
@@ -179,7 +179,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Redefinição de senha — Clube GeekPop & Toys',
       preheader: 'Você solicitou a redefinição da sua senha.',
       body: `
-        <h2 style="color:#d4a520;margin:0 0 12px">Redefinir sua senha</h2>
+        <h2 style="color:#F04080;margin:0 0 12px">Redefinir sua senha</h2>
         <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
         <p>Clique no botão abaixo para escolher uma nova senha:</p>
         ${infoBox('⏳ Este link expira em <strong>1 hora</strong>.<br>Se você não solicitou isso, pode ignorar este e-mail com segurança — sua conta permanece protegida.')}`,
@@ -191,7 +191,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Bem-vindo ao Clube GeekPop & Toys! 🎮',
       preheader: `${name}, você agora é membro ${v.plan || ''} do clube!`,
       body: `
-        <h2 style="color:#d4a520;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
+        <h2 style="color:#F04080;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
         <p>Sua conta no <strong>Clube GeekPop & Toys</strong> foi ativada com sucesso${v.plan ? ` no plano <strong>${v.plan}</strong>` : ''}. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>
         ${featureList([
@@ -421,7 +421,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
   const ctaHtml = tmpl.cta
     ? `<div style="text-align:center;margin:28px 0 8px">
-        <a href="${tmpl.cta.url}" style="display:inline-block;background:linear-gradient(135deg,#d4a520,#b8860b);color:#000000;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:0.3px;box-shadow:0 4px 14px rgba(212,165,32,0.35)">${tmpl.cta.text}</a>
+        <a href="${tmpl.cta.url}" style="display:inline-block;background:linear-gradient(135deg,#F04080,#E11D6A);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:0.3px;box-shadow:0 4px 14px rgba(240,64,128,0.35)">${tmpl.cta.text}</a>
        </div>`
     : '';
 
@@ -448,21 +448,21 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     <!-- Header with Logo -->
     <div style="text-align:center;padding:24px 0 16px">
       <a href="${siteUrl}" style="text-decoration:none">
-        <img src="${logoUrl}" alt="Geek &amp; Toys" width="80" height="80" style="display:inline-block;width:80px;height:80px;border-radius:16px;border:2px solid rgba(212,165,32,0.3)" />
+        <img src="${logoUrl}" alt="GeekPop &amp; Toys" width="80" height="80" style="display:inline-block;width:80px;height:80px;border-radius:16px;border:2px solid rgba(240,64,128,0.3)" />
       </a>
       <div style="margin-top:12px">
         <a href="${siteUrl}" style="text-decoration:none;font-size:22px;letter-spacing:2px;font-weight:800">
-          <span style="color:#d4a520">GEEK</span><span style="color:#ffffff;opacity:0.5">&amp;</span><span style="color:#ffffff">TOYS</span>
+          <span style="color:#F04080">Geek</span><span style="color:#FCBE04">Pop</span><span style="color:#ffffff;opacity:0.5"> &amp; </span><span style="color:#FCBE04">Toys</span>
         </a>
-        <p style="margin:2px 0 0;font-size:10px;color:#d4a520;letter-spacing:3px;text-transform:uppercase;font-weight:600">Clube de Vantagens</p>
+        <p style="margin:2px 0 0;font-size:10px;color:#F04080;letter-spacing:3px;text-transform:uppercase;font-weight:600">Clube de Vantagens</p>
       </div>
     </div>
 
     <!-- Gold Accent Line -->
-    <div style="height:2px;background:linear-gradient(90deg,transparent,#d4a520,transparent);margin:0 40px 16px"></div>
+    <div style="height:2px;background:linear-gradient(90deg,transparent,#F04080,transparent);margin:0 40px 16px"></div>
 
     <!-- Content Card -->
-    <div style="background:linear-gradient(180deg,#16213e,#141e33);border-radius:16px;padding:28px 24px;border:1px solid rgba(212,165,32,0.12);color:#e2e8f0;line-height:1.7;font-size:15px">
+    <div style="background:linear-gradient(180deg,#16213e,#141e33);border-radius:16px;padding:28px 24px;border:1px solid rgba(240,64,128,0.12);color:#e2e8f0;line-height:1.7;font-size:15px">
       ${tmpl.body}
       ${ctaHtml}
     </div>
@@ -470,28 +470,28 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     <!-- Footer -->
     <div style="padding:24px 16px 8px">
       <!-- Divider -->
-      <div style="height:1px;background:rgba(212,165,32,0.15);margin-bottom:20px"></div>
+      <div style="height:1px;background:rgba(240,64,128,0.15);margin-bottom:20px"></div>
 
       <!-- Social Links -->
       <div style="text-align:center;margin-bottom:16px">
-        <a href="https://www.instagram.com/geeketoys/" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#d4a520;text-decoration:none;font-size:16px;margin:0 4px" title="Instagram">&#9737;</a>
-        <a href="https://www.facebook.com/geeketoyscolection/" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#d4a520;text-decoration:none;font-size:16px;margin:0 4px" title="Facebook">f</a>
-        <a href="https://www.tiktok.com/@geeketoys" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#d4a520;text-decoration:none;font-size:16px;margin:0 4px" title="TikTok">&#9835;</a>
+        <a href="https://www.instagram.com/geeketoys/" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#F04080;text-decoration:none;font-size:16px;margin:0 4px" title="Instagram">&#9737;</a>
+        <a href="https://www.facebook.com/geeketoyscolection/" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#F04080;text-decoration:none;font-size:16px;margin:0 4px" title="Facebook">f</a>
+        <a href="https://www.tiktok.com/@geeketoys" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#F04080;text-decoration:none;font-size:16px;margin:0 4px" title="TikTok">&#9835;</a>
         <a href="${whatsappUrl}" style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:50%;background:#1e293b;color:#25d366;text-decoration:none;font-size:16px;margin:0 4px" title="WhatsApp">&#9742;</a>
       </div>
 
       <!-- Site Links -->
       <div style="text-align:center;margin-bottom:14px">
-        <a href="${siteUrl}" style="color:#d4a520;text-decoration:none;font-size:12px;font-weight:600">Loja Online</a>
+        <a href="https://shop.geeketoys.com.br" style="color:#F04080;text-decoration:none;font-size:12px;font-weight:600">Loja Online</a>
         <span style="color:#334155;margin:0 8px">&bull;</span>
-        <a href="${clubUrl}/membro" style="color:#d4a520;text-decoration:none;font-size:12px;font-weight:600">Minha Conta</a>
+        <a href="${clubUrl}/membro" style="color:#F04080;text-decoration:none;font-size:12px;font-weight:600">Minha Conta</a>
         <span style="color:#334155;margin:0 8px">&bull;</span>
-        <a href="${whatsappUrl}" style="color:#d4a520;text-decoration:none;font-size:12px;font-weight:600">WhatsApp</a>
+        <a href="${whatsappUrl}" style="color:#F04080;text-decoration:none;font-size:12px;font-weight:600">WhatsApp</a>
       </div>
 
       <!-- Company Info -->
       <div style="text-align:center;color:#475569;font-size:10px;line-height:1.6">
-        <p style="margin:0;font-weight:600;color:#64748b">Geek &amp; Toys &mdash; Pioneiros do Funko Pop no Brasil</p>
+        <p style="margin:0;font-weight:600;color:#64748b">GeekPop &amp; Toys &mdash; Pioneiros do Funko Pop no Brasil</p>
         <p style="margin:3px 0">CNPJ: 52.846.344/0001-10</p>
         <p style="margin:3px 0">R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ</p>
         <p style="margin:3px 0">(21) 98546-4666 &bull; geeketoys.com.br</p>

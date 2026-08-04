@@ -22,7 +22,7 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
     if (!visible || firedRef.current) return
     firedRef.current = true
 
-    const colors = ['#ec4899', '#f72585', '#f5c518', '#ffffff', '#8b5cf6']
+    const colors = ['#F04080', '#f72585', '#FCBE04', '#ffffff', '#ff8cbf']
 
     // Burst from the left
     confetti({ particleCount: 80, spread: 70, origin: { x: 0.15, y: 0.6 }, colors })

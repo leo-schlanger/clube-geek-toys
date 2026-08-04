@@ -111,27 +111,35 @@ export default function ShopHome() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {/* Hero — apenas na home sem filtros */}
         {!categorySlug && !search && (
-          <section className="mb-8 overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-accent/10 p-6 sm:p-10">
+          <section className="mb-8 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-background to-accent/10 p-6 sm:p-10">
             <div className="max-w-xl">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
-                Loja oficial do Clube GeekPop & Toys
+                Loja oficial GeekPop & Toys
               </span>
               <h1 className="mt-3 text-2xl font-heading font-bold sm:text-4xl">
-                Colecionáveis, games e cultura geek
+                Colecionáveis, K-pop e cultura geek
               </h1>
               <p className="mt-2 text-muted-foreground">
-                Membros do clube ganham <strong className="text-green-600">15% de desconto</strong> em
+                Membros do clube ganham <strong className="text-accent">15% de desconto</strong> em
                 qualquer produto. Entre e economize.
               </p>
-              {isEventVisible() && (
-                <Button asChild className="mt-4 gap-2" size="sm">
-                  <Link to="/evento">
-                    <Ticket className="h-4 w-4" />
-                    Evento &amp; ingressos
-                  </Link>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="outline" className="gap-2 border-primary/40">
+                  <a href="https://club.geeketoys.com.br/assinar" target="_blank" rel="noopener noreferrer">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Entrar no Clube
+                  </a>
                 </Button>
-              )}
+                {isEventVisible() && (
+                  <Button asChild className="gap-2" size="sm">
+                    <Link to="/evento">
+                      <Ticket className="h-4 w-4" />
+                      Evento &amp; ingressos
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
           </section>
         )}

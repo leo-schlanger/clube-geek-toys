@@ -51,14 +51,14 @@ test.describe('Captura tutorial admin', () => {
         svg.setAttribute('style', 'position:absolute;inset:0;width:100vw;height:100vh')
         const defs = document.createElementNS(NS, 'defs')
         defs.innerHTML =
-          '<marker id="ah" markerWidth="12" markerHeight="12" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 Z" fill="#ec4899"/></marker>'
+          '<marker id="ah" markerWidth="12" markerHeight="12" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 Z" fill="#F04080"/></marker>'
         svg.appendChild(defs)
         layer.appendChild(svg)
 
         let stackTop = 16
         resolved.forEach(({ box: r, label }) => {
           const boxEl = document.createElement('div')
-          boxEl.style.cssText = `position:fixed;left:${r.x - 4}px;top:${r.y - 4}px;width:${r.width + 8}px;height:${r.height + 8}px;border:3px solid #ec4899;border-radius:8px;box-shadow:0 0 0 3px rgba(236,72,153,.25)`
+          boxEl.style.cssText = `position:fixed;left:${r.x - 4}px;top:${r.y - 4}px;width:${r.width + 8}px;height:${r.height + 8}px;border:3px solid #F04080;border-radius:8px;box-shadow:0 0 0 3px rgba(236,72,153,.25)`
           layer.appendChild(boxEl)
 
           const toRight = r.x + r.width < window.innerWidth - 300
@@ -71,7 +71,7 @@ test.describe('Captura tutorial admin', () => {
 
           const lab = document.createElement('div')
           lab.textContent = label
-          lab.style.cssText = `position:fixed;left:${lx}px;top:${ly}px;width:${lw}px;background:#ec4899;color:#fff;padding:7px 11px;border-radius:9px;font-size:14px;font-weight:700;line-height:1.25;box-shadow:0 3px 10px rgba(0,0,0,.45)`
+          lab.style.cssText = `position:fixed;left:${lx}px;top:${ly}px;width:${lw}px;background:#F04080;color:#fff;padding:7px 11px;border-radius:9px;font-size:14px;font-weight:700;line-height:1.25;box-shadow:0 3px 10px rgba(0,0,0,.45)`
           layer.appendChild(lab)
 
           const x1 = toRight ? lx : lx + lw
@@ -83,7 +83,7 @@ test.describe('Captura tutorial admin', () => {
           ln.setAttribute('y1', String(y1))
           ln.setAttribute('x2', String(x2))
           ln.setAttribute('y2', String(y2))
-          ln.setAttribute('stroke', '#ec4899')
+          ln.setAttribute('stroke', '#F04080')
           ln.setAttribute('stroke-width', '3')
           ln.setAttribute('marker-end', 'url(#ah)')
           svg.appendChild(ln)

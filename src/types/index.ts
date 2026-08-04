@@ -95,7 +95,7 @@ export const CLUB_PLAN: Plan = {
     'Brinde especial de boas-vindas',
     'Entrada gratuita em eventos participantes',
   ],
-  color: '#7c3aed',
+  color: '#F04080',
   icon: '🎮',
 }
 

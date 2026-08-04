@@ -13,7 +13,7 @@ export default defineConfig({
         name: 'Clube GeekPop & Toys',
         short_name: 'GeekPop',
         description: 'Clube de vantagens — 15% de desconto em qualquer produto, na loja física e online',
-        theme_color: '#ec4899',
+        theme_color: '#F04080',
         background_color: '#0d0d0d',
         display: 'standalone',
         orientation: 'portrait',

@@ -28,12 +28,13 @@ const planStyles: Record<PlanType, {
   mutedText: string
 }> = {
   club: {
-    bg: 'linear-gradient(135deg, #150a2e 0%, #3b1d70 15%, #241145 35%, #6d28d9 50%, #241145 65%, #3b1d70 85%, #150a2e 100%)',
-    chip: 'linear-gradient(135deg, #c4b5fd, #ede9fe, #a78bfa)',
-    accent: '#c4b5fd',
-    glow: 'rgba(124, 58, 237, 0.35)',
-    text: '#f5f3ff',
-    mutedText: 'rgba(245,243,255,0.55)',
+    // Hot Pink → Pop Yellow metallic (brand GeekPop & Toys)
+    bg: 'linear-gradient(135deg, #1a0610 0%, #4a1028 18%, #F04080 45%, #FCBE04 55%, #F04080 70%, #3a0d20 88%, #1a0610 100%)',
+    chip: 'linear-gradient(135deg, #FCBE04, #FFE566, #F04080)',
+    accent: '#FCBE04',
+    glow: 'rgba(240, 64, 128, 0.4)',
+    text: '#fff7fb',
+    mutedText: 'rgba(255,247,251,0.6)',
   },
 }
 

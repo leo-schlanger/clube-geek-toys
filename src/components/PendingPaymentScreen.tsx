@@ -106,7 +106,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   }
 
   const planColors = {
-    club: 'from-violet-500 to-purple-700',
+    club: 'from-primary to-accent',
   }
 
   async function handlePaymentSuccess() {

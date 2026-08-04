@@ -47,7 +47,7 @@ describe('Badge', () => {
 
   it('should render club variant', () => {
     const { container } = render(<Badge variant="club">Club</Badge>)
-    expect(container.firstChild).toHaveClass('bg-violet-600')
+    expect(container.firstChild).toHaveClass('bg-primary')
   })
 
   // --- Custom class ---

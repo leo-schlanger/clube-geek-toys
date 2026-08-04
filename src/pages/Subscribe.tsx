@@ -91,7 +91,7 @@ export default function Subscribe() {
               Apenas <strong className="text-primary text-lg">{formatCurrency(CLUB_PLAN.price)}</strong>/ano
             </span>
             <a href="#plano">
-              <Button size="lg" className="btn-glow font-bold text-base px-8 h-12 rounded-full bg-gradient-to-r from-pink-500 to-fuchsia-600 hover:from-pink-400 hover:to-fuchsia-500 text-white">
+              <Button size="lg" className="btn-glow font-bold text-base px-8 h-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
                 ASSINE AGORA
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -129,7 +129,7 @@ export default function Subscribe() {
           <Card className="relative overflow-hidden flex flex-col ring-2 ring-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-violet-500 via-purple-400 to-violet-600 text-white/80">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent text-primary-foreground">
                   <Sparkles className="h-7 w-7" />
                 </div>
                 <div>
@@ -158,7 +158,7 @@ export default function Subscribe() {
 
             <CardFooter className="p-6 pt-0">
               <Link to="/cadastro?plano=club&tipo=annual" className="w-full">
-                <Button className="w-full h-11 font-semibold bg-gradient-to-r from-pink-500 to-fuchsia-600 text-white hover:from-pink-400 hover:to-fuchsia-500">
+                <Button className="w-full h-11 font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
                   ASSINAR <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>

@@ -19,7 +19,7 @@ const badgeVariants = cva(
         warning:
           "border-transparent bg-yellow-500 text-white",
         club:
-          "border-transparent bg-violet-600 text-white",
+          "border-transparent bg-primary text-primary-foreground",
       },
     },
     defaultVariants: {

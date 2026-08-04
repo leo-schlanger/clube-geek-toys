@@ -252,24 +252,17 @@ CLUB_PLAN.color = "#7c3aed"; // ← roxo; alvo: '#F04080'
 
 - Tema dark com **primary rosa** e **accent amarelo** em `src/index.css`
 - Utilitários glow / shimmer / gradient-text rosa→âmbar
-- `theme-color` meta `#ec4899` (próximo do hot pink)
+- `theme-color` meta `#F04080`
 - Confetti e vários CTAs com pink
 - Borders com matiz rosado (`--border`)
 
-### 6.2 Gaps prioritários (código a corrigir)
+### 6.2 Alinhamento de código (Ago/2026)
 
-| #   | Onde                                         | Problema                                  | Correção alvo                                      |
-| --- | -------------------------------------------- | ----------------------------------------- | -------------------------------------------------- |
-| 1   | `MembershipCard.tsx` `planStyles`            | Gradiente **roxo** VIP                    | Gradiente **rosa → magenta → amarelo** (metal pop) |
-| 2   | `types/index.ts` `CLUB_PLAN.color`           | `#7c3aed`                                 | `#F04080`                                          |
-| 3   | `badge.tsx` variant `club`                   | `violet-600`                              | `bg-primary` ou hot pink                           |
-| 4   | `email.service.ts`                           | Branding **dourado** + nome “GEEK & TOYS” | Pink + yellow + “GeekPop & Toys”                   |
-| 5   | `Subscribe.tsx`, `RadioMiniPlayer.tsx`       | Gradientes `pink→fuchsia`                 | Primary / hot pink (sem roxo)                      |
-| 6   | `ShopHome.tsx`, `SubscriptionManagement.tsx` | `violet-*` residual                       | primary / accent                                   |
-| 7   | `tailwind.config.js`                         | `heading: Space Grotesk`                  | `Outfit` (igual HTML/CSS)                          |
-| 8   | `--primary` token                            | `330 81% 60%` (~`#EB4699`)                | `340 85% 59%` (`#F04080`) — matiz da peça          |
-| 9   | Hardcoded HSL em glows (`index.css`)         | Valores antigos 330°                      | Atualizar para 340° se o token mudar               |
-| 10  | Docs ARCHITECTURE / e-mails                  | Menciona só dourado `#d4a520`             | Ver §11 abaixo (atualizado)                        |
+Todos os gaps da peça de marca foram aplicados no SPA (club / admin / shop compartilham o bundle):
+
+- Tokens `--primary` / `--accent` / glows em `src/index.css`
+- Carteirinha, badge `club`, CTAs, e-mails, confetti, Stripe Elements
+- Site institucional promove Loja + Clube + Evento (`ChannelsSection`, hero, nav)
 
 ### 6.3 Escopo de superfícies
 
