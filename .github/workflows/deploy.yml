@@ -32,10 +32,59 @@ jobs:
 
       - name: Setup SSH
         run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+
+          # Write private key (ensure trailing newline — OpenSSH rejects keys without it)
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          # Strip accidental Windows CRLF
+          sed -i 's/\r$//' ~/.ssh/deploy_key
+
+          # Fail fast if secret is empty / not a valid key
+          if [ ! -s ~/.ssh/deploy_key ]; then
+            echo "ERROR: secrets.VPS_SSH_KEY is empty"
+            exit 1
+          fi
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "ERROR: secrets.VPS_SSH_KEY is not a valid private key (check PEM format / newlines in GitHub Secret)"
+            exit 1
+          fi
+
+          HOST="${{ secrets.VPS_HOST }}"
+          if [ -z "$HOST" ]; then
+            echo "ERROR: secrets.VPS_HOST is empty"
+            exit 1
+          fi
+
+          # ssh-keyscan can flake on GitHub runners — retry
+          ok=0
+          for i in 1 2 3 4 5; do
+            if ssh-keyscan -T 15 -H "$HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err; then
+              ok=1
+              echo "ssh-keyscan ok (attempt $i)"
+              break
+            fi
+            echo "ssh-keyscan attempt $i failed:"
+            cat /tmp/keyscan.err || true
+            sleep 4
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "ERROR: could not fetch host key for $HOST after retries"
+            exit 1
+          fi
+
+          # Safer defaults for subsequent ssh/rsync
+          cat >> ~/.ssh/config <<EOF
+          Host ${HOST}
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 15
+            ServerAliveCountMax 4
+          EOF
+          chmod 600 ~/.ssh/config
 
       - name: Deploy server files
         run: |
@@ -43,18 +92,18 @@ jobs:
             --exclude='node_modules' \
             --exclude='.env' \
             --exclude='scripts/' \
-            -e "ssh -i ~/.ssh/deploy_key" \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
             server/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/server/
 
       - name: Deploy frontend
         run: |
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key" \
+            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes" \
             dist/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/dist/
 
       - name: Rebuild and restart containers
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
             cd /opt/clube-geek-toys/server
             docker compose build --no-cache api
             docker compose up -d --force-recreate api nginx
