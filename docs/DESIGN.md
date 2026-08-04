@@ -67,17 +67,20 @@ Usar **apenas** em vitrines, filtros de coleção K-pop e ilustrações — não
 | Destructive | `#EE4444` | `0 84% 60%`   | Erro, cancelamento         |
 | Info        | `#3B82F6` | `217 91% 60%` | Avisos neutros (admin)     |
 
-### 2.4 Superfícies — tema escuro (app)
+### 2.4 Superfícies — tema light (app)
 
-O produto digital **permanece dark-first** (clube, admin, shop, PDV), alinhado ao site institucional e à legibilidade noturna. A marca pop entra via **primary rosa + accent amarelo**, não via fundo branco.
+O produto digital (**club / admin / shop**, mesmo bundle) usa **tema light** alinhado à peça de marketing e ao site `geeketoys.com.br`.
 
-| Token CSS                | Valor atual            | Hex       | Papel                 |
-| ------------------------ | ---------------------- | --------- | --------------------- |
-| `--background`           | `0 0% 5.1%`            | `#0D0D0D` | Fundo da página       |
-| `--foreground`           | `0 0% 96.1%`           | `#F5F5F5` | Texto principal       |
-| `--card` / `--secondary` | `240 33% 11.4%`        | `#131326` | Cards, painéis        |
-| `--muted`                | `240 10% 20%`          | `#2D2D38` | Superfície secundária |
-| `--muted-foreground`     | `240 10% 69%`          | `#A8A8B7` | Texto auxiliar        |
+**Arquivo de verdade no código:** `src/index.css` (`:root` CSS variables) + mapa Tailwind em `tailwind.config.js`.
+
+| Token CSS                | Valor atual     | Hex       | Papel                 |
+| ------------------------ | --------------- | --------- | --------------------- |
+| `--background`           | `330 40% 99%`   | `#FDFBFC` | Fundo da página       |
+| `--foreground`           | `240 20% 12%`   | `#181825` | Texto principal       |
+| `--card`                 | `0 0% 100%`     | `#FFFFFF` | Cards, painéis        |
+| `--secondary`            | `330 55% 96%`   | `#FAEFF5` | Faixas / superfícies  |
+| `--muted`                | `330 25% 95%`   | `#F5EFF2` | Superfície secundária |
+| `--muted-foreground`     | `240 8% 42%`    | `#636374` | Texto auxiliar        |
 | `--border`               | `330 18% 24%`          | `#48323D` | Bordas (tom rosa)     |
 | `--input`                | `330 15% 15%`          | `#2B2026` | Campos                |
 | `--primary`              | **alvo** `340 85% 59%` | `#F04080` | Marca (ver §6 gaps)   |
@@ -266,13 +269,13 @@ Todos os gaps da peça de marca foram aplicados no SPA (club / admin / shop comp
 
 ### 6.3 Escopo de superfícies
 
-| Superfície                   | Tema               | Marca                                 |
-| ---------------------------- | ------------------ | ------------------------------------- |
-| club / admin / shop / PDV    | Dark UI            | Rosa primary + amarelo accent         |
-| E-mails transacionais        | Dark HTML          | Mesma paleta (não só gold)            |
-| Peças de marketing / stories | Light + borda pink | Comic outlines, yellow bursts         |
-| Carteirinha digital          | Dark premium       | Rosa metálico + dourado, **não roxo** |
-| Contrato PDF                 | Light formal       | Gold secundário ok                    |
+| Superfície                   | Tema                    | Marca                                 |
+| ---------------------------- | ----------------------- | ------------------------------------- |
+| club / admin / shop / PDV    | **Light UI** (tokens)   | Rosa primary + amarelo accent         |
+| E-mails transacionais        | Dark HTML (inbox)       | Primary pink + accent yellow          |
+| Peças de marketing / stories | Light + borda pink      | Comic outlines, yellow bursts         |
+| Carteirinha digital          | Gradiente rosa/amarelo  | Premium pop, **não roxo**             |
+| Contrato PDF                 | Light formal            | Gold secundário ok                    |
 
 ---
 

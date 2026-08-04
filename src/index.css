@@ -2,47 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  =============================================================================
+  TEMA DE MARCA — GeekPop & Toys (fonte: docs/DESIGN.md + peça de marketing)
+  Club / Admin / Shop = mesmo bundle → estes tokens valem para os 3.
+  =============================================================================
+  Hot Pink (primary)  #F04080  → hsl(340 85% 59%)
+  Pop Yellow (accent) #FCBE04  → hsl(45 97% 50%)
+  Fundo light (marca pop / K-culture) — alinhado ao site geeketoys.com.br
+  =============================================================================
+*/
+
 @layer base {
   :root {
-    /* Dark theme matching main GeekPop & Toys site */
-    --background: 0 0% 5.1%;
-    --foreground: 0 0% 96.1%;
+    /* Light base — white with pink whisper (marca) */
+    --background: 330 40% 99%;
+    --foreground: 240 20% 12%;
 
-    --card: 240 33% 11.4%;
-    --card-foreground: 0 0% 96.1%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 20% 12%;
 
-    --popover: 240 33% 11.4%;
-    --popover-foreground: 0 0% 96.1%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 20% 12%;
 
-    /* Hot Pink primary (GeekPop brand) + Pop Yellow accent */
+    /* Hot Pink — GeekPop primary #F04080 */
     --primary: 340 85% 59%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 33% 11.4%;
-    --secondary-foreground: 0 0% 96.1%;
+    /* Soft pink surface */
+    --secondary: 330 55% 96%;
+    --secondary-foreground: 330 50% 28%;
 
-    --muted: 240 10% 20%;
-    --muted-foreground: 240 10% 69%;
+    --muted: 330 25% 95%;
+    --muted-foreground: 240 8% 42%;
 
+    /* Pop Yellow — Toys accent #FCBE04 */
     --accent: 45 97% 50%;
-    --accent-foreground: 0 0% 5%;
+    --accent-foreground: 240 20% 12%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 340 18% 24%;
-    --input: 340 15% 15%;
+    /* Soft pink borders (moldura da marca) */
+    --border: 340 45% 88%;
+    --input: 340 30% 94%;
     --ring: 340 85% 59%;
 
     --radius: 0.75rem;
 
-    /* Custom colors */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 5%;
 
-    /* Banner de evento na loja (EventAnnouncementBanner) */
+    /* Banner de evento na loja */
     --shop-event-banner-h: 0px;
   }
 }
@@ -117,7 +130,7 @@
   .glass {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    background: hsl(0 0% 5.1% / 0.8);
+    background: hsl(0 0% 100% / 0.82);
   }
 }
 

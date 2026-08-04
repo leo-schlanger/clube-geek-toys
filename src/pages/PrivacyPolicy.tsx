@@ -14,7 +14,7 @@ export default function PrivacyPolicy() {
 
                 <div className="glass p-8 md:p-12 rounded-2xl border border-border shadow-2xl">
                     <h1 className="text-4xl font-heading font-bold mb-8 gradient-text">Política de Privacidade</h1>
-                    <div className="prose prose-invert max-w-none space-y-6 text-muted-foreground">
+                    <div className="prose max-w-none space-y-6 text-muted-foreground">
                         <p className="text-sm"><strong>Última atualização:</strong> 26 de março de 2026</p>
 
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
