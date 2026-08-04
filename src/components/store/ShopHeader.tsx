@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Search, User, Menu, X } from 'lucide-react'
+import { ShoppingCart, Search, User, Menu, X, CalendarHeart } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { CartDrawer } from './CartDrawer'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { cn } from '../../lib/utils'
+import { isEventVisible } from '../../data/event'
 
 interface ShopHeaderProps {
   /** Membro ativo — mostra selo de desconto no cabeçalho. */
@@ -58,6 +59,20 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
               Loja GeekPop & Toys
             </span>
           </Link>
+
+          {isEventVisible() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="hidden shrink-0 gap-1.5 text-primary sm:inline-flex"
+            >
+              <Link to="/evento">
+                <CalendarHeart className="h-4 w-4" />
+                Evento
+              </Link>
+            </Button>
+          )}
 
           {/* Busca (desktop) */}
           <form onSubmit={handleSearch} className="relative hidden flex-1 md:block">

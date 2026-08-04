@@ -1,6 +1,6 @@
 # Clube GeekPop & Toys — Documentacao do Projeto
 
-> **Ultima atualizacao:** 19 de Abril de 2026
+> **Ultima atualizacao:** 4 de Agosto de 2026
 
 ## 1. Dados da Empresa
 
@@ -66,6 +66,23 @@ Radio online via AzuraCast (stack independente). Player integrado no site instit
 ### 3.9 Modulo Analytics
 
 Umami self-hosted para rastreamento de uso sem cookies de terceiros.
+
+### 3.10 Design System e Marca
+
+Identidade visual **GeekPop & Toys**: estética pop/K-culture com **Hot Pink** (`#F04080`) + **Pop Yellow** (`#FCBE04`), tipografia Outfit + Inter, UI dark-first.
+
+Documentacao completa (paleta, tokens CSS, inventário de componentes, gaps e regras de uso):
+
+- **[`docs/DESIGN.md`](DESIGN.md)** — fonte de verdade de marca
+- Referencia visual: [`docs/assets/brand-reference.jpg`](assets/brand-reference.jpg)
+
+### 3.11 Eventos (loja + site)
+
+Modulo de evento ativo na **loja** (`shop.geeketoys.com.br`): banner no topo, card na home, pagina `/evento` com infos, reserva de ingresso (WhatsApp) e galeria com download de fotos.
+
+- Config: `src/data/event.ts`
+- Doc operacional: [`docs/EVENTS.md`](EVENTS.md)
+- Espelho no site institucional: repo `geek-toys-home`
 
 ## 4. Modelos de Dados (PostgreSQL)
 
@@ -585,10 +602,13 @@ clube-geek-toys/
 │
 ├── docs/
 │   ├── ARCHITECTURE.md                  # Diagrama e decisoes
+│   ├── DESIGN.md                        # Design system e marca
 │   ├── PROJECT.md                       # Este arquivo
 │   ├── RADIO.md                         # Operacao da radio AzuraCast
 │   ├── SECURITY.md                      # Seguranca e LGPD
-│   └── TODO.md                          # Roadmap e tarefas
+│   ├── TODO.md                          # Roadmap e tarefas
+│   └── assets/
+│       └── brand-reference.jpg          # Peca visual de marca
 │
 ├── scripts/
 │   └── radio/
@@ -810,3 +830,15 @@ clube-geek-toys/
 | TikTok     | https://tiktok.com/@geeketoys           |
 | WhatsApp   | https://wa.me/5521985464666             |
 | Shopee     | https://shopee.com.br/geeketoys         |
+
+## 11. Design e Branding
+
+| Item           | Valor                    |
+| -------------- | ------------------------ |
+| Nome de marca  | GeekPop & Toys           |
+| Primary        | Hot Pink `#F04080`       |
+| Accent         | Pop Yellow `#FCBE04`     |
+| Superficie app | Dark (`#0D0D0D`)         |
+| Headings       | Outfit                   |
+| Body           | Inter                    |
+| Doc            | [`DESIGN.md`](DESIGN.md) |

@@ -41,6 +41,9 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 5%;
+
+    /* Banner de evento na loja (EventAnnouncementBanner) */
+    --shop-event-banner-h: 0px;
   }
 }
 

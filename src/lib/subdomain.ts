@@ -8,6 +8,22 @@
 export type AppMode = 'admin' | 'member' | 'shop'
 
 /**
+ * Known app subdomains (first label). Used when swapping host labels.
+ * "admin" still detects as admin mode, but canonical public host is always "adm"
+ * (nginx 301 admin.* → adm.* — evita filtros que bloqueiam o label "admin").
+ */
+const KNOWN_APP_SUBDOMAINS = new Set([
+  'adm',
+  'admin',
+  'club',
+  'shop',
+  'www',
+  'api',
+  'analytics',
+  'radio',
+])
+
+/**
  * Get the current subdomain from the hostname
  */
 export function getSubdomain(): string {
@@ -68,7 +84,7 @@ export function getShopUrl(): string {
   const parts = hostname.split('.')
   if (parts.length >= 2) {
     const currentSub = parts[0].toLowerCase()
-    if (['adm', 'admin', 'club', 'shop', 'www'].includes(currentSub)) {
+    if (KNOWN_APP_SUBDOMAINS.has(currentSub)) {
       parts[0] = 'shop'
     } else {
       parts.unshift('shop')
@@ -121,7 +137,8 @@ export function isRoleAllowedOnSubdomain(role: string | null, appMode: AppMode):
 }
 
 /**
- * Get URL for a different subdomain (for cross-linking)
+ * Get URL for a different subdomain (for cross-linking).
+ * Admin canônico = `adm.*` (não `admin.*`) — ver redirect nginx.
  */
 export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
   const hostname = window.location.hostname
@@ -136,17 +153,14 @@ export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
       : `${protocol}//${hostname}${port}`
   }
 
-  // Handle production domains
+  // Handle production domains (incl. mirror geekpoptoys.com.br)
   const parts = hostname.split('.')
 
   if (parts.length >= 2) {
-    // Check if first part is already a subdomain
     const currentSub = parts[0].toLowerCase()
-    if (currentSub === 'adm' || currentSub === 'admin' || currentSub === 'club' || currentSub === 'www') {
-      // Replace existing subdomain
+    if (KNOWN_APP_SUBDOMAINS.has(currentSub)) {
       parts[0] = targetSubdomain === 'admin' ? 'adm' : 'club'
     } else {
-      // Add subdomain
       parts.unshift(targetSubdomain === 'admin' ? 'adm' : 'club')
     }
   }

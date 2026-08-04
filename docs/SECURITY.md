@@ -190,12 +190,15 @@ Em conformidade com a **Lei 14.063/2020** (assinatura eletrônica):
 
 ### CORS
 
-Whitelist de origens permitidas (middleware `cors.ts`):
+Whitelist de origens (middleware `cors.ts`):
 
-- `https://club.geeketoys.com.br`
-- `https://admin.geeketoys.com.br`
-- `https://shop.geeketoys.com.br`
+- `FRONTEND_URL` + `ALLOWED_ORIGINS` (env)
+- **Qualquer subdomínio HTTPS** de `geeketoys.com.br` e do espelho `geekpoptoys.com.br`
+  (ex.: `club.*`, `adm.*`, `admin.*`, `shop.*`, `api.*`)
 - `localhost` apenas em desenvolvimento
+
+**Admin canônico:** use `https://adm.geeketoys.com.br` (ou `adm.geekpoptoys.com.br`).  
+`admin.*` redireciona 301 → `adm.*` (nginx) para evitar bloqueios de adblock/filtros no label `admin`.
 
 ### Headers de Segurança
 

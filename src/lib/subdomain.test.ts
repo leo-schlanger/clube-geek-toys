@@ -85,6 +85,18 @@ describe('getSubdomain', () => {
     expect(getSubdomain()).toBe('admin')
   })
 
+  it('should return "adm" for adm.geekpoptoys.com.br (mirror domain)', async () => {
+    mockLocation({ hostname: 'adm.geekpoptoys.com.br', search: '' })
+    const { getSubdomain } = await loadModule()
+    expect(getSubdomain()).toBe('adm')
+  })
+
+  it('should return "admin" for admin.geekpoptoys.com.br (mirror domain)', async () => {
+    mockLocation({ hostname: 'admin.geekpoptoys.com.br', search: '' })
+    const { getSubdomain } = await loadModule()
+    expect(getSubdomain()).toBe('admin')
+  })
+
   it('should lowercase the subdomain', async () => {
     mockLocation({ hostname: 'ADM.geeketoys.com.br', search: '' })
     const { getSubdomain } = await loadModule()
@@ -329,6 +341,18 @@ describe('getSubdomainUrl', () => {
     mockLocation({ hostname: 'club.geeketoys.com.br', protocol: 'https:', port: '', search: '' })
     const { getSubdomainUrl } = await loadModule()
     expect(getSubdomainUrl('admin')).toBe('https://adm.geeketoys.com.br')
+  })
+
+  it('should map club.geekpoptoys → adm.geekpoptoys (mirror)', async () => {
+    mockLocation({ hostname: 'club.geekpoptoys.com.br', protocol: 'https:', port: '', search: '' })
+    const { getSubdomainUrl } = await loadModule()
+    expect(getSubdomainUrl('admin')).toBe('https://adm.geekpoptoys.com.br')
+  })
+
+  it('should canonicalize admin.geekpoptoys → adm when targeting admin again', async () => {
+    mockLocation({ hostname: 'admin.geekpoptoys.com.br', protocol: 'https:', port: '', search: '' })
+    const { getSubdomainUrl } = await loadModule()
+    expect(getSubdomainUrl('admin')).toBe('https://adm.geekpoptoys.com.br')
   })
 
   it('should replace "adm" subdomain with "club" for member target', async () => {

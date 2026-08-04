@@ -91,6 +91,15 @@ Radio da loja via AzuraCast, acessivel em `radio.geeketoys.com.br`. Stack isolad
 
 Umami self-hosted em `analytics.geeketoys.com.br` para metricas de uso sem rastreamento invasivo (compliance LGPD).
 
+### Design e Marca
+
+Identidade **GeekPop & Toys** (pop / K-culture): **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04`, UI dark-first, tipografia Outfit + Inter.  
+Documentacao completa e inventário de componentes: [`docs/DESIGN.md`](docs/DESIGN.md).
+
+### Eventos (loja)
+
+Na loja (`shop.geeketoys.com.br`): banner de anuncio, pagina `/evento` com infos, reserva de ingresso (WhatsApp) e galeria com download de fotos. Config em `src/data/event.ts` — ver [`docs/EVENTS.md`](docs/EVENTS.md).
+
 ### Emails Transacionais
 
 Templates via Resend API cobrindo todo o ciclo de vida:
@@ -129,7 +138,7 @@ Tarefas automaticas diarias (6h UTC):
 | Dominio                      | Servico                                                               |
 | ---------------------------- | --------------------------------------------------------------------- |
 | `club.geeketoys.com.br`      | SPA membros                                                           |
-| `admin.geeketoys.com.br`     | SPA admin                                                             |
+| `adm.geeketoys.com.br`       | SPA admin (canônico; `admin.*` redireciona 301)                       |
 | `shop.geeketoys.com.br`      | SPA loja (mesmo bundle Vite; subdominio detectado por `getAppMode()`) |
 | `api.geeketoys.com.br`       | API Express (serve tambem `/uploads` de imagens de produto)           |
 | `analytics.geeketoys.com.br` | Umami Analytics                                                       |
@@ -156,6 +165,8 @@ clube-geek-toys/
 │   └── docker-compose.yml  # Orquestracao de producao
 ├── scripts/radio/          # Scripts de gestao da biblioteca musical
 ├── docs/                   # Documentacao tecnica
+│   ├── DESIGN.md           # Design system e marca (paleta, componentes)
+│   └── assets/             # Referencias visuais de marca
 ├── .github/workflows/      # CI/CD (GitHub Actions)
 ├── DEPLOY.md               # Guia de deploy
 └── CLAUDE.md               # Guia operacional para Claude Code

@@ -1,6 +1,6 @@
 # Arquitetura Tecnica - Clube GeekPop & Toys
 
-> **Ultima atualizacao:** 19 de Abril de 2026
+> **Ultima atualizacao:** 4 de Agosto de 2026
 
 ## 1. Visao Geral do Sistema
 
@@ -18,7 +18,7 @@ Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse prox
  ─────────                 ┌──────────────────────────────────────────────┐
                            │                                              │
   club.*  ─────────┐       │  ┌──────────────────────────────────────┐    │
-  admin.* ─────────┤       │  │         Nginx (80/443)               │    │
+  admin.* ─301→adm  ┤       │  │         Nginx (80/443)               │    │
   adm.*   ─────────┤       │  │  SSL termination + Reverse Proxy     │    │
   shop.*  ─────────┤──────►│  │  Security headers (HSTS, nosniff)    │    │
   api.*   ─────────┤       │  │  (mesmo bundle SPA; getAppMode())    │    │
@@ -458,11 +458,13 @@ O contrato digital segue conformidade com a **Lei 14.063/2020** (assinaturas ele
 
 ## 10. Carteirinha Digital
 
-A carteirinha digital e renderizada inteiramente no frontend com proporcoes de cartao de credito (1.586:1).
+A carteirinha digital e renderizada inteiramente no frontend (`MembershipCard`) com proporcoes de cartao de credito (1.586:1).
+
+**Design de marca (alvo):** gradiente metalico **rosa → amarelo** (`#F04080` / `#FCBE04`), nao roxo. Ver [`DESIGN.md`](DESIGN.md) §7.
 
 ### Frente
 
-- Gradiente metalico do Clube GeekPop & Toys
+- Gradiente metalico pop da marca GeekPop & Toys (rosa / amarelo)
 - Icone de chip inteligente (smart chip)
 - Icone de pagamento contactless (NFC)
 - Efeito holografico com shimmer animado (CSS)
@@ -485,13 +487,19 @@ A carteirinha digital e renderizada inteiramente no frontend com proporcoes de c
 
 ### Interacao
 
-- Animacao de flip 3D (Framer Motion) ao clicar — rotacao de 180 graus com perspectiva
+- Animacao de flip 3D (CSS transform / perspectiva) ao clicar — rotacao de 180 graus
+
+> **Gap conhecido:** o codigo ainda usa gradiente roxo (`#6d28d9` / `#7c3aed`) e `CLUB_PLAN.color = '#7c3aed'`. Alinhamento documentado em [`DESIGN.md`](DESIGN.md) §6.
 
 ---
 
 ## 11. Emails (17 templates)
 
-Todos os emails usam a API do **Resend** com templates HTML inline renderizados server-side. Design dark-theme com cores da marca (dourado `#d4a520`, fundo `#0a0a1a`).
+Todos os emails usam a API do **Resend** com templates HTML inline renderizados server-side.
+
+**Design de marca (alvo):** dark-theme com **Hot Pink** `#F04080` (primary) + **Pop Yellow** `#FCBE04` (accent), fundo `#0a0a1a` / `#0D0D0D`, wordmark **GeekPop & Toys**. Ver [`DESIGN.md`](DESIGN.md) §5.6.
+
+> **Gap conhecido:** o shell atual em `email.service.ts` ainda usa dourado `#d4a520` e o wordmark "GEEK & TOYS". Migrar para a paleta oficial no mesmo PR de design.
 
 | #   | Template                      | Gatilho                                                           |
 | --- | ----------------------------- | ----------------------------------------------------------------- |

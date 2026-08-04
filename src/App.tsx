@@ -11,6 +11,7 @@ import { CookieConsent } from './components/CookieConsent'
 import { ConfirmProvider } from './hooks/useConfirm'
 import { CartProvider } from './contexts/CartContext'
 import { getAppMode } from './lib/subdomain'
+import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
 
 // Lazy loaded pages - Member Area
 const Login = lazy(() => import('./pages/Login'))
@@ -35,6 +36,7 @@ const Cart = lazy(() => import('./pages/shop/Cart'))
 const ShopCheckout = lazy(() => import('./pages/shop/ShopCheckout'))
 const OrderConfirmation = lazy(() => import('./pages/shop/OrderConfirmation'))
 const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
+const EventPage = lazy(() => import('./pages/shop/EventPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -255,10 +257,12 @@ function MemberRoutes() {
 
 /**
  * Rotas da Loja (shop.geeketoys.com.br) — públicas, com carrinho.
+ * Banner de evento fica acima de todas as páginas da loja.
  */
 function ShopRoutes() {
   return (
     <CartProvider>
+      <EventAnnouncementBanner />
       <Routes>
         <Route path="/" element={<ShopHome />} />
         <Route path="/categoria/:slug" element={<ShopHome />} />
@@ -267,6 +271,7 @@ function ShopRoutes() {
         <Route path="/checkout" element={<ShopCheckout />} />
         <Route path="/pedido/:id" element={<OrderConfirmation />} />
         <Route path="/entrar" element={<ShopLogin />} />
+        <Route path="/evento" element={<EventPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </CartProvider>

@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 19 de Abril de 2026
+> **Ultima atualizacao:** 4 de Agosto de 2026
 
 ## Legenda
 
@@ -187,6 +187,20 @@
 
 ## Pendente
 
+### Eventos — loja + site institucional (pedido Laura — Ago/2026)
+
+> **Loja (`shop.*`):** este repo — `docs/EVENTS.md`, `src/data/event.ts`, rota `/evento`  
+> **Home (`geeketoys.com.br`):** repo `geek-toys-home` — `docs/EVENTS.md`
+
+- [x] **Planejamento** - Banner + infos + fotos com download + reserva de ingresso
+- [x] **Site institucional** - Banner, seções, reserva, fotos (geek-toys-home)
+- [x] **Loja (shop)** - Banner em todas as páginas, card na home, `/evento`, reserva, fotos
+- [x] **Galeria com download** - Baixar uma / baixar todas (`public/eventos/<slug>/`)
+- [x] **Reserva online de ingresso** - Formulário → WhatsApp da loja
+- [ ] **MEDIO** Conteúdo real do próximo evento (Laura preenche `event.ts` + fotos nos dois repos)
+- [ ] **MEDIO** Sincronizar `event.ts` / fotos entre loja e home ao publicar evento
+- [ ] **FUTURO** Validar membro do Clube na reserva / pagamento Stripe de ingresso
+
 ### MEDIO - Planejado
 
 - [ ] **Aumentar cobertura de testes** - Meta: 70% (atual ~11%)
@@ -226,12 +240,45 @@
 
 ---
 
+## Domínios / Admin (Agosto 2026)
+
+- [x] **Diagnóstico admin.geekpoptoys.com.br** - DNS/cert/CORS/HTML OK nos quatro hosts (admin/adm × geeketoys/geekpoptoys)
+- [x] **Canônico adm.\*** - nginx 301 `admin.geeketoys.com.br` e `admin.geekpoptoys.com.br` → `adm.*` correspondente
+- [x] **Links internos** - `getSubdomainUrl('admin')` gera `adm.*` (não `admin.*`)
+- [ ] **Deploy nginx** - rsync/compose recreate nginx na VPS para o 301 valer em produção
+
+## Design System / Branding (Agosto 2026)
+
+Fonte de verdade: [`docs/DESIGN.md`](DESIGN.md) | Referencia: [`docs/assets/brand-reference.jpg`](assets/brand-reference.jpg)
+
+Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-first | Outfit + Inter.
+
+### Documentacao
+
+- [x] **DESIGN.md** - Paleta, tokens, inventário de componentes, gaps e regras de uso
+- [x] **Referencia visual versionada** - `docs/assets/brand-reference.jpg`
+- [x] **ARCHITECTURE / PROJECT** - Carteirinha, e-mails e secao de branding atualizados
+
+### Alinhamento de codigo (pendente)
+
+- [ ] **ALTO** Tokens CSS primary/accent para HSL da peca (`340 85% 59%` / `45 97% 50%`) + glows em `index.css`
+- [ ] **ALTO** Carteirinha digital (`MembershipCard`) — trocar gradiente roxo por rosa/amarelo metalico
+- [ ] **ALTO** `CLUB_PLAN.color` de `#7c3aed` → `#F04080`
+- [ ] **ALTO** Badge `club` (violet) → primary
+- [ ] **ALTO** E-mails (`email.service.ts`) — dourado `#d4a520` e wordmark "GEEK & TOYS" → pink/yellow + "GeekPop & Toys"
+- [ ] **MEDIO** Remover residual `violet-*` / `fuchsia-*` em Subscribe, ShopHome, SubscriptionManagement, RadioMiniPlayer
+- [ ] **MEDIO** `tailwind.config.js` `fontFamily.heading` → Outfit (igual HTML/CSS)
+- [ ] **BAIXO** Revisar OG image / favicon se precisar de borda pink comic da peca
+
+---
+
 ## Debitos Tecnicos
 
 1. MapperUtils usa `any` (necessario para flexibilidade)
 2. Soft-delete de usuarios (role → `disabled`, nao deleta)
 3. vendor-charts bundle (435KB) - Lazy loaded via ReportsTab
 4. Erros TypeScript pre-existentes em payments.ts, reports.ts (tipos `unknown`)
+5. Residuos de cor roxo/dourado fora da marca (ver Design System acima)
 
 ---
 
@@ -259,4 +306,4 @@
 
 ---
 
-_Documento atualizado em 19 de Abril de 2026_
+_Documento atualizado em 4 de Agosto de 2026_

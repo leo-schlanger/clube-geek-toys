@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
-import { Sparkles, Search as SearchIcon } from 'lucide-react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Sparkles, Search as SearchIcon, Ticket } from 'lucide-react'
 import type { Product, Category } from '../../types'
 import { listProducts, listCategories } from '../../lib/products'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { CategoryNav } from '../../components/store/CategoryNav'
+import { EventPromoCard } from '../../components/store/EventPromoCard'
 import { useShopMember } from '../../components/store/useShopMember'
+import { Button } from '../../components/ui/button'
+import { isEventVisible } from '../../data/event'
 
 /**
  * Vitrine principal da loja. Serve tanto a rota "/" quanto "/categoria/:slug",
@@ -108,7 +111,7 @@ export default function ShopHome() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {/* Hero — apenas na home sem filtros */}
         {!categorySlug && !search && (
-          <section className="mb-8 overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-violet-500/10 p-6 sm:p-10">
+          <section className="mb-8 overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-accent/10 p-6 sm:p-10">
             <div className="max-w-xl">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
@@ -121,9 +124,20 @@ export default function ShopHome() {
                 Membros do clube ganham <strong className="text-green-600">15% de desconto</strong> em
                 qualquer produto. Entre e economize.
               </p>
+              {isEventVisible() && (
+                <Button asChild className="mt-4 gap-2" size="sm">
+                  <Link to="/evento">
+                    <Ticket className="h-4 w-4" />
+                    Evento &amp; ingressos
+                  </Link>
+                </Button>
+              )}
             </div>
           </section>
         )}
+
+        {/* Destaque do evento ativo */}
+        {!categorySlug && !search && <EventPromoCard />}
 
         {/* Categorias */}
         <div className="mb-6">

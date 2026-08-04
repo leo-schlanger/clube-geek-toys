@@ -179,13 +179,14 @@ O nginx atua como reverse proxy central:
 
 ### Subdomínios servidos
 
-| Domínio                                           | Backend                        |
-| ------------------------------------------------- | ------------------------------ |
-| `club.geeketoys.com.br`                           | Arquivos estáticos (SPA)       |
-| `admin.geeketoys.com.br` / `adm.geeketoys.com.br` | Arquivos estáticos (SPA admin) |
-| `api.geeketoys.com.br`                            | Proxy para `api:3001`          |
-| `analytics.geeketoys.com.br`                      | Proxy para `umami:3000`        |
-| `radio.geeketoys.com.br`                          | Proxy para `azuracast:80`      |
+| Domínio                                               | Backend                          |
+| ----------------------------------------------------- | -------------------------------- |
+| `club.geeketoys.com.br`                               | Arquivos estáticos (SPA)         |
+| `adm.geeketoys.com.br` (canônico)                     | Arquivos estáticos (SPA admin)   |
+| `admin.geeketoys.com.br` / `admin.geekpoptoys.com.br` | **301 →** `adm.*` correspondente |
+| `api.geeketoys.com.br`                                | Proxy para `api:3001`            |
+| `analytics.geeketoys.com.br`                          | Proxy para `umami:3000`          |
+| `radio.geeketoys.com.br`                              | Proxy para `azuracast:80`        |
 
 ---
 
