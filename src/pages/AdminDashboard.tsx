@@ -404,8 +404,10 @@ export default function AdminDashboard() {
               size="sm"
               onClick={() => fetchData(true)}
               disabled={refreshing}
+              className="shrink-0"
+              aria-label="Atualizar"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Atualizar</span>
             </Button>
           </div>
@@ -474,7 +476,7 @@ export default function AdminDashboard() {
                       onClick={() => navigate('/pdv')}
                       className="w-full sm:w-auto"
                     >
-                      <ShoppingCart className="h-5 w-5 mr-2" />
+                      <ShoppingCart className="h-5 w-5" />
                       Abrir PDV
                     </Button>
                   </div>

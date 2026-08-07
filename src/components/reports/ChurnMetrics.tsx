@@ -89,9 +89,9 @@ export function ChurnMetrics({ data, loading }: ChurnMetricsProps) {
               {metrics.trend !== 0 && (
                 <span className={`flex items-center text-xs ${metrics.trend > 0 ? 'text-red-500' : 'text-green-500'}`}>
                   {metrics.trend > 0 ? (
-                    <TrendingUp className="h-3 w-3 mr-0.5" />
+                    <TrendingUp className="h-3 w-3" />
                   ) : (
-                    <TrendingDown className="h-3 w-3 mr-0.5" />
+                    <TrendingDown className="h-3 w-3" />
                   )}
                   {Math.abs(metrics.trend)}%
                 </span>

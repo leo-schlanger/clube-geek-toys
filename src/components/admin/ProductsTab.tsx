@@ -100,7 +100,7 @@ export function ProductsTab() {
             </CardDescription>
           </div>
           <Button onClick={() => setModal({ mode: 'create', product: null })}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Novo Produto
           </Button>
         </div>

@@ -374,7 +374,7 @@ export function SubscriptionManagement({
                   onClick={() => setConfirmAction('pause')}
                   className="hover:bg-orange-500/10 hover:text-orange-600 hover:border-orange-500/50"
                 >
-                  <Pause className="h-4 w-4 mr-2" />
+                  <Pause className="h-4 w-4" />
                   Pausar Assinatura
                 </Button>
               )}
@@ -385,7 +385,7 @@ export function SubscriptionManagement({
                   onClick={() => setConfirmAction('resume')}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  <Play className="h-4 w-4 mr-2" />
+                  <Play className="h-4 w-4" />
                   Reativar Assinatura
                 </Button>
               )}
@@ -396,7 +396,7 @@ export function SubscriptionManagement({
                   className="text-red-500 hover:text-red-600 hover:bg-red-500/10 hover:border-red-500/50"
                   onClick={() => setConfirmAction('cancel')}
                 >
-                  <XCircle className="h-4 w-4 mr-2" />
+                  <XCircle className="h-4 w-4" />
                   Cancelar
                 </Button>
               )}
@@ -406,7 +406,7 @@ export function SubscriptionManagement({
                 onClick={() => setShowHistory(!showHistory)}
                 className={showHistory ? 'bg-muted' : ''}
               >
-                <History className="h-4 w-4 mr-2" />
+                <History className="h-4 w-4" />
                 Histórico
                 {showHistory ? (
                   <ChevronUp className="h-4 w-4 ml-1" />
@@ -581,19 +581,19 @@ export function SubscriptionManagement({
                 <>
                   {confirmAction === 'pause' && (
                     <>
-                      <Pause className="h-4 w-4 mr-2" />
+                      <Pause className="h-4 w-4" />
                       Confirmar Pausa
                     </>
                   )}
                   {confirmAction === 'resume' && (
                     <>
-                      <Play className="h-4 w-4 mr-2" />
+                      <Play className="h-4 w-4" />
                       Confirmar Reativação
                     </>
                   )}
                   {confirmAction === 'cancel' && (
                     <>
-                      <XCircle className="h-4 w-4 mr-2" />
+                      <XCircle className="h-4 w-4" />
                       Confirmar Cancelamento
                     </>
                   )}

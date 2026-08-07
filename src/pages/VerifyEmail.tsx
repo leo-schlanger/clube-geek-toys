@@ -282,7 +282,7 @@ export default function VerifyEmail() {
               <Loading size="sm" />
             ) : (
               <>
-                <CheckCircle className="h-4 w-4 mr-2" />
+                <CheckCircle className="h-4 w-4" />
                 Já Verifiquei
               </>
             )}
@@ -301,7 +301,7 @@ export default function VerifyEmail() {
               `Reenviar em ${cooldown}s`
             ) : (
               <>
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className="h-4 w-4" />
                 Reenviar Email
               </>
             )}
@@ -319,7 +319,7 @@ export default function VerifyEmail() {
               onClick={handleLogout}
               className="w-full text-muted-foreground"
             >
-              <LogOut className="h-4 w-4 mr-2" />
+              <LogOut className="h-4 w-4" />
               Usar outro email
             </Button>
           </div>

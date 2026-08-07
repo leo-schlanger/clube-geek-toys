@@ -179,16 +179,16 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={handleReset} disabled={!hasChanges || saving}>
-          <RotateCcw className="h-4 w-4 mr-2" />
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" onClick={handleReset} disabled={!hasChanges || saving} className="shrink-0">
+          <RotateCcw className="h-4 w-4" />
           Descartar
         </Button>
-        <Button onClick={handleSave} disabled={!hasChanges || saving}>
+        <Button onClick={handleSave} disabled={!hasChanges || saving} className="shrink-0">
           {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <Save className="h-4 w-4 mr-2" />
+            <Save className="h-4 w-4" />
           )}
           Salvar Configurações
         </Button>

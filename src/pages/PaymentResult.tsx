@@ -156,7 +156,7 @@ export default function PaymentResult({ type: initialType }: PaymentResultProps)
                 className="flex-1"
                 onClick={() => navigate('/membro')}
               >
-                <Home className="h-4 w-4 mr-2" />
+                <Home className="h-4 w-4" />
                 Ir para Minha Área
               </Button>
             ) : (
@@ -166,7 +166,7 @@ export default function PaymentResult({ type: initialType }: PaymentResultProps)
                   className="flex-1"
                   onClick={() => navigate('/')}
                 >
-                  <Home className="h-4 w-4 mr-2" />
+                  <Home className="h-4 w-4" />
                   Início
                 </Button>
                 {type === 'error' && (
@@ -174,7 +174,7 @@ export default function PaymentResult({ type: initialType }: PaymentResultProps)
                     className="flex-1"
                     onClick={() => navigate('/assinar')}
                   >
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <RefreshCw className="h-4 w-4" />
                     Tentar Novamente
                   </Button>
                 )}

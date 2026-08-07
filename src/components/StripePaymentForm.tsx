@@ -118,7 +118,7 @@ function CheckoutForm({ onSuccess, onError, onCancel, submitLabel, amount }: Omi
                 <Loading size="sm" />
               ) : (
                 <>
-                  <CreditCard className="h-4 w-4 mr-2" />
+                  <CreditCard className="h-4 w-4" />
                   {submitLabel || (amount ? `Pagar R$ ${amount.toFixed(2).replace('.', ',')}` : 'Confirmar Pagamento')}
                 </>
               )}

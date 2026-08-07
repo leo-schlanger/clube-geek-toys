@@ -65,13 +65,11 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
             <Button
               variant="ghost"
               size="sm"
-              asChild
-              className="hidden shrink-0 gap-1.5 text-primary sm:inline-flex"
+              className="hidden shrink-0 text-primary sm:inline-flex"
+              onClick={() => navigate('/evento')}
             >
-              <Link to="/evento">
-                <CalendarHeart className="h-4 w-4" />
-                Evento
-              </Link>
+              <CalendarHeart className="h-4 w-4" />
+              Evento
             </Button>
           )}
 

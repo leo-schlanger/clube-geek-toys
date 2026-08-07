@@ -115,7 +115,7 @@ export default function ShopCheckout() {
             className="mb-4 -ml-2 text-muted-foreground"
           >
             <Link to="/carrinho">
-              <ArrowLeft className="mr-1 h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" />
               Voltar ao carrinho
             </Link>
           </Button>
@@ -199,7 +199,7 @@ export default function ShopCheckout() {
                 <Button type="submit" size="lg" className="w-full" disabled={submitting}>
                   {submitting ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      <Loader2 className="h-5 w-5 animate-spin" />
                       Processando...
                     </>
                   ) : (

@@ -91,6 +91,14 @@ describe('Button', () => {
     expect(screen.getByRole('button')).toHaveClass('h-10')
   })
 
+  it('should include gap and svg shrink classes for icon+text layout', () => {
+    render(<Button>With icon</Button>)
+    const btn = screen.getByRole('button')
+    expect(btn).toHaveClass('gap-2')
+    expect(btn.className).toMatch(/\[&_svg\]:shrink-0/)
+    expect(btn).toHaveClass('whitespace-nowrap')
+  })
+
   it('should render small size', () => {
     render(<Button size="sm">Small</Button>)
     expect(screen.getByRole('button')).toHaveClass('h-9')

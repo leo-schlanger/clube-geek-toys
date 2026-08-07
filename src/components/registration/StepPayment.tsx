@@ -327,7 +327,7 @@ export function StepPayment({
           <AlertCircle className="h-8 w-8 mx-auto text-red-500" />
           <p className="text-sm text-red-500">{error}</p>
           <Button variant="outline" size="sm" onClick={() => setError(null)}>
-            <RefreshCw className="h-4 w-4 mr-2" />
+            <RefreshCw className="h-4 w-4" />
             Tentar novamente
           </Button>
         </div>
@@ -381,7 +381,7 @@ export function StepPayment({
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
-              <CreditCard className="h-4 w-4 mr-2" />
+              <CreditCard className="h-4 w-4" />
               Iniciar Assinatura com Cartao
             </>
           )}
@@ -480,7 +480,7 @@ export function StepPayment({
 
       {/* ── Back button (always visible) ────────────────────────────────────── */}
       <Button variant="ghost" onClick={onBack} className="w-full">
-        <ArrowLeft className="h-4 w-4 mr-2" />
+        <ArrowLeft className="h-4 w-4" />
         Voltar
       </Button>
     </motion.div>

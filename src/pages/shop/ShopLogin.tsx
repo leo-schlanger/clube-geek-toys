@@ -116,7 +116,7 @@ export default function ShopLogin() {
       >
         <Button variant="ghost" size="sm" asChild className="mb-3 -ml-2 text-muted-foreground">
           <Link to="/">
-            <ArrowLeft className="mr-1 h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" />
             Voltar à loja
           </Link>
         </Button>
@@ -228,12 +228,12 @@ export default function ShopLogin() {
                   <Loading size="sm" />
                 ) : isLocked ? (
                   <>
-                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    <ShieldAlert className="h-4 w-4" />
                     Aguarde {formatTime(lockoutTime)}
                   </>
                 ) : (
                   <>
-                    <LogIn className="mr-2 h-4 w-4" />
+                    <LogIn className="h-4 w-4" />
                     Entrar
                   </>
                 )}

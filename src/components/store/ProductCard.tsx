@@ -124,7 +124,7 @@ export function ProductCard({ product, isMember = false }: ProductCardProps) {
           className={cn('mt-2 w-full', outOfStock && 'opacity-60')}
           size="sm"
         >
-          <ShoppingCart className="mr-2 h-4 w-4" />
+          <ShoppingCart className="h-4 w-4" />
           {outOfStock ? 'Esgotado' : 'Adicionar'}
         </Button>
       </CardContent>

@@ -314,7 +314,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                       className="w-full"
                       onClick={() => setShowContract(true)}
                     >
-                      <PenTool className="h-5 w-5 mr-2" />
+                      <PenTool className="h-5 w-5" />
                       Assinar Contrato
                     </Button>
                   </div>
@@ -362,7 +362,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                       onClick={() => setShowPayment(true)}
                       disabled={!contract}
                     >
-                      <CreditCard className="h-5 w-5 mr-2" />
+                      <CreditCard className="h-5 w-5" />
                       {hasPendingPayment ? 'Continuar Pagamento' : 'Pagar Agora'}
                     </Button>
 
@@ -373,7 +373,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                         onClick={checkPreviousPayment}
                         disabled={checkingPrevious}
                       >
-                        <RefreshCw className="h-4 w-4 mr-2" />
+                        <RefreshCw className="h-4 w-4" />
                         Verificar se já paguei
                       </Button>
                     )}

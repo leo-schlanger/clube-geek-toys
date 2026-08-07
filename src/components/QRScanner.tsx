@@ -245,7 +245,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
               <CameraOff className="h-16 w-16 opacity-50" />
               <p className="text-center px-4 text-sm">{error || 'Câmera não disponível'}</p>
               <Button variant="secondary" onClick={startCamera}>
-                <RefreshCw className="h-4 w-4 mr-2" />
+                <RefreshCw className="h-4 w-4" />
                 Tentar Novamente
               </Button>
             </div>

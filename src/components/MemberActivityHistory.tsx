@@ -168,12 +168,12 @@ export function MemberActivityHistory({ memberId, limit }: MemberActivityHistory
               >
                 {showAll ? (
                   <>
-                    <ChevronUp className="h-4 w-4 mr-1" />
+                    <ChevronUp className="h-4 w-4" />
                     Ver menos
                   </>
                 ) : (
                   <>
-                    <ChevronDown className="h-4 w-4 mr-1" />
+                    <ChevronDown className="h-4 w-4" />
                     Ver mais ({logs.length - 5} atividades)
                   </>
                 )}

@@ -191,7 +191,7 @@ export function MembersTable({
                   onActivate(member)
                 }}
               >
-                <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                <CheckCircle className="h-3.5 w-3.5" />
                 Ativar
               </Button>
             )}
@@ -283,15 +283,15 @@ export function MembersTable({
               <DropdownMenuLabel>Reenviar Email</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => onResendEmail(member, 'verification')}>
-                <Mail className="h-4 w-4 mr-2" />
+                <Mail className="h-4 w-4" />
                 Verificação de Email
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onResendEmail(member, 'welcome')}>
-                <CheckCircle className="h-4 w-4 mr-2" />
+                <CheckCircle className="h-4 w-4" />
                 Boas-vindas
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onResendEmail(member, 'renewal')}>
-                <Star className="h-4 w-4 mr-2" />
+                <Star className="h-4 w-4" />
                 Lembrete de Renovação
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -313,7 +313,7 @@ export function MembersTable({
               className="text-red-500 focus:text-red-500"
               onClick={() => onDelete(member)}
             >
-              <UserX className="h-4 w-4 mr-2" />
+              <UserX className="h-4 w-4" />
               Desativar membro
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -350,7 +350,7 @@ export function MembersTable({
           Cadastre o primeiro membro para começar
         </p>
         <Button onClick={onCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4" />
           Cadastrar Membro
         </Button>
       </div>
@@ -369,7 +369,7 @@ export function MembersTable({
           </p>
         </div>
         <Button onClick={onCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-4 w-4" />
           Novo Membro
         </Button>
       </div>

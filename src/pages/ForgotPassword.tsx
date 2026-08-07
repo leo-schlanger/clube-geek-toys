@@ -74,7 +74,7 @@ function RequestResetForm() {
           <CardFooter>
             <Link to="/login" className="w-full">
               <Button variant="outline" className="w-full">
-                <ArrowLeft className="mr-2 h-4 w-4" />
+                <ArrowLeft className="h-4 w-4" />
                 Voltar para o login
               </Button>
             </Link>

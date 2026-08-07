@@ -186,13 +186,13 @@ export default function OrderConfirmation() {
             <div className="flex w-full flex-col gap-2 pt-2 sm:flex-row">
               <Button asChild variant="outline" className="flex-1">
                 <Link to="/">
-                  <Home className="mr-2 h-4 w-4" />
+                  <Home className="h-4 w-4" />
                   Voltar à loja
                 </Link>
               </Button>
               <Button asChild className="flex-1">
                 <Link to="/">
-                  <ShoppingBag className="mr-2 h-4 w-4" />
+                  <ShoppingBag className="h-4 w-4" />
                   Continuar comprando
                 </Link>
               </Button>

@@ -22,10 +22,10 @@ export function ReportFilters({
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Calendar className="h-5 w-5 text-muted-foreground" />
         <span className="text-sm font-medium">Período:</span>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {periods.map((period) => (
             <Button
               key={period.value}
@@ -44,8 +44,9 @@ export function ReportFilters({
         size="sm"
         onClick={onRefresh}
         disabled={refreshing}
+        className="shrink-0"
       >
-        <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+        <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
         Atualizar
       </Button>
     </div>

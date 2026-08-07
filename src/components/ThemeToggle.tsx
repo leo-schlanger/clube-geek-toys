@@ -47,7 +47,7 @@ export function ThemeToggle({ variant = 'icon', className }: Props) {
       role="group"
       aria-label="Tema da interface"
       className={cn(
-        'inline-flex rounded-lg border border-border bg-muted/50 p-0.5 gap-0.5',
+        'grid w-full grid-cols-3 gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5',
         className
       )}
     >
@@ -59,7 +59,8 @@ export function ThemeToggle({ variant = 'icon', className }: Props) {
             type="button"
             onClick={() => setTheme(id)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
+              'inline-flex min-w-0 items-center justify-center gap-1 rounded-md px-1.5 py-2 text-xs font-medium transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               active
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
@@ -67,8 +68,8 @@ export function ThemeToggle({ variant = 'icon', className }: Props) {
             aria-pressed={active}
             title={label}
           >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{label}</span>
+            <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate leading-none">{label}</span>
           </button>
         )
       })}

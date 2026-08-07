@@ -189,7 +189,7 @@ export default function PDV() {
             onClick={() => { setMode('search'); setShowScanner(false) }}
             className="flex-1"
           >
-            <Search className="h-4 w-4 mr-2" />
+            <Search className="h-4 w-4" />
             Buscar CPF
           </Button>
           <Button
@@ -197,7 +197,7 @@ export default function PDV() {
             onClick={() => { setMode('scanner'); setShowScanner(true) }}
             className="flex-1"
           >
-            <Camera className="h-4 w-4 mr-2" />
+            <Camera className="h-4 w-4" />
             Scanner QR
           </Button>
         </div>
@@ -341,7 +341,7 @@ export default function PDV() {
               {/* Reset Button */}
               <div className="mt-6 text-center">
                 <Button onClick={resetVerification} size="lg">
-                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <RefreshCw className="h-4 w-4" />
                   Nova Verificação
                 </Button>
               </div>

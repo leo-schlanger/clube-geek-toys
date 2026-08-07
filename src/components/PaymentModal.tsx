@@ -304,7 +304,7 @@ export function PaymentModal({
               <AlertCircle className="h-8 w-8 mx-auto text-red-500" />
               <p className="text-sm text-red-500">{error}</p>
               <Button variant="outline" size="sm" onClick={() => setError(null)}>
-                <RefreshCw className="h-4 w-4 mr-2" />Tentar novamente
+                <RefreshCw className="h-4 w-4" />Tentar novamente
               </Button>
             </div>
           )}
@@ -333,7 +333,7 @@ export function PaymentModal({
           {/* Subscription goes straight to card */}
           {!method && !error && mode === 'subscription' && (
             <Button onClick={handleCardPayment} disabled={loading} className="w-full" size="lg">
-              {loading ? <Loading size="sm" /> : <><CreditCard className="h-4 w-4 mr-2" />Iniciar Assinatura com Cartão</>}
+              {loading ? <Loading size="sm" /> : <><CreditCard className="h-4 w-4" />Iniciar Assinatura com Cartão</>}
             </Button>
           )}
 

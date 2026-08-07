@@ -372,7 +372,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                   </Badge>
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  <Calendar className="inline h-4 w-4 mr-1" />
+                  <Calendar className="inline h-4 w-4" />
                   Expira: {new Date(member.expiryDate).toLocaleDateString('pt-BR')}
                 </div>
               </div>
@@ -715,7 +715,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                               disabled={subscriptionActionLoading}
                               onClick={() => handleSubscriptionAction('pause')}
                             >
-                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Pause className="h-4 w-4 mr-1" /> Pausar</>}
+                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Pause className="h-4 w-4" /> Pausar</>}
                             </Button>
                           )}
                           {(subscription.status as string) === 'paused' && (
@@ -726,7 +726,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                               disabled={subscriptionActionLoading}
                               onClick={() => handleSubscriptionAction('resume')}
                             >
-                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" /> Retomar</>}
+                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4" /> Retomar</>}
                             </Button>
                           )}
                           {(subscription.status as string) !== 'cancelled' && (
@@ -737,7 +737,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                               disabled={subscriptionActionLoading}
                               onClick={() => handleSubscriptionAction('cancel')}
                             >
-                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Ban className="h-4 w-4 mr-1" /> Cancelar</>}
+                              {subscriptionActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Ban className="h-4 w-4" /> Cancelar</>}
                             </Button>
                           )}
                         </div>
@@ -817,7 +817,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                               size="sm"
                               onClick={() => window.open(contract.pdf_url as string, '_blank')}
                             >
-                              <Download className="h-4 w-4 mr-1" /> Baixar PDF
+                              <Download className="h-4 w-4" /> Baixar PDF
                             </Button>
                           )}
                           <Button
@@ -830,7 +830,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                             {verifyLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <><ShieldCheck className="h-4 w-4 mr-1" /> Verificar Integridade</>
+                              <><ShieldCheck className="h-4 w-4" /> Verificar Integridade</>
                             )}
                           </Button>
                         </div>

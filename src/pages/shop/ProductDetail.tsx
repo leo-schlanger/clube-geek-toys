@@ -88,7 +88,7 @@ export default function ProductDetail() {
           onClick={() => navigate(-1)}
           className="mb-4 -ml-2 text-muted-foreground"
         >
-          <ChevronLeft className="mr-1 h-4 w-4" />
+          <ChevronLeft className="h-4 w-4" />
           Voltar
         </Button>
 
@@ -257,7 +257,7 @@ export default function ProductDetail() {
                   onClick={handleAddToCart}
                   disabled={outOfStock}
                 >
-                  <ShoppingCart className="mr-2 h-5 w-5" />
+                  <ShoppingCart className="h-5 w-5" />
                   {outOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
                 </Button>
               </div>

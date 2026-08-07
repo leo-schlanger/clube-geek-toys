@@ -98,7 +98,7 @@ export function LogsTab({
           size="sm"
           onClick={() => setSubTab('audit')}
         >
-          <Clock className="h-4 w-4 mr-2" />
+          <Clock className="h-4 w-4" />
           Auditoria
         </Button>
         <Button
@@ -106,7 +106,7 @@ export function LogsTab({
           size="sm"
           onClick={() => setSubTab('errors')}
         >
-          <Bug className="h-4 w-4 mr-2" />
+          <Bug className="h-4 w-4" />
           Erros
           {errorStats && Number(errorStats.errors_24h) > 0 && (
             <span className="ml-2 px-1.5 py-0.5 text-xs rounded-full bg-red-500 text-white">

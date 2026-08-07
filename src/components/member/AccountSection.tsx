@@ -68,7 +68,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
               Meus Dados
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={onEditProfile}>
-              <Edit className="h-4 w-4 mr-1" />
+              <Edit className="h-4 w-4" />
               Editar
             </Button>
           </div>
@@ -143,7 +143,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
                   className="flex-1"
                   onClick={() => window.open(contract.pdfUrl, '_blank')}
                 >
-                  <Download className="h-4 w-4 mr-2" />
+                  <Download className="h-4 w-4" />
                   Baixar PDF
                 </Button>
                 <Button
@@ -157,7 +157,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
                     <Loading size="sm" />
                   ) : (
                     <>
-                      <Send className="h-4 w-4 mr-2" />
+                      <Send className="h-4 w-4" />
                       Enviar por Email
                     </>
                   )}

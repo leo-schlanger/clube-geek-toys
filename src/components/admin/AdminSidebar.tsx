@@ -76,7 +76,7 @@ function NavContent({
       <div className="p-3 border-b border-border">
         <Button
           variant={isPDVActive ? 'default' : 'outline'}
-          className="w-full justify-start gap-3"
+          className="w-full justify-start"
           onClick={handlePDVClick}
         >
           <ShoppingCart className="h-5 w-5" />
@@ -133,13 +133,13 @@ function UserFooter({ onSignOut, onClose }: { onSignOut: () => void; onClose?: (
           </div>
         </div>
       )}
-      <div className="px-1">
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5 px-2">Tema</p>
-        <ThemeToggle variant="segmented" className="w-full justify-between" />
+      <div className="px-1 space-y-1.5">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground px-1">Tema</p>
+        <ThemeToggle variant="segmented" />
       </div>
       <Button
         variant="ghost"
-        className="w-full justify-start gap-3 text-muted-foreground"
+        className="w-full justify-start text-muted-foreground"
         onClick={() => {
           onSignOut()
           onClose?.()

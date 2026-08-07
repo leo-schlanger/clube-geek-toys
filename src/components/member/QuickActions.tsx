@@ -22,7 +22,7 @@ export function QuickActions({ member, onRenew, onEditProfile }: QuickActionsPro
           className="w-full h-14 text-base btn-glow"
           onClick={onRenew}
         >
-          <RefreshCw className="h-5 w-5 mr-2" />
+          <RefreshCw className="h-5 w-5" />
           Renovar
         </Button>
       ) : (
@@ -32,7 +32,7 @@ export function QuickActions({ member, onRenew, onEditProfile }: QuickActionsPro
           className="w-full h-14 text-base"
           onClick={onEditProfile}
         >
-          <Settings className="h-5 w-5 mr-2" />
+          <Settings className="h-5 w-5" />
           Meu Perfil
         </Button>
       )}
@@ -44,7 +44,7 @@ export function QuickActions({ member, onRenew, onEditProfile }: QuickActionsPro
         asChild
       >
         <a href={getShopUrl()}>
-          <ShoppingBag className="h-5 w-5 mr-2" />
+          <ShoppingBag className="h-5 w-5" />
           Ir para a loja
         </a>
       </Button>

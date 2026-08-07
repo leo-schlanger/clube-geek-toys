@@ -480,7 +480,7 @@ export function ProductModal({
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="h-4 w-4 mr-2" />
+                  <Upload className="h-4 w-4" />
                   Enviar imagens
                 </Button>
                 {!isEditMode && pendingFiles.length > 0 && (

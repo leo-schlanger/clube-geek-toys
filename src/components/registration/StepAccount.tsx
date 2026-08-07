@@ -344,9 +344,9 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
             {/* Submit */}
             <Button type="submit" className="w-full" size="lg" disabled={loading || (TURNSTILE_ENABLED && !turnstileToken)}>
               {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <ArrowRight className="mr-2 h-4 w-4" />
+                <ArrowRight className="h-4 w-4" />
               )}
               Criar Conta
             </Button>

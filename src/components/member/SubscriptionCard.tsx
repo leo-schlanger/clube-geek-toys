@@ -104,7 +104,7 @@ export function SubscriptionCard({ member, subscription, onSubscriptionChange }:
             className="w-full"
             onClick={() => setShowManagement(!showManagement)}
           >
-            <Settings className="h-4 w-4 mr-2" />
+            <Settings className="h-4 w-4" />
             Gerenciar Assinatura
             {showManagement ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
           </Button>

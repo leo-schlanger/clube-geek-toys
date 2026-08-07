@@ -28,7 +28,7 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
             <CardDescription>Gerencie o acesso e cargos dos usuários cadastrados</CardDescription>
           </div>
           <Button onClick={onCreateUser}>
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="h-4 w-4" />
             Novo Usuário
           </Button>
         </div>
@@ -60,9 +60,12 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
                         Desativado
                       </Badge>
                     ) : (
-                      <Badge variant={user.role === 'admin' ? 'club' : user.role === 'seller' ? 'default' : 'secondary'}>
-                        {user.role === 'admin' && <Shield className="h-3 w-3 mr-1 inline" />}
-                        {user.role}
+                      <Badge
+                        variant={user.role === 'admin' ? 'club' : user.role === 'seller' ? 'default' : 'secondary'}
+                        className="inline-flex items-center gap-1"
+                      >
+                        {user.role === 'admin' && <Shield className="h-3 w-3" />}
+                        <span className="capitalize">{user.role}</span>
                       </Badge>
                     )}
                   </td>

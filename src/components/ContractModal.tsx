@@ -493,7 +493,7 @@ export function ContractModal({
 
                 {!canvasReady && !canvasError && (
                   <div className="text-center text-sm text-muted-foreground">
-                    <Loader2 className="inline h-4 w-4 animate-spin mr-2" />
+                    <Loader2 className="inline h-4 w-4 animate-spin" />
                     Carregando área de assinatura...
                   </div>
                 )}
@@ -512,7 +512,7 @@ export function ContractModal({
                         setTimeout(() => setupCanvas(), 100)
                       }}
                     >
-                      <RotateCcw className="mr-2 h-4 w-4" />
+                      <RotateCcw className="h-4 w-4" />
                       Tentar novamente
                     </Button>
                   </div>
@@ -605,11 +605,11 @@ export function ContractModal({
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setStep('read')}>
-                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    <ArrowLeft className="h-4 w-4" />
                     Voltar
                   </Button>
                   <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={clearSignature} disabled={!canvasReady}>
-                    <RotateCcw className="mr-1 h-4 w-4" />
+                    <RotateCcw className="h-4 w-4" />
                     Limpar
                   </Button>
                 </div>
@@ -624,23 +624,23 @@ export function ContractModal({
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={() => setStep('sign')} disabled={loading}>
-                    <ArrowLeft className="mr-1 h-4 w-4" />
+                    <ArrowLeft className="h-4 w-4" />
                     Voltar
                   </Button>
                   <Button variant="outline" className="flex-1 sm:flex-none h-11" onClick={handleDownload} disabled={loading}>
-                    <Download className="mr-1 h-4 w-4" />
+                    <Download className="h-4 w-4" />
                     PDF
                   </Button>
                 </div>
                 <Button className="flex-1 h-12 text-base font-semibold" onClick={processContract} disabled={loading}>
                   {loading ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      <Loader2 className="h-5 w-5 animate-spin" />
                       Salvando...
                     </>
                   ) : (
                     <>
-                      <Check className="mr-2 h-5 w-5" />
+                      <Check className="h-5 w-5" />
                       Finalizar Contrato
                     </>
                   )}

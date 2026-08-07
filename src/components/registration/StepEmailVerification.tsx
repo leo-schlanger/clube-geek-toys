@@ -166,9 +166,9 @@ export function StepEmailVerification({
             onClick={handleManualCheck}
           >
             {checking ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <CheckCircle className="mr-2 h-4 w-4" />
+              <CheckCircle className="h-4 w-4" />
             )}
             Ja verifiquei
           </Button>
@@ -183,9 +183,9 @@ export function StepEmailVerification({
               onClick={handleResend}
             >
               {resending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
+                <RefreshCw className="h-4 w-4" />
               )}
               {cooldown > 0
                 ? `Reenviar email (${cooldown}s)`

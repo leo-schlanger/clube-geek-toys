@@ -380,7 +380,7 @@ export default function Register() {
         {/* Header */}
         <div className="text-center mb-6">
           <Link to="/assinar" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft className="h-4 w-4" />
             Voltar para planos
           </Link>
           <div className="mb-4">
@@ -483,7 +483,7 @@ export default function Register() {
               <p className="text-sm font-medium">Dados do membro nao encontrados.</p>
               <p className="text-xs text-muted-foreground">Por favor, volte e preencha seus dados novamente.</p>
               <Button variant="outline" onClick={() => { setStep(1); setAccountCreated(true) }}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para dados
+                <ArrowLeft className="h-4 w-4" /> Voltar para dados
               </Button>
             </CardContent>
           </Card>

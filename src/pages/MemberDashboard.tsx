@@ -110,11 +110,11 @@ export default function MemberDashboard() {
           </CardHeader>
           <CardContent className="space-y-3">
             <Button onClick={() => { setLoading(true); fetchMemberData() }} size="lg" className="w-full">
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-4 w-4" />
               Tentar novamente
             </Button>
             <Button variant="outline" onClick={signOut} className="w-full">
-              <LogOut className="h-4 w-4 mr-2" />
+              <LogOut className="h-4 w-4" />
               Sair
             </Button>
           </CardContent>
@@ -145,7 +145,7 @@ export default function MemberDashboard() {
               Assinar agora
             </Button>
             <Button variant="outline" onClick={signOut} className="w-full">
-              <LogOut className="h-4 w-4 mr-2" />
+              <LogOut className="h-4 w-4" />
               Sair
             </Button>
           </CardContent>
@@ -236,7 +236,7 @@ export default function MemberDashboard() {
               )}
             </div>
             <Button variant="warning" size="sm" className="btn-glow shrink-0" onClick={() => setModal('renew')}>
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-4 w-4" />
               Renovar
             </Button>
           </div>

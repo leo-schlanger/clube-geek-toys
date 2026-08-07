@@ -326,7 +326,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
               disabled={actionLoading}
               className="flex-1"
             >
-              <CheckCircle className="h-4 w-4 mr-2" />
+              <CheckCircle className="h-4 w-4" />
               Confirmar PIX
             </Button>
           )}
@@ -338,7 +338,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
               disabled={actionLoading}
               className="flex-1"
             >
-              <RotateCcw className="h-4 w-4 mr-2" />
+              <RotateCcw className="h-4 w-4" />
               Reembolsar
             </Button>
           )}
