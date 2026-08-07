@@ -69,6 +69,12 @@ async function uniqueSlug(table: 'products' | 'categories', base: string, exclud
 
 // ─── Products ────────────────────────────────────────────────────────────────
 
+/** Seed/QA products must not appear on the public storefront. */
+function isSeedProductName(name: string | null | undefined): boolean {
+  const n = (name ?? '').trim().toLowerCase();
+  return n.startsWith('checkup') || n.includes('checkup api');
+}
+
 export async function listProducts(opts: {
   category?: string;   // category slug
   search?: string;
@@ -83,6 +89,9 @@ export async function listProducts(opts: {
 
   if (!opts.includeInactive) {
     conditions.push(`p.active = TRUE`);
+    // Hide QA/seed products from public catalog (still visible in admin via includeInactive)
+    conditions.push(`p.name NOT ILIKE 'checkup%'`);
+    conditions.push(`p.slug NOT ILIKE 'checkup%'`);
   }
   if (opts.category) {
     conditions.push(`c.slug = $${i++}`);
@@ -137,7 +146,11 @@ export async function getProductBySlug(slug: string, includeInactive = false): P
      WHERE p.slug = $1 ${includeInactive ? '' : 'AND p.active = TRUE'}`,
     [slug]
   );
-  return result.rows[0] ? mapProduct(result.rows[0]) : null;
+  if (!result.rows[0]) return null;
+  const product = mapProduct(result.rows[0]);
+  // Block direct public access to seed products by slug
+  if (!includeInactive && isSeedProductName(product.name)) return null;
+  return product;
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -245,7 +258,13 @@ export async function deactivateProduct(id: string): Promise<void> {
 
 export async function listCategories(includeInactive = false): Promise<Category[]> {
   const result = await query(
-    `SELECT * FROM categories ${includeInactive ? '' : 'WHERE active = TRUE'} ORDER BY sort_order ASC, name ASC`
+    includeInactive
+      ? `SELECT * FROM categories ORDER BY sort_order ASC, name ASC`
+      : `SELECT * FROM categories
+         WHERE active = TRUE
+           AND name NOT ILIKE 'checkup%'
+           AND slug NOT ILIKE 'checkup%'
+         ORDER BY sort_order ASC, name ASC`
   );
   return result.rows.map(mapCategory);
 }

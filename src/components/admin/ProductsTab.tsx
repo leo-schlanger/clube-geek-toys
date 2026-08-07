@@ -79,13 +79,25 @@ export function ProductsTab() {
       )
     : products
 
+  // Produtos ativos sem imagem — prioridade visual para a Laura completar o catálogo
+  const missingPhotoCount = products.filter(
+    (p) => p.active && (!p.images || p.images.length === 0)
+  ).length
+
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <CardTitle>Produtos</CardTitle>
-            <CardDescription>Gerencie o catálogo da loja</CardDescription>
+            <CardDescription>
+              Gerencie o catálogo da loja
+              {missingPhotoCount > 0 && (
+                <span className="mt-1 block text-amber-600 dark:text-amber-400 font-medium">
+                  {missingPhotoCount} produto(s) ativo(s) sem foto — edite e envie as imagens.
+                </span>
+              )}
+            </CardDescription>
           </div>
           <Button onClick={() => setModal({ mode: 'create', product: null })}>
             <Plus className="h-4 w-4 mr-2" />
@@ -124,18 +136,24 @@ export function ProductsTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((product) => (
+                {filtered.map((product) => {
+                  const hasPhoto = Boolean(product.images?.[0])
+                  return (
                   <tr
                     key={product.id}
-                    className={`border-b hover:bg-muted/50 transition-colors ${!product.active ? 'opacity-50' : ''}`}
+                    className={`border-b hover:bg-muted/50 transition-colors ${!product.active ? 'opacity-50' : ''} ${product.active && !hasPhoto ? 'bg-amber-500/5' : ''}`}
                   >
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center shrink-0">
-                          {product.images?.[0] ? (
+                        <div
+                          className={`h-12 w-12 rounded-lg overflow-hidden border bg-muted flex items-center justify-center shrink-0 ${
+                            hasPhoto ? 'border-border' : 'border-amber-500/50'
+                          }`}
+                        >
+                          {hasPhoto ? (
                             <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
                           ) : (
-                            <ImageOff className="h-5 w-5 text-muted-foreground" />
+                            <ImageOff className="h-5 w-5 text-amber-600" />
                           )}
                         </div>
                         <div className="min-w-0">
@@ -145,6 +163,11 @@ export function ProductsTab() {
                           </p>
                           {product.sku && (
                             <p className="text-xs text-muted-foreground font-mono">{product.sku}</p>
+                          )}
+                          {product.active && !hasPhoto && (
+                            <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                              Sem foto — clique em editar para enviar
+                            </p>
                           )}
                         </div>
                       </div>
@@ -168,9 +191,16 @@ export function ProductsTab() {
                       </Badge>
                     </td>
                     <td className="py-4 px-4">
-                      <Badge variant={product.active ? 'success' : 'outline'}>
-                        {product.active ? 'Ativo' : 'Inativo'}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant={product.active ? 'success' : 'outline'}>
+                          {product.active ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                        {product.active && !hasPhoto && (
+                          <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
+                            Sem foto
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -197,7 +227,8 @@ export function ProductsTab() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
 

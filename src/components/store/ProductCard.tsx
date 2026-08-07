@@ -48,12 +48,24 @@ export function ProductCard({ product, isMember = false }: ProductCardProps) {
             alt={product.name}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={(e) => {
+              // Broken URL → fall back to empty state instead of alt icon only
+              const el = e.currentTarget
+              el.style.display = 'none'
+              const fallback = el.nextElementSibling as HTMLElement | null
+              if (fallback) fallback.classList.remove('hidden')
+            }}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <ImageOff className="h-10 w-10" />
-          </div>
-        )}
+        ) : null}
+        <div
+          className={cn(
+            'flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted text-muted-foreground',
+            image ? 'hidden absolute inset-0' : ''
+          )}
+        >
+          <ImageOff className="h-10 w-10 opacity-60" />
+          <span className="text-xs font-medium uppercase tracking-wide">Sem foto</span>
+        </div>
 
         {/* Selos sobre a imagem */}
         <div className="absolute left-2 top-2 flex flex-col gap-1">

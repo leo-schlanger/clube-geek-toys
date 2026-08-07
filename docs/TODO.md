@@ -201,7 +201,9 @@
 - [x] **35 fotos do evento** - `public/eventos/kpop-night/` nos dois repos (sem duplicatas)
 - [x] **WhatsApp loja principal** - (11) 91466-2881 + secundário (21) 98546-4666
 - [ ] **MEDIO** Deploy do site institucional (`geek-toys-home`) — sem CI automático
-- [ ] **MEDIO** Fotos de produto no admin (vários SKUs ainda sem imagem)
+- [ ] **ALTO** Laura: enviar fotos reais dos 14 produtos ativos (vitrine mostra "Sem foto")
+- [x] **Filtro seed Checkup** - não listar na API pública / categorias
+- [x] **Admin highlight** - badge "Sem foto" + contagem no catálogo
 - [ ] **FUTURO** Validar membro do Clube na reserva / pagamento Stripe de ingresso
 
 ### MEDIO - Planejado
