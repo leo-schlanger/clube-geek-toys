@@ -1,0 +1,80 @@
+# One-shot: create/reset E2E admin + member on production DB via deploy SSH key.
+name: Seed E2E users
+
+on:
+  push:
+    branches: [chore/seed-e2e-users]
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          [ -n "$(tail -c1 ~/.ssh/deploy_key)" ] && echo >> ~/.ssh/deploy_key
+          for i in 1 2 3; do
+            ssh-keyscan -T 20 -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null && break
+            sleep 2
+          done
+
+      - name: Upsert E2E admin + member via node+pg inside API container
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            "docker exec -i clube-geek-api node" <<'NODE'
+          const bcrypt = require('bcrypt');
+          const { Pool } = require('pg');
+
+          const ADMIN_EMAIL = 'e2e-admin@geeketoys.com.br';
+          const ADMIN_PASSWORD = 'E2eAdmin2026!';
+          const MEMBER_EMAIL = 'e2e-member@geeketoys.com.br';
+          const MEMBER_PASSWORD = 'E2eMember2026!';
+
+          (async () => {
+            const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+            try {
+              const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+              const memberHash = await bcrypt.hash(MEMBER_PASSWORD, 12);
+
+              await pool.query(
+                `INSERT INTO users (email, password_hash, role, email_verified, email_verified_at)
+                 VALUES (lower($1), $2, 'admin', TRUE, NOW())
+                 ON CONFLICT (email) DO UPDATE SET
+                   password_hash = EXCLUDED.password_hash,
+                   role = 'admin',
+                   email_verified = TRUE,
+                   email_verified_at = COALESCE(users.email_verified_at, NOW())`,
+                [ADMIN_EMAIL, adminHash]
+              );
+
+              await pool.query(
+                `INSERT INTO users (email, password_hash, role, email_verified, email_verified_at)
+                 VALUES (lower($1), $2, 'member', TRUE, NOW())
+                 ON CONFLICT (email) DO UPDATE SET
+                   password_hash = EXCLUDED.password_hash,
+                   role = 'member',
+                   email_verified = TRUE,
+                   email_verified_at = COALESCE(users.email_verified_at, NOW())`,
+                [MEMBER_EMAIL, memberHash]
+              );
+
+              const r = await pool.query(
+                `SELECT email, role, email_verified FROM users
+                 WHERE email IN (lower($1), lower($2)) ORDER BY email`,
+                [ADMIN_EMAIL, MEMBER_EMAIL]
+              );
+              console.log(JSON.stringify(r.rows, null, 2));
+              console.log('SEED_DONE');
+            } finally {
+              await pool.end();
+            }
+          })().catch((e) => {
+            console.error(e);
+            process.exit(1);
+          });
+          NODE
