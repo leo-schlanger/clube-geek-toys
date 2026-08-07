@@ -197,8 +197,11 @@
 - [x] **Loja (shop)** - Banner em todas as páginas, card na home, `/evento`, reserva, fotos
 - [x] **Galeria com download** - Baixar uma / baixar todas (`public/eventos/<slug>/`)
 - [x] **Reserva online de ingresso** - Formulário → WhatsApp da loja
-- [ ] **MEDIO** Conteúdo real do próximo evento (Laura preenche `event.ts` + fotos nos dois repos)
-- [ ] **MEDIO** Sincronizar `event.ts` / fotos entre loja e home ao publicar evento
+- [x] **Conteúdo real GeekPop Night** - 6/set/2026 14h–18h, R$ 20, colo/PCD isentos (07/08/2026)
+- [x] **35 fotos do evento** - `public/eventos/kpop-night/` nos dois repos (sem duplicatas)
+- [x] **WhatsApp loja principal** - (11) 91466-2881 + secundário (21) 98546-4666
+- [ ] **MEDIO** Deploy do site institucional (`geek-toys-home`) — sem CI automático
+- [ ] **MEDIO** Fotos de produto no admin (vários SKUs ainda sem imagem)
 - [ ] **FUTURO** Validar membro do Clube na reserva / pagamento Stripe de ingresso
 
 ### MEDIO - Planejado
@@ -229,7 +232,7 @@
 
 - [ ] **App Mobile (React Native)** - App nativo para iOS/Android
 - [ ] **Multi-tenancy** - Suportar multiplas lojas
-- [ ] **Integracao com marketplaces** - Sincronizar catalogo da loja com Shopee/Mercado Livre
+- [ ] ~~**Integracao com marketplaces (Shopee/ML)**~~ — **cancelado** (Laura: não usam mais; loja própria)
 - [ ] **Sistema de indicacao** - Tracking + rewards
 
 ### Infraestrutura
@@ -306,4 +309,4 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 
 ---
 
-_Documento atualizado em 4 de Agosto de 2026_
+_Documento atualizado em 7 de Agosto de 2026_

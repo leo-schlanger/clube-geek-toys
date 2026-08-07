@@ -39,12 +39,29 @@ test.describe('Loja pública GeekPop (produção)', () => {
     expect(errors, `erros no console/rede:\n${errors.join('\n')}`).toEqual([])
   })
 
-  test('home: estado de catálogo vazio é tratado (API /products OK)', async ({ page }) => {
+  test('home: catálogo da API aparece ou estado vazio amigável', async ({ page }) => {
     await page.goto(SHOP, { waitUntil: 'networkidle' })
-    // catálogo vazio → mensagem amigável (confirma que a API respondeu 200 e não quebrou)
-    await expect(
-      page.getByText(/Nenhum produto disponível|Nenhum produto encontrado/i).first()
-    ).toBeVisible()
+    // Com estoque real: lista produtos; sem estoque: mensagem amigável (API 200 em ambos)
+    const empty = page.getByText(/Nenhum produto disponível|Nenhum produto encontrado/i)
+    const productLink = page.locator('a[href^="/produto/"]').first()
+    const hasProducts = (await productLink.count()) > 0
+    if (hasProducts) {
+      await expect(productLink).toBeVisible()
+    } else {
+      await expect(empty.first()).toBeVisible()
+    }
+  })
+
+  test('evento: página /evento carrega com data e reserva', async ({ page }) => {
+    const errors = collectErrors(page)
+    await page.goto(`${SHOP}/evento`, { waitUntil: 'domcontentloaded' })
+    await expect(page.getByRole('heading').first()).toBeVisible()
+    // conteúdo ativo: preço e/ou data de setembro
+    await expect(page.getByText(/R\$\s*20|setembro|ingresso/i).first()).toBeVisible({
+      timeout: 15_000,
+    })
+    await page.screenshot({ path: 'e2e/.out/shop-evento.png', fullPage: true })
+    expect(errors.filter((e) => e.startsWith('pageerror')), errors.join('\n')).toEqual([])
   })
 
   test('carrinho: abre a gaveta e mostra carrinho vazio', async ({ page }) => {

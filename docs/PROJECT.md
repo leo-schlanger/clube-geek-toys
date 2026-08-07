@@ -1,6 +1,6 @@
 # Clube GeekPop & Toys — Documentacao do Projeto
 
-> **Ultima atualizacao:** 4 de Agosto de 2026
+> **Ultima atualizacao:** 7 de Agosto de 2026
 
 ## 1. Dados da Empresa
 
@@ -11,9 +11,11 @@
 | **CNPJ**          | 52.846.344/0001-10                                               |
 | **Endereco**      | R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ |
 | **CEP**           | 22011-001                                                        |
-| **Telefone**      | (21) 98546-4666                                                  |
+| **WhatsApp loja** | (11) 91466-2881 — principal (atendentes)                         |
+| **WhatsApp**      | (21) 98546-4666 — gerência (Norberto)                            |
 | **Email**         | geeketoys@gmail.com                                              |
 | **Site**          | geeketoys.com.br                                                 |
+| **Loja online**   | shop.geeketoys.com.br                                            |
 
 ## 2. Visao do Produto
 
@@ -821,15 +823,18 @@ clube-geek-toys/
 └── .env.example
 ```
 
-## 10. Redes Sociais
+## 10. Redes Sociais e Contato
 
-| Plataforma | Link                                    |
-| ---------- | --------------------------------------- |
-| Instagram  | https://instagram.com/geeketoys         |
-| Facebook   | https://facebook.com/geeketoyscolection |
-| TikTok     | https://tiktok.com/@geeketoys           |
-| WhatsApp   | https://wa.me/5521985464666             |
-| Shopee     | https://shopee.com.br/geeketoys         |
+| Plataforma        | Link / número                           |
+| ----------------- | --------------------------------------- |
+| Instagram         | https://instagram.com/geeketoys         |
+| Facebook          | https://facebook.com/geeketoyscolection |
+| TikTok            | https://tiktok.com/@geeketoys           |
+| WhatsApp loja     | https://wa.me/5511914662881 (principal) |
+| WhatsApp gerência | https://wa.me/5521985464666             |
+| Loja própria      | https://shop.geeketoys.com.br           |
+
+> **Shopee e Mercado Livre foram descontinuados** (pedido Laura, ago/2026). Vendas online só pela loja própria.
 
 ## 11. Design e Branding
 
@@ -838,7 +843,7 @@ clube-geek-toys/
 | Nome de marca  | GeekPop & Toys           |
 | Primary        | Hot Pink `#F04080`       |
 | Accent         | Pop Yellow `#FCBE04`     |
-| Superficie app | Dark (`#0D0D0D`)         |
+| Superficie app | Light-first (ver DESIGN) |
 | Headings       | Outfit                   |
 | Body           | Inter                    |
 | Doc            | [`DESIGN.md`](DESIGN.md) |
