@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 
-    <!-- Anti-FOUC: aplica tema antes do React (localStorage + system) -->
+    <!-- Anti-FOUC: light é o padrão; dark só se o usuário escolheu -->
     <script>
       (function () {
         try {
           var k = 'geekpop-theme';
-          var t = localStorage.getItem(k) || 'system';
+          var t = localStorage.getItem(k) || 'light';
           var dark =
             t === 'dark' ||
             (t === 'system' &&

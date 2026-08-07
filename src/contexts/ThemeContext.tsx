@@ -37,7 +37,8 @@ function readStored(): ThemePreference {
   } catch {
     /* ignore */
   }
-  return 'system'
+  // Default: light (marca / site institucional)
+  return 'light'
 }
 
 function applyDomTheme(resolved: ResolvedTheme) {
@@ -53,7 +54,7 @@ function applyDomTheme(resolved: ResolvedTheme) {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemePreference>(() =>
-    typeof window !== 'undefined' ? readStored() : 'system'
+    typeof window !== 'undefined' ? readStored() : 'light'
   )
   const [system, setSystem] = useState<ResolvedTheme>(() =>
     typeof window !== 'undefined' ? getSystemTheme() : 'light'
