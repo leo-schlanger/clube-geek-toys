@@ -33,10 +33,13 @@ vi.mock('../reports', () => ({
 const sampleMonthlyData: MonthlyReportData[] = [
   {
     period: '2025-01',
-    month: 'Jan',
+    month: '2025-01',
     revenue: 1000,
+    paymentCount: 7,
     newMembers: 5,
     churnedMembers: 1,
+    shopRevenue: 0,
+    shopOrders: 0,
   },
 ]
 

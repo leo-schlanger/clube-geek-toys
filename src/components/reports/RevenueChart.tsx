@@ -23,17 +23,24 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
   const chartData = useMemo(() => {
     return data.map((d) => ({
       ...d,
-      revenueFormatted: formatCurrency(d.revenue),
+      periodLabel: d.period,
     }))
   }, [data])
 
-  const totalRevenue = useMemo(() => {
-    return data.reduce((sum, d) => sum + d.revenue, 0)
-  }, [data])
-
+  const totalClub = useMemo(() => data.reduce((sum, d) => sum + d.revenue, 0), [data])
+  const totalShop = useMemo(
+    () => data.reduce((sum, d) => sum + (d.shopRevenue || 0), 0),
+    [data]
+  )
+  const hasShop = totalShop > 0
+  const monthsWithActivity = useMemo(
+    () => data.filter((d) => d.revenue > 0 || (d.shopRevenue || 0) > 0 || d.paymentCount > 0).length,
+    [data]
+  )
   const averageRevenue = useMemo(() => {
-    return data.length > 0 ? totalRevenue / data.length : 0
-  }, [totalRevenue, data.length])
+    const base = monthsWithActivity || data.length || 1
+    return totalClub / base
+  }, [totalClub, monthsWithActivity, data.length])
 
   if (loading) {
     return (
@@ -56,30 +63,41 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
               Receita Mensal
             </CardTitle>
             <CardDescription>
-              Evolucao da receita nos ultimos {data.length} meses
+              Assinaturas do clube (pagamentos confirmados)
+              {hasShop ? ' e loja online' : ''}
+              {data.length > 0 ? ` · últimos ${data.length} meses` : ''}
             </CardDescription>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold text-green-500">{formatCurrency(totalRevenue)}</p>
+          <div className="text-left sm:text-right space-y-1">
+            <div>
+              <p className="text-sm text-muted-foreground">Clube (total)</p>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalClub)}</p>
+            </div>
+            {hasShop && (
+              <div>
+                <p className="text-sm text-muted-foreground">Loja (total)</p>
+                <p className="text-lg font-semibold text-primary">{formatCurrency(totalShop)}</p>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              Media: {formatCurrency(averageRevenue)}/mes
+              Média clube: {formatCurrency(averageRevenue)}/mês
             </p>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
-          {data.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              Nenhum dado disponivel
+          {data.length === 0 || (totalClub === 0 && totalShop === 0) ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-center px-4">
+              Nenhum pagamento confirmado neste período ainda. Quando houver
+              assinaturas ou pedidos pagos, a receita aparece mês a mês aqui.
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -96,7 +114,15 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
                   className="text-muted-foreground"
                 />
                 <Tooltip
-                  formatter={(value) => [formatCurrency(Number(value)), 'Receita']}
+                  formatter={(value, name) => {
+                    const label =
+                      name === 'revenue'
+                        ? 'Clube'
+                        : name === 'shopRevenue'
+                          ? 'Loja'
+                          : String(name)
+                    return [formatCurrency(Number(value)), label]
+                  }}
                   labelStyle={{ color: 'var(--foreground)' }}
                   contentStyle={{
                     backgroundColor: 'var(--card)',
@@ -108,12 +134,23 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
                 <Line
                   type="monotone"
                   dataKey="revenue"
-                  name="Receita"
+                  name="Clube"
                   stroke="#10b981"
                   strokeWidth={2}
                   dot={{ fill: '#10b981', strokeWidth: 2 }}
                   activeDot={{ r: 6 }}
                 />
+                {hasShop && (
+                  <Line
+                    type="monotone"
+                    dataKey="shopRevenue"
+                    name="Loja"
+                    stroke="#F04080"
+                    strokeWidth={2}
+                    dot={{ fill: '#F04080', strokeWidth: 2 }}
+                    activeDot={{ r: 6 }}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}

@@ -24,7 +24,7 @@ export function ReportFilters({
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div className="flex items-center gap-2">
         <Calendar className="h-5 w-5 text-muted-foreground" />
-        <span className="text-sm font-medium">Periodo:</span>
+        <span className="text-sm font-medium">Período:</span>
         <div className="flex gap-1">
           {periods.map((period) => (
             <Button

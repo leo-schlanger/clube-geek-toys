@@ -73,7 +73,7 @@ export function ChurnMetrics({ data, loading }: ChurnMetricsProps) {
               Taxa de Churn
             </CardTitle>
             <CardDescription>
-              Porcentagem de cancelamentos por mes
+              Porcentagem de cancelamentos por mês
             </CardDescription>
           </div>
         </div>
@@ -99,7 +99,7 @@ export function ChurnMetrics({ data, loading }: ChurnMetricsProps) {
             </div>
           </div>
           <div className="p-3 bg-muted rounded-lg">
-            <div className="text-sm text-muted-foreground">Media</div>
+            <div className="text-sm text-muted-foreground">Média</div>
             <span className="text-2xl font-bold">{metrics.avgRate}%</span>
           </div>
           <div className="p-3 bg-muted rounded-lg">
@@ -113,9 +113,11 @@ export function ChurnMetrics({ data, loading }: ChurnMetricsProps) {
       </CardHeader>
       <CardContent>
         <div className="h-[200px]">
-          {data.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              Nenhum dado disponivel
+          {data.length === 0 || (metrics.totalChurned === 0 && metrics.avgRate === 0) ? (
+            <div className="h-full flex items-center justify-center text-muted-foreground text-center px-4">
+              {data.length === 0
+                ? 'Nenhum dado disponível'
+                : 'Sem cancelamentos/expirações neste período. A taxa de churn aparece quando houver saídas reais.'}
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">

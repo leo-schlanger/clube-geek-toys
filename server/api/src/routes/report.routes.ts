@@ -5,6 +5,11 @@ import * as reportService from '../services/report.service.js';
 export const reportRouter = Router();
 reportRouter.use(authenticate, requireRole('admin'));
 
+function parseMonths(raw: unknown): number {
+  const requested = Number(raw) || 6;
+  return Math.max(1, Math.min(requested, 24));
+}
+
 // GET /reports/daily
 reportRouter.get('/daily', async (_req, res, next) => {
   try {
@@ -15,12 +20,10 @@ reportRouter.get('/daily', async (_req, res, next) => {
   }
 });
 
-// GET /reports/monthly
+// GET /reports/monthly?months=6
 reportRouter.get('/monthly', async (req, res, next) => {
   try {
-    // Bound months to a sensible range to prevent DoS via huge time windows.
-    const requested = Number(req.query.months) || 6;
-    const months = Math.max(1, Math.min(requested, 24));
+    const months = parseMonths(req.query.months);
     const result = await reportService.getMonthlyReport(months);
     res.json(result);
   } catch (err) {
@@ -28,10 +31,21 @@ reportRouter.get('/monthly', async (req, res, next) => {
   }
 });
 
-// GET /reports/churn — expired + cancelled members grouped by month
-reportRouter.get('/churn', async (_req, res, next) => {
+// GET /reports/churn?months=6 — expired + cancelled members grouped by month
+reportRouter.get('/churn', async (req, res, next) => {
   try {
-    const result = await reportService.getChurnReport();
+    const months = parseMonths(req.query.months);
+    const result = await reportService.getChurnReport(months);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /reports/plan-distribution — single club plan with real counts/revenue
+reportRouter.get('/plan-distribution', async (_req, res, next) => {
+  try {
+    const result = await reportService.getPlanDistribution();
     res.json(result);
   } catch (err) {
     next(err);
@@ -48,7 +62,7 @@ reportRouter.get('/today-revenue', async (_req, res, next) => {
   }
 });
 
-// GET /reports/realtime-stats — replaces Firestore onSnapshot
+// GET /reports/realtime-stats — dashboard polling
 reportRouter.get('/realtime-stats', async (_req, res, next) => {
   try {
     const result = await reportService.getRealtimeStats();

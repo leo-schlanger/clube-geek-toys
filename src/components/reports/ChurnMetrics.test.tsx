@@ -53,7 +53,7 @@ describe('ChurnMetrics', () => {
   it('renders empty state', () => {
     render(<ChurnMetrics data={[]} />)
 
-    expect(screen.getByText(/nenhum dado disponivel/i)).toBeInTheDocument()
+    expect(screen.getByText(/nenhum dado dispon/i)).toBeInTheDocument()
   })
 
   it('renders current churn rate', () => {

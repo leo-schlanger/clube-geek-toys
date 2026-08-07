@@ -46,14 +46,20 @@ describe('getMonthlyReport', () => {
       {
         month: '2026-01',
         revenue: 1500,
+        paymentCount: 10,
         newMembers: 10,
         churnedMembers: 2,
+        shopRevenue: 200,
+        shopOrders: 3,
       },
       {
         month: '2026-02',
         revenue: 1800,
+        paymentCount: 12,
         newMembers: 15,
         churnedMembers: 1,
+        shopRevenue: 0,
+        shopOrders: 0,
       },
     ]
     mockedApi.get.mockResolvedValueOnce({ data: rawData, status: 200 })
@@ -65,8 +71,11 @@ describe('getMonthlyReport', () => {
       period: '2026-01',
       month: '2026-01',
       revenue: 1500,
+      paymentCount: 10,
       newMembers: 10,
       churnedMembers: 2,
+      shopRevenue: 200,
+      shopOrders: 3,
     })
     expect(mockedApi.get).toHaveBeenCalledWith('/reports/monthly?months=6')
   })
@@ -105,6 +114,8 @@ describe('getMonthlyReport', () => {
 
     expect(result[0].newMembers).toBe(0)
     expect(result[0].churnedMembers).toBe(0)
+    expect(result[0].paymentCount).toBe(0)
+    expect(result[0].shopRevenue).toBe(0)
   })
 })
 
@@ -113,42 +124,33 @@ describe('getMonthlyReport', () => {
 // =============================================================================
 
 describe('getRevenueByPlan', () => {
-  it('deve retornar distribuição única do plano club com 100%', async () => {
+  it('deve retornar distribuição do plano club a partir de /plan-distribution', async () => {
     mockedApi.get.mockResolvedValueOnce({
-      data: {
-        members: { total: 100 },
-      },
+      data: [{ plan: 'club', count: 12, revenue: 1799.88, percentage: 100 }],
       status: 200,
     })
 
     const result = await getRevenueByPlan()
 
+    expect(mockedApi.get).toHaveBeenCalledWith('/reports/plan-distribution')
     expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({ plan: 'club', count: 100, revenue: 0, percentage: 100 })
+    expect(result[0]).toEqual({
+      plan: 'club',
+      count: 12,
+      revenue: 1799.88,
+      percentage: 100,
+    })
   })
 
-  it('deve tratar zero membros (percentual 0)', async () => {
+  it('deve tratar zero membros', async () => {
     mockedApi.get.mockResolvedValueOnce({
-      data: { members: { total: 0 } },
+      data: [{ plan: 'club', count: 0, revenue: 0, percentage: 0 }],
       status: 200,
     })
 
     const result = await getRevenueByPlan()
 
-    expect(result).toHaveLength(1)
     expect(result[0]).toEqual({ plan: 'club', count: 0, revenue: 0, percentage: 0 })
-  })
-
-  it('deve usar 0 quando o total está ausente', async () => {
-    mockedApi.get.mockResolvedValueOnce({
-      data: { members: {} },
-      status: 200,
-    })
-
-    const result = await getRevenueByPlan()
-
-    expect(result[0].count).toBe(0)
-    expect(result[0].percentage).toBe(0)
   })
 
   it('should return empty array on error', async () => {
@@ -173,16 +175,33 @@ describe('getRevenueByPlan', () => {
 // =============================================================================
 
 describe('getChurnRate', () => {
-  it('should return churn data', async () => {
+  it('should return churn data with months query', async () => {
     const churn = [
       { period: '2026-01', churnRate: 5, churned: 2, total: 40 },
     ]
     mockedApi.get.mockResolvedValueOnce({ data: churn, status: 200 })
 
-    const result = await getChurnRate()
+    const result = await getChurnRate(6)
 
     expect(result).toEqual(churn)
-    expect(mockedApi.get).toHaveBeenCalledWith('/reports/churn')
+    expect(mockedApi.get).toHaveBeenCalledWith('/reports/churn?months=6')
+  })
+
+  it('should map snake_case API fields', async () => {
+    mockedApi.get.mockResolvedValueOnce({
+      data: [{ period: '2026-02', churn_rate: 2.5, churned: 1, total: 40 }],
+      status: 200,
+    })
+
+    const result = await getChurnRate(3)
+
+    expect(result[0]).toEqual({
+      period: '2026-02',
+      churnRate: 2.5,
+      churned: 1,
+      total: 40,
+    })
+    expect(mockedApi.get).toHaveBeenCalledWith('/reports/churn?months=3')
   })
 
   it('should return empty array on no data', async () => {
@@ -227,7 +246,7 @@ describe('getMemberStats', () => {
       active: 80,
       pending: 10,
       expired: 10,
-      byPlan: { club: 100 },
+      byPlan: { club: 80 },
     })
     expect(mockedApi.get).toHaveBeenCalledWith('/reports/realtime-stats')
   })
@@ -300,7 +319,6 @@ describe('calculateGrowthRate', () => {
   })
 
   it('should handle decimal precision', () => {
-    // 33.333... should be rounded to one decimal
     const result = calculateGrowthRate(400, 300)
     expect(result).toBe(33.3)
   })

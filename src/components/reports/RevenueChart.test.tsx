@@ -30,9 +30,36 @@ import { RevenueChart } from './RevenueChart'
 import type { MonthlyReportData } from '../../lib/reports'
 
 const sampleData: MonthlyReportData[] = [
-  { period: 'Jan/26', month: '2026-01', revenue: 500, newMembers: 5, churnedMembers: 1, pointsEarned: 100, pointsRedeemed: 20 },
-  { period: 'Feb/26', month: '2026-02', revenue: 800, newMembers: 8, churnedMembers: 2, pointsEarned: 200, pointsRedeemed: 40 },
-  { period: 'Mar/26', month: '2026-03', revenue: 1200, newMembers: 10, churnedMembers: 1, pointsEarned: 300, pointsRedeemed: 50 },
+  {
+    period: '2026-01',
+    month: '2026-01',
+    revenue: 500,
+    paymentCount: 3,
+    newMembers: 5,
+    churnedMembers: 1,
+    shopRevenue: 0,
+    shopOrders: 0,
+  },
+  {
+    period: '2026-02',
+    month: '2026-02',
+    revenue: 800,
+    paymentCount: 5,
+    newMembers: 8,
+    churnedMembers: 2,
+    shopRevenue: 100,
+    shopOrders: 1,
+  },
+  {
+    period: '2026-03',
+    month: '2026-03',
+    revenue: 1200,
+    paymentCount: 8,
+    newMembers: 10,
+    churnedMembers: 1,
+    shopRevenue: 50,
+    shopOrders: 1,
+  },
 ]
 
 describe('RevenueChart', () => {
@@ -46,7 +73,7 @@ describe('RevenueChart', () => {
   it('renders empty state when data is empty', () => {
     render(<RevenueChart data={[]} />)
 
-    expect(screen.getByText(/nenhum dado disponivel/i)).toBeInTheDocument()
+    expect(screen.getByText(/nenhum pagamento confirmado/i)).toBeInTheDocument()
   })
 
   it('renders chart with data', () => {
@@ -60,14 +87,13 @@ describe('RevenueChart', () => {
   it('shows the number of months covered', () => {
     render(<RevenueChart data={sampleData} />)
 
-    expect(screen.getByText(/ultimos 3 meses/i)).toBeInTheDocument()
+    expect(screen.getByText(/ltimos 3 meses/i)).toBeInTheDocument()
   })
 
   it('shows average revenue', () => {
     render(<RevenueChart data={sampleData} />)
 
-    // Average: 2500 / 3 ~= 833.33
-    expect(screen.getByText(/media/i)).toBeInTheDocument()
+    expect(screen.getByText(/m[eé]dia/i)).toBeInTheDocument()
   })
 
   it('renders the responsive container when data exists', () => {

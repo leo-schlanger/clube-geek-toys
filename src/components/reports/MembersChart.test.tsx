@@ -35,8 +35,26 @@ import { MembersChart } from './MembersChart'
 import type { MonthlyReportData } from '../../lib/reports'
 
 const sampleData: MonthlyReportData[] = [
-  { period: 'Jan/26', month: '2026-01', revenue: 500, newMembers: 5, churnedMembers: 1 },
-  { period: 'Feb/26', month: '2026-02', revenue: 800, newMembers: 8, churnedMembers: 2 },
+  {
+    period: '2026-01',
+    month: '2026-01',
+    revenue: 500,
+    paymentCount: 3,
+    newMembers: 5,
+    churnedMembers: 1,
+    shopRevenue: 0,
+    shopOrders: 0,
+  },
+  {
+    period: '2026-02',
+    month: '2026-02',
+    revenue: 800,
+    paymentCount: 5,
+    newMembers: 8,
+    churnedMembers: 2,
+    shopRevenue: 100,
+    shopOrders: 1,
+  },
 ]
 
 describe('MembersChart', () => {
@@ -49,7 +67,7 @@ describe('MembersChart', () => {
   it('renders empty state for bar chart when no data', () => {
     render(<MembersChart data={[]} />)
 
-    expect(screen.getAllByText(/nenhum dado disponivel/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/nenhum dado dispon/i)).toBeInTheDocument()
   })
 
   it('renders the bar chart with data', () => {
