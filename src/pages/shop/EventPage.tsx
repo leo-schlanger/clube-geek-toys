@@ -6,10 +6,10 @@ import {
   Gift,
   Clock,
   ArrowRight,
+  Images,
 } from 'lucide-react'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { EventTicketForm } from '../../components/store/EventTicketForm'
-import { EventPhotosSection } from '../../components/store/EventPhotosSection'
 import { useShopMember } from '../../components/store/useShopMember'
 import { Button } from '../../components/ui/button'
 import {
@@ -19,7 +19,8 @@ import {
 } from '../../data/event'
 
 /**
- * Página completa do evento na loja: infos, reserva e fotos com download.
+ * Página do evento na loja: infos + reserva.
+ * Fotos ficam na galeria geral do site principal (geeketoys.com.br#galeria).
  */
 export default function EventPage() {
   const { isMember } = useShopMember()
@@ -49,7 +50,7 @@ export default function EventPage() {
           </span>
           <h1 className="font-heading text-3xl font-bold sm:text-4xl">{event.title}</h1>
           <p className="mt-2 text-muted-foreground">
-            Informações, reserva de ingresso e fotos oficiais para download.
+            Informações e reserva de ingresso online.
           </p>
         </div>
 
@@ -129,14 +130,20 @@ export default function EventPage() {
             <Button asChild className="mt-6 w-full" size="lg">
               <a href="#ingressos">Reservar ingresso</a>
             </Button>
-            <Button asChild variant="outline" className="mt-2 w-full">
-              <a href="#fotos-evento">Ver fotos</a>
+            <Button asChild variant="outline" className="mt-2 w-full gap-2">
+              <a
+                href="https://geeketoys.com.br#galeria"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Images className="h-4 w-4" />
+                Ver galeria no site
+              </a>
             </Button>
           </div>
         </div>
 
         <EventTicketForm event={event} />
-        <EventPhotosSection event={event} />
       </main>
 
       <footer className="border-t py-6 text-center text-sm text-muted-foreground">

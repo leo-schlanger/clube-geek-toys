@@ -4,6 +4,8 @@
 > **Pedido Laura:** evento **6/set/2026 (domingo) 14h–18h**, ingresso **R$ 20** (criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
 > **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)
 
+> **Galeria (Laura, 07/08/2026):** fotos em `public/eventos/kpop-night/` entram na **galeria geral** (`#galeria` no home). Sem botão de download e sem seção `#fotos-evento`.
+
 ---
 
 ## Superfícies
@@ -34,7 +36,7 @@ Fotos em ambos (ou só na loja, se preferir):
 | Card na home                           | `EventPromoCard` em `ShopHome`            |
 | Página completa                        | `/evento` → `EventPage`                   |
 | Reserva WhatsApp                       | `EventTicketForm`                         |
-| Fotos + download                       | `EventPhotosSection`                      |
+| Fotos na galeria                       | `EventPhotosSection`                      |
 
 ---
 
