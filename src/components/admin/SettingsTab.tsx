@@ -4,8 +4,9 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { toast } from 'sonner'
-import { Save, RotateCcw, AlertTriangle, Loader2, Database } from 'lucide-react'
+import { Save, RotateCcw, AlertTriangle, Loader2, Database, Palette } from 'lucide-react'
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
+import { ThemeToggle } from '../ThemeToggle'
 
 interface SettingsState {
   values: Record<string, unknown>
@@ -108,6 +109,22 @@ export function SettingsTab() {
             Configurações persistidas no banco. As alterações entram em vigor imediatamente
             e ficam registradas no audit log.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Aparência (local ao navegador) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5 text-primary" />
+            Aparência
+          </CardTitle>
+          <CardDescription>
+            Tema claro, escuro ou seguir o sistema. Preferência salva neste navegador.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ThemeToggle variant="segmented" />
         </CardContent>
       </Card>
 

@@ -67,25 +67,25 @@ Usar **apenas** em vitrines, filtros de coleção K-pop e ilustrações — não
 | Destructive | `#EE4444` | `0 84% 60%`   | Erro, cancelamento         |
 | Info        | `#3B82F6` | `217 91% 60%` | Avisos neutros (admin)     |
 
-### 2.4 Superfícies — tema light (app)
+### 2.4 Superfícies — tema light / dark (app)
 
-O produto digital (**club / admin / shop**, mesmo bundle) usa **tema light** alinhado à peça de marketing e ao site `geeketoys.com.br`.
+O produto digital (**club / admin / shop**, mesmo bundle) suporta **tema light e dark** com preferência do usuário (`light` | `dark` | `system`), salva em `localStorage` (`geekpop-theme`). Toggle em loja, membro, admin, login e PDV.
 
-**Arquivo de verdade no código:** `src/index.css` (`:root` CSS variables) + mapa Tailwind em `tailwind.config.js`.
+**Arquivo de verdade no código:** `src/index.css` (`:root` + `.dark` CSS variables) + `ThemeProvider` + mapa Tailwind (`darkMode: class`).
 
-| Token CSS                | Valor atual     | Hex       | Papel                 |
-| ------------------------ | --------------- | --------- | --------------------- |
-| `--background`           | `330 40% 99%`   | `#FDFBFC` | Fundo da página       |
-| `--foreground`           | `240 20% 12%`   | `#181825` | Texto principal       |
-| `--card`                 | `0 0% 100%`     | `#FFFFFF` | Cards, painéis        |
-| `--secondary`            | `330 55% 96%`   | `#FAEFF5` | Faixas / superfícies  |
-| `--muted`                | `330 25% 95%`   | `#F5EFF2` | Superfície secundária |
-| `--muted-foreground`     | `240 8% 42%`    | `#636374` | Texto auxiliar        |
-| `--border`               | `330 18% 24%`          | `#48323D` | Bordas (tom rosa)     |
-| `--input`                | `330 15% 15%`          | `#2B2026` | Campos                |
-| `--primary`              | **alvo** `340 85% 59%` | `#F04080` | Marca (ver §6 gaps)   |
-| `--accent`               | **alvo** `45 97% 50%`  | `#FCBE04` | Amarelo pop           |
-| `--ring`                 | = primary              |           | Focus ring            |
+| Token CSS            | Valor atual            | Hex       | Papel                 |
+| -------------------- | ---------------------- | --------- | --------------------- |
+| `--background`       | `330 40% 99%`          | `#FDFBFC` | Fundo da página       |
+| `--foreground`       | `240 20% 12%`          | `#181825` | Texto principal       |
+| `--card`             | `0 0% 100%`            | `#FFFFFF` | Cards, painéis        |
+| `--secondary`        | `330 55% 96%`          | `#FAEFF5` | Faixas / superfícies  |
+| `--muted`            | `330 25% 95%`          | `#F5EFF2` | Superfície secundária |
+| `--muted-foreground` | `240 8% 42%`           | `#636374` | Texto auxiliar        |
+| `--border`           | `330 18% 24%`          | `#48323D` | Bordas (tom rosa)     |
+| `--input`            | `330 15% 15%`          | `#2B2026` | Campos                |
+| `--primary`          | **alvo** `340 85% 59%` | `#F04080` | Marca (ver §6 gaps)   |
+| `--accent`           | **alvo** `45 97% 50%`  | `#FCBE04` | Amarelo pop           |
+| `--ring`             | = primary              |           | Focus ring            |
 
 ### 2.5 Superfícies — tema claro (marketing / e-mail opcional)
 
@@ -269,13 +269,13 @@ Todos os gaps da peça de marca foram aplicados no SPA (club / admin / shop comp
 
 ### 6.3 Escopo de superfícies
 
-| Superfície                   | Tema                    | Marca                                 |
-| ---------------------------- | ----------------------- | ------------------------------------- |
-| club / admin / shop / PDV    | **Light UI** (tokens)   | Rosa primary + amarelo accent         |
-| E-mails transacionais        | Dark HTML (inbox)       | Primary pink + accent yellow          |
-| Peças de marketing / stories | Light + borda pink      | Comic outlines, yellow bursts         |
-| Carteirinha digital          | Gradiente rosa/amarelo  | Premium pop, **não roxo**             |
-| Contrato PDF                 | Light formal            | Gold secundário ok                    |
+| Superfície                   | Tema                   | Marca                         |
+| ---------------------------- | ---------------------- | ----------------------------- |
+| club / admin / shop / PDV    | **Light UI** (tokens)  | Rosa primary + amarelo accent |
+| E-mails transacionais        | Dark HTML (inbox)      | Primary pink + accent yellow  |
+| Peças de marketing / stories | Light + borda pink     | Comic outlines, yellow bursts |
+| Carteirinha digital          | Gradiente rosa/amarelo | Premium pop, **não roxo**     |
+| Contrato PDF                 | Light formal           | Gold secundário ok            |
 
 ---
 

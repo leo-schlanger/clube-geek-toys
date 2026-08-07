@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react'
+import { useTheme } from '../contexts/ThemeContext'
 
 declare global {
   interface Window {
@@ -34,6 +35,7 @@ export function Turnstile({ onVerify, onExpire, onError }: TurnstileProps) {
   const onVerifyRef = useRef(onVerify)
   const onExpireRef = useRef(onExpire)
   const onErrorRef = useRef(onError)
+  const { resolved } = useTheme()
 
   useEffect(() => {
     onVerifyRef.current = onVerify
@@ -49,10 +51,10 @@ export function Turnstile({ onVerify, onExpire, onError }: TurnstileProps) {
       callback: (token: string) => onVerifyRef.current(token),
       'expired-callback': () => onExpireRef.current?.(),
       'error-callback': () => onErrorRef.current?.(),
-      theme: 'dark',
+      theme: resolved,
       language: 'pt-br',
     })
-  }, [])
+  }, [resolved])
 
   useEffect(() => {
     if (!SITE_KEY) return

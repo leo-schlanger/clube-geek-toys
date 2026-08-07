@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   Mail,
 } from 'lucide-react'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 // Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
 const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
@@ -177,6 +178,7 @@ export default function MemberDashboard() {
             <span className="text-lg font-heading font-bold text-foreground hidden sm:block">Clube GeekPop & Toys</span>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle variant="icon" />
             <Button variant="ghost" size="icon" onClick={() => setModal('profile')} title="Editar Perfil">
               <Settings className="h-5 w-5" />
             </Button>

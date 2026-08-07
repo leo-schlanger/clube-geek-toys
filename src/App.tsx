@@ -10,8 +10,14 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { CookieConsent } from './components/CookieConsent'
 import { ConfirmProvider } from './hooks/useConfirm'
 import { CartProvider } from './contexts/CartContext'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { getAppMode } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
+
+function ThemedToaster() {
+  const { resolved } = useTheme()
+  return <Toaster position="top-right" richColors theme={resolved} />
+}
 
 // Lazy loaded pages - Member Area
 const Login = lazy(() => import('./pages/Login'))
@@ -294,23 +300,25 @@ function AppRoutes() {
 function App() {
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <AuthProvider>
-            <ConfirmProvider>
-              <SkipLink />
-              <OfflineBanner />
-              <Suspense fallback={<LoadingPage />}>
-                <main id="main-content">
-                  <AppRoutes />
-                </main>
-              </Suspense>
-              <Toaster position="top-right" richColors />
-              <CookieConsent />
-            </ConfirmProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <AuthProvider>
+              <ConfirmProvider>
+                <SkipLink />
+                <OfflineBanner />
+                <Suspense fallback={<LoadingPage />}>
+                  <main id="main-content">
+                    <AppRoutes />
+                  </main>
+                </Suspense>
+                <ThemedToaster />
+                <CookieConsent />
+              </ConfirmProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   )
 }

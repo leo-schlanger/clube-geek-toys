@@ -58,6 +58,44 @@
     /* Banner de evento na loja */
     --shop-event-banner-h: 0px;
   }
+
+  /* Dark — mesma marca (Hot Pink / Pop Yellow), superfícies escuras */
+  .dark {
+    --background: 240 15% 7%;
+    --foreground: 330 20% 96%;
+
+    --card: 240 12% 10%;
+    --card-foreground: 330 20% 96%;
+
+    --popover: 240 12% 10%;
+    --popover-foreground: 330 20% 96%;
+
+    /* Hot Pink mantido */
+    --primary: 340 85% 59%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 330 20% 14%;
+    --secondary-foreground: 330 40% 90%;
+
+    --muted: 240 10% 14%;
+    --muted-foreground: 240 8% 65%;
+
+    /* Pop Yellow mantido */
+    --accent: 45 97% 50%;
+    --accent-foreground: 240 20% 10%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 330 12% 20%;
+    --input: 330 12% 16%;
+    --ring: 340 85% 59%;
+
+    --success: 142 70% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 5%;
+  }
 }
 
 @layer base {
@@ -131,6 +169,10 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     background: hsl(0 0% 100% / 0.82);
+  }
+
+  .dark .glass {
+    background: hsl(240 12% 10% / 0.85);
   }
 }
 

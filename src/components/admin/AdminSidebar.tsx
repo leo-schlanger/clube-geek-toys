@@ -24,6 +24,7 @@ import {
 import { useState } from 'react'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
+import { ThemeToggle } from '../ThemeToggle'
 
 export type AdminTab = 'dashboard' | 'members' | 'products' | 'orders' | 'users' | 'logs' | 'reports' | 'settings'
 
@@ -132,6 +133,10 @@ function UserFooter({ onSignOut, onClose }: { onSignOut: () => void; onClose?: (
           </div>
         </div>
       )}
+      <div className="px-1">
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5 px-2">Tema</p>
+        <ThemeToggle variant="segmented" className="w-full justify-between" />
+      </div>
       <Button
         variant="ghost"
         className="w-full justify-start gap-3 text-muted-foreground"

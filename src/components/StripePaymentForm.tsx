@@ -19,6 +19,7 @@ import { Button } from './ui/button'
 import { Loading } from './ui/loading'
 import { toast } from 'sonner'
 import { CreditCard, ShieldCheck } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface StripePaymentFormProps {
   clientSecret: string
@@ -135,6 +136,8 @@ function CheckoutForm({ onSuccess, onError, onCancel, submitLabel, amount }: Omi
  */
 export function StripePaymentForm(props: StripePaymentFormProps) {
   const stripePromise = getStripePromise()
+  const { resolved } = useTheme()
+  const isDark = resolved === 'dark'
 
   if (!props.clientSecret) {
     return (
@@ -146,15 +149,16 @@ export function StripePaymentForm(props: StripePaymentFormProps) {
 
   return (
     <Elements
+      key={resolved}
       stripe={stripePromise}
       options={{
         clientSecret: props.clientSecret,
         appearance: {
-          theme: 'night',
+          theme: isDark ? 'night' : 'stripe',
           variables: {
             colorPrimary: '#F04080',
-            colorBackground: '#1a1a2e',
-            colorText: '#e0e0e0',
+            colorBackground: isDark ? '#1a1a2e' : '#ffffff',
+            colorText: isDark ? '#e0e0e0' : '#181825',
             colorDanger: '#ef4444',
             borderRadius: '8px',
             fontFamily: 'Inter, system-ui, sans-serif',

@@ -32,6 +32,7 @@ import {
   LogOut,
   Percent,
 } from 'lucide-react'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 interface VerificationResult {
   member: Member | null
@@ -171,9 +172,12 @@ export default function PDV() {
               <p className="text-xs text-muted-foreground">Verificação de membros</p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={signOut}>
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle variant="icon" />
+            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair">
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
 

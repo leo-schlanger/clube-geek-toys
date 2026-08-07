@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, act } from '@testing-library/react'
+import { ThemeProvider } from '../contexts/ThemeContext'
 
 // We need to control SITE_KEY via import.meta.env before importing the component
 const MOCK_SITE_KEY = 'test-site-key-123'
 
 // Mock import.meta.env at module level
 vi.stubEnv('VITE_TURNSTILE_SITE_KEY', MOCK_SITE_KEY)
+
+function renderWithTheme(ui: React.ReactElement) {
+  return render(<ThemeProvider>{ui}</ThemeProvider>)
+}
 
 describe('Turnstile', () => {
   let renderMock: ReturnType<typeof vi.fn>
@@ -22,6 +27,7 @@ describe('Turnstile', () => {
       reset: resetMock,
     }
     vi.useFakeTimers()
+    localStorage.removeItem('geekpop-theme')
   })
 
   afterEach(() => {
@@ -32,7 +38,7 @@ describe('Turnstile', () => {
 
   it('should render the container div when SITE_KEY is set', async () => {
     const { Turnstile } = await import('./Turnstile')
-    const { container } = render(<Turnstile onVerify={vi.fn()} />)
+    const { container } = renderWithTheme(<Turnstile onVerify={vi.fn()} />)
     const div = container.querySelector('.flex.justify-center')
     expect(div).toBeInTheDocument()
   })
@@ -40,13 +46,13 @@ describe('Turnstile', () => {
   it('should call window.turnstile.render on mount when turnstile is available', async () => {
     const { Turnstile } = await import('./Turnstile')
     const onVerify = vi.fn()
-    render(<Turnstile onVerify={onVerify} />)
+    renderWithTheme(<Turnstile onVerify={onVerify} />)
     expect(renderMock).toHaveBeenCalledTimes(1)
     expect(renderMock).toHaveBeenCalledWith(
       expect.any(HTMLDivElement),
       expect.objectContaining({
         sitekey: MOCK_SITE_KEY,
-        theme: 'dark',
+        theme: 'light',
         language: 'pt-br',
       }),
     )
@@ -59,7 +65,7 @@ describe('Turnstile', () => {
       options.callback('test-token-abc')
       return 'widget-id-1'
     })
-    render(<Turnstile onVerify={onVerify} />)
+    renderWithTheme(<Turnstile onVerify={onVerify} />)
     expect(onVerify).toHaveBeenCalledWith('test-token-abc')
   })
 
@@ -70,7 +76,7 @@ describe('Turnstile', () => {
       options['expired-callback']?.()
       return 'widget-id-1'
     })
-    render(<Turnstile onVerify={vi.fn()} onExpire={onExpire} />)
+    renderWithTheme(<Turnstile onVerify={vi.fn()} onExpire={onExpire} />)
     expect(onExpire).toHaveBeenCalled()
   })
 
@@ -81,13 +87,13 @@ describe('Turnstile', () => {
       options['error-callback']?.()
       return 'widget-id-1'
     })
-    render(<Turnstile onVerify={vi.fn()} onError={onError} />)
+    renderWithTheme(<Turnstile onVerify={vi.fn()} onError={onError} />)
     expect(onError).toHaveBeenCalled()
   })
 
   it('should remove widget on unmount', async () => {
     const { Turnstile } = await import('./Turnstile')
-    const { unmount } = render(<Turnstile onVerify={vi.fn()} />)
+    const { unmount } = renderWithTheme(<Turnstile onVerify={vi.fn()} />)
     unmount()
     expect(removeMock).toHaveBeenCalledWith('widget-id-1')
   })
@@ -95,7 +101,7 @@ describe('Turnstile', () => {
   it('should poll for turnstile if not yet loaded on mount', async () => {
     delete window.turnstile
     const { Turnstile } = await import('./Turnstile')
-    render(<Turnstile onVerify={vi.fn()} />)
+    renderWithTheme(<Turnstile onVerify={vi.fn()} />)
     expect(renderMock).not.toHaveBeenCalled()
 
     // Now simulate turnstile becoming available after a delay
@@ -121,10 +127,15 @@ describe('Turnstile without SITE_KEY', () => {
   })
 
   it('should return null when SITE_KEY is empty', async () => {
-    // Re-import to get fresh module with empty SITE_KEY
+    // Re-import to get fresh module with empty SITE_KEY (and matching ThemeProvider)
     vi.resetModules()
+    const { ThemeProvider: TP } = await import('../contexts/ThemeContext')
     const { Turnstile } = await import('./Turnstile')
-    const { container } = render(<Turnstile onVerify={vi.fn()} />)
+    const { container } = render(
+      <TP>
+        <Turnstile onVerify={vi.fn()} />
+      </TP>
+    )
     expect(container.innerHTML).toBe('')
   })
 })

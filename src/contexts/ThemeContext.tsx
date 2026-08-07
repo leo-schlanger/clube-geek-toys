@@ -1,0 +1,105 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react'
+
+export type ThemePreference = 'light' | 'dark' | 'system'
+export type ResolvedTheme = 'light' | 'dark'
+
+const STORAGE_KEY = 'geekpop-theme'
+
+type ThemeContextValue = {
+  /** Preferência salva pelo usuário (inclui "system"). */
+  theme: ThemePreference
+  /** Tema efetivo aplicado no DOM. */
+  resolved: ResolvedTheme
+  setTheme: (theme: ThemePreference) => void
+  /** Alterna entre light e dark (ignora system → vai para o oposto do atual). */
+  toggle: () => void
+}
+
+const ThemeContext = createContext<ThemeContextValue | null>(null)
+
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function readStored(): ThemePreference {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY)
+    if (v === 'light' || v === 'dark' || v === 'system') return v
+  } catch {
+    /* ignore */
+  }
+  return 'system'
+}
+
+function applyDomTheme(resolved: ResolvedTheme) {
+  const root = document.documentElement
+  root.classList.toggle('dark', resolved === 'dark')
+  root.style.colorScheme = resolved
+  // theme-color for mobile browser chrome
+  const meta = document.querySelector('meta[name="theme-color"]')
+  if (meta) {
+    meta.setAttribute('content', resolved === 'dark' ? '#12121A' : '#F04080')
+  }
+}
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setThemeState] = useState<ThemePreference>(() =>
+    typeof window !== 'undefined' ? readStored() : 'system'
+  )
+  const [system, setSystem] = useState<ResolvedTheme>(() =>
+    typeof window !== 'undefined' ? getSystemTheme() : 'light'
+  )
+
+  const resolved: ResolvedTheme = theme === 'system' ? system : theme
+
+  // Apply class whenever resolved theme changes
+  useEffect(() => {
+    applyDomTheme(resolved)
+  }, [resolved])
+
+  // Listen to OS preference when on "system"
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => setSystem(mq.matches ? 'dark' : 'light')
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  const setTheme = useCallback((next: ThemePreference) => {
+    setThemeState(next)
+    try {
+      localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const toggle = useCallback(() => {
+    setTheme(resolved === 'dark' ? 'light' : 'dark')
+  }, [resolved, setTheme])
+
+  const value = useMemo(
+    () => ({ theme, resolved, setTheme, toggle }),
+    [theme, resolved, setTheme, toggle]
+  )
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+}
+
+export function useTheme(): ThemeContextValue {
+  const ctx = useContext(ThemeContext)
+  if (!ctx) {
+    throw new Error('useTheme must be used within ThemeProvider')
+  }
+  return ctx
+}

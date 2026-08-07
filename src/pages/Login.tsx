@@ -11,6 +11,7 @@ import { Eye, EyeOff, LogIn, ShieldAlert, Star, Zap, Shield, Gift } from 'lucide
 import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 import { isBlocked, recordFailedAttempt, clearAttempts } from '../lib/rate-limit'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { motion } from 'framer-motion'
 
 const FEATURES = [
@@ -128,7 +129,10 @@ export default function Login() {
   const lockoutProgress = isLocked ? ((lockoutTotal - lockoutTime) / lockoutTotal) * 100 : 0
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-background">
+    <div className="min-h-screen flex flex-col md:flex-row bg-background relative">
+      <div className="absolute right-3 top-3 z-20">
+        <ThemeToggle variant="icon" />
+      </div>
       {/* ── Left branding panel (desktop) / Top banner (mobile) ── */}
       <div className="relative flex flex-col items-center justify-center bg-primary/5 px-8 py-10 md:w-1/2 md:min-h-screen">
         {/* Decorative gradient blobs */}

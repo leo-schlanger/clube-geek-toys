@@ -8,6 +8,7 @@ import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { CartDrawer } from './CartDrawer'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
+import { ThemeToggle } from '../ThemeToggle'
 import { cn } from '../../lib/utils'
 import { isEventVisible } from '../../data/event'
 
@@ -90,6 +91,8 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
           {/* Ações */}
           <div className="ml-auto flex items-center gap-1 md:ml-0">
             {isMember && <MemberDiscountBadge className="hidden sm:inline-flex" />}
+
+            <ThemeToggle variant="icon" />
 
             {/* Busca (mobile toggle) */}
             <Button

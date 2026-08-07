@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Eye, EyeOff, Loader2, ShieldAlert } from 'lucide-react'
 import { getAppMode, getLoginRedirectPath } from '../lib/subdomain'
 import { Loading } from '../components/ui/loading'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { isBlocked, recordFailedAttempt, clearAttempts } from '../lib/rate-limit'
 
 export default function AdminLogin() {
@@ -113,7 +114,10 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+      <div className="absolute right-3 top-3 z-20">
+        <ThemeToggle variant="icon" />
+      </div>
       <Card className="w-full max-w-md border-border bg-card/80 backdrop-blur">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
