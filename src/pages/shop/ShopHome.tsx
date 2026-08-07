@@ -188,8 +188,27 @@ export default function ShopHome() {
         </section>
       </main>
 
-      <footer className="mt-12 border-t py-6 text-center text-sm text-muted-foreground">
-        <p>Clube Geek &amp; Toys — Loja oficial</p>
+      <footer className="mt-12 border-t py-6 text-center text-sm text-muted-foreground space-y-2">
+        <p>GeekPop &amp; Toys — Loja oficial</p>
+        <p>
+          <a
+            href="https://wa.me/5511914662881"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            WhatsApp loja (11) 91466-2881
+          </a>
+          {' · '}
+          <a
+            href="https://wa.me/5521985464666"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            (21) 98546-4666
+          </a>
+        </p>
       </footer>
     </div>
   )

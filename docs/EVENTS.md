@@ -1,7 +1,7 @@
 # Eventos na loja (shop.geeketoys.com.br)
 
-> **Última atualização:** 4 de Agosto de 2026  
-> **Pedido Laura:** anúncio no topo, infos, fotos com download, reserva de ingresso  
+> **Última atualização:** 7 de Agosto de 2026  
+> **Pedido Laura:** evento **6/set/2026 (domingo) 14h–18h**, ingresso **R$ 20** (criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
 > **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)
 
 ---
