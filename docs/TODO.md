@@ -192,15 +192,15 @@
 > **Loja (`shop.*`):** este repo — `docs/EVENTS.md`, `src/data/event.ts`, rota `/evento`  
 > **Home (`geeketoys.com.br`):** repo `geek-toys-home` — `docs/EVENTS.md`
 
-- [x] **Planejamento** - Banner + infos + fotos com download + reserva de ingresso
+- [x] **Planejamento** - Banner + infos + reserva de ingresso + galeria geral
 - [x] **Site institucional** - Banner, seções, reserva, fotos (geek-toys-home)
 - [x] **Loja (shop)** - Banner em todas as páginas, card na home, `/evento`, reserva, fotos
-- [x] **Galeria com download** - Baixar uma / baixar todas (`public/eventos/<slug>/`)
+- [x] **Galeria geral** - fotos no home `#galeria` (sem download)
 - [x] **Reserva online de ingresso** - Formulário → WhatsApp da loja
 - [x] **Conteúdo real GeekPop Night** - 6/set/2026 14h–18h, R$ 20, colo/PCD isentos (07/08/2026)
 - [x] **35 fotos do evento** - `public/eventos/kpop-night/` nos dois repos (sem duplicatas)
 - [x] **WhatsApp loja principal** - (11) 91466-2881 + secundário (21) 98546-4666
-- [ ] **MEDIO** Deploy do site institucional (`geek-toys-home`) — sem CI automático
+- [x] **E2E users** - e2e-admin@ / e2e-member@ (CLAUDE.local.md)
 - [ ] **ALTO** Laura: enviar fotos reais dos 14 produtos ativos (vitrine mostra "Sem foto")
 - [x] **Filtro seed Checkup** - não listar na API pública / categorias
 - [x] **Admin highlight** - badge "Sem foto" + contagem no catálogo
