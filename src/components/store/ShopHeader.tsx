@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Search, User, Menu, X, CalendarHeart } from 'lucide-react'
+import { ShoppingCart, Search, User, Menu, X, CalendarHeart, Package, Wallet } from 'lucide-react'
+import { getStoreCredit } from '../../lib/reviews'
+import { formatCurrency, cn } from '../../lib/utils'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
@@ -9,7 +11,6 @@ import { useAuth } from '../../contexts/AuthContext'
 import { CartDrawer } from './CartDrawer'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { ThemeToggle } from '../ThemeToggle'
-import { cn } from '../../lib/utils'
 import { isEventVisible } from '../../data/event'
 
 interface ShopHeaderProps {
@@ -30,6 +31,7 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [term, setTerm] = useState(() => searchParams.get('search') ?? '')
+  const [creditBalance, setCreditBalance] = useState(0)
   const mobileInputRef = useRef<HTMLInputElement>(null)
 
   // Mantém o campo em sincronia quando o query param muda (ex.: navegação por link).
@@ -41,6 +43,28 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
   useEffect(() => {
     if (mobileSearchOpen) mobileInputRef.current?.focus()
   }, [mobileSearchOpen])
+
+  useEffect(() => {
+    let active = true
+    if (!user) {
+      queueMicrotask(() => {
+        if (active) setCreditBalance(0)
+      })
+      return () => {
+        active = false
+      }
+    }
+    getStoreCredit()
+      .then((c) => {
+        if (active) setCreditBalance(c.balance)
+      })
+      .catch(() => {
+        if (active) setCreditBalance(0)
+      })
+    return () => {
+      active = false
+    }
+  }, [user])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -124,10 +148,35 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
               )}
             </Button>
 
+            {/* Crédito de loja + Minhas compras */}
+            {user && creditBalance > 0 && (
+              <span
+                className="hidden items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent sm:inline-flex"
+                title="Crédito de loja (avaliações)"
+              >
+                <Wallet className="h-3 w-3" />
+                {formatCurrency(creditBalance)}
+              </span>
+            )}
+            {user && (
+              <Button
+                variant="ghost"
+                size="icon"
+                asChild
+                aria-label="Minhas compras"
+                className="hidden sm:inline-flex"
+                title="Minhas compras"
+              >
+                <Link to="/minhas-compras">
+                  <Package className="h-5 w-5" />
+                </Link>
+              </Button>
+            )}
+
             {/* Login / conta */}
             {user ? (
               <Button variant="ghost" size="icon" asChild aria-label="Minha conta">
-                <Link to="/entrar">
+                <Link to="/minhas-compras">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <User className="h-4 w-4" />
                   </span>

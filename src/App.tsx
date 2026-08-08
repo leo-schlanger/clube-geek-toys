@@ -43,6 +43,8 @@ const ShopCheckout = lazy(() => import('./pages/shop/ShopCheckout'))
 const OrderConfirmation = lazy(() => import('./pages/shop/OrderConfirmation'))
 const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
 const EventPage = lazy(() => import('./pages/shop/EventPage'))
+const MyOrders = lazy(() => import('./pages/shop/MyOrders'))
+const MyOrderDetail = lazy(() => import('./pages/shop/MyOrderDetail'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -276,6 +278,8 @@ function ShopRoutes() {
         <Route path="/carrinho" element={<Cart />} />
         <Route path="/checkout" element={<ShopCheckout />} />
         <Route path="/pedido/:id" element={<OrderConfirmation />} />
+        <Route path="/minhas-compras" element={<MyOrders />} />
+        <Route path="/minhas-compras/:id" element={<MyOrderDetail />} />
         <Route path="/entrar" element={<ShopLogin />} />
         <Route path="/evento" element={<EventPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

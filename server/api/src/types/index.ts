@@ -140,6 +140,12 @@ export interface Product {
   sku: string | null;
   active: boolean;
   featured: boolean;
+  weightG?: number | null;
+  heightCm?: number | null;
+  widthCm?: number | null;
+  lengthCm?: number | null;
+  ratingAvg?: number;
+  ratingCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -168,6 +174,12 @@ export interface Order {
   discount: number;
   discountReason: string | null;
   shippingCost: number;
+  shippingService?: string | null;
+  shippingServiceId?: string | null;
+  shippingDays?: number | null;
+  trackingCode?: string | null;
+  trackingUrl?: string | null;
+  storeCreditApplied?: number;
   total: number;
   status: OrderStatus;
   paymentMethod: OrderPaymentMethod | null;

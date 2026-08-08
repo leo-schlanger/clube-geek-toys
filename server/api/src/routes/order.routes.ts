@@ -7,6 +7,17 @@ import * as orderService from '../services/order.service.js';
 
 export const orderRouter = Router();
 
+const shippingAddressSchema = z.object({
+  cep: z.string().min(8).max(9),
+  street: z.string().min(1).max(200),
+  number: z.string().min(1).max(20),
+  complement: z.string().max(100).optional(),
+  neighborhood: z.string().min(1).max(120),
+  city: z.string().min(1).max(120),
+  state: z.string().min(2).max(2),
+  recipientName: z.string().max(200).optional(),
+});
+
 const createOrderSchema = z.object({
   items: z
     .array(
@@ -21,8 +32,13 @@ const createOrderSchema = z.object({
     email: z.string().email(),
     phone: z.string().max(30).optional(),
   }),
-  shippingAddress: z.record(z.string(), z.unknown()).optional(),
+  shippingAddress: shippingAddressSchema,
+  shipping: z.object({
+    quoteToken: z.string().min(10),
+    serviceId: z.string().min(1).max(80),
+  }),
   paymentMethod: z.enum(['pix', 'credit_card']),
+  applyStoreCredit: z.boolean().optional(),
 });
 
 // POST /orders — create order + charge (guest or logged-in member). optionalAuth applies the
@@ -31,6 +47,46 @@ orderRouter.post('/', optionalAuth, paymentLimiter, validate(createOrderSchema),
   try {
     const result = await orderService.createOrder(req.body, req.user);
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Member: Minhas compras ──────────────────────────────────────────────────
+// Must be registered before /:id routes.
+
+const TAB_STATUSES: Record<string, string[] | undefined> = {
+  all: undefined,
+  to_pay: ['pending'],
+  preparing: ['paid', 'processing'],
+  on_the_way: ['shipped'],
+  finished: ['delivered'],
+  cancelled: ['cancelled', 'refunded'],
+};
+
+orderRouter.get('/me', authenticate, async (req, res, next) => {
+  try {
+    const tab = (req.query.tab as string) || 'all';
+    const statuses = TAB_STATUSES[tab];
+    const result = await orderService.listMyOrders(req.user!.userId, {
+      statuses,
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+orderRouter.get('/me/:id', authenticate, async (req, res, next) => {
+  try {
+    const order = await orderService.getMyOrderById(req.user!.userId, req.params.id as string);
+    if (!order) {
+      res.status(404).json({ error: 'Pedido não encontrado.' });
+      return;
+    }
+    res.json(order);
   } catch (err) {
     next(err);
   }
@@ -103,6 +159,25 @@ orderRouter.post('/:id/confirm-pix', authenticate, requireRole('admin'), async (
 orderRouter.post('/:id/refund', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
     const order = await orderService.refundOrder(req.params.id as string, req.user!.userId);
+    res.json(order);
+  } catch (err) {
+    next(err);
+  }
+});
+
+const trackingSchema = z.object({
+  trackingCode: z.string().min(5).max(64),
+  trackingUrl: z.string().url().optional(),
+});
+
+orderRouter.patch('/:id/tracking', authenticate, requireRole('admin'), validate(trackingSchema), async (req, res, next) => {
+  try {
+    const order = await orderService.setOrderTracking(
+      req.params.id as string,
+      req.body.trackingCode,
+      req.user!.userId,
+      req.body.trackingUrl
+    );
     res.json(order);
   } catch (err) {
     next(err);

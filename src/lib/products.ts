@@ -54,6 +54,18 @@ export interface ProductInput {
   sku?: string | null
   active?: boolean
   featured?: boolean
+  weightG?: number | null
+  heightCm?: number | null
+  widthCm?: number | null
+  lengthCm?: number | null
+}
+
+/** Public: related products for PDP "Você também pode gostar". */
+export async function listRelatedProducts(slug: string): Promise<Product[]> {
+  const result = await api.get<{ products: Product[] }>(`/products/${slug}/related`, {
+    skipAuth: true,
+  })
+  return result.data?.products ?? []
 }
 
 export async function adminListProducts(params: ProductListParams = {}): Promise<ProductListResult> {

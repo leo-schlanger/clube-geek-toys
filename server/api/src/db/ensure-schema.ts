@@ -190,6 +190,70 @@ export async function ensureSchema(): Promise<void> {
       CREATE TRIGGER tr_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
 
+    // ─── Shop shipping / reviews / credit (migration 010) ────────────────────
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_g INTEGER`);
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS height_cm NUMERIC(6,1)`);
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS width_cm NUMERIC(6,1)`);
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS length_cm NUMERIC(6,1)`);
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS rating_avg NUMERIC(3,2) NOT NULL DEFAULT 0`);
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS rating_count INTEGER NOT NULL DEFAULT 0`);
+
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_service VARCHAR(40)`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_service_id TEXT`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_days INTEGER`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_code VARCHAR(64)`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_credit_applied DECIMAL(10,2) NOT NULL DEFAULT 0`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS melhor_envio_cart_id TEXT`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS melhor_envio_order_id TEXT`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_tracking ON orders(tracking_code) WHERE tracking_code IS NOT NULL`);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS product_reviews (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        order_item_id UUID REFERENCES order_items(id) ON DELETE SET NULL,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+        title VARCHAR(120),
+        body TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'published'
+          CHECK (status IN ('pending', 'published', 'hidden')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (order_id, product_id)
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_reviews_product ON product_reviews(product_id, status)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_reviews_user ON product_reviews(user_id)`);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS store_credits (
+        user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        balance DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (balance >= 0),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS store_credit_ledger (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount DECIMAL(10,2) NOT NULL,
+        reason VARCHAR(40) NOT NULL,
+        order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+        review_id UUID REFERENCES product_reviews(id) ON DELETE SET NULL,
+        note TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_credit_ledger_user ON store_credit_ledger(user_id, created_at DESC)`);
+    await query(`
+      INSERT INTO config (key, value) VALUES ('review_reward_amount', '1.00'::jsonb)
+      ON CONFLICT (key) DO NOTHING
+    `);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

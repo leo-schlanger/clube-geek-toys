@@ -8,6 +8,8 @@ import { ProductGrid } from '../../components/store/ProductGrid'
 import { CategoryNav } from '../../components/store/CategoryNav'
 import { EventPromoCard } from '../../components/store/EventPromoCard'
 import { useShopMember } from '../../components/store/useShopMember'
+import { SeoHead, SHOP_DEFAULT_SEO } from '../../components/store/SeoHead'
+import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { Button } from '../../components/ui/button'
 import { isEventVisible } from '../../data/event'
 
@@ -106,6 +108,26 @@ export default function ShopHome() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SeoHead
+        title={
+          search
+            ? `Busca: ${search}`
+            : activeCategory
+              ? activeCategory.name
+              : SHOP_DEFAULT_SEO.title
+        }
+        description={
+          activeCategory?.description ||
+          SHOP_DEFAULT_SEO.description
+        }
+        path={
+          categorySlug
+            ? `/categoria/${categorySlug}`
+            : search
+              ? `/?search=${encodeURIComponent(search)}`
+              : '/'
+        }
+      />
       <ShopHeader isMember={isMember} />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
@@ -115,14 +137,14 @@ export default function ShopHome() {
             <div className="max-w-xl">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
-                Loja oficial GeekPop & Toys
+                Loja de K-pop no Rio de Janeiro
               </span>
               <h1 className="mt-3 text-2xl font-heading font-bold sm:text-4xl">
-                Colecionáveis, K-pop e cultura geek
+                Photocards, merch e cultura pop
               </h1>
               <p className="mt-2 text-muted-foreground">
-                Membros do clube ganham <strong className="text-accent">15% de desconto</strong> em
-                qualquer produto. Entre e economize.
+                Envio pelos Correios para todo o Brasil. Membros do clube ganham{' '}
+                <strong className="text-accent">15% de desconto</strong> em qualquer produto.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="outline" className="gap-2 border-primary/40">
@@ -188,8 +210,9 @@ export default function ShopHome() {
         </section>
       </main>
 
-      <footer className="mt-12 border-t py-6 text-center text-sm text-muted-foreground space-y-2">
-        <p>GeekPop &amp; Toys — Loja oficial</p>
+      <footer className="mt-12 border-t py-8 text-center text-sm text-muted-foreground space-y-3">
+        <p className="font-medium text-foreground">GeekPop &amp; Toys — Loja de K-pop no Rio de Janeiro</p>
+        <PaymentTrustBadges className="mx-auto max-w-sm" />
         <p>
           <a
             href="https://wa.me/5511914662881"
@@ -208,6 +231,9 @@ export default function ShopHome() {
           >
             (21) 98546-4666
           </a>
+        </p>
+        <p className="text-xs">
+          R. Barata Ribeiro, 181 - loja J · Copacabana, RJ · Envio Correios para todo o Brasil
         </p>
       </footer>
     </div>

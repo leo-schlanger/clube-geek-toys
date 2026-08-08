@@ -13,13 +13,18 @@ import {
 import { toast } from 'sonner'
 import type { Product } from '../../types'
 import { MEMBER_SHOP_DISCOUNT } from '../../types'
-import { getProductBySlug } from '../../lib/products'
+import { getProductBySlug, listRelatedProducts } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
+import { ProductGrid } from '../../components/store/ProductGrid'
+import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
+import { ProductReviews } from '../../components/store/ProductReviews'
+import { StarRating } from '../../components/store/StarRating'
+import { SeoHead } from '../../components/store/SeoHead'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Skeleton } from '../../components/ui/skeleton'
@@ -32,6 +37,7 @@ export default function ProductDetail() {
   const { isMember } = useShopMember()
 
   const [product, setProduct] = useState<Product | null>(null)
+  const [related, setRelated] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeImage, setActiveImage] = useState(0)
@@ -47,11 +53,21 @@ export default function ProductDetail() {
       setNotFound(false)
       setActiveImage(0)
       setQuantity(1)
+      setRelated([])
       try {
         const p = await getProductBySlug(productSlug)
         if (!active) return
         if (!p) setNotFound(true)
-        else setProduct(p)
+        else {
+          setProduct(p)
+          listRelatedProducts(productSlug)
+            .then((list) => {
+              if (active) setRelated(list)
+            })
+            .catch(() => {
+              if (active) setRelated([])
+            })
+        }
       } catch {
         if (active) setNotFound(true)
       } finally {
@@ -79,6 +95,18 @@ export default function ProductDetail() {
 
   return (
     <div className="min-h-screen bg-background">
+      {product && (
+        <SeoHead
+          title={product.name}
+          description={
+            product.description?.slice(0, 160) ||
+            `${product.name} na loja GeekPop & Toys — K-pop e colecionáveis com frete Correios.`
+          }
+          path={`/produto/${product.slug}`}
+          image={product.images[0]}
+          type="product"
+        />
+      )}
       <ShopHeader isMember={isMember} />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
@@ -158,6 +186,17 @@ export default function ProductDetail() {
               <h1 className="mt-1 text-2xl font-heading font-bold sm:text-3xl">
                 {product.name}
               </h1>
+
+              {(product.ratingCount ?? 0) > 0 && (
+                <div className="mt-2">
+                  <StarRating
+                    value={product.ratingAvg ?? 0}
+                    size="sm"
+                    showValue
+                    count={product.ratingCount}
+                  />
+                </div>
+              )}
 
               {product.sku && (
                 <span className="mt-1 text-xs text-muted-foreground">SKU: {product.sku}</span>
@@ -264,8 +303,10 @@ export default function ProductDetail() {
 
               <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                 <ShieldCheck className="h-4 w-4 text-green-500" />
-                Compra segura. Pagamento via PIX ou cartão de crédito.
+                Compra segura. Frete pelos Correios. Pagamento via PIX ou cartão.
               </div>
+
+              <PaymentTrustBadges className="mt-4" compact />
 
               {!user && (
                 <p className="mt-2 text-xs text-muted-foreground">
@@ -274,6 +315,21 @@ export default function ProductDetail() {
               )}
             </div>
           </div>
+        )}
+
+        {product && (
+          <ProductReviews
+            productSlug={product.slug}
+            ratingAvg={product.ratingAvg}
+            ratingCount={product.ratingCount}
+          />
+        )}
+
+        {product && related.length > 0 && (
+          <section className="mt-12 border-t pt-10">
+            <h2 className="mb-4 text-xl font-heading font-bold">Você também pode gostar</h2>
+            <ProductGrid products={related} loading={false} isMember={isMember} />
+          </section>
         )}
       </main>
     </div>

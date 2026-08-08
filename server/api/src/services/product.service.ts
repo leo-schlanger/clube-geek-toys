@@ -20,6 +20,12 @@ function mapProduct(row: pg.QueryResultRow): Product {
     sku: row.sku,
     active: row.active,
     featured: row.featured,
+    weightG: row.weight_g != null ? Number(row.weight_g) : null,
+    heightCm: row.height_cm != null ? Number(row.height_cm) : null,
+    widthCm: row.width_cm != null ? Number(row.width_cm) : null,
+    lengthCm: row.length_cm != null ? Number(row.length_cm) : null,
+    ratingAvg: row.rating_avg != null ? parseFloat(row.rating_avg) : 0,
+    ratingCount: row.rating_count != null ? Number(row.rating_count) : 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -174,11 +180,16 @@ export async function createProduct(data: {
   sku?: string | null;
   active?: boolean;
   featured?: boolean;
+  weightG?: number | null;
+  heightCm?: number | null;
+  widthCm?: number | null;
+  lengthCm?: number | null;
 }): Promise<Product> {
   const slug = await uniqueSlug('products', data.name);
   const result = await query(
-    `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku, active, featured)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11)
+    `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku, active, featured,
+                           weight_g, height_cm, width_cm, length_cm)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING *`,
     [
       data.name,
@@ -192,6 +203,10 @@ export async function createProduct(data: {
       data.sku ?? null,
       data.active ?? true,
       data.featured ?? false,
+      data.weightG ?? null,
+      data.heightCm ?? null,
+      data.widthCm ?? null,
+      data.lengthCm ?? null,
     ]
   );
   return mapProduct(result.rows[0]);
@@ -209,6 +224,10 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     sku: 'sku',
     active: 'active',
     featured: 'featured',
+    weightG: 'weight_g',
+    heightCm: 'height_cm',
+    widthCm: 'width_cm',
+    lengthCm: 'length_cm',
   };
 
   const sets: string[] = [];
@@ -252,6 +271,54 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
 export async function deactivateProduct(id: string): Promise<void> {
   const result = await query(`UPDATE products SET active = FALSE WHERE id = $1 RETURNING id`, [id]);
   if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+}
+
+/** "Você também pode gostar" — same category first, then featured. */
+export async function listRelatedProducts(slug: string, limit = 8): Promise<Product[]> {
+  const base = await getProductBySlug(slug, false);
+  if (!base) return [];
+
+  const take = Math.max(1, Math.min(limit, 16));
+  const params: unknown[] = [base.id];
+  let i = 2;
+  let categoryFilter = '';
+  if (base.categoryId) {
+    categoryFilter = `AND p.category_id = $${i++}`;
+    params.push(base.categoryId);
+  }
+
+  const sameCat = await query(
+    `SELECT p.*, c.name AS category_name
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+     WHERE p.active = TRUE
+       AND p.id <> $1
+       AND p.name NOT ILIKE 'checkup%'
+       AND p.stock > 0
+       ${categoryFilter}
+     ORDER BY p.featured DESC, p.created_at DESC
+     LIMIT $${i}`,
+    [...params, take]
+  );
+
+  let products = sameCat.rows.map(mapProduct);
+  if (products.length < take) {
+    const exclude = [base.id, ...products.map((p) => p.id)];
+    const more = await query(
+      `SELECT p.*, c.name AS category_name
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.active = TRUE
+         AND p.id <> ALL($1::uuid[])
+         AND p.name NOT ILIKE 'checkup%'
+         AND p.stock > 0
+       ORDER BY p.featured DESC, p.created_at DESC
+       LIMIT $2`,
+      [exclude, take - products.length]
+    );
+    products = [...products, ...more.rows.map(mapProduct)];
+  }
+  return products;
 }
 
 // ─── Categories ──────────────────────────────────────────────────────────────

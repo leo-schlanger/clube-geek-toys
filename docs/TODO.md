@@ -206,6 +206,22 @@
 - [x] **Admin highlight** - badge "Sem foto" + contagem no catálogo
 - [ ] **FUTURO** Validar membro do Clube na reserva / pagamento Stripe de ingresso
 
+### Loja / pedidos (pedido Laura — Ago/2026)
+
+- [x] **Estudo + plano** - frete Correios, minhas compras, reviews, SEO K-pop
+- [x] **SEO/bio K-pop** - geek-toys-home title/OG/Hero/About; e-mail footer; shop hero/sitemap
+- [x] **Frete no checkout** - CEP ViaCEP + cotação Melhor Envio (fallback tabela) + frete no total
+- [x] **Endereço de entrega** - formulário checkout + `shipping_address` tipado
+- [x] **Minhas compras** - abas Tudo / A pagar / Preparando / A caminho / Finalizado / Cancelado
+- [x] **Rastreio** - admin salva código Correios; cliente vê link em Minhas compras
+- [x] **Você também pode gostar** - related por categoria no PDP
+- [x] **Formas de pagamento (trust)** - badges PIX/cartão no checkout, PDP e footer
+- [ ] **ALTO** Conta Melhor Envio + `MELHOR_ENVIO_TOKEN` em produção (sem token usa tabela fallback)
+- [x] **Avaliações + crédito fixo** - review pós-entrega, R$1 default, checkout com crédito, admin moderação
+- [ ] **MEDIO** Etiqueta automática Melhor Envio
+- [ ] **MEDIO** Sitemap dinâmico de produtos + OG por host no nginx
+- [ ] **BAIXO** Google Meu Negócio / Instagram bio (manual Laura)
+
 ### MEDIO - Planejado
 
 - [ ] **Aumentar cobertura de testes** - Meta: 70% (atual ~11%)
@@ -214,7 +230,7 @@
 - [ ] **Structured logging** - Substituir console.log por logger com niveis (Pino/Winston)
 - [ ] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze
 - [ ] **Fluxo de atualizar metodo de pagamento** - Atualmente requer cancelar e re-assinar
-- [ ] **Calculo de frete na loja** - Integrar frete real no checkout (hoje `shipping_cost = 0`)
+- [x] **Calculo de frete na loja** - ViaCEP + Melhor Envio / fallback (migration 010)
 - [ ] **Gateway PIX automatico na loja** - Confirmacao de PIX de pedido ainda e manual pelo admin
 
 ### BAIXO - Nice to Have

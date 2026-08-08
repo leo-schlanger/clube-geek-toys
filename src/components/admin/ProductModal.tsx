@@ -49,6 +49,10 @@ interface FormState {
   sku: string
   active: boolean
   featured: boolean
+  weightG: string
+  heightCm: string
+  widthCm: string
+  lengthCm: string
 }
 
 function toFormState(product?: Product | null): FormState {
@@ -62,6 +66,10 @@ function toFormState(product?: Product | null): FormState {
     sku: product?.sku ?? '',
     active: product?.active ?? true,
     featured: product?.featured ?? false,
+    weightG: product?.weightG != null ? String(product.weightG) : '',
+    heightCm: product?.heightCm != null ? String(product.heightCm) : '',
+    widthCm: product?.widthCm != null ? String(product.widthCm) : '',
+    lengthCm: product?.lengthCm != null ? String(product.lengthCm) : '',
   }
 }
 
@@ -192,6 +200,15 @@ export function ProductModal({
       return
     }
 
+    const weightG = form.weightG.trim() ? Number(form.weightG) : null
+    const heightCm = form.heightCm.trim() ? Number(form.heightCm) : null
+    const widthCm = form.widthCm.trim() ? Number(form.widthCm) : null
+    const lengthCm = form.lengthCm.trim() ? Number(form.lengthCm) : null
+    if (weightG != null && (!Number.isInteger(weightG) || weightG <= 0)) {
+      toast.error('Peso (g) inválido')
+      return
+    }
+
     const payload: ProductInput = {
       name,
       description: form.description.trim() || null,
@@ -203,6 +220,10 @@ export function ProductModal({
       sku: form.sku.trim() || null,
       active: form.active,
       featured: form.featured,
+      weightG,
+      heightCm,
+      widthCm,
+      lengthCm,
     }
 
     setLoading(true)
@@ -351,6 +372,72 @@ export function ProductModal({
                   value={form.sku}
                   onChange={(e) => update('sku', e.target.value)}
                 />
+              </div>
+            </div>
+
+            {/* Embalagem / frete Correios */}
+            <div className="space-y-2">
+              <Label>Embalagem (frete Correios)</Label>
+              <p className="text-xs text-muted-foreground">
+                Usado no cálculo de frete. Se vazio, usa padrão 300g · 16×11×6 cm (photocard/caixa pequena).
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="product-weight" className="text-xs text-muted-foreground">
+                    Peso (g)
+                  </Label>
+                  <Input
+                    id="product-weight"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="300"
+                    value={form.weightG}
+                    onChange={(e) => update('weightG', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="product-len" className="text-xs text-muted-foreground">
+                    Comp. (cm)
+                  </Label>
+                  <Input
+                    id="product-len"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    placeholder="16"
+                    value={form.lengthCm}
+                    onChange={(e) => update('lengthCm', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="product-width" className="text-xs text-muted-foreground">
+                    Larg. (cm)
+                  </Label>
+                  <Input
+                    id="product-width"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    placeholder="11"
+                    value={form.widthCm}
+                    onChange={(e) => update('widthCm', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="product-height" className="text-xs text-muted-foreground">
+                    Alt. (cm)
+                  </Label>
+                  <Input
+                    id="product-height"
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    placeholder="6"
+                    value={form.heightCm}
+                    onChange={(e) => update('heightCm', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 

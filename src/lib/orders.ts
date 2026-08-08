@@ -2,11 +2,24 @@ import { api } from './api-client'
 import type { Order, OrderStatus, PixQRData } from '../types'
 import type { CartItem } from '../types'
 
+export interface ShippingAddressPayload {
+  cep: string
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city: string
+  state: string
+  recipientName?: string
+}
+
 export interface CreateOrderPayload {
   items: { productId: string; quantity: number }[]
   customer: { name: string; email: string; phone?: string }
-  shippingAddress?: Record<string, unknown>
+  shippingAddress: ShippingAddressPayload
+  shipping: { quoteToken: string; serviceId: string }
   paymentMethod: 'pix' | 'credit_card'
+  applyStoreCredit?: boolean
 }
 
 export interface CreateOrderResult {
@@ -78,4 +91,36 @@ export async function confirmPixOrder(id: string): Promise<Order | null> {
 export async function refundOrder(id: string): Promise<boolean> {
   const result = await api.post(`/orders/${id}/refund`)
   return !result.error
+}
+
+export async function setOrderTracking(
+  id: string,
+  trackingCode: string,
+  trackingUrl?: string
+): Promise<Order | null> {
+  const result = await api.patch<Order>(`/orders/${id}/tracking`, {
+    trackingCode,
+    ...(trackingUrl ? { trackingUrl } : {}),
+  })
+  return result.data ?? null
+}
+
+/** Minhas compras (logged-in member). */
+export async function listMyOrders(params: {
+  tab?: string
+  page?: number
+  limit?: number
+} = {}): Promise<OrderListResult> {
+  const qs = new URLSearchParams()
+  if (params.tab) qs.set('tab', params.tab)
+  if (params.page) qs.set('page', String(params.page))
+  if (params.limit) qs.set('limit', String(params.limit))
+  const query = qs.toString()
+  const result = await api.get<OrderListResult>(`/orders/me${query ? `?${query}` : ''}`)
+  return result.data ?? { orders: [], total: 0, page: 1, limit: 20 }
+}
+
+export async function getMyOrder(id: string): Promise<Order | null> {
+  const result = await api.get<Order>(`/orders/me/${id}`)
+  return result.data ?? null
 }

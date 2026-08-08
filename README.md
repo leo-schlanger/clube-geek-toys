@@ -8,7 +8,7 @@ Plataforma completa de clube de vantagens para a loja **GeekPop & Toys** -- cada
 
 ## Sobre o Projeto
 
-A **GeekPop & Toys** e uma loja em Copacabana, Rio de Janeiro, pioneira do Funko Pop no Brasil, com mais de 15 anos de atuacao no mercado geek. O **Clube GeekPop & Toys** e o programa de fidelidade digital da loja, oferecendo desconto exclusivo em qualquer produto, brinde especial e entrada gratuita em eventos participantes.
+A **GeekPop & Toys** e uma loja de K-pop e cultura pop em Copacabana, Rio de Janeiro, com mais de 15 anos no mercado geek. Nasceu como referencia em colecionaveis e hoje tem foco em photocards, merch e a cena K-pop, com envio pelos Correios para todo o Brasil. O **Clube GeekPop & Toys** e o programa de fidelidade digital da loja, com 15% de desconto em qualquer produto, brinde especial e entrada gratuita em eventos participantes.
 
 A plataforma inclui:
 

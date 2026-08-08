@@ -491,7 +491,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
       <!-- Company Info -->
       <div style="text-align:center;color:#475569;font-size:10px;line-height:1.6">
-        <p style="margin:0;font-weight:600;color:#64748b">GeekPop &amp; Toys &mdash; Pioneiros do Funko Pop no Brasil</p>
+        <p style="margin:0;font-weight:600;color:#64748b">GeekPop &amp; Toys &mdash; Loja de K-pop no Rio de Janeiro</p>
         <p style="margin:3px 0">CNPJ: 52.846.344/0001-10</p>
         <p style="margin:3px 0">R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ</p>
         <p style="margin:3px 0">(21) 98546-4666 &bull; geeketoys.com.br</p>

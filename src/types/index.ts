@@ -140,6 +140,12 @@ export interface Product {
   sku: string | null
   active: boolean
   featured: boolean
+  weightG?: number | null
+  heightCm?: number | null
+  widthCm?: number | null
+  lengthCm?: number | null
+  ratingAvg?: number
+  ratingCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -168,6 +174,12 @@ export interface Order {
   discount: number
   discountReason: string | null
   shippingCost: number
+  shippingService?: string | null
+  shippingServiceId?: string | null
+  shippingDays?: number | null
+  trackingCode?: string | null
+  trackingUrl?: string | null
+  storeCreditApplied?: number
   total: number
   status: OrderStatus
   paymentMethod: OrderPaymentMethod | null
@@ -177,6 +189,24 @@ export interface Order {
   createdAt: string
   updatedAt: string
   items?: OrderItem[]
+}
+
+/** Abas de "Minhas compras" (UX marketplace). */
+export type MyOrdersTab =
+  | 'all'
+  | 'to_pay'
+  | 'preparing'
+  | 'on_the_way'
+  | 'finished'
+  | 'cancelled'
+
+export const MY_ORDERS_TAB_STATUSES: Record<MyOrdersTab, OrderStatus[] | null> = {
+  all: null,
+  to_pay: ['pending'],
+  preparing: ['paid', 'processing'],
+  on_the_way: ['shipped'],
+  finished: ['delivered'],
+  cancelled: ['cancelled', 'refunded'],
 }
 
 // Dados do QR PIX retornados pelo backend (EMV code para renderizar/copiar)

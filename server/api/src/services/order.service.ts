@@ -8,6 +8,13 @@ import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
 import { MEMBER_SHOP_DISCOUNT, type Order, type OrderItem } from '../types/index.js';
 import type { JwtPayload } from '../middleware/auth.js';
+import {
+  normalizeCep,
+  pickOptionFromQuote,
+  trackingUrlForCode,
+  type ShippingAddressInput,
+} from './shipping.service.js';
+import { redeemForOrder } from './store-credit.service.js';
 
 const PIX_KEY = env.PIX_KEY || '';
 const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
@@ -28,6 +35,12 @@ function mapOrder(row: pg.QueryResultRow): Order {
     discount: parseFloat(row.discount),
     discountReason: row.discount_reason,
     shippingCost: parseFloat(row.shipping_cost),
+    shippingService: row.shipping_service ?? null,
+    shippingServiceId: row.shipping_service_id ?? null,
+    shippingDays: row.shipping_days != null ? Number(row.shipping_days) : null,
+    trackingCode: row.tracking_code ?? null,
+    trackingUrl: row.tracking_url ?? null,
+    storeCreditApplied: row.store_credit_applied != null ? parseFloat(row.store_credit_applied) : 0,
     total: parseFloat(row.total),
     status: row.status,
     paymentMethod: row.payment_method,
@@ -62,8 +75,14 @@ function round2(n: number): number {
 export interface CreateOrderInput {
   items: { productId: string; quantity: number }[];
   customer: { name: string; email: string; phone?: string };
-  shippingAddress?: Record<string, unknown>;
+  shippingAddress: ShippingAddressInput;
+  shipping: {
+    quoteToken: string;
+    serviceId: string;
+  };
   paymentMethod: 'pix' | 'credit_card';
+  /** When true and user is authenticated, apply available store credit (capped at goods total after member discount). */
+  applyStoreCredit?: boolean;
 }
 
 export interface CreateOrderResult {
@@ -81,6 +100,41 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   if (!input.items?.length) {
     throw new AppError(400, 'O carrinho está vazio.', 'EMPTY_CART');
   }
+
+  const addr = input.shippingAddress;
+  if (!addr?.cep || !addr.street || !addr.number || !addr.neighborhood || !addr.city || !addr.state) {
+    throw new AppError(400, 'Endereço de entrega incompleto.', 'INVALID_ADDRESS');
+  }
+  const cep = normalizeCep(addr.cep);
+  if (cep.length !== 8) {
+    throw new AppError(400, 'CEP inválido.', 'INVALID_CEP');
+  }
+  if (!input.shipping?.quoteToken || !input.shipping?.serviceId) {
+    throw new AppError(400, 'Selecione uma opção de frete.', 'SHIPPING_REQUIRED');
+  }
+
+  // Revalidate frete server-side (never trust client price).
+  const shipOpt = pickOptionFromQuote(
+    input.shipping.quoteToken,
+    input.shipping.serviceId,
+    input.items,
+    cep
+  );
+  const shippingCost = round2(shipOpt.price);
+  const shippingService = shipOpt.service || shipOpt.name;
+  const shippingServiceId = shipOpt.id;
+  const shippingDays = shipOpt.days;
+
+  const shippingAddress = {
+    cep,
+    street: addr.street.trim(),
+    number: addr.number.trim(),
+    complement: addr.complement?.trim() || undefined,
+    neighborhood: addr.neighborhood.trim(),
+    city: addr.city.trim(),
+    state: addr.state.trim().toUpperCase().slice(0, 2),
+    recipientName: addr.recipientName?.trim() || input.customer.name,
+  };
 
   // Resolve active membership (for the 15% discount) — never trust the client.
   let memberId: string | null = null;
@@ -130,24 +184,36 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     }
     subtotal = round2(subtotal);
 
-    const discount = memberId ? round2(subtotal * MEMBER_SHOP_DISCOUNT) : 0;
-    const discountReason = memberId ? 'member_15' : null;
-    const total = round2(subtotal - discount);
+    const memberDiscount = memberId ? round2(subtotal * MEMBER_SHOP_DISCOUNT) : 0;
+    const goodsAfterMember = round2(subtotal - memberDiscount);
+    // Provisional total without store credit (frete never discounted).
+    let discount = memberDiscount;
+    let discountReason: string | null = memberDiscount > 0 ? 'member_15' : null;
+    let storeCreditApplied = 0;
+    let total = round2(subtotal - discount + shippingCost);
 
     const orderResult = await client.query(
-      `INSERT INTO orders (member_id, customer_name, customer_email, customer_phone, shipping_address,
-                           subtotal, discount, discount_reason, shipping_cost, total, status, payment_method)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, 0, $9, 'pending', $10)
+      `INSERT INTO orders (
+         member_id, customer_name, customer_email, customer_phone, shipping_address,
+         subtotal, discount, discount_reason, shipping_cost, shipping_service, shipping_service_id,
+         shipping_days, store_credit_applied, total, status, payment_method
+       )
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'pending', $15)
        RETURNING *`,
       [
         memberId,
         input.customer.name,
         input.customer.email,
         input.customer.phone ?? null,
-        input.shippingAddress ? JSON.stringify(input.shippingAddress) : null,
+        JSON.stringify(shippingAddress),
         subtotal,
         discount,
         discountReason,
+        shippingCost,
+        shippingService,
+        shippingServiceId,
+        shippingDays,
+        0,
         total,
         input.paymentMethod,
       ]
@@ -161,6 +227,28 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [orderId, it.productId, it.name, it.slug, it.unitPrice, it.quantity, it.lineTotal, it.image]
       );
+    }
+
+    // Store credit after order exists (ledger needs order_id). Caps at goods after member discount.
+    if (input.applyStoreCredit && user?.userId && goodsAfterMember > 0) {
+      storeCreditApplied = await redeemForOrder(client, user.userId, goodsAfterMember, orderId);
+      if (storeCreditApplied > 0) {
+        discount = round2(memberDiscount + storeCreditApplied);
+        discountReason =
+          memberDiscount > 0 ? 'member_15+store_credit' : 'store_credit';
+        total = round2(subtotal - discount + shippingCost);
+        if (total < 0) {
+          throw new AppError(400, 'Total do pedido inválido.', 'INVALID_TOTAL');
+        }
+        const updated = await client.query(
+          `UPDATE orders
+           SET discount = $1, discount_reason = $2, store_credit_applied = $3, total = $4
+           WHERE id = $5
+           RETURNING *`,
+          [discount, discountReason, storeCreditApplied, total, orderId]
+        );
+        order = mapOrder(updated.rows[0]);
+      }
     }
 
     await client.query('COMMIT');
@@ -249,6 +337,102 @@ export async function listOrders(opts: { status?: string; page?: number; limit?:
     query(`SELECT COUNT(*)::int as total FROM orders ${where}`, params),
   ]);
   return { orders: data.rows.map(mapOrder), total: count.rows[0].total as number, page, limit };
+}
+
+/** Customer order history (member-scoped). statuses = filter group for Minhas compras tabs. */
+export async function listMyOrders(
+  userId: string,
+  opts: { statuses?: string[]; page?: number; limit?: number } = {}
+) {
+  const memberId = await getMemberIdForUser(userId);
+  if (!memberId) {
+    return { orders: [] as Order[], total: 0, page: 1, limit: opts.limit || 20 };
+  }
+
+  const conditions: string[] = ['member_id = $1'];
+  const params: unknown[] = [memberId];
+  let i = 2;
+  if (opts.statuses?.length) {
+    conditions.push(`status = ANY($${i++}::text[])`);
+    params.push(opts.statuses);
+  }
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const limit = Math.max(1, Math.min(opts.limit || 20, 50));
+  const page = Math.max(1, opts.page || 1);
+  const offset = (page - 1) * limit;
+
+  const [data, count] = await Promise.all([
+    query(
+      `SELECT * FROM orders ${where} ORDER BY created_at DESC LIMIT $${i++} OFFSET $${i}`,
+      [...params, limit, offset]
+    ),
+    query(`SELECT COUNT(*)::int as total FROM orders ${where}`, params),
+  ]);
+
+  const orders = data.rows.map(mapOrder);
+  // Attach first-line items for list cards
+  if (orders.length) {
+    const ids = orders.map((o) => o.id);
+    const items = await query(
+      `SELECT * FROM order_items WHERE order_id = ANY($1::uuid[]) ORDER BY id`,
+      [ids]
+    );
+    const byOrder = new Map<string, OrderItem[]>();
+    for (const row of items.rows) {
+      const mapped = mapItem(row);
+      const list = byOrder.get(mapped.orderId) || [];
+      list.push(mapped);
+      byOrder.set(mapped.orderId, list);
+    }
+    for (const o of orders) {
+      o.items = byOrder.get(o.id) || [];
+    }
+  }
+
+  return { orders, total: count.rows[0].total as number, page, limit };
+}
+
+export async function getMyOrderById(userId: string, orderId: string): Promise<Order | null> {
+  const memberId = await getMemberIdForUser(userId);
+  if (!memberId) return null;
+  const result = await query(`SELECT * FROM orders WHERE id = $1 AND member_id = $2`, [
+    orderId,
+    memberId,
+  ]);
+  if (result.rows.length === 0) return null;
+  const order = mapOrder(result.rows[0]);
+  const items = await query(`SELECT * FROM order_items WHERE order_id = $1 ORDER BY id`, [orderId]);
+  order.items = items.rows.map(mapItem);
+  return order;
+}
+
+/** Admin: set tracking code and move to shipped (or keep status if already beyond). */
+export async function setOrderTracking(
+  id: string,
+  trackingCode: string,
+  actorUserId: string,
+  trackingUrl?: string
+): Promise<Order> {
+  const code = trackingCode.trim();
+  if (!code || code.length > 64) {
+    throw new AppError(400, 'Código de rastreio inválido.', 'INVALID_TRACKING');
+  }
+  const url = trackingUrl?.trim() || trackingUrlForCode(code);
+  const result = await query(
+    `UPDATE orders
+     SET tracking_code = $1,
+         tracking_url = $2,
+         status = CASE
+           WHEN status IN ('paid', 'processing') THEN 'shipped'
+           ELSE status
+         END
+     WHERE id = $3
+     RETURNING *`,
+    [code, url, id]
+  );
+  if (result.rows.length === 0) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+  await auditLog('order.tracking_set', actorUserId, { orderId: id, trackingCode: code });
+  return mapOrder(result.rows[0]);
 }
 
 // ─── Admin mutations ─────────────────────────────────────────────────────────

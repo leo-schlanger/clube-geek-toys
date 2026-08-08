@@ -6,5 +6,11 @@ Disallow: /pdv/
 Disallow: /verificar-email
 Disallow: /recuperar-senha
 Disallow: /resultado-pagamento
+Disallow: /checkout
+Disallow: /pedido/
+Disallow: /minhas-compras
 
+# Club
 Sitemap: https://club.geeketoys.com.br/sitemap.xml
+# Shop
+Sitemap: https://shop.geeketoys.com.br/sitemap-shop.xml

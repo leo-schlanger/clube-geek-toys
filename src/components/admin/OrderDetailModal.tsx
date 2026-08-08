@@ -4,7 +4,13 @@ import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
 import type { Order, OrderStatus } from '../../types'
-import { getOrder, updateOrderStatus, confirmPixOrder, refundOrder } from '../../lib/orders'
+import {
+  getOrder,
+  updateOrderStatus,
+  confirmPixOrder,
+  refundOrder,
+  setOrderTracking,
+} from '../../lib/orders'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
@@ -67,6 +73,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [statusValue, setStatusValue] = useState<OrderStatus | ''>('')
+  const [trackingCode, setTrackingCode] = useState('')
 
   useEffect(() => {
     let active = true
@@ -77,6 +84,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
         if (!active) return
         setOrder(data)
         setStatusValue(data?.status ?? '')
+        setTrackingCode(data?.trackingCode ?? '')
       })
       .catch((error) => {
         logger.error('Error fetching order:', error)
@@ -156,6 +164,30 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
     setActionLoading(false)
   }
 
+  async function handleSaveTracking() {
+    if (!order || !trackingCode.trim()) {
+      toast.error('Informe o código de rastreio dos Correios')
+      return
+    }
+    setActionLoading(true)
+    try {
+      const updated = await setOrderTracking(order.id, trackingCode.trim())
+      if (updated) {
+        setOrder(updated)
+        setStatusValue(updated.status)
+        setTrackingCode(updated.trackingCode ?? trackingCode)
+        toast.success('Rastreio salvo — status atualizado para Enviado se estava em preparação')
+        onChanged()
+      } else {
+        toast.error('Erro ao salvar rastreio')
+      }
+    } catch (error) {
+      logger.error('Error saving tracking:', error)
+      toast.error('Erro ao salvar rastreio')
+    }
+    setActionLoading(false)
+  }
+
   const address = order ? formatAddress(order.shippingAddress) : null
   const canConfirmPix = order?.paymentMethod === 'pix' && order?.status === 'pending'
   const canRefund =
@@ -228,8 +260,47 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                     <MapPin className="h-4 w-4 text-muted-foreground" /> Endereço de entrega
                   </h4>
                   <p className="text-sm text-muted-foreground">{address}</p>
+                  {order.shippingService && (
+                    <p className="text-xs text-muted-foreground">
+                      Frete: {order.shippingService}
+                      {order.shippingDays != null ? ` · ~${order.shippingDays} dias úteis` : ''}
+                      {order.shippingCost > 0 ? ` · ${formatCurrency(order.shippingCost)}` : ''}
+                    </p>
+                  )}
                 </div>
               )}
+
+              {/* Rastreio Correios */}
+              <div className="space-y-2 border-t pt-4">
+                <h4 className="font-semibold text-sm">Rastreio (Correios)</h4>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    value={trackingCode}
+                    onChange={(e) => setTrackingCode(e.target.value)}
+                    placeholder="Código de rastreio"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                    disabled={actionLoading}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleSaveTracking}
+                    disabled={actionLoading || !trackingCode.trim()}
+                  >
+                    Salvar rastreio
+                  </Button>
+                </div>
+                {order.trackingUrl && (
+                  <a
+                    href={order.trackingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Abrir rastreamento
+                  </a>
+                )}
+              </div>
 
               {/* Itens */}
               <div className="space-y-2">

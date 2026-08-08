@@ -29,6 +29,9 @@ export const SETTINGS_CATALOGUE: SettingDefinition[] = [
 
   // Payment guards
   { key: 'payment.duplicate_window_days', default: 7, type: 'number', description: 'Janela em dias para bloquear pagamentos duplicados' },
+
+  // Shop: recompensa por avaliar pedido entregue (crédito de loja em R$)
+  { key: 'review_reward_amount', default: 1, type: 'number', description: 'Crédito (R$) ao avaliar um pedido entregue' },
 ];
 
 const definitionByKey = new Map(SETTINGS_CATALOGUE.map((d) => [d.key, d]));

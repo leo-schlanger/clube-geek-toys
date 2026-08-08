@@ -40,6 +40,15 @@ productRouter.get('/', async (req, res, next) => {
   }
 });
 
+productRouter.get('/:slug/related', async (req, res, next) => {
+  try {
+    const products = await productService.listRelatedProducts(req.params.slug as string, 8);
+    res.json({ products });
+  } catch (err) {
+    next(err);
+  }
+});
+
 productRouter.get('/:slug', async (req, res, next) => {
   try {
     const product = await productService.getProductBySlug(req.params.slug as string, false);
@@ -100,6 +109,10 @@ const productSchema = z.object({
   sku: z.string().max(60).optional().nullable(),
   active: z.boolean().optional(),
   featured: z.boolean().optional(),
+  weightG: z.number().int().positive().optional().nullable(),
+  heightCm: z.number().positive().optional().nullable(),
+  widthCm: z.number().positive().optional().nullable(),
+  lengthCm: z.number().positive().optional().nullable(),
 });
 
 productRouter.post('/', authenticate, requireRole('admin'), validate(productSchema), async (req, res, next) => {

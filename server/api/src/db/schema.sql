@@ -283,6 +283,12 @@ CREATE TABLE products (
   sku VARCHAR(60),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   featured BOOLEAN NOT NULL DEFAULT FALSE,
+  weight_g INTEGER CHECK (weight_g IS NULL OR weight_g > 0),
+  height_cm NUMERIC(6,1) CHECK (height_cm IS NULL OR height_cm > 0),
+  width_cm NUMERIC(6,1) CHECK (width_cm IS NULL OR width_cm > 0),
+  length_cm NUMERIC(6,1) CHECK (length_cm IS NULL OR length_cm > 0),
+  rating_avg NUMERIC(3,2) NOT NULL DEFAULT 0,
+  rating_count INTEGER NOT NULL DEFAULT 0 CHECK (rating_count >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -299,6 +305,14 @@ CREATE TABLE orders (
   discount DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
   discount_reason VARCHAR(40),                                     -- 'member_15' quando aplicável
   shipping_cost DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
+  shipping_service VARCHAR(40),
+  shipping_service_id TEXT,
+  shipping_days INTEGER,
+  tracking_code VARCHAR(64),
+  tracking_url TEXT,
+  store_credit_applied DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (store_credit_applied >= 0),
+  melhor_envio_cart_id TEXT,
+  melhor_envio_order_id TEXT,
   total DECIMAL(10,2) NOT NULL CHECK (total >= 0),
   status VARCHAR(20) NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','paid','processing','shipped','delivered','cancelled','refunded')),

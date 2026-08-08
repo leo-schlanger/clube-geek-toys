@@ -38,6 +38,14 @@ const envSchema = z.object({
 
   // CORS — comma-separated list of additional allowed origins (optional)
   ALLOWED_ORIGINS: z.string().optional(),
+
+  // Shipping (Melhor Envio + origin). Token optional: without it, table fallback is used.
+  MELHOR_ENVIO_TOKEN: z.string().min(1).optional(),
+  MELHOR_ENVIO_SANDBOX: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+  SHIPPING_ORIGIN_CEP: z.string().regex(/^\d{8}$/).default('22011001'),
 });
 
 const envSchemaRefined = envSchema.refine(
