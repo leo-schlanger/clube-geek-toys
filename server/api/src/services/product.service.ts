@@ -273,6 +273,48 @@ export async function deactivateProduct(id: string): Promise<void> {
   if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
 }
 
+/** Absolute product URLs for search engines (shop host). */
+export async function buildProductSitemapXml(shopBaseUrl: string): Promise<string> {
+  const base = shopBaseUrl.replace(/\/$/, '');
+  const result = await query(
+    `SELECT slug, updated_at FROM products
+     WHERE active = TRUE
+       AND name NOT ILIKE 'checkup%'
+       AND slug NOT ILIKE 'checkup%'
+     ORDER BY updated_at DESC
+     LIMIT 5000`
+  );
+  const urls = result.rows
+    .map((r) => {
+      const lastmod = r.updated_at
+        ? new Date(r.updated_at as string).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      return `  <url>
+    <loc>${base}/produto/${r.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>`;
+    })
+    .join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${base}/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${base}/evento</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+${urls}
+</urlset>
+`;
+}
+
 /** "Você também pode gostar" — same category first, then featured. */
 export async function listRelatedProducts(slug: string, limit = 8): Promise<Product[]> {
   const base = await getProductBySlug(slug, false);

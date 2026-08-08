@@ -19,7 +19,7 @@ const AVAILABLE_TEMPLATES = [
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
-  'admin-new-member', 'order-confirmed',
+  'admin-new-member', 'order-confirmed', 'order-shipped',
 ];
 
 export function getAvailableTemplates() {
@@ -230,8 +230,27 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
           ['Total', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
         ])}
-        <p style="margin-top:16px">Você receberá novidades sobre o envio em breve.</p>`,
-      cta: { text: 'Continuar comprando', url: 'https://shop.geeketoys.com.br' },
+        <p style="margin-top:16px">Você receberá o código de rastreio dos Correios assim que o pedido for postado.</p>`,
+      cta: { text: 'Acompanhar pedido', url: 'https://shop.geeketoys.com.br/minhas-compras' },
+    },
+
+    'order-shipped': {
+      subject: `Pedido #${v.order_number || ''} enviado — Correios`,
+      preheader: `Seu pedido saiu para entrega. Código: ${v.tracking_code || ''}`,
+      body: `
+        <h2 style="color:#4ade80;margin:0 0 12px">Pedido a caminho! 📦</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Seu pedido foi postado pelos Correios. Use o código abaixo para rastrear:</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Rastreio', `<strong style="font-family:monospace">${v.tracking_code || '—'}</strong>`],
+          ...(v.shipping_service ? [['Serviço', v.shipping_service]] : []),
+        ])}
+        <p style="margin-top:16px">Prazo estimado depende da região e do serviço (PAC/SEDEX).</p>`,
+      cta: {
+        text: 'Rastrear nos Correios',
+        url: v.tracking_url || 'https://rastreamento.correios.com.br/app/index.php',
+      },
     },
 
     'payment-failed': {

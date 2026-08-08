@@ -15,6 +15,7 @@ import {
   type ShippingAddressInput,
 } from './shipping.service.js';
 import { redeemForOrder } from './store-credit.service.js';
+import { sendTemplateEmail } from './email.service.js';
 
 const PIX_KEY = env.PIX_KEY || '';
 const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
@@ -432,7 +433,20 @@ export async function setOrderTracking(
   );
   if (result.rows.length === 0) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
   await auditLog('order.tracking_set', actorUserId, { orderId: id, trackingCode: code });
-  return mapOrder(result.rows[0]);
+  const order = mapOrder(result.rows[0]);
+  // Non-blocking ship notification
+  sendTemplateEmail({
+    template: 'order-shipped',
+    to: order.customerEmail,
+    variables: {
+      name: order.customerName,
+      order_number: String(order.orderNumber),
+      tracking_code: code,
+      tracking_url: url,
+      shipping_service: order.shippingService || '',
+    },
+  }).catch((err) => console.error('[email] order-shipped failed', err));
+  return order;
 }
 
 // ─── Admin mutations ─────────────────────────────────────────────────────────
@@ -468,7 +482,17 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
     await decrementStockForOrder(client, id);
     await client.query('COMMIT');
     await auditLog('order.pix_confirmed', actorUserId, { orderId: id });
-    return mapOrder(updated.rows[0]);
+    const order = mapOrder(updated.rows[0]);
+    sendTemplateEmail({
+      template: 'order-confirmed',
+      to: order.customerEmail,
+      variables: {
+        name: order.customerName,
+        order_number: String(order.orderNumber),
+        total: order.total.toFixed(2).replace('.', ','),
+      },
+    }).catch((err) => console.error('[email] order-confirmed (pix) failed', err));
+    return order;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;

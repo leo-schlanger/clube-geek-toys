@@ -219,7 +219,8 @@
 - [ ] **ALTO** Conta Melhor Envio + `MELHOR_ENVIO_TOKEN` em produção (sem token usa tabela fallback)
 - [x] **Avaliações + crédito fixo** - review pós-entrega, R$1 default, checkout com crédito, admin moderação
 - [ ] **MEDIO** Etiqueta automática Melhor Envio
-- [ ] **MEDIO** Sitemap dinâmico de produtos + OG por host no nginx
+- [x] **Sitemap dinâmico de produtos** + OG title shop via nginx sub_filter
+- [x] **E-mails** order-shipped + order-confirmed no PIX confirm
 - [ ] **BAIXO** Google Meu Negócio / Instagram bio (manual Laura)
 
 ### MEDIO - Planejado

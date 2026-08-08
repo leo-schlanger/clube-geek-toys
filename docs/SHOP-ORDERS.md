@@ -59,9 +59,36 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 | Moderação         | Admin → aba Avaliações (publicar/ocultar)                                            |
 | API               | `POST /reviews/me/order/:id`, `GET /reviews/product/:slug`, `GET /reviews/me/credit` |
 
+## E-mails de pedido
+
+| Evento                 | Template                                 |
+| ---------------------- | ---------------------------------------- |
+| Cartão pago (webhook)  | `order-confirmed`                        |
+| PIX confirmado (admin) | `order-confirmed`                        |
+| Rastreio salvo (admin) | `order-shipped` (código + link Correios) |
+
+## SEO shop
+
+| URL                     | Conteúdo                                                   |
+| ----------------------- | ---------------------------------------------------------- |
+| `/sitemap-shop.xml`     | Páginas estáticas                                          |
+| `/sitemap-products.xml` | Proxy nginx → `GET /products/sitemap.xml` (catálogo ativo) |
+| nginx sub_filter        | Title/description/OG shop (crawlers sem JS)                |
+
 ## Pendente
 
-- Token Melhor Envio em produção
+- Token Melhor Envio em produção (`MELHOR_ENVIO_TOKEN` no `.env` da VPS + recreate api)
 - Etiqueta ME automática
 - Google Meu Negócio / Instagram (manual)
-- Sitemap dinâmico de produtos
+
+### Como obter token Melhor Envio
+
+1. Criar conta em https://melhorenvio.com.br (ou sandbox)
+2. Criar aplicativo OAuth → gerar token de acesso à API
+3. Na VPS, em `/opt/clube-geek-toys/server/.env` (ou secrets do compose):
+   ```
+   MELHOR_ENVIO_TOKEN=seu_token
+   MELHOR_ENVIO_SANDBOX=false
+   SHIPPING_ORIGIN_CEP=22011001
+   ```
+4. `docker compose up -d --force-recreate api`

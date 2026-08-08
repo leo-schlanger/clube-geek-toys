@@ -58,6 +58,10 @@ services:
       FRONTEND_URL: ${FRONTEND_URL}
       API_URL: ${API_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # Frete Correios via Melhor Envio (opcional — sem token usa tabela fallback)
+      MELHOR_ENVIO_TOKEN: ${MELHOR_ENVIO_TOKEN:-}
+      MELHOR_ENVIO_SANDBOX: ${MELHOR_ENVIO_SANDBOX:-false}
+      SHIPPING_ORIGIN_CEP: ${SHIPPING_ORIGIN_CEP:-22011001}
     volumes:
       - uploads:/app/uploads
     expose:

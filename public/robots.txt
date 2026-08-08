@@ -12,5 +12,6 @@ Disallow: /minhas-compras
 
 # Club
 Sitemap: https://club.geeketoys.com.br/sitemap.xml
-# Shop
+# Shop (static pages + dynamic product catalog via API proxy)
 Sitemap: https://shop.geeketoys.com.br/sitemap-shop.xml
+Sitemap: https://shop.geeketoys.com.br/sitemap-products.xml

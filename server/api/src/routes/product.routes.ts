@@ -22,6 +22,18 @@ productRouter.get('/categories', async (_req, res, next) => {
   }
 });
 
+// ─── Public: dynamic product sitemap (XML for shop SEO) ──────────────────────
+// Must be before /:slug so "sitemap.xml" is not treated as a slug.
+
+productRouter.get('/sitemap.xml', async (_req, res, next) => {
+  try {
+    const xml = await productService.buildProductSitemapXml('https://shop.geeketoys.com.br');
+    res.type('application/xml').send(xml);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Public: products ────────────────────────────────────────────────────────
 
 productRouter.get('/', async (req, res, next) => {
