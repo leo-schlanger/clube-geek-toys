@@ -297,6 +297,7 @@ CREATE TABLE orders (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_number SERIAL,                                             -- número curto humano
   member_id UUID REFERENCES members(id) ON DELETE SET NULL,        -- nullable: compra de convidado
+  user_id UUID REFERENCES users(id) ON DELETE SET NULL,            -- set when checkout authenticated
   customer_name VARCHAR(200) NOT NULL,
   customer_email VARCHAR(254) NOT NULL,
   customer_phone VARCHAR(20),
@@ -344,6 +345,7 @@ CREATE INDEX idx_products_featured ON products(featured) WHERE featured = TRUE;
 CREATE INDEX idx_products_created ON products(created_at DESC);
 CREATE INDEX idx_categories_active ON categories(active) WHERE active = TRUE;
 CREATE INDEX idx_orders_member ON orders(member_id);
+CREATE INDEX idx_orders_user ON orders(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_orders_status ON orders(status, created_at DESC);
 CREATE INDEX idx_orders_pi ON orders(stripe_payment_intent_id);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);

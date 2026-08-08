@@ -234,6 +234,18 @@
 - [x] **Calculo de frete na loja** - ViaCEP + Melhor Envio / fallback (migration 010)
 - [ ] **Gateway PIX automatico na loja** - Confirmacao de PIX de pedido ainda e manual pelo admin
 
+### Dados / LGPD / integridade loja (Ago/2026)
+
+- [x] **LGPD export** inclui pedidos, itens, reviews e crédito de loja
+- [x] **LGPD delete** anonimiza pedidos/endereço, oculta reviews, zera crédito
+- [x] **Fix email_logs** no export (member_id / recipient, não user_id inexistente)
+- [x] **Restaurar store credit** em cancel, payment_failed e refund
+- [x] **Race review_reward** — unique index + crédito na mesma TX
+- [x] **orders.user_id** para ownership de Minhas compras
+- [x] **Agregar qty** no checkout (anti oversell por linhas duplicadas)
+- [x] **Docs** PROJECT / DOC-STATUS / SHOP-ORDERS / SECURITY alinhados ao schema 010–011
+- [ ] **FUTURO** Reserva de estoque (hold) entre create e paid
+
 ### BAIXO - Nice to Have
 
 - [ ] **Storybook** - Documentar componentes UI

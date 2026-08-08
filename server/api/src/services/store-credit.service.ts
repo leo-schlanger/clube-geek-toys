@@ -59,15 +59,17 @@ export async function creditUser(
   try {
     if (ownClient) await client.query('BEGIN');
     const bal = await lockBalance(client, userId);
-    const next = round2(bal + amt);
-    await client.query(
-      `UPDATE store_credits SET balance = $1, updated_at = NOW() WHERE user_id = $2`,
-      [next, userId]
-    );
+    // Ledger first: unique indexes (review_reward / order_refund_credit) reject duplicates
+    // before balance mutates when this TX is shared.
     await client.query(
       `INSERT INTO store_credit_ledger (user_id, amount, reason, order_id, review_id, note)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [userId, amt, reason, opts.orderId ?? null, opts.reviewId ?? null, opts.note ?? null]
+    );
+    const next = round2(bal + amt);
+    await client.query(
+      `UPDATE store_credits SET balance = $1, updated_at = NOW() WHERE user_id = $2`,
+      [next, userId]
     );
     if (ownClient) await client.query('COMMIT');
     return next;
@@ -117,4 +119,77 @@ export async function hasReviewRewardForOrder(orderId: string): Promise<boolean>
     [orderId]
   );
   return result.rows.length > 0;
+}
+
+/**
+ * Restore store credit applied on a cancelled/failed/refunded order (idempotent).
+ * Returns amount restored (0 if nothing to restore or already restored).
+ */
+export async function restoreCreditForOrder(
+  orderId: string,
+  opts: { client?: pg.PoolClient; note?: string } = {}
+): Promise<number> {
+  const ownClient = !opts.client;
+  const client = opts.client ?? (await getClient());
+  try {
+    if (ownClient) await client.query('BEGIN');
+
+    const ord = await client.query(
+      `SELECT id, user_id, store_credit_applied, status
+       FROM orders WHERE id = $1 FOR UPDATE`,
+      [orderId]
+    );
+    if (ord.rows.length === 0) {
+      if (ownClient) await client.query('COMMIT');
+      return 0;
+    }
+    const row = ord.rows[0];
+    const amount = round2(parseFloat(row.store_credit_applied || '0'));
+    const userId = row.user_id as string | null;
+    if (amount <= 0 || !userId) {
+      if (ownClient) await client.query('COMMIT');
+      return 0;
+    }
+
+    // Already restored?
+    const existing = await client.query(
+      `SELECT 1 FROM store_credit_ledger
+       WHERE order_id = $1 AND reason = 'order_refund_credit' LIMIT 1`,
+      [orderId]
+    );
+    if (existing.rows.length > 0) {
+      if (ownClient) await client.query('COMMIT');
+      return 0;
+    }
+
+    const bal = await lockBalance(client, userId);
+    const next = round2(bal + amount);
+    await client.query(
+      `UPDATE store_credits SET balance = $1, updated_at = NOW() WHERE user_id = $2`,
+      [next, userId]
+    );
+    try {
+      await client.query(
+        `INSERT INTO store_credit_ledger (user_id, amount, reason, order_id, note)
+         VALUES ($1, $2, 'order_refund_credit', $3, $4)`,
+        [userId, amount, orderId, opts.note ?? 'Crédito devolvido (pedido cancelado/estornado)']
+      );
+    } catch (err: unknown) {
+      const e = err as { code?: string };
+      if (e.code === '23505') {
+        // concurrent restore won the race
+        if (ownClient) await client.query('ROLLBACK').catch(() => {});
+        return 0;
+      }
+      throw err;
+    }
+
+    if (ownClient) await client.query('COMMIT');
+    return amount;
+  } catch (err) {
+    if (ownClient) await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    if (ownClient) client.release();
+  }
 }

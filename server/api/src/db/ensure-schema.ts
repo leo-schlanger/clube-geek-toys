@@ -254,6 +254,20 @@ export async function ensureSchema(): Promise<void> {
       ON CONFLICT (key) DO NOTHING
     `);
 
+    // ─── Shop data integrity (migration 011) ─────────────────────────────────
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id) WHERE user_id IS NOT NULL`);
+    await query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_review_reward_once
+        ON store_credit_ledger (order_id)
+        WHERE reason = 'review_reward' AND order_id IS NOT NULL
+    `);
+    await query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_order_refund_credit_once
+        ON store_credit_ledger (order_id)
+        WHERE reason = 'order_refund_credit' AND order_id IS NOT NULL
+    `);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

@@ -202,46 +202,61 @@ As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
 
 #### `products`
 
-| Coluna           | Tipo          | Restricoes / Notas                               |
-| ---------------- | ------------- | ------------------------------------------------ |
-| id               | UUID          | PK, DEFAULT uuid_generate_v4()                   |
-| name             | VARCHAR(200)  | NOT NULL                                         |
-| slug             | VARCHAR(220)  | NOT NULL, UNIQUE                                 |
-| description      | TEXT          | Nullable                                         |
-| price            | DECIMAL(10,2) | NOT NULL, CHECK >= 0                             |
-| compare_at_price | DECIMAL(10,2) | Nullable, CHECK >= 0 (preco "de/por")            |
-| category_id      | UUID          | FK → categories(id) ON DELETE SET NULL, Nullable |
-| images           | JSONB         | NOT NULL, DEFAULT '[]' (URLs em `/uploads`)      |
-| stock            | INTEGER       | NOT NULL, DEFAULT 0, CHECK >= 0                  |
-| sku              | VARCHAR(60)   | Nullable                                         |
-| active           | BOOLEAN       | NOT NULL, DEFAULT TRUE                           |
-| featured         | BOOLEAN       | NOT NULL, DEFAULT FALSE                          |
-| created_at       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                          |
-| updated_at       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger |
+| Coluna                           | Tipo          | Restricoes / Notas                                    |
+| -------------------------------- | ------------- | ----------------------------------------------------- |
+| id                               | UUID          | PK, DEFAULT uuid_generate_v4()                        |
+| name                             | VARCHAR(200)  | NOT NULL                                              |
+| slug                             | VARCHAR(220)  | NOT NULL, UNIQUE                                      |
+| description                      | TEXT          | Nullable                                              |
+| price                            | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                  |
+| compare_at_price                 | DECIMAL(10,2) | Nullable, CHECK >= 0 (preco "de/por")                 |
+| category_id                      | UUID          | FK → categories(id) ON DELETE SET NULL, Nullable      |
+| images                           | JSONB         | NOT NULL, DEFAULT '[]' (URLs em `/uploads`)           |
+| stock                            | INTEGER       | NOT NULL, DEFAULT 0, CHECK >= 0                       |
+| sku                              | VARCHAR(60)   | Nullable                                              |
+| active                           | BOOLEAN       | NOT NULL, DEFAULT TRUE                                |
+| featured                         | BOOLEAN       | NOT NULL, DEFAULT FALSE                               |
+| weight_g                         | INTEGER       | Nullable, gramas (frete); default runtime 300 se null |
+| height_cm / width_cm / length_cm | NUMERIC(6,1)  | Nullable (frete)                                      |
+| rating_avg                       | NUMERIC(3,2)  | NOT NULL, DEFAULT 0 (agregado de reviews)             |
+| rating_count                     | INTEGER       | NOT NULL, DEFAULT 0                                   |
+| created_at                       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                               |
+| updated_at                       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger      |
 
-#### `orders`
+#### `orders` (migrations 009 + 010 + 011)
 
-| Coluna                   | Tipo          | Restricoes / Notas                                                                                                 |
-| ------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------ |
-| id                       | UUID          | PK, DEFAULT uuid_generate_v4()                                                                                     |
-| order_number             | SERIAL        | Numero sequencial legivel do pedido                                                                                |
-| member_id                | UUID          | FK → members(id) ON DELETE SET NULL, Nullable (pedido pode ser de nao-membro)                                      |
-| customer_name            | VARCHAR(200)  | NOT NULL                                                                                                           |
-| customer_email           | VARCHAR(254)  | NOT NULL                                                                                                           |
-| customer_phone           | VARCHAR(20)   | Nullable                                                                                                           |
-| shipping_address         | JSONB         | Nullable                                                                                                           |
-| subtotal                 | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                               |
-| discount                 | DECIMAL(10,2) | NOT NULL, DEFAULT 0, CHECK >= 0                                                                                    |
-| discount_reason          | VARCHAR(40)   | Nullable, `'member_15'` quando o desconto de membro foi aplicado                                                   |
-| shipping_cost            | DECIMAL(10,2) | NOT NULL, DEFAULT 0, CHECK >= 0                                                                                    |
-| total                    | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                               |
-| status                   | VARCHAR(20)   | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','paid','processing','shipped','delivered','cancelled','refunded') |
-| payment_method           | VARCHAR(20)   | Nullable, CHECK IN ('pix','credit_card')                                                                           |
-| stripe_payment_intent_id | TEXT          | Nullable                                                                                                           |
-| pix_txid                 | TEXT          | Nullable                                                                                                           |
-| paid_at                  | TIMESTAMPTZ   | Nullable                                                                                                           |
-| created_at               | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                                                                                            |
-| updated_at               | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger                                                                   |
+| Coluna                       | Tipo          | Restricoes / Notas                                                                                    |
+| ---------------------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
+| id                           | UUID          | PK, DEFAULT uuid_generate_v4()                                                                        |
+| order_number                 | SERIAL        | Numero sequencial legivel do pedido                                                                   |
+| member_id                    | UUID          | FK → members(id) ON DELETE SET NULL, Nullable (so se membro **ativo** no checkout)                    |
+| user_id                      | UUID          | FK → users(id) ON DELETE SET NULL, Nullable (sempre setado se autenticado — ownership Minhas compras) |
+| customer_name                | VARCHAR(200)  | NOT NULL                                                                                              |
+| customer_email               | VARCHAR(254)  | NOT NULL                                                                                              |
+| customer_phone               | VARCHAR(20)   | Nullable                                                                                              |
+| shipping_address             | JSONB         | `{ cep, street, number, complement?, neighborhood, city, state, recipientName? }`                     |
+| subtotal                     | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                  |
+| discount                     | DECIMAL(10,2) | NOT NULL, DEFAULT 0 — inclui member_15 e/ou store_credit                                              |
+| discount_reason              | VARCHAR(40)   | `'member_15' \| 'store_credit' \| 'member_15+store_credit'`                                           |
+| shipping_cost                | DECIMAL(10,2) | NOT NULL, DEFAULT 0 (frete revalidado server-side)                                                    |
+| shipping_service             | VARCHAR(40)   | PAC/SEDEX etc.                                                                                        |
+| shipping_service_id          | TEXT          | Id Melhor Envio / fallback                                                                            |
+| shipping_days                | INTEGER       | Prazo estimado                                                                                        |
+| tracking_code / tracking_url | VARCHAR/TEXT  | Rastreio Correios                                                                                     |
+| store_credit_applied         | DECIMAL(10,2) | Credito de loja abatido (nao no frete)                                                                |
+| total                        | DECIMAL(10,2) | `subtotal - discount + shipping_cost`                                                                 |
+| status                       | VARCHAR(20)   | pending→paid→processing→shipped→delivered \| cancelled \| refunded                                    |
+| payment_method               | VARCHAR(20)   | pix \| credit_card                                                                                    |
+| stripe_payment_intent_id     | TEXT          | Nullable                                                                                              |
+| pix_txid                     | TEXT          | Nullable                                                                                              |
+| paid_at                      | TIMESTAMPTZ   | Nullable                                                                                              |
+| created_at / updated_at      | TIMESTAMPTZ   | auto                                                                                                  |
+
+#### `product_reviews` / `store_credits` / `store_credit_ledger` (010)
+
+- **Reviews:** 1 por `(order_id, product_id)`; so pedido `delivered` + ownership (`user_id` ou `member_id`).
+- **Credito:** saldo em `store_credits`; ledger com reasons `review_reward` (1× por pedido, unique index), `order_redeem`, `order_refund_credit` (1× restore, unique index), `admin_adjust`.
+- **LGPD:** export inclui pedidos/itens/reviews/credito; delete anonimiza `customer_*` + `shipping_address`, oculta textos de review, zera saldo.
 
 #### `order_items`
 

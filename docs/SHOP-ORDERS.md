@@ -34,13 +34,25 @@ Origem de frete: loja física CEP **22011-001**.
 4. Cliente vê em **Minhas compras → A caminho** com link dos Correios
 5. Marcar `delivered` quando confirmar entrega (manual)
 
-## Schema (migration 010)
+## Schema (migrations 009–011)
 
-- `products`: weight*g, height/width/length_cm, rating*\*
-- `orders`: shipping*service\*, tracking*\*, store_credit_applied
-- `product_reviews`, `store_credits`, `store_credit_ledger` (prontos para Fase avaliações)
+- `products`: weight_g, height/width/length_cm, rating_avg/count
+- `orders`: user*id (ownership), shipping*_, tracking\__, store_credit_applied
+- `product_reviews`, `store_credits`, `store_credit_ledger`
+- Unique ledger: 1× `review_reward` e 1× `order_refund_credit` por pedido
 
 Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
+
+### Integridade de dados (resumo)
+
+| Tema                      | Comportamento                                           |
+| ------------------------- | ------------------------------------------------------- |
+| Preços                    | Sempre do DB sob `FOR UPDATE`                           |
+| Qty duplicada no carrinho | Agregada antes do check de estoque                      |
+| Crédito no pending        | Debitado no create; **devolvido** em cancel/fail/refund |
+| Falha Stripe após create  | Pedido cancelado + crédito restaurado                   |
+| Review reward             | Na mesma TX das reviews + unique index                  |
+| LGPD                      | Export/delete cobrem pedidos, reviews e crédito         |
 
 ## SEO / marca
 

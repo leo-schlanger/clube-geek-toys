@@ -1,6 +1,6 @@
 # Segurança — Clube GeekPop & Toys
 
-> **Última atualização:** 19 de Abril de 2026
+> **Última atualização:** 8 de Agosto de 2026
 
 ## 1. Visão Geral de Segurança
 
@@ -265,20 +265,32 @@ Logs são **imutáveis** (INSERT only, sem UPDATE/DELETE).
 
 ### Princípios Aplicados
 
-| Princípio            | Implementação                                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| Minimização de dados | Apenas dados essenciais coletados (nome, email, CPF, telefone)                             |
-| Consentimento        | Checkbox explícito durante o cadastro                                                      |
-| Finalidade           | Dados utilizados exclusivamente para operações do clube                                    |
-| Mascaramento         | CPF exibido como `***.***.789-00` na interface                                             |
-| Não compartilhamento | Dados não compartilhados com terceiros (exceto Stripe para pagamentos e Resend para email) |
+| Princípio            | Implementação                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| Minimização de dados | Apenas dados essenciais (clube: nome, email, CPF, telefone; loja: endereço de entrega) |
+| Consentimento        | Checkbox explícito durante o cadastro                                                  |
+| Finalidade           | Clube + loja própria (pedidos, frete, avaliações, crédito de loja)                     |
+| Mascaramento         | CPF exibido como `***.***.789-00` na interface                                         |
+| Não compartilhamento | Stripe (pagamentos), Resend (email), ViaCEP/Melhor Envio (frete)                       |
 
-### Direitos do Titular
+### Direitos do Titular (API)
 
-- **Acesso**: membro pode visualizar todos os seus dados
-- **Portabilidade**: contrato em PDF disponível para download
-- **Retenção**: logs de auditoria mantidos para fins de compliance
-- **Comunicação**: apenas emails transacionais (sem marketing sem consentimento)
+| Direito                    | Endpoint / comportamento                                                                                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Acesso / portabilidade** | `GET /lgpd/export` — JSON com user, member, contracts, payments, subscriptions, **pedidos da loja + itens**, **reviews**, **crédito + ledger**, audit e email logs                                         |
+| **Eliminação**             | `POST /lgpd/delete` (senha) — anonimiza user/member/contracts; **redige orders** (nome/email/telefone/endereço); oculta textos de review; zera crédito; bloqueia se assinatura ativa ou pedido em trânsito |
+| **Retenção**               | `audit_logs` e ledger financeiro mantidos (compliance/contábil) com PII reduzida                                                                                                                           |
+| **Comunicação**            | Apenas e-mails transacionais (sem marketing sem consentimento)                                                                                                                                             |
+
+### Dados da loja (PII)
+
+| Dado                               | Onde                             | Notas                                             |
+| ---------------------------------- | -------------------------------- | ------------------------------------------------- |
+| Nome, email, telefone do comprador | `orders.customer_*`              | Também em convidados                              |
+| Endereço completo                  | `orders.shipping_address` JSONB  | CEP, rua, número, bairro, cidade, UF              |
+| Rastreio                           | `tracking_code` / `tracking_url` | Limpo no delete LGPD                              |
+| Avaliação                          | `product_reviews`                | Autor público só como "Cliente" ou nome de membro |
+| Crédito                            | `store_credits` / ledger         | Restaurado se pedido cancela/falha/reembolsa      |
 
 ### Analytics (Umami)
 

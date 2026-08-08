@@ -14,7 +14,7 @@ import {
   trackingUrlForCode,
   type ShippingAddressInput,
 } from './shipping.service.js';
-import { redeemForOrder } from './store-credit.service.js';
+import { redeemForOrder, restoreCreditForOrder } from './store-credit.service.js';
 import { sendTemplateEmail } from './email.service.js';
 
 const PIX_KEY = env.PIX_KEY || '';
@@ -28,6 +28,7 @@ function mapOrder(row: pg.QueryResultRow): Order {
     id: row.id,
     orderNumber: row.order_number,
     memberId: row.member_id,
+    userId: row.user_id ?? null,
     customerName: row.customer_name,
     customerEmail: row.customer_email,
     customerPhone: row.customer_phone,
@@ -138,7 +139,9 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   };
 
   // Resolve active membership (for the 15% discount) — never trust the client.
+  // Always persist user_id when authenticated so "Minhas compras" works even without active plan.
   let memberId: string | null = null;
+  const orderUserId = user?.userId ?? null;
   if (user) {
     const mid = await getMemberIdForUser(user.userId);
     if (mid) {
@@ -150,14 +153,28 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     }
   }
 
+  // Aggregate quantities by productId (prevents double-line stock bypass).
+  const qtyByProduct = new Map<string, number>();
+  for (const it of input.items) {
+    const qty = Math.floor(it.quantity);
+    if (qty <= 0) throw new AppError(400, 'Quantidade inválida.', 'INVALID_QUANTITY');
+    qtyByProduct.set(it.productId, (qtyByProduct.get(it.productId) || 0) + qty);
+  }
+  const aggregatedItems = [...qtyByProduct.entries()].map(([productId, quantity]) => ({
+    productId,
+    quantity,
+  }));
+  // Note: frete quote token was validated against the client cart lines above (input.items).
+  // Stock uses aggregated quantities so duplicate product lines cannot bypass stock checks.
+
   const client = await getClient();
   let orderId: string;
   let order: Order;
   try {
     await client.query('BEGIN');
 
-    // Lock the products and validate availability
-    const ids = input.items.map((it) => it.productId);
+    // Lock the products and validate availability (aggregated qty)
+    const ids = aggregatedItems.map((it) => it.productId);
     const productsResult = await client.query(
       `SELECT id, name, slug, price, stock, active, images
        FROM products WHERE id = ANY($1::uuid[]) FOR UPDATE`,
@@ -167,13 +184,12 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
     const itemRows: { productId: string; name: string; slug: string; unitPrice: number; quantity: number; lineTotal: number; image: string | null }[] = [];
     let subtotal = 0;
-    for (const it of input.items) {
+    for (const it of aggregatedItems) {
       const p = byId.get(it.productId);
       if (!p || !p.active) {
         throw new AppError(400, `Produto indisponível no carrinho.`, 'PRODUCT_UNAVAILABLE');
       }
-      const qty = Math.floor(it.quantity);
-      if (qty <= 0) throw new AppError(400, 'Quantidade inválida.', 'INVALID_QUANTITY');
+      const qty = it.quantity;
       if (p.stock < qty) {
         throw new AppError(409, `Estoque insuficiente para "${p.name}".`, 'INSUFFICIENT_STOCK');
       }
@@ -195,14 +211,15 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
     const orderResult = await client.query(
       `INSERT INTO orders (
-         member_id, customer_name, customer_email, customer_phone, shipping_address,
+         member_id, user_id, customer_name, customer_email, customer_phone, shipping_address,
          subtotal, discount, discount_reason, shipping_cost, shipping_service, shipping_service_id,
          shipping_days, store_credit_applied, total, status, payment_method
        )
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'pending', $15)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16)
        RETURNING *`,
       [
         memberId,
+        orderUserId,
         input.customer.name,
         input.customer.email,
         input.customer.phone ?? null,
@@ -260,41 +277,72 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     client.release();
   }
 
-  // Create the charge outside the DB transaction.
-  if (input.paymentMethod === 'credit_card') {
-    const stripe = getStripe();
-    const pi = await stripe.paymentIntents.create({
-      amount: Math.round(order.total * 100),
-      currency: 'brl',
-      payment_method_types: ['card'],
-      description: `Pedido #${order.orderNumber} - Loja GeekPop & Toys`,
-      receipt_email: order.customerEmail,
-      metadata: {
-        kind: 'shop_order',
+  // Create the charge outside the DB transaction. On failure, cancel + restore credit.
+  try {
+    if (input.paymentMethod === 'credit_card') {
+      const stripe = getStripe();
+      const pi = await stripe.paymentIntents.create({
+        amount: Math.round(order.total * 100),
+        currency: 'brl',
+        payment_method_types: ['card'],
+        description: `Pedido #${order.orderNumber} - Loja GeekPop & Toys`,
+        receipt_email: order.customerEmail,
+        metadata: {
+          kind: 'shop_order',
+          orderId,
+          memberId: order.memberId ?? '',
+          userId: orderUserId ?? '',
+        },
+      });
+      await query(`UPDATE orders SET stripe_payment_intent_id = $1 WHERE id = $2`, [pi.id, orderId]);
+      order.stripePaymentIntentId = pi.id;
+      await auditLog('order.created', orderUserId, {
         orderId,
-        memberId: order.memberId ?? '',
-      },
-    });
-    await query(`UPDATE orders SET stripe_payment_intent_id = $1 WHERE id = $2`, [pi.id, orderId]);
-    order.stripePaymentIntentId = pi.id;
-    return { order, clientSecret: pi.client_secret ?? undefined };
-  }
+        orderNumber: order.orderNumber,
+        total: order.total,
+        storeCreditApplied: order.storeCreditApplied,
+        paymentMethod: 'credit_card',
+      });
+      return { order, clientSecret: pi.client_secret ?? undefined };
+    }
 
-  // PIX — generated locally; admin confirms manually.
-  if (!PIX_KEY) {
-    throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
+    // PIX — generated locally; admin confirms manually.
+    if (!PIX_KEY) {
+      throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
+    }
+    const txId = generatePixTxId();
+    const pixData = generatePixEMV({
+      pixKey: PIX_KEY,
+      amount: order.total,
+      merchantName: PIX_MERCHANT_NAME,
+      merchantCity: PIX_MERCHANT_CITY,
+      txId,
+    });
+    await query(`UPDATE orders SET pix_txid = $1 WHERE id = $2`, [txId, orderId]);
+    order.pixTxid = txId;
+    await auditLog('order.created', orderUserId, {
+      orderId,
+      orderNumber: order.orderNumber,
+      total: order.total,
+      storeCreditApplied: order.storeCreditApplied,
+      paymentMethod: 'pix',
+    });
+    return { order, pixData };
+  } catch (err) {
+    // Compensate: cancel pending order and restore any store credit.
+    await query(
+      `UPDATE orders SET status = 'cancelled' WHERE id = $1 AND status = 'pending'`,
+      [orderId]
+    ).catch(() => {});
+    await restoreCreditForOrder(orderId, {
+      note: 'Crédito devolvido (falha ao criar cobrança)',
+    }).catch((e) => console.error('[order] credit restore after charge fail', e));
+    await auditLog('order.create_failed', orderUserId, {
+      orderId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
-  const txId = generatePixTxId();
-  const pixData = generatePixEMV({
-    pixKey: PIX_KEY,
-    amount: order.total,
-    merchantName: PIX_MERCHANT_NAME,
-    merchantCity: PIX_MERCHANT_CITY,
-    txId,
-  });
-  await query(`UPDATE orders SET pix_txid = $1 WHERE id = $2`, [txId, orderId]);
-  order.pixTxid = txId;
-  return { order, pixData };
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
@@ -340,19 +388,15 @@ export async function listOrders(opts: { status?: string; page?: number; limit?:
   return { orders: data.rows.map(mapOrder), total: count.rows[0].total as number, page, limit };
 }
 
-/** Customer order history (member-scoped). statuses = filter group for Minhas compras tabs. */
+/** Customer order history — by user_id (preferred) or legacy member_id. */
 export async function listMyOrders(
   userId: string,
   opts: { statuses?: string[]; page?: number; limit?: number } = {}
 ) {
   const memberId = await getMemberIdForUser(userId);
-  if (!memberId) {
-    return { orders: [] as Order[], total: 0, page: 1, limit: opts.limit || 20 };
-  }
-
-  const conditions: string[] = ['member_id = $1'];
-  const params: unknown[] = [memberId];
-  let i = 2;
+  const conditions: string[] = ['(user_id = $1 OR ($2::uuid IS NOT NULL AND member_id = $2))'];
+  const params: unknown[] = [userId, memberId];
+  let i = 3;
   if (opts.statuses?.length) {
     conditions.push(`status = ANY($${i++}::text[])`);
     params.push(opts.statuses);
@@ -395,11 +439,11 @@ export async function listMyOrders(
 
 export async function getMyOrderById(userId: string, orderId: string): Promise<Order | null> {
   const memberId = await getMemberIdForUser(userId);
-  if (!memberId) return null;
-  const result = await query(`SELECT * FROM orders WHERE id = $1 AND member_id = $2`, [
-    orderId,
-    memberId,
-  ]);
+  const result = await query(
+    `SELECT * FROM orders
+     WHERE id = $1 AND (user_id = $2 OR ($3::uuid IS NOT NULL AND member_id = $3))`,
+    [orderId, userId, memberId]
+  );
   if (result.rows.length === 0) return null;
   const order = mapOrder(result.rows[0]);
   const items = await query(`SELECT * FROM order_items WHERE order_id = $1 ORDER BY id`, [orderId]);
@@ -457,10 +501,34 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
   if (!VALID_STATUS.includes(status)) {
     throw new AppError(400, 'Status inválido.', 'INVALID_STATUS');
   }
+  const prev = await getOrderById(id, false);
+  if (!prev) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+
   const result = await query(`UPDATE orders SET status = $1 WHERE id = $2 RETURNING *`, [status, id]);
   if (result.rows.length === 0) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
-  await auditLog('order.status_changed', actorUserId, { orderId: id, status });
-  return mapOrder(result.rows[0]);
+  const order = mapOrder(result.rows[0]);
+
+  // Restore store credit when cancelling/refunding a pending or paid order that spent credit.
+  if (
+    (status === 'cancelled' || status === 'refunded') &&
+    prev.status !== 'cancelled' &&
+    prev.status !== 'refunded' &&
+    (order.storeCreditApplied ?? 0) > 0
+  ) {
+    const restored = await restoreCreditForOrder(id, {
+      note: `Crédito devolvido (status → ${status})`,
+    });
+    if (restored > 0) {
+      await auditLog('order.credit_restored', actorUserId, { orderId: id, amount: restored, status });
+    }
+  }
+
+  await auditLog('order.status_changed', actorUserId, {
+    orderId: id,
+    from: prev.status,
+    status,
+  });
+  return order;
 }
 
 /** Admin confirms a PIX order manually: mark paid + decrement stock (idempotent). */
@@ -505,13 +573,29 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
 export async function refundOrder(id: string, actorUserId: string): Promise<Order> {
   const order = await getOrderById(id, false);
   if (!order) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+  if (order.status === 'refunded' || order.status === 'cancelled') {
+    throw new AppError(409, 'Pedido já cancelado/reembolsado.', 'ORDER_ALREADY_CLOSED');
+  }
   if (!order.stripePaymentIntentId) {
     throw new AppError(400, 'Pedido sem cobrança no Stripe (ex.: PIX) — reembolse manualmente.', 'NO_STRIPE_CHARGE');
   }
   const stripe = getStripe();
   await stripe.refunds.create({ payment_intent: order.stripePaymentIntentId });
-  const result = await query(`UPDATE orders SET status = 'refunded' WHERE id = $1 RETURNING *`, [id]);
-  await auditLog('order.refunded', actorUserId, { orderId: id, paymentIntent: order.stripePaymentIntentId });
+  const result = await query(
+    `UPDATE orders SET status = 'refunded' WHERE id = $1 AND status <> 'refunded' RETURNING *`,
+    [id]
+  );
+  if (result.rows.length === 0) {
+    throw new AppError(409, 'Pedido já reembolsado.', 'ORDER_ALREADY_REFUNDED');
+  }
+  const restored = await restoreCreditForOrder(id, {
+    note: 'Crédito devolvido (reembolso Stripe)',
+  });
+  await auditLog('order.refunded', actorUserId, {
+    orderId: id,
+    paymentIntent: order.stripePaymentIntentId,
+    creditRestored: restored,
+  });
   return mapOrder(result.rows[0]);
 }
 

@@ -166,6 +166,7 @@ export interface Order {
   id: string;
   orderNumber: number;
   memberId: string | null;
+  userId?: string | null;
   customerName: string;
   customerEmail: string;
   customerPhone: string | null;

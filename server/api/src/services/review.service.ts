@@ -5,8 +5,8 @@ import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
 import {
   creditUser,
+  getBalance,
   getReviewRewardAmount,
-  hasReviewRewardForOrder,
 } from './store-credit.service.js';
 
 export interface ProductReview {
@@ -98,9 +98,8 @@ export async function listProductReviews(
   const [data, count] = await Promise.all([
     query(
       `SELECT r.*,
-              COALESCE(m.full_name, split_part(u.email, '@', 1)) AS author_name
+              COALESCE(NULLIF(m.full_name, ''), 'Cliente') AS author_name
        FROM product_reviews r
-       JOIN users u ON u.id = r.user_id
        LEFT JOIN members m ON m.id = r.member_id
        WHERE r.product_id = $1 AND r.status = 'published'
        ORDER BY r.created_at DESC
@@ -142,10 +141,7 @@ export async function createOrderReviews(
   }
 
   const memberId = await getMemberIdForUser(userId);
-  const orderResult = await query(
-    `SELECT * FROM orders WHERE id = $1`,
-    [orderId]
-  );
+  const orderResult = await query(`SELECT * FROM orders WHERE id = $1`, [orderId]);
   if (orderResult.rows.length === 0) {
     throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
   }
@@ -153,7 +149,10 @@ export async function createOrderReviews(
   if (order.status !== 'delivered') {
     throw new AppError(400, 'Só é possível avaliar pedidos entregues.', 'ORDER_NOT_DELIVERED');
   }
-  if (!order.member_id || order.member_id !== memberId) {
+  const owns =
+    order.user_id === userId ||
+    (memberId && order.member_id === memberId);
+  if (!owns) {
     throw new AppError(403, 'Este pedido não pertence à sua conta.', 'ORDER_NOT_OWNED');
   }
 
@@ -166,6 +165,8 @@ export async function createOrderReviews(
   );
 
   const created: ProductReview[] = [];
+  let creditAwarded = 0;
+  let newBalance = 0;
   const client = await getClient();
   try {
     await client.query('BEGIN');
@@ -200,10 +201,34 @@ export async function createOrderReviews(
       }
     }
 
-    // Refresh aggregates for each product
     const productIds = [...new Set(created.map((r) => r.productId))];
     for (const pid of productIds) {
       await refreshProductRating(client, pid);
+    }
+
+    // Award credit once per order inside the same TX (unique index enforces 1×).
+    const reward = await getReviewRewardAmount();
+    if (reward > 0) {
+      try {
+        newBalance = await creditUser(userId, reward, 'review_reward', {
+          orderId,
+          reviewId: created[0]?.id,
+          note: 'Recompensa por avaliar pedido',
+          client,
+        });
+        creditAwarded = reward;
+      } catch (err: unknown) {
+        const e = err as { code?: string };
+        if (e.code === '23505') {
+          // Concurrent review already received the reward
+          creditAwarded = 0;
+          newBalance = await getBalance(userId);
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      newBalance = await getBalance(userId);
     }
 
     await client.query('COMMIT');
@@ -214,23 +239,8 @@ export async function createOrderReviews(
     client.release();
   }
 
-  // Award credit once per order (outside review TX so partial reviews still persist)
-  let creditAwarded = 0;
-  let newBalance = await (async () => {
-    const { getBalance } = await import('./store-credit.service.js');
-    return getBalance(userId);
-  })();
-
-  if (!(await hasReviewRewardForOrder(orderId))) {
-    const reward = await getReviewRewardAmount();
-    if (reward > 0) {
-      newBalance = await creditUser(userId, reward, 'review_reward', {
-        orderId,
-        reviewId: created[0]?.id,
-        note: `Recompensa por avaliar pedido`,
-      });
-      creditAwarded = reward;
-    }
+  if (creditAwarded === 0 && newBalance === 0) {
+    newBalance = await getBalance(userId);
   }
 
   await auditLog('order.reviewed', userId, {
@@ -245,9 +255,12 @@ export async function createOrderReviews(
 /** Reviews the user already left for this order (to show "já avaliado"). */
 export async function listReviewsForOrder(userId: string, orderId: string): Promise<ProductReview[]> {
   const memberId = await getMemberIdForUser(userId);
-  const order = await query(`SELECT member_id FROM orders WHERE id = $1`, [orderId]);
+  const order = await query(`SELECT member_id, user_id FROM orders WHERE id = $1`, [orderId]);
   if (order.rows.length === 0) return [];
-  if (!memberId || order.rows[0].member_id !== memberId) {
+  const owns =
+    order.rows[0].user_id === userId ||
+    (memberId && order.rows[0].member_id === memberId);
+  if (!owns) {
     throw new AppError(403, 'Acesso negado.', 'FORBIDDEN');
   }
   const result = await query(

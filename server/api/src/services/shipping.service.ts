@@ -162,9 +162,16 @@ interface QuotePayload {
   source: 'melhor_envio' | 'fallback';
 }
 
+/** Stable cart fingerprint — aggregates qty per product so line order/duplicates match. */
 function itemsKey(items: QuoteItemInput[]): string {
-  return items
-    .map((i) => `${i.productId}:${Math.floor(i.quantity)}`)
+  const map = new Map<string, number>();
+  for (const i of items) {
+    const q = Math.floor(i.quantity);
+    if (q <= 0) continue;
+    map.set(i.productId, (map.get(i.productId) || 0) + q);
+  }
+  return [...map.entries()]
+    .map(([id, q]) => `${id}:${q}`)
     .sort()
     .join('|');
 }

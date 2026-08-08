@@ -4,6 +4,7 @@ import { getClient } from '../config/database.js';
 import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
 import { decrementStockForOrder } from './order.service.js';
+import { restoreCreditForOrder } from './store-credit.service.js';
 
 /**
  * Email job collected during transaction processing — sent AFTER commit.
@@ -29,6 +30,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
   const webhookKey = `stripe_${event.id}`;
 
   const pendingEmails: PendingEmail[] = [];
+  const pendingCreditRestores: string[] = [];
 
   const client = await getClient();
   try {
@@ -54,7 +56,12 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         break;
 
       case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(client, event.data.object as Stripe.PaymentIntent, pendingEmails);
+        await handlePaymentIntentFailed(
+          client,
+          event.data.object as Stripe.PaymentIntent,
+          pendingEmails,
+          pendingCreditRestores
+        );
         break;
 
       case 'invoice.paid':
@@ -81,8 +88,20 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
     client.release();
   }
 
-  // Side effects (emails) AFTER commit so they reflect persisted state.
-  // Each one is independent — failure of one doesn't block others.
+  // Side effects AFTER commit so they reflect persisted state.
+  for (const orderId of pendingCreditRestores) {
+    try {
+      const amount = await restoreCreditForOrder(orderId, {
+        note: 'Crédito devolvido (pagamento cartão falhou)',
+      });
+      if (amount > 0) {
+        await auditLog('order.credit_restored', null, { orderId, amount, reason: 'payment_failed' });
+      }
+    } catch (err) {
+      console.error(`[WEBHOOK] Credit restore failed (order=${orderId}):`, err);
+    }
+  }
+
   for (const job of pendingEmails) {
     try {
       await sendTemplateEmail(job);
@@ -180,14 +199,26 @@ async function handlePaymentIntentFailed(
   client: pg.PoolClient,
   paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
+  pendingCreditRestores: string[] = [],
 ): Promise<void> {
-  // Shop order failed — cancel it (stock was never decremented).
+  // Shop order failed — cancel it (stock was never decremented). Credit restored after TX commit.
   if (paymentIntent.metadata?.kind === 'shop_order') {
-    await client.query(
-      `UPDATE orders SET status = 'cancelled' WHERE stripe_payment_intent_id = $1 AND status = 'pending'`,
+    const cancelled = await client.query(
+      `UPDATE orders SET status = 'cancelled'
+       WHERE stripe_payment_intent_id = $1 AND status = 'pending'
+       RETURNING id, store_credit_applied`,
       [paymentIntent.id]
     );
-    await auditLog('order.payment_failed', null, { paymentIntentId: paymentIntent.id, orderId: paymentIntent.metadata?.orderId });
+    const orderId =
+      (cancelled.rows[0]?.id as string | undefined) ||
+      (paymentIntent.metadata?.orderId as string | undefined);
+    if (orderId && cancelled.rows[0] && parseFloat(cancelled.rows[0].store_credit_applied || '0') > 0) {
+      pendingCreditRestores.push(orderId);
+    }
+    await auditLog('order.payment_failed', null, {
+      paymentIntentId: paymentIntent.id,
+      orderId,
+    });
     return;
   }
 
