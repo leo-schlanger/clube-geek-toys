@@ -7,20 +7,21 @@
 
 ## Veredito
 
-| Área                          | Docs                               | Código      | Notas                                    |
-| ----------------------------- | ---------------------------------- | ----------- | ---------------------------------------- |
-| Stack clube + loja + API      | PROJECT / ARCHITECTURE             | ✅          | OK                                       |
-| Plano único / 15%             | PROJECT                            | ✅          | Desconto server-side                     |
-| Loja checkout Stripe/PIX      | PROJECT                            | ✅          | PIX manual admin                         |
-| **Frete CEP + Melhor Envio**  | SHOP-ORDERS + PROJECT (atualizado) | ✅          | Fallback tabela sem token                |
-| **Minhas compras (6 abas)**   | SHOP-ORDERS                        | ✅          | Ownership por `user_id` ou `member_id`   |
-| **Rastreio + e-mail shipped** | SHOP-ORDERS                        | ✅          | Admin cola código                        |
-| **Reviews + crédito loja**    | SHOP-ORDERS + PROJECT              | ✅          | R$1 default; unique 1×/pedido            |
-| **LGPD shop (export/delete)** | SECURITY (abaixo)                  | ✅          | Corrigido 08/08 (orders/reviews/credits) |
-| Eventos / rádio / design      | EVENTS / RADIO / DESIGN            | ✅          | OK                                       |
-| Fotos de produto              | TODO                               | ⚠️ conteúdo | Laura                                    |
-| Token Melhor Envio prod       | TODO / SHOP-ORDERS                 | ⚠️ ops      | Sem token = fallback                     |
-| Site home SEO K-pop           | SHOP-ORDERS                        | ✅ código   | Deploy home separado                     |
+| Área                          | Docs                               | Código      | Notas                                     |
+| ----------------------------- | ---------------------------------- | ----------- | ----------------------------------------- |
+| Stack clube + loja + API      | PROJECT / ARCHITECTURE             | ✅          | OK                                        |
+| Plano único / 15%             | PROJECT                            | ✅          | Desconto server-side                      |
+| Loja checkout Stripe/PIX      | PROJECT                            | ✅          | PIX manual admin                          |
+| **Frete CEP + Melhor Envio**  | SHOP-ORDERS + PROJECT (atualizado) | ✅          | Fallback tabela sem token                 |
+| **Minhas compras (6 abas)**   | SHOP-ORDERS                        | ✅          | Ownership por `user_id` ou `member_id`    |
+| **Rastreio + e-mail shipped** | SHOP-ORDERS                        | ✅          | Admin cola código                         |
+| **Reviews + crédito loja**    | SHOP-ORDERS + PROJECT              | ✅          | R$1 default; unique 1×/pedido             |
+| **LGPD shop (export/delete)** | SECURITY (abaixo)                  | ✅          | Corrigido 08/08 (orders/reviews/credits)  |
+| Eventos / rádio / design      | EVENTS / RADIO / DESIGN            | ✅          | OK                                        |
+| Fotos de produto              | TODO                               | ⚠️ conteúdo | Laura                                     |
+| Token Melhor Envio prod       | TODO / SHOP-ORDERS                 | ⚠️ ops      | Sem token = fallback                      |
+| Site home SEO K-pop           | SHOP-ORDERS                        | ✅          | ✅ prod www (Vercel; title Loja de K-pop) |
+| Design pink/yellow            | DESIGN / TODO                      | ✅          | Residual purple limpo 08/08               |
 
 **Conclusão:** docs principais de loja estavam **atrasados** em PROJECT (ainda migration 009 only). Atualizados nesta revisão. SHOP-ORDERS.md é a fonte operacional da loja.
 

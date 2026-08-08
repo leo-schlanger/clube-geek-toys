@@ -210,6 +210,7 @@
 
 - [x] **Estudo + plano** - frete Correios, minhas compras, reviews, SEO K-pop
 - [x] **SEO/bio K-pop** - geek-toys-home title/OG/Hero/About; e-mail footer; shop hero/sitemap
+- [x] **Deploy home em produção** - `www.geeketoys.com.br` já serve título/copy "Loja de K-pop" (Vercel auto a partir de `main`)
 - [x] **Frete no checkout** - CEP ViaCEP + cotação Melhor Envio (fallback tabela) + frete no total
 - [x] **Endereço de entrega** - formulário checkout + `shipping_address` tipado
 - [x] **Minhas compras** - abas Tudo / A pagar / Preparando / A caminho / Finalizado / Cancelado
@@ -293,16 +294,16 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 - [x] **Referencia visual versionada** - `docs/assets/brand-reference.jpg`
 - [x] **ARCHITECTURE / PROJECT** - Carteirinha, e-mails e secao de branding atualizados
 
-### Alinhamento de codigo (pendente)
+### Alinhamento de codigo
 
-- [ ] **ALTO** Tokens CSS primary/accent para HSL da peca (`340 85% 59%` / `45 97% 50%`) + glows em `index.css`
-- [ ] **ALTO** Carteirinha digital (`MembershipCard`) — trocar gradiente roxo por rosa/amarelo metalico
-- [ ] **ALTO** `CLUB_PLAN.color` de `#7c3aed` → `#F04080`
-- [ ] **ALTO** Badge `club` (violet) → primary
-- [ ] **ALTO** E-mails (`email.service.ts`) — dourado `#d4a520` e wordmark "GEEK & TOYS" → pink/yellow + "GeekPop & Toys"
-- [ ] **MEDIO** Remover residual `violet-*` / `fuchsia-*` em Subscribe, ShopHome, SubscriptionManagement, RadioMiniPlayer
-- [ ] **MEDIO** `tailwind.config.js` `fontFamily.heading` → Outfit (igual HTML/CSS)
-- [ ] **BAIXO** Revisar OG image / favicon se precisar de borda pink comic da peca
+- [x] **Tokens CSS** primary/accent HSL da peça (`340 85% 59%` / `45 97% 50%`) + glows em `index.css`
+- [x] **Carteirinha digital** (`MembershipCard`) — gradiente rosa/amarelo metalico (sem roxo residual no shimmer)
+- [x] **`CLUB_PLAN.color`** → `#F04080`
+- [x] **Badge `club`** → `bg-primary` (não violet)
+- [x] **E-mails** — Hot Pink/Pop Yellow + wordmark "GeekPop & Toys" (footer loja K-pop RJ)
+- [x] **Residual purple** removido em Subscribe, SubscriptionManagement, RealtimeMetrics (08/08/2026)
+- [x] **`tailwind.config.js`** `fontFamily.heading` → Outfit
+- [ ] **BAIXO** Revisar OG image / favicon se precisar de borda pink comic da peça
 
 ---
 
@@ -312,7 +313,7 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 2. Soft-delete de usuarios (role → `disabled`, nao deleta)
 3. vendor-charts bundle (435KB) - Lazy loaded via ReportsTab
 4. Erros TypeScript pre-existentes em payments.ts, reports.ts (tipos `unknown`)
-5. Residuos de cor roxo/dourado fora da marca (ver Design System acima)
+5. ~~Residuos de cor roxo/dourado fora da marca~~ — limpos 08/08/2026 (Subscribe/SubscriptionManagement/RealtimeMetrics/MembershipCard)
 
 ---
 

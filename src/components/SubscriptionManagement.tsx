@@ -303,8 +303,8 @@ export function SubscriptionManagement({
 
             <div className="p-4 bg-muted/50 rounded-xl border border-border/50 hover:border-border transition-colors">
               <div className="flex items-center gap-2 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-purple-500" />
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-primary" />
                 </div>
                 <span className="text-sm font-medium text-muted-foreground">Membro desde</span>
               </div>

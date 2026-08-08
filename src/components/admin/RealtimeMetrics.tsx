@@ -224,7 +224,7 @@ export function RealtimeMetrics() {
           value={stats.newMembersToday}
           subtitle={`${stats.newMembersThisWeek} nesta semana`}
           icon={<Calendar className="h-5 w-5" />}
-          colorClass="text-purple-500"
+          colorClass="text-primary"
           highlight={stats.newMembersToday > 0}
         />
       </div>

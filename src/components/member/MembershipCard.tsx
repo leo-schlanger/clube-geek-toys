@@ -138,7 +138,7 @@ export function MembershipCard({ member }: MembershipCardProps) {
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.15) 42%, rgba(255,219,112,0.08) 48%, rgba(200,120,255,0.06) 52%, transparent 60%)',
+                background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.15) 42%, rgba(255,219,112,0.10) 48%, rgba(240,64,128,0.08) 52%, transparent 60%)',
                 backgroundSize: '250% 100%',
                 animation: 'shimmer 5s ease-in-out infinite',
               }}

@@ -106,7 +106,7 @@ export default function Subscribe() {
           >
             <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-500" /> Pagamento seguro</span>
             <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Ativação imediata</span>
-            <span className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 text-purple-400" /> 15% em qualquer produto</span>
+            <span className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 text-primary" /> 15% em qualquer produto</span>
             <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-blue-400" /> PIX ou cartão</span>
           </motion.div>
         </div>
@@ -173,7 +173,7 @@ export default function Subscribe() {
           <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">Por que ser VIP?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {[
-              { icon: <ShoppingBag className="h-6 w-6 text-purple-400" />, title: '15% de desconto', desc: 'Em qualquer produto, na loja física e na loja online' },
+              { icon: <ShoppingBag className="h-6 w-6 text-primary" />, title: '15% de desconto', desc: 'Em qualquer produto, na loja física e na loja online' },
               { icon: <Gift className="h-6 w-6 text-pink-400" />, title: 'Brinde especial', desc: 'Um mimo geek de boas-vindas ao entrar no clube' },
               { icon: <Zap className="h-6 w-6 text-blue-400" />, title: 'Eventos participantes', desc: 'Entrada gratuita nos eventos do Clube GeekPop & Toys' },
               { icon: <Shield className="h-6 w-6 text-green-400" />, title: 'Carteirinha digital', desc: 'QR Code exclusivo para identificação na loja' },
@@ -214,8 +214,8 @@ export default function Subscribe() {
               <span className="text-xs font-medium text-muted-foreground">Cancele quando quiser</span>
             </div>
             <div className="flex flex-col items-center gap-2 text-center">
-              <div className="p-3 rounded-full bg-purple-500/10 border border-purple-500/20">
-                <ShoppingBag className="h-6 w-6 text-purple-400" />
+              <div className="p-3 rounded-full bg-primary/10 border border-primary/20">
+                <ShoppingBag className="h-6 w-6 text-primary" />
               </div>
               <span className="text-xs font-medium text-muted-foreground">15% desde o 1º dia</span>
             </div>
