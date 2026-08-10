@@ -217,7 +217,7 @@
 - [x] **Rastreio** - admin salva código Correios; cliente vê link em Minhas compras
 - [x] **Você também pode gostar** - related por categoria no PDP
 - [x] **Formas de pagamento (trust)** - badges PIX/cartão no checkout, PDP e footer
-- [ ] **ALTO** Conta Melhor Envio + `MELHOR_ENVIO_TOKEN` em produção (sem token usa tabela fallback)
+- [ ] **ALTO** Conta Melhor Envio + `MELHOR_ENVIO_TOKEN` em produção — **token ainda vazio** na VPS (cotação = fallback PAC/SEDEX). Código OK; falta o Bearer da conta ME (ver SHOP-ORDERS.md)
 - [x] **Avaliações + crédito fixo** - review pós-entrega, R$1 default, checkout com crédito, admin moderação
 - [ ] **MEDIO** Etiqueta automática Melhor Envio
 - [x] **Sitemap dinâmico de produtos** + OG title shop via nginx sub_filter
@@ -258,7 +258,8 @@
 - [x] **Testes unitários Atacado** - cnpj, wholesale API client, pages, store components
 - [ ] **Cobertura global 70%** - meta de projeto (baseline ~11%); expandir gradualmente
 - [x] **Deploy** - Atacado + variações em prod (master CI)
-- [ ] **Operação** - Laura/Norberto: aprovar CNPJs e marcar produtos (`wholesale_enabled`; hoje 0 SKUs)
+- [x] **Operação** - 55 SKUs com `wholesale_enabled` em prod (10/08; min 2/3/6 por faixa de preço; exclui Checkup)
+- [ ] **Operação** - Laura/Norberto: aprovar CNPJs de clientes B2B quando se cadastrarem
 
 ### Variações de produto estilo Shopee (pedido Laura 10/08/2026)
 

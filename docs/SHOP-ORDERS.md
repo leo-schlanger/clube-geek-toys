@@ -38,7 +38,7 @@ Origem de frete: loja física CEP **22011-001**.
 ## Schema (migrations 009–012)
 
 - `products`: weight_g, height/width/length_cm, rating_avg/count, **wholesale_enabled**, **wholesale_min_qty**
-- `orders`: user*id (ownership), shipping*_, tracking\__, store_credit_applied, **channel**, **customer_cnpj**, **wholesale_account_id**
+- `orders`: user*id (ownership), shipping*\_, tracking\_\_, store_credit_applied, **channel**, **customer_cnpj**, **wholesale_account_id**
 - `product_reviews`, `store_credits`, `store_credit_ledger`
 - **`wholesale_accounts`** (012): CNPJ, empresa, status pending/approved/rejected/disabled
 - Unique ledger: 1× `review_reward` e 1× `order_refund_credit` por pedido
@@ -100,19 +100,27 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 ## Pendente
 
-- Token Melhor Envio em produção (`MELHOR_ENVIO_TOKEN` no `.env` da VPS + recreate api)
+- [ ] **Token Melhor Envio em produção** — `MELHOR_ENVIO_TOKEN` ainda **vazio** na VPS (cotação retorna `source: fallback` PAC R$18 / SEDEX R$32). Precisa do token da conta ME da loja.
 - Etiqueta ME automática
 - Google Meu Negócio / Instagram (manual)
-- Operação Atacado: marcar produtos `wholesale_enabled` na importação; aprovar CNPJs no admin
+- [x] Atacado: 55 SKUs `wholesale_enabled` (10/08/2026)
+- [ ] Aprovar CNPJs B2B no admin quando houver cadastros
 
-### Como obter token Melhor Envio
+### Como obter token Melhor Envio (bloqueio atual)
 
-1. Criar conta em https://melhorenvio.com.br (ou sandbox)
-2. Criar aplicativo OAuth → gerar token de acesso à API
-3. Na VPS, em `/opt/clube-geek-toys/server/.env` (ou secrets do compose):
-   ```
-   MELHOR_ENVIO_TOKEN=seu_token
+1. Conta em https://melhorenvio.com.br (produção) ou sandbox
+2. Painel → **Integrações / API / Aplicativos** → criar app OAuth (ou personal token se disponível no plano)
+3. Gerar **Bearer access token** com escopos de cotação (`shipping-calculate` / cart conforme o app)
+4. Na VPS (`/opt/clube-geek-toys/server/.env`) — **não commitar**:
+   ```bash
+   MELHOR_ENVIO_TOKEN=eyJ...token_real...
    MELHOR_ENVIO_SANDBOX=false
    SHIPPING_ORIGIN_CEP=22011001
    ```
-4. `docker compose up -d --force-recreate api`
+5. Recreate API:
+   ```bash
+   cd /opt/clube-geek-toys/server && docker compose up -d --force-recreate api
+   ```
+6. Validar: `POST /shipping/quote` deve retornar `"source":"melhor_envio"` (não `fallback`)
+
+> Quem tem a conta ME (Norberto/Laura) envia o token por canal seguro; aí colamos na VPS em 1 min.
