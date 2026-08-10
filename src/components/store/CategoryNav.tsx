@@ -8,13 +8,23 @@ interface CategoryNavProps {
   /** Slug da categoria atualmente selecionada (undefined = "Todos"). */
   activeSlug?: string
   loading?: boolean
+  /** Base path for links: "" (default) or "/atacado". */
+  basePath?: string
+  /** Use ?category=slug instead of /categoria/:slug (atacado home). */
+  queryParam?: boolean
 }
 
 /**
  * Navegação horizontal de categorias. Cada item linka para /categoria/:slug,
- * e "Todos" volta para a raiz da loja.
+ * e "Todos" volta para a raiz da loja (ou basePath).
  */
-export function CategoryNav({ categories, activeSlug, loading = false }: CategoryNavProps) {
+export function CategoryNav({
+  categories,
+  activeSlug,
+  loading = false,
+  basePath = '',
+  queryParam = false,
+}: CategoryNavProps) {
   if (loading) {
     return (
       <div className="flex gap-2 overflow-x-auto pb-2">
@@ -35,15 +45,22 @@ export function CategoryNav({ categories, activeSlug, loading = false }: Categor
         : 'border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
     )
 
+  const root = basePath || '/'
+  const allHref = queryParam ? root : root === '/' ? '/' : root
+  const catHref = (slug: string) =>
+    queryParam
+      ? `${basePath || '/'}?category=${encodeURIComponent(slug)}`
+      : `${basePath}/categoria/${slug}`
+
   return (
     <nav aria-label="Categorias" className="flex gap-2 overflow-x-auto pb-2">
-      <Link to="/" className={pillClass(!activeSlug)}>
+      <Link to={allHref} className={pillClass(!activeSlug)}>
         Todos
       </Link>
       {categories.map((category) => (
         <Link
           key={category.id}
-          to={`/categoria/${category.slug}`}
+          to={catHref(category.slug)}
           className={pillClass(activeSlug === category.slug)}
         >
           {category.name}

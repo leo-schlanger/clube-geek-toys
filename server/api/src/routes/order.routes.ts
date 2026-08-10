@@ -23,7 +23,8 @@ const createOrderSchema = z.object({
     .array(
       z.object({
         productId: z.string().uuid(),
-        quantity: z.number().int().positive().max(99),
+        // Atacado pode precisar de volumes maiores que o varejo (cap 999)
+        quantity: z.number().int().positive().max(999),
       })
     )
     .min(1),
@@ -39,10 +40,12 @@ const createOrderSchema = z.object({
   }),
   paymentMethod: z.enum(['pix', 'credit_card']),
   applyStoreCredit: z.boolean().optional(),
+  channel: z.enum(['retail', 'wholesale']).optional(),
+  cnpj: z.string().min(14).max(18).optional(),
 });
 
 // POST /orders — create order + charge (guest or logged-in member). optionalAuth applies the
-// 15% member discount server-side when an active member is authenticated.
+// 15% member discount (retail) or 25% wholesale discount (channel=wholesale + approved CNPJ).
 orderRouter.post('/', optionalAuth, paymentLimiter, validate(createOrderSchema), async (req, res, next) => {
   try {
     const result = await orderService.createOrder(req.body, req.user);

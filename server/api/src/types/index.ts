@@ -110,6 +110,11 @@ export const CLUB_PLAN_PRICE = 149.99;
 // Desconto do membro ativo na loja (fração). Aplicado server-side no checkout.
 export const MEMBER_SHOP_DISCOUNT = 0.15;
 
+// Desconto atacadista aprovado (fração). Canal wholesale apenas; não empilha com member_15.
+export const WHOLESALE_SHOP_DISCOUNT = 0.25;
+
+export type ShopChannel = 'retail' | 'wholesale';
+
 // ─── Shop / e-commerce ────────────────────────────────────────────────────────
 
 export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
@@ -146,6 +151,10 @@ export interface Product {
   lengthCm?: number | null;
   ratingAvg?: number;
   ratingCount?: number;
+  /** Disponível no canal atacado (aba /atacado). Default false — pronto antes da importação. */
+  wholesaleEnabled?: boolean;
+  /** Quantidade mínima por SKU no atacado. */
+  wholesaleMinQty?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -181,6 +190,9 @@ export interface Order {
   trackingCode?: string | null;
   trackingUrl?: string | null;
   storeCreditApplied?: number;
+  channel?: ShopChannel;
+  customerCnpj?: string | null;
+  wholesaleAccountId?: string | null;
   total: number;
   status: OrderStatus;
   paymentMethod: OrderPaymentMethod | null;

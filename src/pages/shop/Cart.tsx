@@ -1,27 +1,41 @@
 import { Link } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ImageOff, Sparkles } from 'lucide-react'
-import { MEMBER_SHOP_DISCOUNT } from '../../types'
+import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { formatCurrency } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
+import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 
 export default function Cart() {
-  const { items, subtotal, setQuantity, removeItem } = useCart()
+  const { items, subtotal, setQuantity, removeItem, channel } = useCart()
   const { isMember } = useShopMember()
+  const { isApproved: isWholesaleApproved } = useWholesaleAccount()
+  const isWholesale = channel === 'wholesale'
+  const base = isWholesale ? '/atacado' : ''
+  const productPrefix = isWholesale ? '/atacado/produto' : '/produto'
 
-  const estimatedDiscount = isMember ? subtotal * MEMBER_SHOP_DISCOUNT : 0
+  const discountFrac = isWholesale
+    ? isWholesaleApproved
+      ? WHOLESALE_SHOP_DISCOUNT
+      : 0
+    : isMember
+      ? MEMBER_SHOP_DISCOUNT
+      : 0
+  const estimatedDiscount = subtotal * discountFrac
   const estimatedTotal = subtotal - estimatedDiscount
 
   return (
     <div className="min-h-screen bg-background">
-      <ShopHeader isMember={isMember} />
+      <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
       <main className="mx-auto max-w-4xl px-4 py-6">
-        <h1 className="mb-6 text-2xl font-heading font-bold">Meu carrinho</h1>
+        <h1 className="mb-6 text-2xl font-heading font-bold">
+          {isWholesale ? 'Carrinho atacado' : 'Meu carrinho'}
+        </h1>
 
         {items.length === 0 ? (
           <Card>
@@ -30,27 +44,34 @@ export default function Cart() {
               <div>
                 <p className="text-lg font-medium">Seu carrinho está vazio</p>
                 <p className="text-muted-foreground">
-                  Que tal explorar nossos produtos geek?
+                  {isWholesale
+                    ? 'Explore o catálogo atacado quando houver produtos liberados.'
+                    : 'Que tal explorar nossos produtos geek?'}
                 </p>
               </div>
               <Button asChild size="lg">
-                <Link to="/">Ir às compras</Link>
+                <Link to={isWholesale ? '/atacado' : '/'}>
+                  {isWholesale ? 'Ir ao atacado' : 'Ir às compras'}
+                </Link>
               </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-            {/* Itens */}
             <div className="space-y-3">
               {items.map((item) => (
                 <Card key={item.productId}>
                   <CardContent className="flex gap-4 p-4">
                     <Link
-                      to={`/produto/${item.slug}`}
+                      to={`${productPrefix}/${item.slug}`}
                       className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted"
                     >
                       {item.image ? (
-                        <img src={item.image} alt={item.name} className="h-full w-full object-cover" />
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                        />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                           <ImageOff className="h-6 w-6" />
@@ -60,7 +81,7 @@ export default function Cart() {
 
                     <div className="flex flex-1 flex-col">
                       <Link
-                        to={`/produto/${item.slug}`}
+                        to={`${productPrefix}/${item.slug}`}
                         className="font-medium leading-snug hover:text-primary"
                       >
                         {item.name}
@@ -80,7 +101,9 @@ export default function Cart() {
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
-                          <span className="w-9 text-center text-sm tabular-nums">{item.quantity}</span>
+                          <span className="w-9 text-center text-sm tabular-nums">
+                            {item.quantity}
+                          </span>
                           <button
                             type="button"
                             aria-label="Aumentar quantidade"
@@ -110,7 +133,6 @@ export default function Cart() {
               ))}
             </div>
 
-            {/* Resumo */}
             <div className="lg:sticky lg:top-20 lg:self-start">
               <Card>
                 <CardContent className="space-y-4 p-4">
@@ -122,18 +144,26 @@ export default function Cart() {
                       <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                     </div>
 
-                    {isMember ? (
+                    {discountFrac > 0 ? (
                       <>
                         <div className="flex items-center justify-between text-green-600">
                           <span className="flex items-center gap-1.5">
-                            <MemberDiscountBadge />
+                            {isWholesale ? (
+                              <span className="text-sm font-medium">Desconto atacado (25%)</span>
+                            ) : (
+                              <MemberDiscountBadge />
+                            )}
                           </span>
-                          <span className="tabular-nums">-{formatCurrency(estimatedDiscount)}</span>
+                          <span className="tabular-nums">
+                            -{formatCurrency(estimatedDiscount)}
+                          </span>
                         </div>
                         <div className="h-px bg-border" />
                         <div className="flex justify-between text-base font-semibold">
                           <span>Total estimado</span>
-                          <span className="tabular-nums">{formatCurrency(estimatedTotal)}</span>
+                          <span className="tabular-nums">
+                            {formatCurrency(estimatedTotal)}
+                          </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
                           O valor final é confirmado no checkout.
@@ -146,29 +176,42 @@ export default function Cart() {
                           <span>Total</span>
                           <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                         </div>
-                        <Link
-                          to="/entrar"
-                          className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"
-                        >
-                          <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                          <span>
-                            Membros economizam 15%.{' '}
-                            <strong className="text-primary">Entrar</strong>
-                          </span>
-                        </Link>
+                        {isWholesale ? (
+                          <Link
+                            to="/atacado/entrar"
+                            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"
+                          >
+                            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                            <span>
+                              Atacadistas aprovados ganham 25%.{' '}
+                              <strong className="text-primary">Entrar com CNPJ</strong>
+                            </span>
+                          </Link>
+                        ) : (
+                          <Link
+                            to="/entrar"
+                            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"
+                          >
+                            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                            <span>
+                              Membros economizam 15%.{' '}
+                              <strong className="text-primary">Entrar</strong>
+                            </span>
+                          </Link>
+                        )}
                       </>
                     )}
                   </div>
 
                   <Button asChild size="lg" className="w-full">
-                    <Link to="/checkout">
+                    <Link to={`${base}/checkout`}>
                       Finalizar compra
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
 
                   <Button asChild variant="ghost" size="sm" className="w-full">
-                    <Link to="/">Continuar comprando</Link>
+                    <Link to={isWholesale ? '/atacado' : '/'}>Continuar comprando</Link>
                   </Button>
                 </CardContent>
               </Card>

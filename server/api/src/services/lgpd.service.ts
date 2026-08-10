@@ -9,7 +9,7 @@ const BCRYPT_ROUNDS = 12;
 /**
  * Export all user data for LGPD compliance (Art. 18).
  * Excludes sensitive fields: password_hash, refresh_token_hash.
- * Includes shop orders, reviews and store credit (migration 010+).
+ * Includes shop orders, reviews, store credit (010+) and wholesale account (012).
  */
 export async function exportUserData(userId: string) {
   const userResult = await query(
@@ -74,6 +74,21 @@ export async function exportUserData(userId: string) {
     [userId]
   );
 
+  // Wholesale B2B account (CNPJ / company PII) — table may not exist on pre-012 DBs
+  let wholesaleAccount: Record<string, unknown> | null = null;
+  try {
+    const wholesaleResult = await query(
+      `SELECT id, cnpj, company_name, trade_name, state_registration, phone,
+              contact_name, business_activity, status, rejection_reason,
+              reviewed_at, created_at, updated_at
+       FROM wholesale_accounts WHERE user_id = $1`,
+      [userId]
+    );
+    wholesaleAccount = wholesaleResult.rows[0] || null;
+  } catch {
+    // migration 012 not applied yet
+  }
+
   const auditResult = await query(
     `SELECT * FROM audit_logs
      WHERE user_id = $1 OR ($2::uuid IS NOT NULL AND member_id = $2)
@@ -116,6 +131,7 @@ export async function exportUserData(userId: string) {
     productReviews: reviewsResult.rows,
     storeCredit: storeCreditResult.rows[0] || { balance: 0 },
     storeCreditLedger: storeCreditLedgerResult.rows,
+    wholesaleAccount,
     auditLogs: auditResult.rows,
     emailLogs: emailResult.rows,
   };
@@ -224,7 +240,8 @@ export async function deleteUserAccount(userId: string, password: string) {
          customer_phone = NULL,
          shipping_address = '{"redacted":true}'::jsonb,
          tracking_code = NULL,
-         tracking_url = NULL
+         tracking_url = NULL,
+         customer_cnpj = NULL
        WHERE user_id = $1
           OR ($2::uuid IS NOT NULL AND member_id = $2)
           OR lower(customer_email) = lower($3)`,
@@ -246,6 +263,28 @@ export async function deleteUserAccount(userId: string, password: string) {
       `UPDATE store_credits SET balance = 0, updated_at = NOW() WHERE user_id = $1`,
       [userId]
     );
+
+    // Disable + redact wholesale account (CNPJ / company PII).
+    // CNPJ becomes a unique placeholder derived from account id (keeps UNIQUE, no real PII).
+    try {
+      await client.query(
+        `UPDATE wholesale_accounts SET
+           company_name = 'REDACTED',
+           trade_name = NULL,
+           state_registration = NULL,
+           phone = NULL,
+           contact_name = 'REDACTED',
+           business_activity = NULL,
+           status = 'disabled',
+           rejection_reason = NULL,
+           admin_notes = NULL,
+           cnpj = lpad(right(replace(id::text, '-', ''), 14), 14, '0')
+         WHERE user_id = $1`,
+        [userId]
+      );
+    } catch {
+      // table may not exist pre-012
+    }
 
     // Redact email log recipients tied to this person
     if (memberId) {
@@ -272,6 +311,7 @@ export async function deleteUserAccount(userId: string, password: string) {
           shopOrdersAnonymized: true,
           reviewsHidden: true,
           storeCreditZeroed: true,
+          wholesaleRedacted: true,
         }),
       ]
     );

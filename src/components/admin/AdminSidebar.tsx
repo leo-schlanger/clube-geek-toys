@@ -19,6 +19,7 @@ import {
   Package,
   ClipboardList,
   Star,
+  Building2,
   LogOut,
   Menu,
 } from 'lucide-react'
@@ -32,6 +33,7 @@ export type AdminTab =
   | 'members'
   | 'products'
   | 'orders'
+  | 'wholesale'
   | 'reviews'
   | 'users'
   | 'logs'
@@ -49,6 +51,7 @@ const menuItems: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'members', label: 'Membros', icon: Users },
   { id: 'products', label: 'Produtos', icon: Package },
   { id: 'orders', label: 'Pedidos', icon: ClipboardList },
+  { id: 'wholesale', label: 'Atacado', icon: Building2 },
   { id: 'reviews', label: 'Avaliações', icon: Star },
   { id: 'users', label: 'Usuários', icon: UserCog },
   { id: 'logs', label: 'Logs', icon: FileText },

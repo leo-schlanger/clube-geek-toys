@@ -7,41 +7,54 @@ import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
-import { MEMBER_SHOP_DISCOUNT } from '../../types'
+import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 
 interface ProductCardProps {
   product: Product
   /** Se o usuário logado é membro ativo — mostra preço com preview de desconto. */
   isMember?: boolean
+  /** Canal atacado: link /atacado/produto, preview 25%, min qty. */
+  isWholesale?: boolean
+  /** Conta atacadista aprovada — mostra preço com −25%. */
+  isWholesaleApproved?: boolean
 }
 
 /**
- * Card de vitrine de um produto. Linka para /produto/:slug e permite
- * adicionar direto ao carrinho. O desconto de membro exibido é só preview.
+ * Card de vitrine de um produto. Linka para /produto/:slug (ou /atacado/produto)
+ * e permite adicionar direto ao carrinho. Descontos exibidos são só preview.
  */
-export function ProductCard({ product, isMember = false }: ProductCardProps) {
+export function ProductCard({
+  product,
+  isMember = false,
+  isWholesale = false,
+  isWholesaleApproved = false,
+}: ProductCardProps) {
   const { addItem } = useCart()
 
   const image = product.images?.[0] ?? null
   const outOfStock = product.stock <= 0
   const onSale = product.compareAtPrice != null && product.compareAtPrice > product.price
   const memberPrice = product.price * (1 - MEMBER_SHOP_DISCOUNT)
+  const wholesalePrice = product.price * (1 - WHOLESALE_SHOP_DISCOUNT)
+  const minQty = isWholesale ? Math.max(1, product.wholesaleMinQty ?? 1) : 1
+  const href = isWholesale ? `/atacado/produto/${product.slug}` : `/produto/${product.slug}`
 
   function handleAdd(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
     if (outOfStock) return
-    addItem(product, 1)
-    toast.success(`${product.name} adicionado ao carrinho`)
+    addItem(product, minQty)
+    toast.success(
+      minQty > 1
+        ? `${product.name} adicionado (${minQty} un. mín. atacado)`
+        : `${product.name} adicionado ao carrinho`
+    )
   }
 
   return (
     <Card className="group flex h-full flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-lg">
-      <Link
-        to={`/produto/${product.slug}`}
-        className="relative block aspect-square overflow-hidden bg-muted"
-      >
+      <Link to={href} className="relative block aspect-square overflow-hidden bg-muted">
         {image ? (
           <img
             src={image}
@@ -49,7 +62,6 @@ export function ProductCard({ product, isMember = false }: ProductCardProps) {
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
-              // Broken URL → fall back to empty state instead of alt icon only
               const el = e.currentTarget
               el.style.display = 'none'
               const fallback = el.nextElementSibling as HTMLElement | null
@@ -67,21 +79,25 @@ export function ProductCard({ product, isMember = false }: ProductCardProps) {
           <span className="text-xs font-medium uppercase tracking-wide">Sem foto</span>
         </div>
 
-        {/* Selos sobre a imagem */}
         <div className="absolute left-2 top-2 flex flex-col gap-1">
           {product.featured && <Badge variant="club">Destaque</Badge>}
           {onSale && <Badge variant="destructive">Promo</Badge>}
+          {isWholesale && (
+            <Badge className="bg-primary text-primary-foreground">Atacado</Badge>
+          )}
         </div>
 
         {outOfStock && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
-            <Badge variant="secondary" className="text-sm">Esgotado</Badge>
+            <Badge variant="secondary" className="text-sm">
+              Esgotado
+            </Badge>
           </div>
         )}
       </Link>
 
       <CardContent className="flex flex-1 flex-col gap-2 p-4">
-        <Link to={`/produto/${product.slug}`} className="flex-1">
+        <Link to={href} className="flex-1">
           {product.categoryName && (
             <span className="text-xs uppercase tracking-wide text-muted-foreground">
               {product.categoryName}
@@ -104,7 +120,22 @@ export function ProductCard({ product, isMember = false }: ProductCardProps) {
             )}
           </div>
 
-          {isMember ? (
+          {isWholesale ? (
+            isWholesaleApproved ? (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  −25% atacado
+                </Badge>
+                <span className="text-sm font-semibold text-green-600">
+                  {formatCurrency(wholesalePrice)}
+                </span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Atacadistas pagam {formatCurrency(wholesalePrice)}
+              </span>
+            )
+          ) : isMember ? (
             <div className="flex items-center gap-2">
               <MemberDiscountBadge />
               <span className="text-sm font-semibold text-green-600">
@@ -115,6 +146,10 @@ export function ProductCard({ product, isMember = false }: ProductCardProps) {
             <span className="text-xs text-muted-foreground">
               Membros pagam {formatCurrency(memberPrice)}
             </span>
+          )}
+
+          {isWholesale && minQty > 1 && (
+            <span className="text-xs text-muted-foreground">Mín. {minQty} un.</span>
           )}
         </div>
 

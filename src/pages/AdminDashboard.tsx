@@ -41,6 +41,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 const MembersTab = lazy(() => import('../components/admin/MembersTab').then(m => ({ default: m.MembersTab })))
 const ProductsTab = lazy(() => import('../components/admin/ProductsTab').then(m => ({ default: m.ProductsTab })))
 const OrdersTab = lazy(() => import('../components/admin/OrdersTab').then(m => ({ default: m.OrdersTab })))
+const WholesaleTab = lazy(() => import('../components/admin/WholesaleTab').then(m => ({ default: m.WholesaleTab })))
 const ReviewsTab = lazy(() => import('../components/admin/ReviewsTab').then(m => ({ default: m.ReviewsTab })))
 const UsersTab = lazy(() => import('../components/admin/UsersTab').then(m => ({ default: m.UsersTab })))
 const LogsTab = lazy(() => import('../components/admin/LogsTab').then(m => ({ default: m.LogsTab })))
@@ -65,6 +66,7 @@ const VALID_TABS: AdminTab[] = [
   'members',
   'products',
   'orders',
+  'wholesale',
   'reviews',
   'users',
   'reports',
@@ -394,6 +396,7 @@ export default function AdminDashboard() {
                 {activeTab === 'members' && 'Membros'}
                 {activeTab === 'products' && 'Produtos'}
                 {activeTab === 'orders' && 'Pedidos'}
+                {activeTab === 'wholesale' && 'Atacado'}
                 {activeTab === 'reviews' && 'Avaliações'}
                 {activeTab === 'users' && 'Usuários'}
                 {activeTab === 'logs' && 'Logs de Auditoria'}
@@ -405,6 +408,7 @@ export default function AdminDashboard() {
                 {activeTab === 'members' && 'Gerencie os membros do clube'}
                 {activeTab === 'products' && 'Gerencie o catálogo da loja'}
                 {activeTab === 'orders' && 'Acompanhe e gerencie os pedidos'}
+                {activeTab === 'wholesale' && 'Aprove CNPJ e gerencie atacadistas (−25%)'}
                 {activeTab === 'reviews' && 'Modere avaliações da loja'}
                 {activeTab === 'users' && 'Gerencie usuários do sistema'}
                 {activeTab === 'logs' && 'Histórico de ações no sistema'}
@@ -537,6 +541,7 @@ export default function AdminDashboard() {
             )}
             {activeTab === 'products' && <ProductsTab />}
             {activeTab === 'orders' && <OrdersTab />}
+            {activeTab === 'wholesale' && <WholesaleTab />}
             {activeTab === 'reviews' && <ReviewsTab />}
             {activeTab === 'users' && (
               <UsersTab

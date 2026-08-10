@@ -45,6 +45,7 @@ productRouter.get('/', async (req, res, next) => {
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
       includeInactive: false,
+      wholesaleOnly: req.query.wholesale === 'true' || req.query.channel === 'wholesale',
     });
     res.json(result);
   } catch (err) {
@@ -125,6 +126,8 @@ const productSchema = z.object({
   heightCm: z.number().positive().optional().nullable(),
   widthCm: z.number().positive().optional().nullable(),
   lengthCm: z.number().positive().optional().nullable(),
+  wholesaleEnabled: z.boolean().optional(),
+  wholesaleMinQty: z.number().int().positive().max(9999).optional(),
 });
 
 productRouter.post('/', authenticate, requireRole('admin'), validate(productSchema), async (req, res, next) => {

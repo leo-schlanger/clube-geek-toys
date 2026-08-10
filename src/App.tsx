@@ -45,6 +45,9 @@ const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
 const EventPage = lazy(() => import('./pages/shop/EventPage'))
 const MyOrders = lazy(() => import('./pages/shop/MyOrders'))
 const MyOrderDetail = lazy(() => import('./pages/shop/MyOrderDetail'))
+const WholesaleHome = lazy(() => import('./pages/shop/WholesaleHome'))
+const WholesaleLogin = lazy(() => import('./pages/shop/WholesaleLogin'))
+const WholesaleRegister = lazy(() => import('./pages/shop/WholesaleRegister'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -282,6 +285,13 @@ function ShopRoutes() {
         <Route path="/minhas-compras/:id" element={<MyOrderDetail />} />
         <Route path="/entrar" element={<ShopLogin />} />
         <Route path="/evento" element={<EventPage />} />
+        {/* Canal Atacado (aba dedicada + CNPJ) */}
+        <Route path="/atacado" element={<WholesaleHome />} />
+        <Route path="/atacado/entrar" element={<WholesaleLogin />} />
+        <Route path="/atacado/cadastro" element={<WholesaleRegister />} />
+        <Route path="/atacado/produto/:slug" element={<ProductDetail />} />
+        <Route path="/atacado/carrinho" element={<Cart />} />
+        <Route path="/atacado/checkout" element={<ShopCheckout />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </CartProvider>

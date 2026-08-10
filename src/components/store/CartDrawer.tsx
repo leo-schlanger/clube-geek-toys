@@ -11,23 +11,39 @@ import {
 import { Button } from '../ui/button'
 import { formatCurrency } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
-import { MEMBER_SHOP_DISCOUNT } from '../../types'
+import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 
 interface CartDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** Membro ativo — exibe estimativa de desconto (preview; total real no checkout). */
   isMember?: boolean
+  /** Conta atacadista aprovada — preview −25%. */
+  isWholesaleApproved?: boolean
 }
 
 /**
  * Gaveta lateral do carrinho. Lista itens, permite ajustar quantidade/remover
  * e leva ao carrinho completo ou checkout.
  */
-export function CartDrawer({ open, onOpenChange, isMember = false }: CartDrawerProps) {
-  const { items, subtotal, count, setQuantity, removeItem } = useCart()
+export function CartDrawer({
+  open,
+  onOpenChange,
+  isMember = false,
+  isWholesaleApproved = false,
+}: CartDrawerProps) {
+  const { items, subtotal, count, setQuantity, removeItem, channel } = useCart()
+  const isWholesale = channel === 'wholesale'
+  const base = isWholesale ? '/atacado' : ''
 
-  const estimatedDiscount = isMember ? subtotal * MEMBER_SHOP_DISCOUNT : 0
+  const discountFrac = isWholesale
+    ? isWholesaleApproved
+      ? WHOLESALE_SHOP_DISCOUNT
+      : 0
+    : isMember
+      ? MEMBER_SHOP_DISCOUNT
+      : 0
+  const estimatedDiscount = subtotal * discountFrac
   const estimatedTotal = subtotal - estimatedDiscount
 
   return (
@@ -140,10 +156,12 @@ export function CartDrawer({ open, onOpenChange, isMember = false }: CartDrawerP
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                 </div>
-                {isMember && (
+                {discountFrac > 0 && (
                   <>
                     <div className="flex justify-between text-green-600">
-                      <span>Desconto membro (15%)</span>
+                      <span>
+                        {isWholesale ? 'Desconto atacado (25%)' : 'Desconto membro (15%)'}
+                      </span>
                       <span className="tabular-nums">-{formatCurrency(estimatedDiscount)}</span>
                     </div>
                     <div className="flex justify-between font-semibold">
@@ -162,12 +180,12 @@ export function CartDrawer({ open, onOpenChange, isMember = false }: CartDrawerP
               <div className="flex w-full flex-col gap-2">
                 <SheetClose asChild>
                   <Button asChild className="w-full">
-                    <Link to="/checkout">Finalizar compra</Link>
+                    <Link to={`${base}/checkout`}>Finalizar compra</Link>
                   </Button>
                 </SheetClose>
                 <SheetClose asChild>
                   <Button asChild variant="outline" className="w-full">
-                    <Link to="/carrinho">Ver carrinho</Link>
+                    <Link to={`${base}/carrinho`}>Ver carrinho</Link>
                   </Button>
                 </SheetClose>
               </div>

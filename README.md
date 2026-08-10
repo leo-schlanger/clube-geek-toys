@@ -16,6 +16,7 @@ A plataforma inclui:
 - **Contrato digital** com validade juridica (Lei 14.063/2020)
 - **Carteirinha digital premium** com QR Code e design metalico
 - **Loja e-commerce propria** em `shop.geeketoys.com.br` com desconto de membro aplicado no checkout
+- **Canal Atacado B2B** em `shop.geeketoys.com.br/atacado` (CNPJ + 25% apos aprovacao)
 - **PDV integrado** para verificacao de membro e aplicacao de desconto na loja fisica
 - **Radio online** via AzuraCast em `radio.geeketoys.com.br`
 
@@ -64,6 +65,16 @@ Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdom
 - **Desconto de 15% do membro aplicado server-side no checkout** (`discount_reason = 'member_15'`) — nunca confiando no valor enviado pelo cliente
 - Webhook confirma o pagamento e baixa o estoque automaticamente; PIX de loja e confirmado manualmente pelo admin
 
+### Canal Atacado (B2B)
+
+Aba dedicada em `/atacado` (mesmo host da loja):
+
+- Cadastro e login com **CNPJ** (checksum brasileiro + confere com o cadastro)
+- Aprovacao manual no admin (atividade / objeto social alinhado a compra)
+- **25% de desconto** server-side (`discount_reason = 'wholesale_25'`) so com conta aprovada
+- Produtos so entram no catalogo atacado com flag `wholesale_enabled` (pronto antes da importacao)
+- Documentacao: [`docs/WHOLESALE.md`](docs/WHOLESALE.md)
+
 ### PDV (Ponto de Venda)
 
 Interface para vendedores na loja fisica:
@@ -78,6 +89,7 @@ Painel completo de gestao:
 
 - Visao geral com metricas (membros ativos, receita, churn)
 - Gestao de membros (busca, filtros, edicao, ativacao/desativacao)
+- Aba **Atacado** (aprovacao de CNPJ B2B) e flag de produto para o canal
 - Confirmacao de pagamentos PIX pendentes (assinatura e loja)
 - Gestao da loja: aba **Produtos** (catalogo, estoque, imagens) e aba **Pedidos**
 - Logs de acoes do sistema

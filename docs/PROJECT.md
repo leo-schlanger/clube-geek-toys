@@ -1,6 +1,6 @@
 # Clube GeekPop & Toys — Documentacao do Projeto
 
-> **Ultima atualizacao:** 7 de Agosto de 2026
+> **Ultima atualizacao:** 10 de Agosto de 2026
 
 ## 1. Dados da Empresa
 
@@ -39,7 +39,7 @@ Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renova
 
 ### 3.2 Modulo Admin
 
-Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, estoque, imagens; aba **Pedidos** — listagem, status, confirmacao de PIX de loja), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
+Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, estoque, imagens, flag atacado; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
 
 ### 3.3 Modulo PDV (Ponto de Venda)
 
@@ -48,6 +48,10 @@ Verificacao de membros por CPF ou QR Code e visualizacao do status do membro e d
 ### 3.4 Modulo Loja (E-commerce)
 
 Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, busca, paginas de produto), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`.
+
+### 3.4.1 Canal Atacado (B2B)
+
+Aba dedicada em `shop.geeketoys.com.br/atacado`. Cadastro com **CNPJ** (validado), aprovacao manual no admin (atividade / objeto social alinhado a compra). Login exige CNPJ correto. Desconto de **25%** server-side (`discount_reason = 'wholesale_25'`) apenas com conta `approved`. Produtos so entram no catalogo atacado com `wholesale_enabled = true` (pronto antes da importacao — vitrine vazia ate liberar SKUs). Detalhes: [`docs/WHOLESALE.md`](WHOLESALE.md).
 
 ### 3.5 Modulo Pagamento
 
@@ -220,30 +224,35 @@ As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
 | height_cm / width_cm / length_cm | NUMERIC(6,1)  | Nullable (frete)                                      |
 | rating_avg                       | NUMERIC(3,2)  | NOT NULL, DEFAULT 0 (agregado de reviews)             |
 | rating_count                     | INTEGER       | NOT NULL, DEFAULT 0                                   |
+| wholesale_enabled                | BOOLEAN       | NOT NULL, DEFAULT FALSE — aparece no canal `/atacado` |
+| wholesale_min_qty                | INTEGER       | NOT NULL, DEFAULT 1, CHECK >= 1                       |
 | created_at                       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW()                               |
 | updated_at                       | TIMESTAMPTZ   | NOT NULL, DEFAULT NOW(), auto-update via trigger      |
 
-#### `orders` (migrations 009 + 010 + 011)
+#### `orders` (migrations 009 + 010 + 011 + 012)
 
 | Coluna                       | Tipo          | Restricoes / Notas                                                                                    |
 | ---------------------------- | ------------- | ----------------------------------------------------------------------------------------------------- |
 | id                           | UUID          | PK, DEFAULT uuid_generate_v4()                                                                        |
 | order_number                 | SERIAL        | Numero sequencial legivel do pedido                                                                   |
-| member_id                    | UUID          | FK → members(id) ON DELETE SET NULL, Nullable (so se membro **ativo** no checkout)                    |
+| member_id                    | UUID          | FK → members(id) ON DELETE SET NULL, Nullable (so se membro **ativo** no checkout retail)             |
 | user_id                      | UUID          | FK → users(id) ON DELETE SET NULL, Nullable (sempre setado se autenticado — ownership Minhas compras) |
 | customer_name                | VARCHAR(200)  | NOT NULL                                                                                              |
 | customer_email               | VARCHAR(254)  | NOT NULL                                                                                              |
 | customer_phone               | VARCHAR(20)   | Nullable                                                                                              |
 | shipping_address             | JSONB         | `{ cep, street, number, complement?, neighborhood, city, state, recipientName? }`                     |
 | subtotal                     | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                  |
-| discount                     | DECIMAL(10,2) | NOT NULL, DEFAULT 0 — inclui member_15 e/ou store_credit                                              |
-| discount_reason              | VARCHAR(40)   | `'member_15' \| 'store_credit' \| 'member_15+store_credit'`                                           |
+| discount                     | DECIMAL(10,2) | NOT NULL, DEFAULT 0 — member_15 e/ou wholesale_25 e/ou store_credit                                   |
+| discount_reason              | VARCHAR(40)   | `'member_15' \| 'wholesale_25' \| 'store_credit' \| combinacoes com +store_credit`                    |
 | shipping_cost                | DECIMAL(10,2) | NOT NULL, DEFAULT 0 (frete revalidado server-side)                                                    |
 | shipping_service             | VARCHAR(40)   | PAC/SEDEX etc.                                                                                        |
 | shipping_service_id          | TEXT          | Id Melhor Envio / fallback                                                                            |
 | shipping_days                | INTEGER       | Prazo estimado                                                                                        |
 | tracking_code / tracking_url | VARCHAR/TEXT  | Rastreio Correios                                                                                     |
 | store_credit_applied         | DECIMAL(10,2) | Credito de loja abatido (nao no frete)                                                                |
+| channel                      | VARCHAR(20)   | `retail` (default) \| `wholesale`                                                                     |
+| customer_cnpj                | VARCHAR(14)   | Digitos; preenchido no canal atacado                                                                  |
+| wholesale_account_id         | UUID          | FK → wholesale_accounts(id) ON DELETE SET NULL                                                        |
 | total                        | DECIMAL(10,2) | `subtotal - discount + shipping_cost`                                                                 |
 | status                       | VARCHAR(20)   | pending→paid→processing→shipped→delivered \| cancelled \| refunded                                    |
 | payment_method               | VARCHAR(20)   | pix \| credit_card                                                                                    |
@@ -252,11 +261,23 @@ As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
 | paid_at                      | TIMESTAMPTZ   | Nullable                                                                                              |
 | created_at / updated_at      | TIMESTAMPTZ   | auto                                                                                                  |
 
+#### `wholesale_accounts` (migration 012)
+
+| Coluna                                       | Tipo        | Notas                                                 |
+| -------------------------------------------- | ----------- | ----------------------------------------------------- |
+| id                                           | UUID        | PK                                                    |
+| user_id                                      | UUID        | UNIQUE FK → users                                     |
+| cnpj                                         | VARCHAR(14) | UNIQUE, so digitos, validado Modulo 11 na API         |
+| company_name / trade_name / contact_name     | VARCHAR     | Empresa + responsavel                                 |
+| business_activity                            | TEXT        | Objeto social / o que vende — base da aprovacao admin |
+| status                                       | VARCHAR(20) | `pending` \| `approved` \| `rejected` \| `disabled`   |
+| rejection_reason / reviewed_by / reviewed_at |             | Auditoria de revisao                                  |
+
 #### `product_reviews` / `store_credits` / `store_credit_ledger` (010)
 
 - **Reviews:** 1 por `(order_id, product_id)`; so pedido `delivered` + ownership (`user_id` ou `member_id`).
 - **Credito:** saldo em `store_credits`; ledger com reasons `review_reward` (1× por pedido, unique index), `order_redeem`, `order_refund_credit` (1× restore, unique index), `admin_adjust`.
-- **LGPD:** export inclui pedidos/itens/reviews/credito; delete anonimiza `customer_*` + `shipping_address`, oculta textos de review, zera saldo.
+- **LGPD:** export inclui pedidos/itens/reviews/credito/**wholesaleAccount**; delete anonimiza `customer_*` + shipping + **customer_cnpj**, oculta reviews, zera credito, desativa conta atacado.
 
 #### `order_items`
 
@@ -429,30 +450,41 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Products (`/products`)
 
-| Metodo | Endpoint                   | Descricao                                    | Auth    |
-| ------ | -------------------------- | -------------------------------------------- | ------- |
-| GET    | `/products/categories`     | Lista categorias ativas                      | Publico |
-| GET    | `/products`                | Catalogo publico (filtros, busca, paginacao) | Publico |
-| GET    | `/products/:slug`          | Detalhe de um produto                        | Publico |
-| POST   | `/products/categories`     | Cria categoria                               | admin   |
-| PATCH  | `/products/categories/:id` | Atualiza categoria                           | admin   |
-| DELETE | `/products/categories/:id` | Remove categoria                             | admin   |
-| POST   | `/products`                | Cria produto                                 | admin   |
-| PATCH  | `/products/:id`            | Atualiza produto                             | admin   |
-| DELETE | `/products/:id`            | Remove produto                               | admin   |
-| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart)     | admin   |
+| Metodo | Endpoint                   | Descricao                                                   | Auth    |
+| ------ | -------------------------- | ----------------------------------------------------------- | ------- |
+| GET    | `/products/categories`     | Lista categorias ativas                                     | Publico |
+| GET    | `/products`                | Catalogo publico (`?wholesale=true` filtra atacado)         | Publico |
+| GET    | `/products/:slug`          | Detalhe de um produto                                       | Publico |
+| POST   | `/products/categories`     | Cria categoria                                              | admin   |
+| PATCH  | `/products/categories/:id` | Atualiza categoria                                          | admin   |
+| DELETE | `/products/categories/:id` | Remove categoria                                            | admin   |
+| POST   | `/products`                | Cria produto (incl. `wholesaleEnabled` / `wholesaleMinQty`) | admin   |
+| PATCH  | `/products/:id`            | Atualiza produto                                            | admin   |
+| DELETE | `/products/:id`            | Remove produto                                              | admin   |
+| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart)                    | admin   |
 
 ### Orders (`/orders`)
 
-| Metodo | Endpoint                  | Descricao                                                     | Auth                 |
-| ------ | ------------------------- | ------------------------------------------------------------- | -------------------- |
-| POST   | `/orders`                 | Cria pedido (checkout; desconto de 15% resolvido server-side) | Publico/JWT opcional |
-| GET    | `/orders/:id/status`      | Consulta status do pedido (polling)                           | Publico              |
-| GET    | `/orders`                 | Lista pedidos (filtros, paginacao)                            | admin                |
-| GET    | `/orders/:id`             | Detalhe de um pedido                                          | admin                |
-| PATCH  | `/orders/:id/status`      | Atualiza status (processing/shipped/...)                      | admin                |
-| POST   | `/orders/:id/confirm-pix` | Confirma manualmente um PIX de loja                           | admin                |
-| POST   | `/orders/:id/refund`      | Estorna pedido pago                                           | admin                |
+| Metodo | Endpoint                  | Descricao                                                                              | Auth                 |
+| ------ | ------------------------- | -------------------------------------------------------------------------------------- | -------------------- |
+| POST   | `/orders`                 | Checkout: `member_15` (retail) ou `wholesale_25` (`channel=wholesale` + CNPJ aprovado) | Publico/JWT opcional |
+| GET    | `/orders/me`              | Minhas compras (ownership user_id / member_id)                                         | JWT                  |
+| GET    | `/orders/:id/status`      | Consulta status do pedido (polling)                                                    | Publico              |
+| GET    | `/orders`                 | Lista pedidos (filtros, paginacao)                                                     | admin                |
+| GET    | `/orders/:id`             | Detalhe de um pedido                                                                   | admin                |
+| PATCH  | `/orders/:id/status`      | Atualiza status (processing/shipped/...)                                               | admin                |
+| POST   | `/orders/:id/confirm-pix` | Confirma manualmente um PIX de loja                                                    | admin                |
+| POST   | `/orders/:id/refund`      | Estorna pedido pago                                                                    | admin                |
+
+### Wholesale / Atacado (`/wholesale`)
+
+| Metodo | Endpoint                  | Descricao                                      | Auth    |
+| ------ | ------------------------- | ---------------------------------------------- | ------- |
+| POST   | `/wholesale/register`     | Cadastro B2B (CNPJ + empresa) → status pending | Publico |
+| POST   | `/wholesale/login`        | Login com e-mail + senha + **CNPJ correto**    | Publico |
+| GET    | `/wholesale/me`           | Conta atacado do usuario logado                | JWT     |
+| GET    | `/wholesale/accounts`     | Lista contas (filtro status)                   | admin   |
+| PATCH  | `/wholesale/accounts/:id` | `approve` \| `reject` \| `disable`             | admin   |
 
 ### Contracts (`/contracts`)
 
@@ -621,6 +653,9 @@ clube-geek-toys/
 │   ├── ARCHITECTURE.md                  # Diagrama e decisoes
 │   ├── DESIGN.md                        # Design system e marca
 │   ├── PROJECT.md                       # Este arquivo
+│   ├── SHOP-ORDERS.md                   # Operacao loja (frete, pedidos, reviews)
+│   ├── WHOLESALE.md                     # Canal atacado B2B (CNPJ / 25%)
+│   ├── DOC-STATUS.md                    # Auditoria docs ↔ codigo
 │   ├── RADIO.md                         # Operacao da radio AzuraCast
 │   ├── SECURITY.md                      # Seguranca e LGPD
 │   ├── TODO.md                          # Roadmap e tarefas
@@ -654,7 +689,10 @@ clube-geek-toys/
 │   │       │       ├── 006-payment-count.sql
 │   │       │       ├── 007-refresh-token-grace.sql
 │   │       │       ├── 008-single-plan-drop-points.sql  # Colapsa plano p/ 'club' + dropa pontos
-│   │       │       └── 009-shop.sql                      # Tabelas da loja (categories/products/orders/order_items)
+│   │       │       ├── 009-shop.sql                     # Tabelas da loja (categories/products/orders/order_items)
+│   │       │       ├── 010-shop-shipping-orders-ux.sql  # Frete, reviews, credito
+│   │       │       ├── 011-shop-data-integrity.sql      # user_id orders, unique ledger
+│   │       │       └── 012-wholesale.sql                # Atacado: accounts, flags produto, channel
 │   │       ├── middleware/
 │   │       │   ├── auth.ts              # JWT + RBAC (authenticate, requireRole)
 │   │       │   ├── cors.ts              # CORS whitelist
@@ -684,8 +722,9 @@ clube-geek-toys/
 │   │       │   ├── member.service.ts
 │   │       │   ├── payment.service.ts
 │   │       │   ├── subscription.service.ts
-│   │       │   ├── product.service.ts   # Catalogo, estoque, imagens
-│   │       │   ├── order.service.ts     # Pedidos, desconto de membro, baixa de estoque
+│   │       │   ├── product.service.ts   # Catalogo, estoque, imagens, wholesale flags
+│   │       │   ├── order.service.ts     # Pedidos, member_15 / wholesale_25, baixa de estoque
+│   │       │   ├── wholesale.service.ts # Contas B2B, CNPJ, aprovacao
 │   │       │   ├── contract.service.ts
 │   │       │   ├── email.service.ts     # 17 templates HTML
 │   │       │   ├── webhook.service.ts   # Assinatura + pedidos de loja (shop_order)
@@ -731,7 +770,7 @@ clube-geek-toys/
 │   ├── App.tsx                          # Router + providers
 │   ├── contexts/
 │   │   ├── AuthContext.tsx              # JWT auth context
-│   │   └── CartContext.tsx             # Carrinho da loja (localStorage)
+│   │   └── CartContext.tsx             # Carrinho loja (retail + wholesale em keys separadas)
 │   ├── pages/
 │   │   ├── Subscribe.tsx                # Landing page
 │   │   ├── Register.tsx                 # Cadastro (stepper)
@@ -746,8 +785,9 @@ clube-geek-toys/
 │   │   ├── shop/                        # Paginas da loja (shop.geeketoys.com.br)
 │   │   │   ├── ShopHome.tsx, ProductDetail.tsx
 │   │   │   ├── Cart.tsx, ShopCheckout.tsx
-│   │   │   ├── OrderConfirmation.tsx
-│   │   │   └── ShopLogin.tsx
+│   │   │   ├── OrderConfirmation.tsx, ShopLogin.tsx
+│   │   │   ├── WholesaleHome.tsx, WholesaleLogin.tsx, WholesaleRegister.tsx
+│   │   │   └── MyOrders.tsx, MyOrderDetail.tsx, EventPage.tsx
 │   │   ├── TermsOfUse.tsx              # Termos de uso
 │   │   └── PrivacyPolicy.tsx            # Politica de privacidade
 │   ├── components/
@@ -762,8 +802,9 @@ clube-geek-toys/
 │   │   ├── admin/                       # Tabs admin (lazy loaded)
 │   │   │   ├── AdminSidebar.tsx
 │   │   │   ├── MembersTab.tsx, UsersTab.tsx
-│   │   │   ├── ProductsTab.tsx, ProductModal.tsx        # Gestao da loja
+│   │   │   ├── ProductsTab.tsx, ProductModal.tsx        # Gestao da loja (+ flag atacado)
 │   │   │   ├── OrdersTab.tsx, OrderDetailModal.tsx      # Pedidos da loja
+│   │   │   ├── WholesaleTab.tsx                         # Aprovacao CNPJ atacadistas
 │   │   │   ├── LogsTab.tsx, ReportsTab.tsx, SettingsTab.tsx
 │   │   │   └── RealtimeMetrics.tsx
 │   │   ├── store/                       # Componentes da loja

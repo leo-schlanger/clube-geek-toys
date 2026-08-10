@@ -1,6 +1,6 @@
 # Arquitetura Tecnica - Clube GeekPop & Toys
 
-> **Ultima atualizacao:** 4 de Agosto de 2026
+> **Ultima atualizacao:** 10 de Agosto de 2026
 
 ## 1. Visao Geral do Sistema
 
@@ -352,9 +352,10 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
      │                            │                              │
      │  POST /orders (checkout)   │                              │
      │───────────────────────────►│  createOrder():              │
-     │                            │   • resolve membro ativo      │
-     │                            │   • aplica 15% server-side    │
-     │                            │     (discount_reason=member_15)│
+     │  channel=retail|wholesale  │   • retail: member_15 se ativo│
+     │                            │   • wholesale: approved CNPJ  │
+     │                            │     → wholesale_25 (25%)      │
+     │                            │   • frete HMAC revalidado     │
      │                            │   • cria PaymentIntent/PIX     │
      │   { order, clientSecret }  │     (metadata.kind=shop_order) │
      │◄───────────────────────────│                              │
@@ -371,11 +372,23 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
 
 ### Desconto de membro (server-side)
 
-O desconto de **15%** so e aplicado quando ha um membro **ativo** autenticado no checkout. O backend nunca confia no valor enviado pelo cliente:
+O desconto de **15%** so e aplicado quando ha um membro **ativo** autenticado no checkout **no canal retail**. O backend nunca confia no valor enviado pelo cliente:
 
 - `order.service` resolve o `member_id` do usuario autenticado e verifica `status = 'active'` e `expiry_date >= CURRENT_DATE`
 - Se valido, calcula `discount = subtotal * 0.15` e grava `discount_reason = 'member_15'`; caso contrario, `discount = 0`
 - Constante `MEMBER_SHOP_DISCOUNT = 0.15` em `server/api/src/types/index.ts`
+
+### Canal Atacado B2B (`/atacado`)
+
+Aba dedicada no mesmo host `shop.*`. Detalhes operacionais: [`WHOLESALE.md`](WHOLESALE.md).
+
+- Cadastro: `POST /wholesale/register` (CNPJ validado + empresa + atividade)
+- Login: `POST /wholesale/login` (email + senha + **CNPJ que confere**)
+- Admin: `GET/PATCH /wholesale/accounts` (aprovar / recusar / desativar)
+- Catalogo: `GET /products?wholesale=true` (so `wholesale_enabled`)
+- Checkout: `channel=wholesale` + `cnpj` → `WHOLESALE_SHOP_DISCOUNT = 0.25` (`wholesale_25`)
+- Carrinho separado em `localStorage` (`clube_geek_shop_cart_wholesale`)
+- Schema: migration **012** + `ensureSchema` no boot da API
 
 ### Estoque
 
@@ -611,7 +624,7 @@ Apos todos os jobs, registra `last_cron_run` na tabela `config` para monitoramen
          │ failure_reason     │
          └────────────────────┘
 
-Loja (migration 009):
+Loja (migrations 009–012):
 
 ┌──────────────┐     ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │  categories  │     │    products      │     │     orders       │     │   order_items    │
@@ -619,21 +632,28 @@ Loja (migration 009):
 │ id (UUID PK) │◄────│ id (UUID PK)     │◄────│ id (UUID PK)     │◄────│ id (UUID PK)     │
 │ name         │     │ category_id (FK) │     │ order_number     │     │ order_id (FK)    │
 │ slug (UQ)    │     │ name             │     │ member_id (FK)   │     │ product_id (FK)  │
-│ description  │     │ slug (UQ)        │     │ customer_name    │     │ product_name     │
-│ active       │     │ price            │     │ customer_email   │     │ product_slug     │
-│ sort_order   │     │ compare_at_price │     │ subtotal         │     │ unit_price       │
-│ created_at   │     │ images (JSONB)   │     │ discount         │     │ quantity         │
-│ updated_at   │     │ stock            │     │ discount_reason  │     │ line_total       │
-└──────────────┘     │ sku              │     │ total            │     │ image_url        │
-                     │ active           │     │ status (enum)    │     └──────────────────┘
-                     │ featured         │     │ payment_method   │
-                     │ created_at       │     │ stripe_payment_  │
-                     │ updated_at       │     │  intent_id       │
-                     └──────────────────┘     │ pix_txid         │
-                                              │ paid_at          │
-                                              │ created_at       │
-                                              │ updated_at       │
-                                              └──────────────────┘
+│ description  │     │ slug (UQ)        │     │ user_id (FK)     │     │ product_name     │
+│ active       │     │ price            │     │ customer_*       │     │ unit_price / qty │
+│ sort_order   │     │ stock / images   │     │ subtotal/discount│     │ line_total       │
+└──────────────┘     │ wholesale_enabled│     │ channel retail|  │     └──────────────────┘
+                     │ wholesale_min_qty│     │   wholesale      │
+                     │ weight / dims    │     │ customer_cnpj    │
+                     │ rating_*         │     │ wholesale_acct FK│──┐
+                     └──────────────────┘     │ shipping/track   │  │
+                                              │ store_credit_app │  │
+                                              └──────────────────┘  │
+┌────────────────────┐                                             │
+│ wholesale_accounts │◄────────────────────────────────────────────┘
+├────────────────────┤
+│ id (UUID PK)       │
+│ user_id (UQ FK)    │
+│ cnpj (UQ 14 dig)   │
+│ company_name       │
+│ contact_name       │
+│ business_activity  │
+│ status pending|    │
+│   approved|…       │
+└────────────────────┘
 
 ┌──────────────┐  ┌──────────────┐  ┌───────────────────┐
 │  audit_logs  │  │  email_logs  │  │processed_webhooks │

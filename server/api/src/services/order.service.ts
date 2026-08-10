@@ -6,7 +6,13 @@ import { getStripe } from '../utils/stripe.js';
 import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
-import { MEMBER_SHOP_DISCOUNT, type Order, type OrderItem } from '../types/index.js';
+import {
+  MEMBER_SHOP_DISCOUNT,
+  WHOLESALE_SHOP_DISCOUNT,
+  type Order,
+  type OrderItem,
+  type ShopChannel,
+} from '../types/index.js';
 import type { JwtPayload } from '../middleware/auth.js';
 import {
   normalizeCep,
@@ -16,6 +22,8 @@ import {
 } from './shipping.service.js';
 import { redeemForOrder, restoreCreditForOrder } from './store-credit.service.js';
 import { sendTemplateEmail } from './email.service.js';
+import { getApprovedAccountByUserId } from './wholesale.service.js';
+import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 
 const PIX_KEY = env.PIX_KEY || '';
 const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
@@ -43,6 +51,9 @@ function mapOrder(row: pg.QueryResultRow): Order {
     trackingCode: row.tracking_code ?? null,
     trackingUrl: row.tracking_url ?? null,
     storeCreditApplied: row.store_credit_applied != null ? parseFloat(row.store_credit_applied) : 0,
+    channel: (row.channel as ShopChannel) || 'retail',
+    customerCnpj: row.customer_cnpj ?? null,
+    wholesaleAccountId: row.wholesale_account_id ?? null,
     total: parseFloat(row.total),
     status: row.status,
     paymentMethod: row.payment_method,
@@ -85,6 +96,10 @@ export interface CreateOrderInput {
   paymentMethod: 'pix' | 'credit_card';
   /** When true and user is authenticated, apply available store credit (capped at goods total after member discount). */
   applyStoreCredit?: boolean;
+  /** retail (default) | wholesale — wholesale requires approved CNPJ account + enabled products. */
+  channel?: ShopChannel;
+  /** Required on wholesale channel; must match the approved account CNPJ. */
+  cnpj?: string;
 }
 
 export interface CreateOrderResult {
@@ -94,14 +109,21 @@ export interface CreateOrderResult {
 }
 
 /**
- * Create a shop order. Prices and the member discount are ALWAYS recomputed server-side
+ * Create a shop order. Prices and discounts are ALWAYS recomputed server-side
  * from the DB — the client only sends productId + quantity. Stock is validated but only
  * decremented on payment confirmation (webhook / admin PIX confirm).
+ *
+ * Channels:
+ * - retail: optional member_15 when active member
+ * - wholesale: requires auth + approved CNPJ account; wholesale_25; only wholesale_enabled products
  */
 export async function createOrder(input: CreateOrderInput, user?: JwtPayload): Promise<CreateOrderResult> {
   if (!input.items?.length) {
     throw new AppError(400, 'O carrinho está vazio.', 'EMPTY_CART');
   }
+
+  const channel: ShopChannel = input.channel === 'wholesale' ? 'wholesale' : 'retail';
+  const isWholesale = channel === 'wholesale';
 
   const addr = input.shippingAddress;
   if (!addr?.cep || !addr.street || !addr.number || !addr.neighborhood || !addr.city || !addr.state) {
@@ -113,6 +135,32 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   }
   if (!input.shipping?.quoteToken || !input.shipping?.serviceId) {
     throw new AppError(400, 'Selecione uma opção de frete.', 'SHIPPING_REQUIRED');
+  }
+
+  // Wholesale: must be logged in with approved CNPJ account matching the provided CNPJ.
+  let wholesaleAccountId: string | null = null;
+  let customerCnpj: string | null = null;
+  if (isWholesale) {
+    if (!user?.userId) {
+      throw new AppError(401, 'Faça login no atacado com CNPJ para comprar.', 'WHOLESALE_AUTH_REQUIRED');
+    }
+    const cnpj = normalizeCnpj(input.cnpj || '');
+    if (!isValidCnpj(cnpj)) {
+      throw new AppError(400, 'CNPJ inválido.', 'INVALID_CNPJ');
+    }
+    const acc = await getApprovedAccountByUserId(user.userId);
+    if (!acc) {
+      throw new AppError(
+        403,
+        'Cadastro de atacado pendente de aprovação ou inexistente. Só vendemos atacado a CNPJ aprovado e alinhado ao objeto da compra.',
+        'WHOLESALE_NOT_APPROVED'
+      );
+    }
+    if (acc.cnpj !== cnpj) {
+      throw new AppError(403, 'CNPJ não confere com o cadastro de atacado.', 'CNPJ_MISMATCH');
+    }
+    wholesaleAccountId = acc.id;
+    customerCnpj = cnpj;
   }
 
   // Revalidate frete server-side (never trust client price).
@@ -139,10 +187,11 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   };
 
   // Resolve active membership (for the 15% discount) — never trust the client.
+  // Wholesale channel does NOT stack member discount (uses wholesale_25 only).
   // Always persist user_id when authenticated so "Minhas compras" works even without active plan.
   let memberId: string | null = null;
   const orderUserId = user?.userId ?? null;
-  if (user) {
+  if (user && !isWholesale) {
     const mid = await getMemberIdForUser(user.userId);
     if (mid) {
       const m = await query(
@@ -176,7 +225,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     // Lock the products and validate availability (aggregated qty)
     const ids = aggregatedItems.map((it) => it.productId);
     const productsResult = await client.query(
-      `SELECT id, name, slug, price, stock, active, images
+      `SELECT id, name, slug, price, stock, active, images, wholesale_enabled, wholesale_min_qty
        FROM products WHERE id = ANY($1::uuid[]) FOR UPDATE`,
       [ids]
     );
@@ -188,6 +237,23 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       const p = byId.get(it.productId);
       if (!p || !p.active) {
         throw new AppError(400, `Produto indisponível no carrinho.`, 'PRODUCT_UNAVAILABLE');
+      }
+      if (isWholesale) {
+        if (!p.wholesale_enabled) {
+          throw new AppError(
+            400,
+            `"${p.name}" não está disponível no atacado no momento.`,
+            'PRODUCT_NOT_WHOLESALE'
+          );
+        }
+        const minQty = Math.max(1, Number(p.wholesale_min_qty) || 1);
+        if (it.quantity < minQty) {
+          throw new AppError(
+            400,
+            `"${p.name}" exige quantidade mínima de ${minQty} no atacado.`,
+            'WHOLESALE_MIN_QTY'
+          );
+        }
       }
       const qty = it.quantity;
       if (p.stock < qty) {
@@ -201,11 +267,21 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     }
     subtotal = round2(subtotal);
 
-    const memberDiscount = memberId ? round2(subtotal * MEMBER_SHOP_DISCOUNT) : 0;
-    const goodsAfterMember = round2(subtotal - memberDiscount);
+    // Discounts: wholesale_25 XOR member_15 (never both).
+    const wholesaleDiscount = isWholesale ? round2(subtotal * WHOLESALE_SHOP_DISCOUNT) : 0;
+    const memberDiscount = !isWholesale && memberId ? round2(subtotal * MEMBER_SHOP_DISCOUNT) : 0;
+    const baseDiscount = isWholesale ? wholesaleDiscount : memberDiscount;
+    const baseReason: string | null = isWholesale
+      ? wholesaleDiscount > 0
+        ? 'wholesale_25'
+        : null
+      : memberDiscount > 0
+        ? 'member_15'
+        : null;
+    const goodsAfterDiscount = round2(subtotal - baseDiscount);
     // Provisional total without store credit (frete never discounted).
-    let discount = memberDiscount;
-    let discountReason: string | null = memberDiscount > 0 ? 'member_15' : null;
+    let discount = baseDiscount;
+    let discountReason: string | null = baseReason;
     let storeCreditApplied = 0;
     let total = round2(subtotal - discount + shippingCost);
 
@@ -213,9 +289,11 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       `INSERT INTO orders (
          member_id, user_id, customer_name, customer_email, customer_phone, shipping_address,
          subtotal, discount, discount_reason, shipping_cost, shipping_service, shipping_service_id,
-         shipping_days, store_credit_applied, total, status, payment_method
+         shipping_days, store_credit_applied, total, status, payment_method,
+         channel, customer_cnpj, wholesale_account_id
        )
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16,
+               $17, $18, $19)
        RETURNING *`,
       [
         memberId,
@@ -234,6 +312,9 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         0,
         total,
         input.paymentMethod,
+        channel,
+        customerCnpj,
+        wholesaleAccountId,
       ]
     );
     order = mapOrder(orderResult.rows[0]);
@@ -247,13 +328,15 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       );
     }
 
-    // Store credit after order exists (ledger needs order_id). Caps at goods after member discount.
-    if (input.applyStoreCredit && user?.userId && goodsAfterMember > 0) {
-      storeCreditApplied = await redeemForOrder(client, user.userId, goodsAfterMember, orderId);
+    // Store credit after order exists (ledger needs order_id). Caps at goods after channel discount.
+    // Available on both channels when authenticated.
+    if (input.applyStoreCredit && user?.userId && goodsAfterDiscount > 0) {
+      storeCreditApplied = await redeemForOrder(client, user.userId, goodsAfterDiscount, orderId);
       if (storeCreditApplied > 0) {
-        discount = round2(memberDiscount + storeCreditApplied);
-        discountReason =
-          memberDiscount > 0 ? 'member_15+store_credit' : 'store_credit';
+        discount = round2(baseDiscount + storeCreditApplied);
+        discountReason = baseReason
+          ? `${baseReason}+store_credit`
+          : 'store_credit';
         total = round2(subtotal - discount + shippingCost);
         if (total < 0) {
           throw new AppError(400, 'Total do pedido inválido.', 'INVALID_TOTAL');

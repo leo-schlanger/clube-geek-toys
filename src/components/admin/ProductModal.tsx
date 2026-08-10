@@ -53,6 +53,8 @@ interface FormState {
   heightCm: string
   widthCm: string
   lengthCm: string
+  wholesaleEnabled: boolean
+  wholesaleMinQty: string
 }
 
 function toFormState(product?: Product | null): FormState {
@@ -70,6 +72,8 @@ function toFormState(product?: Product | null): FormState {
     heightCm: product?.heightCm != null ? String(product.heightCm) : '',
     widthCm: product?.widthCm != null ? String(product.widthCm) : '',
     lengthCm: product?.lengthCm != null ? String(product.lengthCm) : '',
+    wholesaleEnabled: product?.wholesaleEnabled ?? false,
+    wholesaleMinQty: product?.wholesaleMinQty != null ? String(product.wholesaleMinQty) : '1',
   }
 }
 
@@ -209,6 +213,14 @@ export function ProductModal({
       return
     }
 
+    const wholesaleMinQty = form.wholesaleMinQty.trim()
+      ? Math.max(1, Number(form.wholesaleMinQty))
+      : 1
+    if (!Number.isInteger(wholesaleMinQty) || wholesaleMinQty < 1) {
+      toast.error('Qtd. mínima atacado inválida')
+      return
+    }
+
     const payload: ProductInput = {
       name,
       description: form.description.trim() || null,
@@ -224,6 +236,8 @@ export function ProductModal({
       heightCm,
       widthCm,
       lengthCm,
+      wholesaleEnabled: form.wholesaleEnabled,
+      wholesaleMinQty,
     }
 
     setLoading(true)
@@ -628,6 +642,33 @@ export function ProductModal({
                   <p className="text-xs text-muted-foreground">Aparece em destaque</p>
                 </div>
               </label>
+              <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.wholesaleEnabled}
+                  onChange={(e) => update('wholesaleEnabled', e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Disponível no atacado</p>
+                  <p className="text-xs text-muted-foreground">
+                    Aparece em /atacado (desconto 25% para CNPJ aprovado). Deixe desligado até a
+                    importação se ainda não for vender no atacado.
+                  </p>
+                </div>
+              </label>
+              {form.wholesaleEnabled && (
+                <div className="sm:col-span-2 space-y-1">
+                  <Label htmlFor="wholesaleMinQty">Qtd. mínima no atacado</Label>
+                  <Input
+                    id="wholesaleMinQty"
+                    type="number"
+                    min={1}
+                    value={form.wholesaleMinQty}
+                    onChange={(e) => update('wholesaleMinQty', e.target.value)}
+                  />
+                </div>
+              )}
             </div>
           </CardContent>
 

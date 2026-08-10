@@ -29,6 +29,8 @@ import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
+import { useShopChannel } from '../../components/store/useShopChannel'
+import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { SeoHead } from '../../components/store/SeoHead'
 import { getStoreCredit } from '../../lib/reviews'
@@ -38,13 +40,17 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
+import { WHOLESALE_SHOP_DISCOUNT, MEMBER_SHOP_DISCOUNT } from '../../types'
 
 type PaymentChoice = 'credit_card' | 'pix'
 
 export default function ShopCheckout() {
   const navigate = useNavigate()
   const { items, subtotal } = useCart()
+  const channel = useShopChannel()
+  const isWholesale = channel === 'wholesale'
   const { member, isMember } = useShopMember()
+  const { account: wholesaleAccount, isApproved: isWholesaleApproved } = useWholesaleAccount()
   const { user } = useAuth()
 
   const [name, setName] = useState('')
@@ -112,16 +118,23 @@ export default function ShopCheckout() {
   const selectedOption: ShippingOption | null =
     quote?.options.find((o) => o.id === selectedServiceId) ?? null
 
+  const discountFraction = isWholesale
+    ? isWholesaleApproved
+      ? WHOLESALE_SHOP_DISCOUNT
+      : 0
+    : isMember
+      ? MEMBER_SHOP_DISCOUNT
+      : 0
+  const goodsAfterDiscount = subtotal * (1 - discountFraction)
+
   const estimatedCredit = (() => {
     if (!applyStoreCredit || storeCreditBalance <= 0) return 0
-    const goods = isMember ? subtotal * 0.85 : subtotal
-    return Math.min(storeCreditBalance, goods)
+    return Math.min(storeCreditBalance, goodsAfterDiscount)
   })()
 
   const estimatedTotal = (() => {
-    const goods = isMember ? subtotal * 0.85 : subtotal
     const ship = selectedOption?.price ?? 0
-    return Math.max(0, goods - estimatedCredit + ship)
+    return Math.max(0, goodsAfterDiscount - estimatedCredit + ship)
   })()
 
   const handleCepBlur = useCallback(async () => {
@@ -195,6 +208,14 @@ export default function ShopCheckout() {
       return
     }
 
+    if (isWholesale) {
+      if (!user || !isWholesaleApproved || !wholesaleAccount) {
+        toast.error('Faça login no atacado com CNPJ aprovado para finalizar a compra.')
+        navigate('/atacado/entrar')
+        return
+      }
+    }
+
     setSubmitting(true)
     try {
       const res = await createOrder({
@@ -220,6 +241,8 @@ export default function ShopCheckout() {
         },
         paymentMethod,
         applyStoreCredit: Boolean(user && applyStoreCredit && storeCreditBalance > 0),
+        channel: isWholesale ? 'wholesale' : 'retail',
+        cnpj: isWholesale ? wholesaleAccount!.cnpj : undefined,
       })
       setResult(res)
     } catch (err) {
@@ -253,7 +276,7 @@ export default function ShopCheckout() {
         path="/checkout"
         noIndex
       />
-      <ShopHeader isMember={isMember} />
+      <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
       <main className="mx-auto max-w-4xl px-4 py-6">
         {!result && (
@@ -263,14 +286,16 @@ export default function ShopCheckout() {
             asChild
             className="mb-4 -ml-2 text-muted-foreground"
           >
-            <Link to="/carrinho">
+            <Link to={isWholesale ? '/atacado/carrinho' : '/carrinho'}>
               <ArrowLeft className="h-4 w-4" />
               Voltar ao carrinho
             </Link>
           </Button>
         )}
 
-        <h1 className="mb-6 text-2xl font-heading font-bold">Finalizar compra</h1>
+        <h1 className="mb-6 text-2xl font-heading font-bold">
+          {isWholesale ? 'Finalizar compra atacado' : 'Finalizar compra'}
+        </h1>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-6">
@@ -658,10 +683,16 @@ export default function ShopCheckout() {
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                     </div>
-                    {isMember && (
+                    {discountFraction > 0 && (
                       <div className="flex items-center justify-between text-green-600">
-                        <MemberDiscountBadge />
-                        <span className="tabular-nums">-{formatCurrency(subtotal * 0.15)}</span>
+                        {isWholesale ? (
+                          <span className="text-sm font-medium">Desconto atacado (25%)</span>
+                        ) : (
+                          <MemberDiscountBadge />
+                        )}
+                        <span className="tabular-nums">
+                          -{formatCurrency(subtotal * discountFraction)}
+                        </span>
                       </div>
                     )}
                     {user && storeCreditBalance > 0 && (
@@ -701,7 +732,19 @@ export default function ShopCheckout() {
                   </div>
                 )}
 
-                {!order && !isMember && (
+                {!order && isWholesale && !isWholesaleApproved && (
+                  <Link
+                    to="/atacado/entrar"
+                    className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"
+                  >
+                    <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                    <span>
+                      Atacado exige login com CNPJ aprovado (−25%).{' '}
+                      <strong className="text-primary">Entrar</strong>
+                    </span>
+                  </Link>
+                )}
+                {!order && !isWholesale && !isMember && (
                   <Link
                     to="/entrar"
                     className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"

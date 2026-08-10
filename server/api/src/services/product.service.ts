@@ -26,6 +26,8 @@ function mapProduct(row: pg.QueryResultRow): Product {
     lengthCm: row.length_cm != null ? Number(row.length_cm) : null,
     ratingAvg: row.rating_avg != null ? parseFloat(row.rating_avg) : 0,
     ratingCount: row.rating_count != null ? Number(row.rating_count) : 0,
+    wholesaleEnabled: row.wholesale_enabled === true,
+    wholesaleMinQty: row.wholesale_min_qty != null ? Number(row.wholesale_min_qty) : 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -88,6 +90,8 @@ export async function listProducts(opts: {
   page?: number;
   limit?: number;
   includeInactive?: boolean; // admin only
+  /** When true, only products marked for wholesale channel. */
+  wholesaleOnly?: boolean;
 }) {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -98,6 +102,9 @@ export async function listProducts(opts: {
     // Hide QA/seed products from public catalog (still visible in admin via includeInactive)
     conditions.push(`p.name NOT ILIKE 'checkup%'`);
     conditions.push(`p.slug NOT ILIKE 'checkup%'`);
+  }
+  if (opts.wholesaleOnly) {
+    conditions.push(`p.wholesale_enabled = TRUE`);
   }
   if (opts.category) {
     conditions.push(`c.slug = $${i++}`);
@@ -184,12 +191,15 @@ export async function createProduct(data: {
   heightCm?: number | null;
   widthCm?: number | null;
   lengthCm?: number | null;
+  wholesaleEnabled?: boolean;
+  wholesaleMinQty?: number;
 }): Promise<Product> {
   const slug = await uniqueSlug('products', data.name);
+  const minQty = Math.max(1, data.wholesaleMinQty ?? 1);
   const result = await query(
     `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku, active, featured,
-                           weight_g, height_cm, width_cm, length_cm)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15)
+                           weight_g, height_cm, width_cm, length_cm, wholesale_enabled, wholesale_min_qty)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
      RETURNING *`,
     [
       data.name,
@@ -207,6 +217,8 @@ export async function createProduct(data: {
       data.heightCm ?? null,
       data.widthCm ?? null,
       data.lengthCm ?? null,
+      data.wholesaleEnabled ?? false,
+      minQty,
     ]
   );
   return mapProduct(result.rows[0]);
@@ -228,6 +240,8 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     heightCm: 'height_cm',
     widthCm: 'width_cm',
     lengthCm: 'length_cm',
+    wholesaleEnabled: 'wholesale_enabled',
+    wholesaleMinQty: 'wholesale_min_qty',
   };
 
   const sets: string[] = [];

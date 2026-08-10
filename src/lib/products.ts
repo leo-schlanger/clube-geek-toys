@@ -14,6 +14,8 @@ export interface ProductListParams {
   featured?: boolean
   page?: number
   limit?: number
+  /** Canal atacado: só produtos com wholesale_enabled. */
+  wholesale?: boolean
 }
 
 /** Public: list active products with optional filters. */
@@ -24,6 +26,7 @@ export async function listProducts(params: ProductListParams = {}): Promise<Prod
   if (params.featured) qs.set('featured', 'true')
   if (params.page) qs.set('page', String(params.page))
   if (params.limit) qs.set('limit', String(params.limit))
+  if (params.wholesale) qs.set('wholesale', 'true')
   const query = qs.toString()
   const result = await api.get<ProductListResult>(`/products${query ? `?${query}` : ''}`, { skipAuth: true })
   return result.data ?? { products: [], total: 0, page: 1, limit: 24 }
@@ -58,6 +61,8 @@ export interface ProductInput {
   heightCm?: number | null
   widthCm?: number | null
   lengthCm?: number | null
+  wholesaleEnabled?: boolean
+  wholesaleMinQty?: number
 }
 
 /** Public: related products for PDP "Você também pode gostar". */

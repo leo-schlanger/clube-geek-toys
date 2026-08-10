@@ -268,6 +268,72 @@ export async function ensureSchema(): Promise<void> {
         WHERE reason = 'order_refund_credit' AND order_id IS NOT NULL
     `);
 
+    // ─── Wholesale / Atacado (migration 012) ──────────────────────────────────
+    await query(`
+      CREATE TABLE IF NOT EXISTS wholesale_accounts (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        cnpj VARCHAR(14) NOT NULL UNIQUE,
+        company_name VARCHAR(200) NOT NULL,
+        trade_name VARCHAR(200),
+        state_registration VARCHAR(40),
+        phone VARCHAR(20),
+        contact_name VARCHAR(200) NOT NULL,
+        business_activity TEXT,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending'
+          CHECK (status IN ('pending', 'approved', 'rejected', 'disabled')),
+        rejection_reason TEXT,
+        reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        reviewed_at TIMESTAMPTZ,
+        admin_notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_wholesale_status ON wholesale_accounts(status, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_wholesale_cnpj ON wholesale_accounts(cnpj)`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_wholesale_accounts_updated_at
+        BEFORE UPDATE ON wholesale_accounts
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS wholesale_enabled BOOLEAN NOT NULL DEFAULT FALSE`);
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS wholesale_min_qty INTEGER NOT NULL DEFAULT 1`);
+    // CHECK may be missing if column was added without it on an older ensureSchema run
+    await query(`DO $$ BEGIN
+      ALTER TABLE products ADD CONSTRAINT chk_products_wholesale_min_qty CHECK (wholesale_min_qty >= 1);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    // Normalize invalid mins (should not happen; defensive)
+    await query(`UPDATE products SET wholesale_min_qty = 1 WHERE wholesale_min_qty IS NULL OR wholesale_min_qty < 1`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_products_wholesale
+      ON products(wholesale_enabled) WHERE wholesale_enabled = TRUE AND active = TRUE`);
+
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel VARCHAR(20) NOT NULL DEFAULT 'retail'`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_cnpj VARCHAR(14)`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS wholesale_account_id UUID`);
+    // FK after column exists (idempotent)
+    await query(`DO $$ BEGIN
+      ALTER TABLE orders
+        ADD CONSTRAINT fk_orders_wholesale_account
+        FOREIGN KEY (wholesale_account_id) REFERENCES wholesale_accounts(id) ON DELETE SET NULL;
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE orders ADD CONSTRAINT chk_orders_channel CHECK (channel IN ('retail', 'wholesale'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    // Backfill channel for any NULL rows (should not exist with DEFAULT)
+    await query(`UPDATE orders SET channel = 'retail' WHERE channel IS NULL`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_channel ON orders(channel, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_wholesale ON orders(wholesale_account_id)
+      WHERE wholesale_account_id IS NOT NULL`);
+
+    await query(`
+      INSERT INTO config (key, value) VALUES
+        ('wholesale.enabled', 'true'::jsonb),
+        ('wholesale.discount_percent', '25'::jsonb)
+      ON CONFLICT (key) DO NOTHING
+    `);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

@@ -289,6 +289,8 @@ CREATE TABLE products (
   length_cm NUMERIC(6,1) CHECK (length_cm IS NULL OR length_cm > 0),
   rating_avg NUMERIC(3,2) NOT NULL DEFAULT 0,
   rating_count INTEGER NOT NULL DEFAULT 0 CHECK (rating_count >= 0),
+  wholesale_enabled BOOLEAN NOT NULL DEFAULT FALSE,                 -- canal /atacado
+  wholesale_min_qty INTEGER NOT NULL DEFAULT 1 CHECK (wholesale_min_qty >= 1),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -304,7 +306,7 @@ CREATE TABLE orders (
   shipping_address JSONB,
   subtotal DECIMAL(10,2) NOT NULL CHECK (subtotal >= 0),
   discount DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
-  discount_reason VARCHAR(40),                                     -- 'member_15' quando aplicável
+  discount_reason VARCHAR(40),                                     -- 'member_15' | 'wholesale_25' (+ store_credit)
   shipping_cost DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
   shipping_service VARCHAR(40),
   shipping_service_id TEXT,
@@ -312,6 +314,10 @@ CREATE TABLE orders (
   tracking_code VARCHAR(64),
   tracking_url TEXT,
   store_credit_applied DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (store_credit_applied >= 0),
+  channel VARCHAR(20) NOT NULL DEFAULT 'retail'
+    CHECK (channel IN ('retail', 'wholesale')),
+  customer_cnpj VARCHAR(14),
+  wholesale_account_id UUID,                                       -- FK wholesale_accounts
   melhor_envio_cart_id TEXT,
   melhor_envio_order_id TEXT,
   total DECIMAL(10,2) NOT NULL CHECK (total >= 0),
@@ -321,6 +327,27 @@ CREATE TABLE orders (
   stripe_payment_intent_id TEXT,
   pix_txid TEXT,
   paid_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Contas atacadistas (CNPJ + aprovação admin)
+CREATE TABLE IF NOT EXISTS wholesale_accounts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  cnpj VARCHAR(14) NOT NULL UNIQUE,
+  company_name VARCHAR(200) NOT NULL,
+  trade_name VARCHAR(200),
+  state_registration VARCHAR(40),
+  phone VARCHAR(20),
+  contact_name VARCHAR(200) NOT NULL,
+  business_activity TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'approved', 'rejected', 'disabled')),
+  rejection_reason TEXT,
+  reviewed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ,
+  admin_notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -8,7 +8,8 @@ Documentação operacional da evolução da loja (`shop.geeketoys.com.br`) após
 | ------------------ | ----------------------------------------------------------------------------------- |
 | **Frete por CEP**  | Checkout: ViaCEP preenche endereço; `POST /shipping/quote` cota frete               |
 | **Provedor**       | Melhor Envio se `MELHOR_ENVIO_TOKEN` setado; senão **tabela fallback** PAC/SEDEX    |
-| **Total**          | `subtotal − member_15 + shipping` (server-side; frete sem 15%)                      |
+| **Total**          | `subtotal − desconto + shipping` (server-side; frete sem desconto)                  |
+| **Atacado B2B**    | Aba `/atacado`, CNPJ, 25% (`wholesale_25`) — ver [`WHOLESALE.md`](WHOLESALE.md)     |
 | **Cotação segura** | `quoteToken` HMAC (TTL ~25 min); revalidado no create order                         |
 | **Minhas compras** | `/minhas-compras` com abas marketplace (requer login + `member_id`)                 |
 | **Rastreio**       | Admin cola código → `PATCH /orders/:id/tracking` → status `shipped` + link Correios |
@@ -34,25 +35,35 @@ Origem de frete: loja física CEP **22011-001**.
 4. Cliente vê em **Minhas compras → A caminho** com link dos Correios
 5. Marcar `delivered` quando confirmar entrega (manual)
 
-## Schema (migrations 009–011)
+## Schema (migrations 009–012)
 
-- `products`: weight_g, height/width/length_cm, rating_avg/count
-- `orders`: user*id (ownership), shipping*_, tracking\__, store_credit_applied
+- `products`: weight_g, height/width/length_cm, rating_avg/count, **wholesale_enabled**, **wholesale_min_qty**
+- `orders`: user*id (ownership), shipping*_, tracking\__, store_credit_applied, **channel**, **customer_cnpj**, **wholesale_account_id**
 - `product_reviews`, `store_credits`, `store_credit_ledger`
+- **`wholesale_accounts`** (012): CNPJ, empresa, status pending/approved/rejected/disabled
 - Unique ledger: 1× `review_reward` e 1× `order_refund_credit` por pedido
 
 Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 ### Integridade de dados (resumo)
 
-| Tema                      | Comportamento                                           |
-| ------------------------- | ------------------------------------------------------- |
-| Preços                    | Sempre do DB sob `FOR UPDATE`                           |
-| Qty duplicada no carrinho | Agregada antes do check de estoque                      |
-| Crédito no pending        | Debitado no create; **devolvido** em cancel/fail/refund |
-| Falha Stripe após create  | Pedido cancelado + crédito restaurado                   |
-| Review reward             | Na mesma TX das reviews + unique index                  |
-| LGPD                      | Export/delete cobrem pedidos, reviews e crédito         |
+| Tema                      | Comportamento                                                          |
+| ------------------------- | ---------------------------------------------------------------------- |
+| Preços                    | Sempre do DB sob `FOR UPDATE`                                          |
+| Qty duplicada no carrinho | Agregada antes do check de estoque                                     |
+| Desconto retail           | `member_15` se membro ativo                                            |
+| Desconto atacado          | `wholesale_25` se conta approved + CNPJ; **não empilha** com member_15 |
+| Crédito no pending        | Debitado no create; **devolvido** em cancel/fail/refund                |
+| Falha Stripe após create  | Pedido cancelado + crédito restaurado                                  |
+| Review reward             | Na mesma TX das reviews + unique index                                 |
+| LGPD                      | Export/delete cobrem pedidos, reviews, crédito e atacado               |
+
+### Canais de pedido
+
+| `orders.channel`   | Quem compra                      | Desconto         |
+| ------------------ | -------------------------------- | ---------------- |
+| `retail` (default) | Convidado ou membro logado       | 0 ou `member_15` |
+| `wholesale`        | JWT + conta atacado **approved** | `wholesale_25`   |
 
 ## SEO / marca
 
@@ -92,6 +103,7 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 - Token Melhor Envio em produção (`MELHOR_ENVIO_TOKEN` no `.env` da VPS + recreate api)
 - Etiqueta ME automática
 - Google Meu Negócio / Instagram (manual)
+- Operação Atacado: marcar produtos `wholesale_enabled` na importação; aprovar CNPJs no admin
 
 ### Como obter token Melhor Envio
 

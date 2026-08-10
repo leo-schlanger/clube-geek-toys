@@ -7,6 +7,8 @@ interface ProductGridProps {
   products: Product[]
   loading?: boolean
   isMember?: boolean
+  isWholesale?: boolean
+  isWholesaleApproved?: boolean
   /** Mensagem exibida quando não há produtos. */
   emptyMessage?: string
 }
@@ -34,6 +36,8 @@ export function ProductGrid({
   products,
   loading = false,
   isMember = false,
+  isWholesale = false,
+  isWholesaleApproved = false,
   emptyMessage = 'Nenhum produto encontrado.',
 }: ProductGridProps) {
   if (loading) {
@@ -52,7 +56,13 @@ export function ProductGrid({
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       {products.map((product) => (
-        <ProductCard key={product.id} product={product} isMember={isMember} />
+        <ProductCard
+          key={product.id}
+          product={product}
+          isMember={isMember}
+          isWholesale={isWholesale}
+          isWholesaleApproved={isWholesaleApproved}
+        />
       ))}
     </div>
   )

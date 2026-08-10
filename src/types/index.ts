@@ -108,6 +108,11 @@ export const PLANS: Record<PlanType, Plan> = {
 // real é sempre recalculado no backend). Ver server/api/src/types MEMBER_SHOP_DISCOUNT.
 export const MEMBER_SHOP_DISCOUNT = 0.15
 
+// Desconto atacadista (fração) — canal /atacado, conta CNPJ aprovada. Server-side only.
+export const WHOLESALE_SHOP_DISCOUNT = 0.25
+
+export type ShopChannel = 'retail' | 'wholesale'
+
 // ============================================
 // SHOP / E-COMMERCE TYPES
 // ============================================
@@ -146,6 +151,30 @@ export interface Product {
   lengthCm?: number | null
   ratingAvg?: number
   ratingCount?: number
+  wholesaleEnabled?: boolean
+  wholesaleMinQty?: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type WholesaleStatus = 'pending' | 'approved' | 'rejected' | 'disabled'
+
+export interface WholesaleAccount {
+  id: string
+  userId: string
+  cnpj: string
+  companyName: string
+  tradeName: string | null
+  stateRegistration: string | null
+  phone: string | null
+  contactName: string
+  businessActivity: string | null
+  status: WholesaleStatus
+  rejectionReason: string | null
+  reviewedBy: string | null
+  reviewedAt: string | null
+  adminNotes: string | null
+  email?: string
   createdAt: string
   updatedAt: string
 }
@@ -181,6 +210,9 @@ export interface Order {
   trackingCode?: string | null
   trackingUrl?: string | null
   storeCreditApplied?: number
+  channel?: ShopChannel
+  customerCnpj?: string | null
+  wholesaleAccountId?: string | null
   total: number
   status: OrderStatus
   paymentMethod: OrderPaymentMethod | null

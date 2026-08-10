@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Search, User, Menu, X, CalendarHeart, Package, Wallet } from 'lucide-react'
+import { ShoppingCart, Search, User, Menu, X, CalendarHeart, Package, Wallet, Building2 } from 'lucide-react'
 import { getStoreCredit } from '../../lib/reviews'
 import { formatCurrency, cn } from '../../lib/utils'
 import { Button } from '../ui/button'
@@ -12,19 +12,23 @@ import { CartDrawer } from './CartDrawer'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { ThemeToggle } from '../ThemeToggle'
 import { isEventVisible } from '../../data/event'
+import { useWholesaleAccount } from './useWholesaleAccount'
 
 interface ShopHeaderProps {
   /** Membro ativo — mostra selo de desconto no cabeçalho. */
   isMember?: boolean
+  /** Canal atacado — branding e busca em /atacado. */
+  isWholesale?: boolean
 }
 
 /**
  * Cabeçalho da loja: logo, busca, carrinho (abre gaveta) e login/avatar.
- * A busca navega para /?search=... (a home lê o query param).
+ * A busca navega para /?search=... (ou /atacado?search= no canal atacado).
  */
-export function ShopHeader({ isMember = false }: ShopHeaderProps) {
+export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeaderProps) {
   const { count } = useCart()
   const { user } = useAuth()
+  const { isApproved: isWholesaleApproved } = useWholesaleAccount()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -69,7 +73,8 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     const q = term.trim()
-    navigate(q ? `/?search=${encodeURIComponent(q)}` : '/')
+    const base = isWholesale ? '/atacado' : '/'
+    navigate(q ? `${base}?search=${encodeURIComponent(q)}` : base)
     setMobileSearchOpen(false)
   }
 
@@ -78,14 +83,35 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
           {/* Logo */}
-          <Link to="/" className="flex shrink-0 items-center gap-2">
+          <Link to={isWholesale ? '/atacado' : '/'} className="flex shrink-0 items-center gap-2">
             <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-9 w-auto" />
             <span className="hidden text-sm font-heading font-semibold sm:inline">
-              Loja GeekPop & Toys
+              {isWholesale ? 'Atacado GeekPop & Toys' : 'Loja GeekPop & Toys'}
             </span>
           </Link>
 
-          {isEventVisible() && (
+          {/* Aba Loja / Atacado */}
+          <div className="hidden items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 sm:flex">
+            <Button
+              variant={!isWholesale ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 px-3 text-xs"
+              onClick={() => navigate('/')}
+            >
+              Loja
+            </Button>
+            <Button
+              variant={isWholesale ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 gap-1 px-3 text-xs"
+              onClick={() => navigate('/atacado')}
+            >
+              <Building2 className="h-3.5 w-3.5" />
+              Atacado
+            </Button>
+          </div>
+
+          {isEventVisible() && !isWholesale && (
             <Button
               variant="ghost"
               size="sm"
@@ -104,7 +130,7 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
               type="search"
               value={term}
               onChange={(e) => setTerm(e.target.value)}
-              placeholder="Buscar produtos geek..."
+              placeholder={isWholesale ? 'Buscar no atacado...' : 'Buscar produtos geek...'}
               className="pl-9"
               aria-label="Buscar produtos"
             />
@@ -112,7 +138,23 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
 
           {/* Ações */}
           <div className="ml-auto flex items-center gap-1 md:ml-0">
-            {isMember && <MemberDiscountBadge className="hidden sm:inline-flex" />}
+            {/* Mobile: atalho Atacado */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="sm:hidden"
+              onClick={() => navigate(isWholesale ? '/' : '/atacado')}
+              aria-label={isWholesale ? 'Ir para loja' : 'Ir para atacado'}
+            >
+              <Building2 className="h-4 w-4" />
+            </Button>
+
+            {isMember && !isWholesale && <MemberDiscountBadge className="hidden sm:inline-flex" />}
+            {isWholesale && (
+              <Badge variant="outline" className="hidden text-xs sm:inline-flex">
+                −25% B2B
+              </Badge>
+            )}
 
             <ThemeToggle variant="icon" />
 
@@ -184,12 +226,12 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
               </Button>
             ) : (
               <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
-                <Link to="/entrar">Entrar</Link>
+                <Link to={isWholesale ? '/atacado/entrar' : '/entrar'}>Entrar</Link>
               </Button>
             )}
             {!user && (
               <Button variant="ghost" size="icon" asChild className="sm:hidden" aria-label="Entrar">
-                <Link to="/entrar">
+                <Link to={isWholesale ? '/atacado/entrar' : '/entrar'}>
                   <Menu className="h-5 w-5" />
                 </Link>
               </Button>
@@ -216,7 +258,12 @@ export function ShopHeader({ isMember = false }: ShopHeaderProps) {
         )}
       </header>
 
-      <CartDrawer open={drawerOpen} onOpenChange={setDrawerOpen} isMember={isMember} />
+      <CartDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        isMember={isMember}
+        isWholesaleApproved={isWholesale && isWholesaleApproved}
+      />
     </>
   )
 }

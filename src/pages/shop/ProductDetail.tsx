@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Product } from '../../types'
-import { MEMBER_SHOP_DISCOUNT } from '../../types'
+import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { getProductBySlug, listRelatedProducts } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
@@ -20,6 +20,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
+import { useShopChannel } from '../../components/store/useShopChannel'
+import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
@@ -35,6 +37,9 @@ export default function ProductDetail() {
   const { addItem } = useCart()
   const { user } = useAuth()
   const { isMember } = useShopMember()
+  const channel = useShopChannel()
+  const isWholesale = channel === 'wholesale'
+  const { isApproved: isWholesaleApproved } = useWholesaleAccount()
 
   const [product, setProduct] = useState<Product | null>(null)
   const [related, setRelated] = useState<Product[]>([])
@@ -47,7 +52,8 @@ export default function ProductDetail() {
     if (!slug) return
     let active = true
 
-    // Async runner keeps setState off the synchronous effect body.
+    // Async runner keeps setState off the synchronous effect body
+    // (product load below).
     async function loadProduct(productSlug: string) {
       setLoading(true)
       setNotFound(false)
@@ -57,12 +63,22 @@ export default function ProductDetail() {
       try {
         const p = await getProductBySlug(productSlug)
         if (!active) return
-        if (!p) setNotFound(true)
-        else {
+        // No canal atacado, só exibir SKUs liberados (wholesale_enabled)
+        if (!p || (isWholesale && p.wholesaleEnabled === false)) {
+          setNotFound(true)
+          setProduct(null)
+        } else {
           setProduct(p)
+          if (isWholesale && p.wholesaleMinQty && p.wholesaleMinQty > 1) {
+            setQuantity(p.wholesaleMinQty)
+          }
           listRelatedProducts(productSlug)
             .then((list) => {
-              if (active) setRelated(list)
+              if (!active) return
+              const filtered = isWholesale
+                ? list.filter((x) => x.wholesaleEnabled !== false)
+                : list
+              setRelated(filtered)
             })
             .catch(() => {
               if (active) setRelated([])
@@ -80,17 +96,25 @@ export default function ProductDetail() {
     return () => {
       active = false
     }
-  }, [slug])
+  }, [slug, isWholesale])
 
   const outOfStock = product ? product.stock <= 0 : false
   const onSale =
     product?.compareAtPrice != null && product.compareAtPrice > product.price
   const memberPrice = product ? product.price * (1 - MEMBER_SHOP_DISCOUNT) : 0
+  const wholesalePrice = product ? product.price * (1 - WHOLESALE_SHOP_DISCOUNT) : 0
+  const minQty =
+    isWholesale && product ? Math.max(1, product.wholesaleMinQty ?? 1) : 1
 
   function handleAddToCart() {
     if (!product || outOfStock) return
-    addItem(product, quantity)
-    toast.success(`${product.name} adicionado ao carrinho`)
+    const qty = Math.max(quantity, minQty)
+    addItem(product, qty)
+    toast.success(
+      minQty > 1
+        ? `${product.name} adicionado (mín. ${minQty} un. no atacado)`
+        : `${product.name} adicionado ao carrinho`
+    )
   }
 
   return (
@@ -102,12 +126,12 @@ export default function ProductDetail() {
             product.description?.slice(0, 160) ||
             `${product.name} na loja GeekPop & Toys — K-pop e colecionáveis com frete Correios.`
           }
-          path={`/produto/${product.slug}`}
+          path={isWholesale ? `/atacado/produto/${product.slug}` : `/produto/${product.slug}`}
           image={product.images[0]}
           type="product"
         />
       )}
-      <ShopHeader isMember={isMember} />
+      <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
         <Button
@@ -132,7 +156,9 @@ export default function ProductDetail() {
               </p>
             </div>
             <Button asChild>
-              <Link to="/">Voltar para a loja</Link>
+              <Link to={isWholesale ? '/atacado' : '/'}>
+                {isWholesale ? 'Voltar ao atacado' : 'Voltar para a loja'}
+              </Link>
             </Button>
           </div>
         ) : (
@@ -213,8 +239,32 @@ export default function ProductDetail() {
                   )}
                 </div>
 
-                {/* Preview de desconto de membro */}
-                {isMember ? (
+                {/* Preview de desconto */}
+                {isWholesale ? (
+                  isWholesaleApproved ? (
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2">
+                      <Badge className="bg-primary">−25% atacado</Badge>
+                      <span className="text-sm">
+                        Seu preço atacado:{' '}
+                        <strong className="text-green-600">
+                          {formatCurrency(wholesalePrice)}
+                        </strong>
+                      </span>
+                    </div>
+                  ) : (
+                    <Link
+                      to="/atacado/entrar"
+                      className="mt-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm transition-colors hover:bg-primary/10"
+                    >
+                      <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                      <span>
+                        Atacadistas aprovados ganham{' '}
+                        <strong className="text-primary">25% de desconto</strong> (
+                        {formatCurrency(wholesalePrice)})
+                      </span>
+                    </Link>
+                  )
+                ) : isMember ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2">
                     <MemberDiscountBadge />
                     <span className="text-sm">
@@ -234,9 +284,14 @@ export default function ProductDetail() {
                     </span>
                   </Link>
                 )}
-                {isMember && (
+                {(isMember || (isWholesale && isWholesaleApproved)) && (
                   <p className="mt-1 text-xs text-muted-foreground">
                     Desconto aplicado automaticamente no checkout.
+                  </p>
+                )}
+                {isWholesale && minQty > 1 && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Quantidade mínima no atacado: {minQty} un.
                   </p>
                 )}
               </div>
@@ -328,7 +383,13 @@ export default function ProductDetail() {
         {product && related.length > 0 && (
           <section className="mt-12 border-t pt-10">
             <h2 className="mb-4 text-xl font-heading font-bold">Você também pode gostar</h2>
-            <ProductGrid products={related} loading={false} isMember={isMember} />
+            <ProductGrid
+              products={related}
+              loading={false}
+              isMember={isMember && !isWholesale}
+              isWholesale={isWholesale}
+              isWholesaleApproved={isWholesaleApproved}
+            />
           </section>
         )}
       </main>

@@ -247,6 +247,17 @@
 - [x] **Docs** PROJECT / DOC-STATUS / SHOP-ORDERS / SECURITY alinhados ao schema 010–011
 - [ ] **FUTURO** Reserva de estoque (hold) entre create e paid
 
+### Atacado B2B (pedido Norberto 10/08/2026)
+
+- [x] **Schema 012** - `wholesale_accounts`, flags de produto, `orders.channel` / CNPJ
+- [x] **API** - register/login CNPJ, admin approve, checkout `wholesale_25`
+- [x] **Shop** - aba `/atacado`, cadastro, login, carrinho separado, checkout
+- [x] **Admin** - aba Atacadistas + flag "Disponível no atacado" no produto
+- [x] **LGPD** - export/delete cobrem conta atacado e `customer_cnpj`
+- [x] **Docs** - WHOLESALE, PROJECT, ARCH, SHOP-ORDERS, SECURITY, DOC-STATUS, README
+- [ ] **Deploy** - push master + CI (ensureSchema no boot da API)
+- [ ] **Operação** - Laura/Norberto: aprovar CNPJs e marcar produtos na importação
+
 ### BAIXO - Nice to Have
 
 - [ ] **Storybook** - Documentar componentes UI
