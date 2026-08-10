@@ -690,7 +690,15 @@ describe('AdminDashboard', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar Pagamento' }))
     await waitFor(() => {
-      expect(mockUpdateMember).toHaveBeenCalledWith('m1', { status: 'active' })
+      expect(mockUpdateMember).toHaveBeenCalledWith(
+        'm1',
+        expect.objectContaining({
+          status: 'active',
+          startDate: expect.any(String),
+          expiryDate: expect.any(String),
+          activatedByPayment: 'admin_manual',
+        })
+      )
     })
     confirmSpy.mockRestore()
   })

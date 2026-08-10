@@ -28,9 +28,22 @@ vi.mock('lucide-react', () => {
     <span {...props}>{children as string}</span>
   )
   return {
-    LayoutDashboard: icon, Users: icon, UserCog: icon,
-    FileText: icon, BarChart3: icon, Settings: icon, ShoppingCart: icon,
-    LogOut: icon, Menu: icon, Package: icon, ClipboardList: icon,
+    LayoutDashboard: icon,
+    Users: icon,
+    UserCog: icon,
+    FileText: icon,
+    BarChart3: icon,
+    Settings: icon,
+    ShoppingCart: icon,
+    LogOut: icon,
+    Menu: icon,
+    Package: icon,
+    ClipboardList: icon,
+    Building2: icon,
+    Star: icon,
+    Moon: icon,
+    Sun: icon,
+    Monitor: icon,
   }
 })
 

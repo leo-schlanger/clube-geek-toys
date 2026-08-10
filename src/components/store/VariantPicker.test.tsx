@@ -72,7 +72,10 @@ describe('VariantPicker / matchVariant', () => {
     )
     expect(screen.getByText('Variações')).toBeInTheDocument()
     expect(screen.getByText('Rosa')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('Preto'))
-    expect(onChange).toHaveBeenCalled()
+    // Preto is unavailable (stock 0 / no valid combo with Tamanho P) — toggle selected Rosa instead
+    fireEvent.click(screen.getByRole('button', { name: 'Rosa' }))
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ Cor: '', Tamanho: 'P' })
+    )
   })
 })
