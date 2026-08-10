@@ -25,7 +25,7 @@ async function sendEmail(params: {
   memberId?: string
 }): Promise<EmailResponse> {
   try {
-    const result = await api.post('/email/send', {
+    const result = await api.post<{ message?: string; id?: string }>('/email/send', {
       template: params.template,
       to: params.to,
       variables: params.variables,

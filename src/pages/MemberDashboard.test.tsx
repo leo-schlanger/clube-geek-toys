@@ -46,13 +46,18 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('lucide-react', () => {
-  const icon = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>
+  const icon = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <span {...props}>{children}</span>
+  )
   return {
     LogOut: icon,
     Settings: icon,
     RefreshCw: icon,
     AlertTriangle: icon,
     Mail: icon,
+    Moon: icon,
+    Sun: icon,
+    Monitor: icon,
   }
 })
 

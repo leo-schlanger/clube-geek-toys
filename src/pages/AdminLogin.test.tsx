@@ -36,8 +36,18 @@ vi.mock('../lib/rate-limit', () => ({
 }))
 
 vi.mock('lucide-react', () => {
-  const icon = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>
-  return { Eye: icon, EyeOff: icon, Loader2: icon, ShieldAlert: icon }
+  const icon = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    <span {...props}>{children}</span>
+  )
+  return {
+    Eye: icon,
+    EyeOff: icon,
+    Loader2: icon,
+    ShieldAlert: icon,
+    Moon: icon,
+    Sun: icon,
+    Monitor: icon,
+  }
 })
 
 vi.mock('../components/ui/loading', () => ({

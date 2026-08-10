@@ -110,10 +110,20 @@ export async function updateMember(
 }
 
 /**
- * Ativa membro após confirmação de pagamento
+ * Ativa membro (admin/manual). API preenche start/expiry anual se faltarem.
  */
 export async function activateMember(id: string): Promise<boolean> {
-  return updateMember(id, { status: 'active' } as Partial<Member>)
+  const start = new Date()
+  const expiry = new Date(start)
+  expiry.setFullYear(expiry.getFullYear() + 1)
+  return updateMember(id, {
+    status: 'active',
+    startDate: start.toISOString().slice(0, 10),
+    expiryDate: expiry.toISOString().slice(0, 10),
+    activatedAt: start.toISOString(),
+    activatedByPayment: 'admin_manual',
+    pendingPayment: null,
+  } as Partial<Member>)
 }
 
 /**
@@ -121,7 +131,9 @@ export async function activateMember(id: string): Promise<boolean> {
  */
 export function isMemberActive(member: Member): boolean {
   if (member.status !== 'active') return false
+  if (!member.expiryDate) return false
   const expiryDate = new Date(member.expiryDate)
+  if (Number.isNaN(expiryDate.getTime())) return false
   return expiryDate >= new Date()
 }
 

@@ -272,9 +272,21 @@ export default function AdminDashboard() {
         if (result.error) throw new Error(result.error)
         toast.success('Pagamento PIX confirmado e membro ativado!')
       } else {
-        // No pending PIX payment found — activate directly (manual/admin override)
-        await updateMember(member.id, { status: 'active' })
-        toast.success('Membro ativado manualmente')
+        // Manual/admin override: set active + annual window so PDV/desconto loja funcionam.
+        const start = new Date()
+        const expiry = new Date(start)
+        expiry.setFullYear(expiry.getFullYear() + 1)
+        const startDate = start.toISOString().slice(0, 10)
+        const expiryDate = expiry.toISOString().slice(0, 10)
+        await updateMember(member.id, {
+          status: 'active',
+          startDate,
+          expiryDate,
+          activatedAt: start.toISOString(),
+          activatedByPayment: 'admin_manual',
+          pendingPayment: null,
+        } as Partial<Member>)
+        toast.success(`Membro ativado até ${expiry.toLocaleDateString('pt-BR')}`)
       }
       fetchData(true)
     } catch (error) {

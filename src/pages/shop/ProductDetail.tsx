@@ -13,7 +13,6 @@ import {
 import { toast } from 'sonner'
 import type { Product } from '../../types'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
-import type { Product } from '../../types'
 import { getProductBySlug, listRelatedProducts } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'

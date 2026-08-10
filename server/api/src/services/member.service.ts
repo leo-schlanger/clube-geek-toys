@@ -283,6 +283,32 @@ export async function updateMember(
   }
   const before = beforeRow.rows[0];
 
+  // Admin sets status=active without expiry → fill annual window so PDV/shop discount work.
+  if (
+    userRole !== 'member' &&
+    data.status === 'active' &&
+    data.expiryDate == null &&
+    !before.expiry_date
+  ) {
+    const start = new Date();
+    const expiry = new Date(start);
+    expiry.setFullYear(expiry.getFullYear() + 1);
+    if (data.startDate == null && !before.start_date) {
+      setClauses.push(`start_date = $${paramIndex++}`);
+      values.push(start.toISOString().slice(0, 10));
+    }
+    setClauses.push(`expiry_date = $${paramIndex++}`);
+    values.push(expiry.toISOString().slice(0, 10));
+    if (data.activatedAt == null && !before.activated_at) {
+      setClauses.push(`activated_at = $${paramIndex++}`);
+      values.push(start.toISOString());
+    }
+    if (data.activatedByPayment == null && !before.activated_by_payment) {
+      setClauses.push(`activated_by_payment = $${paramIndex++}`);
+      values.push('admin_manual');
+    }
+  }
+
   values.push(id);
   const result = await query(
     `UPDATE members SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`,

@@ -257,8 +257,8 @@
 - [x] **Docs** - WHOLESALE, PROJECT, ARCH, SHOP-ORDERS, SECURITY, DOC-STATUS, README
 - [x] **Testes unitários Atacado** - cnpj, wholesale API client, pages, store components
 - [ ] **Cobertura global 70%** - meta de projeto (baseline ~11%); expandir gradualmente
-- [ ] **Deploy** - push master + CI (ensureSchema no boot da API)
-- [ ] **Operação** - Laura/Norberto: aprovar CNPJs e marcar produtos na importação
+- [x] **Deploy** - Atacado + variações em prod (master CI)
+- [ ] **Operação** - Laura/Norberto: aprovar CNPJs e marcar produtos (`wholesale_enabled`; hoje 0 SKUs)
 
 ### Variações de produto estilo Shopee (pedido Laura 10/08/2026)
 
@@ -267,6 +267,16 @@
 - [x] **Admin** - eixos + gerar combinações + preço/estoque por SKU
 - [x] **PDP** - seletor de variações abaixo do produto (como Shopee)
 - [x] **Docs** - `PRODUCT-VARIANTS.md`
+- [x] **Ilimitado** - removido max 2 eixos; UI com chips de opção + textos claros (10/08)
+- [x] **Dados prod** - eixos da Bolsa/BT21 normalizados (Cor / Personagem)
+
+### Hardening (10/08/2026 — validação de fluxos)
+
+- [x] **Admin criar membro** - cria user do e-mail (não amarra no JWT do admin)
+- [x] **Assinatura Stripe** - valor sempre `CLUB_PLAN_PRICE` no server
+- [x] **Restock** - cancel/refund após pago devolve estoque
+- [x] **Ativar membro manual** - preenche start/expiry +1 ano se faltar
+- [x] **Categorias** - "Assessório"→"Acessório", "Vestuario"→"Vestuário"
 
 ### BAIXO - Nice to Have
 
@@ -301,7 +311,7 @@
 - [x] **Diagnóstico admin.geekpoptoys.com.br** - DNS/cert/CORS/HTML OK nos quatro hosts (admin/adm × geeketoys/geekpoptoys)
 - [x] **Canônico adm.\*** - nginx 301 `admin.geeketoys.com.br` e `admin.geekpoptoys.com.br` → `adm.*` correspondente
 - [x] **Links internos** - `getSubdomainUrl('admin')` gera `adm.*` (não `admin.*`)
-- [ ] **Deploy nginx** - rsync/compose recreate nginx na VPS para o 301 valer em produção
+- [x] **Deploy nginx** - `admin.*` → 301 `adm.*` ok em produção
 
 ## Design System / Branding (Agosto 2026)
 

@@ -58,10 +58,16 @@ export async function createSubscription(
       return null
     }
 
+    const data = result.data as {
+      id: string
+      status: string
+      init_point?: string
+      clientSecret?: string
+    }
     return {
-      id: result.data.id,
-      status: result.data.status,
-      initPoint: result.data.init_point,
+      id: data.id,
+      status: data.status,
+      initPoint: data.init_point,
     }
   } catch (error) {
     paymentLogger.error('Error creating subscription:', error)
