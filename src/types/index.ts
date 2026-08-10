@@ -163,7 +163,7 @@ export interface Product {
   updatedAt: string
 }
 
-/** Eixo de variação (máx. 2, como na Shopee): Cor, Tamanho… */
+/** Eixo de variação (Cor, Tamanho, Material…). Sem limite de quantidade. */
 export interface VariantAxis {
   name: string
   options: string[]

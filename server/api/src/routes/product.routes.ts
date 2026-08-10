@@ -136,19 +136,16 @@ const productSchema = z.object({
         options: z.array(z.string().min(1).max(60)).min(1).max(50),
       })
     )
-    .max(2)
     .optional(),
 });
 
 const variantsReplaceSchema = z.object({
-  axes: z
-    .array(
-      z.object({
-        name: z.string().min(1).max(40),
-        options: z.array(z.string().min(1).max(60)).min(1).max(50),
-      })
-    )
-    .max(2),
+  axes: z.array(
+    z.object({
+      name: z.string().min(1).max(40),
+      options: z.array(z.string().min(1).max(60)).min(1).max(50),
+    })
+  ),
   variants: z.array(
     z.object({
       id: z.string().uuid().optional(),

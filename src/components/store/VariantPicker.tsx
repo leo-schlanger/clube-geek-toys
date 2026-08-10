@@ -12,7 +12,7 @@ interface VariantPickerProps {
 }
 
 /**
- * Seletor de variações estilo Shopee: eixos (Cor, Tamanho…) com botões de opção.
+ * Seletor de variações: eixos (Cor, Tamanho, Material…) com botões de opção.
  * Mostra estoque/preço da combinação quando completa.
  */
 export function VariantPicker({ product, selected, onChange, matched }: VariantPickerProps) {

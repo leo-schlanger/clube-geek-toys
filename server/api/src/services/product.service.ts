@@ -30,7 +30,6 @@ function mapVariant(row: pg.QueryResultRow): ProductVariant {
 function parseAxes(raw: unknown): VariantAxis[] {
   if (!Array.isArray(raw)) return [];
   return raw
-    .slice(0, 2)
     .map((a) => {
       const name = String((a as { name?: string })?.name || '').trim();
       const options = Array.isArray((a as { options?: unknown })?.options)
@@ -405,9 +404,6 @@ export async function replaceVariants(
   if (!product) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
 
   const cleanAxes = parseAxes(axes);
-  if (cleanAxes.length > 2) {
-    throw new AppError(400, 'No máximo 2 tipos de variação (como na Shopee).', 'TOO_MANY_AXES');
-  }
 
   const client = await getClient();
   try {

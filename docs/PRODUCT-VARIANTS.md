@@ -4,22 +4,22 @@
 
 ## Como funciona (Shopee-like)
 
-| Conceito                       | Implementação                                                                      |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| **Listing**                    | Tabela `products` (nome, descrição, fotos gerais)                                  |
-| **Tipos de variação** (máx. 2) | `products.variant_axes` JSONB — ex. `[{ name: "Cor", options: ["Rosa","Preto"] }]` |
-| **SKU / combinação**           | Tabela `product_variants` — preço, estoque, SKU, imagens por opção                 |
-| **Vitrine**                    | 1 card; preço “a partir de” = min das variantes ativas                             |
-| **PDP**                        | `VariantPicker`: botões por eixo; preço/estoque/imagem mudam                       |
-| **Carrinho**                   | `variantId` + rótulo no item                                                       |
-| **Pedido**                     | `order_items.variant_id` + `variant_label` (snapshot)                              |
+| Conceito                           | Implementação                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------- |
+| **Listing**                        | Tabela `products` (nome, descrição, fotos gerais)                                  |
+| **Tipos de variação** (ilimitados) | `products.variant_axes` JSONB — ex. `[{ name: "Cor", options: ["Rosa","Preto"] }]` |
+| **SKU / combinação**               | Tabela `product_variants` — preço, estoque, SKU, imagens por opção                 |
+| **Vitrine**                        | 1 card; preço “a partir de” = min das variantes ativas                             |
+| **PDP**                            | `VariantPicker`: botões por eixo; preço/estoque/imagem mudam                       |
+| **Carrinho**                       | `variantId` + rótulo no item                                                       |
+| **Pedido**                         | `order_items.variant_id` + `variant_label` (snapshot)                              |
 
 ## Admin
 
 1. Produtos → editar/criar
-2. Ativar **Variações (modelo Shopee)**
-3. 1º tipo (ex. Cor) + opções separadas por vírgula
-4. 2º tipo opcional (ex. Tamanho)
+2. Ativar **Variações**
+3. Adicionar tipos (Cor, Tamanho, Material…) + opções separadas por vírgula
+4. **Adicionar tipo** quantas vezes precisar (sem limite)
 5. **Gerar combinações** → preencher preço/estoque/SKU de cada linha
 6. Salvar
 
