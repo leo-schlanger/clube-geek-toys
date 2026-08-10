@@ -226,7 +226,7 @@
 
 ### MEDIO - Planejado
 
-- [ ] **Aumentar cobertura de testes** - Meta: 70% statements/functions (medido 10/08/2026: **lines 70.2%** ✓ · **stmts 68.3%** · **funcs 65.4%** · **branches 60.8%**; suite 2160✓). Gap principal: `src/pages/shop/*` (~13%)
+- [x] **Aumentar cobertura de testes** - Meta 70% atingida (10/08 noite): **stmts 74.0%** · **lines 76.2%** · **funcs 70.1%** · **branches 68.0%** (2192 testes ✓). Shop pages cobertas (`src/pages/shop` ~74% stmts).
 - [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
 - [ ] **Settings/preferencias do membro** - Permitir editar preferencias pessoais e notificacoes
 - [ ] **Structured logging** - Substituir console.log por logger com niveis (Pino/Winston)
@@ -353,11 +353,11 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 
 ### Qualidade
 
-| Metrica           | Atual                          | Meta            |
-| ----------------- | ------------------------------ | --------------- |
-| Test coverage     | ~68% stmts / 70% lines (10/08) | 70% stmts+funcs |
-| TypeScript strict | Sim                            | Sim             |
-| ESLint errors     | 0                              | 0               |
+| Metrica           | Atual                             | Meta |
+| ----------------- | --------------------------------- | ---- |
+| Test coverage     | **74% stmts / 76% lines** (10/08) | 70%  |
+| TypeScript strict | Sim                               | Sim  |
+| ESLint errors     | 0                                 | 0    |
 
 ### Infraestrutura
 
