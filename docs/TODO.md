@@ -255,8 +255,18 @@
 - [x] **Admin** - aba Atacadistas + flag "Disponível no atacado" no produto
 - [x] **LGPD** - export/delete cobrem conta atacado e `customer_cnpj`
 - [x] **Docs** - WHOLESALE, PROJECT, ARCH, SHOP-ORDERS, SECURITY, DOC-STATUS, README
+- [x] **Testes unitários Atacado** - cnpj, wholesale API client, pages, store components
+- [ ] **Cobertura global 70%** - meta de projeto (baseline ~11%); expandir gradualmente
 - [ ] **Deploy** - push master + CI (ensureSchema no boot da API)
 - [ ] **Operação** - Laura/Norberto: aprovar CNPJs e marcar produtos na importação
+
+### Variações de produto estilo Shopee (pedido Laura 10/08/2026)
+
+- [x] **Schema 013** - `has_variants`, `variant_axes`, `product_variants`, snapshot no pedido
+- [x] **API** - PUT `/products/:id/variants`, checkout com `variantId`
+- [x] **Admin** - eixos + gerar combinações + preço/estoque por SKU
+- [x] **PDP** - seletor de variações abaixo do produto (como Shopee)
+- [x] **Docs** - `PRODUCT-VARIANTS.md`
 
 ### BAIXO - Nice to Have
 

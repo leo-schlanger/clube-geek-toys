@@ -1,22 +1,68 @@
 import pg from 'pg';
-import { query } from '../config/database.js';
+import { query, getClient } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
-import type { Product, Category } from '../types/index.js';
+import type { Product, Category, ProductVariant, VariantAxis } from '../types/index.js';
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
 
+function mapVariant(row: pg.QueryResultRow): ProductVariant {
+  const opts =
+    row.options && typeof row.options === 'object' && !Array.isArray(row.options)
+      ? (row.options as Record<string, string>)
+      : {};
+  return {
+    id: row.id,
+    productId: row.product_id,
+    name: row.name,
+    options: opts,
+    sku: row.sku ?? null,
+    price: parseFloat(row.price),
+    compareAtPrice: row.compare_at_price != null ? parseFloat(row.compare_at_price) : null,
+    stock: Number(row.stock) || 0,
+    images: Array.isArray(row.images) ? row.images : [],
+    active: row.active !== false,
+    sortOrder: Number(row.sort_order) || 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function parseAxes(raw: unknown): VariantAxis[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, 2)
+    .map((a) => {
+      const name = String((a as { name?: string })?.name || '').trim();
+      const options = Array.isArray((a as { options?: unknown })?.options)
+        ? ((a as { options: unknown[] }).options as unknown[])
+            .map((o) => String(o).trim())
+            .filter(Boolean)
+        : [];
+      return { name, options };
+    })
+    .filter((a) => a.name && a.options.length > 0);
+}
+
 function mapProduct(row: pg.QueryResultRow): Product {
+  const hasVariants = row.has_variants === true;
+  const price = parseFloat(row.price);
+  const stock = Number(row.stock) || 0;
+  // Aggregates from LEFT JOIN subquery (list) or filled later
+  const priceFrom =
+    row.price_from != null ? parseFloat(row.price_from) : hasVariants ? price : null;
+  const stockTotal =
+    row.stock_total != null ? Number(row.stock_total) : hasVariants ? stock : null;
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
     description: row.description,
-    price: parseFloat(row.price),
+    price: hasVariants && priceFrom != null ? priceFrom : price,
     compareAtPrice: row.compare_at_price != null ? parseFloat(row.compare_at_price) : null,
     categoryId: row.category_id,
     categoryName: row.category_name ?? null,
     images: Array.isArray(row.images) ? row.images : [],
-    stock: row.stock,
+    stock: hasVariants && stockTotal != null ? stockTotal : stock,
     sku: row.sku,
     active: row.active,
     featured: row.featured,
@@ -28,6 +74,10 @@ function mapProduct(row: pg.QueryResultRow): Product {
     ratingCount: row.rating_count != null ? Number(row.rating_count) : 0,
     wholesaleEnabled: row.wholesale_enabled === true,
     wholesaleMinQty: row.wholesale_min_qty != null ? Number(row.wholesale_min_qty) : 1,
+    hasVariants,
+    variantAxes: parseAxes(row.variant_axes),
+    priceFrom: hasVariants ? priceFrom : null,
+    stockTotal: hasVariants ? stockTotal : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -126,9 +176,16 @@ export async function listProducts(opts: {
 
   const [data, count] = await Promise.all([
     query(
-      `SELECT p.*, c.name as category_name
+      `SELECT p.*, c.name as category_name,
+              vs.price_from, vs.stock_total
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
+       LEFT JOIN LATERAL (
+         SELECT MIN(v.price)::float AS price_from,
+                COALESCE(SUM(v.stock), 0)::int AS stock_total
+         FROM product_variants v
+         WHERE v.product_id = p.id AND v.active = TRUE
+       ) vs ON p.has_variants = TRUE
        ${where}
        ORDER BY p.featured DESC, p.created_at DESC
        LIMIT $${i++} OFFSET $${i}`,
@@ -151,6 +208,42 @@ export async function listProducts(opts: {
   };
 }
 
+async function attachVariants(product: Product, includeInactiveVariants = false): Promise<Product> {
+  if (!product.hasVariants) {
+    return { ...product, variants: [] };
+  }
+  const variants = await listVariants(product.id, includeInactiveVariants);
+  const active = variants.filter((v) => v.active);
+  const priceFrom = active.length ? Math.min(...active.map((v) => v.price)) : product.price;
+  const stockTotal = active.reduce((s, v) => s + v.stock, 0);
+  return {
+    ...product,
+    variants,
+    priceFrom,
+    stockTotal,
+    price: priceFrom,
+    stock: stockTotal,
+  };
+}
+
+export async function listVariants(
+  productId: string,
+  includeInactive = false
+): Promise<ProductVariant[]> {
+  const result = await query(
+    `SELECT * FROM product_variants
+     WHERE product_id = $1 ${includeInactive ? '' : 'AND active = TRUE'}
+     ORDER BY sort_order ASC, name ASC`,
+    [productId]
+  );
+  return result.rows.map(mapVariant);
+}
+
+export async function getVariantById(id: string): Promise<ProductVariant | null> {
+  const result = await query(`SELECT * FROM product_variants WHERE id = $1`, [id]);
+  return result.rows[0] ? mapVariant(result.rows[0]) : null;
+}
+
 export async function getProductBySlug(slug: string, includeInactive = false): Promise<Product | null> {
   const result = await query(
     `SELECT p.*, c.name as category_name
@@ -163,7 +256,7 @@ export async function getProductBySlug(slug: string, includeInactive = false): P
   const product = mapProduct(result.rows[0]);
   // Block direct public access to seed products by slug
   if (!includeInactive && isSeedProductName(product.name)) return null;
-  return product;
+  return attachVariants(product, includeInactive);
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
@@ -173,7 +266,8 @@ export async function getProductById(id: string): Promise<Product | null> {
      WHERE p.id = $1`,
     [id]
   );
-  return result.rows[0] ? mapProduct(result.rows[0]) : null;
+  if (!result.rows[0]) return null;
+  return attachVariants(mapProduct(result.rows[0]), true);
 }
 
 export async function createProduct(data: {
@@ -242,6 +336,8 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     lengthCm: 'length_cm',
     wholesaleEnabled: 'wholesale_enabled',
     wholesaleMinQty: 'wholesale_min_qty',
+    hasVariants: 'has_variants',
+    variantAxes: 'variant_axes',
   };
 
   const sets: string[] = [];
@@ -249,9 +345,11 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
   let i = 1;
   for (const [key, col] of Object.entries(fieldMap)) {
     if (key in data && data[key] !== undefined) {
-      if (col === 'images') {
-        sets.push(`images = $${i++}::jsonb`);
-        values.push(JSON.stringify(data[key] ?? []));
+      if (col === 'images' || col === 'variant_axes') {
+        sets.push(`${col} = $${i++}::jsonb`);
+        const payload =
+          col === 'variant_axes' ? parseAxes(data[key]) : (data[key] ?? []);
+        values.push(JSON.stringify(payload));
       } else {
         sets.push(`${col} = $${i++}`);
         values.push(data[key]);
@@ -278,7 +376,191 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     values
   );
   if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
-  return mapProduct(result.rows[0]);
+  return attachVariants(mapProduct(result.rows[0]), true);
+}
+
+export type VariantInput = {
+  id?: string;
+  name: string;
+  options: Record<string, string>;
+  sku?: string | null;
+  price: number;
+  compareAtPrice?: number | null;
+  stock?: number;
+  images?: string[];
+  active?: boolean;
+  sortOrder?: number;
+};
+
+/**
+ * Replace all variants of a product (Shopee-style matrix save).
+ * When variants are empty, turns has_variants off.
+ */
+export async function replaceVariants(
+  productId: string,
+  axes: VariantAxis[],
+  variants: VariantInput[]
+): Promise<Product> {
+  const product = await getProductById(productId);
+  if (!product) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+
+  const cleanAxes = parseAxes(axes);
+  if (cleanAxes.length > 2) {
+    throw new AppError(400, 'No máximo 2 tipos de variação (como na Shopee).', 'TOO_MANY_AXES');
+  }
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    if (!variants.length || cleanAxes.length === 0) {
+      await client.query(
+        `UPDATE products SET has_variants = FALSE, variant_axes = '[]'::jsonb WHERE id = $1`,
+        [productId]
+      );
+      await client.query(`DELETE FROM product_variants WHERE product_id = $1`, [productId]);
+      await client.query('COMMIT');
+      const updated = await getProductById(productId);
+      if (!updated) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+      return updated;
+    }
+
+    // Validate unique names
+    const names = new Set<string>();
+    for (const v of variants) {
+      const name = String(v.name || '').trim();
+      if (!name) throw new AppError(400, 'Cada variação precisa de um nome.', 'VARIANT_NAME_REQUIRED');
+      if (names.has(name)) {
+        throw new AppError(400, `Variação duplicada: ${name}`, 'VARIANT_DUPLICATE');
+      }
+      names.add(name);
+      if (v.price == null || Number(v.price) < 0) {
+        throw new AppError(400, `Preço inválido em "${name}".`, 'VARIANT_PRICE');
+      }
+    }
+
+    await client.query(
+      `UPDATE products SET has_variants = TRUE, variant_axes = $1::jsonb WHERE id = $2`,
+      [JSON.stringify(cleanAxes), productId]
+    );
+
+    // Upsert by keeping ids when provided; delete removed
+    const keepIds: string[] = [];
+    let sort = 0;
+    for (const v of variants) {
+      const name = String(v.name).trim();
+      const options = v.options && typeof v.options === 'object' ? v.options : {};
+      const price = Number(v.price);
+      const stock = Math.max(0, Math.floor(Number(v.stock) || 0));
+      const images = Array.isArray(v.images) ? v.images : [];
+      const compareAt =
+        v.compareAtPrice != null && !Number.isNaN(Number(v.compareAtPrice))
+          ? Number(v.compareAtPrice)
+          : null;
+      const active = v.active !== false;
+      const sku = v.sku?.trim() || null;
+
+      if (v.id) {
+        const upd = await client.query(
+          `UPDATE product_variants SET
+             name = $1, options = $2::jsonb, sku = $3, price = $4, compare_at_price = $5,
+             stock = $6, images = $7::jsonb, active = $8, sort_order = $9
+           WHERE id = $10 AND product_id = $11
+           RETURNING id`,
+          [
+            name,
+            JSON.stringify(options),
+            sku,
+            price,
+            compareAt,
+            stock,
+            JSON.stringify(images),
+            active,
+            v.sortOrder ?? sort,
+            v.id,
+            productId,
+          ]
+        );
+        if (upd.rows[0]) {
+          keepIds.push(upd.rows[0].id);
+        } else {
+          // id not found — insert
+          const ins = await client.query(
+            `INSERT INTO product_variants
+               (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order)
+             VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8::jsonb,$9,$10)
+             RETURNING id`,
+            [
+              productId,
+              name,
+              JSON.stringify(options),
+              sku,
+              price,
+              compareAt,
+              stock,
+              JSON.stringify(images),
+              active,
+              v.sortOrder ?? sort,
+            ]
+          );
+          keepIds.push(ins.rows[0].id);
+        }
+      } else {
+        const ins = await client.query(
+          `INSERT INTO product_variants
+             (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order)
+           VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8::jsonb,$9,$10)
+           RETURNING id`,
+          [
+            productId,
+            name,
+            JSON.stringify(options),
+            sku,
+            price,
+            compareAt,
+            stock,
+            JSON.stringify(images),
+            active,
+            v.sortOrder ?? sort,
+          ]
+        );
+        keepIds.push(ins.rows[0].id);
+      }
+      sort += 1;
+    }
+
+    if (keepIds.length) {
+      await client.query(
+        `DELETE FROM product_variants WHERE product_id = $1 AND NOT (id = ANY($2::uuid[]))`,
+        [productId, keepIds]
+      );
+    }
+
+    // Sync parent price/stock for admin list when has variants (min price / sum stock)
+    const agg = await client.query(
+      `SELECT MIN(price)::float AS price_from, COALESCE(SUM(stock),0)::int AS stock_total
+       FROM product_variants WHERE product_id = $1 AND active = TRUE`,
+      [productId]
+    );
+    if (agg.rows[0]?.price_from != null) {
+      await client.query(`UPDATE products SET price = $1, stock = $2 WHERE id = $3`, [
+        agg.rows[0].price_from,
+        agg.rows[0].stock_total,
+        productId,
+      ]);
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const updated = await getProductById(productId);
+  if (!updated) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+  return updated;
 }
 
 /** Soft-delete: deactivate so historical order_items snapshots stay intact. */

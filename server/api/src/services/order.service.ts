@@ -76,6 +76,8 @@ function mapItem(row: pg.QueryResultRow): OrderItem {
     quantity: row.quantity,
     lineTotal: parseFloat(row.line_total),
     imageUrl: row.image_url,
+    variantId: row.variant_id ?? null,
+    variantLabel: row.variant_label ?? null,
   };
 }
 
@@ -86,7 +88,7 @@ function round2(n: number): number {
 // ─── Create order (checkout) ─────────────────────────────────────────────────
 
 export interface CreateOrderInput {
-  items: { productId: string; quantity: number }[];
+  items: { productId: string; quantity: number; variantId?: string }[];
   customer: { name: string; email: string; phone?: string };
   shippingAddress: ShippingAddressInput;
   shipping: {
@@ -202,19 +204,22 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     }
   }
 
-  // Aggregate quantities by productId (prevents double-line stock bypass).
-  const qtyByProduct = new Map<string, number>();
+  // Aggregate by productId + variantId (prevents double-line stock bypass).
+  const qtyByKey = new Map<string, { productId: string; variantId: string | null; quantity: number }>();
   for (const it of input.items) {
     const qty = Math.floor(it.quantity);
     if (qty <= 0) throw new AppError(400, 'Quantidade inválida.', 'INVALID_QUANTITY');
-    qtyByProduct.set(it.productId, (qtyByProduct.get(it.productId) || 0) + qty);
+    const variantId = it.variantId || null;
+    const key = `${it.productId}::${variantId || ''}`;
+    const prev = qtyByKey.get(key);
+    qtyByKey.set(key, {
+      productId: it.productId,
+      variantId,
+      quantity: (prev?.quantity || 0) + qty,
+    });
   }
-  const aggregatedItems = [...qtyByProduct.entries()].map(([productId, quantity]) => ({
-    productId,
-    quantity,
-  }));
+  const aggregatedItems = [...qtyByKey.values()];
   // Note: frete quote token was validated against the client cart lines above (input.items).
-  // Stock uses aggregated quantities so duplicate product lines cannot bypass stock checks.
 
   const client = await getClient();
   let orderId: string;
@@ -222,16 +227,38 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   try {
     await client.query('BEGIN');
 
-    // Lock the products and validate availability (aggregated qty)
-    const ids = aggregatedItems.map((it) => it.productId);
+    // Lock products and validate availability (aggregated qty)
+    const ids = [...new Set(aggregatedItems.map((it) => it.productId))];
     const productsResult = await client.query(
-      `SELECT id, name, slug, price, stock, active, images, wholesale_enabled, wholesale_min_qty
+      `SELECT id, name, slug, price, stock, active, images, wholesale_enabled, wholesale_min_qty,
+              COALESCE(has_variants, FALSE) AS has_variants
        FROM products WHERE id = ANY($1::uuid[]) FOR UPDATE`,
       [ids]
     );
     const byId = new Map(productsResult.rows.map((r) => [r.id, r]));
 
-    const itemRows: { productId: string; name: string; slug: string; unitPrice: number; quantity: number; lineTotal: number; image: string | null }[] = [];
+    // Lock variants used
+    const variantIds = aggregatedItems.map((i) => i.variantId).filter(Boolean) as string[];
+    const variantsById = new Map<string, pg.QueryResultRow>();
+    if (variantIds.length) {
+      const vr = await client.query(
+        `SELECT * FROM product_variants WHERE id = ANY($1::uuid[]) FOR UPDATE`,
+        [variantIds]
+      );
+      for (const r of vr.rows) variantsById.set(r.id, r);
+    }
+
+    const itemRows: {
+      productId: string;
+      name: string;
+      slug: string;
+      unitPrice: number;
+      quantity: number;
+      lineTotal: number;
+      image: string | null;
+      variantId: string | null;
+      variantLabel: string | null;
+    }[] = [];
     let subtotal = 0;
     for (const it of aggregatedItems) {
       const p = byId.get(it.productId);
@@ -255,15 +282,59 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
           );
         }
       }
-      const qty = it.quantity;
-      if (p.stock < qty) {
-        throw new AppError(409, `Estoque insuficiente para "${p.name}".`, 'INSUFFICIENT_STOCK');
+
+      const hasVariants = p.has_variants === true;
+      let unitPrice = parseFloat(p.price);
+      let stock = Number(p.stock);
+      let image: string | null =
+        Array.isArray(p.images) && p.images.length ? p.images[0] : null;
+      let displayName = p.name as string;
+      let variantLabel: string | null = null;
+      let variantId: string | null = null;
+
+      if (hasVariants) {
+        if (!it.variantId) {
+          throw new AppError(
+            400,
+            `Selecione a variação de "${p.name}" (cor/tamanho).`,
+            'VARIANT_REQUIRED'
+          );
+        }
+        const v = variantsById.get(it.variantId);
+        if (!v || v.product_id !== p.id || !v.active) {
+          throw new AppError(400, `Variação indisponível para "${p.name}".`, 'VARIANT_UNAVAILABLE');
+        }
+        unitPrice = parseFloat(v.price);
+        stock = Number(v.stock);
+        variantLabel = v.name;
+        variantId = v.id;
+        displayName = `${p.name} — ${v.name}`;
+        if (Array.isArray(v.images) && v.images.length) image = v.images[0];
+      } else if (it.variantId) {
+        throw new AppError(400, `Produto "${p.name}" não possui variações.`, 'VARIANT_NOT_ALLOWED');
       }
-      const unitPrice = parseFloat(p.price);
+
+      const qty = it.quantity;
+      if (stock < qty) {
+        throw new AppError(
+          409,
+          `Estoque insuficiente para "${displayName}".`,
+          'INSUFFICIENT_STOCK'
+        );
+      }
       const lineTotal = round2(unitPrice * qty);
       subtotal += lineTotal;
-      const image = Array.isArray(p.images) && p.images.length ? p.images[0] : null;
-      itemRows.push({ productId: p.id, name: p.name, slug: p.slug, unitPrice, quantity: qty, lineTotal, image });
+      itemRows.push({
+        productId: p.id,
+        name: displayName,
+        slug: p.slug,
+        unitPrice,
+        quantity: qty,
+        lineTotal,
+        image,
+        variantId,
+        variantLabel,
+      });
     }
     subtotal = round2(subtotal);
 
@@ -322,9 +393,20 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
     for (const it of itemRows) {
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, product_slug, unit_price, quantity, line_total, image_url)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [orderId, it.productId, it.name, it.slug, it.unitPrice, it.quantity, it.lineTotal, it.image]
+        `INSERT INTO order_items (order_id, product_id, product_name, product_slug, unit_price, quantity, line_total, image_url, variant_id, variant_label)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+          orderId,
+          it.productId,
+          it.name,
+          it.slug,
+          it.unitPrice,
+          it.quantity,
+          it.lineTotal,
+          it.image,
+          it.variantId,
+          it.variantLabel,
+        ]
       );
     }
 
@@ -682,12 +764,30 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   return mapOrder(result.rows[0]);
 }
 
-/** Decrement product stock for every item in an order. Shared by webhook + PIX confirm. */
+/** Decrement product/variant stock for every item in an order. Shared by webhook + PIX confirm. */
 export async function decrementStockForOrder(client: pg.PoolClient, orderId: string): Promise<void> {
+  // Simple products (no variant)
   await client.query(
     `UPDATE products p SET stock = GREATEST(0, p.stock - oi.quantity)
      FROM order_items oi
-     WHERE oi.order_id = $1 AND oi.product_id = p.id`,
+     WHERE oi.order_id = $1 AND oi.product_id = p.id AND oi.variant_id IS NULL`,
+    [orderId]
+  );
+  // Variant SKUs (Shopee model)
+  await client.query(
+    `UPDATE product_variants v SET stock = GREATEST(0, v.stock - oi.quantity)
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.variant_id = v.id`,
+    [orderId]
+  );
+  // Keep parent listing stock as sum of active variants (display)
+  await client.query(
+    `UPDATE products p SET stock = COALESCE((
+       SELECT SUM(v.stock)::int FROM product_variants v
+       WHERE v.product_id = p.id AND v.active = TRUE
+     ), p.stock)
+     WHERE p.has_variants = TRUE
+       AND p.id IN (SELECT product_id FROM order_items WHERE order_id = $1 AND product_id IS NOT NULL)`,
     [orderId]
   );
 }

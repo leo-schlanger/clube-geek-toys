@@ -1,5 +1,5 @@
 import { api, apiRequest } from './api-client'
-import type { Product, Category } from '../types'
+import type { Product, Category, ProductVariant, VariantAxis } from '../types'
 
 export interface ProductListResult {
   products: Product[]
@@ -63,6 +63,41 @@ export interface ProductInput {
   lengthCm?: number | null
   wholesaleEnabled?: boolean
   wholesaleMinQty?: number
+  hasVariants?: boolean
+  variantAxes?: VariantAxis[]
+}
+
+export interface VariantInput {
+  id?: string
+  name: string
+  options: Record<string, string>
+  sku?: string | null
+  price: number
+  compareAtPrice?: number | null
+  stock?: number
+  images?: string[]
+  active?: boolean
+  sortOrder?: number
+}
+
+/** Admin: salva eixos + matriz de SKUs (estilo Shopee). */
+export async function replaceProductVariants(
+  productId: string,
+  axes: VariantAxis[],
+  variants: VariantInput[]
+): Promise<Product | null> {
+  const result = await api.put<Product>(`/products/${productId}/variants`, {
+    axes,
+    variants,
+  } as unknown as Record<string, unknown>)
+  return result.data ?? null
+}
+
+export async function listProductVariants(productId: string): Promise<ProductVariant[]> {
+  const result = await api.get<{ variants: ProductVariant[] }>(`/products/${productId}/variants`, {
+    skipAuth: true,
+  })
+  return result.data?.variants ?? []
 }
 
 /** Public: related products for PDP "Você também pode gostar". */
@@ -77,6 +112,11 @@ export async function adminListProducts(params: ProductListParams = {}): Promise
   // Admins reuse the public list endpoint but see the same catalog; inactive management
   // is handled per-product. For a full admin listing we pass a high limit.
   return listProducts({ limit: 100, ...params })
+}
+
+/** Admin: full product with variants (uses public slug detail which embeds variants). */
+export async function getProductForEdit(slug: string): Promise<Product | null> {
+  return getProductBySlug(slug)
 }
 
 export async function createProduct(data: ProductInput): Promise<Product | null> {

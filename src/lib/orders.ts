@@ -14,7 +14,7 @@ export interface ShippingAddressPayload {
 }
 
 export interface CreateOrderPayload {
-  items: { productId: string; quantity: number }[]
+  items: { productId: string; quantity: number; variantId?: string }[]
   customer: { name: string; email: string; phone?: string }
   shippingAddress: ShippingAddressPayload
   shipping: { quoteToken: string; serviceId: string }
@@ -40,8 +40,14 @@ export async function createOrder(payload: CreateOrderPayload): Promise<CreateOr
 }
 
 /** Helper: build the order payload from cart items. */
-export function cartToOrderItems(items: CartItem[]): { productId: string; quantity: number }[] {
-  return items.map((i) => ({ productId: i.productId, quantity: i.quantity }))
+export function cartToOrderItems(
+  items: CartItem[]
+): { productId: string; quantity: number; variantId?: string }[] {
+  return items.map((i) => ({
+    productId: i.productId,
+    quantity: i.quantity,
+    ...(i.variantId ? { variantId: i.variantId } : {}),
+  }))
 }
 
 export interface OrderStatusInfo {

@@ -6,14 +6,16 @@ import { Label } from '../ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
-import type { Product, Category } from '../../types'
+import type { Product, Category, VariantAxis } from '../../types'
 import {
   createProduct,
   updateProduct,
   uploadProductImages,
   createCategory,
   deleteCategory,
+  replaceProductVariants,
   type ProductInput,
+  type VariantInput,
 } from '../../lib/products'
 import { formatCurrency } from '../../lib/utils'
 import { toast } from 'sonner'
@@ -89,6 +91,87 @@ export function ProductModal({
 
   const [form, setForm] = useState<FormState>(() => toFormState(product))
   const [loading, setLoading] = useState(false)
+
+  // Variações estilo Shopee (até 2 eixos)
+  const [hasVariants, setHasVariants] = useState(() => product?.hasVariants ?? false)
+  const [axis1Name, setAxis1Name] = useState(() => product?.variantAxes?.[0]?.name ?? 'Cor')
+  const [axis1Opts, setAxis1Opts] = useState(
+    () => product?.variantAxes?.[0]?.options?.join(', ') ?? ''
+  )
+  const [axis2Name, setAxis2Name] = useState(() => product?.variantAxes?.[1]?.name ?? '')
+  const [axis2Opts, setAxis2Opts] = useState(
+    () => product?.variantAxes?.[1]?.options?.join(', ') ?? ''
+  )
+  const [variantRows, setVariantRows] = useState<VariantInput[]>(() =>
+    (product?.variants ?? []).map((v) => ({
+      id: v.id,
+      name: v.name,
+      options: v.options,
+      sku: v.sku,
+      price: v.price,
+      compareAtPrice: v.compareAtPrice,
+      stock: v.stock,
+      images: v.images,
+      active: v.active,
+      sortOrder: v.sortOrder,
+    }))
+  )
+
+  function buildAxes(): VariantAxis[] {
+    const axes: VariantAxis[] = []
+    const o1 = axis1Opts
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (axis1Name.trim() && o1.length) axes.push({ name: axis1Name.trim(), options: o1 })
+    const o2 = axis2Opts
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    if (axis2Name.trim() && o2.length) axes.push({ name: axis2Name.trim(), options: o2 })
+    return axes.slice(0, 2)
+  }
+
+  /** Gera matriz de combinações (Shopee) a partir dos eixos. */
+  function generateVariantMatrix() {
+    const axes = buildAxes()
+    if (!axes.length) {
+      toast.error('Informe pelo menos 1 tipo de variação e opções (ex.: Cor: Rosa, Preto)')
+      return
+    }
+    const combos: Record<string, string>[] = [{}]
+    for (const axis of axes) {
+      const next: Record<string, string>[] = []
+      for (const c of combos) {
+        for (const opt of axis.options) {
+          next.push({ ...c, [axis.name]: opt })
+        }
+      }
+      combos.splice(0, combos.length, ...next)
+    }
+    const basePrice = Number(form.price) || 0
+    const baseStock = Number(form.stock) || 0
+    const existingByName = new Map(variantRows.map((r) => [r.name, r]))
+    const rows: VariantInput[] = combos.map((options, idx) => {
+      const name = axes.map((a) => options[a.name]).join(' / ')
+      const prev = existingByName.get(name)
+      return {
+        id: prev?.id,
+        name,
+        options,
+        sku: prev?.sku ?? '',
+        price: prev?.price ?? basePrice,
+        compareAtPrice: prev?.compareAtPrice ?? null,
+        stock: prev?.stock ?? baseStock,
+        images: prev?.images ?? [],
+        active: prev?.active ?? true,
+        sortOrder: idx,
+      }
+    })
+    setVariantRows(rows)
+    setHasVariants(true)
+    toast.success(`${rows.length} variação(ões) gerada(s)`)
+  }
 
   // Image management. `images` holds URLs already saved / added by URL.
   // `pendingFiles` holds newly picked files that must be uploaded after the
@@ -254,6 +337,24 @@ export function ProductModal({
         toast.error(isEditMode ? 'Erro ao atualizar produto' : 'Erro ao criar produto')
         setLoading(false)
         return
+      }
+
+      // Variações Shopee: salva eixos + SKUs (ou limpa)
+      if (hasVariants && variantRows.length > 0) {
+        const axes = buildAxes()
+        const withVariants = await replaceProductVariants(
+          saved.id,
+          axes,
+          variantRows.map((r, i) => ({
+            ...r,
+            price: Number(r.price),
+            stock: Number(r.stock) || 0,
+            sortOrder: i,
+          }))
+        )
+        if (withVariants) saved = withVariants
+      } else if (isEditMode && product?.hasVariants && !hasVariants) {
+        await replaceProductVariants(saved.id, [], [])
       }
 
       // Upload any newly picked files now that we have a product id.
@@ -667,6 +768,115 @@ export function ProductModal({
                     value={form.wholesaleMinQty}
                     onChange={(e) => update('wholesaleMinQty', e.target.value)}
                   />
+                </div>
+              )}
+            </div>
+
+            {/* Variações estilo Shopee */}
+            <div className="space-y-3 rounded-lg border p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium">Variações (modelo Shopee)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Ex.: bolsa em 4 cores — o cliente clica no produto e escolhe a variação.
+                    Até 2 tipos (Cor, Tamanho…).
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={hasVariants}
+                    onChange={(e) => setHasVariants(e.target.checked)}
+                  />
+                  Ativar
+                </label>
+              </div>
+
+              {hasVariants && (
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>1º tipo (ex.: Cor)</Label>
+                      <Input value={axis1Name} onChange={(e) => setAxis1Name(e.target.value)} />
+                      <Input
+                        placeholder="Opções separadas por vírgula: Rosa, Preto, Azul"
+                        value={axis1Opts}
+                        onChange={(e) => setAxis1Opts(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>2º tipo opcional (ex.: Tamanho)</Label>
+                      <Input
+                        value={axis2Name}
+                        onChange={(e) => setAxis2Name(e.target.value)}
+                        placeholder="Deixe vazio se não usar"
+                      />
+                      <Input
+                        placeholder="P, M, G"
+                        value={axis2Opts}
+                        onChange={(e) => setAxis2Opts(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={generateVariantMatrix}>
+                    <Plus className="h-4 w-4" />
+                    Gerar combinações
+                  </Button>
+
+                  {variantRows.length > 0 && (
+                    <div className="max-h-64 space-y-2 overflow-y-auto rounded border p-2">
+                      {variantRows.map((row, idx) => (
+                        <div
+                          key={row.name + idx}
+                          className="grid grid-cols-12 items-center gap-2 text-sm"
+                        >
+                          <span className="col-span-4 truncate font-medium" title={row.name}>
+                            {row.name}
+                          </span>
+                          <Input
+                            className="col-span-3 h-8"
+                            type="number"
+                            step="0.01"
+                            value={row.price}
+                            onChange={(e) => {
+                              const price = Number(e.target.value)
+                              setVariantRows((rows) =>
+                                rows.map((r, i) => (i === idx ? { ...r, price } : r))
+                              )
+                            }}
+                            aria-label={`Preço ${row.name}`}
+                          />
+                          <Input
+                            className="col-span-2 h-8"
+                            type="number"
+                            value={row.stock ?? 0}
+                            onChange={(e) => {
+                              const stock = Number(e.target.value)
+                              setVariantRows((rows) =>
+                                rows.map((r, i) => (i === idx ? { ...r, stock } : r))
+                              )
+                            }}
+                            aria-label={`Estoque ${row.name}`}
+                          />
+                          <Input
+                            className="col-span-3 h-8"
+                            placeholder="SKU"
+                            value={row.sku ?? ''}
+                            onChange={(e) => {
+                              const sku = e.target.value
+                              setVariantRows((rows) =>
+                                rows.map((r, i) => (i === idx ? { ...r, sku } : r))
+                              )
+                            }}
+                            aria-label={`SKU ${row.name}`}
+                          />
+                        </div>
+                      ))}
+                      <p className="text-[11px] text-muted-foreground">
+                        Colunas: variação · preço · estoque · SKU
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
-import type { CartItem, Product, ShopChannel } from '../types'
+import type { CartItem, Product, ProductVariant, ShopChannel } from '../types'
 
 const STORAGE_KEY_RETAIL = 'clube_geek_shop_cart'
 const STORAGE_KEY_WHOLESALE = 'clube_geek_shop_cart_wholesale'
@@ -14,10 +14,19 @@ interface CartContextValue {
   count: number
   subtotal: number
   channel: ShopChannel
-  addItem: (product: Product, quantity?: number) => void
-  removeItem: (productId: string) => void
-  setQuantity: (productId: string, quantity: number) => void
+  addItem: (product: Product, quantity?: number, variant?: ProductVariant | null) => void
+  /** lineKey = productId or productId::variantId */
+  removeItem: (lineKey: string) => void
+  setQuantity: (lineKey: string, quantity: number) => void
   clear: () => void
+}
+
+function lineKey(productId: string, variantId?: string | null): string {
+  return variantId ? `${productId}::${variantId}` : productId
+}
+
+function itemKey(i: CartItem): string {
+  return lineKey(i.productId, i.variantId)
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -72,18 +81,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items, activeChannel, cartVersion])
 
   const addItem = useCallback(
-    (product: Product, quantity = 1) => {
+    (product: Product, quantity = 1, variant?: ProductVariant | null) => {
       setItems((prev) => {
-        const existing = prev.find((i) => i.productId === product.id)
-        const maxStock = product.stock
+        const vId = variant?.id ?? null
+        const key = lineKey(product.id, vId)
+        const maxStock = variant ? variant.stock : product.stock
+        const price = variant ? variant.price : product.price
+        const image =
+          (variant?.images?.[0] ?? product.images[0] ?? null) as string | null
+        const label = variant?.name ?? null
+        const displayName = variant ? `${product.name} — ${variant.name}` : product.name
         const minQty =
           activeChannel === 'wholesale' && product.wholesaleMinQty
             ? Math.max(1, product.wholesaleMinQty)
             : 1
+        const existing = prev.find((i) => itemKey(i) === key)
         if (existing) {
           const nextQty = Math.min(Math.max(existing.quantity + quantity, minQty), maxStock)
           return prev.map((i) =>
-            i.productId === product.id ? { ...i, quantity: nextQty, stock: maxStock } : i
+            itemKey(i) === key ? { ...i, quantity: nextQty, stock: maxStock, price } : i
           )
         }
         const initial = Math.min(Math.max(quantity, minQty), maxStock) || minQty
@@ -91,10 +107,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           {
             productId: product.id,
-            name: product.name,
+            variantId: vId,
+            variantLabel: label,
+            name: displayName,
             slug: product.slug,
-            price: product.price,
-            image: product.images[0] ?? null,
+            price,
+            image,
             quantity: initial,
             stock: maxStock,
           },
@@ -104,15 +122,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     [activeChannel]
   )
 
-  const removeItem = useCallback((productId: string) => {
-    setItems((prev) => prev.filter((i) => i.productId !== productId))
+  const removeItem = useCallback((key: string) => {
+    setItems((prev) => prev.filter((i) => itemKey(i) !== key && i.productId !== key))
   }, [])
 
-  const setQuantity = useCallback((productId: string, quantity: number) => {
+  const setQuantity = useCallback((key: string, quantity: number) => {
     setItems((prev) =>
       prev
         .map((i) =>
-          i.productId === productId
+          itemKey(i) === key || i.productId === key
             ? { ...i, quantity: Math.max(1, Math.min(quantity, i.stock)) }
             : i
         )

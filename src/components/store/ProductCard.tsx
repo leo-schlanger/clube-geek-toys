@@ -111,14 +111,19 @@ export function ProductCard({
         <div className="mt-1 flex flex-col gap-0.5">
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold text-foreground">
-              {formatCurrency(product.price)}
+              {product.hasVariants && product.priceFrom != null
+                ? `a partir de ${formatCurrency(product.priceFrom)}`
+                : formatCurrency(product.price)}
             </span>
-            {onSale && (
+            {onSale && !product.hasVariants && (
               <span className="text-sm text-muted-foreground line-through">
                 {formatCurrency(product.compareAtPrice as number)}
               </span>
             )}
           </div>
+          {product.hasVariants && (
+            <span className="text-xs text-muted-foreground">Várias opções</span>
+          )}
 
           {isWholesale ? (
             isWholesaleApproved ? (

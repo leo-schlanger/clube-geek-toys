@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner'
 import type { Product } from '../../types'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
+import type { Product } from '../../types'
 import { getProductBySlug, listRelatedProducts } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
@@ -22,6 +23,7 @@ import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
+import { VariantPicker, matchVariant } from '../../components/store/VariantPicker'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
@@ -47,6 +49,7 @@ export default function ProductDetail() {
   const [notFound, setNotFound] = useState(false)
   const [activeImage, setActiveImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
+  const [variantSel, setVariantSel] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!slug) return
@@ -59,6 +62,7 @@ export default function ProductDetail() {
       setNotFound(false)
       setActiveImage(0)
       setQuantity(1)
+      setVariantSel({})
       setRelated([])
       try {
         const p = await getProductBySlug(productSlug)
@@ -69,6 +73,14 @@ export default function ProductDetail() {
           setProduct(null)
         } else {
           setProduct(p)
+          // Pré-seleciona 1ª opção de cada eixo se houver
+          if (p.hasVariants && p.variantAxes?.length) {
+            const init: Record<string, string> = {}
+            for (const axis of p.variantAxes) {
+              if (axis.options[0]) init[axis.name] = axis.options[0]
+            }
+            setVariantSel(init)
+          }
           if (isWholesale && p.wholesaleMinQty && p.wholesaleMinQty > 1) {
             setQuantity(p.wholesaleMinQty)
           }
@@ -98,22 +110,36 @@ export default function ProductDetail() {
     }
   }, [slug, isWholesale])
 
-  const outOfStock = product ? product.stock <= 0 : false
-  const onSale =
-    product?.compareAtPrice != null && product.compareAtPrice > product.price
-  const memberPrice = product ? product.price * (1 - MEMBER_SHOP_DISCOUNT) : 0
-  const wholesalePrice = product ? product.price * (1 - WHOLESALE_SHOP_DISCOUNT) : 0
+  const matched = product ? matchVariant(product, variantSel) : null
+  const displayPrice = matched?.price ?? product?.price ?? 0
+  const displayStock = matched?.stock ?? product?.stock ?? 0
+  const displayImages =
+    matched?.images?.length ? matched.images : product?.images ?? []
+  const outOfStock = product
+    ? product.hasVariants
+      ? !matched || matched.stock <= 0
+      : product.stock <= 0
+    : false
+  const compareAt = matched?.compareAtPrice ?? product?.compareAtPrice ?? null
+  const onSale = compareAt != null && compareAt > displayPrice
+  const memberPrice = displayPrice * (1 - MEMBER_SHOP_DISCOUNT)
+  const wholesalePrice = displayPrice * (1 - WHOLESALE_SHOP_DISCOUNT)
   const minQty =
     isWholesale && product ? Math.max(1, product.wholesaleMinQty ?? 1) : 1
 
   function handleAddToCart() {
     if (!product || outOfStock) return
+    if (product.hasVariants && !matched) {
+      toast.error('Selecione a variação (cor/tamanho) antes de adicionar.')
+      return
+    }
     const qty = Math.max(quantity, minQty)
-    addItem(product, qty)
+    addItem(product, qty, matched)
+    const label = matched ? `${product.name} — ${matched.name}` : product.name
     toast.success(
       minQty > 1
-        ? `${product.name} adicionado (mín. ${minQty} un. no atacado)`
-        : `${product.name} adicionado ao carrinho`
+        ? `${label} adicionado (mín. ${minQty} un. no atacado)`
+        : `${label} adicionado ao carrinho`
     )
   }
 
@@ -127,7 +153,7 @@ export default function ProductDetail() {
             `${product.name} na loja GeekPop & Toys — K-pop e colecionáveis com frete Correios.`
           }
           path={isWholesale ? `/atacado/produto/${product.slug}` : `/produto/${product.slug}`}
-          image={product.images[0]}
+          image={displayImages[0] || product.images[0]}
           type="product"
         />
       )}
@@ -166,9 +192,9 @@ export default function ProductDetail() {
             {/* Galeria */}
             <div className="space-y-3">
               <div className="aspect-square overflow-hidden rounded-xl border bg-muted">
-                {product.images.length > 0 ? (
+                {displayImages.length > 0 ? (
                   <img
-                    src={product.images[activeImage]}
+                    src={displayImages[Math.min(activeImage, displayImages.length - 1)]}
                     alt={product.name}
                     className="h-full w-full object-contain"
                   />
@@ -179,9 +205,9 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {product.images.length > 1 && (
+              {displayImages.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {product.images.map((img, i) => (
+                  {displayImages.map((img, i) => (
                     <button
                       key={img + i}
                       type="button"
@@ -231,13 +257,25 @@ export default function ProductDetail() {
               {/* Preço */}
               <div className="mt-4">
                 <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-bold">{formatCurrency(product.price)}</span>
-                  {onSale && (
+                  <span className="text-3xl font-bold">{formatCurrency(displayPrice)}</span>
+                  {onSale && compareAt != null && (
                     <span className="text-lg text-muted-foreground line-through">
-                      {formatCurrency(product.compareAtPrice as number)}
+                      {formatCurrency(compareAt)}
+                    </span>
+                  )}
+                  {product.hasVariants && product.priceFrom != null && !matched && (
+                    <span className="text-sm text-muted-foreground">
+                      a partir de {formatCurrency(product.priceFrom)}
                     </span>
                   )}
                 </div>
+
+                <VariantPicker
+                  product={product}
+                  selected={variantSel}
+                  onChange={setVariantSel}
+                  matched={matched}
+                />
 
                 {/* Preview de desconto */}
                 {isWholesale ? (
@@ -300,9 +338,9 @@ export default function ProductDetail() {
               <div className="mt-4 text-sm">
                 {outOfStock ? (
                   <Badge variant="secondary">Esgotado</Badge>
-                ) : product.stock <= 5 ? (
+                ) : displayStock <= 5 ? (
                   <span className="text-yellow-600">
-                    Últimas {product.stock} unidades!
+                    Últimas {displayStock} unidades!
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-green-600">
@@ -338,8 +376,8 @@ export default function ProductDetail() {
                     type="button"
                     aria-label="Aumentar quantidade"
                     className="flex h-11 w-11 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-                    onClick={() => setQuantity((q) => Math.min(product.stock, q + 1))}
-                    disabled={outOfStock || quantity >= product.stock}
+                    onClick={() => setQuantity((q) => Math.min(displayStock, q + 1))}
+                    disabled={outOfStock || quantity >= displayStock}
                   >
                     <Plus className="h-4 w-4" />
                   </button>

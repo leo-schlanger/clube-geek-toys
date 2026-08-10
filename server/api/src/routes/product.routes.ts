@@ -128,6 +128,41 @@ const productSchema = z.object({
   lengthCm: z.number().positive().optional().nullable(),
   wholesaleEnabled: z.boolean().optional(),
   wholesaleMinQty: z.number().int().positive().max(9999).optional(),
+  hasVariants: z.boolean().optional(),
+  variantAxes: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(40),
+        options: z.array(z.string().min(1).max(60)).min(1).max(50),
+      })
+    )
+    .max(2)
+    .optional(),
+});
+
+const variantsReplaceSchema = z.object({
+  axes: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(40),
+        options: z.array(z.string().min(1).max(60)).min(1).max(50),
+      })
+    )
+    .max(2),
+  variants: z.array(
+    z.object({
+      id: z.string().uuid().optional(),
+      name: z.string().min(1).max(200),
+      options: z.record(z.string()),
+      sku: z.string().max(60).optional().nullable(),
+      price: z.number().nonnegative(),
+      compareAtPrice: z.number().nonnegative().optional().nullable(),
+      stock: z.number().int().nonnegative().optional(),
+      images: z.array(z.string()).max(8).optional(),
+      active: z.boolean().optional(),
+      sortOrder: z.number().int().optional(),
+    })
+  ),
 });
 
 productRouter.post('/', authenticate, requireRole('admin'), validate(productSchema), async (req, res, next) => {
@@ -141,6 +176,33 @@ productRouter.post('/', authenticate, requireRole('admin'), validate(productSche
 productRouter.patch('/:id', authenticate, requireRole('admin'), validate(productSchema.partial()), async (req, res, next) => {
   try {
     res.json(await productService.updateProduct(req.params.id as string, req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /products/:id/variants — salva eixos + matriz de SKUs (estilo Shopee)
+productRouter.put(
+  '/:id/variants',
+  authenticate,
+  requireRole('admin'),
+  validate(variantsReplaceSchema),
+  async (req, res, next) => {
+    try {
+      res.json(
+        await productService.replaceVariants(req.params.id as string, req.body.axes, req.body.variants)
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+productRouter.get('/:id/variants', async (req, res, next) => {
+  try {
+    // Public list of active variants by product id (or by parent slug via product fetch)
+    const variants = await productService.listVariants(req.params.id as string, false);
+    res.json({ variants });
   } catch (err) {
     next(err);
   }

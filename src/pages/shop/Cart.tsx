@@ -59,8 +59,12 @@ export default function Cart() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
             <div className="space-y-3">
-              {items.map((item) => (
-                <Card key={item.productId}>
+              {items.map((item) => {
+                const key = item.variantId
+                  ? `${item.productId}::${item.variantId}`
+                  : item.productId
+                return (
+                <Card key={key}>
                   <CardContent className="flex gap-4 p-4">
                     <Link
                       to={`${productPrefix}/${item.slug}`}
@@ -88,6 +92,7 @@ export default function Cart() {
                       </Link>
                       <span className="text-sm text-muted-foreground">
                         {formatCurrency(item.price)} cada
+                        {item.variantLabel ? ` · ${item.variantLabel}` : ''}
                       </span>
 
                       <div className="mt-auto flex items-center gap-3 pt-2">
@@ -96,7 +101,7 @@ export default function Cart() {
                             type="button"
                             aria-label="Diminuir quantidade"
                             className="flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-                            onClick={() => setQuantity(item.productId, item.quantity - 1)}
+                            onClick={() => setQuantity(key, item.quantity - 1)}
                             disabled={item.quantity <= 1}
                           >
                             <Minus className="h-3.5 w-3.5" />
@@ -108,7 +113,7 @@ export default function Cart() {
                             type="button"
                             aria-label="Aumentar quantidade"
                             className="flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40"
-                            onClick={() => setQuantity(item.productId, item.quantity + 1)}
+                            onClick={() => setQuantity(key, item.quantity + 1)}
                             disabled={item.quantity >= item.stock}
                           >
                             <Plus className="h-3.5 w-3.5" />
@@ -117,7 +122,7 @@ export default function Cart() {
                         <button
                           type="button"
                           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-destructive"
-                          onClick={() => removeItem(item.productId)}
+                          onClick={() => removeItem(key)}
                         >
                           <Trash2 className="h-4 w-4" />
                           <span className="hidden sm:inline">Remover</span>
@@ -130,7 +135,8 @@ export default function Cart() {
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
             </div>
 
             <div className="lg:sticky lg:top-20 lg:self-start">

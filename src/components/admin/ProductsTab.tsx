@@ -6,7 +6,12 @@ import { Input } from '../ui/input'
 import { Loading } from '../ui/loading'
 import { ProductModal } from './ProductModal'
 import type { Product, Category } from '../../types'
-import { adminListProducts, deleteProduct, listCategories } from '../../lib/products'
+import {
+  adminListProducts,
+  deleteProduct,
+  listCategories,
+  getProductForEdit,
+} from '../../lib/products'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
@@ -207,7 +212,14 @@ export function ProductsTab() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setModal({ mode: 'edit', product })}
+                          onClick={async () => {
+                            try {
+                              const full = (await getProductForEdit(product.slug)) ?? product
+                              setModal({ mode: 'edit', product: full })
+                            } catch {
+                              setModal({ mode: 'edit', product })
+                            }
+                          }}
                           className="h-8 w-8 p-0"
                           title="Editar produto"
                         >

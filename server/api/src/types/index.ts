@@ -155,8 +155,41 @@ export interface Product {
   wholesaleEnabled?: boolean;
   /** Quantidade mínima por SKU no atacado. */
   wholesaleMinQty?: number;
+  /** Modelo Shopee: listing com variações (cor/tamanho…). */
+  hasVariants?: boolean;
+  /** Eixos de variação: max 2, ex. [{ name: "Cor", options: ["Rosa","Preto"] }] */
+  variantAxes?: VariantAxis[];
+  /** Preenchido no detalhe/admin quando hasVariants. */
+  variants?: ProductVariant[];
+  /** Preço mínimo entre variantes ativas (vitrine). */
+  priceFrom?: number | null;
+  /** Estoque somado das variantes ativas. */
+  stockTotal?: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Eixo de variação (Shopee: 1º tipo / 2º tipo). Max 2 por produto. */
+export interface VariantAxis {
+  name: string;
+  options: string[];
+}
+
+/** SKU vendável de um listing com variações. */
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  name: string;
+  options: Record<string, string>;
+  sku: string | null;
+  price: number;
+  compareAtPrice: number | null;
+  stock: number;
+  images: string[];
+  active: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface OrderItem {
@@ -169,6 +202,8 @@ export interface OrderItem {
   quantity: number;
   lineTotal: number;
   imageUrl: string | null;
+  variantId?: string | null;
+  variantLabel?: string | null;
 }
 
 export interface Order {

@@ -153,8 +153,37 @@ export interface Product {
   ratingCount?: number
   wholesaleEnabled?: boolean
   wholesaleMinQty?: number
+  /** Shopee-style: listing com variações */
+  hasVariants?: boolean
+  variantAxes?: VariantAxis[]
+  variants?: ProductVariant[]
+  priceFrom?: number | null
+  stockTotal?: number | null
   createdAt: string
   updatedAt: string
+}
+
+/** Eixo de variação (máx. 2, como na Shopee): Cor, Tamanho… */
+export interface VariantAxis {
+  name: string
+  options: string[]
+}
+
+/** SKU de uma combinação de opções */
+export interface ProductVariant {
+  id: string
+  productId: string
+  name: string
+  options: Record<string, string>
+  sku: string | null
+  price: number
+  compareAtPrice: number | null
+  stock: number
+  images: string[]
+  active: boolean
+  sortOrder: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type WholesaleStatus = 'pending' | 'approved' | 'rejected' | 'disabled'
@@ -254,6 +283,10 @@ export interface PixQRData {
 // Item do carrinho (persistido em localStorage no subdomínio da loja)
 export interface CartItem {
   productId: string
+  /** SKU de variação (Shopee); undefined = produto simples */
+  variantId?: string | null
+  /** Ex.: "Rosa / M" */
+  variantLabel?: string | null
   name: string
   slug: string
   price: number
