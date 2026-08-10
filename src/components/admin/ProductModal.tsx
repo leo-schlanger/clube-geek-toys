@@ -98,15 +98,13 @@ export function ProductModal({
   const [form, setForm] = useState<FormState>(() => toFormState(product))
   const [loading, setLoading] = useState(false)
 
-  // Variações: eixos ilimitados (Cor, Tamanho, Material…)
-  const [hasVariants, setHasVariants] = useState(() => product?.hasVariants ?? false)
-  const [axisDrafts, setAxisDrafts] = useState<AxisDraft[]>(() => {
-    const axes = product?.variantAxes ?? []
-    if (!axes.length) return [{ name: 'Cor', optionsText: '' }]
+  // Variações: eixos + opções ilimitados (1 tipo "Cor" com N opções = N SKUs)
+  function axesToDrafts(axes?: VariantAxis[] | null): AxisDraft[] {
+    if (!axes?.length) return [{ name: 'Cor', optionsText: '' }]
     return axes.map((a) => ({ name: a.name, optionsText: a.options.join(', ') }))
-  })
-  const [variantRows, setVariantRows] = useState<VariantInput[]>(() =>
-    (product?.variants ?? []).map((v) => ({
+  }
+  function variantsToRows(variants?: Product['variants']): VariantInput[] {
+    return (variants ?? []).map((v) => ({
       id: v.id,
       name: v.name,
       options: v.options,
@@ -118,15 +116,32 @@ export function ProductModal({
       active: v.active,
       sortOrder: v.sortOrder,
     }))
-  )
+  }
+
+  const [hasVariants, setHasVariants] = useState(() => product?.hasVariants ?? false)
+  const [axisDrafts, setAxisDrafts] = useState<AxisDraft[]>(() => axesToDrafts(product?.variantAxes))
+  const [variantRows, setVariantRows] = useState<VariantInput[]>(() => variantsToRows(product?.variants))
+  const [newOptionByAxis, setNewOptionByAxis] = useState<Record<number, string>>({})
+
+  /** Parse opções: vírgula, ponto-e-vírgula ou quebra de linha. */
+  function parseOptionsText(text: string): string[] {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const part of text.split(/[,;\n]+/)) {
+      const o = part.trim()
+      if (!o) continue
+      const key = o.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(o)
+    }
+    return out
+  }
 
   function buildAxes(): VariantAxis[] {
     const axes: VariantAxis[] = []
     for (const draft of axisDrafts) {
-      const options = draft.optionsText
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
+      const options = parseOptionsText(draft.optionsText)
       if (draft.name.trim() && options.length) {
         axes.push({ name: draft.name.trim(), options })
       }
@@ -146,11 +161,38 @@ export function ProductModal({
     setAxisDrafts((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)))
   }
 
+  function addOptionChip(axisIndex: number) {
+    const raw = (newOptionByAxis[axisIndex] ?? '').trim()
+    if (!raw) return
+    const current = parseOptionsText(axisDrafts[axisIndex]?.optionsText ?? '')
+    if (current.some((o) => o.toLowerCase() === raw.toLowerCase())) {
+      toast.error('Opção já existe neste tipo')
+      return
+    }
+    updateAxisDraft(axisIndex, { optionsText: [...current, raw].join(', ') })
+    setNewOptionByAxis((prev) => ({ ...prev, [axisIndex]: '' }))
+  }
+
+  function removeOptionChip(axisIndex: number, option: string) {
+    const current = parseOptionsText(axisDrafts[axisIndex]?.optionsText ?? '')
+    updateAxisDraft(axisIndex, {
+      optionsText: current.filter((o) => o !== option).join(', '),
+    })
+  }
+
   /** Gera matriz de combinações a partir dos eixos. */
   function generateVariantMatrix() {
     const axes = buildAxes()
     if (!axes.length) {
-      toast.error('Informe pelo menos 1 tipo de variação e opções (ex.: Cor: Rosa, Preto)')
+      toast.error(
+        'Informe o tipo (ex.: Cor) e as opções (ex.: Rosa, Preto, Azul). Use o botão + para adicionar cada cor.'
+      )
+      return
+    }
+    let total = 1
+    for (const a of axes) total *= a.options.length
+    if (total > 500) {
+      toast.error(`Combinações demais (${total}). Reduza opções ou tipos (máx. 500 SKUs).`)
       return
     }
     const combos: Record<string, string>[] = [{}]
@@ -184,7 +226,7 @@ export function ProductModal({
     })
     setVariantRows(rows)
     setHasVariants(true)
-    toast.success(`${rows.length} variação(ões) gerada(s)`)
+    toast.success(`${rows.length} variação(ões) gerada(s) — confira preço/estoque e salve`)
   }
 
   // Image management. `images` holds URLs already saved / added by URL.
@@ -204,6 +246,10 @@ export function ProductModal({
     setForm(toFormState(product))
     setImages(product?.images ?? [])
     setPendingFiles([])
+    setHasVariants(product?.hasVariants ?? false)
+    setAxisDrafts(axesToDrafts(product?.variantAxes))
+    setVariantRows(variantsToRows(product?.variants))
+    setNewOptionByAxis({})
   }, [product])
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -353,9 +399,17 @@ export function ProductModal({
         return
       }
 
-      // Variações Shopee: salva eixos + SKUs (ou limpa)
+      // Variações: salva eixos + SKUs (ou limpa)
       if (hasVariants && variantRows.length > 0) {
         const axes = buildAxes()
+        if (!axes.length) {
+          toast.error(
+            'Produto salvo, mas as variações precisam de tipo + opções (ex.: Cor → Rosa, Preto). Clique em Gerar combinações.'
+          )
+          setLoading(false)
+          onSuccess()
+          return
+        }
         const withVariants = await replaceProductVariants(
           saved.id,
           axes,
@@ -366,7 +420,13 @@ export function ProductModal({
             sortOrder: i,
           }))
         )
-        if (withVariants) saved = withVariants
+        if (!withVariants) {
+          toast.error('Produto salvo, mas falhou ao gravar as variações. Tente de novo.')
+          setLoading(false)
+          onSuccess()
+          return
+        }
+        saved = withVariants
       } else if (isEditMode && product?.hasVariants && !hasVariants) {
         await replaceProductVariants(saved.id, [], [])
       }
@@ -786,14 +846,16 @@ export function ProductModal({
               )}
             </div>
 
-            {/* Variações: eixos ilimitados */}
+            {/* Variações: 1 tipo "Cor" + N opções = N SKUs (ilimitado) */}
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Variações</p>
                   <p className="text-xs text-muted-foreground">
-                    Ex.: bolsa em 4 cores — o cliente clica no produto e escolhe a variação.
-                    Tipos ilimitados (Cor, Tamanho, Material…).
+                    <strong className="text-foreground">Tipo</strong> = o que muda (ex. Cor).{' '}
+                    <strong className="text-foreground">Opções</strong> = cada valor (Rosa, Preto,
+                    Azul…) — <strong className="text-foreground">sem limite</strong>. Depois clique
+                    em Gerar combinações.
                   </p>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
@@ -809,45 +871,98 @@ export function ProductModal({
               {hasVariants && (
                 <div className="space-y-3">
                   <div className="space-y-3">
-                    {axisDrafts.map((draft, idx) => (
-                      <div key={idx} className="space-y-1 rounded-md border border-border/60 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <Label>
-                            {idx + 1}º tipo
-                            {idx === 0 ? ' (ex.: Cor)' : idx === 1 ? ' (ex.: Tamanho)' : ''}
-                          </Label>
-                          {axisDrafts.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-muted-foreground"
-                              onClick={() => removeAxisDraft(idx)}
-                              aria-label={`Remover ${idx + 1}º tipo`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                    {axisDrafts.map((draft, idx) => {
+                      const options = parseOptionsText(draft.optionsText)
+                      return (
+                        <div key={idx} className="space-y-2 rounded-md border border-border/60 p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label>
+                              Tipo {idx + 1}
+                              {idx === 0 ? ' (ex.: Cor)' : idx === 1 ? ' (ex.: Tamanho)' : ''}
+                            </Label>
+                            {axisDrafts.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-muted-foreground"
+                                onClick={() => removeAxisDraft(idx)}
+                                aria-label={`Remover tipo ${idx + 1}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                          <Input
+                            value={draft.name}
+                            onChange={(e) => updateAxisDraft(idx, { name: e.target.value })}
+                            placeholder={idx === 0 ? 'Cor' : idx === 1 ? 'Tamanho' : 'Nome do tipo'}
+                          />
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">
+                              Opções ({options.length}) — digite e adicione uma a uma
+                            </Label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {options.map((opt) => (
+                                <span
+                                  key={opt}
+                                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                >
+                                  {opt}
+                                  <button
+                                    type="button"
+                                    className="rounded-full p-0.5 hover:bg-primary/20"
+                                    onClick={() => removeOptionChip(idx, opt)}
+                                    aria-label={`Remover ${opt}`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <Input
+                                className="h-8"
+                                placeholder="Ex.: Rosa"
+                                value={newOptionByAxis[idx] ?? ''}
+                                onChange={(e) =>
+                                  setNewOptionByAxis((prev) => ({ ...prev, [idx]: e.target.value }))
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    addOptionChip(idx)
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 shrink-0"
+                                onClick={() => addOptionChip(idx)}
+                              >
+                                <Plus className="h-4 w-4" />
+                                Opção
+                              </Button>
+                            </div>
+                            <Input
+                              className="h-8 text-xs"
+                              placeholder="Ou cole várias: Rosa, Preto, Azul"
+                              value={draft.optionsText}
+                              onChange={(e) => updateAxisDraft(idx, { optionsText: e.target.value })}
+                            />
+                          </div>
                         </div>
-                        <Input
-                          value={draft.name}
-                          onChange={(e) => updateAxisDraft(idx, { name: e.target.value })}
-                          placeholder={idx === 0 ? 'Cor' : idx === 1 ? 'Tamanho' : 'Nome do tipo'}
-                        />
-                        <Input
-                          placeholder="Opções separadas por vírgula: Rosa, Preto, Azul"
-                          value={draft.optionsText}
-                          onChange={(e) => updateAxisDraft(idx, { optionsText: e.target.value })}
-                        />
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={addAxisDraft}>
                       <Plus className="h-4 w-4" />
-                      Adicionar tipo
+                      Outro tipo (ex. Tamanho)
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={generateVariantMatrix}>
+                    <Button type="button" size="sm" onClick={generateVariantMatrix}>
                       <Plus className="h-4 w-4" />
                       Gerar combinações
                     </Button>
@@ -855,6 +970,9 @@ export function ProductModal({
 
                   {variantRows.length > 0 && (
                     <div className="max-h-64 space-y-2 overflow-y-auto rounded border p-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {variantRows.length} SKU(s) — ajuste preço / estoque / SKU
+                      </p>
                       {variantRows.map((row, idx) => (
                         <div
                           key={row.name + idx}
@@ -902,9 +1020,6 @@ export function ProductModal({
                           />
                         </div>
                       ))}
-                      <p className="text-[11px] text-muted-foreground">
-                        Colunas: variação · preço · estoque · SKU
-                      </p>
                     </div>
                   )}
                 </div>

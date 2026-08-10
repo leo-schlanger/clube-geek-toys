@@ -111,9 +111,9 @@ export default function ShopCheckout() {
 
   useEffect(() => {
     if (items.length === 0 && !result) {
-      navigate('/carrinho', { replace: true })
+      navigate(isWholesale ? '/atacado/carrinho' : '/carrinho', { replace: true })
     }
-  }, [items.length, result, navigate])
+  }, [items.length, result, navigate, isWholesale])
 
   const selectedOption: ShippingOption | null =
     quote?.options.find((o) => o.id === selectedServiceId) ?? null

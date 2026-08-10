@@ -230,7 +230,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
 
     try {
       if (isCreateMode) {
-        // Create new member (without user_id since it's created by admin)
+        // Staff create: API creates/reuses a user for the email (not the admin JWT).
         const result = await createMember('admin-created', {
           fullName: sanitizedData.fullName,
           email: sanitizedData.email,

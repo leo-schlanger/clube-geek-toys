@@ -673,18 +673,35 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
   if (result.rows.length === 0) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
   const order = mapOrder(result.rows[0]);
 
-  // Restore store credit when cancelling/refunding a pending or paid order that spent credit.
-  if (
+  const closing =
     (status === 'cancelled' || status === 'refunded') &&
     prev.status !== 'cancelled' &&
-    prev.status !== 'refunded' &&
-    (order.storeCreditApplied ?? 0) > 0
-  ) {
+    prev.status !== 'refunded';
+  const hadStockDecremented = ['paid', 'processing', 'shipped', 'delivered'].includes(prev.status);
+
+  // Restore store credit when cancelling/refunding a pending or paid order that spent credit.
+  if (closing && (order.storeCreditApplied ?? 0) > 0) {
     const restored = await restoreCreditForOrder(id, {
       note: `Crédito devolvido (status → ${status})`,
     });
     if (restored > 0) {
       await auditLog('order.credit_restored', actorUserId, { orderId: id, amount: restored, status });
+    }
+  }
+
+  // Restock when undoing a paid (or later) order.
+  if (closing && hadStockDecremented) {
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+      await restoreStockForOrder(client, id);
+      await client.query('COMMIT');
+      await auditLog('order.stock_restored', actorUserId, { orderId: id, status });
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
     }
   }
 
@@ -746,6 +763,7 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   }
   const stripe = getStripe();
   await stripe.refunds.create({ payment_intent: order.stripePaymentIntentId });
+  const hadStock = ['paid', 'processing', 'shipped', 'delivered'].includes(order.status);
   const result = await query(
     `UPDATE orders SET status = 'refunded' WHERE id = $1 AND status <> 'refunded' RETURNING *`,
     [id]
@@ -756,10 +774,24 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   const restored = await restoreCreditForOrder(id, {
     note: 'Crédito devolvido (reembolso Stripe)',
   });
+  if (hadStock) {
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+      await restoreStockForOrder(client, id);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
   await auditLog('order.refunded', actorUserId, {
     orderId: id,
     paymentIntent: order.stripePaymentIntentId,
     creditRestored: restored,
+    stockRestored: hadStock,
   });
   return mapOrder(result.rows[0]);
 }
@@ -780,7 +812,27 @@ export async function decrementStockForOrder(client: pg.PoolClient, orderId: str
      WHERE oi.order_id = $1 AND oi.variant_id = v.id`,
     [orderId]
   );
-  // Keep parent listing stock as sum of active variants (display)
+  await syncParentStockFromVariants(client, orderId);
+}
+
+/** Reverse of decrement — used on cancel/refund after stock was taken. */
+export async function restoreStockForOrder(client: pg.PoolClient, orderId: string): Promise<void> {
+  await client.query(
+    `UPDATE products p SET stock = p.stock + oi.quantity
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.product_id = p.id AND oi.variant_id IS NULL`,
+    [orderId]
+  );
+  await client.query(
+    `UPDATE product_variants v SET stock = v.stock + oi.quantity
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.variant_id = v.id`,
+    [orderId]
+  );
+  await syncParentStockFromVariants(client, orderId);
+}
+
+async function syncParentStockFromVariants(client: pg.PoolClient, orderId: string): Promise<void> {
   await client.query(
     `UPDATE products p SET stock = COALESCE((
        SELECT SUM(v.stock)::int FROM product_variants v

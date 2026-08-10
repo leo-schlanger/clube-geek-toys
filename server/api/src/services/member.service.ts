@@ -1,10 +1,14 @@
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import pg from 'pg';
-import { query } from '../config/database.js';
+import { query, getClient } from '../config/database.js';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { auditLog, diffObjects } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
 import type { Member } from '../types/index.js';
+
+const BCRYPT_ROUNDS = 12;
 
 function mapMemberRow(row: pg.QueryResultRow): Member {
   return {
@@ -109,22 +113,39 @@ export async function getMembersCount(): Promise<number> {
   return result.rows[0].count;
 }
 
-export async function createMember(
-  userId: string,
-  data: {
-    cpf: string;
-    fullName: string;
-    email: string;
-    phone?: string;
-    plan: string;
-    paymentType: string;
-  }
-): Promise<Member> {
+type CreateMemberData = {
+  cpf: string;
+  fullName: string;
+  email: string;
+  phone?: string;
+  plan: string;
+  paymentType: string;
+};
+
+function notifyAdminNewMember(data: CreateMemberData): void {
+  if (!env.ADMIN_EMAIL) return;
+  const paymentLabel = data.paymentType === 'monthly' ? 'Mensal' : 'Anual';
+  sendTemplateEmail({
+    template: 'admin-new-member',
+    to: env.ADMIN_EMAIL,
+    variables: {
+      member_name: data.fullName,
+      member_email: data.email,
+      member_cpf: data.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+      member_phone: data.phone || '—',
+      plan: data.plan,
+      payment_type: paymentLabel,
+      admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
+    },
+  }).catch((err) => console.error('[MEMBER] Admin notification error:', err));
+}
+
+/** Self-service: member creates their own profile bound to their JWT user. */
+export async function createMember(userId: string, data: CreateMemberData): Promise<Member> {
   if (!userId || userId.trim() === '') {
     throw new AppError(400, 'userId é obrigatório');
   }
 
-  // Check CPF uniqueness
   const existing = await query('SELECT id FROM members WHERE cpf = $1', [data.cpf]);
   if (existing.rows.length > 0) {
     throw new AppError(409, 'CPF já cadastrado');
@@ -137,25 +158,71 @@ export async function createMember(
     [userId, data.cpf, data.fullName, data.email, data.phone || null, data.plan, data.paymentType]
   );
 
-  // Notify admin about new registration (non-blocking)
-  if (env.ADMIN_EMAIL) {
-    const paymentLabel = data.paymentType === 'monthly' ? 'Mensal' : 'Anual';
-    sendTemplateEmail({
-      template: 'admin-new-member',
-      to: env.ADMIN_EMAIL,
-      variables: {
-        member_name: data.fullName,
-        member_email: data.email,
-        member_cpf: data.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
-        member_phone: data.phone || '—',
-        plan: data.plan,
-        payment_type: paymentLabel,
-        admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
-      },
-    }).catch((err) => console.error('[MEMBER] Admin notification error:', err));
+  notifyAdminNewMember(data);
+  return mapMemberRow(result.rows[0]);
+}
+
+/**
+ * Admin/seller creates a third-party member.
+ * Creates (or reuses) a user for the email — never binds to the staff JWT user_id.
+ * Password is a random secret; member must use "esqueci a senha" to access the portal.
+ */
+export async function createMemberByStaff(
+  data: CreateMemberData,
+  actorUserId: string
+): Promise<Member> {
+  const email = data.email.toLowerCase().trim();
+  const cpf = data.cpf.replace(/\D/g, '');
+
+  const existingCpf = await query('SELECT id FROM members WHERE cpf = $1', [cpf]);
+  if (existingCpf.rows.length > 0) {
+    throw new AppError(409, 'CPF já cadastrado', 'CPF_EXISTS');
   }
 
-  return mapMemberRow(result.rows[0]);
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    let userId: string;
+    const existingUser = await client.query(`SELECT id FROM users WHERE email = $1`, [email]);
+    if (existingUser.rows[0]) {
+      userId = existingUser.rows[0].id as string;
+      const linked = await client.query(`SELECT id FROM members WHERE user_id = $1`, [userId]);
+      if (linked.rows.length > 0) {
+        throw new AppError(409, 'Este e-mail já possui membro vinculado.', 'EMAIL_HAS_MEMBER');
+      }
+    } else {
+      const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), BCRYPT_ROUNDS);
+      const inserted = await client.query(
+        `INSERT INTO users (email, password_hash, role, email_verified)
+         VALUES ($1, $2, 'member', TRUE)
+         RETURNING id`,
+        [email, passwordHash]
+      );
+      userId = inserted.rows[0].id as string;
+    }
+
+    const result = await client.query(
+      `INSERT INTO members (user_id, cpf, full_name, email, phone, plan, payment_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [userId, cpf, data.fullName, email, data.phone || null, data.plan, data.paymentType]
+    );
+
+    await client.query('COMMIT');
+    await auditLog('member.created_by_staff', actorUserId, {
+      memberId: result.rows[0].id,
+      email,
+      cpf,
+    });
+    notifyAdminNewMember({ ...data, email, cpf });
+    return mapMemberRow(result.rows[0]);
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateMember(

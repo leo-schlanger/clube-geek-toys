@@ -158,22 +158,22 @@ memberRouter.get('/:id/subscription', requireRole('admin', 'seller'), async (req
   } catch (err) { next(err); }
 });
 
-// POST /members — create (admin/seller for arbitrary creation; member can self-register their own
-// member record once via /auth/register flow only — body.userId locked to req.user.userId).
+// POST /members — self-register (member → own user_id) or admin/seller creates third-party member
+// (creates a login user for the email, never binds to the admin's user_id).
 memberRouter.post('/', validate(createMemberSchema), async (req, res, next) => {
   try {
-    // Members may only create their OWN member profile (matched to their userId).
-    // Admins/sellers can create for anyone.
-    if (req.user!.role === 'member') {
-      // Member can only have one record (UNIQUE on user_id), and createMember uses req.user.userId
-      // anyway. We additionally block any attempt to override or pass extra metadata.
-      // Service-level UNIQUE constraint is the final gate.
-    } else if (!['admin', 'seller'].includes(req.user!.role)) {
-      res.status(403).json({ error: 'Acesso negado', code: 'FORBIDDEN' });
+    const role = req.user!.role;
+    if (role === 'member') {
+      const member = await memberService.createMember(req.user!.userId, req.body);
+      res.status(201).json(member);
       return;
     }
-    const member = await memberService.createMember(req.user!.userId, req.body);
-    res.status(201).json(member);
+    if (role === 'admin' || role === 'seller') {
+      const member = await memberService.createMemberByStaff(req.body, req.user!.userId);
+      res.status(201).json(member);
+      return;
+    }
+    res.status(403).json({ error: 'Acesso negado', code: 'FORBIDDEN' });
   } catch (err) {
     next(err);
   }

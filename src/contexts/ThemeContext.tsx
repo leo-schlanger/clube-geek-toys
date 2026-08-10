@@ -97,10 +97,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
+/** Fallback for unit tests / edge renders outside ThemeProvider. */
+const THEME_FALLBACK: ThemeContextValue = {
+  theme: 'light',
+  resolved: 'light',
+  setTheme: () => {},
+  toggle: () => {},
+}
+
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext)
-  if (!ctx) {
-    throw new Error('useTheme must be used within ThemeProvider')
-  }
-  return ctx
+  return ctx ?? THEME_FALLBACK
 }

@@ -18,10 +18,12 @@
 
 1. Produtos → editar/criar
 2. Ativar **Variações**
-3. Adicionar tipos (Cor, Tamanho, Material…) + opções separadas por vírgula
-4. **Adicionar tipo** quantas vezes precisar (sem limite)
+3. **Tipo** = o eixo (ex. `Cor`). **Opções** = cada valor (Rosa, Preto, Azul…) — use **+ Opção** ou cole com vírgulas. **Sem limite** de opções nem de tipos.
+4. Opcional: **Outro tipo** (ex. Tamanho) se precisar de matriz 2D+
 5. **Gerar combinações** → preencher preço/estoque/SKU de cada linha
 6. Salvar
+
+> Erro comum: colocar o nome da cor no campo **Tipo** (ex. "Cor vermelha") e só 1 opção. O certo é Tipo=`Cor` e Opções=`Vermelha, Azul, Preto`.
 
 ## API
 

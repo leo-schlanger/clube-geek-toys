@@ -18,7 +18,8 @@ const createSchema = z.object({
   frequency_type: z.enum(['months', 'years']).default('years'),
   payer_email: z.string().email(),
   payer_name: z.string().min(1),
-  transaction_amount: z.number().positive(),
+  /** Optional for backwards compat — server always uses CLUB_PLAN_PRICE. */
+  transaction_amount: z.number().positive().optional(),
 });
 
 // POST /subscription/create

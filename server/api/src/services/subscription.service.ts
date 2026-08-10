@@ -3,6 +3,7 @@ import { AppError } from '../middleware/error-handler.js';
 import { getStripe, getOrCreateCustomer } from '../utils/stripe.js';
 import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
+import { CLUB_PLAN_PRICE } from '../types/index.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -12,7 +13,8 @@ interface CreateSubscriptionData {
   frequency_type: string;
   payer_email: string;
   payer_name: string;
-  transaction_amount: number;
+  /** Ignored server-side — amount is always CLUB_PLAN_PRICE for the club plan. */
+  transaction_amount?: number;
 }
 
 interface SubscriptionRow {
@@ -93,6 +95,8 @@ export async function createSubscription(data: CreateSubscriptionData) {
   });
 
   // 3. Create Stripe Subscription (incomplete — client confirms via PaymentElement)
+  // Server locks amount to the club plan price (never trust client transaction_amount).
+  const amount = CLUB_PLAN_PRICE;
   const paymentType = data.frequency_type === 'years' ? 'annual' : 'monthly';
   const interval = paymentType === 'annual' ? 'year' : 'month';
 
@@ -111,7 +115,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
           product_data: {
             name: `Clube GeekPop & Toys - Plano ${data.plan.charAt(0).toUpperCase() + data.plan.slice(1)}`,
           },
-          unit_amount: Math.round(data.transaction_amount * 100),
+          unit_amount: Math.round(amount * 100),
           recurring: { interval: interval as 'month' | 'year' },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any,
@@ -152,7 +156,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
         status,
         data.plan,
         data.frequency_type,
-        data.transaction_amount,
+        amount,
         data.payer_email,
       ],
     );
@@ -175,7 +179,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
     subscriptionId,
     stripeSubscriptionId: stripeSubscription.id,
     plan: data.plan,
-    amount: data.transaction_amount,
+    amount,
   }).catch(() => {});
 
   // 7. Send confirmation email (outside transaction, non-blocking)
@@ -185,7 +189,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
     variables: {
       name: member.full_name,
       plan: data.plan,
-      amount: data.transaction_amount.toFixed(2).replace('.', ','),
+      amount: amount.toFixed(2).replace('.', ','),
       card_last_four: '****',
     },
     member_id: data.member_id,
