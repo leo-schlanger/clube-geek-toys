@@ -31,6 +31,9 @@ import {
   ImageOff,
 } from 'lucide-react'
 
+/** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — admin pode precificar livremente. */
+const MAX_PRODUCT_PRICE = 999_999.99
+
 interface ProductModalProps {
   mode: 'create' | 'edit'
   product?: Product | null
@@ -330,14 +333,17 @@ export function ProductModal({
       return
     }
     const price = Number(form.price)
-    if (!Number.isFinite(price) || price < 0) {
-      toast.error('Preço inválido')
+    if (!Number.isFinite(price) || price < 0 || price > MAX_PRODUCT_PRICE) {
+      toast.error(`Preço inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`)
       return
     }
 
     const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null
-    if (compareAtPrice != null && (!Number.isFinite(compareAtPrice) || compareAtPrice < 0)) {
-      toast.error('Preço "de" inválido')
+    if (
+      compareAtPrice != null &&
+      (!Number.isFinite(compareAtPrice) || compareAtPrice < 0 || compareAtPrice > MAX_PRODUCT_PRICE)
+    ) {
+      toast.error(`Preço "de" inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`)
       return
     }
 
@@ -408,6 +414,17 @@ export function ProductModal({
           )
           setLoading(false)
           onSuccess()
+          return
+        }
+        const badVariant = variantRows.find((r) => {
+          const p = Number(r.price)
+          return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE
+        })
+        if (badVariant) {
+          toast.error(
+            `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`
+          )
+          setLoading(false)
           return
         }
         const withVariants = await replaceProductVariants(
@@ -510,8 +527,9 @@ export function ProductModal({
                   type="number"
                   step="0.01"
                   min="0"
+                  max={MAX_PRODUCT_PRICE}
                   inputMode="decimal"
-                  placeholder="0,00"
+                  placeholder="Ex.: 7500 ou 149.90"
                   value={form.price}
                   onChange={(e) => update('price', e.target.value)}
                 />
@@ -523,6 +541,7 @@ export function ProductModal({
                   type="number"
                   step="0.01"
                   min="0"
+                  max={MAX_PRODUCT_PRICE}
                   inputMode="decimal"
                   placeholder="Preço original riscado"
                   value={form.compareAtPrice}
@@ -985,6 +1004,8 @@ export function ProductModal({
                             className="col-span-3 h-8"
                             type="number"
                             step="0.01"
+                            min="0"
+                            max={MAX_PRODUCT_PRICE}
                             value={row.price}
                             onChange={(e) => {
                               const price = Number(e.target.value)

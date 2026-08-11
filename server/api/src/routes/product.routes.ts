@@ -111,11 +111,15 @@ productRouter.delete('/categories/:id', authenticate, requireRole('admin'), asyn
 
 // ─── Admin: product CRUD ─────────────────────────────────────────────────────
 
+/** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — sem teto artificial baixo. */
+const MAX_PRODUCT_PRICE = 999_999.99;
+const moneySchema = z.number().nonnegative().max(MAX_PRODUCT_PRICE);
+
 const productSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).optional().nullable(),
-  price: z.number().nonnegative(),
-  compareAtPrice: z.number().nonnegative().optional().nullable(),
+  price: moneySchema,
+  compareAtPrice: moneySchema.optional().nullable(),
   categoryId: z.string().uuid().optional().nullable(),
   images: z.array(z.string().url()).max(8).optional(),
   stock: z.number().int().nonnegative().optional(),
@@ -152,8 +156,8 @@ const variantsReplaceSchema = z.object({
       name: z.string().min(1).max(200),
       options: z.record(z.string()),
       sku: z.string().max(60).optional().nullable(),
-      price: z.number().nonnegative(),
-      compareAtPrice: z.number().nonnegative().optional().nullable(),
+      price: moneySchema,
+      compareAtPrice: moneySchema.optional().nullable(),
       stock: z.number().int().nonnegative().optional(),
       images: z.array(z.string()).max(8).optional(),
       active: z.boolean().optional(),

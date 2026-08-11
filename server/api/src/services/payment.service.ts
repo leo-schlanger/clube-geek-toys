@@ -13,7 +13,8 @@ const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
 const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
 
 const MIN_AMOUNT = 1.00;
-const MAX_AMOUNT = 999.90;
+/** Teto generoso (XXXXXX.XX) — admin/loja não devem esbarrar em limite artificial baixo. */
+const MAX_AMOUNT = 999_999.99;
 
 function validateAmount(amount: number): void {
   if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
