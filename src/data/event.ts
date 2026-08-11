@@ -54,13 +54,14 @@ export const ACTIVE_EVENT: EventConfig = {
   startsAt: '2026-09-06T14:00:00-03:00',
   endsAt: '2026-09-06T18:00:00-03:00',
   location: {
-    name: 'GeekPop & Toys — Copacabana',
-    address: 'R. Barata Ribeiro, 181 — loja J, Copacabana, Rio de Janeiro — RJ',
+    name: 'Copacabana Mar Hotel',
+    address:
+      'Rua Ministro Viveiros de Castro, 115 — Copacabana, Rio de Janeiro — RJ',
     mapsUrl:
-      'https://maps.google.com/?q=R.+Barata+Ribeiro,+181+Copacabana+Rio+de+Janeiro',
+      'https://maps.google.com/?q=Copacabana+Mar+Hotel,+Rua+Ministro+Viveiros+de+Castro,+115+Copacabana+Rio+de+Janeiro',
   },
   description: [
-    'Um encontro especial na loja para fãs de K-pop, colecionáveis e cultura pop. Música ambiente, ambiente temático, lançamentos e muita interação com a equipe GeekPop.',
+    'Um encontro especial no Copacabana Mar Hotel para fãs de K-pop, colecionáveis e cultura pop. Música ambiente, ambiente temático, lançamentos e muita interação com a equipe GeekPop.',
     'Ingresso: R$ 20 por pessoa. Criança de colo e criança com deficiência (PCD) não pagam. Membros do Clube GeekPop & Toys têm entrada gratuita nos eventos participantes — apresente a carteirinha digital ou o CPF na porta.',
   ],
   highlights: [

@@ -140,7 +140,7 @@ export default function ShopHome() {
                 Loja de K-pop no Rio de Janeiro
               </span>
               <h1 className="mt-3 text-2xl font-heading font-bold sm:text-4xl">
-                Photocards, merch e cultura pop
+                Photocards, Merch e Cultura Geek e Kpop
               </h1>
               <p className="mt-2 text-muted-foreground">
                 Envio pelos Correios para todo o Brasil. Membros do clube ganham{' '}

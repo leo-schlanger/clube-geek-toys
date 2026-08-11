@@ -23,7 +23,7 @@ export function EventPromoCard() {
         <div className="max-w-xl space-y-3">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
             <Sparkles className="h-3.5 w-3.5" />
-            Evento na loja
+            Evento de Kpop
           </span>
           <h2 className="font-heading text-2xl font-bold sm:text-3xl">{event.title}</h2>
           <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-4">
@@ -41,7 +41,7 @@ export function EventPromoCard() {
           </p>
           {price != null && event.ticketReservation.enabled && (
             <p className="text-sm">
-              Ingresso a partir de{' '}
+              Ingresso no valor de{' '}
               <strong className="text-accent">
                 {event.ticketReservation.currencyLabel ?? 'R$'}{' '}
                 {price.toFixed(2).replace('.', ',')}
