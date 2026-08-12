@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { VariantPicker, matchVariant } from './VariantPicker'
+import { VariantPicker, matchVariant, resolveVariantImages } from './VariantPicker'
 import type { Product } from '../../types'
 
 const product: Product = {
@@ -11,7 +11,7 @@ const product: Product = {
   price: 80,
   compareAtPrice: null,
   categoryId: null,
-  images: [],
+  images: ['https://example.com/listing.jpg'],
   stock: 5,
   sku: null,
   active: true,
@@ -31,7 +31,7 @@ const product: Product = {
       price: 80,
       compareAtPrice: null,
       stock: 2,
-      images: [],
+      images: ['https://example.com/rosa.jpg'],
       active: true,
       sortOrder: 0,
     },
@@ -44,7 +44,7 @@ const product: Product = {
       price: 90,
       compareAtPrice: null,
       stock: 0,
-      images: [],
+      images: ['https://example.com/preto.jpg'],
       active: true,
       sortOrder: 1,
     },
@@ -73,9 +73,32 @@ describe('VariantPicker / matchVariant', () => {
     expect(screen.getByText('Variações')).toBeInTheDocument()
     expect(screen.getByText('Rosa')).toBeInTheDocument()
     // Preto is unavailable (stock 0 / no valid combo with Tamanho P) — toggle selected Rosa instead
-    fireEvent.click(screen.getByRole('button', { name: 'Rosa' }))
+    fireEvent.click(screen.getByRole('button', { name: /Rosa/i }))
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ Cor: '', Tamanho: 'P' })
     )
+  })
+
+  it('shows image swatches when variants have photos', () => {
+    render(
+      <VariantPicker
+        product={product}
+        selected={{ Cor: 'Rosa', Tamanho: 'P' }}
+        onChange={vi.fn()}
+        matched={product.variants![0]}
+      />
+    )
+    const imgs = screen.getAllByRole('img')
+    expect(imgs.length).toBeGreaterThan(0)
+  })
+
+  it('resolveVariantImages prefers matched, then partial, then listing', () => {
+    expect(resolveVariantImages(product, { Cor: 'Rosa', Tamanho: 'P' }, product.variants![0])).toEqual([
+      'https://example.com/rosa.jpg',
+    ])
+    expect(resolveVariantImages(product, { Cor: 'Preto' }, null)).toEqual([
+      'https://example.com/preto.jpg',
+    ])
+    expect(resolveVariantImages(product, {}, null)).toEqual(['https://example.com/listing.jpg'])
   })
 })

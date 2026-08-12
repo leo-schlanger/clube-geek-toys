@@ -12,8 +12,9 @@ interface VariantPickerProps {
 }
 
 /**
- * Seletor de variações: eixos (Cor, Tamanho, Material…) com botões de opção.
- * Mostra estoque/preço da combinação quando completa.
+ * Seletor de variações estilo Shopee: eixos (Cor, Tamanho…) com botões de opção.
+ * Opções com foto da variante viram swatches (miniatura + rótulo).
+ * Preço/estoque da combinação quando completa.
  */
 export function VariantPicker({ product, selected, onChange, matched }: VariantPickerProps) {
   const axes = useMemo(() => product.variantAxes ?? [], [product.variantAxes])
@@ -44,6 +45,40 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
     return map
   }, [axes, variants, selected])
 
+  /**
+   * Miniatura da opção (Shopee): prioriza variante compatível com a seleção atual;
+   * se não houver, usa qualquer variante ativa com foto nessa opção (ex.: outra cor).
+   */
+  const optionImage = useMemo(() => {
+    const map: Record<string, Record<string, string | null>> = {}
+    for (const axis of axes) {
+      map[axis.name] = {}
+      for (const opt of axis.options) {
+        const withOpt = variants.filter(
+          (v) => (v.options[axis.name] || '') === opt && v.images?.length
+        )
+        const compatible = withOpt.find((v) => {
+          for (const [k, val] of Object.entries(selected)) {
+            if (k === axis.name) continue
+            if (!val) continue
+            if ((v.options[k] || '') !== val) return false
+          }
+          return true
+        })
+        map[axis.name][opt] = compatible?.images?.[0] ?? withOpt[0]?.images?.[0] ?? null
+      }
+    }
+    return map
+  }, [axes, variants, selected])
+
+  const anyOptionHasImage = useMemo(
+    () =>
+      axes.some((axis) =>
+        axis.options.some((opt) => Boolean(optionImage[axis.name]?.[opt]))
+      ),
+    [axes, optionImage]
+  )
+
   if (!product.hasVariants || axes.length === 0) return null
 
   return (
@@ -63,6 +98,9 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
             {axis.options.map((opt) => {
               const isSelected = selected[axis.name] === opt
               const available = availableFor[axis.name]?.has(opt) ?? false
+              const thumb = optionImage[axis.name]?.[opt]
+              const showThumb = Boolean(thumb) || anyOptionHasImage
+
               return (
                 <button
                   key={opt}
@@ -75,15 +113,35 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
                     })
                   }
                   className={cn(
-                    'rounded-md border px-3 py-1.5 text-sm transition-colors',
+                    'group relative flex items-center gap-2 rounded-md border text-sm transition-colors',
+                    showThumb ? 'p-1 pr-2.5' : 'px-3 py-1.5',
                     isSelected
-                      ? 'border-primary bg-primary/10 font-medium text-primary'
+                      ? 'border-primary bg-primary/10 font-medium text-primary ring-1 ring-primary/40'
                       : available
                         ? 'border-input hover:border-primary/50'
                         : 'cursor-not-allowed border-dashed opacity-40 line-through'
                   )}
+                  title={opt}
                 >
-                  {opt}
+                  {showThumb && (
+                    <span
+                      className={cn(
+                        'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded bg-muted',
+                        isSelected && 'ring-1 ring-primary/50'
+                      )}
+                    >
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt={opt}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </span>
+                  )}
+                  <span className={cn(showThumb && 'text-xs sm:text-sm')}>{opt}</span>
                 </button>
               )
             })}
@@ -116,4 +174,33 @@ export function matchVariant(
   return (
     variants.find((v) => axes.every((a) => (v.options[a.name] || '') === selected[a.name])) ?? null
   )
+}
+
+/**
+ * Galeria a exibir na PDP (estilo Shopee):
+ * 1) combinação completa com fotos próprias → fotos da variante
+ * 2) seleção parcial → 1ª variante compatível com foto
+ * 3) fallback → fotos do listing
+ */
+export function resolveVariantImages(
+  product: Product,
+  selected: Record<string, string>,
+  matched: ProductVariant | null
+): string[] {
+  if (matched?.images?.length) return matched.images
+
+  const variants = (product.variants ?? []).filter((v) => v.active)
+  if (variants.length && Object.values(selected).some(Boolean)) {
+    const partial = variants.find((v) => {
+      if (!v.images?.length) return false
+      for (const [k, val] of Object.entries(selected)) {
+        if (!val) continue
+        if ((v.options[k] || '') !== val) return false
+      }
+      return true
+    })
+    if (partial?.images?.length) return partial.images
+  }
+
+  return product.images ?? []
 }

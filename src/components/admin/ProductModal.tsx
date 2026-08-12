@@ -240,6 +240,13 @@ export function ProductModal({
   const [imageUrl, setImageUrl] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Foto por variação (estilo Shopee): arquivo pendente por índice da linha.
+  const [pendingVariantFiles, setPendingVariantFiles] = useState<Record<number, File>>({})
+  const [pendingVariantPreviews, setPendingVariantPreviews] = useState<Record<number, string>>({})
+  const [variantImageTarget, setVariantImageTarget] = useState<number | null>(null)
+  const [variantUrlDraft, setVariantUrlDraft] = useState<Record<number, string>>({})
+  const variantFileInputRef = useRef<HTMLInputElement>(null)
+
   // Inline category creation
   const [newCategoryName, setNewCategoryName] = useState('')
   const [creatingCategory, setCreatingCategory] = useState(false)
@@ -253,6 +260,13 @@ export function ProductModal({
     setAxisDrafts(axesToDrafts(product?.variantAxes))
     setVariantRows(variantsToRows(product?.variants))
     setNewOptionByAxis({})
+    setPendingVariantFiles({})
+    setPendingVariantPreviews((prev) => {
+      for (const url of Object.values(prev)) URL.revokeObjectURL(url)
+      return {}
+    })
+    setVariantImageTarget(null)
+    setVariantUrlDraft({})
   }, [product])
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -284,6 +298,106 @@ export function ProductModal({
 
   function removePendingFile(index: number) {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function setVariantImages(idx: number, nextImages: string[]) {
+    setVariantRows((rows) => rows.map((r, i) => (i === idx ? { ...r, images: nextImages } : r)))
+  }
+
+  function revokePendingPreview(idx: number) {
+    setPendingVariantPreviews((prev) => {
+      const url = prev[idx]
+      if (url) URL.revokeObjectURL(url)
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
+  }
+
+  function clearVariantImage(idx: number) {
+    setVariantImages(idx, [])
+    setPendingVariantFiles((prev) => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
+    revokePendingPreview(idx)
+  }
+
+  function assignGalleryImageToVariant(idx: number, url: string) {
+    setVariantImages(idx, [url])
+    setPendingVariantFiles((prev) => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
+    revokePendingPreview(idx)
+  }
+
+  function openVariantFilePicker(idx: number) {
+    setVariantImageTarget(idx)
+    // Defer click so state is set before the change handler runs.
+    queueMicrotask(() => variantFileInputRef.current?.click())
+  }
+
+  async function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const idx = variantImageTarget
+    if (variantFileInputRef.current) variantFileInputRef.current.value = ''
+    if (!file || idx == null) return
+
+    // Produto já existe: upload imediato e anexa URL na variação.
+    const productId = product?.id
+    if (productId) {
+      try {
+        const before = new Set(images)
+        const updated = await uploadProductImages(productId, [file])
+        if (!updated?.images?.length) {
+          toast.error('Falha no upload da foto da variação')
+          return
+        }
+        const added = updated.images.filter((u) => !before.has(u))
+        const url = added[0] ?? updated.images[updated.images.length - 1]
+        setImages(updated.images)
+        setVariantImages(idx, [url])
+        setPendingVariantFiles((prev) => {
+          const next = { ...prev }
+          delete next[idx]
+          return next
+        })
+        revokePendingPreview(idx)
+        toast.success(`Foto da variação "${variantRows[idx]?.name ?? ''}" enviada`)
+      } catch (error) {
+        logger.error('Error uploading variant image:', error)
+        toast.error('Erro ao enviar foto da variação')
+      }
+      return
+    }
+
+    // Criação: guarda arquivo e mostra preview; sobe no save.
+    setPendingVariantFiles((prev) => ({ ...prev, [idx]: file }))
+    setPendingVariantPreviews((prev) => {
+      if (prev[idx]) URL.revokeObjectURL(prev[idx])
+      return { ...prev, [idx]: URL.createObjectURL(file) }
+    })
+    setVariantImages(idx, []) // URL real vem no save; preview usa blob
+  }
+
+  function applyVariantImageUrl(idx: number) {
+    const url = (variantUrlDraft[idx] ?? '').trim()
+    if (!url) return
+    if (!/^https?:\/\//i.test(url)) {
+      toast.error('URL da variação inválida (use http/https)')
+      return
+    }
+    setVariantImages(idx, [url])
+    setPendingVariantFiles((prev) => {
+      const next = { ...prev }
+      delete next[idx]
+      return next
+    })
+    revokePendingPreview(idx)
+    setVariantUrlDraft((prev) => ({ ...prev, [idx]: '' }))
   }
 
   async function handleCreateCategory() {
@@ -405,8 +519,46 @@ export function ProductModal({
         return
       }
 
-      // Variações: salva eixos + SKUs (ou limpa)
-      if (hasVariants && variantRows.length > 0) {
+      // Upload de imagens do listing + fotos de variação pendentes (precisa de productId).
+      let catalogImages = [...images]
+      if (pendingFiles.length > 0) {
+        const withImages = await uploadProductImages(saved.id, pendingFiles)
+        if (!withImages) {
+          toast.error('Produto salvo, mas houve erro no upload das imagens')
+        } else {
+          catalogImages = withImages.images
+          saved = withImages
+        }
+      }
+
+      // Resolve fotos de variação que ainda são File (modo criar)
+      const rowsWithImages = variantRows.map((r, i) => ({
+        ...r,
+        price: Number(r.price),
+        stock: Number(r.stock) || 0,
+        images: Array.isArray(r.images) ? [...r.images] : [],
+        sortOrder: i,
+      }))
+      const pendingEntries = Object.entries(pendingVariantFiles)
+      if (pendingEntries.length > 0) {
+        let known = new Set(catalogImages)
+        for (const [idxStr, file] of pendingEntries) {
+          const idx = Number(idxStr)
+          const updated = await uploadProductImages(saved.id, [file])
+          if (!updated?.images?.length) continue
+          const added = updated.images.filter((u) => !known.has(u))
+          const url = added[0] ?? updated.images[updated.images.length - 1]
+          known = new Set(updated.images)
+          catalogImages = updated.images
+          saved = updated
+          if (rowsWithImages[idx]) {
+            rowsWithImages[idx].images = [url]
+          }
+        }
+      }
+
+      // Variações: salva eixos + SKUs com fotos (ou limpa)
+      if (hasVariants && rowsWithImages.length > 0) {
         const axes = buildAxes()
         if (!axes.length) {
           toast.error(
@@ -416,7 +568,7 @@ export function ProductModal({
           onSuccess()
           return
         }
-        const badVariant = variantRows.find((r) => {
+        const badVariant = rowsWithImages.find((r) => {
           const p = Number(r.price)
           return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE
         })
@@ -427,16 +579,7 @@ export function ProductModal({
           setLoading(false)
           return
         }
-        const withVariants = await replaceProductVariants(
-          saved.id,
-          axes,
-          variantRows.map((r, i) => ({
-            ...r,
-            price: Number(r.price),
-            stock: Number(r.stock) || 0,
-            sortOrder: i,
-          }))
-        )
+        const withVariants = await replaceProductVariants(saved.id, axes, rowsWithImages)
         if (!withVariants) {
           toast.error('Produto salvo, mas falhou ao gravar as variações. Tente de novo.')
           setLoading(false)
@@ -446,14 +589,6 @@ export function ProductModal({
         saved = withVariants
       } else if (isEditMode && product?.hasVariants && !hasVariants) {
         await replaceProductVariants(saved.id, [], [])
-      }
-
-      // Upload any newly picked files now that we have a product id.
-      if (pendingFiles.length > 0) {
-        const withImages = await uploadProductImages(saved.id, pendingFiles)
-        if (!withImages) {
-          toast.error('Produto salvo, mas houve erro no upload das imagens')
-        }
       }
 
       toast.success(isEditMode ? 'Produto atualizado!' : 'Produto criado!')
@@ -988,59 +1123,175 @@ export function ProductModal({
                   </div>
 
                   {variantRows.length > 0 && (
-                    <div className="max-h-64 space-y-2 overflow-y-auto rounded border p-2">
+                    <div className="max-h-96 space-y-3 overflow-y-auto rounded border p-2">
                       <p className="text-xs font-medium text-muted-foreground">
-                        {variantRows.length} SKU(s) — ajuste preço / estoque / SKU
+                        {variantRows.length} SKU(s) — foto própria, preço, estoque e SKU (como na
+                        Shopee)
                       </p>
-                      {variantRows.map((row, idx) => (
-                        <div
-                          key={row.name + idx}
-                          className="grid grid-cols-12 items-center gap-2 text-sm"
-                        >
-                          <span className="col-span-4 truncate font-medium" title={row.name}>
-                            {row.name}
-                          </span>
-                          <Input
-                            className="col-span-3 h-8"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max={MAX_PRODUCT_PRICE}
-                            value={row.price}
-                            onChange={(e) => {
-                              const price = Number(e.target.value)
-                              setVariantRows((rows) =>
-                                rows.map((r, i) => (i === idx ? { ...r, price } : r))
-                              )
-                            }}
-                            aria-label={`Preço ${row.name}`}
-                          />
-                          <Input
-                            className="col-span-2 h-8"
-                            type="number"
-                            value={row.stock ?? 0}
-                            onChange={(e) => {
-                              const stock = Number(e.target.value)
-                              setVariantRows((rows) =>
-                                rows.map((r, i) => (i === idx ? { ...r, stock } : r))
-                              )
-                            }}
-                            aria-label={`Estoque ${row.name}`}
-                          />
-                          <Input
-                            className="col-span-3 h-8"
-                            placeholder="SKU"
-                            value={row.sku ?? ''}
-                            onChange={(e) => {
-                              const sku = e.target.value
-                              setVariantRows((rows) =>
-                                rows.map((r, i) => (i === idx ? { ...r, sku } : r))
-                              )
-                            }}
-                            aria-label={`SKU ${row.name}`}
-                          />
-                        </div>
-                      ))}
+                      <input
+                        ref={variantFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleVariantFilePick}
+                      />
+                      {variantRows.map((row, idx) => {
+                        const pendingFile = pendingVariantFiles[idx]
+                        const thumbUrl = row.images?.[0] || pendingVariantPreviews[idx] || null
+                        return (
+                          <div
+                            key={row.name + idx}
+                            className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2"
+                          >
+                            <div className="grid grid-cols-12 items-center gap-2 text-sm">
+                              {/* Foto da variação */}
+                              <div className="col-span-2 sm:col-span-1">
+                                <button
+                                  type="button"
+                                  onClick={() => openVariantFilePicker(idx)}
+                                  className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
+                                  title={`Foto de ${row.name}`}
+                                  aria-label={`Enviar foto da variação ${row.name}`}
+                                >
+                                  {thumbUrl ? (
+                                    <img
+                                      src={thumbUrl}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <Upload className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                </button>
+                              </div>
+                              <span
+                                className="col-span-4 truncate font-medium sm:col-span-3"
+                                title={row.name}
+                              >
+                                {row.name}
+                              </span>
+                              <Input
+                                className="col-span-3 h-8 sm:col-span-3"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max={MAX_PRODUCT_PRICE}
+                                value={row.price}
+                                onChange={(e) => {
+                                  const price = Number(e.target.value)
+                                  setVariantRows((rows) =>
+                                    rows.map((r, i) => (i === idx ? { ...r, price } : r))
+                                  )
+                                }}
+                                aria-label={`Preço ${row.name}`}
+                              />
+                              <Input
+                                className="col-span-2 h-8"
+                                type="number"
+                                value={row.stock ?? 0}
+                                onChange={(e) => {
+                                  const stock = Number(e.target.value)
+                                  setVariantRows((rows) =>
+                                    rows.map((r, i) => (i === idx ? { ...r, stock } : r))
+                                  )
+                                }}
+                                aria-label={`Estoque ${row.name}`}
+                              />
+                              <Input
+                                className="col-span-12 h-8 sm:col-span-3"
+                                placeholder="SKU"
+                                value={row.sku ?? ''}
+                                onChange={(e) => {
+                                  const sku = e.target.value
+                                  setVariantRows((rows) =>
+                                    rows.map((r, i) => (i === idx ? { ...r, sku } : r))
+                                  )
+                                }}
+                                aria-label={`SKU ${row.name}`}
+                              />
+                            </div>
+
+                            {/* Controles de foto da variação */}
+                            <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => openVariantFilePicker(idx)}
+                              >
+                                <Upload className="h-3 w-3" />
+                                {thumbUrl ? 'Trocar foto' : 'Foto'}
+                              </Button>
+                              {(thumbUrl || pendingFile) && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs text-muted-foreground"
+                                  onClick={() => clearVariantImage(idx)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  Remover
+                                </Button>
+                              )}
+                              <div className="flex min-w-0 flex-1 gap-1">
+                                <Input
+                                  className="h-7 text-xs"
+                                  placeholder="Ou cole URL da foto desta variação"
+                                  value={variantUrlDraft[idx] ?? ''}
+                                  onChange={(e) =>
+                                    setVariantUrlDraft((prev) => ({
+                                      ...prev,
+                                      [idx]: e.target.value,
+                                    }))
+                                  }
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      applyVariantImageUrl(idx)
+                                    }
+                                  }}
+                                  aria-label={`URL da foto ${row.name}`}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 shrink-0 text-xs"
+                                  onClick={() => applyVariantImageUrl(idx)}
+                                >
+                                  OK
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Atalho: escolher imagem já do produto */}
+                            {images.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-14">
+                                <span className="text-[10px] text-muted-foreground">
+                                  Da galeria:
+                                </span>
+                                {images.slice(0, 8).map((url) => (
+                                  <button
+                                    key={url}
+                                    type="button"
+                                    onClick={() => assignGalleryImageToVariant(idx, url)}
+                                    className={`h-8 w-8 overflow-hidden rounded border transition-colors ${
+                                      row.images?.[0] === url
+                                        ? 'border-primary ring-1 ring-primary'
+                                        : 'border-border hover:border-primary/60'
+                                    }`}
+                                    title="Usar esta imagem na variação"
+                                  >
+                                    <img src={url} alt="" className="h-full w-full object-cover" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

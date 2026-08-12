@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ShoppingCart, Search, User, Menu, X, CalendarHeart, Package, Wallet, Building2 } from 'lucide-react'
+import { ShoppingCart, Search, User, Menu, CalendarHeart, Package, Wallet, Building2 } from 'lucide-react'
 import { getStoreCredit } from '../../lib/reviews'
 import { formatCurrency, cn } from '../../lib/utils'
 import { Button } from '../ui/button'
@@ -22,8 +22,8 @@ interface ShopHeaderProps {
 }
 
 /**
- * Cabeçalho da loja: logo, busca, carrinho (abre gaveta) e login/avatar.
- * A busca navega para /?search=... (ou /atacado?search= no canal atacado).
+ * Cabeçalho da loja estilo Shopee: logo, busca sempre visível com botão,
+ * carrinho (gaveta) e login/avatar. Busca → /?search=... (ou /atacado?search=).
  */
 export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeaderProps) {
   const { count } = useCart()
@@ -33,20 +33,15 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
   const [searchParams] = useSearchParams()
 
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [term, setTerm] = useState(() => searchParams.get('search') ?? '')
   const [creditBalance, setCreditBalance] = useState(0)
-  const mobileInputRef = useRef<HTMLInputElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Mantém o campo em sincronia quando o query param muda (ex.: navegação por link).
   // queueMicrotask evita o setState síncrono no corpo do efeito (cascading renders).
   useEffect(() => {
     queueMicrotask(() => setTerm(searchParams.get('search') ?? ''))
   }, [searchParams])
-
-  useEffect(() => {
-    if (mobileSearchOpen) mobileInputRef.current?.focus()
-  }, [mobileSearchOpen])
 
   useEffect(() => {
     let active = true
@@ -75,17 +70,21 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
     const q = term.trim()
     const base = isWholesale ? '/atacado' : '/'
     navigate(q ? `${base}?search=${encodeURIComponent(q)}` : base)
-    setMobileSearchOpen(false)
   }
+
+  const searchPlaceholder = isWholesale
+    ? 'Buscar no atacado...'
+    : 'Buscar produtos, marcas, merch...'
 
   return (
     <>
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
+        {/* Linha 1: logo + canais + ações */}
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:h-16 sm:gap-3">
           {/* Logo */}
           <Link to={isWholesale ? '/atacado' : '/'} className="flex shrink-0 items-center gap-2">
-            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-9 w-auto" />
-            <span className="hidden text-sm font-heading font-semibold sm:inline">
+            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-8 w-auto sm:h-9" />
+            <span className="hidden text-sm font-heading font-semibold lg:inline">
               {isWholesale ? 'Atacado GeekPop & Toys' : 'Loja GeekPop & Toys'}
             </span>
           </Link>
@@ -115,7 +114,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             <Button
               variant="ghost"
               size="sm"
-              className="hidden shrink-0 text-primary sm:inline-flex"
+              className="hidden shrink-0 text-primary md:inline-flex"
               onClick={() => navigate('/evento')}
             >
               <CalendarHeart className="h-4 w-4" />
@@ -123,21 +122,37 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             </Button>
           )}
 
-          {/* Busca (desktop) */}
-          <form onSubmit={handleSearch} className="relative hidden flex-1 md:block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              placeholder={isWholesale ? 'Buscar no atacado...' : 'Buscar produtos geek...'}
-              className="pl-9"
-              aria-label="Buscar produtos"
-            />
+          {/* Busca (desktop / tablet) — estilo Shopee: borda brand + botão Buscar */}
+          <form
+            onSubmit={handleSearch}
+            className="relative ml-1 hidden min-w-0 flex-1 items-stretch sm:flex"
+          >
+            <div className="flex w-full overflow-hidden rounded-md border-2 border-primary bg-background shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={searchInputRef}
+                  type="search"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="h-10 border-0 bg-transparent pl-9 pr-2 shadow-none focus-visible:ring-0"
+                  aria-label="Buscar produtos"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="h-10 shrink-0 rounded-none rounded-r-[4px] px-4 text-sm font-semibold"
+                aria-label="Pesquisar"
+              >
+                <Search className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Buscar</span>
+              </Button>
+            </div>
           </form>
 
           {/* Ações */}
-          <div className="ml-auto flex items-center gap-1 md:ml-0">
+          <div className="ml-auto flex items-center gap-0.5 sm:ml-0 sm:gap-1">
             {/* Mobile: atalho Atacado */}
             <Button
               variant="ghost"
@@ -157,17 +172,6 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             )}
 
             <ThemeToggle variant="icon" />
-
-            {/* Busca (mobile toggle) */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              aria-label="Buscar"
-              onClick={() => setMobileSearchOpen((v) => !v)}
-            >
-              {mobileSearchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
-            </Button>
 
             {/* Carrinho */}
             <Button
@@ -239,23 +243,29 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
           </div>
         </div>
 
-        {/* Busca (mobile expandida) */}
-        {mobileSearchOpen && (
-          <form onSubmit={handleSearch} className="border-t p-3 md:hidden">
-            <div className="relative">
+        {/* Linha 2 mobile: busca sempre visível (padrão Shopee) */}
+        <form onSubmit={handleSearch} className="border-t px-3 py-2 sm:hidden">
+          <div className="flex overflow-hidden rounded-md border-2 border-primary bg-background shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
+            <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                ref={mobileInputRef}
                 type="search"
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
-                placeholder="Buscar produtos geek..."
-                className="pl-9"
+                placeholder={searchPlaceholder}
+                className="h-10 border-0 bg-transparent pl-9 pr-2 shadow-none focus-visible:ring-0"
                 aria-label="Buscar produtos"
               />
             </div>
-          </form>
-        )}
+            <Button
+              type="submit"
+              className="h-10 shrink-0 rounded-none rounded-r-[4px] px-3.5 font-semibold"
+              aria-label="Pesquisar"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+        </form>
       </header>
 
       <CartDrawer

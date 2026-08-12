@@ -20,8 +20,11 @@
 2. Ativar **Variações**
 3. **Tipo** = o eixo (ex. `Cor`). **Opções** = cada valor (Rosa, Preto, Azul…) — use **+ Opção** ou cole com vírgulas. **Sem limite** de opções nem de tipos.
 4. Opcional: **Outro tipo** (ex. Tamanho) se precisar de matriz 2D+
-5. **Gerar combinações** → preencher preço/estoque/SKU de cada linha
-6. Salvar
+5. **Gerar combinações** → preencher **foto / preço / estoque / SKU** de cada linha
+6. Em cada SKU: clique no quadrado da foto (upload), cole URL, ou escolha uma imagem da **galeria do produto**
+7. Salvar
+
+> **Foto por variação (Shopee):** a PDP troca a galeria ao escolher a opção; o seletor mostra miniatura quando a variante tem imagem. Sem foto na variante, cai nas fotos gerais do listing.
 
 > Erro comum: colocar o nome da cor no campo **Tipo** (ex. "Cor vermelha") e só 1 opção. O certo é Tipo=`Cor` e Opções=`Vermelha, Azul, Preto`.
 

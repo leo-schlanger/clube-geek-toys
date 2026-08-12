@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ShoppingCart,
@@ -22,7 +22,11 @@ import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
-import { VariantPicker, matchVariant } from '../../components/store/VariantPicker'
+import {
+  VariantPicker,
+  matchVariant,
+  resolveVariantImages,
+} from '../../components/store/VariantPicker'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
@@ -112,8 +116,17 @@ export default function ProductDetail() {
   const matched = product ? matchVariant(product, variantSel) : null
   const displayPrice = matched?.price ?? product?.price ?? 0
   const displayStock = matched?.stock ?? product?.stock ?? 0
-  const displayImages =
-    matched?.images?.length ? matched.images : product?.images ?? []
+  const displayImages = useMemo(
+    () => (product ? resolveVariantImages(product, variantSel, matched) : []),
+    [product, variantSel, matched]
+  )
+
+  // Ao trocar variação, volta para a 1ª foto da galeria da variante (Shopee).
+  const galleryKey = displayImages[0] ?? ''
+  useEffect(() => {
+    setActiveImage(0)
+  }, [galleryKey])
+
   const outOfStock = product
     ? product.hasVariants
       ? !matched || matched.stock <= 0
@@ -194,8 +207,12 @@ export default function ProductDetail() {
                 {displayImages.length > 0 ? (
                   <img
                     src={displayImages[Math.min(activeImage, displayImages.length - 1)]}
-                    alt={product.name}
-                    className="h-full w-full object-contain"
+                    alt={
+                      matched
+                        ? `${product.name} — ${matched.name}`
+                        : product.name
+                    }
+                    className="h-full w-full object-contain transition-opacity duration-200"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
