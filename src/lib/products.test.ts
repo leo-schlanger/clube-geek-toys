@@ -100,7 +100,17 @@ describe('products API client', () => {
     mockedRequest.mockResolvedValue({ data: product, status: 200 })
     const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
     const res = await uploadProductImages('p1', [file])
-    expect(mockedRequest).toHaveBeenCalled()
-    expect(res?.id).toBe('p1')
+    expect(mockedRequest).toHaveBeenCalledWith(
+      '/products/p1/images',
+      expect.objectContaining({ method: 'POST', noRetry: true, timeoutMs: 60_000 })
+    )
+    expect(res).toEqual({ ok: true, product })
+  })
+
+  it('uploadProductImages surfaces API error', async () => {
+    mockedRequest.mockResolvedValue({ error: 'Imagem muito grande', status: 400 })
+    const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
+    const res = await uploadProductImages('p1', [file])
+    expect(res).toEqual({ ok: false, error: 'Imagem muito grande' })
   })
 })

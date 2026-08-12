@@ -134,8 +134,21 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return !result.error
 }
 
-/** Upload product images (multipart). Returns the updated product. */
-export async function uploadProductImages(id: string, files: File[]): Promise<Product | null> {
+export type UploadProductImagesResult =
+  | { ok: true; product: Product }
+  | { ok: false; error: string }
+
+/**
+ * Upload product images (multipart). Returns the updated product or a clear error.
+ * Uses a longer timeout — phone photos can be multi-MB even after compression.
+ */
+export async function uploadProductImages(
+  id: string,
+  files: File[]
+): Promise<UploadProductImagesResult> {
+  if (!files.length) {
+    return { ok: false, error: 'Nenhuma imagem selecionada.' }
+  }
   const form = new FormData()
   for (const f of files) form.append('images', f)
   // FormData body — apiRequest leaves the Content-Type unset so the browser adds the
@@ -143,8 +156,17 @@ export async function uploadProductImages(id: string, files: File[]): Promise<Pr
   const result = await apiRequest<Product>(`/products/${id}/images`, {
     method: 'POST',
     body: form,
+    // Don't retry POST multipart (body may not re-send cleanly after network blip).
+    noRetry: true,
+    timeoutMs: 60_000,
   })
-  return result.data ?? null
+  if (result.data) {
+    return { ok: true, product: result.data }
+  }
+  return {
+    ok: false,
+    error: result.error || 'Falha no upload das imagens.',
+  }
 }
 
 export interface CategoryInput {

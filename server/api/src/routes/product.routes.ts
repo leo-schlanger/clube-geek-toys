@@ -220,30 +220,84 @@ productRouter.delete('/:id', authenticate, requireRole('admin'), async (req, res
 
 // ─── Admin: product image upload ─────────────────────────────────────────────
 
+const PRODUCT_IMAGE_MAX_BYTES = 12 * 1024 * 1024; // 12 MB
+const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
     const productId = String(req.params.id || 'temp');
     const dir = path.join('/app/uploads/products', productId);
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    } catch (err) {
+      cb(err as Error, dir);
+    }
   },
   filename: (_req, file, cb) => {
-    const ext = (path.extname(file.originalname) || '.jpg').toLowerCase();
+    const rawExt = (path.extname(file.originalname) || '').toLowerCase();
+    const byMime =
+      file.mimetype === 'image/png' ? '.png' : file.mimetype === 'image/webp' ? '.webp' : '.jpg';
+    const ext = ['.jpg', '.jpeg', '.png', '.webp'].includes(rawExt)
+      ? rawExt === '.jpeg'
+        ? '.jpg'
+        : rawExt
+      : byMime;
     cb(null, `${crypto.randomUUID()}${ext}`);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES, files: 6 },
   fileFilter: (_req, file, cb) => {
-    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+    if (ALLOWED_IMAGE_MIME.has(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Apenas imagens JPEG, PNG ou WEBP são permitidas'));
     }
   },
 });
+
+/** Map multer / file-filter failures to clear 4xx responses (not generic 500). */
+function handleProductImageUpload(
+  req: import('express').Request,
+  res: import('express').Response,
+  next: import('express').NextFunction
+): void {
+  upload.array('images', 6)(req, res, (err: unknown) => {
+    if (!err) {
+      next();
+      return;
+    }
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({
+          error: 'Imagem muito grande. Máximo 12 MB por arquivo (JPEG, PNG ou WEBP).',
+          code: 'IMAGE_TOO_LARGE',
+        });
+        return;
+      }
+      if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+        res.status(400).json({
+          error: 'Envie no máximo 6 imagens por vez.',
+          code: 'TOO_MANY_IMAGES',
+        });
+        return;
+      }
+      res.status(400).json({ error: `Falha no upload: ${err.message}`, code: err.code });
+      return;
+    }
+    if (err instanceof Error) {
+      res.status(400).json({
+        error: err.message || 'Arquivo de imagem inválido.',
+        code: 'INVALID_IMAGE_TYPE',
+      });
+      return;
+    }
+    next(err);
+  });
+}
 
 /** Validate real image content by magic bytes (MIME can be spoofed). */
 function isValidImage(filePath: string): boolean {
@@ -262,28 +316,40 @@ function isValidImage(filePath: string): boolean {
 }
 
 // POST /products/:id/images — upload up to 6 product images
-productRouter.post('/:id/images', authenticate, requireRole('admin'), upload.array('images', 6), async (req, res, next) => {
-  try {
-    const files = (req.files as Express.Multer.File[]) || [];
-    if (files.length === 0) {
-      res.status(400).json({ error: 'Nenhuma imagem enviada.' });
-      return;
-    }
-    const urls: string[] = [];
-    for (const f of files) {
-      if (!isValidImage(f.path)) {
-        try { fs.unlinkSync(f.path); } catch { /* ignore */ }
-        continue;
+productRouter.post(
+  '/:id/images',
+  authenticate,
+  requireRole('admin'),
+  handleProductImageUpload,
+  async (req, res, next) => {
+    try {
+      const files = (req.files as Express.Multer.File[]) || [];
+      if (files.length === 0) {
+        res.status(400).json({ error: 'Nenhuma imagem enviada.', code: 'NO_IMAGES' });
+        return;
       }
-      urls.push(`${env.API_URL}/uploads/products/${req.params.id}/${path.basename(f.path)}`);
+      const urls: string[] = [];
+      for (const f of files) {
+        if (!isValidImage(f.path)) {
+          try {
+            fs.unlinkSync(f.path);
+          } catch {
+            /* ignore */
+          }
+          continue;
+        }
+        urls.push(`${env.API_URL}/uploads/products/${req.params.id}/${path.basename(f.path)}`);
+      }
+      if (urls.length === 0) {
+        res
+          .status(400)
+          .json({ error: 'Arquivos enviados não são imagens válidas (JPEG, PNG ou WEBP).', code: 'INVALID_IMAGE' });
+        return;
+      }
+      const product = await productService.addProductImages(req.params.id as string, urls);
+      res.status(201).json(product);
+    } catch (err) {
+      next(err);
     }
-    if (urls.length === 0) {
-      res.status(400).json({ error: 'Arquivos enviados não são imagens válidas.', code: 'INVALID_IMAGE' });
-      return;
-    }
-    const product = await productService.addProductImages(req.params.id as string, urls);
-    res.status(201).json(product);
-  } catch (err) {
-    next(err);
   }
-});
+);

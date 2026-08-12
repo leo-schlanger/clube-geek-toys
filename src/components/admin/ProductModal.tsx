@@ -17,6 +17,11 @@ import {
   type ProductInput,
   type VariantInput,
 } from '../../lib/products'
+import {
+  prepareProductImages,
+  PRODUCT_IMAGE_ACCEPT,
+  PRODUCT_IMAGE_ACCEPT_LABEL,
+} from '../../lib/product-image'
 import { formatCurrency } from '../../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -100,6 +105,7 @@ export function ProductModal({
 
   const [form, setForm] = useState<FormState>(() => toFormState(product))
   const [loading, setLoading] = useState(false)
+  const [uploadingImages, setUploadingImages] = useState(false)
 
   // Variações: eixos + opções ilimitados (1 tipo "Cor" com N opções = N SKUs)
   function axesToDrafts(axes?: VariantAxis[] | null): AxisDraft[] {
@@ -252,7 +258,7 @@ export function ProductModal({
   const [creatingCategory, setCreatingCategory] = useState(false)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync local form when the edited product changes
+     
     setForm(toFormState(product))
     setImages(product?.images ?? [])
     setPendingFiles([])
@@ -284,12 +290,49 @@ export function ProductModal({
     setImageUrl('')
   }
 
-  function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
-    if (files.length === 0) return
-    setPendingFiles((prev) => [...prev, ...files])
+  async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? [])
     // Allow re-picking the same file later.
     if (fileInputRef.current) fileInputRef.current.value = ''
+    if (picked.length === 0) return
+
+    setUploadingImages(true)
+    try {
+      const { files, errors, compressedCount } = await prepareProductImages(picked)
+      for (const msg of errors) toast.error(msg)
+      if (files.length === 0) return
+
+      // Edição: envia na hora (botão "Enviar imagens" = upload imediato).
+      if (isEditMode && product?.id) {
+        const result = await uploadProductImages(product.id, files)
+        if (!result.ok) {
+          toast.error(result.error)
+          return
+        }
+        setImages(result.product.images)
+        toast.success(
+          files.length === 1
+            ? 'Imagem enviada'
+            : `${files.length} imagens enviadas${compressedCount ? ' (compactadas)' : ''}`
+        )
+        return
+      }
+
+      // Criação: guarda e sobe no save (precisa de productId).
+      setPendingFiles((prev) => [...prev, ...files])
+      if (compressedCount > 0) {
+        toast.message(
+          compressedCount === 1
+            ? 'Foto compactada para envio mais rápido'
+            : `${compressedCount} fotos compactadas para envio mais rápido`
+        )
+      }
+    } catch (error) {
+      logger.error('Error preparing product images:', error)
+      toast.error('Erro ao processar as imagens selecionadas')
+    } finally {
+      setUploadingImages(false)
+    }
   }
 
   function removeExistingImage(index: number) {
@@ -341,21 +384,27 @@ export function ProductModal({
   }
 
   async function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const raw = e.target.files?.[0]
     const idx = variantImageTarget
     if (variantFileInputRef.current) variantFileInputRef.current.value = ''
-    if (!file || idx == null) return
+    if (!raw || idx == null) return
+
+    const prepared = await prepareProductImages([raw])
+    for (const msg of prepared.errors) toast.error(msg)
+    const file = prepared.files[0]
+    if (!file) return
 
     // Produto já existe: upload imediato e anexa URL na variação.
     const productId = product?.id
     if (productId) {
       try {
         const before = new Set(images)
-        const updated = await uploadProductImages(productId, [file])
-        if (!updated?.images?.length) {
-          toast.error('Falha no upload da foto da variação')
+        const result = await uploadProductImages(productId, [file])
+        if (!result.ok || !result.product.images?.length) {
+          toast.error(result.ok ? 'Falha no upload da foto da variação' : result.error)
           return
         }
+        const updated = result.product
         const added = updated.images.filter((u) => !before.has(u))
         const url = added[0] ?? updated.images[updated.images.length - 1]
         setImages(updated.images)
@@ -523,11 +572,11 @@ export function ProductModal({
       let catalogImages = [...images]
       if (pendingFiles.length > 0) {
         const withImages = await uploadProductImages(saved.id, pendingFiles)
-        if (!withImages) {
-          toast.error('Produto salvo, mas houve erro no upload das imagens')
+        if (!withImages.ok) {
+          toast.error(`Produto salvo, mas falhou o upload das imagens: ${withImages.error}`)
         } else {
-          catalogImages = withImages.images
-          saved = withImages
+          catalogImages = withImages.product.images
+          saved = withImages.product
         }
       }
 
@@ -545,12 +594,12 @@ export function ProductModal({
         for (const [idxStr, file] of pendingEntries) {
           const idx = Number(idxStr)
           const updated = await uploadProductImages(saved.id, [file])
-          if (!updated?.images?.length) continue
-          const added = updated.images.filter((u) => !known.has(u))
-          const url = added[0] ?? updated.images[updated.images.length - 1]
-          known = new Set(updated.images)
-          catalogImages = updated.images
-          saved = updated
+          if (!updated.ok || !updated.product.images?.length) continue
+          const added = updated.product.images.filter((u) => !known.has(u))
+          const url = added[0] ?? updated.product.images[updated.product.images.length - 1]
+          known = new Set(updated.product.images)
+          catalogImages = updated.product.images
+          saved = updated.product
           if (rowsWithImages[idx]) {
             rowsWithImages[idx].images = [url]
           }
@@ -899,7 +948,7 @@ export function ProductModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={PRODUCT_IMAGE_ACCEPT}
                   multiple
                   onChange={handlePickFiles}
                   className="hidden"
@@ -908,16 +957,20 @@ export function ProductModal({
                   type="button"
                   variant="outline"
                   size="sm"
+                  disabled={uploadingImages || loading}
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="h-4 w-4" />
-                  Enviar imagens
+                  {uploadingImages ? <Loading size="sm" /> : <Upload className="h-4 w-4" />}
+                  {uploadingImages ? 'Enviando…' : 'Enviar imagens'}
                 </Button>
-                {!isEditMode && pendingFiles.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    As imagens serão enviadas ao salvar o produto.
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {PRODUCT_IMAGE_ACCEPT_LABEL}
+                  {isEditMode
+                    ? ' · envio imediato ao selecionar'
+                    : pendingFiles.length > 0
+                      ? ' · serão enviadas ao salvar o produto'
+                      : ' · no produto novo, sobem ao salvar'}
+                </p>
               </div>
 
               {/* Colar URL externa */}
@@ -1131,7 +1184,7 @@ export function ProductModal({
                       <input
                         ref={variantFileInputRef}
                         type="file"
-                        accept="image/*"
+                        accept={PRODUCT_IMAGE_ACCEPT}
                         className="hidden"
                         onChange={handleVariantFilePick}
                       />

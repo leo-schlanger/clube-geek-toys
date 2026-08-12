@@ -181,9 +181,10 @@ export interface ApiResponse<T = unknown> {
 
 export async function apiRequest<T = unknown>(
   path: string,
-  options: RequestInit & { skipAuth?: boolean; noRetry?: boolean } = {}
+  options: RequestInit & { skipAuth?: boolean; noRetry?: boolean; timeoutMs?: number } = {}
 ): Promise<ApiResponse<T>> {
-  const { skipAuth, noRetry, ...fetchOptions } = options
+  const { skipAuth, noRetry, timeoutMs, ...fetchOptions } = options
+  const timeout = timeoutMs ?? DEFAULT_TIMEOUT
 
   // Add auth header
   if (!skipAuth) {
@@ -196,7 +197,8 @@ export async function apiRequest<T = unknown>(
     }
   }
 
-  // Default content type for JSON
+  // Default content type for JSON only — never set Content-Type on FormData
+  // (browser must add the multipart boundary itself).
   if (fetchOptions.body && typeof fetchOptions.body === 'string') {
     fetchOptions.headers = {
       'Content-Type': 'application/json',
@@ -208,8 +210,8 @@ export async function apiRequest<T = unknown>(
 
   try {
     const response = noRetry
-      ? await fetchWithTimeout(url, fetchOptions)
-      : await fetchWithRetry(url, fetchOptions)
+      ? await fetchWithTimeout(url, fetchOptions, timeout)
+      : await fetchWithRetry(url, fetchOptions, MAX_RETRIES, timeout)
 
     // Handle 401 — try token refresh
     if (response.status === 401 && !skipAuth) {

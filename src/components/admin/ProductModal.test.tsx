@@ -16,7 +16,7 @@ vi.mock('../../lib/products', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), message: vi.fn() },
 }))
 
 import { ProductModal } from './ProductModal'
