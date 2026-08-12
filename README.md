@@ -59,7 +59,8 @@ Cartao premium com visual metalico, chip decorativo, shimmer holografico animado
 
 Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`):
 
-- Catalogo publico com categorias, busca e paginas de produto
+- Catalogo publico com categorias, busca estilo Shopee (header) e paginas de produto
+- Variacoes de produto (cor/tamanho etc.) com preco/estoque e **foto por SKU** (admin + PDP)
 - Carrinho persistido em `localStorage` (`CartContext`)
 - Checkout com cartao (Stripe) ou PIX local
 - **Desconto de 15% do membro aplicado server-side no checkout** (`discount_reason = 'member_15'`) — nunca confiando no valor enviado pelo cliente

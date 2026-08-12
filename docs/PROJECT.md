@@ -47,7 +47,7 @@ Verificacao de membros por CPF ou QR Code e visualizacao do status do membro e d
 
 ### 3.4 Modulo Loja (E-commerce)
 
-Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, busca, paginas de produto), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`.
+Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`.
 
 ### 3.4.1 Canal Atacado (B2B)
 

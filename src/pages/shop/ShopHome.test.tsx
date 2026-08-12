@@ -97,7 +97,7 @@ describe('ShopHome', () => {
   it('renders hero and product grid on home', async () => {
     renderHome('/')
     expect(screen.getByTestId('shop-header')).toBeInTheDocument()
-    expect(screen.getByText(/Photocards, merch e cultura pop/i)).toBeInTheDocument()
+    expect(screen.getByText(/Photocards, Merch e Cultura Geek e Kpop/i)).toBeInTheDocument()
     await waitFor(() => {
       const grids = screen.getAllByTestId('grid')
       expect(grids.some((g) => g.textContent?.includes('Photocard BTS'))).toBe(true)

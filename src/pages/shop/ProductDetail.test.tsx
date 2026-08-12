@@ -62,11 +62,6 @@ vi.mock('../../components/store/ProductGrid', () => ({
   ProductGrid: () => null,
 }))
 
-vi.mock('../../components/store/VariantPicker', () => ({
-  VariantPicker: () => null,
-  matchVariant: () => null,
-}))
-
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
@@ -74,11 +69,12 @@ vi.mock('sonner', () => ({
 import { getProductBySlug, listRelatedProducts } from '../../lib/products'
 import { toast } from 'sonner'
 import ProductDetail from './ProductDetail'
+import type { Product } from '../../types'
 
 const mockedGet = vi.mocked(getProductBySlug)
 const mockedRelated = vi.mocked(listRelatedProducts)
 
-const product = {
+const product: Product = {
   id: 'p1',
   name: 'Bolsa jeans',
   slug: 'bolsa-jeans',
@@ -95,6 +91,44 @@ const product = {
   hasVariants: false,
   createdAt: '',
   updatedAt: '',
+}
+
+const productWithVariants: Product = {
+  ...product,
+  id: 'p2',
+  name: 'Bolsa colorida',
+  slug: 'bolsa-colorida',
+  images: ['https://example.com/listing.jpg'],
+  hasVariants: true,
+  variantAxes: [{ name: 'Cor', options: ['Rosa', 'Preto'] }],
+  variants: [
+    {
+      id: 'v-rosa',
+      productId: 'p2',
+      name: 'Rosa',
+      options: { Cor: 'Rosa' },
+      sku: 'BR',
+      price: 100,
+      compareAtPrice: null,
+      stock: 5,
+      images: ['https://example.com/rosa.jpg'],
+      active: true,
+      sortOrder: 0,
+    },
+    {
+      id: 'v-preto',
+      productId: 'p2',
+      name: 'Preto',
+      options: { Cor: 'Preto' },
+      sku: 'BP',
+      price: 110,
+      compareAtPrice: null,
+      stock: 3,
+      images: ['https://example.com/preto.jpg'],
+      active: true,
+      sortOrder: 1,
+    },
+  ],
 }
 
 function renderPdp(slug = 'bolsa-jeans') {
@@ -139,5 +173,51 @@ describe('ProductDetail', () => {
     await waitFor(() => {
       expect(screen.getByText(/Produto não encontrado/i)).toBeInTheDocument()
     })
+  })
+
+  it('swaps main gallery image when selecting a variant with its own photo', async () => {
+    mockedGet.mockResolvedValue(productWithVariants)
+    renderPdp('bolsa-colorida')
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Bolsa colorida' })).toBeInTheDocument()
+    })
+
+    // Pré-seleciona 1ª opção (Rosa) — galeria da variante Rosa
+    const main = screen.getByRole('img', { name: /Bolsa colorida/i })
+    expect(main.getAttribute('src')).toBe('https://example.com/rosa.jpg')
+
+    fireEvent.click(screen.getByRole('button', { name: /Preto/i }))
+    await waitFor(() => {
+      const after = screen.getByRole('img', { name: /Bolsa colorida/i })
+      expect(after.getAttribute('src')).toBe('https://example.com/preto.jpg')
+    })
+  })
+
+  it('disables add-to-cart when variation selection is cleared', async () => {
+    mockedGet.mockResolvedValue(productWithVariants)
+    renderPdp('bolsa-colorida')
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Bolsa colorida' })).toBeInTheDocument()
+    })
+    // Desmarca Rosa (toggle) → matched null → botão esgotado/desabilitado
+    fireEvent.click(screen.getByRole('button', { name: /Rosa/i }))
+    const addBtn = screen.getByRole('button', { name: /Esgotado|Adicionar/i })
+    expect(addBtn).toBeDisabled()
+    expect(mockAddItem).not.toHaveBeenCalled()
+  })
+
+  it('adds selected variant to cart', async () => {
+    mockedGet.mockResolvedValue(productWithVariants)
+    renderPdp('bolsa-colorida')
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Bolsa colorida' })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Preto/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Adicionar ao carrinho|Adicionar/i }))
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: 'bolsa-colorida' }),
+      1,
+      expect.objectContaining({ id: 'v-preto', name: 'Preto' })
+    )
   })
 })

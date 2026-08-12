@@ -270,6 +270,9 @@
 - [x] **Docs** - `PRODUCT-VARIANTS.md`
 - [x] **Ilimitado** - removido max 2 eixos; UI com chips de opção + textos claros (10/08)
 - [x] **Dados prod** - eixos da Bolsa/BT21 normalizados (Cor / Personagem)
+- [x] **Foto por variação** - admin: upload/URL/galeria por SKU; PDP: galeria + swatches (12/08)
+- [x] **Busca loja estilo Shopee** - barra sempre visível + borda brand + botão Buscar (12/08)
+- [x] **Testes** - VariantPicker (swatches/`resolveVariantImages`), ShopHeader busca, PDP troca de foto
 
 ### Hardening (10/08/2026 — validação de fluxos)
 

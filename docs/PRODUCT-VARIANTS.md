@@ -8,9 +8,11 @@
 | ---------------------------------- | ---------------------------------------------------------------------------------- |
 | **Listing**                        | Tabela `products` (nome, descrição, fotos gerais)                                  |
 | **Tipos de variação** (ilimitados) | `products.variant_axes` JSONB — ex. `[{ name: "Cor", options: ["Rosa","Preto"] }]` |
-| **SKU / combinação**               | Tabela `product_variants` — preço, estoque, SKU, imagens por opção                 |
+| **SKU / combinação**               | Tabela `product_variants` — preço, estoque, SKU, **imagens por SKU**               |
 | **Vitrine**                        | 1 card; preço “a partir de” = min das variantes ativas                             |
-| **PDP**                            | `VariantPicker`: botões por eixo; preço/estoque/imagem mudam                       |
+| **PDP**                            | `VariantPicker` com swatches; `resolveVariantImages` troca a galeria               |
+| **Admin foto**                     | Por linha de SKU: upload, URL ou imagem da galeria do listing                      |
+| **Busca loja**                     | Header Shopee-like (`ShopHeader`) → `/?search=`                                    |
 | **Carrinho**                       | `variantId` + rótulo no item                                                       |
 | **Pedido**                         | `order_items.variant_id` + `variant_label` (snapshot)                              |
 

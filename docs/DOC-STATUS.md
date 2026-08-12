@@ -19,7 +19,9 @@
 | **Atacado B2B (CNPJ / 25%)**  | WHOLESALE + PROJECT + SHOP-ORDERS | ✅          | Schema 012; deploy necessário em prod  |
 | **LGPD shop + wholesale**     | SECURITY / DOC-STATUS             | ✅          | Export/delete cobrem CNPJ e conta B2B  |
 | Eventos / rádio / design      | EVENTS / RADIO / DESIGN           | ✅          | OK                                     |
-| Fotos de produto              | TODO                              | ⚠️ conteúdo | Laura                                  |
+| Fotos de produto              | TODO                              | ⚠️ conteúdo | Laura (listing + por variação)         |
+| **Variações + foto por SKU**  | PRODUCT-VARIANTS + PROJECT        | ✅          | Admin upload/URL/galeria; PDP swatches |
+| **Busca loja estilo Shopee**  | PROJECT / README                  | ✅          | Header sempre visível + botão Buscar   |
 | Token Melhor Envio prod       | TODO / SHOP-ORDERS                | ⚠️ ops      | Sem token = fallback                   |
 | Site home SEO K-pop           | SHOP-ORDERS                       | ✅          | Vercel www                             |
 | Design pink/yellow            | DESIGN / TODO                     | ✅          | Residual purple limpo 08/08            |
