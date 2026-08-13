@@ -103,6 +103,10 @@ describe('ProductModal — foto por variação', () => {
     )
 
     expect(screen.getByText(/SKU\(s\) — foto própria/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Enviar imagens/i)).toBeInTheDocument()
+    const listingInput = screen.getByLabelText(/Enviar imagens/i)
+    expect(listingInput).toHaveAttribute('type', 'file')
+    expect(listingInput.className).not.toMatch(/\bhidden\b/)
     expect(screen.getByLabelText(/Enviar foto da variação Rosa/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/Enviar foto da variação Preto/i)).toBeInTheDocument()
     // Galeria do listing disponível para atribuir

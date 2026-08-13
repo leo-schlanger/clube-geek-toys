@@ -6,10 +6,12 @@
 export const PRODUCT_IMAGE_MAX_BYTES = 12 * 1024 * 1024 // 12 MB (matches API)
 /** Target after client compression — keeps uploads fast on mobile networks. */
 export const PRODUCT_IMAGE_TARGET_BYTES = 2.5 * 1024 * 1024
-export const PRODUCT_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp'
-export const PRODUCT_IMAGE_ACCEPT_LABEL = 'JPEG, PNG ou WEBP · até 12 MB'
+/** Broad accept so iPhone Camera Roll (HEIC) and Android gallery actually appear. */
+export const PRODUCT_IMAGE_ACCEPT = 'image/*'
+export const PRODUCT_IMAGE_ACCEPT_LABEL = 'Foto da galeria ou arquivo · até 12 MB'
 
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const JPEG_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg'])
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'])
 
 export type PrepareImageResult =
   | { ok: true; file: File; compressed: boolean }
@@ -26,12 +28,17 @@ function renameWithExt(name: string, ext: string): string {
   return `${base}${ext}`
 }
 
+function isHeicFile(file: File): boolean {
+  const mime = (file.type || '').toLowerCase()
+  const name = file.name || ''
+  return mime === 'image/heic' || mime === 'image/heif' || /\.hei[cf]$/i.test(name)
+}
+
 /**
- * Load a File into an HTMLImageElement (works for JPEG/PNG/WEBP in modern browsers).
- * HEIC and other unsupported formats reject here.
+ * Load a File into an HTMLImageElement (JPEG/PNG/WEBP; HEIC on iOS Safari).
  * Timeout avoids hanging when the environment never fires load/error (e.g. invalid bytes).
  */
-function loadImageFromFile(file: File, timeoutMs = 4000): Promise<HTMLImageElement> {
+function loadImageFromFile(file: File, timeoutMs = 8_000): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -126,19 +133,7 @@ async function compressImageFile(file: File, targetBytes: number): Promise<File 
 export async function prepareProductImage(file: File): Promise<PrepareImageResult> {
   const mime = (file.type || '').toLowerCase()
   const name = file.name || 'imagem'
-
-  // Common phone formats we don't accept as-is
-  if (
-    mime === 'image/heic' ||
-    mime === 'image/heif' ||
-    /\.heic$/i.test(name) ||
-    /\.heif$/i.test(name)
-  ) {
-    return {
-      ok: false,
-      error: `"${name}": formato HEIC não suportado. Exporte como JPEG no celular ou use PNG/WEBP.`,
-    }
-  }
+  const heic = isHeicFile(file)
 
   if (mime === 'image/gif' || /\.gif$/i.test(name)) {
     return {
@@ -147,56 +142,52 @@ export async function prepareProductImage(file: File): Promise<PrepareImageResul
     }
   }
 
-  if (mime && !ALLOWED_MIME.has(mime) && !mime.startsWith('image/')) {
+  if (mime && !ALLOWED_MIME.has(mime) && !heic && !mime.startsWith('image/')) {
     return {
       ok: false,
-      error: `"${name}": tipo inválido. Use ${PRODUCT_IMAGE_ACCEPT_LABEL}.`,
+      error: `"${name}": tipo inválido. Use uma foto JPEG, PNG, WEBP ou a galeria do celular.`,
     }
   }
 
-  if (!mime || !ALLOWED_MIME.has(mime)) {
-    // Some browsers leave type empty — try decode; if it works, re-encode as JPEG
+  const needsConvert =
+    heic || !ALLOWED_MIME.has(mime) || file.size > PRODUCT_IMAGE_TARGET_BYTES
+
+  if (needsConvert) {
+    // iOS Safari can decode HEIC into a canvas and re-encode as JPEG.
+    const compressed = await compressImageFile(file, PRODUCT_IMAGE_TARGET_BYTES)
+    if (compressed && compressed.size <= PRODUCT_IMAGE_MAX_BYTES) {
+      return { ok: true, file: compressed, compressed: true }
+    }
+    if (heic) {
+      return {
+        ok: false,
+        error: `"${name}": foto HEIC do iPhone. Abra o painel no Safari (converte sozinho) ou exporte como JPEG.`,
+      }
+    }
     if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
-      return {
-        ok: false,
-        error: `"${name}": arquivo maior que 12 MB.`,
-      }
-    }
-    const compressed = await compressImageFile(file, PRODUCT_IMAGE_TARGET_BYTES)
-    if (!compressed) {
-      return {
-        ok: false,
-        error: `"${name}": não foi possível ler a imagem. Use JPEG, PNG ou WEBP.`,
-      }
-    }
-    return { ok: true, file: compressed, compressed: true }
-  }
-
-  if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
-    const compressed = await compressImageFile(file, PRODUCT_IMAGE_TARGET_BYTES)
-    if (!compressed || compressed.size > PRODUCT_IMAGE_MAX_BYTES) {
       return {
         ok: false,
         error: `"${name}": maior que 12 MB mesmo após compactar. Escolha outra foto.`,
       }
     }
-    return { ok: true, file: compressed, compressed: true }
-  }
-
-  // Large but under hard cap: compress for faster upload
-  if (file.size > PRODUCT_IMAGE_TARGET_BYTES) {
-    const compressed = await compressImageFile(file, PRODUCT_IMAGE_TARGET_BYTES)
-    if (compressed && compressed.size < file.size) {
-      return { ok: true, file: compressed, compressed: true }
+    if (!ALLOWED_MIME.has(mime)) {
+      return {
+        ok: false,
+        error: `"${name}": não foi possível ler a imagem. Use JPEG, PNG ou WEBP.`,
+      }
     }
+    // Allowed MIME, compress failed, still under hard cap — send original.
   }
 
-  // Normalize extension for multer filename
-  const ext = extensionForMime(mime)
-  if (!name.toLowerCase().endsWith(ext)) {
+  const outMime = JPEG_MIMES.has(mime) ? 'image/jpeg' : mime || 'image/jpeg'
+  const ext = extensionForMime(outMime)
+  if (outMime !== mime || !name.toLowerCase().endsWith(ext)) {
     return {
       ok: true,
-      file: new File([file], renameWithExt(name, ext), { type: mime, lastModified: file.lastModified }),
+      file: new File([file], renameWithExt(name, ext), {
+        type: outMime,
+        lastModified: file.lastModified,
+      }),
       compressed: false,
     }
   }

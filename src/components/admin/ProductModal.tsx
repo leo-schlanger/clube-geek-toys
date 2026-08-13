@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { logger } from '../../lib/logger'
-import { Button } from '../ui/button'
+import { Button, buttonVariants } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
@@ -22,7 +22,7 @@ import {
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_ACCEPT_LABEL,
 } from '../../lib/product-image'
-import { formatCurrency } from '../../lib/utils'
+import { cn, formatCurrency } from '../../lib/utils'
 import { toast } from 'sonner'
 import {
   X,
@@ -47,6 +47,8 @@ interface ProductModalProps {
   onSuccess: () => void
   /** Called after a category is created/removed so the parent can refetch. */
   onCategoriesChange?: () => void
+  /** Immediate upload in edit mode — keep the list thumbnail in sync without remounting the modal. */
+  onImagesChange?: (productId: string, images: string[]) => void
 }
 
 interface FormState {
@@ -100,12 +102,14 @@ export function ProductModal({
   onClose,
   onSuccess,
   onCategoriesChange,
+  onImagesChange,
 }: ProductModalProps) {
   const isEditMode = mode === 'edit'
 
   const [form, setForm] = useState<FormState>(() => toFormState(product))
   const [loading, setLoading] = useState(false)
   const [uploadingImages, setUploadingImages] = useState(false)
+  const [uploadPhase, setUploadPhase] = useState<'prepare' | 'upload'>('prepare')
 
   // Variações: eixos + opções ilimitados (1 tipo "Cor" com N opções = N SKUs)
   function axesToDrafts(axes?: VariantAxis[] | null): AxisDraft[] {
@@ -244,21 +248,17 @@ export function ProductModal({
   const [images, setImages] = useState<string[]>(product?.images ?? [])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [imageUrl, setImageUrl] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Foto por variação (estilo Shopee): arquivo pendente por índice da linha.
   const [pendingVariantFiles, setPendingVariantFiles] = useState<Record<number, File>>({})
   const [pendingVariantPreviews, setPendingVariantPreviews] = useState<Record<number, string>>({})
-  const [variantImageTarget, setVariantImageTarget] = useState<number | null>(null)
   const [variantUrlDraft, setVariantUrlDraft] = useState<Record<number, string>>({})
-  const variantFileInputRef = useRef<HTMLInputElement>(null)
 
   // Inline category creation
   const [newCategoryName, setNewCategoryName] = useState('')
   const [creatingCategory, setCreatingCategory] = useState(false)
 
   useEffect(() => {
-     
     setForm(toFormState(product))
     setImages(product?.images ?? [])
     setPendingFiles([])
@@ -271,9 +271,10 @@ export function ProductModal({
       for (const url of Object.values(prev)) URL.revokeObjectURL(url)
       return {}
     })
-    setVariantImageTarget(null)
     setVariantUrlDraft({})
-  }, [product])
+    // Reset only when switching products — a new `product` object with the same
+    // id (parent list refresh) must not wipe photos just uploaded.
+  }, [product?.id])
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -293,10 +294,11 @@ export function ProductModal({
   async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? [])
     // Allow re-picking the same file later.
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    e.target.value = ''
     if (picked.length === 0) return
 
     setUploadingImages(true)
+    setUploadPhase('prepare')
     try {
       const { files, errors, compressedCount } = await prepareProductImages(picked)
       for (const msg of errors) toast.error(msg)
@@ -304,12 +306,14 @@ export function ProductModal({
 
       // Edição: envia na hora (botão "Enviar imagens" = upload imediato).
       if (isEditMode && product?.id) {
+        setUploadPhase('upload')
         const result = await uploadProductImages(product.id, files)
         if (!result.ok) {
           toast.error(result.error)
           return
         }
         setImages(result.product.images)
+        onImagesChange?.(product.id, result.product.images)
         toast.success(
           files.length === 1
             ? 'Imagem enviada'
@@ -377,17 +381,10 @@ export function ProductModal({
     revokePendingPreview(idx)
   }
 
-  function openVariantFilePicker(idx: number) {
-    setVariantImageTarget(idx)
-    // Defer click so state is set before the change handler runs.
-    queueMicrotask(() => variantFileInputRef.current?.click())
-  }
-
-  async function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
     const raw = e.target.files?.[0]
-    const idx = variantImageTarget
-    if (variantFileInputRef.current) variantFileInputRef.current.value = ''
-    if (!raw || idx == null) return
+    e.target.value = ''
+    if (!raw) return
 
     const prepared = await prepareProductImages([raw])
     for (const msg of prepared.errors) toast.error(msg)
@@ -408,6 +405,7 @@ export function ProductModal({
         const added = updated.images.filter((u) => !before.has(u))
         const url = added[0] ?? updated.images[updated.images.length - 1]
         setImages(updated.images)
+        onImagesChange?.(productId, updated.images)
         setVariantImages(idx, [url])
         setPendingVariantFiles((prev) => {
           const next = { ...prev }
@@ -943,26 +941,31 @@ export function ProductModal({
                 </div>
               )}
 
-              {/* Upload de arquivos */}
+              {/* Upload de arquivos — <label> + overlay input (iOS Safari bloqueia click() em input hidden). */}
               <div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={PRODUCT_IMAGE_ACCEPT}
-                  multiple
-                  onChange={handlePickFiles}
-                  className="hidden"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={uploadingImages || loading}
-                  onClick={() => fileInputRef.current?.click()}
+                <label
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'sm' }),
+                    'relative cursor-pointer overflow-hidden',
+                    (uploadingImages || loading) && 'pointer-events-none opacity-50'
+                  )}
                 >
+                  <input
+                    type="file"
+                    accept={PRODUCT_IMAGE_ACCEPT}
+                    multiple
+                    onChange={handlePickFiles}
+                    disabled={uploadingImages || loading}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Enviar imagens"
+                  />
                   {uploadingImages ? <Loading size="sm" /> : <Upload className="h-4 w-4" />}
-                  {uploadingImages ? 'Enviando…' : 'Enviar imagens'}
-                </Button>
+                  {uploadingImages
+                    ? uploadPhase === 'prepare'
+                      ? 'Preparando…'
+                      : 'Enviando…'
+                    : 'Enviar imagens'}
+                </label>
                 <p className="text-xs text-muted-foreground mt-1">
                   {PRODUCT_IMAGE_ACCEPT_LABEL}
                   {isEditMode
@@ -1181,13 +1184,6 @@ export function ProductModal({
                         {variantRows.length} SKU(s) — foto própria, preço, estoque e SKU (como na
                         Shopee)
                       </p>
-                      <input
-                        ref={variantFileInputRef}
-                        type="file"
-                        accept={PRODUCT_IMAGE_ACCEPT}
-                        className="hidden"
-                        onChange={handleVariantFilePick}
-                      />
                       {variantRows.map((row, idx) => {
                         const pendingFile = pendingVariantFiles[idx]
                         const thumbUrl = row.images?.[0] || pendingVariantPreviews[idx] || null
@@ -1199,13 +1195,18 @@ export function ProductModal({
                             <div className="grid grid-cols-12 items-center gap-2 text-sm">
                               {/* Foto da variação */}
                               <div className="col-span-2 sm:col-span-1">
-                                <button
-                                  type="button"
-                                  onClick={() => openVariantFilePicker(idx)}
-                                  className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
+                                <label
+                                  className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
                                   title={`Foto de ${row.name}`}
                                   aria-label={`Enviar foto da variação ${row.name}`}
                                 >
+                                  <input
+                                    id={`variant-photo-${idx}`}
+                                    type="file"
+                                    accept={PRODUCT_IMAGE_ACCEPT}
+                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                    onChange={(e) => void handleVariantFilePick(e, idx)}
+                                  />
                                   {thumbUrl ? (
                                     <img
                                       src={thumbUrl}
@@ -1215,7 +1216,7 @@ export function ProductModal({
                                   ) : (
                                     <Upload className="h-4 w-4 text-muted-foreground" />
                                   )}
-                                </button>
+                                </label>
                               </div>
                               <span
                                 className="col-span-4 truncate font-medium sm:col-span-3"
@@ -1266,16 +1267,16 @@ export function ProductModal({
 
                             {/* Controles de foto da variação */}
                             <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => openVariantFilePicker(idx)}
+                              <label
+                                htmlFor={`variant-photo-${idx}`}
+                                className={cn(
+                                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                                  'h-7 cursor-pointer text-xs'
+                                )}
                               >
                                 <Upload className="h-3 w-3" />
                                 {thumbUrl ? 'Trocar foto' : 'Foto'}
-                              </Button>
+                              </label>
                               {(thumbUrl || pendingFile) && (
                                 <Button
                                   type="button"

@@ -221,7 +221,15 @@ productRouter.delete('/:id', authenticate, requireRole('admin'), async (req, res
 // ─── Admin: product image upload ─────────────────────────────────────────────
 
 const PRODUCT_IMAGE_MAX_BYTES = 12 * 1024 * 1024; // 12 MB
-const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+/** iPhone often sends image/heic (sometimes with JPEG bytes). Android may send image/jpg. */
+function isLikelyImageUpload(file: Express.Multer.File): boolean {
+  const mime = (file.mimetype || '').toLowerCase();
+  const name = (file.originalname || '').toLowerCase();
+  if (!mime || mime === 'application/octet-stream') return true;
+  if (mime.startsWith('image/')) return true;
+  return /\.(jpe?g|png|webp|hei[cf])$/.test(name);
+}
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
@@ -236,8 +244,9 @@ const storage = multer.diskStorage({
   },
   filename: (_req, file, cb) => {
     const rawExt = (path.extname(file.originalname) || '').toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
     const byMime =
-      file.mimetype === 'image/png' ? '.png' : file.mimetype === 'image/webp' ? '.webp' : '.jpg';
+      mime === 'image/png' ? '.png' : mime === 'image/webp' ? '.webp' : '.jpg';
     const ext = ['.jpg', '.jpeg', '.png', '.webp'].includes(rawExt)
       ? rawExt === '.jpeg'
         ? '.jpg'
@@ -251,10 +260,10 @@ const upload = multer({
   storage,
   limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES, files: 6 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_IMAGE_MIME.has(file.mimetype)) {
+    if (isLikelyImageUpload(file)) {
       cb(null, true);
     } else {
-      cb(new Error('Apenas imagens JPEG, PNG ou WEBP são permitidas'));
+      cb(new Error('Envie uma foto (JPEG, PNG, WEBP ou da galeria do celular).'));
     }
   },
 });
@@ -299,19 +308,22 @@ function handleProductImageUpload(
   });
 }
 
-/** Validate real image content by magic bytes (MIME can be spoofed). */
-function isValidImage(filePath: string): boolean {
+/** Sniff real image bytes (MIME from phones is often wrong). */
+function sniffImageKind(filePath: string): 'jpeg' | 'png' | 'webp' | 'heic' | null {
   try {
     const fd = fs.openSync(filePath, 'r');
     const buf = Buffer.alloc(12);
     fs.readSync(fd, buf, 0, 12, 0);
     fs.closeSync(fd);
-    const jpeg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
-    const png = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
-    const webp = buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
-    return jpeg || png || webp;
+    if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpeg';
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png';
+    if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
+    const brand = buf.toString('ascii', 4, 8);
+    const ftyp = buf.toString('ascii', 8, 12);
+    if (brand === 'ftyp' && /^(heic|heif|mif1|msf1)/i.test(ftyp)) return 'heic';
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -329,8 +341,11 @@ productRouter.post(
         return;
       }
       const urls: string[] = [];
+      let sawHeic = false;
       for (const f of files) {
-        if (!isValidImage(f.path)) {
+        const kind = sniffImageKind(f.path);
+        if (kind === 'heic') sawHeic = true;
+        if (kind !== 'jpeg' && kind !== 'png' && kind !== 'webp') {
           try {
             fs.unlinkSync(f.path);
           } catch {
@@ -341,12 +356,24 @@ productRouter.post(
         urls.push(`${env.API_URL}/uploads/products/${req.params.id}/${path.basename(f.path)}`);
       }
       if (urls.length === 0) {
-        res
-          .status(400)
-          .json({ error: 'Arquivos enviados não são imagens válidas (JPEG, PNG ou WEBP).', code: 'INVALID_IMAGE' });
+        res.status(400).json(
+          sawHeic
+            ? {
+                error:
+                  'Foto HEIC do iPhone. Atualize a página e envie de novo (o painel converte no Safari) ou exporte como JPEG.',
+                code: 'HEIC_NOT_SUPPORTED',
+              }
+            : {
+                error: 'Arquivos enviados não são imagens válidas (JPEG, PNG ou WEBP).',
+                code: 'INVALID_IMAGE',
+              }
+        );
         return;
       }
       const product = await productService.addProductImages(req.params.id as string, urls);
+      console.log(
+        `[UPLOAD] product=${req.params.id} kept=${urls.length}/${files.length}${sawHeic ? ' heic-skipped' : ''}`
+      );
       res.status(201).json(product);
     } catch (err) {
       next(err);

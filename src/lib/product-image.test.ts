@@ -6,11 +6,22 @@ import {
 } from './product-image'
 
 describe('product-image helpers', () => {
-  it('rejects HEIC with clear message', async () => {
+  it('rejects HEIC when the environment cannot decode it', async () => {
     const file = new File([new Uint8Array([0, 0, 0, 0])], 'foto.heic', { type: 'image/heic' })
     const res = await prepareProductImage(file)
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toMatch(/HEIC/i)
+  }, 15_000)
+
+  it('normalizes Android image/jpg MIME to image/jpeg', async () => {
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...Array(100).fill(0), 0xff, 0xd9])
+    const file = new File([bytes], 'foto.jpg', { type: 'image/jpg' })
+    const res = await prepareProductImage(file)
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.file.type).toBe('image/jpeg')
+      expect(res.file.name).toMatch(/\.jpg$/i)
+    }
   })
 
   it('rejects GIF', async () => {
@@ -56,5 +67,5 @@ describe('product-image helpers', () => {
     const batch = await prepareProductImages([ok, bad])
     expect(batch.errors.length).toBe(1)
     expect(batch.files.length).toBe(1)
-  })
+  }, 15_000)
 })

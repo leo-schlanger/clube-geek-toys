@@ -272,6 +272,9 @@ export function ProductsTab() {
             fetchProducts()
           }}
           onCategoriesChange={fetchCategories}
+          onImagesChange={(id, images) => {
+            setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, images } : p)))
+          }}
         />
       )}
     </Card>
