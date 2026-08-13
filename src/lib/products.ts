@@ -158,7 +158,7 @@ export async function uploadProductImages(
     body: form,
     // Don't retry POST multipart (body may not re-send cleanly after network blip).
     noRetry: true,
-    timeoutMs: 90_000,
+    timeoutMs: 120_000,
   })
   if (result.data) {
     return { ok: true, product: result.data }

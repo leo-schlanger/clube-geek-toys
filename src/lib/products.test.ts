@@ -102,7 +102,7 @@ describe('products API client', () => {
     const res = await uploadProductImages('p1', [file])
     expect(mockedRequest).toHaveBeenCalledWith(
       '/products/p1/images',
-      expect.objectContaining({ method: 'POST', noRetry: true, timeoutMs: 90_000 })
+      expect.objectContaining({ method: 'POST', noRetry: true, timeoutMs: 120_000 })
     )
     expect(res).toEqual({ ok: true, product })
   })

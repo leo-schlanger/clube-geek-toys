@@ -1,14 +1,17 @@
 /**
  * Client-side helpers for product image uploads.
- * Validates MIME/size and compresses large phone photos so they fit the API limit.
+ * Accepts large/4K phone photos and resizes them — we don't ask the staff to edit files.
  */
 
-export const PRODUCT_IMAGE_MAX_BYTES = 12 * 1024 * 1024 // 12 MB (matches API)
-/** Target after client compression — keeps uploads fast on mobile networks. */
-export const PRODUCT_IMAGE_TARGET_BYTES = 2.5 * 1024 * 1024
+export const PRODUCT_IMAGE_MAX_BYTES = 40 * 1024 * 1024 // incoming cap (matches API + nginx)
+/** After resize: sharp enough for the shop, small enough for mobile upload. */
+export const PRODUCT_IMAGE_TARGET_BYTES = 3.5 * 1024 * 1024
+/** Longest side after resize. 2560 keeps 4K shots looking crisp on retina. */
+export const PRODUCT_IMAGE_MAX_SIDE = 2560
 /** Broad accept so iPhone Camera Roll (HEIC) and Android gallery actually appear. */
 export const PRODUCT_IMAGE_ACCEPT = 'image/*'
-export const PRODUCT_IMAGE_ACCEPT_LABEL = 'Foto da galeria ou arquivo · até 12 MB'
+export const PRODUCT_IMAGE_ACCEPT_LABEL =
+  'Foto da galeria ou arquivo · 4K é redimensionada sozinha · até 40 MB'
 
 const JPEG_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg'])
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'])
@@ -38,7 +41,7 @@ function isHeicFile(file: File): boolean {
  * Load a File into an HTMLImageElement (JPEG/PNG/WEBP; HEIC on iOS Safari).
  * Timeout avoids hanging when the environment never fires load/error (e.g. invalid bytes).
  */
-function loadImageFromFile(file: File, timeoutMs = 8_000): Promise<HTMLImageElement> {
+function loadImageFromFile(file: File, timeoutMs = 12_000): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -66,6 +69,41 @@ function loadImageFromFile(file: File, timeoutMs = 8_000): Promise<HTMLImageElem
   })
 }
 
+type Drawable = CanvasImageSource & { width: number; height: number }
+
+function closeDrawable(src: Drawable): void {
+  if ('close' in src && typeof (src as ImageBitmap).close === 'function') {
+    try {
+      ;(src as ImageBitmap).close()
+    } catch {
+      /* already closed */
+    }
+  }
+}
+
+export function fittedSize(width: number, height: number, maxSide: number): { width: number; height: number } {
+  if (width < 1 || height < 1) return { width: 1, height: 1 }
+  if (width <= maxSide && height <= maxSide) return { width, height }
+  const scale = maxSide / Math.max(width, height)
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
+}
+
+/** Decode (createImageBitmap downscales 4K/48MP with less memory; Image() is the fallback). */
+async function decodeDrawable(file: File): Promise<Drawable | null> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      return await createImageBitmap(file)
+    } catch {
+      /* HEIC on desktop Chrome, or jsdom — fall through */
+    }
+  }
+  try {
+    return await loadImageFromFile(file)
+  } catch {
+    return null
+  }
+}
+
 async function canvasToBlob(
   canvas: HTMLCanvasElement,
   type: string,
@@ -77,49 +115,48 @@ async function canvasToBlob(
 }
 
 /**
- * Downscale + re-encode as JPEG until under `targetBytes` (or quality floor).
+ * Downscale (4K → 2560) + re-encode as JPEG until under `targetBytes`.
+ * Keeps shrinking instead of giving up — staff should never have to edit the file.
  */
 async function compressImageFile(file: File, targetBytes: number): Promise<File | null> {
-  let img: HTMLImageElement
-  try {
-    img = await loadImageFromFile(file)
-  } catch {
+  const src = await decodeDrawable(file)
+  if (!src) return null
+
+  const srcW = src.width
+  const srcH = src.height
+  if (srcW < 1 || srcH < 1) {
+    closeDrawable(src)
     return null
   }
 
-  const maxSide = 2000
-  let { width, height } = img
-  if (width < 1 || height < 1) return null
-
-  if (width > maxSide || height > maxSide) {
-    const scale = maxSide / Math.max(width, height)
-    width = Math.round(width * scale)
-    height = Math.round(height * scale)
-  }
-
   const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
   const ctx = canvas.getContext('2d')
-  if (!ctx) return null
-  ctx.drawImage(img, 0, 0, width, height)
+  if (!ctx) {
+    closeDrawable(src)
+    return null
+  }
 
-  let quality = 0.85
-  let blob = await canvasToBlob(canvas, 'image/jpeg', quality)
-  while (blob && blob.size > targetBytes && quality > 0.45) {
-    quality -= 0.1
+  let maxSide = PRODUCT_IMAGE_MAX_SIDE
+  let blob: Blob | null = null
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const { width, height } = fittedSize(srcW, srcH, maxSide)
+    canvas.width = width
+    canvas.height = height
+    ctx.drawImage(src, 0, 0, width, height)
+
+    let quality = 0.88
     blob = await canvasToBlob(canvas, 'image/jpeg', quality)
+    while (blob && blob.size > targetBytes && quality > 0.55) {
+      quality -= 0.08
+      blob = await canvasToBlob(canvas, 'image/jpeg', quality)
+    }
+
+    if (blob && blob.size <= targetBytes) break
+    maxSide = Math.max(640, Math.round(maxSide * 0.72))
   }
 
-  // Still too big: shrink dimensions once more
-  if (blob && blob.size > targetBytes) {
-    const scale = Math.sqrt(targetBytes / blob.size) * 0.95
-    canvas.width = Math.max(1, Math.round(width * scale))
-    canvas.height = Math.max(1, Math.round(height * scale))
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-    blob = await canvasToBlob(canvas, 'image/jpeg', 0.8)
-  }
-
+  closeDrawable(src)
   if (!blob) return null
   return new File([blob], renameWithExt(file.name, '.jpg'), {
     type: 'image/jpeg',
@@ -149,34 +186,33 @@ export async function prepareProductImage(file: File): Promise<PrepareImageResul
     }
   }
 
-  const needsConvert =
-    heic || !ALLOWED_MIME.has(mime) || file.size > PRODUCT_IMAGE_TARGET_BYTES
+  // Anything over ~1 MB is treated as a phone/4K shot: decode and fit. Tiny files skip.
+  const needsConvert = heic || !ALLOWED_MIME.has(mime) || file.size > 1024 * 1024
 
   if (needsConvert) {
-    // iOS Safari can decode HEIC into a canvas and re-encode as JPEG.
     const compressed = await compressImageFile(file, PRODUCT_IMAGE_TARGET_BYTES)
     if (compressed && compressed.size <= PRODUCT_IMAGE_MAX_BYTES) {
       return { ok: true, file: compressed, compressed: true }
     }
-    if (heic) {
+    // Resize failed: still send the original if it fits the incoming cap.
+    if (!heic && ALLOWED_MIME.has(mime) && file.size <= PRODUCT_IMAGE_MAX_BYTES) {
+      // fall through to normalize + upload original
+    } else if (heic) {
       return {
         ok: false,
         error: `"${name}": foto HEIC do iPhone. Abra o painel no Safari (converte sozinho) ou exporte como JPEG.`,
       }
-    }
-    if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+    } else if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
       return {
         ok: false,
-        error: `"${name}": maior que 12 MB mesmo após compactar. Escolha outra foto.`,
+        error: `"${name}": arquivo enorme e o celular não conseguiu redimensionar. Tente de novo no Safari ou envie uma foto por vez.`,
       }
-    }
-    if (!ALLOWED_MIME.has(mime)) {
+    } else if (!ALLOWED_MIME.has(mime)) {
       return {
         ok: false,
         error: `"${name}": não foi possível ler a imagem. Use JPEG, PNG ou WEBP.`,
       }
     }
-    // Allowed MIME, compress failed, still under hard cap — send original.
   }
 
   const outMime = JPEG_MIMES.has(mime) ? 'image/jpeg' : mime || 'image/jpeg'

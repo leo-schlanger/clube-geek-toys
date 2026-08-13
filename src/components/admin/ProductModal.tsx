@@ -327,8 +327,8 @@ export function ProductModal({
       if (compressedCount > 0) {
         toast.message(
           compressedCount === 1
-            ? 'Foto compactada para envio mais rápido'
-            : `${compressedCount} fotos compactadas para envio mais rápido`
+            ? 'Foto redimensionada automaticamente'
+            : `${compressedCount} fotos redimensionadas automaticamente`
         )
       }
     } catch (error) {

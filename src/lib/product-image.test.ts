@@ -1,17 +1,25 @@
 import { describe, it, expect } from 'vitest'
 import {
+  fittedSize,
   prepareProductImage,
   prepareProductImages,
   PRODUCT_IMAGE_MAX_BYTES,
+  PRODUCT_IMAGE_MAX_SIDE,
 } from './product-image'
 
 describe('product-image helpers', () => {
+  it('fits 4K into the max side without cropping', () => {
+    expect(fittedSize(3840, 2160, PRODUCT_IMAGE_MAX_SIDE)).toEqual({ width: 2560, height: 1440 })
+    expect(fittedSize(2160, 3840, PRODUCT_IMAGE_MAX_SIDE)).toEqual({ width: 1440, height: 2560 })
+    expect(fittedSize(1200, 800, PRODUCT_IMAGE_MAX_SIDE)).toEqual({ width: 1200, height: 800 })
+  })
+
   it('rejects HEIC when the environment cannot decode it', async () => {
     const file = new File([new Uint8Array([0, 0, 0, 0])], 'foto.heic', { type: 'image/heic' })
     const res = await prepareProductImage(file)
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.error).toMatch(/HEIC/i)
-  }, 15_000)
+  }, 20_000)
 
   it('normalizes Android image/jpg MIME to image/jpeg', async () => {
     const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, ...Array(100).fill(0), 0xff, 0xd9])
@@ -56,8 +64,8 @@ describe('product-image helpers', () => {
     Object.defineProperty(file, 'size', { value: PRODUCT_IMAGE_MAX_BYTES + 100 })
     const res = await prepareProductImage(file)
     expect(res.ok).toBe(false)
-    if (!res.ok) expect(res.error).toMatch(/12 MB|compactar|ler a imagem/i)
-  }, 15_000)
+    if (!res.ok) expect(res.error).toMatch(/40 MB|redimensionar|compactar|ler a imagem|enorme/i)
+  }, 20_000)
 
   it('prepareProductImages aggregates errors and files', async () => {
     const ok = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], 'ok.jpg', {
@@ -67,5 +75,5 @@ describe('product-image helpers', () => {
     const batch = await prepareProductImages([ok, bad])
     expect(batch.errors.length).toBe(1)
     expect(batch.files.length).toBe(1)
-  }, 15_000)
+  }, 20_000)
 })

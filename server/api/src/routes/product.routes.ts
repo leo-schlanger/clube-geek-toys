@@ -220,7 +220,7 @@ productRouter.delete('/:id', authenticate, requireRole('admin'), async (req, res
 
 // ─── Admin: product image upload ─────────────────────────────────────────────
 
-const PRODUCT_IMAGE_MAX_BYTES = 12 * 1024 * 1024; // 12 MB
+const PRODUCT_IMAGE_MAX_BYTES = 40 * 1024 * 1024; // 40 MB — 4K phone photos; client resizes before send
 
 /** iPhone often sends image/heic (sometimes with JPEG bytes). Android may send image/jpg. */
 function isLikelyImageUpload(file: Express.Multer.File): boolean {
@@ -282,7 +282,7 @@ function handleProductImageUpload(
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         res.status(400).json({
-          error: 'Imagem muito grande. Máximo 12 MB por arquivo (JPEG, PNG ou WEBP).',
+          error: 'Imagem muito grande. Máximo 40 MB por arquivo — fotos 4K são reduzidas automaticamente no painel.',
           code: 'IMAGE_TOO_LARGE',
         });
         return;
