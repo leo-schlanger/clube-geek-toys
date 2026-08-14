@@ -69,7 +69,6 @@ jobs:
           rsync -avz --delete \
             --exclude='node_modules' \
             --exclude='.env' \
-            --exclude='scripts/' \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
             server/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/server/
 

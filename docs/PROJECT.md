@@ -757,7 +757,9 @@ clube-geek-toys/
 │   │   └── README.md
 │   │
 │   ├── scripts/
-│   │   ├── backup-postgres.sh
+│   │   ├── backup-postgres.sh           # pg_dump diario (7d) / weekly (12 sem.)
+│   │   ├── cron-backup.sh               # wrapper diario (le .env)
+│   │   ├── cron-backup-weekly.sh        # wrapper domingo 04:00 UTC
 │   │   ├── build-frontend.sh
 │   │   ├── health-check.sh
 │   │   └── restore-postgres.sh

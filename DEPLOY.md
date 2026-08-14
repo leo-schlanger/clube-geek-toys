@@ -334,14 +334,27 @@ ssh $VPS_HOST "cd /opt/clube-geek-toys/server && docker compose up -d --force-re
 
 ### Backup automático
 
-```bash
-# Na VPS, tornar script executável
-chmod +x /opt/clube-geek-toys/server/scripts/backup-postgres.sh
+Dois dumps `pg_dump | gzip` no disco da VPS (`/opt/clube-geek-toys/backups/`). Credenciais vêm do `.env` via `cron-backup*.sh` (nada de senha no crontab).
 
-# Adicionar ao crontab (backup diário às 3h UTC, retenção 7 dias)
-crontab -e
-# Adicionar a linha:
-0 3 * * * cd /opt/clube-geek-toys/server && ./scripts/backup-postgres.sh >> /var/log/clube-backup.log 2>&1
+| Job     | Quando (UTC)                    | Pasta                                  | Retenção   |
+| ------- | ------------------------------- | -------------------------------------- | ---------- |
+| Diário  | `0 3 * * *` (00:00 BRT)         | `/opt/clube-geek-toys/backups/`        | 7 dias     |
+| Semanal | `0 4 * * 0` (domingo 01:00 BRT) | `/opt/clube-geek-toys/backups/weekly/` | 12 semanas |
+
+```bash
+chmod +x /opt/clube-geek-toys/server/scripts/backup-postgres.sh \
+         /opt/clube-geek-toys/server/scripts/cron-backup.sh \
+         /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh
+
+# crontab root:
+# 0 3 * * * /opt/clube-geek-toys/server/scripts/cron-backup.sh >> /var/log/clube-backup.log 2>&1
+# 0 4 * * 0 /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh >> /var/log/clube-backup-weekly.log 2>&1
+```
+
+Dump manual (hoje, sem esperar o domingo):
+
+```bash
+ssh $VPS_HOST /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh
 ```
 
 ### Backup manual
@@ -354,7 +367,7 @@ ssh $VPS_HOST "docker exec clube-geek-postgres pg_dump -U \$POSTGRES_USER \$POST
 
 ```bash
 # Restore em container limpo
-ssh $VPS_HOST "cd /opt/clube-geek-toys/server && ./scripts/restore-postgres.sh /opt/clube-geek-toys/backups/<arquivo>.sql.gz"
+ssh $VPS_HOST "cd /opt/clube-geek-toys/server && ./scripts/restore-postgres.sh /opt/clube-geek-toys/backups/weekly/<arquivo>.sql.gz"
 ```
 
 ### Contratos (PDFs)

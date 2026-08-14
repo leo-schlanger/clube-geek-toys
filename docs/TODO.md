@@ -94,7 +94,7 @@
 - [x] **Analytics com Umami** - Self-hosted em analytics.geeketoys.com.br
 - [x] **Docker Compose** - Todos os servicos containerizados com resource limits
 - [x] **Nginx reverse proxy** - SSL termination + security headers + SPA serving
-- [x] **Backup automatico PostgreSQL** - Script pg_dump + cron diario + retencao 7 dias
+- [x] **Backup automatico PostgreSQL** - Script pg_dump + cron diario (7 dias) + semanal domingo (12 semanas)
 - [x] **Log rotation** - Docker json-file driver com max-size 10m em todos os servicos
 - [x] **Health check + alertas** - Script cron 5min + alerta via Resend
 - [x] **Cron health monitoring** - Timestamp last_cron_run salvo em config table
@@ -230,7 +230,7 @@
 - [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
 - [ ] **Settings/preferencias do membro** - Permitir editar preferencias pessoais e notificacoes
 - [ ] **Structured logging** - Substituir console.log por logger com niveis (Pino/Winston)
-- [ ] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze
+- [ ] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze (local: diario 7d + semanal 12 sem. na VPS)
 - [ ] **Fluxo de atualizar metodo de pagamento** - Atualmente requer cancelar e re-assinar
 - [x] **Calculo de frete na loja** - ViaCEP + Melhor Envio / fallback (migration 010)
 - [ ] **Gateway PIX automatico na loja** - Confirmacao de PIX de pedido ainda e manual pelo admin
