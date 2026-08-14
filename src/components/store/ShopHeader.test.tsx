@@ -92,4 +92,16 @@ describe('ShopHeader', () => {
     fireEvent.submit(input.closest('form')!)
     expect(mockNavigate).toHaveBeenCalledWith('/atacado?search=kit')
   })
+
+  it('keeps the current sort when searching', () => {
+    render(
+      <MemoryRouter initialEntries={['/?sort=price_asc']}>
+        <ShopHeader />
+      </MemoryRouter>
+    )
+    const input = screen.getAllByRole('searchbox', { name: /Buscar produtos/i })[0]
+    fireEvent.change(input, { target: { value: 'photocard' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(mockNavigate).toHaveBeenCalledWith('/?search=photocard&sort=price_asc')
+  })
 })

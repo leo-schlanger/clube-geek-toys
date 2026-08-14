@@ -344,8 +344,9 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
   Loja (shop.*)                    API                          Stripe / Admin
   ─────────────                ────────                       ────────────────
      │                            │                              │
-     │  Catalogo publico          │  GET /products               │
-     │───────────────────────────►│  GET /products/:slug         │
+     │  Catalogo publico          │  GET /products?sort=&page=   │
+     │  (ORDER BY + LIMIT/OFFSET) │  GET /products/:slug         │
+     │───────────────────────────►│                              │
      │                            │                              │
      │  Carrinho (localStorage)   │                              │
      │  CartContext               │                              │
@@ -385,7 +386,7 @@ Aba dedicada no mesmo host `shop.*`. Detalhes operacionais: [`WHOLESALE.md`](WHO
 - Cadastro: `POST /wholesale/register` (CNPJ validado + empresa + atividade)
 - Login: `POST /wholesale/login` (email + senha + **CNPJ que confere**)
 - Admin: `GET/PATCH /wholesale/accounts` (aprovar / recusar / desativar)
-- Catalogo: `GET /products?wholesale=true` (so `wholesale_enabled`)
+- Catalogo: `GET /products?wholesale=true` (so `wholesale_enabled`); mesma `?sort=` da loja
 - Checkout: `channel=wholesale` + `cnpj` → `WHOLESALE_SHOP_DISCOUNT = 0.25` (`wholesale_25`)
 - Carrinho separado em `localStorage` (`clube_geek_shop_cart_wholesale`)
 - Schema: migration **012** + `ensureSchema` no boot da API
@@ -398,7 +399,7 @@ Aba dedicada no mesmo host `shop.*`. Detalhes operacionais: [`WHOLESALE.md`](WHO
 
 ### Imagens de produto
 
-Imagens sao enviadas por `POST /products/:id/images` (multipart) e armazenadas no volume `/uploads`, servidas publicamente pelo nginx via `api.geeketoys.com.br`.
+Imagens sao enviadas por `POST /products/:id/images` (multipart) e armazenadas no volume `/uploads`, servidas publicamente pelo nginx via `api.geeketoys.com.br`. No painel, o admin recorta e escolhe o tamanho (px) no cliente antes do multipart; fotos 4K continuam sendo redimensionadas automaticamente.
 
 ---
 

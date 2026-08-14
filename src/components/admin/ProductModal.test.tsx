@@ -175,4 +175,23 @@ describe('ProductModal — foto por variação', () => {
       'https://cdn.example.com/rosa-sku.jpg'
     )
   })
+
+  it('opens the crop dialog when a listing image is picked', () => {
+    render(
+      <ProductModal
+        mode="edit"
+        product={product}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+    const input = screen.getByLabelText(/Enviar imagens/i) as HTMLInputElement
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], 'foto.jpg', {
+      type: 'image/jpeg',
+    })
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(screen.getByRole('dialog', { name: /Cortar imagem/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Aplicar recorte/i })).toBeInTheDocument()
+  })
 })

@@ -1,11 +1,14 @@
 import { api, apiRequest } from './api-client'
 import type { Product, Category, ProductVariant, VariantAxis } from '../types'
+import { DEFAULT_PRODUCT_SORT, type ProductSort } from './product-sort'
 
 export interface ProductListResult {
   products: Product[]
   total: number
   page: number
   limit: number
+  /** Present when the request asked for `stats=true` (admin). */
+  missingPhotoCount?: number
 }
 
 export interface ProductListParams {
@@ -16,6 +19,10 @@ export interface ProductListParams {
   limit?: number
   /** Canal atacado: só produtos com wholesale_enabled. */
   wholesale?: boolean
+  /** Ordenação do catálogo. Padrão: mais recentes. */
+  sort?: ProductSort
+  /** Pedir contagem de produtos ativos sem foto (admin). */
+  stats?: boolean
 }
 
 /** Public: list active products with optional filters. */
@@ -27,6 +34,8 @@ export async function listProducts(params: ProductListParams = {}): Promise<Prod
   if (params.page) qs.set('page', String(params.page))
   if (params.limit) qs.set('limit', String(params.limit))
   if (params.wholesale) qs.set('wholesale', 'true')
+  if (params.sort && params.sort !== DEFAULT_PRODUCT_SORT) qs.set('sort', params.sort)
+  if (params.stats) qs.set('stats', 'true')
   const query = qs.toString()
   const result = await api.get<ProductListResult>(`/products${query ? `?${query}` : ''}`, { skipAuth: true })
   return result.data ?? { products: [], total: 0, page: 1, limit: 24 }
@@ -109,9 +118,8 @@ export async function listRelatedProducts(slug: string): Promise<Product[]> {
 }
 
 export async function adminListProducts(params: ProductListParams = {}): Promise<ProductListResult> {
-  // Admins reuse the public list endpoint but see the same catalog; inactive management
-  // is handled per-product. For a full admin listing we pass a high limit.
-  return listProducts({ limit: 100, ...params })
+  // Same catalog endpoint; sort/search/page run in SQL (ORDER BY + LIMIT/OFFSET).
+  return listProducts({ limit: 25, stats: true, ...params })
 }
 
 /** Admin: full product with variants (uses public slug detail which embeds variants). */

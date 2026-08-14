@@ -3,9 +3,18 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Sparkles, Search as SearchIcon, Ticket } from 'lucide-react'
 import type { Product, Category } from '../../types'
 import { listProducts, listCategories } from '../../lib/products'
+import {
+  parseProductSort,
+  parseCatalogPage,
+  catalogPageCount,
+  SHOP_CATALOG_PAGE_SIZE,
+  type ProductSort,
+} from '../../lib/product-sort'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { CategoryNav } from '../../components/store/CategoryNav'
+import { ProductSortSelect } from '../../components/store/ProductSortSelect'
+import { CatalogPager } from '../../components/store/CatalogPager'
 import { EventPromoCard } from '../../components/store/EventPromoCard'
 import { useShopMember } from '../../components/store/useShopMember'
 import { SeoHead, SHOP_DEFAULT_SEO } from '../../components/store/SeoHead'
@@ -19,8 +28,10 @@ import { isEventVisible } from '../../data/event'
  */
 export default function ShopHome() {
   const { slug: categorySlug } = useParams<{ slug: string }>()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const search = searchParams.get('search')?.trim() || ''
+  const sort = parseProductSort(searchParams.get('sort'))
+  const page = parseCatalogPage(searchParams.get('page'))
 
   const { isMember } = useShopMember()
 
@@ -28,6 +39,7 @@ export default function ShopHome() {
   const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   const [products, setProducts] = useState<Product[]>([])
+  const [total, setTotal] = useState(0)
   const [featured, setFeatured] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -83,11 +95,26 @@ export default function ShopHome() {
         const res = await listProducts({
           category: categorySlug || undefined,
           search: search || undefined,
-          limit: 48,
+          sort,
+          page,
+          limit: SHOP_CATALOG_PAGE_SIZE,
         })
-        if (active) setProducts(res.products)
+        if (active) {
+          setProducts(res.products)
+          setTotal(res.total)
+          const pages = catalogPageCount(res.total, SHOP_CATALOG_PAGE_SIZE)
+          if (res.total > 0 && page > pages) {
+            const nextParams = new URLSearchParams(searchParams)
+            if (pages <= 1) nextParams.delete('page')
+            else nextParams.set('page', String(pages))
+            setSearchParams(nextParams, { replace: true })
+          }
+        }
       } catch {
-        if (active) setProducts([])
+        if (active) {
+          setProducts([])
+          setTotal(0)
+        }
       } finally {
         if (active) setLoading(false)
       }
@@ -98,7 +125,22 @@ export default function ShopHome() {
     return () => {
       active = false
     }
-  }, [categorySlug, search])
+  }, [categorySlug, search, sort, page, searchParams, setSearchParams])
+
+  function setSort(next: ProductSort) {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next === 'newest') nextParams.delete('sort')
+    else nextParams.set('sort', next)
+    nextParams.delete('page')
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function setPage(next: number) {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next <= 1) nextParams.delete('page')
+    else nextParams.set('page', String(next))
+    setSearchParams(nextParams)
+  }
 
   const activeCategory = categories.find((c) => c.slug === categorySlug)
 
@@ -191,11 +233,14 @@ export default function ShopHome() {
 
         {/* Grade principal */}
         <section>
-          <div className="mb-4 flex items-center gap-2">
-            {search ? (
-              <SearchIcon className="h-5 w-5 text-muted-foreground" />
-            ) : null}
-            <h2 className="text-lg font-heading font-semibold">{heading}</h2>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              {search ? (
+                <SearchIcon className="h-5 w-5 text-muted-foreground" />
+              ) : null}
+              <h2 className="text-lg font-heading font-semibold">{heading}</h2>
+            </div>
+            <ProductSortSelect value={sort} onChange={setSort} />
           </div>
           <ProductGrid
             products={products}
@@ -207,6 +252,14 @@ export default function ShopHome() {
                 : 'Nenhum produto disponível nesta categoria.'
             }
           />
+          {!loading && (
+            <CatalogPager
+              page={page}
+              total={total}
+              pageSize={SHOP_CATALOG_PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          )}
         </section>
       </main>
 

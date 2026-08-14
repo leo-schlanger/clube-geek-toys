@@ -274,6 +274,14 @@
 - [x] **Busca loja estilo Shopee** - barra sempre visível + borda brand + botão Buscar (12/08)
 - [x] **Testes** - VariantPicker (swatches/`resolveVariantImages`), ShopHeader busca, PDP troca de foto
 
+### Filtros do catálogo + recorte de foto (pedido Laura 13/08/2026)
+
+- [x] **Ordenação na loja/atacado** - A–Z, Z–A, postagem (mais recentes/antigos), menor/maior preço (`?sort=`, `ORDER BY` no Postgres + `LIMIT/OFFSET`)
+- [x] **Paginação** - loja/atacado `?page=` (24/página); admin 10/25/50/100; troca de sort/busca volta à página 1
+- [x] **Ordenação no admin** - mesma grade na aba Produtos via API (padrão A–Z para agrupar photocards)
+- [x] **Recorte no post** - diálogo ao enviar imagem (proporção Quadrado/Photocard/Retrato/Paisagem/Livre + tamanho 800/1200/1600/personalizado)
+- [x] **Testes** - product-sort, ProductSortSelect, ImageCropDialog, crop math, ShopHome/Wholesale/CategoryNav/ShopHeader
+
 ### Hardening (10/08/2026 — validação de fluxos)
 
 - [x] **Admin criar membro** - cria user do e-mail (não amarra no JWT do admin)

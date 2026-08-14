@@ -91,7 +91,7 @@ describe('ShopHome', () => {
         updatedAt: '',
       },
     ])
-    mockedList.mockResolvedValue({ products: [sampleProduct], total: 1, page: 1, limit: 48 })
+    mockedList.mockResolvedValue({ products: [sampleProduct], total: 1, page: 1, limit: 24 })
   })
 
   it('renders hero and product grid on home', async () => {
@@ -106,11 +106,19 @@ describe('ShopHome', () => {
   })
 
 
+  it('renders the catalog sort control on the home grid', async () => {
+    renderHome('/')
+    expect(screen.getByLabelText('Ordenar produtos')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalled()
+    })
+  })
+
   it('loads products for category slug', async () => {
     renderHome('/categoria/musica')
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'musica', limit: 48 })
+        expect.objectContaining({ category: 'musica', limit: 24, page: 1 })
       )
     })
     await waitFor(() => {
@@ -126,8 +134,27 @@ describe('ShopHome', () => {
     expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ search: 'bts' }))
   })
 
+  it('passes alphabetical sort from the query string', async () => {
+    renderHome('/?sort=name')
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'name', limit: 24, page: 1 })
+      )
+    })
+    expect(screen.getByLabelText('Ordenar produtos')).toHaveValue('name')
+  })
+
+  it('asks the API for the requested catalog page', async () => {
+    renderHome('/?sort=price_asc&page=2')
+    await waitFor(() => {
+      expect(mockedList).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: 'price_asc', page: 2, limit: 24 })
+      )
+    })
+  })
+
   it('handles empty catalog', async () => {
-    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 48 })
+    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
     renderHome('/')
     await waitFor(() => {
       expect(mockedList).toHaveBeenCalled()

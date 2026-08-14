@@ -55,4 +55,14 @@ describe('CategoryNav', () => {
     expect(link?.getAttribute('href')).toContain('/atacado')
     expect(link?.getAttribute('href')).toContain('category=musica')
   })
+
+  it('keeps the current catalog sort in category links', () => {
+    render(
+      <MemoryRouter initialEntries={['/?sort=name']}>
+        <CategoryNav categories={cats} />
+      </MemoryRouter>
+    )
+    expect(screen.getByText('Música').closest('a')?.getAttribute('href')).toContain('sort=name')
+    expect(screen.getByText('Todos').closest('a')?.getAttribute('href')).toContain('sort=name')
+  })
 })

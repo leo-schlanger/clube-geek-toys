@@ -132,6 +132,42 @@ function isSeedProductName(name: string | null | undefined): boolean {
   return n.startsWith('checkup') || n.includes('checkup api');
 }
 
+export const PRODUCT_SORTS = [
+  'newest',
+  'oldest',
+  'name',
+  'name_desc',
+  'price_asc',
+  'price_desc',
+] as const;
+
+export type ProductSort = (typeof PRODUCT_SORTS)[number];
+
+const PRODUCT_SORT_SET = new Set<string>(PRODUCT_SORTS);
+
+export function parseProductSort(value: unknown): ProductSort {
+  return typeof value === 'string' && PRODUCT_SORT_SET.has(value) ? (value as ProductSort) : 'newest';
+}
+
+/** ORDER BY whitelist — never interpolate raw query strings. `p.id` keeps pages stable. */
+function orderBySql(sort: ProductSort): string {
+  switch (sort) {
+    case 'oldest':
+      return 'p.created_at ASC, LOWER(p.name) ASC, p.id ASC';
+    case 'name':
+      return 'LOWER(p.name) ASC, p.created_at DESC, p.id ASC';
+    case 'name_desc':
+      return 'LOWER(p.name) DESC, p.created_at DESC, p.id ASC';
+    case 'price_asc':
+      return 'COALESCE(vs.price_from, p.price) ASC, LOWER(p.name) ASC, p.id ASC';
+    case 'price_desc':
+      return 'COALESCE(vs.price_from, p.price) DESC, LOWER(p.name) ASC, p.id ASC';
+    case 'newest':
+    default:
+      return 'p.featured DESC, p.created_at DESC, p.id ASC';
+  }
+}
+
 export async function listProducts(opts: {
   category?: string;   // category slug
   search?: string;
@@ -141,6 +177,10 @@ export async function listProducts(opts: {
   includeInactive?: boolean; // admin only
   /** When true, only products marked for wholesale channel. */
   wholesaleOnly?: boolean;
+  /** Catalog sort. Default: featured then newest. */
+  sort?: ProductSort | string;
+  /** Include count of active products without images (admin banner). */
+  includeStats?: boolean;
 }) {
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -163,7 +203,9 @@ export async function listProducts(opts: {
     conditions.push(`p.featured = TRUE`);
   }
   if (opts.search && opts.search.trim()) {
-    conditions.push(`(p.name ILIKE $${i} OR p.description ILIKE $${i})`);
+    conditions.push(
+      `(p.name ILIKE $${i} OR p.description ILIKE $${i} OR COALESCE(p.sku, '') ILIKE $${i} OR COALESCE(c.name, '') ILIKE $${i})`
+    );
     params.push(`%${opts.search.trim()}%`);
     i++;
   }
@@ -172,10 +214,9 @@ export async function listProducts(opts: {
   const limit = Math.max(1, Math.min(opts.limit || 24, 100));
   const page = Math.max(1, opts.page || 1);
   const offset = (page - 1) * limit;
+  const orderBy = orderBySql(parseProductSort(opts.sort));
 
-  const [data, count] = await Promise.all([
-    query(
-      `SELECT p.*, c.name as category_name,
+  const dataSql = `SELECT p.*, c.name as category_name,
               vs.price_from, vs.stock_total
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
@@ -186,10 +227,11 @@ export async function listProducts(opts: {
          WHERE v.product_id = p.id AND v.active = TRUE
        ) vs ON p.has_variants = TRUE
        ${where}
-       ORDER BY p.featured DESC, p.created_at DESC
-       LIMIT $${i++} OFFSET $${i}`,
-      [...params, limit, offset]
-    ),
+       ORDER BY ${orderBy}
+       LIMIT $${i++} OFFSET $${i}`;
+
+  const [data, count, stats] = await Promise.all([
+    query(dataSql, [...params, limit, offset]),
     query(
       `SELECT COUNT(*)::int as total
        FROM products p
@@ -197,6 +239,14 @@ export async function listProducts(opts: {
        ${where}`,
       params
     ),
+    opts.includeStats
+      ? query(
+          `SELECT COUNT(*)::int as total
+           FROM products
+           WHERE active = TRUE
+             AND jsonb_array_length(COALESCE(images, '[]'::jsonb)) = 0`
+        )
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -204,6 +254,7 @@ export async function listProducts(opts: {
     total: count.rows[0].total as number,
     page,
     limit,
+    missingPhotoCount: stats ? (stats.rows[0].total as number) : undefined,
   };
 }
 

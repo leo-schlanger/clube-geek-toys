@@ -52,12 +52,27 @@ describe('products API client', () => {
       data: { products: [product], total: 1, page: 1, limit: 24 },
       status: 200,
     })
-    const res = await listProducts({ wholesale: true, search: 'card', limit: 10 })
+    const res = await listProducts({ wholesale: true, search: 'card', limit: 10, sort: 'name' })
     expect(mockedApi.get).toHaveBeenCalledWith(
       expect.stringMatching(/wholesale=true/),
       { skipAuth: true }
     )
+    expect(mockedApi.get.mock.calls[0][0]).toMatch(/sort=name/)
     expect(res.products).toHaveLength(1)
+  })
+
+  it('listProducts sends page and stats for SQL pagination', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: { products: [product], total: 40, page: 2, limit: 24, missingPhotoCount: 3 },
+      status: 200,
+    })
+    const res = await listProducts({ page: 2, limit: 24, sort: 'price_asc', stats: true })
+    expect(mockedApi.get.mock.calls[0][0]).toMatch(/page=2/)
+    expect(mockedApi.get.mock.calls[0][0]).toMatch(/limit=24/)
+    expect(mockedApi.get.mock.calls[0][0]).toMatch(/sort=price_asc/)
+    expect(mockedApi.get.mock.calls[0][0]).toMatch(/stats=true/)
+    expect(res.page).toBe(2)
+    expect(res.missingPhotoCount).toBe(3)
   })
 
   it('listProducts defaults empty', async () => {

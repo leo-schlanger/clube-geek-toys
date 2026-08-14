@@ -46,6 +46,8 @@ productRouter.get('/', async (req, res, next) => {
       limit: req.query.limit ? Number(req.query.limit) : undefined,
       includeInactive: false,
       wholesaleOnly: req.query.wholesale === 'true' || req.query.channel === 'wholesale',
+      sort: productService.parseProductSort(req.query.sort),
+      includeStats: req.query.stats === 'true',
     });
     res.json(result);
   } catch (err) {

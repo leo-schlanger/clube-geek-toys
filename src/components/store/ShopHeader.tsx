@@ -69,7 +69,12 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
     e.preventDefault()
     const q = term.trim()
     const base = isWholesale ? '/atacado' : '/'
-    navigate(q ? `${base}?search=${encodeURIComponent(q)}` : base)
+    const next = new URLSearchParams()
+    if (q) next.set('search', q)
+    const sort = searchParams.get('sort')
+    if (sort) next.set('sort', sort)
+    const qs = next.toString().replace(/\+/g, '%20')
+    navigate(qs ? `${base}?${qs}` : base)
   }
 
   const searchPlaceholder = isWholesale

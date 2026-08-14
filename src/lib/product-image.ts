@@ -11,7 +11,115 @@ export const PRODUCT_IMAGE_MAX_SIDE = 2560
 /** Broad accept so iPhone Camera Roll (HEIC) and Android gallery actually appear. */
 export const PRODUCT_IMAGE_ACCEPT = 'image/*'
 export const PRODUCT_IMAGE_ACCEPT_LABEL =
-  'Foto da galeria ou arquivo · 4K é redimensionada sozinha · até 40 MB'
+  'Foto da galeria · recorte e tamanho na hora · 4K é redimensionada · até 40 MB'
+
+/** Recorte em pixels da imagem original. */
+export interface ImageCropRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface CoverCropInput {
+  imageWidth: number
+  imageHeight: number
+  frameWidth: number
+  frameHeight: number
+  zoom: number
+  panX: number
+  panY: number
+}
+
+export function clampCoverPan(
+  imageWidth: number,
+  imageHeight: number,
+  frameWidth: number,
+  frameHeight: number,
+  zoom: number,
+  panX: number,
+  panY: number
+): { panX: number; panY: number } {
+  const z = Math.max(1, zoom)
+  const cover = Math.max(frameWidth / Math.max(1, imageWidth), frameHeight / Math.max(1, imageHeight))
+  const displayedW = imageWidth * cover * z
+  const displayedH = imageHeight * cover * z
+  const maxX = Math.max(0, (displayedW - frameWidth) / 2)
+  const maxY = Math.max(0, (displayedH - frameHeight) / 2)
+  return {
+    panX: Math.min(maxX, Math.max(-maxX, panX)),
+    panY: Math.min(maxY, Math.max(-maxY, panY)),
+  }
+}
+
+/** Converte zoom + pan do preview (object-cover) em retângulo na imagem fonte. */
+export function computeCoverCrop(input: CoverCropInput): ImageCropRect {
+  const imageWidth = Math.max(1, input.imageWidth)
+  const imageHeight = Math.max(1, input.imageHeight)
+  const frameWidth = Math.max(1, input.frameWidth)
+  const frameHeight = Math.max(1, input.frameHeight)
+  const zoom = Math.max(1, input.zoom)
+  const cover = Math.max(frameWidth / imageWidth, frameHeight / imageHeight)
+  const scale = cover * zoom
+  const { panX, panY } = clampCoverPan(
+    imageWidth,
+    imageHeight,
+    frameWidth,
+    frameHeight,
+    zoom,
+    input.panX,
+    input.panY
+  )
+  const displayedW = imageWidth * scale
+  const displayedH = imageHeight * scale
+  const imageLeft = (frameWidth - displayedW) / 2 + panX
+  const imageTop = (frameHeight - displayedH) / 2 + panY
+  const x = Math.min(imageWidth - 1, Math.max(0, -imageLeft / scale))
+  const y = Math.min(imageHeight - 1, Math.max(0, -imageTop / scale))
+  const width = Math.min(imageWidth - x, frameWidth / scale)
+  const height = Math.min(imageHeight - y, frameHeight / scale)
+  return { x, y, width: Math.max(1, width), height: Math.max(1, height) }
+}
+
+/** Lado maior → largura/altura respeitando a proporção do recorte. */
+export function sizeFromLongestSide(
+  cropWidth: number,
+  cropHeight: number,
+  longest: number
+): { width: number; height: number } {
+  const w = Math.max(1, cropWidth)
+  const h = Math.max(1, cropHeight)
+  const cap = Math.max(1, Math.round(longest))
+  if (w >= h) {
+    return { width: cap, height: Math.max(1, Math.round((cap * h) / w)) }
+  }
+  return { width: Math.max(1, Math.round((cap * w) / h)), height: cap }
+}
+
+export function resolveCropOutputSize(
+  crop: ImageCropRect,
+  requested?: { width?: number; height?: number; longestSide?: number },
+  maxSide = PRODUCT_IMAGE_MAX_SIDE
+): { width: number; height: number } {
+  if (requested?.longestSide) {
+    const sized = sizeFromLongestSide(crop.width, crop.height, requested.longestSide)
+    return fittedSize(sized.width, sized.height, maxSide)
+  }
+  const aspect = crop.width / Math.max(1, crop.height)
+  let w = requested?.width
+  let h = requested?.height
+  if (w && h) {
+    /* keep both */
+  } else if (w) {
+    h = Math.round(w / aspect)
+  } else if (h) {
+    w = Math.round(h * aspect)
+  } else {
+    w = Math.round(crop.width)
+    h = Math.round(crop.height)
+  }
+  return fittedSize(Math.max(1, w), Math.max(1, h), maxSide)
+}
 
 const JPEG_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg'])
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/webp'])
@@ -157,6 +265,38 @@ async function compressImageFile(file: File, targetBytes: number): Promise<File 
   }
 
   closeDrawable(src)
+  if (!blob) return null
+  return new File([blob], renameWithExt(file.name, '.jpg'), {
+    type: 'image/jpeg',
+    lastModified: Date.now(),
+  })
+}
+
+/**
+ * Recorta a imagem e redimensiona para o tamanho de saída (JPEG).
+ */
+export async function cropProductImage(
+  file: File,
+  crop: ImageCropRect,
+  output?: { width?: number; height?: number; longestSide?: number }
+): Promise<File | null> {
+  const src = await decodeDrawable(file)
+  if (!src) return null
+
+  const size = resolveCropOutputSize(crop, output)
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    closeDrawable(src)
+    return null
+  }
+
+  canvas.width = size.width
+  canvas.height = size.height
+  ctx.drawImage(src, crop.x, crop.y, crop.width, crop.height, 0, 0, size.width, size.height)
+  closeDrawable(src)
+
+  const blob = await canvasToBlob(canvas, 'image/jpeg', 0.9)
   if (!blob) return null
   return new File([blob], renameWithExt(file.name, '.jpg'), {
     type: 'image/jpeg',

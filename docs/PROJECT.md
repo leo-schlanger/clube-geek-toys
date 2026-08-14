@@ -47,7 +47,7 @@ Verificacao de membros por CPF ou QR Code e visualizacao do status do membro e d
 
 ### 3.4 Modulo Loja (E-commerce)
 
-Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`.
+Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=` — e **ordenacao** A–Z / postagem / preco via `?sort=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`. No admin, o envio de foto abre um **recorte** (proporcao + tamanho em pixels) antes do upload.
 
 ### 3.4.1 Canal Atacado (B2B)
 
@@ -450,18 +450,18 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Products (`/products`)
 
-| Metodo | Endpoint                   | Descricao                                                   | Auth    |
-| ------ | -------------------------- | ----------------------------------------------------------- | ------- |
-| GET    | `/products/categories`     | Lista categorias ativas                                     | Publico |
-| GET    | `/products`                | Catalogo publico (`?wholesale=true` filtra atacado)         | Publico |
-| GET    | `/products/:slug`          | Detalhe de um produto                                       | Publico |
-| POST   | `/products/categories`     | Cria categoria                                              | admin   |
-| PATCH  | `/products/categories/:id` | Atualiza categoria                                          | admin   |
-| DELETE | `/products/categories/:id` | Remove categoria                                            | admin   |
-| POST   | `/products`                | Cria produto (incl. `wholesaleEnabled` / `wholesaleMinQty`) | admin   |
-| PATCH  | `/products/:id`            | Atualiza produto                                            | admin   |
-| DELETE | `/products/:id`            | Remove produto                                              | admin   |
-| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart)                    | admin   |
+| Metodo | Endpoint                   | Descricao                                                                                                                                                | Auth    |
+| ------ | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| GET    | `/products/categories`     | Lista categorias ativas                                                                                                                                  | Publico |
+| GET    | `/products`                | Catalogo publico (`?wholesale=true`, `?sort=name\|newest\|oldest\|name_desc\|price_asc\|price_desc`, `?page=&limit=` — ORDER BY + LIMIT/OFFSET no banco) | Publico |
+| GET    | `/products/:slug`          | Detalhe de um produto                                                                                                                                    | Publico |
+| POST   | `/products/categories`     | Cria categoria                                                                                                                                           | admin   |
+| PATCH  | `/products/categories/:id` | Atualiza categoria                                                                                                                                       | admin   |
+| DELETE | `/products/categories/:id` | Remove categoria                                                                                                                                         | admin   |
+| POST   | `/products`                | Cria produto (incl. `wholesaleEnabled` / `wholesaleMinQty`)                                                                                              | admin   |
+| PATCH  | `/products/:id`            | Atualiza produto                                                                                                                                         | admin   |
+| DELETE | `/products/:id`            | Remove produto                                                                                                                                           | admin   |
+| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart)                                                                                                                 | admin   |
 
 ### Orders (`/orders`)
 

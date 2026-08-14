@@ -16,31 +16,51 @@ import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
 import { Plus, Search, Package, Pencil, Trash2, Star, ImageOff } from 'lucide-react'
+import { parseProductSort, ADMIN_CATALOG_PAGE_SIZE, type ProductSort } from '../../lib/product-sort'
+import { ProductSortSelect } from '../store/ProductSortSelect'
+import { Pagination } from '../ui/pagination'
+import { useDebounce } from '../../hooks/useDebounce'
 
 type ModalState = { mode: 'create' | 'edit'; product: Product | null } | null
 
 export function ProductsTab() {
   const [products, setProducts] = useState<Product[]>([])
+  const [total, setTotal] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<ProductSort>('name')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(ADMIN_CATALOG_PAGE_SIZE)
+  const [missingPhotoCount, setMissingPhotoCount] = useState(0)
   const [modal, setModal] = useState<ModalState>(null)
+  const debouncedSearch = useDebounce(search, 300)
 
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     try {
       const [productsResult, cats] = await Promise.all([
-        adminListProducts(),
+        adminListProducts({
+          sort,
+          search: debouncedSearch.trim() || undefined,
+          page,
+          limit: pageSize,
+          stats: true,
+        }),
         listCategories(),
       ])
       setProducts(productsResult.products)
+      setTotal(productsResult.total)
+      if (productsResult.missingPhotoCount != null) {
+        setMissingPhotoCount(productsResult.missingPhotoCount)
+      }
       setCategories(cats)
     } catch (error) {
       logger.error('Error fetching products:', error)
       toast.error('Erro ao carregar produtos')
     }
     setLoading(false)
-  }, [])
+  }, [sort, debouncedSearch, page, pageSize])
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -74,20 +94,8 @@ export function ProductsTab() {
     [fetchProducts]
   )
 
-  const term = search.trim().toLowerCase()
-  const filtered = term
-    ? products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(term) ||
-          (p.sku?.toLowerCase().includes(term) ?? false) ||
-          (p.categoryName?.toLowerCase().includes(term) ?? false)
-      )
-    : products
-
-  // Produtos ativos sem imagem — prioridade visual para a Laura completar o catálogo
-  const missingPhotoCount = products.filter(
-    (p) => p.active && (!p.images || p.images.length === 0)
-  ).length
+  const term = search.trim()
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   return (
     <Card>
@@ -110,14 +118,27 @@ export function ProductsTab() {
           </Button>
         </div>
 
-        {/* Busca */}
-        <div className="relative mt-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome, SKU ou categoria..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
+        {/* Busca + ordenação */}
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, SKU ou categoria..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+              className="pl-10"
+            />
+          </div>
+          <ProductSortSelect
+            id="admin-product-sort"
+            value={sort}
+            onChange={(next) => {
+              setSort(parseProductSort(next))
+              setPage(1)
+            }}
           />
         </div>
       </CardHeader>
@@ -141,7 +162,7 @@ export function ProductsTab() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((product) => {
+                {products.map((product) => {
                   const hasPhoto = Boolean(product.images?.[0])
                   return (
                   <tr
@@ -244,7 +265,7 @@ export function ProductsTab() {
               </tbody>
             </table>
 
-            {filtered.length === 0 && (
+            {products.length === 0 && (
               <div className="text-center py-12">
                 <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <p className="text-muted-foreground font-medium">
@@ -256,6 +277,21 @@ export function ProductsTab() {
                     : 'Clique em "Novo Produto" para adicionar o primeiro item'}
                 </p>
               </div>
+            )}
+
+            {total > 0 && (
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={total}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setPage(1)
+                }}
+                pageSizeOptions={[10, 25, 50, 100]}
+              />
             )}
           </div>
         )}

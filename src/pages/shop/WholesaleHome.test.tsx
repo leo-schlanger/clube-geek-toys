@@ -50,7 +50,7 @@ describe('WholesaleHome', () => {
   })
 
   it('shows empty catalog preparation message', async () => {
-    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 48 })
+    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
     render(
       <MemoryRouter>
         <WholesaleHome />
@@ -60,7 +60,9 @@ describe('WholesaleHome', () => {
       expect(screen.getByText(/Catálogo atacado em preparação/i)).toBeInTheDocument()
     })
     expect(screen.getByText(/Atacado B2B/i)).toBeInTheDocument()
-    expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ wholesale: true }))
+    expect(mockedList).toHaveBeenCalledWith(
+      expect.objectContaining({ wholesale: true, sort: 'newest', page: 1, limit: 24 })
+    )
   })
 
   it('lists wholesale products when available', async () => {

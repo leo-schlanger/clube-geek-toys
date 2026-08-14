@@ -22,6 +22,7 @@ import {
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_ACCEPT_LABEL,
 } from '../../lib/product-image'
+import { ImageCropDialog } from './ImageCropDialog'
 import { cn, formatCurrency } from '../../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -248,6 +249,9 @@ export function ProductModal({
   const [images, setImages] = useState<string[]>(product?.images ?? [])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [imageUrl, setImageUrl] = useState('')
+  const [cropSession, setCropSession] = useState<
+    { files: File[]; kind: 'listing' } | { files: File[]; kind: 'variant'; variantIndex: number } | null
+  >(null)
 
   // Foto por variação (estilo Shopee): arquivo pendente por índice da linha.
   const [pendingVariantFiles, setPendingVariantFiles] = useState<Record<number, File>>({})
@@ -291,12 +295,7 @@ export function ProductModal({
     setImageUrl('')
   }
 
-  async function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? [])
-    // Allow re-picking the same file later.
-    e.target.value = ''
-    if (picked.length === 0) return
-
+  async function commitListingImages(picked: File[]) {
     setUploadingImages(true)
     setUploadPhase('prepare')
     try {
@@ -337,6 +336,14 @@ export function ProductModal({
     } finally {
       setUploadingImages(false)
     }
+  }
+
+  function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? [])
+    // Allow re-picking the same file later.
+    e.target.value = ''
+    if (picked.length === 0) return
+    setCropSession({ files: picked, kind: 'listing' })
   }
 
   function removeExistingImage(index: number) {
@@ -381,11 +388,7 @@ export function ProductModal({
     revokePendingPreview(idx)
   }
 
-  async function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
-    const raw = e.target.files?.[0]
-    e.target.value = ''
-    if (!raw) return
-
+  async function commitVariantImage(raw: File, idx: number) {
     const prepared = await prepareProductImages([raw])
     for (const msg of prepared.errors) toast.error(msg)
     const file = prepared.files[0]
@@ -428,6 +431,25 @@ export function ProductModal({
       return { ...prev, [idx]: URL.createObjectURL(file) }
     })
     setVariantImages(idx, []) // URL real vem no save; preview usa blob
+  }
+
+  function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
+    const raw = e.target.files?.[0]
+    e.target.value = ''
+    if (!raw) return
+    setCropSession({ files: [raw], kind: 'variant', variantIndex: idx })
+  }
+
+  function handleCropComplete(cropped: File[]) {
+    const session = cropSession
+    setCropSession(null)
+    if (!session || cropped.length === 0) return
+    if (session.kind === 'variant') {
+      const file = cropped[0]
+      if (file) void commitVariantImage(file, session.variantIndex)
+      return
+    }
+    void commitListingImages(cropped)
   }
 
   function applyVariantImageUrl(idx: number) {
@@ -653,6 +675,7 @@ export function ProductModal({
     Number.isFinite(priceNum) && Number.isFinite(compareNum) && compareNum > priceNum && priceNum > 0
 
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="relative">
@@ -1364,5 +1387,13 @@ export function ProductModal({
         </form>
       </Card>
     </div>
+    {cropSession && (
+      <ImageCropDialog
+        files={cropSession.files}
+        onCancel={() => setCropSession(null)}
+        onComplete={handleCropComplete}
+      />
+    )}
+    </>
   )
 }

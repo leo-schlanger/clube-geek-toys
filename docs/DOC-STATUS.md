@@ -7,24 +7,26 @@
 
 ## Veredito
 
-| Área                          | Docs                              | Código      | Notas                                  |
-| ----------------------------- | --------------------------------- | ----------- | -------------------------------------- |
-| Stack clube + loja + API      | PROJECT / ARCHITECTURE            | ✅          | OK                                     |
-| Plano único / 15%             | PROJECT                           | ✅          | Desconto server-side                   |
-| Loja checkout Stripe/PIX      | PROJECT                           | ✅          | PIX manual admin                       |
-| **Frete CEP + Melhor Envio**  | SHOP-ORDERS + PROJECT             | ✅          | Fallback tabela sem token              |
-| **Minhas compras (6 abas)**   | SHOP-ORDERS                       | ✅          | Ownership por `user_id` ou `member_id` |
-| **Rastreio + e-mail shipped** | SHOP-ORDERS                       | ✅          | Admin cola código                      |
-| **Reviews + crédito loja**    | SHOP-ORDERS + PROJECT             | ✅          | R$1 default; unique 1×/pedido          |
-| **Atacado B2B (CNPJ / 25%)**  | WHOLESALE + PROJECT + SHOP-ORDERS | ✅          | Schema 012; deploy necessário em prod  |
-| **LGPD shop + wholesale**     | SECURITY / DOC-STATUS             | ✅          | Export/delete cobrem CNPJ e conta B2B  |
-| Eventos / rádio / design      | EVENTS / RADIO / DESIGN           | ✅          | OK                                     |
-| Fotos de produto              | TODO                              | ⚠️ conteúdo | Laura (listing + por variação)         |
-| **Variações + foto por SKU**  | PRODUCT-VARIANTS + PROJECT        | ✅          | Admin upload/URL/galeria; PDP swatches |
-| **Busca loja estilo Shopee**  | PROJECT / README                  | ✅          | Header sempre visível + botão Buscar   |
-| Token Melhor Envio prod       | TODO / SHOP-ORDERS                | ⚠️ ops      | Sem token = fallback                   |
-| Site home SEO K-pop           | SHOP-ORDERS                       | ✅          | Vercel www                             |
-| Design pink/yellow            | DESIGN / TODO                     | ✅          | Residual purple limpo 08/08            |
+| Área                          | Docs                              | Código      | Notas                                   |
+| ----------------------------- | --------------------------------- | ----------- | --------------------------------------- |
+| Stack clube + loja + API      | PROJECT / ARCHITECTURE            | ✅          | OK                                      |
+| Plano único / 15%             | PROJECT                           | ✅          | Desconto server-side                    |
+| Loja checkout Stripe/PIX      | PROJECT                           | ✅          | PIX manual admin                        |
+| **Frete CEP + Melhor Envio**  | SHOP-ORDERS + PROJECT             | ✅          | Fallback tabela sem token               |
+| **Minhas compras (6 abas)**   | SHOP-ORDERS                       | ✅          | Ownership por `user_id` ou `member_id`  |
+| **Rastreio + e-mail shipped** | SHOP-ORDERS                       | ✅          | Admin cola código                       |
+| **Reviews + crédito loja**    | SHOP-ORDERS + PROJECT             | ✅          | R$1 default; unique 1×/pedido           |
+| **Atacado B2B (CNPJ / 25%)**  | WHOLESALE + PROJECT + SHOP-ORDERS | ✅          | Schema 012; deploy necessário em prod   |
+| **LGPD shop + wholesale**     | SECURITY / DOC-STATUS             | ✅          | Export/delete cobrem CNPJ e conta B2B   |
+| Eventos / rádio / design      | EVENTS / RADIO / DESIGN           | ✅          | OK                                      |
+| Fotos de produto              | TODO                              | ⚠️ conteúdo | Laura (listing + por variação)          |
+| **Variações + foto por SKU**  | PRODUCT-VARIANTS + PROJECT        | ✅          | Admin upload/URL/galeria; PDP swatches  |
+| **Busca loja estilo Shopee**  | PROJECT / README                  | ✅          | Header sempre visível + botão Buscar    |
+| **Ordenação do catálogo**     | PROJECT / ARCHITECTURE / TODO     | ✅          | `?sort=` no SQL + `?page=` LIMIT/OFFSET |
+| **Recorte de foto no admin**  | PROJECT / ARCHITECTURE / TODO     | ✅          | Proporção + tamanho px no upload        |
+| Token Melhor Envio prod       | TODO / SHOP-ORDERS                | ⚠️ ops      | Sem token = fallback                    |
+| Site home SEO K-pop           | SHOP-ORDERS                       | ✅          | Vercel www                              |
+| Design pink/yellow            | DESIGN / TODO                     | ✅          | Residual purple limpo 08/08             |
 
 **Conclusão:** docs alinhados ao código do Atacado (012). Fonte operacional B2B: [`WHOLESALE.md`](WHOLESALE.md).
 

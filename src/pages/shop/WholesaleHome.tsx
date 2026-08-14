@@ -4,9 +4,18 @@ import { Building2, Package, ShieldCheck, Clock, AlertCircle } from 'lucide-reac
 import type { Product, Category } from '../../types'
 import { WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { listProducts, listCategories } from '../../lib/products'
+import {
+  parseProductSort,
+  parseCatalogPage,
+  catalogPageCount,
+  SHOP_CATALOG_PAGE_SIZE,
+  type ProductSort,
+} from '../../lib/product-sort'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { CategoryNav } from '../../components/store/CategoryNav'
+import { ProductSortSelect } from '../../components/store/ProductSortSelect'
+import { CatalogPager } from '../../components/store/CatalogPager'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
 import { SeoHead } from '../../components/store/SeoHead'
 import { Button } from '../../components/ui/button'
@@ -19,9 +28,11 @@ import { formatCurrency } from '../../lib/utils'
  * Pronto antes da importação: se não houver SKUs, mostra estado vazio com CTA de cadastro.
  */
 export default function WholesaleHome() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const search = searchParams.get('search')?.trim() || ''
   const categorySlug = searchParams.get('category')?.trim() || ''
+  const sort = parseProductSort(searchParams.get('sort'))
+  const page = parseCatalogPage(searchParams.get('page'))
 
   const { account, isApproved, isPending, loading: accLoading } = useWholesaleAccount()
 
@@ -52,12 +63,21 @@ export default function WholesaleHome() {
         const res = await listProducts({
           search: search || undefined,
           category: categorySlug || undefined,
+          sort,
+          page,
           wholesale: true,
-          limit: 48,
+          limit: SHOP_CATALOG_PAGE_SIZE,
         })
         if (active) {
           setProducts(res.products)
           setTotal(res.total)
+          const pages = catalogPageCount(res.total, SHOP_CATALOG_PAGE_SIZE)
+          if (res.total > 0 && page > pages) {
+            const nextParams = new URLSearchParams(searchParams)
+            if (pages <= 1) nextParams.delete('page')
+            else nextParams.set('page', String(pages))
+            setSearchParams(nextParams, { replace: true })
+          }
         }
       } catch {
         if (active) {
@@ -72,7 +92,22 @@ export default function WholesaleHome() {
     return () => {
       active = false
     }
-  }, [search, categorySlug])
+  }, [search, categorySlug, sort, page, searchParams, setSearchParams])
+
+  function setSort(next: ProductSort) {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next === 'newest') nextParams.delete('sort')
+    else nextParams.set('sort', next)
+    nextParams.delete('page')
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  function setPage(next: number) {
+    const nextParams = new URLSearchParams(searchParams)
+    if (next <= 1) nextParams.delete('page')
+    else nextParams.set('page', String(next))
+    setSearchParams(nextParams)
+  }
 
   const discountPct = Math.round(WHOLESALE_SHOP_DISCOUNT * 100)
 
@@ -190,13 +225,22 @@ export default function WholesaleHome() {
           </div>
         ) : (
           <>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {total} produto{total === 1 ? '' : 's'} disponível{total === 1 ? '' : 'is'} no atacado
-            </p>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-muted-foreground">
+                {total} produto{total === 1 ? '' : 's'} disponível{total === 1 ? '' : 'is'} no atacado
+              </p>
+              <ProductSortSelect value={sort} onChange={setSort} id="wholesale-product-sort" />
+            </div>
             <ProductGrid
               products={products}
               isWholesale
               isWholesaleApproved={isApproved}
+            />
+            <CatalogPager
+              page={page}
+              total={total}
+              pageSize={SHOP_CATALOG_PAGE_SIZE}
+              onPageChange={setPage}
             />
           </>
         )}

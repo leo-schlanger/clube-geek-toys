@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import type { Category } from '../../types'
+import { isProductSort } from '../../lib/product-sort'
 import { cn } from '../../lib/utils'
 import { Skeleton } from '../ui/skeleton'
 
@@ -25,6 +26,15 @@ export function CategoryNav({
   basePath = '',
   queryParam = false,
 }: CategoryNavProps) {
+  const [searchParams] = useSearchParams()
+  const sort = searchParams.get('sort')
+  const sortQuery = isProductSort(sort) ? `sort=${encodeURIComponent(sort)}` : ''
+
+  function withSort(href: string): string {
+    if (!sortQuery) return href
+    return href.includes('?') ? `${href}&${sortQuery}` : `${href}?${sortQuery}`
+  }
+
   if (loading) {
     return (
       <div className="flex gap-2 overflow-x-auto pb-2">
@@ -54,13 +64,13 @@ export function CategoryNav({
 
   return (
     <nav aria-label="Categorias" className="flex gap-2 overflow-x-auto pb-2">
-      <Link to={allHref} className={pillClass(!activeSlug)}>
+      <Link to={withSort(allHref)} className={pillClass(!activeSlug)}>
         Todos
       </Link>
       {categories.map((category) => (
         <Link
           key={category.id}
-          to={catHref(category.slug)}
+          to={withSort(catHref(category.slug))}
           className={pillClass(activeSlug === category.slug)}
         >
           {category.name}
