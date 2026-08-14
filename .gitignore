@@ -106,3 +106,6 @@ server/uploads/
 # Deploy scripts with credentials (NEVER commit)
 server/scripts/ssh_exec.py
 server/scripts/sftp_upload.py
+
+# Vitest coverage (reportsDirectory em vitest.config.ts)
+.coverage/

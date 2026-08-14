@@ -116,6 +116,26 @@ Implementado via middleware `rate-limit.ts`, baseado em IP do cliente:
 
 Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`.
 
+### Conteúdo gerado por usuário (perguntas na loja)
+
+As perguntas de produto (migration 017) aparecem na vitrine **sem aprovação
+prévia** — decisão de produto de 14/08/2026, modelo Mercado Livre. Como o
+limitador de IP sozinho não segura uma conta determinada, a contenção é por
+conta:
+
+- **Login obrigatório** para perguntar (`POST /questions` exige JWT) — a pergunta tem dono
+- **Máx. 10 perguntas em aberto** por usuário (`MAX_OPEN_QUESTIONS_PER_USER`); só volta a poder perguntar quando as anteriores forem respondidas → `429 TOO_MANY_OPEN_QUESTIONS`
+- Corpo limitado a 1000 caracteres (resposta, 2000), validado no Zod e no service
+- Moderação a posteriori: `PATCH /questions/:id/status` com `hidden` tira da vitrine
+- Na vitrine sai apenas o **primeiro nome** de quem perguntou, nunca o nome completo nem o e-mail
+
+Notificações são sempre lidas/escritas com o `userId` do JWT — nunca com id
+vindo da query — então um usuário não alcança as notificações de outro.
+
+**LGPD:** o export inclui `productQuestions` e `notifications`; a exclusão de
+conta troca o texto da pergunta por `REDACTED`, limpa a resposta pública (ela
+cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
+
 ## 6. Segurança de Pagamentos
 
 ### Stripe (Cartão de Crédito)

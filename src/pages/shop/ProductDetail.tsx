@@ -30,6 +30,8 @@ import {
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
+import { ProductVideoGallery } from '../../components/store/ProductVideoGallery'
+import { ProductQuestions } from '../../components/store/ProductQuestions'
 import { StarRating } from '../../components/store/StarRating'
 import { SeoHead } from '../../components/store/SeoHead'
 import { Button } from '../../components/ui/button'
@@ -238,6 +240,10 @@ export default function ProductDetail() {
                   ))}
                 </div>
               )}
+
+              {product.videos && product.videos.length > 0 && (
+                <ProductVideoGallery videos={product.videos} productName={product.name} />
+              )}
             </div>
 
             {/* Info */}
@@ -433,6 +439,8 @@ export default function ProductDetail() {
             ratingCount={product.ratingCount}
           />
         )}
+
+        {product && <ProductQuestions productSlug={product.slug} productId={product.id} />}
 
         {product && related.length > 0 && (
           <section className="mt-12 border-t pt-10">

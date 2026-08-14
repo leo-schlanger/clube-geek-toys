@@ -1,5 +1,5 @@
 import { api, apiRequest } from './api-client'
-import type { Product, Category, ProductVariant, VariantAxis } from '../types'
+import type { Product, Category, ProductVariant, VariantAxis, ProductVideo } from '../types'
 import { DEFAULT_PRODUCT_SORT, type ProductSort } from './product-sort'
 
 export interface ProductListResult {
@@ -61,7 +61,10 @@ export interface ProductInput {
   price: number
   compareAtPrice?: number | null
   categoryId?: string | null
+  /** Múltiplas categorias; a primeira vira a principal. Prevalece sobre categoryId. */
+  categoryIds?: string[]
   images?: string[]
+  videos?: ProductVideo[]
   stock?: number
   sku?: string | null
   active?: boolean
@@ -142,13 +145,76 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return !result.error
 }
 
-export type UploadProductImagesResult =
+export type UploadProductVideoResult =
   | { ok: true; product: Product }
   | { ok: false; error: string }
+
+/** Sobe um MP4 e anexa em products.videos. Links externos vão pelo PATCH normal. */
+export async function uploadProductVideo(
+  id: string,
+  file: File
+): Promise<UploadProductVideoResult> {
+  const form = new FormData()
+  form.append('video', file)
+  const result = await apiRequest<Product>(`/products/${id}/video`, {
+    method: 'POST',
+    body: form,
+    noRetry: true,
+    // Vídeo é bem maior que foto — a rede da loja pode ser lenta.
+    timeoutMs: 300_000,
+  })
+  return result.data
+    ? { ok: true, product: result.data }
+    : { ok: false, error: result.error || 'Falha no upload do vídeo.' }
+}
+
+/** Clona o produto (inativo) para cadastro em série. */
+export async function duplicateProduct(id: string): Promise<Product | null> {
+  const result = await api.post<Product>(`/products/${id}/duplicate`, {})
+  return result.data ?? null
+}
+
+/** Tetos espelhados de server/api/src/services/product.service.ts. */
+export const MAX_PRODUCT_IMAGES = 30
+export const MAX_VARIANT_IMAGES = 10
+export const MAX_IMAGE_UPLOAD_BATCH = 20
+export const MAX_PRODUCT_CATEGORIES = 5
+
+export type UploadProductImagesResult =
+  | { ok: true; product: Product; skippedOverLimit: number }
+  | { ok: false; error: string }
+
+export type UploadProductMediaResult =
+  | { ok: true; urls: string[] }
+  | { ok: false; error: string }
+
+/** Fatia a seleção no teto que o multer aceita por requisição. */
+function chunkFiles(files: File[]): File[][] {
+  const chunks: File[][] = []
+  for (let i = 0; i < files.length; i += MAX_IMAGE_UPLOAD_BATCH) {
+    chunks.push(files.slice(i, i + MAX_IMAGE_UPLOAD_BATCH))
+  }
+  return chunks
+}
+
+function postImages<T>(path: string, files: File[]) {
+  const form = new FormData()
+  for (const f of files) form.append('images', f)
+  // FormData body — apiRequest leaves the Content-Type unset so the browser adds the
+  // multipart boundary, and still attaches the Authorization header.
+  return apiRequest<T>(path, {
+    method: 'POST',
+    body: form,
+    // Don't retry POST multipart (body may not re-send cleanly after network blip).
+    noRetry: true,
+    timeoutMs: 120_000,
+  })
+}
 
 /**
  * Upload product images (multipart). Returns the updated product or a clear error.
  * Uses a longer timeout — phone photos can be multi-MB even after compression.
+ * Seleções acima de MAX_IMAGE_UPLOAD_BATCH viram várias requisições.
  */
 export async function uploadProductImages(
   id: string,
@@ -157,24 +223,46 @@ export async function uploadProductImages(
   if (!files.length) {
     return { ok: false, error: 'Nenhuma imagem selecionada.' }
   }
-  const form = new FormData()
-  for (const f of files) form.append('images', f)
-  // FormData body — apiRequest leaves the Content-Type unset so the browser adds the
-  // multipart boundary, and still attaches the Authorization header.
-  const result = await apiRequest<Product>(`/products/${id}/images`, {
-    method: 'POST',
-    body: form,
-    // Don't retry POST multipart (body may not re-send cleanly after network blip).
-    noRetry: true,
-    timeoutMs: 120_000,
-  })
-  if (result.data) {
-    return { ok: true, product: result.data }
+  let product: Product | null = null
+  let skippedOverLimit = 0
+
+  for (const chunk of chunkFiles(files)) {
+    const result = await postImages<Product>(`/products/${id}/images`, chunk)
+    if (!result.data) {
+      // Um lote falhou: os anteriores já ficaram salvos, então devolve o erro
+      // sem descartar o que foi gravado.
+      return { ok: false, error: result.error || 'Falha no upload das imagens.' }
+    }
+    product = result.data
+    skippedOverLimit += (result.data as Product & { skippedOverLimit?: number }).skippedOverLimit ?? 0
   }
-  return {
-    ok: false,
-    error: result.error || 'Falha no upload das imagens.',
+
+  return product
+    ? { ok: true, product, skippedOverLimit }
+    : { ok: false, error: 'Falha no upload das imagens.' }
+}
+
+/**
+ * Sobe arquivos e devolve só as URLs, sem anexar na galeria do listing.
+ * É o caminho das fotos de variação: elas são gravadas em product_variants.images
+ * pelo PUT /variants, então não podem inflar products.images.
+ */
+export async function uploadProductMedia(
+  productId: string,
+  files: File[]
+): Promise<UploadProductMediaResult> {
+  if (!files.length) {
+    return { ok: false, error: 'Nenhuma imagem selecionada.' }
   }
+  const urls: string[] = []
+  for (const chunk of chunkFiles(files)) {
+    const result = await postImages<{ urls: string[] }>(`/products/${productId}/media`, chunk)
+    if (!result.data?.urls?.length) {
+      return { ok: false, error: result.error || 'Falha no upload das imagens.' }
+    }
+    urls.push(...result.data.urls)
+  }
+  return { ok: true, urls }
 }
 
 export interface CategoryInput {

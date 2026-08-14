@@ -1,7 +1,33 @@
 import pg from 'pg';
 import { query, getClient } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
-import type { Product, Category, ProductVariant, VariantAxis } from '../types/index.js';
+import type {
+  Product,
+  Category,
+  ProductVariant,
+  VariantAxis,
+  ProductVideo,
+} from '../types/index.js';
+
+// ─── Image caps ──────────────────────────────────────────────────────────────
+
+/**
+ * Teto da galeria do listing. Precisa ser folgado porque o PATCH do produto
+ * reenvia o array inteiro — um teto baixo trava o save de produtos já povoados,
+ * que foi exatamente o bug de "não consigo salvar depois de subir as fotos".
+ * Por isso o upload também respeita este teto (ver addProductImages).
+ */
+export const MAX_PRODUCT_IMAGES = 30;
+/** Fotos por variação (cada SKU tem a própria galeria). */
+export const MAX_VARIANT_IMAGES = 10;
+/** Imagens por requisição de upload (multer). */
+export const MAX_IMAGE_UPLOAD_BATCH = 20;
+/** Categorias por produto (a primeira é a principal, espelhada em products.category_id). */
+export const MAX_PRODUCT_CATEGORIES = 5;
+/** Vídeos por produto (link externo ou MP4 hospedado). */
+export const MAX_PRODUCT_VIDEOS = 5;
+/** MP4 no volume /uploads. Acima disso, é caso de usar link do YouTube. */
+export const PRODUCT_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
 
@@ -25,6 +51,21 @@ function mapVariant(row: pg.QueryResultRow): ProductVariant {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** Aceita só o formato conhecido — JSONB legado ou lixo vira lista vazia. */
+function parseVideos(raw: unknown): ProductVideo[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((v) => {
+      const item = v as { kind?: string; url?: string; title?: string };
+      const url = String(item?.url || '').trim();
+      const kind = item?.kind === 'youtube' || item?.kind === 'instagram' ? item.kind : 'file';
+      const title = item?.title ? String(item.title).slice(0, 200) : undefined;
+      return url ? ({ kind, url, ...(title ? { title } : {}) } as ProductVideo) : null;
+    })
+    .filter((v): v is ProductVideo => v !== null)
+    .slice(0, MAX_PRODUCT_VIDEOS);
 }
 
 function parseAxes(raw: unknown): VariantAxis[] {
@@ -60,7 +101,20 @@ function mapProduct(row: pg.QueryResultRow): Product {
     compareAtPrice: row.compare_at_price != null ? parseFloat(row.compare_at_price) : null,
     categoryId: row.category_id,
     categoryName: row.category_name ?? null,
+    // Vindas do LATERAL de product_categories; caem na principal quando ausentes
+    // (ex.: SELECT que não faz o join).
+    categoryIds: Array.isArray(row.category_ids)
+      ? (row.category_ids as string[])
+      : row.category_id
+        ? [row.category_id]
+        : [],
+    categoryNames: Array.isArray(row.category_names)
+      ? (row.category_names as string[])
+      : row.category_name
+        ? [row.category_name]
+        : [],
     images: Array.isArray(row.images) ? row.images : [],
+    videos: parseVideos(row.videos),
     stock: hasVariants && stockTotal != null ? stockTotal : stock,
     sku: row.sku,
     active: row.active,
@@ -122,6 +176,54 @@ async function uniqueSlug(table: 'products' | 'categories', base: string, exclud
     n += 1;
     candidate = `${root}-${n}`;
   }
+}
+
+// ─── Categorias por produto ──────────────────────────────────────────────────
+
+/**
+ * Agrega as categorias do produto (principal primeiro). Depende do alias `p`
+ * na query que o inclui.
+ */
+const CATEGORIES_LATERAL = `
+       LEFT JOIN LATERAL (
+         SELECT array_agg(pc.category_id ORDER BY pc.position, cc.name) AS category_ids,
+                array_agg(cc.name ORDER BY pc.position, cc.name) AS category_names
+         FROM product_categories pc
+         JOIN categories cc ON cc.id = pc.category_id
+         WHERE pc.product_id = p.id
+       ) pcat ON TRUE`;
+
+const CATEGORIES_SELECT = `pcat.category_ids, pcat.category_names`;
+
+/**
+ * Regrava o vínculo produto↔categorias. A primeira da lista vira a principal
+ * (position 0) e é espelhada em products.category_id, que o sitemap, os
+ * relacionados e os relatórios continuam usando.
+ */
+async function syncProductCategories(
+  client: pg.PoolClient | null,
+  productId: string,
+  categoryIds: string[]
+): Promise<string | null> {
+  const run = client
+    ? (sql: string, params: unknown[]) => client.query(sql, params)
+    : (sql: string, params: unknown[]) => query(sql, params);
+
+  const unique = [...new Set(categoryIds.filter(Boolean))].slice(0, MAX_PRODUCT_CATEGORIES);
+
+  await run(`DELETE FROM product_categories WHERE product_id = $1`, [productId]);
+  for (const [position, categoryId] of unique.entries()) {
+    await run(
+      `INSERT INTO product_categories (product_id, category_id, position)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (product_id, category_id) DO UPDATE SET position = EXCLUDED.position`,
+      [productId, categoryId, position]
+    );
+  }
+
+  const primary = unique[0] ?? null;
+  await run(`UPDATE products SET category_id = $2 WHERE id = $1`, [productId, primary]);
+  return primary;
 }
 
 // ─── Products ────────────────────────────────────────────────────────────────
@@ -196,7 +298,12 @@ export async function listProducts(opts: {
     conditions.push(`p.wholesale_enabled = TRUE`);
   }
   if (opts.category) {
-    conditions.push(`c.slug = $${i++}`);
+    // Qualquer uma das categorias do produto, não só a principal.
+    conditions.push(
+      `EXISTS (SELECT 1 FROM product_categories pcf
+               JOIN categories cf ON cf.id = pcf.category_id
+               WHERE pcf.product_id = p.id AND cf.slug = $${i++})`
+    );
     params.push(opts.category);
   }
   if (opts.featured) {
@@ -204,7 +311,10 @@ export async function listProducts(opts: {
   }
   if (opts.search && opts.search.trim()) {
     conditions.push(
-      `(p.name ILIKE $${i} OR p.description ILIKE $${i} OR COALESCE(p.sku, '') ILIKE $${i} OR COALESCE(c.name, '') ILIKE $${i})`
+      `(p.name ILIKE $${i} OR p.description ILIKE $${i} OR COALESCE(p.sku, '') ILIKE $${i}
+        OR EXISTS (SELECT 1 FROM product_categories pcs
+                   JOIN categories cs ON cs.id = pcs.category_id
+                   WHERE pcs.product_id = p.id AND cs.name ILIKE $${i}))`
     );
     params.push(`%${opts.search.trim()}%`);
     i++;
@@ -216,7 +326,7 @@ export async function listProducts(opts: {
   const offset = (page - 1) * limit;
   const orderBy = orderBySql(parseProductSort(opts.sort));
 
-  const dataSql = `SELECT p.*, c.name as category_name,
+  const dataSql = `SELECT p.*, c.name as category_name, ${CATEGORIES_SELECT},
               vs.price_from, vs.stock_total
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
@@ -226,6 +336,7 @@ export async function listProducts(opts: {
          FROM product_variants v
          WHERE v.product_id = p.id AND v.active = TRUE
        ) vs ON p.has_variants = TRUE
+${CATEGORIES_LATERAL}
        ${where}
        ORDER BY ${orderBy}
        LIMIT $${i++} OFFSET $${i}`;
@@ -296,9 +407,10 @@ export async function getVariantById(id: string): Promise<ProductVariant | null>
 
 export async function getProductBySlug(slug: string, includeInactive = false): Promise<Product | null> {
   const result = await query(
-    `SELECT p.*, c.name as category_name
+    `SELECT p.*, c.name as category_name, ${CATEGORIES_SELECT}
      FROM products p
      LEFT JOIN categories c ON c.id = p.category_id
+${CATEGORIES_LATERAL}
      WHERE p.slug = $1 ${includeInactive ? '' : 'AND p.active = TRUE'}`,
     [slug]
   );
@@ -311,8 +423,10 @@ export async function getProductBySlug(slug: string, includeInactive = false): P
 
 export async function getProductById(id: string): Promise<Product | null> {
   const result = await query(
-    `SELECT p.*, c.name as category_name
-     FROM products p LEFT JOIN categories c ON c.id = p.category_id
+    `SELECT p.*, c.name as category_name, ${CATEGORIES_SELECT}
+     FROM products p
+     LEFT JOIN categories c ON c.id = p.category_id
+${CATEGORIES_LATERAL}
      WHERE p.id = $1`,
     [id]
   );
@@ -326,7 +440,9 @@ export async function createProduct(data: {
   price: number;
   compareAtPrice?: number | null;
   categoryId?: string | null;
+  categoryIds?: string[];
   images?: string[];
+  videos?: ProductVideo[];
   stock?: number;
   sku?: string | null;
   active?: boolean;
@@ -340,10 +456,12 @@ export async function createProduct(data: {
 }): Promise<Product> {
   const slug = await uniqueSlug('products', data.name);
   const minQty = Math.max(1, data.wholesaleMinQty ?? 1);
+  // categoryIds manda; categoryId sozinho ainda funciona (compat).
+  const categoryIds = resolveCategoryIds(data.categoryIds, data.categoryId);
   const result = await query(
     `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku, active, featured,
-                           weight_g, height_cm, width_cm, length_cm, wholesale_enabled, wholesale_min_qty)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                           weight_g, height_cm, width_cm, length_cm, wholesale_enabled, wholesale_min_qty, videos)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb)
      RETURNING *`,
     [
       data.name,
@@ -351,7 +469,7 @@ export async function createProduct(data: {
       data.description ?? null,
       data.price,
       data.compareAtPrice ?? null,
-      data.categoryId ?? null,
+      categoryIds[0] ?? null,
       JSON.stringify(data.images ?? []),
       data.stock ?? 0,
       data.sku ?? null,
@@ -363,12 +481,34 @@ export async function createProduct(data: {
       data.lengthCm ?? null,
       data.wholesaleEnabled ?? false,
       minQty,
+      JSON.stringify(parseVideos(data.videos)),
     ]
   );
-  return mapProduct(result.rows[0]);
+  const created = mapProduct(result.rows[0]);
+  if (categoryIds.length) {
+    await syncProductCategories(null, created.id, categoryIds);
+  }
+  return { ...created, categoryIds, categoryNames: created.categoryNames };
+}
+
+/** Normaliza a entrada de categorias: aceita a lista nova ou o campo antigo. */
+function resolveCategoryIds(
+  categoryIds: string[] | undefined,
+  categoryId: string | null | undefined
+): string[] {
+  if (Array.isArray(categoryIds)) {
+    return [...new Set(categoryIds.filter(Boolean))].slice(0, MAX_PRODUCT_CATEGORIES);
+  }
+  return categoryId ? [categoryId] : [];
 }
 
 export async function updateProduct(id: string, data: Record<string, unknown>): Promise<Product> {
+  // categoryIds vive na tabela de junção; quando vem, ela manda em category_id.
+  const hasCategoryIds = Array.isArray(data.categoryIds);
+  const categoryIds = hasCategoryIds
+    ? resolveCategoryIds(data.categoryIds as string[], null)
+    : [];
+
   const fieldMap: Record<string, string> = {
     name: 'name',
     description: 'description',
@@ -388,17 +528,24 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     wholesaleMinQty: 'wholesale_min_qty',
     hasVariants: 'has_variants',
     variantAxes: 'variant_axes',
+    videos: 'videos',
   };
 
   const sets: string[] = [];
   const values: unknown[] = [];
   let i = 1;
   for (const [key, col] of Object.entries(fieldMap)) {
+    // syncProductCategories grava category_id no fim — não deixa o campo antigo sobrescrever.
+    if (hasCategoryIds && key === 'categoryId') continue;
     if (key in data && data[key] !== undefined) {
-      if (col === 'images' || col === 'variant_axes') {
+      if (col === 'images' || col === 'variant_axes' || col === 'videos') {
         sets.push(`${col} = $${i++}::jsonb`);
         const payload =
-          col === 'variant_axes' ? parseAxes(data[key]) : (data[key] ?? []);
+          col === 'variant_axes'
+            ? parseAxes(data[key])
+            : col === 'videos'
+              ? parseVideos(data[key])
+              : (data[key] ?? []);
         values.push(JSON.stringify(payload));
       } else {
         sets.push(`${col} = $${i++}`);
@@ -414,19 +561,120 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     values.push(slug);
   }
 
-  if (sets.length === 0) {
+  if (sets.length === 0 && !hasCategoryIds) {
     const existing = await getProductById(id);
     if (!existing) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
     return existing;
   }
 
-  values.push(id);
-  const result = await query(
-    `UPDATE products SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
-    values
-  );
-  if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
-  return attachVariants(mapProduct(result.rows[0]), true);
+  if (sets.length > 0) {
+    values.push(id);
+    const result = await query(
+      `UPDATE products SET ${sets.join(', ')} WHERE id = $${i} RETURNING id`,
+      values
+    );
+    if (result.rows.length === 0) {
+      throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+    }
+  }
+
+  if (hasCategoryIds) {
+    await syncProductCategories(null, id, categoryIds);
+  }
+
+  // Relê para trazer as categorias agregadas e as variações.
+  const updated = await getProductById(id);
+  if (!updated) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+  return updated;
+}
+
+/**
+ * Duplica um produto (pedido Laura: álbuns com a mesma medida/peso mudam só
+ * nome e foto). O clone entra INATIVO para não vazar pro catálogo antes de ser
+ * revisado, e reaproveita as URLs das imagens — não copia arquivo no disco.
+ */
+export async function duplicateProduct(id: string): Promise<Product> {
+  const source = await getProductById(id);
+  if (!source) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+
+  const name = `${source.name} (cópia)`.slice(0, 200);
+  const slug = await uniqueSlug('products', name);
+
+  const client = await getClient();
+  let cloneId: string;
+  try {
+    await client.query('BEGIN');
+
+    const inserted = await client.query(
+      `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku,
+                             active, featured, weight_g, height_cm, width_cm, length_cm,
+                             wholesale_enabled, wholesale_min_qty, has_variants, variant_axes, videos)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,FALSE,FALSE,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18::jsonb)
+       RETURNING id`,
+      [
+        name,
+        slug,
+        source.description ?? null,
+        source.price,
+        source.compareAtPrice ?? null,
+        source.categoryId ?? null,
+        JSON.stringify(source.images ?? []),
+        // Estoque do clone nasce zerado: é outro produto físico. Copiar o número
+        // do original faria a loja anunciar peça que não existe na prateleira.
+        0,
+        // SKU é único por natureza: quem duplica preenche o novo código.
+        null,
+        source.weightG ?? null,
+        source.heightCm ?? null,
+        source.widthCm ?? null,
+        source.lengthCm ?? null,
+        source.wholesaleEnabled ?? false,
+        source.wholesaleMinQty ?? 1,
+        source.hasVariants ?? false,
+        JSON.stringify(source.variantAxes ?? []),
+        JSON.stringify(source.videos ?? []),
+      ]
+    );
+    cloneId = inserted.rows[0].id as string;
+
+    for (const [position, categoryId] of (source.categoryIds ?? []).entries()) {
+      await client.query(
+        `INSERT INTO product_categories (product_id, category_id, position) VALUES ($1,$2,$3)
+         ON CONFLICT (product_id, category_id) DO NOTHING`,
+        [cloneId, categoryId, position]
+      );
+    }
+
+    for (const variant of source.variants ?? []) {
+      await client.query(
+        `INSERT INTO product_variants
+           (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order)
+         VALUES ($1,$2,$3::jsonb,NULL,$4,$5,$6,$7::jsonb,$8,$9)`,
+        [
+          cloneId,
+          variant.name,
+          JSON.stringify(variant.options),
+          variant.price,
+          variant.compareAtPrice ?? null,
+          0, // mesmo motivo do pai: estoque é físico, não se duplica
+          JSON.stringify(variant.images ?? []),
+          variant.active,
+          variant.sortOrder,
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const clone = await getProductById(cloneId);
+  if (!clone) throw new AppError(500, 'Falha ao duplicar o produto.', 'DUPLICATE_FAILED');
+  return clone;
 }
 
 export type VariantInput = {
@@ -773,12 +1021,66 @@ export async function deactivateCategory(id: string): Promise<void> {
   if (result.rows.length === 0) throw new AppError(404, 'Categoria não encontrada.', 'CATEGORY_NOT_FOUND');
 }
 
-/** Attach uploaded image URLs to a product (appends to the existing images array). */
-export async function addProductImages(id: string, urls: string[]): Promise<Product> {
+export interface AddImagesResult {
+  product: Product;
+  /** URLs que couberam no teto e foram gravadas. */
+  accepted: string[];
+  /** URLs recusadas por estourar o teto — o caller apaga os arquivos. */
+  rejected: string[];
+}
+
+/**
+ * Anexa URLs à galeria do listing, respeitando MAX_PRODUCT_IMAGES.
+ * O teto é aplicado aqui (e não só no Zod do PATCH) para que o upload nunca
+ * deixe o produto num estado que ele mesmo não consegue mais salvar.
+ */
+export async function addProductImages(id: string, urls: string[]): Promise<AddImagesResult> {
+  const current = await query(`SELECT images FROM products WHERE id = $1`, [id]);
+  if (current.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+
+  const existing = Array.isArray(current.rows[0].images) ? (current.rows[0].images as string[]) : [];
+  const room = Math.max(0, MAX_PRODUCT_IMAGES - existing.length);
+  const accepted = urls.slice(0, room);
+  const rejected = urls.slice(room);
+
+  if (accepted.length === 0) {
+    throw new AppError(
+      400,
+      `Este produto já tem ${existing.length} fotos (máximo ${MAX_PRODUCT_IMAGES}). Remova alguma antes de enviar outra.`,
+      'IMAGE_LIMIT_REACHED'
+    );
+  }
+
   const result = await query(
     `UPDATE products SET images = images || $2::jsonb WHERE id = $1 RETURNING *`,
-    [id, JSON.stringify(urls)]
+    [id, JSON.stringify(accepted)]
   );
-  if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+  return { product: mapProduct(result.rows[0]), accepted, rejected };
+}
+
+/** Anexa um vídeo (MP4 hospedado ou link externo) respeitando MAX_PRODUCT_VIDEOS. */
+export async function addProductVideo(id: string, video: ProductVideo): Promise<Product> {
+  const current = await query(`SELECT videos FROM products WHERE id = $1`, [id]);
+  if (current.rows.length === 0) {
+    throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+  }
+
+  const existing = parseVideos(current.rows[0].videos);
+  if (existing.length >= MAX_PRODUCT_VIDEOS) {
+    throw new AppError(
+      400,
+      `Este produto já tem ${MAX_PRODUCT_VIDEOS} vídeos. Remova algum antes de enviar outro.`,
+      'VIDEO_LIMIT_REACHED'
+    );
+  }
+  if (existing.some((v) => v.url === video.url)) {
+    throw new AppError(400, 'Este vídeo já está no produto.', 'VIDEO_DUPLICATE');
+  }
+
+  const result = await query(
+    `UPDATE products SET videos = videos || $2::jsonb WHERE id = $1 RETURNING *`,
+    [id, JSON.stringify(parseVideos([video]))]
+  );
   return mapProduct(result.rows[0]);
 }
+

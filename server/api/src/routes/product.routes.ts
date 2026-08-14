@@ -117,13 +117,34 @@ productRouter.delete('/categories/:id', authenticate, requireRole('admin'), asyn
 const MAX_PRODUCT_PRICE = 999_999.99;
 const moneySchema = z.number().nonnegative().max(MAX_PRODUCT_PRICE);
 
+const {
+  MAX_PRODUCT_IMAGES,
+  MAX_VARIANT_IMAGES,
+  MAX_IMAGE_UPLOAD_BATCH,
+  MAX_PRODUCT_CATEGORIES,
+  MAX_PRODUCT_VIDEOS,
+  PRODUCT_VIDEO_MAX_BYTES,
+} = productService;
+
 const productSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(5000).optional().nullable(),
   price: moneySchema,
   compareAtPrice: moneySchema.optional().nullable(),
   categoryId: z.string().uuid().optional().nullable(),
-  images: z.array(z.string().url()).max(8).optional(),
+  /** Múltiplas categorias; a primeira vira a principal. Prevalece sobre categoryId. */
+  categoryIds: z.array(z.string().uuid()).max(MAX_PRODUCT_CATEGORIES).optional(),
+  images: z.array(z.string().url()).max(MAX_PRODUCT_IMAGES).optional(),
+  videos: z
+    .array(
+      z.object({
+        kind: z.enum(['youtube', 'instagram', 'file']),
+        url: z.string().url(),
+        title: z.string().max(200).optional(),
+      })
+    )
+    .max(MAX_PRODUCT_VIDEOS)
+    .optional(),
   stock: z.number().int().nonnegative().optional(),
   sku: z.string().max(60).optional().nullable(),
   active: z.boolean().optional(),
@@ -161,7 +182,7 @@ const variantsReplaceSchema = z.object({
       price: moneySchema,
       compareAtPrice: moneySchema.optional().nullable(),
       stock: z.number().int().nonnegative().optional(),
-      images: z.array(z.string()).max(8).optional(),
+      images: z.array(z.string()).max(MAX_VARIANT_IMAGES).optional(),
       active: z.boolean().optional(),
       sortOrder: z.number().int().optional(),
     })
@@ -179,6 +200,15 @@ productRouter.post('/', authenticate, requireRole('admin'), validate(productSche
 productRouter.patch('/:id', authenticate, requireRole('admin'), validate(productSchema.partial()), async (req, res, next) => {
   try {
     res.json(await productService.updateProduct(req.params.id as string, req.body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /products/:id/duplicate — clone inativo para cadastro em série
+productRouter.post('/:id/duplicate', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.status(201).json(await productService.duplicateProduct(req.params.id as string));
   } catch (err) {
     next(err);
   }
@@ -260,7 +290,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES, files: 6 },
+  limits: { fileSize: PRODUCT_IMAGE_MAX_BYTES, files: MAX_IMAGE_UPLOAD_BATCH },
   fileFilter: (_req, file, cb) => {
     if (isLikelyImageUpload(file)) {
       cb(null, true);
@@ -276,7 +306,7 @@ function handleProductImageUpload(
   res: import('express').Response,
   next: import('express').NextFunction
 ): void {
-  upload.array('images', 6)(req, res, (err: unknown) => {
+  upload.array('images', MAX_IMAGE_UPLOAD_BATCH)(req, res, (err: unknown) => {
     if (!err) {
       next();
       return;
@@ -291,7 +321,7 @@ function handleProductImageUpload(
       }
       if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
         res.status(400).json({
-          error: 'Envie no máximo 6 imagens por vez.',
+          error: `Envie no máximo ${MAX_IMAGE_UPLOAD_BATCH} imagens por vez.`,
           code: 'TOO_MANY_IMAGES',
         });
         return;
@@ -329,7 +359,57 @@ function sniffImageKind(filePath: string): 'jpeg' | 'png' | 'webp' | 'heic' | nu
   }
 }
 
-// POST /products/:id/images — upload up to 6 product images
+function discardUpload(filePath: string): void {
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    /* já removido ou nunca gravado */
+  }
+}
+
+/**
+ * Valida os bytes recebidos e devolve as URLs públicas. Mantém o caminho em
+ * disco de cada URL para que o caller possa apagar o que não for gravado.
+ */
+function collectUploadedImages(
+  files: Express.Multer.File[],
+  productId: string
+): { urls: string[]; pathByUrl: Map<string, string>; sawHeic: boolean } {
+  const urls: string[] = [];
+  const pathByUrl = new Map<string, string>();
+  let sawHeic = false;
+
+  for (const f of files) {
+    const kind = sniffImageKind(f.path);
+    if (kind === 'heic') sawHeic = true;
+    if (kind !== 'jpeg' && kind !== 'png' && kind !== 'webp') {
+      discardUpload(f.path);
+      continue;
+    }
+    const url = `${env.API_URL}/uploads/products/${productId}/${path.basename(f.path)}`;
+    urls.push(url);
+    pathByUrl.set(url, f.path);
+  }
+
+  return { urls, pathByUrl, sawHeic };
+}
+
+function rejectInvalidUpload(res: import('express').Response, sawHeic: boolean): void {
+  res.status(400).json(
+    sawHeic
+      ? {
+          error:
+            'Foto HEIC do iPhone. Atualize a página e envie de novo (o painel converte no Safari) ou exporte como JPEG.',
+          code: 'HEIC_NOT_SUPPORTED',
+        }
+      : {
+          error: 'Arquivos enviados não são imagens válidas (JPEG, PNG ou WEBP).',
+          code: 'INVALID_IMAGE',
+        }
+  );
+}
+
+// POST /products/:id/images — upload a batch of product (listing) images
 productRouter.post(
   '/:id/images',
   authenticate,
@@ -342,41 +422,161 @@ productRouter.post(
         res.status(400).json({ error: 'Nenhuma imagem enviada.', code: 'NO_IMAGES' });
         return;
       }
-      const urls: string[] = [];
-      let sawHeic = false;
-      for (const f of files) {
-        const kind = sniffImageKind(f.path);
-        if (kind === 'heic') sawHeic = true;
-        if (kind !== 'jpeg' && kind !== 'png' && kind !== 'webp') {
-          try {
-            fs.unlinkSync(f.path);
-          } catch {
-            /* ignore */
-          }
-          continue;
-        }
-        urls.push(`${env.API_URL}/uploads/products/${req.params.id}/${path.basename(f.path)}`);
-      }
+      const productId = req.params.id as string;
+      const { urls, pathByUrl, sawHeic } = collectUploadedImages(files, productId);
       if (urls.length === 0) {
-        res.status(400).json(
-          sawHeic
-            ? {
-                error:
-                  'Foto HEIC do iPhone. Atualize a página e envie de novo (o painel converte no Safari) ou exporte como JPEG.',
-                code: 'HEIC_NOT_SUPPORTED',
-              }
-            : {
-                error: 'Arquivos enviados não são imagens válidas (JPEG, PNG ou WEBP).',
-                code: 'INVALID_IMAGE',
-              }
-        );
+        rejectInvalidUpload(res, sawHeic);
         return;
       }
-      const product = await productService.addProductImages(req.params.id as string, urls);
+
+      let result;
+      try {
+        result = await productService.addProductImages(productId, urls);
+      } catch (err) {
+        for (const url of urls) discardUpload(pathByUrl.get(url) as string);
+        throw err;
+      }
+      // O que não coube no teto não fica ocupando disco.
+      for (const url of result.rejected) discardUpload(pathByUrl.get(url) as string);
+
       console.log(
-        `[UPLOAD] product=${req.params.id} kept=${urls.length}/${files.length}${sawHeic ? ' heic-skipped' : ''}`
+        `[UPLOAD] product=${productId} kept=${result.accepted.length}/${files.length}` +
+          `${result.rejected.length ? ` over-limit=${result.rejected.length}` : ''}` +
+          `${sawHeic ? ' heic-skipped' : ''}`
       );
-      res.status(201).json(product);
+      res.status(201).json({ ...result.product, skippedOverLimit: result.rejected.length });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── Admin: upload de vídeo (MP4) ────────────────────────────────────────────
+
+const videoStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const dir = path.join('/app/uploads/products', String(req.params.id || 'temp'));
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    } catch (err) {
+      cb(err as Error, dir);
+    }
+  },
+  filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}.mp4`),
+});
+
+const videoUpload = multer({
+  storage: videoStorage,
+  limits: { fileSize: PRODUCT_VIDEO_MAX_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const mime = (file.mimetype || '').toLowerCase();
+    const name = (file.originalname || '').toLowerCase();
+    if (mime.startsWith('video/') || /\.(mp4|mov|m4v)$/.test(name)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Envie um vídeo MP4.'));
+    }
+  },
+});
+
+/** Só MP4/MOV: o navegador precisa conseguir tocar sem transcodificação. */
+function isPlayableVideo(filePath: string): boolean {
+  try {
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(12);
+    fs.readSync(fd, buf, 0, 12, 0);
+    fs.closeSync(fd);
+    // Caixa ISO-BMFF: bytes 4..8 = 'ftyp'; marca em 8..12 (isom, mp42, qt  …)
+    if (buf.toString('ascii', 4, 8) !== 'ftyp') return false;
+    return /^(isom|iso2|mp4|avc1|m4v|qt)/i.test(buf.toString('ascii', 8, 12));
+  } catch {
+    return false;
+  }
+}
+
+// POST /products/:id/video — sobe um MP4 e anexa em products.videos
+productRouter.post(
+  '/:id/video',
+  authenticate,
+  requireRole('admin'),
+  (req, res, next) => {
+    videoUpload.single('video')(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({
+          error: `Vídeo muito grande (máximo ${Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). Para arquivos maiores, suba no YouTube e cole o link.`,
+          code: 'VIDEO_TOO_LARGE',
+        });
+        return;
+      }
+      res.status(400).json({
+        error: err instanceof Error ? err.message : 'Arquivo de vídeo inválido.',
+        code: 'INVALID_VIDEO',
+      });
+    });
+  },
+  async (req, res, next) => {
+    try {
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: 'Nenhum vídeo enviado.', code: 'NO_VIDEO' });
+        return;
+      }
+      if (!isPlayableVideo(file.path)) {
+        discardUpload(file.path);
+        res.status(400).json({
+          error: 'Arquivo não é um MP4 válido. Exporte como MP4 (H.264) e envie de novo.',
+          code: 'INVALID_VIDEO',
+        });
+        return;
+      }
+
+      const url = `${env.API_URL}/uploads/products/${req.params.id}/${path.basename(file.path)}`;
+      try {
+        const product = await productService.addProductVideo(req.params.id as string, {
+          kind: 'file',
+          url,
+          title: req.body?.title ? String(req.body.title).slice(0, 200) : undefined,
+        });
+        console.log(`[UPLOAD] video product=${req.params.id} bytes=${file.size}`);
+        res.status(201).json(product);
+      } catch (err) {
+        discardUpload(file.path);
+        throw err;
+      }
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /products/:id/media — sobe arquivos e devolve só as URLs.
+// Usado pelas fotos de variação: elas pertencem ao SKU (product_variants.images,
+// gravado no PUT /variants), não à galeria do listing. Antes o painel reaproveitava
+// /images para isso e cada variação inflava products.images até estourar o teto.
+productRouter.post(
+  '/:id/media',
+  authenticate,
+  requireRole('admin'),
+  handleProductImageUpload,
+  async (req, res, next) => {
+    try {
+      const files = (req.files as Express.Multer.File[]) || [];
+      if (files.length === 0) {
+        res.status(400).json({ error: 'Nenhuma imagem enviada.', code: 'NO_IMAGES' });
+        return;
+      }
+      const { urls, sawHeic } = collectUploadedImages(files, req.params.id as string);
+      if (urls.length === 0) {
+        rejectInvalidUpload(res, sawHeic);
+        return;
+      }
+      console.log(`[UPLOAD] media product=${req.params.id} kept=${urls.length}/${files.length}`);
+      res.status(201).json({ urls });
     } catch (err) {
       next(err);
     }

@@ -63,6 +63,30 @@ export async function exportUserData(userId: string) {
     [userId]
   );
 
+  // Perguntas e notificações (migration 017) — tabelas podem não existir em DB antigo
+  let questions: Record<string, unknown>[] = [];
+  let notifications: Record<string, unknown>[] = [];
+  try {
+    const questionsResult = await query(
+      `SELECT q.id, q.body, q.status, q.answer_body, q.answered_at, q.created_at,
+              p.name AS product_name
+       FROM product_questions q
+       LEFT JOIN products p ON p.id = q.product_id
+       WHERE q.user_id = $1 ORDER BY q.created_at DESC`,
+      [userId]
+    );
+    questions = questionsResult.rows;
+
+    const notificationsResult = await query(
+      `SELECT id, kind, title, body, link, read_at, created_at
+       FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`,
+      [userId]
+    );
+    notifications = notificationsResult.rows;
+  } catch {
+    // migration 017 not applied yet
+  }
+
   const storeCreditResult = await query(
     `SELECT user_id, balance, updated_at FROM store_credits WHERE user_id = $1`,
     [userId]
@@ -131,6 +155,8 @@ export async function exportUserData(userId: string) {
     productReviews: reviewsResult.rows,
     storeCredit: storeCreditResult.rows[0] || { balance: 0 },
     storeCreditLedger: storeCreditLedgerResult.rows,
+    productQuestions: questions,
+    notifications,
     wholesaleAccount,
     auditLogs: auditResult.rows,
     emailLogs: emailResult.rows,
@@ -257,6 +283,30 @@ export async function deleteUserAccount(userId: string, password: string) {
        WHERE user_id = $1`,
       [userId]
     );
+
+    // Redact questions (texto some da vitrine; a resposta pública some junto,
+    // porque ela cita a pergunta) e apaga as notificações — não têm valor de auditoria.
+    //
+    // to_regclass em vez de try/catch: um statement que falha aborta a transação
+    // inteira no Postgres, então o catch salvaria o erro mas quebraria o resto
+    // da exclusão. Aqui a tabela ausente (migration 017 não aplicada) só pula.
+    const has017 = await client.query(
+      `SELECT to_regclass('public.product_questions') IS NOT NULL AS questions,
+              to_regclass('public.notifications') IS NOT NULL AS notifications`
+    );
+    if (has017.rows[0]?.questions) {
+      await client.query(
+        `UPDATE product_questions SET
+           body = 'REDACTED',
+           answer_body = NULL,
+           status = 'hidden'
+         WHERE user_id = $1`,
+        [userId]
+      );
+    }
+    if (has017.rows[0]?.notifications) {
+      await client.query(`DELETE FROM notifications WHERE user_id = $1`, [userId]);
+    }
 
     // Zero store credit (ledger retained for audit, amounts kept)
     await client.query(

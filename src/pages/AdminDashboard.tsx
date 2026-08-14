@@ -41,6 +41,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 const MembersTab = lazy(() => import('../components/admin/MembersTab').then(m => ({ default: m.MembersTab })))
 const ProductsTab = lazy(() => import('../components/admin/ProductsTab').then(m => ({ default: m.ProductsTab })))
 const OrdersTab = lazy(() => import('../components/admin/OrdersTab').then(m => ({ default: m.OrdersTab })))
+const StockTab = lazy(() => import('../components/admin/StockTab').then(m => ({ default: m.StockTab })))
+const QuestionsTab = lazy(() => import('../components/admin/QuestionsTab').then(m => ({ default: m.QuestionsTab })))
 const WholesaleTab = lazy(() => import('../components/admin/WholesaleTab').then(m => ({ default: m.WholesaleTab })))
 const ReviewsTab = lazy(() => import('../components/admin/ReviewsTab').then(m => ({ default: m.ReviewsTab })))
 const UsersTab = lazy(() => import('../components/admin/UsersTab').then(m => ({ default: m.UsersTab })))
@@ -407,9 +409,11 @@ export default function AdminDashboard() {
                 {activeTab === 'dashboard' && 'Dashboard'}
                 {activeTab === 'members' && 'Membros'}
                 {activeTab === 'products' && 'Produtos'}
+                {activeTab === 'stock' && 'Estoque'}
                 {activeTab === 'orders' && 'Pedidos'}
                 {activeTab === 'wholesale' && 'Atacado'}
                 {activeTab === 'reviews' && 'Avaliações'}
+                {activeTab === 'questions' && 'Perguntas'}
                 {activeTab === 'users' && 'Usuários'}
                 {activeTab === 'logs' && 'Logs de Auditoria'}
                 {activeTab === 'reports' && 'Relatórios'}
@@ -419,9 +423,11 @@ export default function AdminDashboard() {
                 {activeTab === 'dashboard' && 'Visão geral do sistema'}
                 {activeTab === 'members' && 'Gerencie os membros do clube'}
                 {activeTab === 'products' && 'Gerencie o catálogo da loja'}
+                {activeTab === 'stock' && 'Ajuste estoque e acompanhe a movimentação'}
                 {activeTab === 'orders' && 'Acompanhe e gerencie os pedidos'}
                 {activeTab === 'wholesale' && 'Aprove CNPJ e gerencie atacadistas (−25%)'}
                 {activeTab === 'reviews' && 'Modere avaliações da loja'}
+                {activeTab === 'questions' && 'Responda as perguntas dos clientes'}
                 {activeTab === 'users' && 'Gerencie usuários do sistema'}
                 {activeTab === 'logs' && 'Histórico de ações no sistema'}
                 {activeTab === 'reports' && 'Métricas e análises'}
@@ -552,9 +558,11 @@ export default function AdminDashboard() {
               />
             )}
             {activeTab === 'products' && <ProductsTab />}
+            {activeTab === 'stock' && <StockTab />}
             {activeTab === 'orders' && <OrdersTab />}
             {activeTab === 'wholesale' && <WholesaleTab />}
             {activeTab === 'reviews' && <ReviewsTab />}
+            {activeTab === 'questions' && <QuestionsTab />}
             {activeTab === 'users' && (
               <UsersTab
                 users={systemUsers}

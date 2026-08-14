@@ -10,9 +10,13 @@ vi.mock('../../lib/products', () => ({
   createProduct: vi.fn(),
   updateProduct: vi.fn(),
   uploadProductImages: vi.fn(),
+  uploadProductMedia: vi.fn(),
   createCategory: vi.fn(),
   deleteCategory: vi.fn(),
   replaceProductVariants: vi.fn(),
+  MAX_PRODUCT_IMAGES: 30,
+  MAX_VARIANT_IMAGES: 10,
+  MAX_IMAGE_UPLOAD_BATCH: 20,
 }))
 
 vi.mock('sonner', () => ({
@@ -102,7 +106,7 @@ describe('ProductModal — foto por variação', () => {
       />
     )
 
-    expect(screen.getByText(/SKU\(s\) — foto própria/i)).toBeInTheDocument()
+    expect(screen.getByText(/SKU\(s\) — cada um com fotos próprias/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/Enviar imagens/i)).toBeInTheDocument()
     const listingInput = screen.getByLabelText(/Enviar imagens/i)
     expect(listingInput).toHaveAttribute('type', 'file')
@@ -193,5 +197,95 @@ describe('ProductModal — foto por variação', () => {
     fireEvent.change(input, { target: { files: [file] } })
     expect(screen.getByRole('dialog', { name: /Cortar imagem/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Aplicar recorte/i })).toBeInTheDocument()
+  })
+})
+
+describe('ProductModal — várias fotos por variação', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function renderEdit() {
+    render(
+      <ProductModal
+        mode="edit"
+        product={product}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+  }
+
+  it('acumula fotos na variação em vez de substituir a anterior', async () => {
+    mockedUpdate.mockResolvedValue(product)
+    mockedReplace.mockResolvedValue(product)
+    renderEdit()
+
+    // "Preto" já tem uma foto no fixture; colar uma URL deve somar, não trocar.
+    const urlInputs = screen.getAllByPlaceholderText(/cole URL da foto desta variação/i)
+    fireEvent.change(urlInputs[1], { target: { value: 'https://cdn.example.com/preto-2.jpg' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'OK' })[1])
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+    await waitFor(() => expect(mockedReplace).toHaveBeenCalled())
+
+    const variantsArg = mockedReplace.mock.calls[0][2] as { name: string; images?: string[] }[]
+    expect(variantsArg.find((v) => v.name === 'Preto')?.images).toEqual([
+      'https://example.com/preto.jpg',
+      'https://cdn.example.com/preto-2.jpg',
+    ])
+  })
+
+  it('não anexa foto de variação na galeria do listing', async () => {
+    mockedUpdate.mockResolvedValue(product)
+    mockedReplace.mockResolvedValue(product)
+    renderEdit()
+
+    const before = screen.getByText(/^\(2\/30\)$/)
+    expect(before).toBeInTheDocument()
+
+    const urlInputs = screen.getAllByPlaceholderText(/cole URL da foto desta variação/i)
+    fireEvent.change(urlInputs[0], { target: { value: 'https://cdn.example.com/rosa.jpg' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'OK' })[0])
+
+    // Contador da galeria do listing não se mexe — era exatamente o que estourava o teto.
+    expect(screen.getByText(/^\(2\/30\)$/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalled())
+    const payload = mockedUpdate.mock.calls[0][1] as { images?: string[] }
+    expect(payload.images).toEqual([
+      'https://example.com/listing.jpg',
+      'https://example.com/extra.jpg',
+    ])
+  })
+
+  it('recusa a foto acima do teto por variação', () => {
+    const cheio: Product = {
+      ...product,
+      variants: [
+        {
+          ...product.variants![0],
+          images: Array.from({ length: 10 }, (_, i) => `https://example.com/rosa-${i}.jpg`),
+        },
+      ],
+      variantAxes: [{ name: 'Cor', options: ['Rosa'] }],
+    }
+    render(
+      <ProductModal
+        mode="edit"
+        product={cheio}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    const urlInput = screen.getByPlaceholderText(/cole URL da foto desta variação/i)
+    fireEvent.change(urlInput, { target: { value: 'https://cdn.example.com/mais-uma.jpg' } })
+    fireEvent.click(screen.getByRole('button', { name: 'OK' }))
+
+    expect(toast.error).toHaveBeenCalledWith('Máximo de 10 fotos por variação')
   })
 })

@@ -9,13 +9,14 @@ import type { Product, Category } from '../../types'
 import {
   adminListProducts,
   deleteProduct,
+  duplicateProduct,
   listCategories,
   getProductForEdit,
 } from '../../lib/products'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
-import { Plus, Search, Package, Pencil, Trash2, Star, ImageOff } from 'lucide-react'
+import { Plus, Search, Package, Pencil, Trash2, Star, ImageOff, Copy } from 'lucide-react'
 import { parseProductSort, ADMIN_CATALOG_PAGE_SIZE, type ProductSort } from '../../lib/product-sort'
 import { ProductSortSelect } from '../store/ProductSortSelect'
 import { Pagination } from '../ui/pagination'
@@ -93,6 +94,22 @@ export function ProductsTab() {
     },
     [fetchProducts]
   )
+
+  const handleDuplicate = useCallback(async (product: Product) => {
+    try {
+      const clone = await duplicateProduct(product.id)
+      if (!clone) {
+        toast.error('Erro ao duplicar produto')
+        return
+      }
+      // Abre o clone já em edição: o fluxo é trocar nome e foto e salvar.
+      toast.success('Cópia criada (inativa) — ajuste nome e fotos')
+      setModal({ mode: 'edit', product: clone })
+    } catch (error) {
+      logger.error('Error duplicating product:', error)
+      toast.error('Erro ao duplicar produto')
+    }
+  }, [])
 
   const term = search.trim()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -199,7 +216,9 @@ export function ProductsTab() {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-sm text-muted-foreground">
-                      {product.categoryName || '—'}
+                      {product.categoryNames?.length
+                        ? product.categoryNames.join(', ')
+                        : product.categoryName || '—'}
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex flex-col">
@@ -245,6 +264,15 @@ export function ProductsTab() {
                           title="Editar produto"
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDuplicate(product)}
+                          className="h-8 w-8 p-0"
+                          title="Duplicar produto (mesmas medidas, peso e variações)"
+                        >
+                          <Copy className="h-4 w-4" />
                         </Button>
                         {product.active && (
                           <Button

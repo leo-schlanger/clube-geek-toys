@@ -6,6 +6,7 @@ import { getStripe } from '../utils/stripe.js';
 import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
+import { recordOrderMovements } from './stock.service.js';
 import {
   MEMBER_SHOP_DISCOUNT,
   WHOLESALE_SHOP_DISCOUNT,
@@ -813,6 +814,8 @@ export async function decrementStockForOrder(client: pg.PoolClient, orderId: str
     [orderId]
   );
   await syncParentStockFromVariants(client, orderId);
+  // Histórico do painel — mesma transação, some junto no rollback.
+  await recordOrderMovements(client, orderId, -1);
 }
 
 /** Reverse of decrement — used on cancel/refund after stock was taken. */
@@ -830,6 +833,7 @@ export async function restoreStockForOrder(client: pg.PoolClient, orderId: strin
     [orderId]
   );
   await syncParentStockFromVariants(client, orderId);
+  await recordOrderMovements(client, orderId, 1);
 }
 
 async function syncParentStockFromVariants(client: pg.PoolClient, orderId: string): Promise<void> {

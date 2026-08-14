@@ -686,7 +686,22 @@ Loja (migrations 009–012):
                               └──────────────┘
 ```
 
-**Total: 16 tabelas** (o sistema de pontos foi removido na migration 008; as tabelas da loja `categories`/`products`/`orders`/`order_items` foram adicionadas na migration 009)
+**Total: 16 tabelas** no diagrama acima (o sistema de pontos foi removido na migration 008; as tabelas da loja `categories`/`products`/`orders`/`order_items` foram adicionadas na migration 009)
+
+Tabelas acrescentadas depois, fora do diagrama:
+
+| Tabela               | Migration | Papel                                                                    |
+| -------------------- | --------- | ------------------------------------------------------------------------ |
+| `wholesale_accounts` | 012       | Contas B2B com CNPJ e aprovação admin                                    |
+| `product_variants`   | 013       | SKU por combinação de opções (preço, estoque, fotos próprias)            |
+| `product_categories` | 014       | Produto ↔ categoria (até 5); `position 0` espelha `products.category_id` |
+| `stock_movements`    | 015       | Livro-razão do estoque: venda, devolução e ajuste manual                 |
+| `product_questions`  | 017       | Perguntas na PDP + resposta da loja                                      |
+| `notifications`      | 017       | Avisos no perfil do cliente (ex.: pergunta respondida)                   |
+
+Migrations 016 e as colunas novas de `products` (`videos`, `low_stock_threshold`,
+`has_variants`, `variant_axes`) não criam tabela. Detalhes em
+[`CATALOG-2026-08.md`](CATALOG-2026-08.md).
 
 ### Recursos do PostgreSQL
 

@@ -282,6 +282,23 @@
 - [x] **Recorte no post** - diálogo ao enviar imagem (proporção Quadrado/Photocard/Retrato/Paisagem/Livre + tamanho 800/1200/1600/personalizado)
 - [x] **Testes** - product-sort, ProductSortSelect, ImageCropDialog, crop math, ShopHome/Wholesale/CategoryNav/ShopHeader
 
+### Catálogo: limites de foto e variações (pedido Laura 14/08/2026)
+
+- [x] **Fase 0 — mais fotos** - galeria do listing 8 → **30**; upload 6 → **20** por lote (seleções maiores são fatiadas no cliente); `client_max_body_size` 120m no bloco da API
+- [x] **Fase 0 — fix "dá problema nas variações"** - foto de variação anexava em `products.images` e, passando do teto, o `PATCH /products/:id` passava a ser rejeitado: **o produto não podia mais ser salvo**. Agora vai por `POST /products/:id/media` (devolve só as URLs) e o teto vale também no upload, não só no Zod
+- [x] **Fase 0 — várias fotos por variação** - até 10 por SKU, com miniaturas, remoção individual e contador `n/10`
+- [x] **Fase 0 — descoberta** - bloco Variações explica que cada opção ganha foto própria após _Gerar combinações_
+- [x] **Fase 0 — testes** - `product.service.test.ts` (teto: cabe / corta excedente / cheio / 404) + 3 casos em `ProductModal.test.tsx`, um deles travando a regressão da galeria
+- [x] **Fase 1 — duplicar produto** - `POST /products/:id/duplicate`; copia medidas, peso, imagens (por URL), categorias e variações; entra inativo, sem SKU, e o painel abre o clone em edição
+- [x] **Fase 1 — até 5 categorias** - migration 014 `product_categories`; `products.category_id` segue como principal (position 0), então sitemap/relacionados/cards não mudam; filtro e busca passam a olhar todas
+- [x] **Fase 2 — controle de estoque** - migration 015 `stock_movements` + `low_stock_threshold`; aba Estoque com edição inline por SKU, filtro acabando/esgotado e histórico; venda e cancelamento gravam movimento na mesma transação da baixa
+- [x] **Fase 2 — vídeos** - migration 016 `products.videos`; link YouTube/Instagram embedado + upload de MP4 (100 MB) no volume /uploads; exibidos abaixo da galeria na PDP
+- [x] **Fase 3 — perguntas e respostas** - migration 017 `product_questions`; pergunta visível na hora (modelo Mercado Livre), login obrigatório, máx. 10 em aberto por usuário, aba Perguntas no admin com esconder/responder
+- [x] **Fase 3 — notificações** - migration 017 `notifications`; sininho no header da loja (sem polling) + e-mail `question-answered` via Resend ao responder
+- [x] **Docs** - `CATALOG-2026-08.md`, PRODUCT-VARIANTS (tetos de imagem), PROJECT (endpoints)
+- [x] **Testes** - `product.service.test.ts` (tetos de imagem e vídeo), `product-video.test.ts` (parse/embed de link), 3 casos novos em `ProductModal.test.tsx`
+- [ ] **Operação** - Laura: revisar os produtos que já passaram de 8 fotos antes do fix (nenhum dado foi perdido; só o save estava travado)
+
 ### Hardening (10/08/2026 — validação de fluxos)
 
 - [x] **Admin criar membro** - cria user do e-mail (não amarra no JWT do admin)

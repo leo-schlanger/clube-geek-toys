@@ -25,6 +25,9 @@ import { orderRouter } from './routes/order.routes.js';
 import { shippingRouter } from './routes/shipping.routes.js';
 import { reviewRouter } from './routes/review.routes.js';
 import { wholesaleRouter } from './routes/wholesale.routes.js';
+import { stockRouter } from './routes/stock.routes.js';
+import { questionRouter } from './routes/question.routes.js';
+import { notificationRouter } from './routes/notification.routes.js';
 import { initCronJobs } from './services/cron.service.js';
 import { ensureSchema } from './db/ensure-schema.js';
 
@@ -91,6 +94,9 @@ app.use('/orders', orderRouter);
 app.use('/shipping', shippingRouter);
 app.use('/reviews', reviewRouter);
 app.use('/wholesale', wholesaleRouter);
+app.use('/stock', stockRouter);
+app.use('/questions', questionRouter);
+app.use('/notifications', notificationRouter);
 app.use('/cron', reportRouter); // cron endpoints share admin auth pattern
 
 // Error handler

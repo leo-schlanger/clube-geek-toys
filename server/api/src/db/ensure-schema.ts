@@ -367,6 +367,93 @@ export async function ensureSchema(): Promise<void> {
     await query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL`);
     await query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label VARCHAR(200)`);
 
+    // ─── Múltiplas categorias por produto (migration 014) ─────────────────────
+    // products.category_id segue sendo a principal (position 0).
+    await query(`
+      CREATE TABLE IF NOT EXISTS product_categories (
+        product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (product_id, category_id)
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_product_categories_category ON product_categories(category_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_product_categories_product ON product_categories(product_id, position)`);
+    await query(`
+      INSERT INTO product_categories (product_id, category_id, position)
+      SELECT id, category_id, 0 FROM products WHERE category_id IS NOT NULL
+      ON CONFLICT (product_id, category_id) DO NOTHING
+    `);
+
+    // ─── Controle de estoque (migration 015) ─────────────────────────────────
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 3`);
+    await query(`
+      CREATE TABLE IF NOT EXISTS stock_movements (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+        variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL,
+        order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+        kind VARCHAR(20) NOT NULL
+          CHECK (kind IN ('sale', 'restock', 'adjustment', 'manual_in', 'manual_out')),
+        quantity INTEGER NOT NULL,
+        stock_after INTEGER,
+        note TEXT,
+        actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_stock_movements_product ON stock_movements(product_id, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_stock_movements_variant ON stock_movements(variant_id, created_at DESC)
+      WHERE variant_id IS NOT NULL`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_stock_movements_order ON stock_movements(order_id)
+      WHERE order_id IS NOT NULL`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(created_at DESC)`);
+
+    // ─── Vídeos de produto (migration 016) ───────────────────────────────────
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS videos JSONB NOT NULL DEFAULT '[]'::jsonb`);
+
+    // ─── Perguntas + notificações (migration 017) ────────────────────────────
+    await query(`
+      CREATE TABLE IF NOT EXISTS product_questions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        member_id UUID REFERENCES members(id) ON DELETE SET NULL,
+        body TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'published'
+          CHECK (status IN ('published', 'hidden')),
+        answer_body TEXT,
+        answered_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        answered_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_questions_product ON product_questions(product_id, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_questions_user ON product_questions(user_id, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_questions_pending
+      ON product_questions(created_at DESC) WHERE answered_at IS NULL`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_product_questions_updated_at
+        BEFORE UPDATE ON product_questions
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+    await query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind VARCHAR(40) NOT NULL,
+        title VARCHAR(200) NOT NULL,
+        body TEXT,
+        link TEXT,
+        read_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL`);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

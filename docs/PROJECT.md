@@ -39,7 +39,7 @@ Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renova
 
 ### 3.2 Modulo Admin
 
-Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, estoque, imagens, flag atacado; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
+Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, fotos, videos, variacoes, ate 5 categorias, duplicar, flag atacado; aba **Estoque** — ajuste por SKU, limiar de "acabando" e historico de movimentacao; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Perguntas** — responder duvidas do cliente; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
 
 ### 3.3 Modulo PDV (Ponto de Venda)
 
@@ -461,7 +461,38 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 | POST   | `/products`                | Cria produto (incl. `wholesaleEnabled` / `wholesaleMinQty`)                                                                                              | admin   |
 | PATCH  | `/products/:id`            | Atualiza produto                                                                                                                                         | admin   |
 | DELETE | `/products/:id`            | Remove produto                                                                                                                                           | admin   |
-| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart)                                                                                                                 | admin   |
+| POST   | `/products/:id/images`     | Upload de imagens do produto (multipart); anexa na galeria do listing                                                                                    | admin   |
+| POST   | `/products/:id/media`      | Upload que devolve **só as URLs** (fotos de variação — não toca na galeria)                                                                              | admin   |
+| POST   | `/products/:id/video`      | Upload de MP4 (até 100 MB) anexado em `products.videos`                                                                                                  | admin   |
+| POST   | `/products/:id/duplicate`  | Clona o produto (inativo, sem SKU) para cadastro em série                                                                                                | admin   |
+
+### Stock (`/stock`) — admin
+
+| Metodo | Endpoint                      | Descricao                                                        |
+| ------ | ----------------------------- | ---------------------------------------------------------------- |
+| GET    | `/stock`                      | Uma linha por SKU vendável; filtros `low` / `out`, busca, página |
+| PATCH  | `/stock`                      | Define o estoque de um SKU e grava o ajuste no histórico         |
+| PATCH  | `/stock/:productId/threshold` | Limiar de "acabando" do produto                                  |
+| GET    | `/stock/:productId/movements` | Histórico de movimentação (inclui as variações)                  |
+
+### Questions (`/questions`)
+
+| Metodo | Endpoint                       | Descricao                                                | Auth    |
+| ------ | ------------------------------ | -------------------------------------------------------- | ------- |
+| GET    | `/questions/product/:slugOrId` | Perguntas publicadas do produto                          | Publico |
+| POST   | `/questions`                   | Perguntar (máx. 10 em aberto por usuário)                | JWT     |
+| GET    | `/questions/me`                | Perguntas do próprio usuário                             | JWT     |
+| GET    | `/questions/admin`             | Fila de moderação (não respondidas primeiro) + `pending` | admin   |
+| POST   | `/questions/:id/answer`        | Responde, notifica o cliente e dispara o e-mail          | admin   |
+| PATCH  | `/questions/:id/status`        | Esconde/publica (moderação a posteriori)                 | admin   |
+
+### Notifications (`/notifications`) — JWT
+
+| Metodo | Endpoint                  | Descricao                               |
+| ------ | ------------------------- | --------------------------------------- |
+| GET    | `/notifications`          | Lista + contador de não lidas (sininho) |
+| PATCH  | `/notifications/:id/read` | Marca uma como lida                     |
+| POST   | `/notifications/read-all` | Marca todas como lidas                  |
 
 ### Orders (`/orders`)
 

@@ -19,7 +19,7 @@ const AVAILABLE_TEMPLATES = [
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
-  'admin-new-member', 'order-confirmed', 'order-shipped',
+  'admin-new-member', 'order-confirmed', 'order-shipped', 'question-answered',
 ];
 
 export function getAvailableTemplates() {
@@ -250,6 +250,22 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: {
         text: 'Rastrear nos Correios',
         url: v.tracking_url || 'https://rastreamento.correios.com.br/app/index.php',
+      },
+    },
+
+    'question-answered': {
+      subject: `Respondemos sua pergunta — ${v.product_name || 'Loja GeekPop & Toys'}`,
+      preheader: 'Sua pergunta sobre o produto foi respondida.',
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Respondemos sua pergunta 💬</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Você perguntou sobre <strong>${v.product_name || 'um produto'}</strong>:</p>
+        ${infoBox(`<em>${v.question || ''}</em>`)}
+        <p style="margin-top:16px">Nossa resposta:</p>
+        ${infoBox(`<strong>${v.answer || ''}</strong>`)}`,
+      cta: {
+        text: 'Ver na loja',
+        url: v.product_url || 'https://shop.geeketoys.com.br',
       },
     },
 

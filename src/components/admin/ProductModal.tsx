@@ -6,14 +6,19 @@ import { Label } from '../ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
-import type { Product, Category, VariantAxis } from '../../types'
+import type { Product, Category, VariantAxis, ProductVideo } from '../../types'
 import {
   createProduct,
   updateProduct,
   uploadProductImages,
+  uploadProductMedia,
+  uploadProductVideo,
   createCategory,
   deleteCategory,
   replaceProductVariants,
+  MAX_PRODUCT_IMAGES,
+  MAX_VARIANT_IMAGES,
+  MAX_PRODUCT_CATEGORIES,
   type ProductInput,
   type VariantInput,
 } from '../../lib/products'
@@ -22,6 +27,14 @@ import {
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_ACCEPT_LABEL,
 } from '../../lib/product-image'
+import {
+  parseVideoUrl,
+  videoKindLabel,
+  videoThumbnail,
+  MAX_PRODUCT_VIDEOS,
+  PRODUCT_VIDEO_ACCEPT,
+  PRODUCT_VIDEO_MAX_BYTES,
+} from '../../lib/product-video'
 import { ImageCropDialog } from './ImageCropDialog'
 import { cn, formatCurrency } from '../../lib/utils'
 import { toast } from 'sonner'
@@ -35,6 +48,7 @@ import {
   Star,
   Tag,
   ImageOff,
+  Video,
 } from 'lucide-react'
 
 /** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — admin pode precificar livremente. */
@@ -57,7 +71,8 @@ interface FormState {
   description: string
   price: string
   compareAtPrice: string
-  categoryId: string
+  /** Categorias do produto, principal primeiro (até MAX_PRODUCT_CATEGORIES). */
+  categoryIds: string[]
   stock: string
   sku: string
   active: boolean
@@ -82,7 +97,11 @@ function toFormState(product?: Product | null): FormState {
     description: product?.description ?? '',
     price: product ? String(product.price) : '',
     compareAtPrice: product?.compareAtPrice != null ? String(product.compareAtPrice) : '',
-    categoryId: product?.categoryId ?? '',
+    categoryIds: product?.categoryIds?.length
+      ? product.categoryIds
+      : product?.categoryId
+        ? [product.categoryId]
+        : [],
     stock: product?.stock != null ? String(product.stock) : '0',
     sku: product?.sku ?? '',
     active: product?.active ?? true,
@@ -249,13 +268,21 @@ export function ProductModal({
   const [images, setImages] = useState<string[]>(product?.images ?? [])
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [imageUrl, setImageUrl] = useState('')
+
+  // Vídeos: links entram na hora (salvam no PATCH); MP4 precisa de productId,
+  // então no modo criação o arquivo sobe depois do save.
+  const [videos, setVideos] = useState<ProductVideo[]>(product?.videos ?? [])
+  const [videoUrl, setVideoUrl] = useState('')
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
   const [cropSession, setCropSession] = useState<
     { files: File[]; kind: 'listing' } | { files: File[]; kind: 'variant'; variantIndex: number } | null
   >(null)
 
-  // Foto por variação (estilo Shopee): arquivo pendente por índice da linha.
-  const [pendingVariantFiles, setPendingVariantFiles] = useState<Record<number, File>>({})
-  const [pendingVariantPreviews, setPendingVariantPreviews] = useState<Record<number, string>>({})
+  // Fotos por variação (estilo Shopee): arquivos pendentes por índice da linha.
+  // Em modo criação ainda não há productId, então sobem no save.
+  const [pendingVariantFiles, setPendingVariantFiles] = useState<Record<number, File[]>>({})
+  const [pendingVariantPreviews, setPendingVariantPreviews] = useState<Record<number, string[]>>({})
   const [variantUrlDraft, setVariantUrlDraft] = useState<Record<number, string>>({})
 
   // Inline category creation
@@ -266,13 +293,16 @@ export function ProductModal({
     setForm(toFormState(product))
     setImages(product?.images ?? [])
     setPendingFiles([])
+    setVideos(product?.videos ?? [])
+    setVideoUrl('')
+    setPendingVideoFile(null)
     setHasVariants(product?.hasVariants ?? false)
     setAxisDrafts(axesToDrafts(product?.variantAxes))
     setVariantRows(variantsToRows(product?.variants))
     setNewOptionByAxis({})
     setPendingVariantFiles({})
     setPendingVariantPreviews((prev) => {
-      for (const url of Object.values(prev)) URL.revokeObjectURL(url)
+      for (const urls of Object.values(prev)) for (const url of urls) URL.revokeObjectURL(url)
       return {}
     })
     setVariantUrlDraft({})
@@ -282,6 +312,28 @@ export function ProductModal({
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  /** Marca/desmarca uma categoria. A primeira da lista é a principal. */
+  function toggleCategory(id: string) {
+    setForm((prev) => {
+      if (prev.categoryIds.includes(id)) {
+        return { ...prev, categoryIds: prev.categoryIds.filter((c) => c !== id) }
+      }
+      if (prev.categoryIds.length >= MAX_PRODUCT_CATEGORIES) {
+        toast.error(`Máximo de ${MAX_PRODUCT_CATEGORIES} categorias por produto`)
+        return prev
+      }
+      return { ...prev, categoryIds: [...prev.categoryIds, id] }
+    })
+  }
+
+  /** Promove a categoria a principal (position 0) — é a usada no sitemap e nos relacionados. */
+  function makePrimaryCategory(id: string) {
+    setForm((prev) => ({
+      ...prev,
+      categoryIds: [id, ...prev.categoryIds.filter((c) => c !== id)],
+    }))
   }
 
   function handleAddImageUrl() {
@@ -296,10 +348,21 @@ export function ProductModal({
   }
 
   async function commitListingImages(picked: File[]) {
+    const room = MAX_PRODUCT_IMAGES - (images.length + pendingFiles.length)
+    if (room <= 0) {
+      toast.error(
+        `A galeria já tem ${MAX_PRODUCT_IMAGES} fotos. Remova alguma antes de enviar outra.`
+      )
+      return
+    }
+    if (picked.length > room) {
+      toast.message(`Só cabem mais ${room} foto(s) na galeria — o excedente foi ignorado`)
+    }
+
     setUploadingImages(true)
     setUploadPhase('prepare')
     try {
-      const { files, errors, compressedCount } = await prepareProductImages(picked)
+      const { files, errors, compressedCount } = await prepareProductImages(picked.slice(0, room))
       for (const msg of errors) toast.error(msg)
       if (files.length === 0) return
 
@@ -313,6 +376,9 @@ export function ProductModal({
         }
         setImages(result.product.images)
         onImagesChange?.(product.id, result.product.images)
+        if (result.skippedOverLimit > 0) {
+          toast.error(`${result.skippedOverLimit} foto(s) não couberam no limite da galeria`)
+        }
         toast.success(
           files.length === 1
             ? 'Imagem enviada'
@@ -358,86 +424,124 @@ export function ProductModal({
     setVariantRows((rows) => rows.map((r, i) => (i === idx ? { ...r, images: nextImages } : r)))
   }
 
-  function revokePendingPreview(idx: number) {
+  /** Quantas fotos a variação já tem somando salvas + pendentes de upload. */
+  function variantImageCount(idx: number): number {
+    return (variantRows[idx]?.images?.length ?? 0) + (pendingVariantFiles[idx]?.length ?? 0)
+  }
+
+  function appendVariantImages(idx: number, urls: string[]) {
+    setVariantRows((rows) =>
+      rows.map((r, i) => {
+        if (i !== idx) return r
+        const merged = [...(r.images ?? [])]
+        for (const url of urls) {
+          if (merged.length >= MAX_VARIANT_IMAGES) break
+          if (!merged.includes(url)) merged.push(url)
+        }
+        return { ...r, images: merged }
+      })
+    )
+  }
+
+  function removeVariantImage(idx: number, url: string) {
+    setVariantImages(idx, (variantRows[idx]?.images ?? []).filter((u) => u !== url))
+  }
+
+  function revokePendingPreviews(idx: number) {
     setPendingVariantPreviews((prev) => {
-      const url = prev[idx]
-      if (url) URL.revokeObjectURL(url)
+      for (const url of prev[idx] ?? []) URL.revokeObjectURL(url)
       const next = { ...prev }
       delete next[idx]
       return next
     })
   }
 
-  function clearVariantImage(idx: number) {
+  function removePendingVariantFile(idx: number, fileIndex: number) {
+    setPendingVariantFiles((prev) => {
+      const rest = (prev[idx] ?? []).filter((_, i) => i !== fileIndex)
+      const next = { ...prev }
+      if (rest.length) next[idx] = rest
+      else delete next[idx]
+      return next
+    })
+    setPendingVariantPreviews((prev) => {
+      const urls = prev[idx] ?? []
+      const removed = urls[fileIndex]
+      if (removed) URL.revokeObjectURL(removed)
+      const rest = urls.filter((_, i) => i !== fileIndex)
+      const next = { ...prev }
+      if (rest.length) next[idx] = rest
+      else delete next[idx]
+      return next
+    })
+  }
+
+  function clearVariantImages(idx: number) {
     setVariantImages(idx, [])
     setPendingVariantFiles((prev) => {
       const next = { ...prev }
       delete next[idx]
       return next
     })
-    revokePendingPreview(idx)
+    revokePendingPreviews(idx)
   }
 
   function assignGalleryImageToVariant(idx: number, url: string) {
-    setVariantImages(idx, [url])
-    setPendingVariantFiles((prev) => {
-      const next = { ...prev }
-      delete next[idx]
-      return next
-    })
-    revokePendingPreview(idx)
+    if (variantImageCount(idx) >= MAX_VARIANT_IMAGES) {
+      toast.error(`Máximo de ${MAX_VARIANT_IMAGES} fotos por variação`)
+      return
+    }
+    appendVariantImages(idx, [url])
   }
 
-  async function commitVariantImage(raw: File, idx: number) {
-    const prepared = await prepareProductImages([raw])
-    for (const msg of prepared.errors) toast.error(msg)
-    const file = prepared.files[0]
-    if (!file) return
+  async function commitVariantImages(raw: File[], idx: number) {
+    const room = MAX_VARIANT_IMAGES - variantImageCount(idx)
+    if (room <= 0) {
+      toast.error(`Esta variação já tem ${MAX_VARIANT_IMAGES} fotos`)
+      return
+    }
+    if (raw.length > room) {
+      toast.message(`Só cabem mais ${room} foto(s) nesta variação — o excedente foi ignorado`)
+    }
 
-    // Produto já existe: upload imediato e anexa URL na variação.
+    const prepared = await prepareProductImages(raw.slice(0, room))
+    for (const msg of prepared.errors) toast.error(msg)
+    if (prepared.files.length === 0) return
+
+    // Produto já existe: sobe agora via /media (sem tocar na galeria do listing)
+    // e guarda as URLs na linha; o PUT /variants persiste no save.
     const productId = product?.id
     if (productId) {
       try {
-        const before = new Set(images)
-        const result = await uploadProductImages(productId, [file])
-        if (!result.ok || !result.product.images?.length) {
-          toast.error(result.ok ? 'Falha no upload da foto da variação' : result.error)
+        const result = await uploadProductMedia(productId, prepared.files)
+        if (!result.ok) {
+          toast.error(result.error)
           return
         }
-        const updated = result.product
-        const added = updated.images.filter((u) => !before.has(u))
-        const url = added[0] ?? updated.images[updated.images.length - 1]
-        setImages(updated.images)
-        onImagesChange?.(productId, updated.images)
-        setVariantImages(idx, [url])
-        setPendingVariantFiles((prev) => {
-          const next = { ...prev }
-          delete next[idx]
-          return next
-        })
-        revokePendingPreview(idx)
-        toast.success(`Foto da variação "${variantRows[idx]?.name ?? ''}" enviada`)
+        appendVariantImages(idx, result.urls)
+        toast.success(
+          `${result.urls.length} foto(s) da variação "${variantRows[idx]?.name ?? ''}" — salve para confirmar`
+        )
       } catch (error) {
-        logger.error('Error uploading variant image:', error)
-        toast.error('Erro ao enviar foto da variação')
+        logger.error('Error uploading variant images:', error)
+        toast.error('Erro ao enviar fotos da variação')
       }
       return
     }
 
-    // Criação: guarda arquivo e mostra preview; sobe no save.
-    setPendingVariantFiles((prev) => ({ ...prev, [idx]: file }))
-    setPendingVariantPreviews((prev) => {
-      if (prev[idx]) URL.revokeObjectURL(prev[idx])
-      return { ...prev, [idx]: URL.createObjectURL(file) }
-    })
-    setVariantImages(idx, []) // URL real vem no save; preview usa blob
+    // Criação: guarda arquivos e mostra preview; sobem no save (precisa de productId).
+    setPendingVariantFiles((prev) => ({ ...prev, [idx]: [...(prev[idx] ?? []), ...prepared.files] }))
+    setPendingVariantPreviews((prev) => ({
+      ...prev,
+      [idx]: [...(prev[idx] ?? []), ...prepared.files.map((f) => URL.createObjectURL(f))],
+    }))
   }
 
   function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
-    const raw = e.target.files?.[0]
+    const raw = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (!raw) return
-    setCropSession({ files: [raw], kind: 'variant', variantIndex: idx })
+    if (raw.length === 0) return
+    setCropSession({ files: raw, kind: 'variant', variantIndex: idx })
   }
 
   function handleCropComplete(cropped: File[]) {
@@ -445,8 +549,7 @@ export function ProductModal({
     setCropSession(null)
     if (!session || cropped.length === 0) return
     if (session.kind === 'variant') {
-      const file = cropped[0]
-      if (file) void commitVariantImage(file, session.variantIndex)
+      void commitVariantImages(cropped, session.variantIndex)
       return
     }
     void commitListingImages(cropped)
@@ -459,14 +562,73 @@ export function ProductModal({
       toast.error('URL da variação inválida (use http/https)')
       return
     }
-    setVariantImages(idx, [url])
-    setPendingVariantFiles((prev) => {
-      const next = { ...prev }
-      delete next[idx]
-      return next
-    })
-    revokePendingPreview(idx)
+    if (variantImageCount(idx) >= MAX_VARIANT_IMAGES) {
+      toast.error(`Máximo de ${MAX_VARIANT_IMAGES} fotos por variação`)
+      return
+    }
+    appendVariantImages(idx, [url])
     setVariantUrlDraft((prev) => ({ ...prev, [idx]: '' }))
+  }
+
+  function handleAddVideoUrl() {
+    if (videos.length >= MAX_PRODUCT_VIDEOS) {
+      toast.error(`Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto`)
+      return
+    }
+    const parsed = parseVideoUrl(videoUrl)
+    if (!parsed.ok) {
+      toast.error(parsed.error)
+      return
+    }
+    if (videos.some((v) => v.url === parsed.video.url)) {
+      toast.error('Este vídeo já está no produto')
+      return
+    }
+    setVideos((prev) => [...prev, parsed.video])
+    setVideoUrl('')
+  }
+
+  function removeVideo(url: string) {
+    setVideos((prev) => prev.filter((v) => v.url !== url))
+  }
+
+  async function handlePickVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    if (videos.length + (pendingVideoFile ? 1 : 0) >= MAX_PRODUCT_VIDEOS) {
+      toast.error(`Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto`)
+      return
+    }
+    if (file.size > PRODUCT_VIDEO_MAX_BYTES) {
+      toast.error(
+        `Vídeo muito grande (máximo ${Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). Suba no YouTube e cole o link.`
+      )
+      return
+    }
+
+    // Criação: guarda e sobe no save (o upload precisa do productId).
+    if (!product?.id) {
+      setPendingVideoFile(file)
+      toast.message('Vídeo será enviado ao salvar o produto')
+      return
+    }
+
+    setUploadingVideo(true)
+    try {
+      const result = await uploadProductVideo(product.id, file)
+      if (!result.ok) {
+        toast.error(result.error)
+        return
+      }
+      setVideos(result.product.videos ?? [])
+      toast.success('Vídeo enviado')
+    } catch (error) {
+      logger.error('Error uploading video:', error)
+      toast.error('Erro ao enviar o vídeo')
+    }
+    setUploadingVideo(false)
   }
 
   async function handleCreateCategory() {
@@ -478,7 +640,7 @@ export function ProductModal({
       if (created) {
         toast.success('Categoria criada')
         setNewCategoryName('')
-        update('categoryId', created.id)
+        toggleCategory(created.id)
         onCategoriesChange?.()
       } else {
         toast.error('Erro ao criar categoria')
@@ -496,7 +658,7 @@ export function ProductModal({
       const ok = await deleteCategory(id)
       if (ok) {
         toast.success('Categoria removida')
-        if (form.categoryId === id) update('categoryId', '')
+        update('categoryIds', form.categoryIds.filter((c) => c !== id))
         onCategoriesChange?.()
       } else {
         toast.error('Erro ao remover categoria')
@@ -558,8 +720,9 @@ export function ProductModal({
       description: form.description.trim() || null,
       price,
       compareAtPrice,
-      categoryId: form.categoryId || null,
+      categoryIds: form.categoryIds,
       images,
+      videos,
       stock,
       sku: form.sku.trim() || null,
       active: form.active,
@@ -589,18 +752,27 @@ export function ProductModal({
       }
 
       // Upload de imagens do listing + fotos de variação pendentes (precisa de productId).
-      let catalogImages = [...images]
       if (pendingFiles.length > 0) {
         const withImages = await uploadProductImages(saved.id, pendingFiles)
         if (!withImages.ok) {
           toast.error(`Produto salvo, mas falhou o upload das imagens: ${withImages.error}`)
         } else {
-          catalogImages = withImages.product.images
           saved = withImages.product
         }
       }
 
-      // Resolve fotos de variação que ainda são File (modo criar)
+      // MP4 escolhido antes do produto existir sobe agora.
+      if (pendingVideoFile) {
+        const uploaded = await uploadProductVideo(saved.id, pendingVideoFile)
+        if (!uploaded.ok) {
+          toast.error(`Produto salvo, mas falhou o envio do vídeo: ${uploaded.error}`)
+        } else {
+          saved = uploaded.product
+        }
+      }
+
+      // Resolve fotos de variação que ainda são File (modo criar). Vão pelo /media:
+      // pertencem ao SKU, não à galeria do listing.
       const rowsWithImages = variantRows.map((r, i) => ({
         ...r,
         price: Number(r.price),
@@ -608,22 +780,16 @@ export function ProductModal({
         images: Array.isArray(r.images) ? [...r.images] : [],
         sortOrder: i,
       }))
-      const pendingEntries = Object.entries(pendingVariantFiles)
-      if (pendingEntries.length > 0) {
-        let known = new Set(catalogImages)
-        for (const [idxStr, file] of pendingEntries) {
-          const idx = Number(idxStr)
-          const updated = await uploadProductImages(saved.id, [file])
-          if (!updated.ok || !updated.product.images?.length) continue
-          const added = updated.product.images.filter((u) => !known.has(u))
-          const url = added[0] ?? updated.product.images[updated.product.images.length - 1]
-          known = new Set(updated.product.images)
-          catalogImages = updated.product.images
-          saved = updated.product
-          if (rowsWithImages[idx]) {
-            rowsWithImages[idx].images = [url]
-          }
+      for (const [idxStr, files] of Object.entries(pendingVariantFiles)) {
+        const idx = Number(idxStr)
+        const row = rowsWithImages[idx]
+        if (!row || files.length === 0) continue
+        const uploaded = await uploadProductMedia(saved.id, files)
+        if (!uploaded.ok) {
+          toast.error(`Falha nas fotos da variação "${row.name}": ${uploaded.error}`)
+          continue
         }
+        row.images = [...row.images, ...uploaded.urls].slice(0, MAX_VARIANT_IMAGES)
       }
 
       // Variações: salva eixos + SKUs com fotos (ou limpa)
@@ -854,22 +1020,61 @@ export function ProductModal({
               </div>
             </div>
 
-            {/* Categoria */}
+            {/* Categorias — até MAX_PRODUCT_CATEGORIES, a primeira é a principal */}
             <div className="space-y-2">
-              <Label htmlFor="product-category">Categoria</Label>
-              <select
-                id="product-category"
-                value={form.categoryId}
-                onChange={(e) => update('categoryId', e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="">Sem categoria</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <Label>
+                Categorias{' '}
+                <span className="font-normal text-muted-foreground">
+                  ({form.categoryIds.length}/{MAX_PRODUCT_CATEGORIES})
+                </span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Um mesmo produto pode aparecer em várias — ex.: chaveiro de comidinha em{' '}
+                <em>Comidas</em> e <em>Acessórios</em>. A marcada como{' '}
+                <strong className="text-foreground">principal</strong> é a usada no link do
+                produto e nas sugestões.
+              </p>
+
+              {categories.length === 0 ? (
+                <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+                  Nenhuma categoria criada ainda — use o campo abaixo.
+                </p>
+              ) : (
+                <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
+                  {categories.map((cat) => {
+                    const checked = form.categoryIds.includes(cat.id)
+                    const isPrimary = form.categoryIds[0] === cat.id
+                    return (
+                      <div key={cat.id} className="flex items-center gap-2">
+                        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 shrink-0"
+                            checked={checked}
+                            onChange={() => toggleCategory(cat.id)}
+                          />
+                          <span className="truncate">{cat.name}</span>
+                        </label>
+                        {checked &&
+                          (isPrimary ? (
+                            <Badge variant="secondary" className="shrink-0 text-[10px]">
+                              principal
+                            </Badge>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => makePrimaryCategory(cat.id)}
+                              className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
+                              title="Tornar categoria principal"
+                            >
+                              tornar principal
+                            </button>
+                          ))}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* Gerenciador de categorias inline */}
               <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/30">
@@ -922,7 +1127,12 @@ export function ProductModal({
 
             {/* Imagens */}
             <div className="space-y-3">
-              <Label>Imagens</Label>
+              <Label>
+                Imagens{' '}
+                <span className="font-normal text-muted-foreground">
+                  ({images.length + pendingFiles.length}/{MAX_PRODUCT_IMAGES})
+                </span>
+              </Label>
 
               {/* Previews */}
               {(images.length > 0 || pendingFiles.length > 0) ? (
@@ -1022,6 +1232,124 @@ export function ProductModal({
               </div>
             </div>
 
+            {/* Vídeos — link do YouTube/Instagram ou MP4 hospedado */}
+            <div className="space-y-3">
+              <Label>
+                Vídeos{' '}
+                <span className="font-normal text-muted-foreground">
+                  ({videos.length + (pendingVideoFile ? 1 : 0)}/{MAX_PRODUCT_VIDEOS})
+                </span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Cole o link do YouTube/Instagram ou envie um MP4 (até{' '}
+                {Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). O vídeo aparece na galeria
+                do produto na loja.
+              </p>
+
+              {(videos.length > 0 || pendingVideoFile) && (
+                <ul className="space-y-2">
+                  {videos.map((video) => {
+                    const thumb = videoThumbnail(video)
+                    return (
+                      <li
+                        key={video.url}
+                        className="flex items-center gap-3 rounded-md border border-border p-2"
+                      >
+                        <div className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                          {thumb ? (
+                            <img src={thumb} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <Video className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <Badge variant="secondary" className="text-[10px]">
+                            {videoKindLabel(video.kind)}
+                          </Badge>
+                          <p className="truncate text-xs text-muted-foreground">{video.url}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeVideo(video.url)}
+                          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          title="Remover vídeo"
+                          aria-label={`Remover vídeo ${video.url}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </li>
+                    )
+                  })}
+                  {pendingVideoFile && (
+                    <li className="flex items-center gap-3 rounded-md border border-dashed border-primary/60 p-2">
+                      <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded bg-muted">
+                        <Video className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Badge variant="secondary" className="text-[10px]">
+                          novo
+                        </Badge>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {pendingVideoFile.name} · sobe ao salvar
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendingVideoFile(null)}
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Remover vídeo"
+                        aria-label="Remover vídeo pendente"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </li>
+                  )}
+                </ul>
+              )}
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Colar link do YouTube ou Instagram"
+                    value={videoUrl}
+                    onChange={(e) => setVideoUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleAddVideoUrl()
+                      }
+                    }}
+                    className="pl-10"
+                    aria-label="Link do vídeo"
+                  />
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddVideoUrl}>
+                  Adicionar
+                </Button>
+              </div>
+
+              <label
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'relative cursor-pointer overflow-hidden',
+                  (uploadingVideo || loading || videos.length >= MAX_PRODUCT_VIDEOS) &&
+                    'pointer-events-none opacity-50'
+                )}
+              >
+                <input
+                  type="file"
+                  accept={PRODUCT_VIDEO_ACCEPT}
+                  onChange={handlePickVideo}
+                  disabled={uploadingVideo || loading}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  aria-label="Enviar vídeo MP4"
+                />
+                {uploadingVideo ? <Loading size="sm" /> : <Video className="h-4 w-4" />}
+                {uploadingVideo ? 'Enviando vídeo…' : 'Enviar MP4'}
+              </label>
+            </div>
+
             {/* Flags */}
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
@@ -1083,12 +1411,14 @@ export function ProductModal({
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Variações</p>
+                  <p className="text-sm font-medium">Variações (foto por opção, estilo Shopee)</p>
                   <p className="text-xs text-muted-foreground">
                     <strong className="text-foreground">Tipo</strong> = o que muda (ex. Cor).{' '}
                     <strong className="text-foreground">Opções</strong> = cada valor (Rosa, Preto,
-                    Azul…) — <strong className="text-foreground">sem limite</strong>. Depois clique
-                    em Gerar combinações.
+                    Azul…) — <strong className="text-foreground">sem limite</strong>. Clique em{' '}
+                    <strong className="text-foreground">Gerar combinações</strong> e cada linha
+                    ganha campo de <strong className="text-foreground">foto própria</strong>, preço
+                    e estoque.
                   </p>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
@@ -1204,12 +1534,14 @@ export function ProductModal({
                   {variantRows.length > 0 && (
                     <div className="max-h-96 space-y-3 overflow-y-auto rounded border p-2">
                       <p className="text-xs font-medium text-muted-foreground">
-                        {variantRows.length} SKU(s) — foto própria, preço, estoque e SKU (como na
-                        Shopee)
+                        {variantRows.length} SKU(s) — cada um com fotos próprias (até{' '}
+                        {MAX_VARIANT_IMAGES}), preço, estoque e SKU, como na Shopee
                       </p>
                       {variantRows.map((row, idx) => {
-                        const pendingFile = pendingVariantFiles[idx]
-                        const thumbUrl = row.images?.[0] || pendingVariantPreviews[idx] || null
+                        const savedImages = row.images ?? []
+                        const previews = pendingVariantPreviews[idx] ?? []
+                        const photoCount = savedImages.length + previews.length
+                        const thumbUrl = savedImages[0] || previews[0] || null
                         return (
                           <div
                             key={row.name + idx}
@@ -1227,6 +1559,7 @@ export function ProductModal({
                                     id={`variant-photo-${idx}`}
                                     type="file"
                                     accept={PRODUCT_IMAGE_ACCEPT}
+                                    multiple
                                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                                     onChange={(e) => void handleVariantFilePick(e, idx)}
                                   />
@@ -1238,6 +1571,11 @@ export function ProductModal({
                                     />
                                   ) : (
                                     <Upload className="h-4 w-4 text-muted-foreground" />
+                                  )}
+                                  {photoCount > 1 && (
+                                    <span className="absolute bottom-0 right-0 rounded-tl bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                                      {photoCount}
+                                    </span>
                                   )}
                                 </label>
                               </div>
@@ -1288,28 +1626,74 @@ export function ProductModal({
                               />
                             </div>
 
+                            {/* Galeria da variação — várias fotos, como na Shopee */}
+                            {photoCount > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pl-0 sm:pl-14">
+                                {savedImages.map((url) => (
+                                  <div
+                                    key={url}
+                                    className="group relative h-12 w-12 overflow-hidden rounded border border-border"
+                                  >
+                                    <img src={url} alt="" className="h-full w-full object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVariantImage(idx, url)}
+                                      className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                      title="Remover foto"
+                                      aria-label={`Remover foto da variação ${row.name}`}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                                {previews.map((url, fileIndex) => (
+                                  <div
+                                    key={url}
+                                    className="group relative h-12 w-12 overflow-hidden rounded border border-dashed border-primary/60"
+                                  >
+                                    <img src={url} alt="" className="h-full w-full object-cover" />
+                                    <span className="absolute bottom-0 left-0 rounded-tr bg-primary/80 px-0.5 text-[9px] text-primary-foreground">
+                                      novo
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => removePendingVariantFile(idx, fileIndex)}
+                                      className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                      title="Remover foto"
+                                      aria-label={`Remover foto pendente da variação ${row.name}`}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
                             {/* Controles de foto da variação */}
                             <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
                               <label
                                 htmlFor={`variant-photo-${idx}`}
                                 className={cn(
                                   buttonVariants({ variant: 'outline', size: 'sm' }),
-                                  'h-7 cursor-pointer text-xs'
+                                  'h-7 cursor-pointer text-xs',
+                                  photoCount >= MAX_VARIANT_IMAGES && 'pointer-events-none opacity-50'
                                 )}
                               >
                                 <Upload className="h-3 w-3" />
-                                {thumbUrl ? 'Trocar foto' : 'Foto'}
+                                {photoCount > 0
+                                  ? `Add fotos (${photoCount}/${MAX_VARIANT_IMAGES})`
+                                  : 'Fotos'}
                               </label>
-                              {(thumbUrl || pendingFile) && (
+                              {photoCount > 0 && (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="sm"
                                   className="h-7 text-xs text-muted-foreground"
-                                  onClick={() => clearVariantImage(idx)}
+                                  onClick={() => clearVariantImages(idx)}
                                 >
                                   <Trash2 className="h-3 w-3" />
-                                  Remover
+                                  Limpar
                                 </Button>
                               )}
                               <div className="flex min-w-0 flex-1 gap-1">
@@ -1349,13 +1733,13 @@ export function ProductModal({
                                 <span className="text-[10px] text-muted-foreground">
                                   Da galeria:
                                 </span>
-                                {images.slice(0, 8).map((url) => (
+                                {images.slice(0, 12).map((url) => (
                                   <button
                                     key={url}
                                     type="button"
                                     onClick={() => assignGalleryImageToVariant(idx, url)}
                                     className={`h-8 w-8 overflow-hidden rounded border transition-colors ${
-                                      row.images?.[0] === url
+                                      savedImages.includes(url)
                                         ? 'border-primary ring-1 ring-primary'
                                         : 'border-border hover:border-primary/60'
                                     }`}

@@ -13,6 +13,7 @@ import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { ThemeToggle } from '../ThemeToggle'
 import { isEventVisible } from '../../data/event'
 import { useWholesaleAccount } from './useWholesaleAccount'
+import { NotificationBell } from './NotificationBell'
 
 interface ShopHeaderProps {
   /** Membro ativo — mostra selo de desconto no cabeçalho. */
@@ -223,6 +224,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
                 </Link>
               </Button>
             )}
+            {user && <NotificationBell />}
 
             {/* Login / conta */}
             {user ? (

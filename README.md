@@ -92,7 +92,7 @@ Painel completo de gestao:
 - Gestao de membros (busca, filtros, edicao, ativacao/desativacao)
 - Aba **Atacado** (aprovacao de CNPJ B2B) e flag de produto para o canal
 - Confirmacao de pagamentos PIX pendentes (assinatura e loja)
-- Gestao da loja: aba **Produtos** (catalogo, estoque, imagens) e aba **Pedidos**
+- Gestao da loja: aba **Produtos** (catalogo, fotos, videos, variacoes, ate 5 categorias, duplicar), aba **Estoque** (ajuste por SKU + historico de movimentacao), aba **Pedidos** e aba **Perguntas** (responder cliente)
 - Logs de acoes do sistema
 - Exportacao CSV
 

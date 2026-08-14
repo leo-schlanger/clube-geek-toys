@@ -138,8 +138,13 @@ export interface Product {
   description: string | null;
   price: number;
   compareAtPrice: number | null;
+  /** Categoria principal (espelha product_categories position 0). */
   categoryId: string | null;
   categoryName?: string | null;
+  /** Todas as categorias do produto, principal primeiro (máx. MAX_PRODUCT_CATEGORIES). */
+  categoryIds?: string[];
+  categoryNames?: string[];
+  videos?: ProductVideo[];
   images: string[];
   stock: number;
   sku: string | null;
@@ -167,6 +172,16 @@ export interface Product {
   stockTotal?: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Vídeo do produto. `file` = MP4 no volume /uploads; os demais são links
+ * externos que a loja embeda.
+ */
+export interface ProductVideo {
+  kind: 'youtube' | 'instagram' | 'file';
+  url: string;
+  title?: string;
 }
 
 /** Eixo de variação (Cor, Tamanho, Material…). Sem limite de quantidade. */

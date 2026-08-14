@@ -20,6 +20,8 @@ import {
   ClipboardList,
   Star,
   Building2,
+  Boxes,
+  HelpCircle,
   LogOut,
   Menu,
 } from 'lucide-react'
@@ -32,9 +34,11 @@ export type AdminTab =
   | 'dashboard'
   | 'members'
   | 'products'
+  | 'stock'
   | 'orders'
   | 'wholesale'
   | 'reviews'
+  | 'questions'
   | 'users'
   | 'logs'
   | 'reports'
@@ -50,9 +54,11 @@ const menuItems: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'members', label: 'Membros', icon: Users },
   { id: 'products', label: 'Produtos', icon: Package },
+  { id: 'stock', label: 'Estoque', icon: Boxes },
   { id: 'orders', label: 'Pedidos', icon: ClipboardList },
   { id: 'wholesale', label: 'Atacado', icon: Building2 },
   { id: 'reviews', label: 'Avaliações', icon: Star },
+  { id: 'questions', label: 'Perguntas', icon: HelpCircle },
   { id: 'users', label: 'Usuários', icon: UserCog },
   { id: 'logs', label: 'Logs', icon: FileText },
   { id: 'reports', label: 'Relatórios', icon: BarChart3 },
