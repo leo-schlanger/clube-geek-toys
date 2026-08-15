@@ -234,18 +234,34 @@ export async function updateMember(
   // Members can only update self-editable profile fields.
   // pendingPayment is allowed for members (used by payment flow to track in-progress checkout).
   const memberAllowedFields = ['fullName', 'phone', 'photoUrl', 'pendingPayment'];
-  const adminFields = [
+  const staffFields = [
     'fullName', 'phone', 'photoUrl', 'plan', 'status', 'paymentType',
     'startDate', 'expiryDate', 'pendingPayment',
     'subscriptionId', 'subscriptionStatus', 'autoRenewal',
     'activatedAt', 'activatedByPayment',
   ];
+  /**
+   * E-mail e CPF só pelo **admin**, nem pelo vendedor do PDV.
+   *
+   * O e-mail é o login: trocá-lo e pedir "esqueci a senha" é uma tomada de conta
+   * completa. CPF é a chave de identidade do membro. O membro comum também não
+   * passa por aqui — troca de e-mail vai por /auth/update-profile, que exige a
+   * senha atual e revalida o endereço.
+   */
+  const adminOnlyIdentityFields = ['email', 'cpf'];
 
-  const allowedFields = userRole === 'member' ? memberAllowedFields : adminFields;
+  const allowedFields =
+    userRole === 'member'
+      ? memberAllowedFields
+      : userRole === 'admin'
+        ? [...staffFields, ...adminOnlyIdentityFields]
+        : staffFields;
 
   // Convert camelCase to snake_case for SQL
   const fieldMap: Record<string, string> = {
     fullName: 'full_name',
+    email: 'email',
+    cpf: 'cpf',
     phone: 'phone',
     photoUrl: 'photo_url',
     plan: 'plan',
@@ -260,6 +276,12 @@ export async function updateMember(
     activatedAt: 'activated_at',
     activatedByPayment: 'activated_by_payment',
   };
+
+  // E-mail é chave de login: normaliza aqui para não criar duas grafias do mesmo
+  // endereço entre members e users.
+  if (typeof data.email === 'string') {
+    data = { ...data, email: data.email.toLowerCase().trim() };
+  }
 
   const setClauses: string[] = [];
   const values: unknown[] = [];
@@ -309,17 +331,68 @@ export async function updateMember(
     }
   }
 
-  values.push(id);
-  const result = await query(
-    `UPDATE members SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
-    values
-  );
+  // Correção de e-mail/CPF pelo admin: os dois são únicos e o e-mail é o login,
+  // então checa colisão antes e grava members + users de uma vez só.
+  // Só conta o que o allowlist do papel deixou entrar: para um membro, `email`
+  // já foi descartado do UPDATE e não pode disparar a troca de login aqui.
+  const newEmail =
+    allowedFields.includes('email') && typeof data.email === 'string' ? data.email : null;
+  const newCpf =
+    allowedFields.includes('cpf') && typeof data.cpf === 'string' ? data.cpf : null;
+  const emailChanged = newEmail != null && newEmail !== before.email;
+  const cpfChanged = newCpf != null && newCpf !== before.cpf;
 
-  if (result.rowCount === 0) {
-    throw new AppError(404, 'Membro não encontrado', 'MEMBER_NOT_FOUND');
+  if (emailChanged) {
+    const taken = await query(
+      `SELECT 1 FROM users WHERE email = $1 AND id <> $2
+       UNION ALL
+       SELECT 1 FROM members WHERE email = $1 AND id <> $3
+       LIMIT 1`,
+      [newEmail, before.user_id, id]
+    );
+    if (taken.rowCount) {
+      throw new AppError(409, 'Este e-mail já está em uso por outra conta.', 'EMAIL_IN_USE');
+    }
+  }
+  if (cpfChanged) {
+    const taken = await query(`SELECT 1 FROM members WHERE cpf = $1 AND id <> $2 LIMIT 1`, [
+      newCpf,
+      id,
+    ]);
+    if (taken.rowCount) {
+      throw new AppError(409, 'Este CPF já está cadastrado em outro membro.', 'CPF_IN_USE');
+    }
   }
 
-  const after = result.rows[0];
+  values.push(id);
+  let after: pg.QueryResultRow;
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(
+      `UPDATE members SET ${setClauses.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      values
+    );
+    if (result.rowCount === 0) {
+      throw new AppError(404, 'Membro não encontrado', 'MEMBER_NOT_FOUND');
+    }
+    after = result.rows[0];
+
+    // users.email é o que o login usa — deixar só members mudar quebraria o acesso.
+    // O endereço novo volta a precisar de verificação.
+    if (emailChanged && before.user_id) {
+      await client.query(
+        `UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2`,
+        [newEmail, before.user_id]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 
   // Audit log with diff (admin/seller actions only — member self-edits are not security-relevant)
   if (actorUserId && userRole !== 'member') {

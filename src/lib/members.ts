@@ -43,12 +43,30 @@ export async function getMemberById(id: string): Promise<Member | null> {
   return result.data || null
 }
 
+/** Teto por página aceito por GET /members (listQuerySchema no back). */
+const MEMBER_PAGE_SIZE = 100
+/** Trava de segurança: 100 páginas = 10k membros. */
+const MEMBER_MAX_PAGES = 100
+
 /**
- * Get all members (admin/seller)
+ * Get all members (admin/seller).
+ *
+ * Pagina em lotes de 100 porque a API rejeita `limit` acima disso — pedir 1000
+ * de uma vez devolvia 400 e a lista de membros do admin ficava vazia.
  */
 export async function getAllMembers(): Promise<Member[]> {
-  const result = await api.get<{ members: Member[]; total: number }>('/members?limit=1000')
-  return result.data?.members || []
+  const all: Member[] = []
+  for (let page = 1; page <= MEMBER_MAX_PAGES; page++) {
+    const result = await api.get<{ members: Member[]; total: number }>(
+      `/members?limit=${MEMBER_PAGE_SIZE}&page=${page}`
+    )
+    const members = result.data?.members
+    if (!members?.length) break
+    all.push(...members)
+    if (all.length >= (result.data?.total ?? all.length)) break
+    if (members.length < MEMBER_PAGE_SIZE) break
+  }
+  return all
 }
 
 /**

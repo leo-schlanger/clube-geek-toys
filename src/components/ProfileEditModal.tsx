@@ -128,15 +128,13 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
         }
       }
 
-      // Update member profile data
+      // Update member profile data.
+      // Só os campos que PATCH /members aceita: o schema é strict e rejeitava a
+      // requisição inteira por causa de `updatedAt`/`email` — e o e-mail já foi
+      // gravado (em users e members) pelo /auth/update-profile acima.
       const updateData: Partial<Member> = {
         fullName: data.fullName,
         phone: data.phone.replace(/\D/g, ''),
-        updatedAt: new Date().toISOString(),
-      }
-
-      if (emailChanged) {
-        updateData.email = data.email
       }
 
       await updateMember(member.id, updateData)

@@ -185,14 +185,29 @@ describe('Members API client', () => {
   // ---- getAllMembers ----
 
   describe('getAllMembers', () => {
-    it('should call GET /members?limit=1000 and return members array', async () => {
+    it('should page within the API limit of 100 and return members array', async () => {
       const members = [makeMember({ id: '1' }), makeMember({ id: '2' })]
       mockedApi.get.mockResolvedValue({ data: { members, total: 2 }, status: 200 })
 
       const result = await getAllMembers()
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/members?limit=1000')
+      expect(mockedApi.get).toHaveBeenCalledWith('/members?limit=100&page=1')
+      expect(mockedApi.get).toHaveBeenCalledTimes(1)
       expect(result).toEqual(members)
+    })
+
+    it('should follow pages until every member is fetched', async () => {
+      const first = Array.from({ length: 100 }, (_, i) => makeMember({ id: `a${i}` }))
+      const second = [makeMember({ id: 'b0' })]
+      mockedApi.get
+        .mockResolvedValueOnce({ data: { members: first, total: 101 }, status: 200 })
+        .mockResolvedValueOnce({ data: { members: second, total: 101 }, status: 200 })
+
+      const result = await getAllMembers()
+
+      expect(mockedApi.get).toHaveBeenNthCalledWith(1, '/members?limit=100&page=1')
+      expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/members?limit=100&page=2')
+      expect(result).toHaveLength(101)
     })
 
     it('should return empty array when data is undefined', async () => {
