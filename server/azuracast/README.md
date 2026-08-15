@@ -17,6 +17,13 @@ Stack isolada para rodar rádio online em `radio.geeketoys.com.br`, coexistindo 
 
 ## Pré-requisitos na VPS
 
+> Este repositório é **público**: IP e credenciais da VPS ficam só em
+> `CLAUDE.local.md` (gitignored). Exporte o alvo antes de rodar o que vem abaixo:
+>
+> ```bash
+> export VPS_HOST=user@ip-ou-hostname   # ou use o alias: ssh geekpop-vps
+> ```
+
 Comandos para rodar **uma vez** antes do primeiro `docker compose up`:
 
 ```bash
@@ -32,7 +39,7 @@ sudo ufw allow 2022/tcp           # SFTP AzuraCast
 sudo ufw allow 8000:8046/tcp      # Streams Icecast/Shoutcast
 
 # 3. DNS — criar registro A apontando para a VPS
-# radio.geeketoys.com.br  A  76.13.114.173
+# radio.geeketoys.com.br  A  <IP da VPS>     # valor em CLAUDE.local.md
 
 # 4. Expandir certificado incluindo o novo subdomínio
 #    (rode no host, depois que o DNS propagar e o bloco nginx
@@ -55,11 +62,11 @@ docker exec clube-geek-nginx nginx -s reload
 
 ```bash
 # Copiar arquivos para a VPS
-ssh root@76.13.114.173 "mkdir -p /opt/azuracast"
-scp docker-compose.yml .env.example root@76.13.114.173:/opt/azuracast/
+ssh $VPS_HOST "mkdir -p /opt/azuracast"
+scp docker-compose.yml .env.example $VPS_HOST:/opt/azuracast/
 
 # Na VPS — gerar senhas e preencher .env
-ssh root@76.13.114.173
+ssh $VPS_HOST
 cd /opt/azuracast
 cp .env.example .env
 sed -i "s|gerar-com-openssl-rand-hex-24|$(openssl rand -hex 24)|" .env   # MYSQL_PASSWORD

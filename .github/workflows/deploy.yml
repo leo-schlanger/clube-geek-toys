@@ -90,6 +90,11 @@ jobs:
             docker compose up -d certbot
             sleep 3
             docker ps --format 'table {{.Names}}\t{{.Status}}'
+            # build --no-cache acumula camadas a cada deploy (24 GB em 15/08/2026).
+            # Roda DEPOIS do up: as imagens em uso não são tocadas, só o cache de
+            # build órfão. `|| true` porque limpeza não pode derrubar o deploy.
+            docker builder prune -af --filter 'until=24h' || true
+            df -h / | tail -1
             echo "Deploy completed at $(date)"
           DEPLOY
 
