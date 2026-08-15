@@ -265,7 +265,7 @@ export default function ShopHome() {
 
       <footer className="mt-12 border-t py-8 text-center text-sm text-muted-foreground space-y-3">
         <p className="font-medium text-foreground">GeekPop &amp; Toys — Loja de K-pop no Rio de Janeiro</p>
-        <PaymentTrustBadges className="mx-auto max-w-sm" />
+        <PaymentTrustBadges className="mx-auto max-w-sm" center />
         <p>
           <a
             href="https://wa.me/5511914662881"
