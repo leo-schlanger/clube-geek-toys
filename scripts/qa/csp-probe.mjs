@@ -58,6 +58,23 @@ if (CANDIDATE) {
   })
 }
 
+/**
+ * Violação conhecida e inofensiva: o zod sonda `new Function("")` dentro de um
+ * try/catch para decidir se pode compilar validador otimizado. Com o CSP ele cai
+ * sozinho no caminho interpretado — validação do cadastro conferida no navegador
+ * com a policy no ar (15/08/2026). Liberar 'unsafe-eval' por causa disso seria
+ * abrir o script-src inteiro para um relatório que não quebra nada.
+ *
+ * Fica listado, mas não reprova a execução. Qualquer violação NOVA reprova.
+ */
+const BENIGNAS = [{ directive: 'script-src', blocked: 'eval', source: /schemas-.*\.js$/ }]
+
+const isBenigna = (v) =>
+  BENIGNAS.some(
+    (b) =>
+      v.directive === b.directive && v.blocked === b.blocked && b.source.test(v.source || '')
+  )
+
 const all = new Map()
 let failures = 0
 let sawHeader = false
@@ -91,16 +108,19 @@ for (const [label, url] of PAGES) {
   }
 
   if (header) sawHeader = true
-  if (violations.length) failures += violations.length
+  const novas = violations.filter((v) => !isBenigna(v))
+  failures += novas.length
   for (const v of violations) {
     const key = `${v.directive} ← ${v.blocked || '(inline)'}`
-    if (!all.has(key)) all.set(key, { ...v, pages: new Set() })
+    if (!all.has(key)) all.set(key, { ...v, benigna: isBenigna(v), pages: new Set() })
     all.get(key).pages.add(label)
   }
 
+  const marca = novas.length ? '❌' : violations.length ? '🟡' : '✅'
   console.log(
-    `${violations.length ? '❌' : '✅'} ${label.padEnd(24)} ` +
-      `violações=${violations.length}${!CANDIDATE && !header ? '  ⚠ SEM header CSP' : ''}`
+    `${marca} ${label.padEnd(24)} ` +
+      `novas=${novas.length}${violations.length - novas.length ? ` conhecidas=${violations.length - novas.length}` : ''}` +
+      `${!CANDIDATE && !header ? '  ⚠ SEM header CSP' : ''}`
   )
   await page.close()
 }
@@ -113,11 +133,12 @@ if (all.size === 0) {
   console.log('✅ nenhuma violação')
 } else {
   for (const [key, v] of all) {
-    console.log(`❌ ${key}`)
+    console.log(`${v.benigna ? '🟡 conhecida' : '❌ NOVA'}: ${key}`)
     console.log(`     origem: ${v.source}:${v.line}`)
     console.log(`     páginas: ${[...v.pages].join(', ')}`)
   }
 }
+console.log(failures ? `\n❌ ${failures} violação(ões) nova(s)` : '\n✅ nenhuma violação nova')
 
 await browser.close()
 process.exit(failures > 0 || (!CANDIDATE && !sawHeader) ? 1 : 0)
