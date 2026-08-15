@@ -10,6 +10,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:changed": "vitest related --run $(git diff --name-only --diff-filter=ACMR HEAD -- \"*.ts\" \"*.tsx\" | tr \"\\n\" \" \")",
+    "test:api": "vitest run --project api",
+    "test:web": "vitest run --project web",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky"
   },

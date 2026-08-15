@@ -6,20 +6,41 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    // WSL + /mnt/d is I/O bound — few workers avoid pool timeouts
+    // WSL + /mnt/d is I/O bound — few workers avoid pool timeouts.
+    // Medido em 15/08/2026 (20 cores, 14 arquivos de componente): 2 workers =
+    // 126s, 6 = 85s, 10 = 78s. De 6 para 10 o custo por worker de montar o
+    // ambiente já come o ganho, então 6 é o joelho da curva.
     pool: 'forks',
-    maxWorkers: 2,
+    maxWorkers: 6,
     minWorkers: 1,
     fileParallelism: true,
     testTimeout: 20_000,
     hookTimeout: 20_000,
-    include: [
-      'src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-      'server/api/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}',
-    ],
     exclude: ['node_modules', 'dist', 'api-worker', 'server/api/node_modules'],
+    /**
+     * Dois ambientes. Montar o jsdom é o que domina o relógio da suíte
+     * (`environment` foi 1876s de 1382s de parede em 15/08/2026), e o código do
+     * servidor não toca em DOM nenhum — rodar aquilo sob jsdom era só custo.
+     */
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'web',
+          environment: 'jsdom',
+          setupFiles: ['./src/test/setup.ts'],
+          include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'api',
+          environment: 'node',
+          include: ['server/api/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}'],
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],
