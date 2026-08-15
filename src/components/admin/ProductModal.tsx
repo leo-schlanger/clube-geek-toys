@@ -1859,7 +1859,7 @@ export function ProductModal({
                               <div className="flex flex-col gap-2 text-sm sm:grid sm:grid-cols-12 sm:items-center">
                                 <div className="flex items-center gap-2 sm:contents">
                                   {/* Foto da variação */}
-                                  <div className="shrink-0 sm:col-span-1">
+                                  <div className="shrink-0 sm:col-span-2">
                                     <label
                                       className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
                                       title={`Foto de ${row.name}`}
@@ -1932,7 +1932,7 @@ export function ProductModal({
                                     aria-label={`Estoque ${row.name}`}
                                   />
                                   <Input
-                                    className="col-span-2 h-8 sm:col-span-3"
+                                    className="col-span-2 h-8 sm:col-span-2"
                                     placeholder="SKU"
                                     value={row.sku ?? ""}
                                     onChange={(e) => {

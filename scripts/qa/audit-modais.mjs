@@ -33,6 +33,8 @@ const probe = () => {
     if (!p) continue
     // <option> não participa do layout do pai: a caixa dele sempre "vaza".
     if (el.tagName === 'OPTION' || p.tagName === 'SELECT') continue
+    // display:contents não gera caixa — comparar contra ela acusa qualquer filho.
+    if (getComputedStyle(p).display === 'contents') continue
     const a = el.getBoundingClientRect()
     const b = p.getBoundingClientRect()
     if (b.width > 0 && (a.right > b.right + 2 || a.left < b.left - 2)) {
