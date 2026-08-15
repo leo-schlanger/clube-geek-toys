@@ -6,6 +6,8 @@
 
 Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 
+### Em aberto
+
 - [ ] **ALTO** — Conferir a renovação do certificado por volta de **17/09/2026**. O
       certbot ficou 3 semanas parado; foi religado, o webroot ACME está validado
       nos 5 domínios testados e o deploy agora garante o container de pé — mas o
@@ -13,26 +15,40 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 - [ ] **ALTO** — Preencher `MELHOR_ENVIO_TOKEN` na VPS. Sem ele toda cotação é
       PAC R$ 24 / SEDEX R$ 42 fixo, sem variar por distância: prejuízo na primeira
       venda para fora do Sudeste.
-- [ ] **MEDIO** — E2E cobrindo cadastro de **variação** e **vídeo**.
-      `admin-shop-flows.spec.ts` só cria produto com imagem — foi por isso que o
-      bug de 15/08 chegou em produção.
 - [ ] **MEDIO** — Rotacionar/isolar `e2e-admin@geeketoys.com.br`: é admin de
       produção com senha fixa documentada. Ideal seria E2E contra staging.
-- [ ] **MEDIO** — CSP nas SPAs (`shop`/`adm`/`club`). A API já manda; as SPAs não,
-      e é nelas que o JWT vive no `localStorage`.
-- [ ] **BAIXO** — `docker builder prune -af` no fim do deploy: 24.3 GB de cache
-      recuperável e crescendo a cada push.
-- [ ] **BAIXO** — Revisar os 4 admins (de 9 usuários) e remover a conta residual
-      `stripe-smoke-…` de abril.
-- [ ] **BAIXO** — Tirar o IP da VPS de `server/azuracast/README.md` (repo público;
-      o `CLAUDE.md` manda IP só no `CLAUDE.local.md`).
-- [ ] **BAIXO** — Suíte de testes leva 40+ min (307 arquivos × setup de jsdom);
-      atrapalha rodar antes do commit.
 - [ ] **MEDIO** — SSH: `PasswordAuthentication no` do `sshd_config` está sendo
       sobrescrito por `sshd_config.d/50-cloud-init.conf` (`yes`). Hoje ninguém
       entra por senha (root barrado por `PermitRootLogin without-password`,
       `ubuntu` com senha travada), mas o efetivo contraria a intenção. Corrigir o
       drop-in e instalar fail2ban.
+- [ ] **BAIXO** — Revisar os 4 admins (de 9 usuários) e remover a conta residual
+      `stripe-smoke-…` de abril.
+
+### Resolvido em 15/08/2026 (mesmo dia)
+
+- [x] **E2E de variação e vídeo** — `admin-shop-flows.spec.ts` passo `3b`. Preenche
+      os eixos e cola o link **sem** clicar em "Gerar combinações"/"Adicionar",
+      salva, reabre e confere que os 2 SKUs e o vídeo ficaram gravados. É esse
+      caminho que reproduzia o bug; clicar nos botões faria o teste passar mesmo
+      com a regressão de volta. Fica depois do funil de compra porque produto com
+      variação exige escolher SKU no carrinho.
+- [x] **CSP nas SPAs** — em `server/nginx/shared-headers.conf`, aplicado a
+      club/shop/adm. Sem `unsafe-inline` nem `unsafe-eval` em `script-src`: o boot
+      saiu do `index.html` para [`public/boot.js`](../public/boot.js) e o zod já cai
+      sozinho no caminho sem `eval`. Cada host da lista veio do código. Validado no
+      navegador contra a produção com [`scripts/qa/csp-probe.mjs`](../scripts/qa/csp-probe.mjs)
+      — **rode essa sonda antes de subir integração externa nova**.
+- [x] **Cache de build** — `docker builder prune -af --filter until=24h` no fim do
+      deploy. Rodado na hora: 34 GB → 24 GB em disco (36% → 25%).
+- [x] **IP fora do repo público** — `server/azuracast/README.md` agora usa
+      `$VPS_HOST`, com nota apontando para o `CLAUDE.local.md`. `git grep` do IP
+      não retorna mais nada.
+- [x] **Suíte de testes** — `maxWorkers` 2 → 6 (medido: 14 arquivos em 126s → 85s;
+      10 workers só chega a 78s, não compensa) e os testes do servidor saíram do
+      jsdom para um projeto `node`. Para o dia a dia o que resolve é
+      `npm run test:changed`, que roda só o que o diff afeta (25 arquivos em ~3 min
+      em vez de 165 em ~23 min). Também há `test:api` e `test:web`.
 
 ## Legenda
 
