@@ -82,6 +82,12 @@ services:
     image: nginx:alpine
     container_name: clube-geek-nginx
     restart: unless-stopped
+    # Recarrega a cada 6h para pegar o certificado renovado pelo container
+    # certbot: o nginx lê o cert uma vez no boot e seguiria servindo o antigo
+    # até expirar. Deploy também recria o nginx, mas isso não pode ser a única
+    # garantia — semana sem deploy é normal.
+    command: >-
+      /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
     logging:
       driver: json-file
       options:

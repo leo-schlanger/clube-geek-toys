@@ -84,6 +84,10 @@ jobs:
             cd /opt/clube-geek-toys/server
             docker compose build --no-cache api
             docker compose up -d --force-recreate api nginx
+            # certbot renova o cert de TODOS os domínios; ele ficou parado 3
+            # semanas sem ninguém notar porque o deploy só recriava api+nginx.
+            # Sem --force-recreate: se já está de pé, não mexe.
+            docker compose up -d certbot
             sleep 3
             docker ps --format 'table {{.Names}}\t{{.Status}}'
             echo "Deploy completed at $(date)"
