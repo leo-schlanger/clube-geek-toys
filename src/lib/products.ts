@@ -125,9 +125,16 @@ export async function adminListProducts(params: ProductListParams = {}): Promise
   return listProducts({ limit: 25, stats: true, ...params })
 }
 
-/** Admin: full product with variants (uses public slug detail which embeds variants). */
-export async function getProductForEdit(slug: string): Promise<Product | null> {
-  return getProductBySlug(slug)
+/**
+ * Admin: produto completo para o modal de edição.
+ *
+ * Usa a rota admin (e não o detalhe público por slug) porque aquela esconde
+ * produto inativo e variação inativa — o modal abria sem as variações e o save
+ * seguinte apagava as que não vieram.
+ */
+export async function getProductForEdit(id: string): Promise<Product | null> {
+  const result = await api.get<Product>(`/products/${id}/edit`)
+  return result.data ?? null
 }
 
 export async function createProduct(data: ProductInput): Promise<Product | null> {

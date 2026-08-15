@@ -263,6 +263,67 @@ export function ProductModal({
     });
   }
 
+  /** Produto cartesiano dos eixos: uma combinação por SKU. */
+  function axisCombinations(axes: VariantAxis[]): Record<string, string>[] {
+    let combos: Record<string, string>[] = [{}];
+    for (const axis of axes) {
+      const next: Record<string, string>[] = [];
+      for (const combo of combos) {
+        for (const opt of axis.options) next.push({ ...combo, [axis.name]: opt });
+      }
+      combos = next;
+    }
+    return combos;
+  }
+
+  function comboName(axes: VariantAxis[], options: Record<string, string>): string {
+    return axes.map((a) => options[a.name]).join(" / ");
+  }
+
+  function newVariantRow(
+    name: string,
+    options: Record<string, string>,
+    sortOrder: number,
+  ): VariantInput {
+    return {
+      name,
+      options,
+      sku: "",
+      price: Number(form.price) || 0,
+      compareAtPrice: null,
+      stock: Number(form.stock) || 0,
+      images: [],
+      active: true,
+      sortOrder,
+    };
+  }
+
+  /**
+   * Acrescenta às linhas atuais os SKUs que os eixos pedem e ainda não existem.
+   * Nunca descarta uma linha já preenchida: se o nome não bate mais com os eixos
+   * (dado legado, opção renomeada), ela continua ali para o admin decidir.
+   */
+  function mergeVariantMatrix(
+    axes: VariantAxis[],
+    rows: VariantInput[],
+  ): { ok: true; rows: VariantInput[] } | { ok: false; error: string } {
+    const combos = axisCombinations(axes);
+    if (combos.length > 500) {
+      return {
+        ok: false,
+        error: `Combinações demais (${combos.length}). Reduza opções ou tipos (máx. 500 SKUs).`,
+      };
+    }
+    const byName = new Map(rows.map((r) => [r.name, r]));
+    const merged = [...rows];
+    for (const options of combos) {
+      const name = comboName(axes, options);
+      if (byName.has(name)) continue;
+      merged.push(newVariantRow(name, options, merged.length));
+    }
+    return { ok: true, rows: merged.map((r, i) => ({ ...r, sortOrder: i })) };
+  }
+
   /** Gera matriz de combinações a partir dos eixos. */
   function generateVariantMatrix() {
     // Confirma o que está digitado antes de gerar, e reflete isso nos chips.
@@ -280,42 +341,22 @@ export function ProductModal({
       );
       return;
     }
-    let total = 1;
-    for (const a of axes) total *= a.options.length;
-    if (total > 500) {
+    const combos = axisCombinations(axes);
+    if (combos.length > 500) {
       toast.error(
-        `Combinações demais (${total}). Reduza opções ou tipos (máx. 500 SKUs).`,
+        `Combinações demais (${combos.length}). Reduza opções ou tipos (máx. 500 SKUs).`,
       );
       return;
     }
-    const combos: Record<string, string>[] = [{}];
-    for (const axis of axes) {
-      const next: Record<string, string>[] = [];
-      for (const c of combos) {
-        for (const opt of axis.options) {
-          next.push({ ...c, [axis.name]: opt });
-        }
-      }
-      combos.splice(0, combos.length, ...next);
-    }
-    const basePrice = Number(form.price) || 0;
-    const baseStock = Number(form.stock) || 0;
+    // Botão explícito: a matriz passa a ser exatamente o que os eixos dizem,
+    // preservando preço/estoque/foto das linhas de mesmo nome.
     const existingByName = new Map(variantRows.map((r) => [r.name, r]));
     const rows: VariantInput[] = combos.map((options, idx) => {
-      const name = axes.map((a) => options[a.name]).join(" / ");
+      const name = comboName(axes, options);
       const prev = existingByName.get(name);
-      return {
-        id: prev?.id,
-        name,
-        options,
-        sku: prev?.sku ?? "",
-        price: prev?.price ?? basePrice,
-        compareAtPrice: prev?.compareAtPrice ?? null,
-        stock: prev?.stock ?? baseStock,
-        images: prev?.images ?? [],
-        active: prev?.active ?? true,
-        sortOrder: idx,
-      };
+      return prev
+        ? { ...prev, options, sortOrder: idx }
+        : newVariantRow(name, options, idx);
     });
     setVariantRows(rows);
     setHasVariants(true);
@@ -693,6 +734,67 @@ export function ProductModal({
     setVideos((prev) => prev.filter((v) => v.url !== url));
   }
 
+  // ─── Rascunhos pendentes ───────────────────────────────────────────────────
+  // Link digitado no campo e ainda não confirmado no "+" conta como escolhido.
+  // Sem isto o save descartava em silêncio o que o admin acabou de colar, que é
+  // a causa de "cadastrei o vídeo / a foto e não salvou".
+
+  type Resolved<T> = { value: T; error?: string };
+
+  function resolvePendingVideos(): Resolved<ProductVideo[]> {
+    const raw = videoUrl.trim();
+    if (!raw) return { value: videos };
+    const parsed = parseVideoUrl(raw);
+    if (!parsed.ok) return { value: videos, error: parsed.error };
+    if (videos.some((v) => v.url === parsed.video.url)) return { value: videos };
+    if (videos.length + (pendingVideoFile ? 1 : 0) >= MAX_PRODUCT_VIDEOS) {
+      return {
+        value: videos,
+        error: `Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto — remova um antes de adicionar o link.`,
+      };
+    }
+    return { value: [...videos, parsed.video] };
+  }
+
+  function resolvePendingImages(): Resolved<string[]> {
+    const raw = imageUrl.trim();
+    if (!raw) return { value: images };
+    if (!/^https?:\/\//i.test(raw)) {
+      return { value: images, error: "URL da imagem inválida (use http/https)" };
+    }
+    if (images.includes(raw)) return { value: images };
+    if (images.length + pendingFiles.length >= MAX_PRODUCT_IMAGES) {
+      return {
+        value: images,
+        error: `A galeria já tem ${MAX_PRODUCT_IMAGES} fotos — remova alguma antes de adicionar a URL.`,
+      };
+    }
+    return { value: [...images, raw] };
+  }
+
+  function resolvePendingVariantImages(
+    row: VariantInput,
+    idx: number,
+  ): Resolved<string[]> {
+    const current = row.images ?? [];
+    const raw = (variantUrlDraft[idx] ?? "").trim();
+    if (!raw) return { value: current };
+    if (!/^https?:\/\//i.test(raw)) {
+      return {
+        value: current,
+        error: `URL da foto da variação "${row.name}" inválida (use http/https)`,
+      };
+    }
+    if (current.includes(raw)) return { value: current };
+    if (current.length >= MAX_VARIANT_IMAGES) {
+      return {
+        value: current,
+        error: `A variação "${row.name}" já tem ${MAX_VARIANT_IMAGES} fotos.`,
+      };
+    }
+    return { value: [...current, raw] };
+  }
+
   async function handlePickVideo(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -846,14 +948,87 @@ export function ProductModal({
       return;
     }
 
+    // Rascunhos ainda no campo entram no save (ver resolvePending*): digitar e
+    // clicar em Salvar tem que valer tanto quanto digitar e clicar no "+".
+    const resolvedImages = resolvePendingImages();
+    if (resolvedImages.error) {
+      toast.error(resolvedImages.error);
+      return;
+    }
+    const resolvedVideos = resolvePendingVideos();
+    if (resolvedVideos.error) {
+      toast.error(resolvedVideos.error);
+      return;
+    }
+
+    // Eixos preenchidos sem clicar em "Gerar combinações" também precisam virar
+    // SKUs — antes o produto salvava sem variação nenhuma e sem avisar.
+    const drafts = draftsWithPendingOptions();
+    const axes = hasVariants ? buildAxes(drafts) : [];
+    let rows = variantRows;
+    if (hasVariants) {
+      if (!axes.length) {
+        toast.error(
+          'Variações estão ativas mas sem tipo + opções. Preencha (ex.: Cor → Rosa, Preto) ou desmarque "Ativar".',
+        );
+        return;
+      }
+      const merged = mergeVariantMatrix(axes, rows);
+      if (!merged.ok) {
+        toast.error(merged.error);
+        return;
+      }
+      // Opção retirada dos eixos não apaga o SKU no save — ele pode ter estoque
+      // e foto. Quem quer mesmo remover usa "Gerar combinações", que refaz a
+      // matriz a partir dos eixos.
+      const nomesDosEixos = new Set(
+        axisCombinations(axes).map((o) => comboName(axes, o)),
+      );
+      const semEixo = merged.rows.filter((r) => !nomesDosEixos.has(r.name));
+      if (semEixo.length) {
+        toast.message(
+          `${semEixo.length} variação(ões) fora dos tipos atuais foram mantidas (${semEixo
+            .map((r) => r.name)
+            .slice(0, 3)
+            .join(", ")}). Use "Gerar combinações" para refazer a matriz.`,
+        );
+      }
+      rows = merged.rows;
+      // Reflete na tela o que vai ser gravado, inclusive se o save falhar depois.
+      setAxisDrafts(drafts);
+      setNewOptionByAxis({});
+      setVariantRows(rows);
+    }
+
+    const badVariant = rows.find((r) => {
+      const p = Number(r.price);
+      return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE;
+    });
+    if (hasVariants && badVariant) {
+      toast.error(
+        `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
+      );
+      return;
+    }
+
+    const variantImages: string[][] = [];
+    for (const [idx, row] of rows.entries()) {
+      const resolved = resolvePendingVariantImages(row, idx);
+      if (resolved.error) {
+        toast.error(resolved.error);
+        return;
+      }
+      variantImages.push(resolved.value);
+    }
+
     const payload: ProductInput = {
       name,
       description: form.description.trim() || null,
       price,
       compareAtPrice,
       categoryIds: form.categoryIds,
-      images,
-      videos,
+      images: resolvedImages.value,
+      videos: resolvedVideos.value,
       stock,
       sku: form.sku.trim() || null,
       active: form.active,
@@ -910,11 +1085,11 @@ export function ProductModal({
 
       // Resolve fotos de variação que ainda são File (modo criar). Vão pelo /media:
       // pertencem ao SKU, não à galeria do listing.
-      const rowsWithImages = variantRows.map((r, i) => ({
+      const rowsWithImages = rows.map((r, i) => ({
         ...r,
         price: Number(r.price),
         stock: Number(r.stock) || 0,
-        images: Array.isArray(r.images) ? [...r.images] : [],
+        images: [...(variantImages[i] ?? [])],
         sortOrder: i,
       }));
       for (const [idxStr, files] of Object.entries(pendingVariantFiles)) {
@@ -934,28 +1109,9 @@ export function ProductModal({
         );
       }
 
-      // Variações: salva eixos + SKUs com fotos (ou limpa)
+      // Variações: salva eixos + SKUs com fotos (ou limpa).
+      // Eixos e preços já foram validados antes do primeiro write.
       if (hasVariants && rowsWithImages.length > 0) {
-        const axes = buildAxes();
-        if (!axes.length) {
-          toast.error(
-            "Produto salvo, mas as variações precisam de tipo + opções (ex.: Cor → Rosa, Preto). Clique em Gerar combinações.",
-          );
-          setLoading(false);
-          onSuccess();
-          return;
-        }
-        const badVariant = rowsWithImages.find((r) => {
-          const p = Number(r.price);
-          return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE;
-        });
-        if (badVariant) {
-          toast.error(
-            `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
-          );
-          setLoading(false);
-          return;
-        }
         const withVariants = await replaceProductVariants(
           saved.id,
           axes,

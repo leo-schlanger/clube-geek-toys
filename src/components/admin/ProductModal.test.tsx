@@ -250,6 +250,122 @@ describe('ProductModal — gerar combinações', () => {
   })
 })
 
+describe('ProductModal — rascunho pendente no Salvar', () => {
+  // Todos estes casos caíam no vazio: o admin digitava, clicava em Salvar, via
+  // "Produto atualizado!" e o dado não existia. Nada de erro na tela.
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockedUpdate.mockResolvedValue(product)
+    mockedReplace.mockResolvedValue(product)
+  })
+
+  const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
+
+  function renderModal(p: Product) {
+    render(
+      <ProductModal
+        mode="edit"
+        product={p}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+  }
+
+  it('salva o link de vídeo colado sem clicar em Adicionar', async () => {
+    renderModal(semVariacao)
+
+    fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
+      target: { value: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalled())
+    const payload = mockedUpdate.mock.calls[0][1] as { videos?: { url: string }[] }
+    expect(payload.videos).toEqual([
+      { kind: 'youtube', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+    ])
+  })
+
+  it('bloqueia o save quando o link de vídeo colado é inválido', async () => {
+    renderModal(semVariacao)
+
+    fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
+      target: { value: 'https://vimeo.com/12345' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(mockedUpdate).not.toHaveBeenCalled()
+  })
+
+  it('gera os SKUs quando os eixos foram preenchidos sem clicar em Gerar combinações', async () => {
+    renderModal(semVariacao)
+
+    fireEvent.click(screen.getByLabelText(/Ativar variações/i))
+    fireEvent.change(screen.getByPlaceholderText('Cor'), { target: { value: 'Cor' } })
+    fireEvent.change(screen.getByPlaceholderText(/Ou cole várias/i), {
+      target: { value: 'Rosa, Preto' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedReplace).toHaveBeenCalled())
+    expect(mockedReplace.mock.calls[0][1]).toEqual([{ name: 'Cor', options: ['Rosa', 'Preto'] }])
+    const rows = mockedReplace.mock.calls[0][2] as { name: string }[]
+    expect(rows.map((r) => r.name)).toEqual(['Rosa', 'Preto'])
+  })
+
+  it('acrescenta a opção nova ao produto que já tem variações', async () => {
+    renderModal(product)
+
+    // "Azul" entra nos eixos sem regerar a matriz; Rosa e Preto continuam com
+    // os seus ids, preço e foto.
+    fireEvent.change(screen.getByPlaceholderText(/Ou cole várias/i), {
+      target: { value: 'Rosa, Preto, Azul' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedReplace).toHaveBeenCalled())
+    const rows = mockedReplace.mock.calls[0][2] as {
+      id?: string
+      name: string
+      images?: string[]
+    }[]
+    expect(rows.map((r) => r.name)).toEqual(['Rosa', 'Preto', 'Azul'])
+    expect(rows.find((r) => r.name === 'Preto')?.id).toBe('v2')
+    expect(rows.find((r) => r.name === 'Preto')?.images).toEqual(['https://example.com/preto.jpg'])
+    expect(rows.find((r) => r.name === 'Azul')?.id).toBeUndefined()
+  })
+
+  it('avisa em vez de salvar mudo quando Ativar está marcado e não há eixo', async () => {
+    renderModal(semVariacao)
+
+    fireEvent.click(screen.getByLabelText(/Ativar variações/i))
+    fireEvent.change(screen.getByPlaceholderText('Cor'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/tipo \+ opções/i))
+    )
+    expect(mockedUpdate).not.toHaveBeenCalled()
+  })
+
+  it('salva a URL de foto da variação colada sem clicar em OK', async () => {
+    renderModal(product)
+
+    const urlInputs = screen.getAllByPlaceholderText(/cole URL da foto desta variação/i)
+    fireEvent.change(urlInputs[0], { target: { value: 'https://cdn.example.com/rosa-draft.jpg' } })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedReplace).toHaveBeenCalled())
+    const rows = mockedReplace.mock.calls[0][2] as { name: string; images?: string[] }[]
+    expect(rows.find((r) => r.name === 'Rosa')?.images).toEqual([
+      'https://cdn.example.com/rosa-draft.jpg',
+    ])
+  })
+})
+
 describe('ProductModal — várias fotos por variação', () => {
   beforeEach(() => {
     vi.clearAllMocks()

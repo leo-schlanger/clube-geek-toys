@@ -254,7 +254,7 @@ export function ProductsTab() {
                           size="sm"
                           onClick={async () => {
                             try {
-                              const full = (await getProductForEdit(product.slug)) ?? product
+                              const full = (await getProductForEdit(product.id)) ?? product
                               setModal({ mode: 'edit', product: full })
                             } catch {
                               setModal({ mode: 'edit', product })

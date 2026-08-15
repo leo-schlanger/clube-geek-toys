@@ -69,3 +69,16 @@ Fonte da verdade: `server/api/src/services/product.service.ts` (espelhado em `sr
 Seleções maiores que `MAX_IMAGE_UPLOAD_BATCH` são fatiadas em várias requisições pelo `uploadProductImages`. O nginx precisa acompanhar: `client_max_body_size 120m` no bloco `api.geeketoys.com.br`.
 
 > **Regressão de 14/08/2026 (não repetir):** o teto da galeria valia só no Zod do `PATCH /products/:id`, mas o upload anexava sem limite — e a foto de variação passava por ele. Cada variação com foto somava uma imagem em `products.images`; ao passar do teto, **o produto não podia mais ser salvo** (o PATCH reenvia o array inteiro e era rejeitado com 400). Correção: `/media` para variação + teto aplicado também em `addProductImages`. Coberto por `product.service.test.ts` e pelo caso "não anexa foto de variação na galeria do listing" em `ProductModal.test.tsx`.
+
+> **Regressão de 15/08/2026 (não repetir):** o admin preenchia tipo + opções, clicava em **Salvar** e o produto era gravado **sem variação nenhuma**, com o toast de sucesso normal. Causa: a matriz de SKUs só existia depois de clicar em "Gerar combinações" — o `handleSubmit` lia `variantRows`, que continuava vazio, e o `PUT /variants` nem chegava a ser chamado. O mesmo padrão derrubava o **vídeo** (link colado e não confirmado no "+" era descartado), a **URL de foto do listing** e a **URL de foto por variação**. Correção: `handleSubmit` resolve todo rascunho pendente antes do primeiro write (`resolvePendingVideos`, `resolvePendingImages`, `resolvePendingVariantImages`) e monta a matriz que faltava com `mergeVariantMatrix`. Rascunho inválido agora **bloqueia** o save com mensagem em vez de sumir. Coberto por "ProductModal — rascunho pendente no Salvar" em `ProductModal.test.tsx`.
+
+### `mergeVariantMatrix` vs "Gerar combinações"
+
+| Caminho                       | O que faz                                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Botão **Gerar combinações**   | Refaz a matriz a partir dos eixos: combinação que não existe mais **some**. Preserva preço/estoque/foto das linhas de mesmo nome.                                      |
+| **Salvar** (merge automático) | Só **acrescenta** os SKUs que os eixos pedem e ainda não existem. Nunca apaga uma linha — ela pode ter estoque e foto. Se sobrar linha fora dos eixos, o painel avisa. |
+
+## Editar produto no admin
+
+`GET /products/:id/edit` (admin) — **não** use o detalhe público por slug. Aquele filtra `active = TRUE` no produto e nas variações, então produto inativo abria sem variação alguma e o save seguinte apagava as variações inativas que não vieram no payload.

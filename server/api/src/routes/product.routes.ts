@@ -227,6 +227,23 @@ productRouter.patch('/:id', authenticate, requireRole('admin'), validate(product
   }
 });
 
+// GET /products/:id/edit — produto completo para o painel.
+// O detalhe público (`/:slug`) esconde produto inativo e variação inativa; o
+// admin precisa dos dois, senão o modal abre sem as variações e o save seguinte
+// apaga o que não veio.
+productRouter.get('/:id/edit', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const product = await productService.getProductById(req.params.id as string);
+    if (!product) {
+      res.status(404).json({ error: 'Produto não encontrado.' });
+      return;
+    }
+    res.json(product);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /products/:id/duplicate — clone inativo para cadastro em série
 productRouter.post('/:id/duplicate', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
