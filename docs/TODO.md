@@ -1,6 +1,38 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 4 de Agosto de 2026
+> **Ultima atualizacao:** 15 de Agosto de 2026
+
+## Aberto pelo checkup de 15/08/2026
+
+Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
+
+- [ ] **ALTO** — Conferir a renovação do certificado por volta de **17/09/2026**. O
+      certbot ficou 3 semanas parado; foi religado, o webroot ACME está validado
+      nos 5 domínios testados e o deploy agora garante o container de pé — mas o
+      primeiro ciclo real de renovação merece um olhar.
+- [ ] **ALTO** — Preencher `MELHOR_ENVIO_TOKEN` na VPS. Sem ele toda cotação é
+      PAC R$ 24 / SEDEX R$ 42 fixo, sem variar por distância: prejuízo na primeira
+      venda para fora do Sudeste.
+- [ ] **MEDIO** — E2E cobrindo cadastro de **variação** e **vídeo**.
+      `admin-shop-flows.spec.ts` só cria produto com imagem — foi por isso que o
+      bug de 15/08 chegou em produção.
+- [ ] **MEDIO** — Rotacionar/isolar `e2e-admin@geeketoys.com.br`: é admin de
+      produção com senha fixa documentada. Ideal seria E2E contra staging.
+- [ ] **MEDIO** — CSP nas SPAs (`shop`/`adm`/`club`). A API já manda; as SPAs não,
+      e é nelas que o JWT vive no `localStorage`.
+- [ ] **BAIXO** — `docker builder prune -af` no fim do deploy: 24.3 GB de cache
+      recuperável e crescendo a cada push.
+- [ ] **BAIXO** — Revisar os 4 admins (de 9 usuários) e remover a conta residual
+      `stripe-smoke-…` de abril.
+- [ ] **BAIXO** — Tirar o IP da VPS de `server/azuracast/README.md` (repo público;
+      o `CLAUDE.md` manda IP só no `CLAUDE.local.md`).
+- [ ] **BAIXO** — Suíte de testes leva 40+ min (307 arquivos × setup de jsdom);
+      atrapalha rodar antes do commit.
+- [ ] **MEDIO** — SSH: `PasswordAuthentication no` do `sshd_config` está sendo
+      sobrescrito por `sshd_config.d/50-cloud-init.conf` (`yes`). Hoje ninguém
+      entra por senha (root barrado por `PermitRootLogin without-password`,
+      `ubuntu` com senha travada), mas o efetivo contraria a intenção. Corrigir o
+      drop-in e instalar fail2ban.
 
 ## Legenda
 

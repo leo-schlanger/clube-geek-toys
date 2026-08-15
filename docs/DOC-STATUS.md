@@ -1,7 +1,12 @@
-# Status da documentação vs realidade (10 Ago 2026)
+# Status da documentação vs realidade (15 Ago 2026)
 
 > Auditoria: docs ↔ código.  
-> Inclui frete, minhas compras, reviews, crédito (010–011) e **Atacado B2B (012)**.
+> Inclui frete, minhas compras, reviews, crédito (010–011), **Atacado B2B (012)**
+> e as migrations 013–019 (variações, categorias múltiplas, estoque, vídeos,
+> perguntas, ícone de categoria, galeria).
+
+**Checkup mais recente:** [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md) —
+cadastro de variações/vídeos, CRUD do painel, infra, segurança e integrações.
 
 ---
 
