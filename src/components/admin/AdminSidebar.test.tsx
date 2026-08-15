@@ -42,6 +42,7 @@ vi.mock('lucide-react', () => {
     Building2: icon,
     Boxes: icon,
     HelpCircle: icon,
+    Images: icon,
     Star: icon,
     Moon: icon,
     Sun: icon,

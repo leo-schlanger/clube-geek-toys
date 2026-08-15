@@ -457,6 +457,41 @@ export async function ensureSchema(): Promise<void> {
     // ─── Ícone por categoria (migration 018) ─────────────────────────────────
     await query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(40)`);
 
+    // ─── Galeria com álbuns (migration 019) ──────────────────────────────────
+    await query(`
+      CREATE TABLE IF NOT EXISTS gallery_albums (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(160) NOT NULL,
+        slug VARCHAR(180) NOT NULL UNIQUE,
+        description TEXT,
+        cover_url TEXT,
+        event_date DATE,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS gallery_photos (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        album_id UUID NOT NULL REFERENCES gallery_albums(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        caption VARCHAR(300),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_gallery_albums_active
+      ON gallery_albums(active, sort_order, event_date DESC)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_gallery_photos_album
+      ON gallery_photos(album_id, sort_order, created_at)`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_gallery_albums_updated_at
+        BEFORE UPDATE ON gallery_albums
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

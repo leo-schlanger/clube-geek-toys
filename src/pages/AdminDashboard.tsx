@@ -43,6 +43,7 @@ const ProductsTab = lazy(() => import('../components/admin/ProductsTab').then(m 
 const OrdersTab = lazy(() => import('../components/admin/OrdersTab').then(m => ({ default: m.OrdersTab })))
 const StockTab = lazy(() => import('../components/admin/StockTab').then(m => ({ default: m.StockTab })))
 const QuestionsTab = lazy(() => import('../components/admin/QuestionsTab').then(m => ({ default: m.QuestionsTab })))
+const GalleryTab = lazy(() => import('../components/admin/GalleryTab').then(m => ({ default: m.GalleryTab })))
 const WholesaleTab = lazy(() => import('../components/admin/WholesaleTab').then(m => ({ default: m.WholesaleTab })))
 const ReviewsTab = lazy(() => import('../components/admin/ReviewsTab').then(m => ({ default: m.ReviewsTab })))
 const UsersTab = lazy(() => import('../components/admin/UsersTab').then(m => ({ default: m.UsersTab })))
@@ -63,13 +64,18 @@ function TabLoadingFallback() {
   )
 }
 
+// Precisa listar toda aba de AdminTab: é o que permite recarregar em ?tab=... e
+// cair na mesma aba em vez de voltar ao dashboard.
 const VALID_TABS: AdminTab[] = [
   'dashboard',
   'members',
   'products',
+  'stock',
   'orders',
   'wholesale',
   'reviews',
+  'questions',
+  'gallery',
   'users',
   'reports',
   'logs',
@@ -414,6 +420,7 @@ export default function AdminDashboard() {
                 {activeTab === 'wholesale' && 'Atacado'}
                 {activeTab === 'reviews' && 'Avaliações'}
                 {activeTab === 'questions' && 'Perguntas'}
+                {activeTab === 'gallery' && 'Galeria'}
                 {activeTab === 'users' && 'Usuários'}
                 {activeTab === 'logs' && 'Logs de Auditoria'}
                 {activeTab === 'reports' && 'Relatórios'}
@@ -428,6 +435,7 @@ export default function AdminDashboard() {
                 {activeTab === 'wholesale' && 'Aprove CNPJ e gerencie atacadistas (−25%)'}
                 {activeTab === 'reviews' && 'Modere avaliações da loja'}
                 {activeTab === 'questions' && 'Responda as perguntas dos clientes'}
+                {activeTab === 'gallery' && 'Pastas de fotos do site institucional'}
                 {activeTab === 'users' && 'Gerencie usuários do sistema'}
                 {activeTab === 'logs' && 'Histórico de ações no sistema'}
                 {activeTab === 'reports' && 'Métricas e análises'}
@@ -563,6 +571,7 @@ export default function AdminDashboard() {
             {activeTab === 'wholesale' && <WholesaleTab />}
             {activeTab === 'reviews' && <ReviewsTab />}
             {activeTab === 'questions' && <QuestionsTab />}
+            {activeTab === 'gallery' && <GalleryTab />}
             {activeTab === 'users' && (
               <UsersTab
                 users={systemUsers}
