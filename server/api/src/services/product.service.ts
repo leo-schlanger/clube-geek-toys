@@ -866,6 +866,76 @@ export async function deactivateProduct(id: string): Promise<void> {
   if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
 }
 
+/** Escapa para uso dentro de atributo HTML. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * HTML mínimo com as meta do produto, para quem compartilha o link.
+ *
+ * WhatsApp, Facebook e Telegram não executam JavaScript: eles leem o HTML
+ * estático, que descreve a loja inteira. Sem isto, todo produto compartilhado
+ * aparecia com a mesma imagem genérica em vez da foto da peça.
+ *
+ * Só crawler chega aqui (o nginx roteia por user-agent); pessoa continua indo
+ * para a SPA, e o redirect abaixo cobre quem cair nesta URL por engano.
+ */
+export async function buildProductShareHtml(
+  slug: string,
+  shopBaseUrl: string
+): Promise<string | null> {
+  const product = await getProductBySlug(slug, false);
+  if (!product) return null;
+
+  const base = shopBaseUrl.replace(/\/$/, '');
+  const url = `${base}/produto/${product.slug}`;
+  const title = `${product.name} — GeekPop & Toys`;
+  const price = product.price.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+  const description =
+    (product.description?.trim().slice(0, 200) ||
+      `${product.name} na GeekPop & Toys, loja de K-pop em Copacabana.`) + ` A partir de ${price}.`;
+  // A primeira foto do produto é o ponto de todo este endpoint.
+  const image = product.images[0] || `${base}/og-image.png`;
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>${escapeHtml(title)}</title>
+<link rel="canonical" href="${escapeHtml(url)}" />
+<meta name="description" content="${escapeHtml(description)}" />
+<meta property="og:type" content="product" />
+<meta property="og:site_name" content="Loja GeekPop & Toys" />
+<meta property="og:locale" content="pt_BR" />
+<meta property="og:url" content="${escapeHtml(url)}" />
+<meta property="og:title" content="${escapeHtml(title)}" />
+<meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:image" content="${escapeHtml(image)}" />
+<meta property="og:image:alt" content="${escapeHtml(product.name)}" />
+<meta property="product:price:amount" content="${product.price.toFixed(2)}" />
+<meta property="product:price:currency" content="BRL" />
+<meta property="product:availability" content="${product.stock > 0 ? 'in stock' : 'out of stock'}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(title)}" />
+<meta name="twitter:description" content="${escapeHtml(description)}" />
+<meta name="twitter:image" content="${escapeHtml(image)}" />
+<meta http-equiv="refresh" content="0; url=${escapeHtml(url)}" />
+</head>
+<body>
+<a href="${escapeHtml(url)}">${escapeHtml(product.name)}</a>
+</body>
+</html>
+`;
+}
+
 /** Absolute product URLs for search engines (shop host). */
 export async function buildProductSitemapXml(shopBaseUrl: string): Promise<string> {
   const base = shopBaseUrl.replace(/\/$/, '');

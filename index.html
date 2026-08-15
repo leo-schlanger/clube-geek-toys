@@ -22,9 +22,13 @@
       })();
     </script>
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/logo-vip.png" />
-    <link rel="apple-touch-icon" href="/logo-vip.png" />
+    <!-- Favicon. O SVG vem primeiro: navegador moderno usa ele e a marca fica
+         nítida em qualquer densidade. Os PNG são o fallback, do menor para o
+         maior, porque logo-vip.png sozinho (512px) virava borrão a 16px. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-256.png" />
     <meta name="theme-color" content="#F04080" />
     <meta name="msapplication-TileColor" content="#F04080" />
 

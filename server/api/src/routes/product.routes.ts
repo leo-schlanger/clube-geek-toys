@@ -55,6 +55,27 @@ productRouter.get('/', async (req, res, next) => {
   }
 });
 
+// GET /products/:slug/share — HTML com as meta do produto para preview de link.
+// Definido antes de '/:slug' para não ser capturado como slug.
+productRouter.get('/:slug/share', async (req, res, next) => {
+  try {
+    const html = await productService.buildProductShareHtml(
+      req.params.slug as string,
+      'https://shop.geeketoys.com.br'
+    );
+    if (!html) {
+      res.status(404).type('html').send('<!DOCTYPE html><title>Produto não encontrado</title>');
+      return;
+    }
+    // Cache curto: a foto e o preço mudam com o catálogo, mas o crawler do
+    // WhatsApp reconsulta o mesmo link várias vezes em sequência.
+    res.set('Cache-Control', 'public, max-age=300');
+    res.type('html').send(html);
+  } catch (err) {
+    next(err);
+  }
+});
+
 productRouter.get('/:slug/related', async (req, res, next) => {
   try {
     const products = await productService.listRelatedProducts(req.params.slug as string, 8);
