@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react'
-import { logger } from '../../lib/logger'
-import { Button, buttonVariants } from '../ui/button'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { Loading } from '../ui/loading'
-import type { Product, Category, VariantAxis, ProductVideo } from '../../types'
+import { useState, useEffect } from "react";
+import { logger } from "../../lib/logger";
+import { Button, buttonVariants } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import { Badge } from "../ui/badge";
+import { Loading } from "../ui/loading";
+import type { Product, Category, VariantAxis, ProductVideo } from "../../types";
 import {
   createProduct,
   updateProduct,
@@ -22,12 +29,12 @@ import {
   MAX_PRODUCT_CATEGORIES,
   type ProductInput,
   type VariantInput,
-} from '../../lib/products'
+} from "../../lib/products";
 import {
   prepareProductImages,
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_ACCEPT_LABEL,
-} from '../../lib/product-image'
+} from "../../lib/product-image";
 import {
   parseVideoUrl,
   videoKindLabel,
@@ -35,11 +42,15 @@ import {
   MAX_PRODUCT_VIDEOS,
   PRODUCT_VIDEO_ACCEPT,
   PRODUCT_VIDEO_MAX_BYTES,
-} from '../../lib/product-video'
-import { CATEGORY_ICONS, categoryIcon, guessCategoryIcon } from '../../lib/category-icons'
-import { ImageCropDialog } from './ImageCropDialog'
-import { cn, formatCurrency } from '../../lib/utils'
-import { toast } from 'sonner'
+} from "../../lib/product-video";
+import {
+  CATEGORY_ICONS,
+  categoryIcon,
+  guessCategoryIcon,
+} from "../../lib/category-icons";
+import { ImageCropDialog } from "./ImageCropDialog";
+import { cn, formatCurrency } from "../../lib/utils";
+import { toast } from "sonner";
 import {
   X,
   Package,
@@ -51,70 +62,72 @@ import {
   Tag,
   ImageOff,
   Video,
-} from 'lucide-react'
+} from "lucide-react";
 
 /** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — admin pode precificar livremente. */
-const MAX_PRODUCT_PRICE = 999_999.99
+const MAX_PRODUCT_PRICE = 999_999.99;
 
 interface ProductModalProps {
-  mode: 'create' | 'edit'
-  product?: Product | null
-  categories: Category[]
-  onClose: () => void
-  onSuccess: () => void
+  mode: "create" | "edit";
+  product?: Product | null;
+  categories: Category[];
+  onClose: () => void;
+  onSuccess: () => void;
   /** Called after a category is created/removed so the parent can refetch. */
-  onCategoriesChange?: () => void
+  onCategoriesChange?: () => void;
   /** Immediate upload in edit mode — keep the list thumbnail in sync without remounting the modal. */
-  onImagesChange?: (productId: string, images: string[]) => void
+  onImagesChange?: (productId: string, images: string[]) => void;
 }
 
 interface FormState {
-  name: string
-  description: string
-  price: string
-  compareAtPrice: string
+  name: string;
+  description: string;
+  price: string;
+  compareAtPrice: string;
   /** Categorias do produto, principal primeiro (até MAX_PRODUCT_CATEGORIES). */
-  categoryIds: string[]
-  stock: string
-  sku: string
-  active: boolean
-  featured: boolean
-  weightG: string
-  heightCm: string
-  widthCm: string
-  lengthCm: string
-  wholesaleEnabled: boolean
-  wholesaleMinQty: string
+  categoryIds: string[];
+  stock: string;
+  sku: string;
+  active: boolean;
+  featured: boolean;
+  weightG: string;
+  heightCm: string;
+  widthCm: string;
+  lengthCm: string;
+  wholesaleEnabled: boolean;
+  wholesaleMinQty: string;
 }
 
 /** Draft de um eixo de variação no formulário admin. */
 interface AxisDraft {
-  name: string
-  optionsText: string
+  name: string;
+  optionsText: string;
 }
 
 function toFormState(product?: Product | null): FormState {
   return {
-    name: product?.name ?? '',
-    description: product?.description ?? '',
-    price: product ? String(product.price) : '',
-    compareAtPrice: product?.compareAtPrice != null ? String(product.compareAtPrice) : '',
+    name: product?.name ?? "",
+    description: product?.description ?? "",
+    price: product ? String(product.price) : "",
+    compareAtPrice:
+      product?.compareAtPrice != null ? String(product.compareAtPrice) : "",
     categoryIds: product?.categoryIds?.length
       ? product.categoryIds
       : product?.categoryId
         ? [product.categoryId]
         : [],
-    stock: product?.stock != null ? String(product.stock) : '0',
-    sku: product?.sku ?? '',
+    stock: product?.stock != null ? String(product.stock) : "0",
+    sku: product?.sku ?? "",
     active: product?.active ?? true,
     featured: product?.featured ?? false,
-    weightG: product?.weightG != null ? String(product.weightG) : '',
-    heightCm: product?.heightCm != null ? String(product.heightCm) : '',
-    widthCm: product?.widthCm != null ? String(product.widthCm) : '',
-    lengthCm: product?.lengthCm != null ? String(product.lengthCm) : '',
+    weightG: product?.weightG != null ? String(product.weightG) : "",
+    heightCm: product?.heightCm != null ? String(product.heightCm) : "",
+    widthCm: product?.widthCm != null ? String(product.widthCm) : "",
+    lengthCm: product?.lengthCm != null ? String(product.lengthCm) : "",
     wholesaleEnabled: product?.wholesaleEnabled ?? false,
-    wholesaleMinQty: product?.wholesaleMinQty != null ? String(product.wholesaleMinQty) : '1',
-  }
+    wholesaleMinQty:
+      product?.wholesaleMinQty != null ? String(product.wholesaleMinQty) : "1",
+  };
 }
 
 export function ProductModal({
@@ -126,19 +139,24 @@ export function ProductModal({
   onCategoriesChange,
   onImagesChange,
 }: ProductModalProps) {
-  const isEditMode = mode === 'edit'
+  const isEditMode = mode === "edit";
 
-  const [form, setForm] = useState<FormState>(() => toFormState(product))
-  const [loading, setLoading] = useState(false)
-  const [uploadingImages, setUploadingImages] = useState(false)
-  const [uploadPhase, setUploadPhase] = useState<'prepare' | 'upload'>('prepare')
+  const [form, setForm] = useState<FormState>(() => toFormState(product));
+  const [loading, setLoading] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<"prepare" | "upload">(
+    "prepare",
+  );
 
   // Variações: eixos + opções ilimitados (1 tipo "Cor" com N opções = N SKUs)
   function axesToDrafts(axes?: VariantAxis[] | null): AxisDraft[] {
-    if (!axes?.length) return [{ name: 'Cor', optionsText: '' }]
-    return axes.map((a) => ({ name: a.name, optionsText: a.options.join(', ') }))
+    if (!axes?.length) return [{ name: "Cor", optionsText: "" }];
+    return axes.map((a) => ({
+      name: a.name,
+      optionsText: a.options.join(", "),
+    }));
   }
-  function variantsToRows(variants?: Product['variants']): VariantInput[] {
+  function variantsToRows(variants?: Product["variants"]): VariantInput[] {
     return (variants ?? []).map((v) => ({
       id: v.id,
       name: v.name,
@@ -150,27 +168,35 @@ export function ProductModal({
       images: v.images,
       active: v.active,
       sortOrder: v.sortOrder,
-    }))
+    }));
   }
 
-  const [hasVariants, setHasVariants] = useState(() => product?.hasVariants ?? false)
-  const [axisDrafts, setAxisDrafts] = useState<AxisDraft[]>(() => axesToDrafts(product?.variantAxes))
-  const [variantRows, setVariantRows] = useState<VariantInput[]>(() => variantsToRows(product?.variants))
-  const [newOptionByAxis, setNewOptionByAxis] = useState<Record<number, string>>({})
+  const [hasVariants, setHasVariants] = useState(
+    () => product?.hasVariants ?? false,
+  );
+  const [axisDrafts, setAxisDrafts] = useState<AxisDraft[]>(() =>
+    axesToDrafts(product?.variantAxes),
+  );
+  const [variantRows, setVariantRows] = useState<VariantInput[]>(() =>
+    variantsToRows(product?.variants),
+  );
+  const [newOptionByAxis, setNewOptionByAxis] = useState<
+    Record<number, string>
+  >({});
 
   /** Parse opções: vírgula, ponto-e-vírgula ou quebra de linha. */
   function parseOptionsText(text: string): string[] {
-    const seen = new Set<string>()
-    const out: string[] = []
+    const seen = new Set<string>();
+    const out: string[] = [];
     for (const part of text.split(/[,;\n]+/)) {
-      const o = part.trim()
-      if (!o) continue
-      const key = o.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      out.push(o)
+      const o = part.trim();
+      if (!o) continue;
+      const key = o.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(o);
     }
-    return out
+    return out;
   }
 
   /**
@@ -180,177 +206,202 @@ export function ProductModal({
    */
   function draftsWithPendingOptions(): AxisDraft[] {
     return axisDrafts.map((draft, idx) => {
-      const pending = (newOptionByAxis[idx] ?? '').trim()
-      if (!pending) return draft
-      const options = parseOptionsText(draft.optionsText)
-      if (options.some((o) => o.toLowerCase() === pending.toLowerCase())) return draft
-      return { ...draft, optionsText: [...options, pending].join(', ') }
-    })
+      const pending = (newOptionByAxis[idx] ?? "").trim();
+      if (!pending) return draft;
+      const options = parseOptionsText(draft.optionsText);
+      if (options.some((o) => o.toLowerCase() === pending.toLowerCase()))
+        return draft;
+      return { ...draft, optionsText: [...options, pending].join(", ") };
+    });
   }
 
-  function buildAxes(drafts: AxisDraft[] = draftsWithPendingOptions()): VariantAxis[] {
-    const axes: VariantAxis[] = []
+  function buildAxes(
+    drafts: AxisDraft[] = draftsWithPendingOptions(),
+  ): VariantAxis[] {
+    const axes: VariantAxis[] = [];
     for (const draft of drafts) {
-      const options = parseOptionsText(draft.optionsText)
+      const options = parseOptionsText(draft.optionsText);
       if (draft.name.trim() && options.length) {
-        axes.push({ name: draft.name.trim(), options })
+        axes.push({ name: draft.name.trim(), options });
       }
     }
-    return axes
+    return axes;
   }
 
   function addAxisDraft() {
-    setAxisDrafts((prev) => [...prev, { name: '', optionsText: '' }])
+    setAxisDrafts((prev) => [...prev, { name: "", optionsText: "" }]);
   }
 
   function removeAxisDraft(index: number) {
-    setAxisDrafts((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))
+    setAxisDrafts((prev) =>
+      prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
+    );
   }
 
   function updateAxisDraft(index: number, patch: Partial<AxisDraft>) {
-    setAxisDrafts((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)))
+    setAxisDrafts((prev) =>
+      prev.map((a, i) => (i === index ? { ...a, ...patch } : a)),
+    );
   }
 
   function addOptionChip(axisIndex: number) {
-    const raw = (newOptionByAxis[axisIndex] ?? '').trim()
-    if (!raw) return
-    const current = parseOptionsText(axisDrafts[axisIndex]?.optionsText ?? '')
+    const raw = (newOptionByAxis[axisIndex] ?? "").trim();
+    if (!raw) return;
+    const current = parseOptionsText(axisDrafts[axisIndex]?.optionsText ?? "");
     if (current.some((o) => o.toLowerCase() === raw.toLowerCase())) {
-      toast.error('Opção já existe neste tipo')
-      return
+      toast.error("Opção já existe neste tipo");
+      return;
     }
-    updateAxisDraft(axisIndex, { optionsText: [...current, raw].join(', ') })
-    setNewOptionByAxis((prev) => ({ ...prev, [axisIndex]: '' }))
+    updateAxisDraft(axisIndex, { optionsText: [...current, raw].join(", ") });
+    setNewOptionByAxis((prev) => ({ ...prev, [axisIndex]: "" }));
   }
 
   function removeOptionChip(axisIndex: number, option: string) {
-    const current = parseOptionsText(axisDrafts[axisIndex]?.optionsText ?? '')
+    const current = parseOptionsText(axisDrafts[axisIndex]?.optionsText ?? "");
     updateAxisDraft(axisIndex, {
-      optionsText: current.filter((o) => o !== option).join(', '),
-    })
+      optionsText: current.filter((o) => o !== option).join(", "),
+    });
   }
 
   /** Gera matriz de combinações a partir dos eixos. */
   function generateVariantMatrix() {
     // Confirma o que está digitado antes de gerar, e reflete isso nos chips.
-    const drafts = draftsWithPendingOptions()
-    setAxisDrafts(drafts)
-    setNewOptionByAxis({})
+    const drafts = draftsWithPendingOptions();
+    setAxisDrafts(drafts);
+    setNewOptionByAxis({});
 
-    const axes = buildAxes(drafts)
+    const axes = buildAxes(drafts);
     if (!axes.length) {
-      const semNome = drafts.some((d) => !d.name.trim())
+      const semNome = drafts.some((d) => !d.name.trim());
       toast.error(
         semNome
-          ? 'Dê um nome ao tipo (ex.: Cor) antes de gerar as combinações.'
-          : 'Adicione ao menos uma opção (ex.: Rosa) no tipo antes de gerar as combinações.'
-      )
-      return
+          ? "Dê um nome ao tipo (ex.: Cor) antes de gerar as combinações."
+          : "Adicione ao menos uma opção (ex.: Rosa) no tipo antes de gerar as combinações.",
+      );
+      return;
     }
-    let total = 1
-    for (const a of axes) total *= a.options.length
+    let total = 1;
+    for (const a of axes) total *= a.options.length;
     if (total > 500) {
-      toast.error(`Combinações demais (${total}). Reduza opções ou tipos (máx. 500 SKUs).`)
-      return
+      toast.error(
+        `Combinações demais (${total}). Reduza opções ou tipos (máx. 500 SKUs).`,
+      );
+      return;
     }
-    const combos: Record<string, string>[] = [{}]
+    const combos: Record<string, string>[] = [{}];
     for (const axis of axes) {
-      const next: Record<string, string>[] = []
+      const next: Record<string, string>[] = [];
       for (const c of combos) {
         for (const opt of axis.options) {
-          next.push({ ...c, [axis.name]: opt })
+          next.push({ ...c, [axis.name]: opt });
         }
       }
-      combos.splice(0, combos.length, ...next)
+      combos.splice(0, combos.length, ...next);
     }
-    const basePrice = Number(form.price) || 0
-    const baseStock = Number(form.stock) || 0
-    const existingByName = new Map(variantRows.map((r) => [r.name, r]))
+    const basePrice = Number(form.price) || 0;
+    const baseStock = Number(form.stock) || 0;
+    const existingByName = new Map(variantRows.map((r) => [r.name, r]));
     const rows: VariantInput[] = combos.map((options, idx) => {
-      const name = axes.map((a) => options[a.name]).join(' / ')
-      const prev = existingByName.get(name)
+      const name = axes.map((a) => options[a.name]).join(" / ");
+      const prev = existingByName.get(name);
       return {
         id: prev?.id,
         name,
         options,
-        sku: prev?.sku ?? '',
+        sku: prev?.sku ?? "",
         price: prev?.price ?? basePrice,
         compareAtPrice: prev?.compareAtPrice ?? null,
         stock: prev?.stock ?? baseStock,
         images: prev?.images ?? [],
         active: prev?.active ?? true,
         sortOrder: idx,
-      }
-    })
-    setVariantRows(rows)
-    setHasVariants(true)
-    toast.success(`${rows.length} variação(ões) gerada(s) — confira preço/estoque e salve`)
+      };
+    });
+    setVariantRows(rows);
+    setHasVariants(true);
+    toast.success(
+      `${rows.length} variação(ões) gerada(s) — confira preço/estoque e salve`,
+    );
   }
 
   // Image management. `images` holds URLs already saved / added by URL.
   // `pendingFiles` holds newly picked files that must be uploaded after the
   // product exists (upload requires a productId).
-  const [images, setImages] = useState<string[]>(product?.images ?? [])
-  const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [imageUrl, setImageUrl] = useState('')
+  const [images, setImages] = useState<string[]>(product?.images ?? []);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [imageUrl, setImageUrl] = useState("");
 
   // Vídeos: links entram na hora (salvam no PATCH); MP4 precisa de productId,
   // então no modo criação o arquivo sobe depois do save.
-  const [videos, setVideos] = useState<ProductVideo[]>(product?.videos ?? [])
-  const [videoUrl, setVideoUrl] = useState('')
-  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null)
-  const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [videos, setVideos] = useState<ProductVideo[]>(product?.videos ?? []);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [cropSession, setCropSession] = useState<
-    { files: File[]; kind: 'listing' } | { files: File[]; kind: 'variant'; variantIndex: number } | null
-  >(null)
+    | { files: File[]; kind: "listing" }
+    | { files: File[]; kind: "variant"; variantIndex: number }
+    | null
+  >(null);
 
   // Fotos por variação (estilo Shopee): arquivos pendentes por índice da linha.
   // Em modo criação ainda não há productId, então sobem no save.
-  const [pendingVariantFiles, setPendingVariantFiles] = useState<Record<number, File[]>>({})
-  const [pendingVariantPreviews, setPendingVariantPreviews] = useState<Record<number, string[]>>({})
-  const [variantUrlDraft, setVariantUrlDraft] = useState<Record<number, string>>({})
+  const [pendingVariantFiles, setPendingVariantFiles] = useState<
+    Record<number, File[]>
+  >({});
+  const [pendingVariantPreviews, setPendingVariantPreviews] = useState<
+    Record<number, string[]>
+  >({});
+  const [variantUrlDraft, setVariantUrlDraft] = useState<
+    Record<number, string>
+  >({});
 
   // Inline category creation
-  const [newCategoryName, setNewCategoryName] = useState('')
-  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   useEffect(() => {
-    setForm(toFormState(product))
-    setImages(product?.images ?? [])
-    setPendingFiles([])
-    setVideos(product?.videos ?? [])
-    setVideoUrl('')
-    setPendingVideoFile(null)
-    setHasVariants(product?.hasVariants ?? false)
-    setAxisDrafts(axesToDrafts(product?.variantAxes))
-    setVariantRows(variantsToRows(product?.variants))
-    setNewOptionByAxis({})
-    setPendingVariantFiles({})
+    setForm(toFormState(product));
+    setImages(product?.images ?? []);
+    setPendingFiles([]);
+    setVideos(product?.videos ?? []);
+    setVideoUrl("");
+    setPendingVideoFile(null);
+    setHasVariants(product?.hasVariants ?? false);
+    setAxisDrafts(axesToDrafts(product?.variantAxes));
+    setVariantRows(variantsToRows(product?.variants));
+    setNewOptionByAxis({});
+    setPendingVariantFiles({});
     setPendingVariantPreviews((prev) => {
-      for (const urls of Object.values(prev)) for (const url of urls) URL.revokeObjectURL(url)
-      return {}
-    })
-    setVariantUrlDraft({})
+      for (const urls of Object.values(prev))
+        for (const url of urls) URL.revokeObjectURL(url);
+      return {};
+    });
+    setVariantUrlDraft({});
     // Reset only when switching products — a new `product` object with the same
     // id (parent list refresh) must not wipe photos just uploaded.
-  }, [product?.id])
+  }, [product?.id]);
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
-  }
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   /** Marca/desmarca uma categoria. A primeira da lista é a principal. */
   function toggleCategory(id: string) {
     setForm((prev) => {
       if (prev.categoryIds.includes(id)) {
-        return { ...prev, categoryIds: prev.categoryIds.filter((c) => c !== id) }
+        return {
+          ...prev,
+          categoryIds: prev.categoryIds.filter((c) => c !== id),
+        };
       }
       if (prev.categoryIds.length >= MAX_PRODUCT_CATEGORIES) {
-        toast.error(`Máximo de ${MAX_PRODUCT_CATEGORIES} categorias por produto`)
-        return prev
+        toast.error(
+          `Máximo de ${MAX_PRODUCT_CATEGORIES} categorias por produto`,
+        );
+        return prev;
       }
-      return { ...prev, categoryIds: [...prev.categoryIds, id] }
-    })
+      return { ...prev, categoryIds: [...prev.categoryIds, id] };
+    });
   }
 
   /** Promove a categoria a principal (position 0) — é a usada no sitemap e nos relacionados. */
@@ -358,400 +409,441 @@ export function ProductModal({
     setForm((prev) => ({
       ...prev,
       categoryIds: [id, ...prev.categoryIds.filter((c) => c !== id)],
-    }))
+    }));
   }
 
   function handleAddImageUrl() {
-    const url = imageUrl.trim()
-    if (!url) return
+    const url = imageUrl.trim();
+    if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
-      toast.error('Informe uma URL válida (http/https)')
-      return
+      toast.error("Informe uma URL válida (http/https)");
+      return;
     }
-    setImages((prev) => [...prev, url])
-    setImageUrl('')
+    setImages((prev) => [...prev, url]);
+    setImageUrl("");
   }
 
   async function commitListingImages(picked: File[]) {
-    const room = MAX_PRODUCT_IMAGES - (images.length + pendingFiles.length)
+    const room = MAX_PRODUCT_IMAGES - (images.length + pendingFiles.length);
     if (room <= 0) {
       toast.error(
-        `A galeria já tem ${MAX_PRODUCT_IMAGES} fotos. Remova alguma antes de enviar outra.`
-      )
-      return
+        `A galeria já tem ${MAX_PRODUCT_IMAGES} fotos. Remova alguma antes de enviar outra.`,
+      );
+      return;
     }
     if (picked.length > room) {
-      toast.message(`Só cabem mais ${room} foto(s) na galeria — o excedente foi ignorado`)
+      toast.message(
+        `Só cabem mais ${room} foto(s) na galeria — o excedente foi ignorado`,
+      );
     }
 
-    setUploadingImages(true)
-    setUploadPhase('prepare')
+    setUploadingImages(true);
+    setUploadPhase("prepare");
     try {
-      const { files, errors, compressedCount } = await prepareProductImages(picked.slice(0, room))
-      for (const msg of errors) toast.error(msg)
-      if (files.length === 0) return
+      const { files, errors, compressedCount } = await prepareProductImages(
+        picked.slice(0, room),
+      );
+      for (const msg of errors) toast.error(msg);
+      if (files.length === 0) return;
 
       // Edição: envia na hora (botão "Enviar imagens" = upload imediato).
       if (isEditMode && product?.id) {
-        setUploadPhase('upload')
-        const result = await uploadProductImages(product.id, files)
+        setUploadPhase("upload");
+        const result = await uploadProductImages(product.id, files);
         if (!result.ok) {
-          toast.error(result.error)
-          return
+          toast.error(result.error);
+          return;
         }
-        setImages(result.product.images)
-        onImagesChange?.(product.id, result.product.images)
+        setImages(result.product.images);
+        onImagesChange?.(product.id, result.product.images);
         if (result.skippedOverLimit > 0) {
-          toast.error(`${result.skippedOverLimit} foto(s) não couberam no limite da galeria`)
+          toast.error(
+            `${result.skippedOverLimit} foto(s) não couberam no limite da galeria`,
+          );
         }
         toast.success(
           files.length === 1
-            ? 'Imagem enviada'
-            : `${files.length} imagens enviadas${compressedCount ? ' (compactadas)' : ''}`
-        )
-        return
+            ? "Imagem enviada"
+            : `${files.length} imagens enviadas${compressedCount ? " (compactadas)" : ""}`,
+        );
+        return;
       }
 
       // Criação: guarda e sobe no save (precisa de productId).
-      setPendingFiles((prev) => [...prev, ...files])
+      setPendingFiles((prev) => [...prev, ...files]);
       if (compressedCount > 0) {
         toast.message(
           compressedCount === 1
-            ? 'Foto redimensionada automaticamente'
-            : `${compressedCount} fotos redimensionadas automaticamente`
-        )
+            ? "Foto redimensionada automaticamente"
+            : `${compressedCount} fotos redimensionadas automaticamente`,
+        );
       }
     } catch (error) {
-      logger.error('Error preparing product images:', error)
-      toast.error('Erro ao processar as imagens selecionadas')
+      logger.error("Error preparing product images:", error);
+      toast.error("Erro ao processar as imagens selecionadas");
     } finally {
-      setUploadingImages(false)
+      setUploadingImages(false);
     }
   }
 
   function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? [])
+    const picked = Array.from(e.target.files ?? []);
     // Allow re-picking the same file later.
-    e.target.value = ''
-    if (picked.length === 0) return
-    setCropSession({ files: picked, kind: 'listing' })
+    e.target.value = "";
+    if (picked.length === 0) return;
+    setCropSession({ files: picked, kind: "listing" });
   }
 
   function removeExistingImage(index: number) {
-    setImages((prev) => prev.filter((_, i) => i !== index))
+    setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
   function removePendingFile(index: number) {
-    setPendingFiles((prev) => prev.filter((_, i) => i !== index))
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   function setVariantImages(idx: number, nextImages: string[]) {
-    setVariantRows((rows) => rows.map((r, i) => (i === idx ? { ...r, images: nextImages } : r)))
+    setVariantRows((rows) =>
+      rows.map((r, i) => (i === idx ? { ...r, images: nextImages } : r)),
+    );
   }
 
   /** Quantas fotos a variação já tem somando salvas + pendentes de upload. */
   function variantImageCount(idx: number): number {
-    return (variantRows[idx]?.images?.length ?? 0) + (pendingVariantFiles[idx]?.length ?? 0)
+    return (
+      (variantRows[idx]?.images?.length ?? 0) +
+      (pendingVariantFiles[idx]?.length ?? 0)
+    );
   }
 
   function appendVariantImages(idx: number, urls: string[]) {
     setVariantRows((rows) =>
       rows.map((r, i) => {
-        if (i !== idx) return r
-        const merged = [...(r.images ?? [])]
+        if (i !== idx) return r;
+        const merged = [...(r.images ?? [])];
         for (const url of urls) {
-          if (merged.length >= MAX_VARIANT_IMAGES) break
-          if (!merged.includes(url)) merged.push(url)
+          if (merged.length >= MAX_VARIANT_IMAGES) break;
+          if (!merged.includes(url)) merged.push(url);
         }
-        return { ...r, images: merged }
-      })
-    )
+        return { ...r, images: merged };
+      }),
+    );
   }
 
   function removeVariantImage(idx: number, url: string) {
-    setVariantImages(idx, (variantRows[idx]?.images ?? []).filter((u) => u !== url))
+    setVariantImages(
+      idx,
+      (variantRows[idx]?.images ?? []).filter((u) => u !== url),
+    );
   }
 
   function revokePendingPreviews(idx: number) {
     setPendingVariantPreviews((prev) => {
-      for (const url of prev[idx] ?? []) URL.revokeObjectURL(url)
-      const next = { ...prev }
-      delete next[idx]
-      return next
-    })
+      for (const url of prev[idx] ?? []) URL.revokeObjectURL(url);
+      const next = { ...prev };
+      delete next[idx];
+      return next;
+    });
   }
 
   function removePendingVariantFile(idx: number, fileIndex: number) {
     setPendingVariantFiles((prev) => {
-      const rest = (prev[idx] ?? []).filter((_, i) => i !== fileIndex)
-      const next = { ...prev }
-      if (rest.length) next[idx] = rest
-      else delete next[idx]
-      return next
-    })
+      const rest = (prev[idx] ?? []).filter((_, i) => i !== fileIndex);
+      const next = { ...prev };
+      if (rest.length) next[idx] = rest;
+      else delete next[idx];
+      return next;
+    });
     setPendingVariantPreviews((prev) => {
-      const urls = prev[idx] ?? []
-      const removed = urls[fileIndex]
-      if (removed) URL.revokeObjectURL(removed)
-      const rest = urls.filter((_, i) => i !== fileIndex)
-      const next = { ...prev }
-      if (rest.length) next[idx] = rest
-      else delete next[idx]
-      return next
-    })
+      const urls = prev[idx] ?? [];
+      const removed = urls[fileIndex];
+      if (removed) URL.revokeObjectURL(removed);
+      const rest = urls.filter((_, i) => i !== fileIndex);
+      const next = { ...prev };
+      if (rest.length) next[idx] = rest;
+      else delete next[idx];
+      return next;
+    });
   }
 
   function clearVariantImages(idx: number) {
-    setVariantImages(idx, [])
+    setVariantImages(idx, []);
     setPendingVariantFiles((prev) => {
-      const next = { ...prev }
-      delete next[idx]
-      return next
-    })
-    revokePendingPreviews(idx)
+      const next = { ...prev };
+      delete next[idx];
+      return next;
+    });
+    revokePendingPreviews(idx);
   }
 
   function assignGalleryImageToVariant(idx: number, url: string) {
     if (variantImageCount(idx) >= MAX_VARIANT_IMAGES) {
-      toast.error(`Máximo de ${MAX_VARIANT_IMAGES} fotos por variação`)
-      return
+      toast.error(`Máximo de ${MAX_VARIANT_IMAGES} fotos por variação`);
+      return;
     }
-    appendVariantImages(idx, [url])
+    appendVariantImages(idx, [url]);
   }
 
   async function commitVariantImages(raw: File[], idx: number) {
-    const room = MAX_VARIANT_IMAGES - variantImageCount(idx)
+    const room = MAX_VARIANT_IMAGES - variantImageCount(idx);
     if (room <= 0) {
-      toast.error(`Esta variação já tem ${MAX_VARIANT_IMAGES} fotos`)
-      return
+      toast.error(`Esta variação já tem ${MAX_VARIANT_IMAGES} fotos`);
+      return;
     }
     if (raw.length > room) {
-      toast.message(`Só cabem mais ${room} foto(s) nesta variação — o excedente foi ignorado`)
+      toast.message(
+        `Só cabem mais ${room} foto(s) nesta variação — o excedente foi ignorado`,
+      );
     }
 
-    const prepared = await prepareProductImages(raw.slice(0, room))
-    for (const msg of prepared.errors) toast.error(msg)
-    if (prepared.files.length === 0) return
+    const prepared = await prepareProductImages(raw.slice(0, room));
+    for (const msg of prepared.errors) toast.error(msg);
+    if (prepared.files.length === 0) return;
 
     // Produto já existe: sobe agora via /media (sem tocar na galeria do listing)
     // e guarda as URLs na linha; o PUT /variants persiste no save.
-    const productId = product?.id
+    const productId = product?.id;
     if (productId) {
       try {
-        const result = await uploadProductMedia(productId, prepared.files)
+        const result = await uploadProductMedia(productId, prepared.files);
         if (!result.ok) {
-          toast.error(result.error)
-          return
+          toast.error(result.error);
+          return;
         }
-        appendVariantImages(idx, result.urls)
+        appendVariantImages(idx, result.urls);
         toast.success(
-          `${result.urls.length} foto(s) da variação "${variantRows[idx]?.name ?? ''}" — salve para confirmar`
-        )
+          `${result.urls.length} foto(s) da variação "${variantRows[idx]?.name ?? ""}" — salve para confirmar`,
+        );
       } catch (error) {
-        logger.error('Error uploading variant images:', error)
-        toast.error('Erro ao enviar fotos da variação')
+        logger.error("Error uploading variant images:", error);
+        toast.error("Erro ao enviar fotos da variação");
       }
-      return
+      return;
     }
 
     // Criação: guarda arquivos e mostra preview; sobem no save (precisa de productId).
-    setPendingVariantFiles((prev) => ({ ...prev, [idx]: [...(prev[idx] ?? []), ...prepared.files] }))
+    setPendingVariantFiles((prev) => ({
+      ...prev,
+      [idx]: [...(prev[idx] ?? []), ...prepared.files],
+    }));
     setPendingVariantPreviews((prev) => ({
       ...prev,
-      [idx]: [...(prev[idx] ?? []), ...prepared.files.map((f) => URL.createObjectURL(f))],
-    }))
+      [idx]: [
+        ...(prev[idx] ?? []),
+        ...prepared.files.map((f) => URL.createObjectURL(f)),
+      ],
+    }));
   }
 
-  function handleVariantFilePick(e: React.ChangeEvent<HTMLInputElement>, idx: number) {
-    const raw = Array.from(e.target.files ?? [])
-    e.target.value = ''
-    if (raw.length === 0) return
-    setCropSession({ files: raw, kind: 'variant', variantIndex: idx })
+  function handleVariantFilePick(
+    e: React.ChangeEvent<HTMLInputElement>,
+    idx: number,
+  ) {
+    const raw = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (raw.length === 0) return;
+    setCropSession({ files: raw, kind: "variant", variantIndex: idx });
   }
 
   function handleCropComplete(cropped: File[]) {
-    const session = cropSession
-    setCropSession(null)
-    if (!session || cropped.length === 0) return
-    if (session.kind === 'variant') {
-      void commitVariantImages(cropped, session.variantIndex)
-      return
+    const session = cropSession;
+    setCropSession(null);
+    if (!session || cropped.length === 0) return;
+    if (session.kind === "variant") {
+      void commitVariantImages(cropped, session.variantIndex);
+      return;
     }
-    void commitListingImages(cropped)
+    void commitListingImages(cropped);
   }
 
   function applyVariantImageUrl(idx: number) {
-    const url = (variantUrlDraft[idx] ?? '').trim()
-    if (!url) return
+    const url = (variantUrlDraft[idx] ?? "").trim();
+    if (!url) return;
     if (!/^https?:\/\//i.test(url)) {
-      toast.error('URL da variação inválida (use http/https)')
-      return
+      toast.error("URL da variação inválida (use http/https)");
+      return;
     }
     if (variantImageCount(idx) >= MAX_VARIANT_IMAGES) {
-      toast.error(`Máximo de ${MAX_VARIANT_IMAGES} fotos por variação`)
-      return
+      toast.error(`Máximo de ${MAX_VARIANT_IMAGES} fotos por variação`);
+      return;
     }
-    appendVariantImages(idx, [url])
-    setVariantUrlDraft((prev) => ({ ...prev, [idx]: '' }))
+    appendVariantImages(idx, [url]);
+    setVariantUrlDraft((prev) => ({ ...prev, [idx]: "" }));
   }
 
   function handleAddVideoUrl() {
     if (videos.length >= MAX_PRODUCT_VIDEOS) {
-      toast.error(`Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto`)
-      return
+      toast.error(`Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto`);
+      return;
     }
-    const parsed = parseVideoUrl(videoUrl)
+    const parsed = parseVideoUrl(videoUrl);
     if (!parsed.ok) {
-      toast.error(parsed.error)
-      return
+      toast.error(parsed.error);
+      return;
     }
     if (videos.some((v) => v.url === parsed.video.url)) {
-      toast.error('Este vídeo já está no produto')
-      return
+      toast.error("Este vídeo já está no produto");
+      return;
     }
-    setVideos((prev) => [...prev, parsed.video])
-    setVideoUrl('')
+    setVideos((prev) => [...prev, parsed.video]);
+    setVideoUrl("");
   }
 
   function removeVideo(url: string) {
-    setVideos((prev) => prev.filter((v) => v.url !== url))
+    setVideos((prev) => prev.filter((v) => v.url !== url));
   }
 
   async function handlePickVideo(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
 
     if (videos.length + (pendingVideoFile ? 1 : 0) >= MAX_PRODUCT_VIDEOS) {
-      toast.error(`Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto`)
-      return
+      toast.error(`Máximo de ${MAX_PRODUCT_VIDEOS} vídeos por produto`);
+      return;
     }
     if (file.size > PRODUCT_VIDEO_MAX_BYTES) {
       toast.error(
-        `Vídeo muito grande (máximo ${Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). Suba no YouTube e cole o link.`
-      )
-      return
+        `Vídeo muito grande (máximo ${Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). Suba no YouTube e cole o link.`,
+      );
+      return;
     }
 
     // Criação: guarda e sobe no save (o upload precisa do productId).
     if (!product?.id) {
-      setPendingVideoFile(file)
-      toast.message('Vídeo será enviado ao salvar o produto')
-      return
+      setPendingVideoFile(file);
+      toast.message("Vídeo será enviado ao salvar o produto");
+      return;
     }
 
-    setUploadingVideo(true)
+    setUploadingVideo(true);
     try {
-      const result = await uploadProductVideo(product.id, file)
+      const result = await uploadProductVideo(product.id, file);
       if (!result.ok) {
-        toast.error(result.error)
-        return
+        toast.error(result.error);
+        return;
       }
-      setVideos(result.product.videos ?? [])
-      toast.success('Vídeo enviado')
+      setVideos(result.product.videos ?? []);
+      toast.success("Vídeo enviado");
     } catch (error) {
-      logger.error('Error uploading video:', error)
-      toast.error('Erro ao enviar o vídeo')
+      logger.error("Error uploading video:", error);
+      toast.error("Erro ao enviar o vídeo");
     }
-    setUploadingVideo(false)
+    setUploadingVideo(false);
   }
 
   async function handleCreateCategory() {
-    const name = newCategoryName.trim()
-    if (!name) return
-    setCreatingCategory(true)
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setCreatingCategory(true);
     try {
-      const created = await createCategory({ name, active: true })
+      const created = await createCategory({ name, active: true });
       if (created) {
-        toast.success('Categoria criada')
-        setNewCategoryName('')
-        toggleCategory(created.id)
-        onCategoriesChange?.()
+        toast.success("Categoria criada");
+        setNewCategoryName("");
+        toggleCategory(created.id);
+        onCategoriesChange?.();
       } else {
-        toast.error('Erro ao criar categoria')
+        toast.error("Erro ao criar categoria");
       }
     } catch (error) {
-      logger.error('Error creating category:', error)
-      toast.error('Erro ao criar categoria')
+      logger.error("Error creating category:", error);
+      toast.error("Erro ao criar categoria");
     }
-    setCreatingCategory(false)
+    setCreatingCategory(false);
   }
 
   async function handleSetCategoryIcon(id: string, icon: string) {
     try {
-      const updated = await updateCategory(id, { icon: icon || null })
+      const updated = await updateCategory(id, { icon: icon || null });
       if (!updated) {
-        toast.error('Erro ao salvar o ícone')
-        return
+        toast.error("Erro ao salvar o ícone");
+        return;
       }
-      onCategoriesChange?.()
+      onCategoriesChange?.();
     } catch (error) {
-      logger.error('Error setting category icon:', error)
-      toast.error('Erro ao salvar o ícone')
+      logger.error("Error setting category icon:", error);
+      toast.error("Erro ao salvar o ícone");
     }
   }
 
   async function handleDeleteCategory(id: string, name: string) {
-    if (!window.confirm(`Remover a categoria "${name}"? Os produtos vinculados ficarão sem categoria.`)) return
+    if (
+      !window.confirm(
+        `Remover a categoria "${name}"? Os produtos vinculados ficarão sem categoria.`,
+      )
+    )
+      return;
     try {
-      const ok = await deleteCategory(id)
+      const ok = await deleteCategory(id);
       if (ok) {
-        toast.success('Categoria removida')
-        update('categoryIds', form.categoryIds.filter((c) => c !== id))
-        onCategoriesChange?.()
+        toast.success("Categoria removida");
+        update(
+          "categoryIds",
+          form.categoryIds.filter((c) => c !== id),
+        );
+        onCategoriesChange?.();
       } else {
-        toast.error('Erro ao remover categoria')
+        toast.error("Erro ao remover categoria");
       }
     } catch (error) {
-      logger.error('Error deleting category:', error)
-      toast.error('Erro ao remover categoria')
+      logger.error("Error deleting category:", error);
+      toast.error("Erro ao remover categoria");
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault();
 
-    const name = form.name.trim()
+    const name = form.name.trim();
     if (name.length < 2) {
-      toast.error('Informe o nome do produto')
-      return
+      toast.error("Informe o nome do produto");
+      return;
     }
-    const price = Number(form.price)
+    const price = Number(form.price);
     if (!Number.isFinite(price) || price < 0 || price > MAX_PRODUCT_PRICE) {
-      toast.error(`Preço inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`)
-      return
+      toast.error(
+        `Preço inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
+      );
+      return;
     }
 
-    const compareAtPrice = form.compareAtPrice.trim() ? Number(form.compareAtPrice) : null
+    const compareAtPrice = form.compareAtPrice.trim()
+      ? Number(form.compareAtPrice)
+      : null;
     if (
       compareAtPrice != null &&
-      (!Number.isFinite(compareAtPrice) || compareAtPrice < 0 || compareAtPrice > MAX_PRODUCT_PRICE)
+      (!Number.isFinite(compareAtPrice) ||
+        compareAtPrice < 0 ||
+        compareAtPrice > MAX_PRODUCT_PRICE)
     ) {
-      toast.error(`Preço "de" inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`)
-      return
+      toast.error(
+        `Preço "de" inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
+      );
+      return;
     }
 
-    const stock = form.stock.trim() ? Number(form.stock) : 0
+    const stock = form.stock.trim() ? Number(form.stock) : 0;
     if (!Number.isInteger(stock) || stock < 0) {
-      toast.error('Estoque inválido')
-      return
+      toast.error("Estoque inválido");
+      return;
     }
 
-    const weightG = form.weightG.trim() ? Number(form.weightG) : null
-    const heightCm = form.heightCm.trim() ? Number(form.heightCm) : null
-    const widthCm = form.widthCm.trim() ? Number(form.widthCm) : null
-    const lengthCm = form.lengthCm.trim() ? Number(form.lengthCm) : null
+    const weightG = form.weightG.trim() ? Number(form.weightG) : null;
+    const heightCm = form.heightCm.trim() ? Number(form.heightCm) : null;
+    const widthCm = form.widthCm.trim() ? Number(form.widthCm) : null;
+    const lengthCm = form.lengthCm.trim() ? Number(form.lengthCm) : null;
     if (weightG != null && (!Number.isInteger(weightG) || weightG <= 0)) {
-      toast.error('Peso (g) inválido')
-      return
+      toast.error("Peso (g) inválido");
+      return;
     }
 
     const wholesaleMinQty = form.wholesaleMinQty.trim()
       ? Math.max(1, Number(form.wholesaleMinQty))
-      : 1
+      : 1;
     if (!Number.isInteger(wholesaleMinQty) || wholesaleMinQty < 1) {
-      toast.error('Qtd. mínima atacado inválida')
-      return
+      toast.error("Qtd. mínima atacado inválida");
+      return;
     }
 
     const payload: ProductInput = {
@@ -772,41 +864,47 @@ export function ProductModal({
       lengthCm,
       wholesaleEnabled: form.wholesaleEnabled,
       wholesaleMinQty,
-    }
+    };
 
-    setLoading(true)
+    setLoading(true);
     try {
-      let saved: Product | null
+      let saved: Product | null;
 
       if (isEditMode && product) {
-        saved = await updateProduct(product.id, payload)
+        saved = await updateProduct(product.id, payload);
       } else {
-        saved = await createProduct(payload)
+        saved = await createProduct(payload);
       }
 
       if (!saved) {
-        toast.error(isEditMode ? 'Erro ao atualizar produto' : 'Erro ao criar produto')
-        setLoading(false)
-        return
+        toast.error(
+          isEditMode ? "Erro ao atualizar produto" : "Erro ao criar produto",
+        );
+        setLoading(false);
+        return;
       }
 
       // Upload de imagens do listing + fotos de variação pendentes (precisa de productId).
       if (pendingFiles.length > 0) {
-        const withImages = await uploadProductImages(saved.id, pendingFiles)
+        const withImages = await uploadProductImages(saved.id, pendingFiles);
         if (!withImages.ok) {
-          toast.error(`Produto salvo, mas falhou o upload das imagens: ${withImages.error}`)
+          toast.error(
+            `Produto salvo, mas falhou o upload das imagens: ${withImages.error}`,
+          );
         } else {
-          saved = withImages.product
+          saved = withImages.product;
         }
       }
 
       // MP4 escolhido antes do produto existir sobe agora.
       if (pendingVideoFile) {
-        const uploaded = await uploadProductVideo(saved.id, pendingVideoFile)
+        const uploaded = await uploadProductVideo(saved.id, pendingVideoFile);
         if (!uploaded.ok) {
-          toast.error(`Produto salvo, mas falhou o envio do vídeo: ${uploaded.error}`)
+          toast.error(
+            `Produto salvo, mas falhou o envio do vídeo: ${uploaded.error}`,
+          );
         } else {
-          saved = uploaded.product
+          saved = uploaded.product;
         }
       }
 
@@ -818,1038 +916,1226 @@ export function ProductModal({
         stock: Number(r.stock) || 0,
         images: Array.isArray(r.images) ? [...r.images] : [],
         sortOrder: i,
-      }))
+      }));
       for (const [idxStr, files] of Object.entries(pendingVariantFiles)) {
-        const idx = Number(idxStr)
-        const row = rowsWithImages[idx]
-        if (!row || files.length === 0) continue
-        const uploaded = await uploadProductMedia(saved.id, files)
+        const idx = Number(idxStr);
+        const row = rowsWithImages[idx];
+        if (!row || files.length === 0) continue;
+        const uploaded = await uploadProductMedia(saved.id, files);
         if (!uploaded.ok) {
-          toast.error(`Falha nas fotos da variação "${row.name}": ${uploaded.error}`)
-          continue
+          toast.error(
+            `Falha nas fotos da variação "${row.name}": ${uploaded.error}`,
+          );
+          continue;
         }
-        row.images = [...row.images, ...uploaded.urls].slice(0, MAX_VARIANT_IMAGES)
+        row.images = [...row.images, ...uploaded.urls].slice(
+          0,
+          MAX_VARIANT_IMAGES,
+        );
       }
 
       // Variações: salva eixos + SKUs com fotos (ou limpa)
       if (hasVariants && rowsWithImages.length > 0) {
-        const axes = buildAxes()
+        const axes = buildAxes();
         if (!axes.length) {
           toast.error(
-            'Produto salvo, mas as variações precisam de tipo + opções (ex.: Cor → Rosa, Preto). Clique em Gerar combinações.'
-          )
-          setLoading(false)
-          onSuccess()
-          return
+            "Produto salvo, mas as variações precisam de tipo + opções (ex.: Cor → Rosa, Preto). Clique em Gerar combinações.",
+          );
+          setLoading(false);
+          onSuccess();
+          return;
         }
         const badVariant = rowsWithImages.find((r) => {
-          const p = Number(r.price)
-          return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE
-        })
+          const p = Number(r.price);
+          return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE;
+        });
         if (badVariant) {
           toast.error(
-            `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`
-          )
-          setLoading(false)
-          return
+            `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
+          );
+          setLoading(false);
+          return;
         }
-        const withVariants = await replaceProductVariants(saved.id, axes, rowsWithImages)
+        const withVariants = await replaceProductVariants(
+          saved.id,
+          axes,
+          rowsWithImages,
+        );
         if (!withVariants) {
-          toast.error('Produto salvo, mas falhou ao gravar as variações. Tente de novo.')
-          setLoading(false)
-          onSuccess()
-          return
+          toast.error(
+            "Produto salvo, mas falhou ao gravar as variações. Tente de novo.",
+          );
+          setLoading(false);
+          onSuccess();
+          return;
         }
-        saved = withVariants
+        saved = withVariants;
       } else if (isEditMode && product?.hasVariants && !hasVariants) {
-        await replaceProductVariants(saved.id, [], [])
+        await replaceProductVariants(saved.id, [], []);
       }
 
-      toast.success(isEditMode ? 'Produto atualizado!' : 'Produto criado!')
-      onSuccess()
+      toast.success(isEditMode ? "Produto atualizado!" : "Produto criado!");
+      onSuccess();
     } catch (error) {
-      logger.error('Error saving product:', error)
-      toast.error('Erro ao salvar produto')
+      logger.error("Error saving product:", error);
+      toast.error("Erro ao salvar produto");
     }
-    setLoading(false)
+    setLoading(false);
   }
 
-  const priceNum = Number(form.price)
-  const compareNum = Number(form.compareAtPrice)
+  const priceNum = Number(form.price);
+  const compareNum = Number(form.compareAtPrice);
   const showDiscountHint =
-    Number.isFinite(priceNum) && Number.isFinite(compareNum) && compareNum > priceNum && priceNum > 0
+    Number.isFinite(priceNum) &&
+    Number.isFinite(compareNum) &&
+    compareNum > priceNum &&
+    priceNum > 0;
 
   return (
     <>
-    <div className="modal-overlay" onClick={onClose}>
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="relative">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-primary" />
-            {isEditMode ? 'Editar Produto' : 'Novo Produto'}
-          </CardTitle>
-          <CardDescription>
-            {isEditMode
-              ? 'Atualize as informações do produto'
-              : 'Preencha os dados para cadastrar um novo produto na loja'}
-          </CardDescription>
-        </CardHeader>
+      <div className="modal-overlay" onClick={onClose}>
+        <Card
+          className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CardHeader className="relative">
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              {isEditMode ? "Editar Produto" : "Novo Produto"}
+            </CardTitle>
+            <CardDescription>
+              {isEditMode
+                ? "Atualize as informações do produto"
+                : "Preencha os dados para cadastrar um novo produto na loja"}
+            </CardDescription>
+          </CardHeader>
 
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            {/* Nome */}
-            <div className="space-y-2">
-              <Label htmlFor="product-name">Nome do Produto</Label>
-              <Input
-                id="product-name"
-                placeholder="Ex.: Action Figure Goku Super Saiyajin"
-                value={form.name}
-                onChange={(e) => update('name', e.target.value)}
-              />
-            </div>
-
-            {/* Descrição */}
-            <div className="space-y-2">
-              <Label htmlFor="product-description">Descrição</Label>
-              <textarea
-                id="product-description"
-                rows={3}
-                placeholder="Detalhes, dimensões, material..."
-                value={form.description}
-                onChange={(e) => update('description', e.target.value)}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
-
-            {/* Preços */}
-            <div className="grid sm:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit}>
+            <CardContent className="space-y-6">
+              {/* Nome */}
               <div className="space-y-2">
-                <Label htmlFor="product-price">Preço (R$)</Label>
+                <Label htmlFor="product-name">Nome do Produto</Label>
                 <Input
-                  id="product-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={MAX_PRODUCT_PRICE}
-                  inputMode="decimal"
-                  placeholder="Ex.: 7500 ou 149.90"
-                  value={form.price}
-                  onChange={(e) => update('price', e.target.value)}
+                  id="product-name"
+                  placeholder="Ex.: Action Figure Goku Super Saiyajin"
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-compare">Preço "de" (opcional)</Label>
-                <Input
-                  id="product-compare"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={MAX_PRODUCT_PRICE}
-                  inputMode="decimal"
-                  placeholder="Preço original riscado"
-                  value={form.compareAtPrice}
-                  onChange={(e) => update('compareAtPrice', e.target.value)}
-                />
-                {showDiscountHint && (
-                  <p className="text-xs text-green-600">
-                    Desconto de {Math.round((1 - priceNum / compareNum) * 100)}% ·{' '}
-                    <span className="line-through text-muted-foreground">{formatCurrency(compareNum)}</span> →{' '}
-                    {formatCurrency(priceNum)}
-                  </p>
-                )}
-              </div>
-            </div>
 
-            {/* Estoque + SKU */}
-            <div className="grid sm:grid-cols-2 gap-4">
+              {/* Descrição */}
               <div className="space-y-2">
-                <Label htmlFor="product-stock">Estoque</Label>
-                <Input
-                  id="product-stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputMode="numeric"
-                  placeholder="0"
-                  value={form.stock}
-                  onChange={(e) => update('stock', e.target.value)}
+                <Label htmlFor="product-description">Descrição</Label>
+                <textarea
+                  id="product-description"
+                  rows={3}
+                  placeholder="Detalhes, dimensões, material..."
+                  value={form.description}
+                  onChange={(e) => update("description", e.target.value)}
+                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-sku">SKU (opcional)</Label>
-                <Input
-                  id="product-sku"
-                  placeholder="Código interno"
-                  value={form.sku}
-                  onChange={(e) => update('sku', e.target.value)}
-                />
-              </div>
-            </div>
 
-            {/* Embalagem / frete Correios */}
-            <div className="space-y-2">
-              <Label>Embalagem (frete Correios)</Label>
-              <p className="text-xs text-muted-foreground">
-                Usado no cálculo de frete. Se vazio, usa padrão 300g · 16×11×6 cm (photocard/caixa pequena).
-              </p>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="product-weight" className="text-xs text-muted-foreground">
-                    Peso (g)
-                  </Label>
+              {/* Preços */}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="product-price">Preço (R$)</Label>
                   <Input
-                    id="product-weight"
+                    id="product-price"
                     type="number"
-                    min="1"
+                    step="0.01"
+                    min="0"
+                    max={MAX_PRODUCT_PRICE}
+                    inputMode="decimal"
+                    placeholder="Ex.: 7500 ou 149.90"
+                    value={form.price}
+                    onChange={(e) => update("price", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product-compare">Preço "de" (opcional)</Label>
+                  <Input
+                    id="product-compare"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={MAX_PRODUCT_PRICE}
+                    inputMode="decimal"
+                    placeholder="Preço original riscado"
+                    value={form.compareAtPrice}
+                    onChange={(e) => update("compareAtPrice", e.target.value)}
+                  />
+                  {showDiscountHint && (
+                    <p className="text-xs text-green-600">
+                      Desconto de{" "}
+                      {Math.round((1 - priceNum / compareNum) * 100)}% ·{" "}
+                      <span className="line-through text-muted-foreground">
+                        {formatCurrency(compareNum)}
+                      </span>{" "}
+                      → {formatCurrency(priceNum)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Estoque + SKU */}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="product-stock">Estoque</Label>
+                  <Input
+                    id="product-stock"
+                    type="number"
+                    min="0"
                     step="1"
-                    placeholder="300"
-                    value={form.weightG}
-                    onChange={(e) => update('weightG', e.target.value)}
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={form.stock}
+                    onChange={(e) => update("stock", e.target.value)}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="product-len" className="text-xs text-muted-foreground">
-                    Comp. (cm)
-                  </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="product-sku">SKU (opcional)</Label>
                   <Input
-                    id="product-len"
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    placeholder="16"
-                    value={form.lengthCm}
-                    onChange={(e) => update('lengthCm', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="product-width" className="text-xs text-muted-foreground">
-                    Larg. (cm)
-                  </Label>
-                  <Input
-                    id="product-width"
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    placeholder="11"
-                    value={form.widthCm}
-                    onChange={(e) => update('widthCm', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="product-height" className="text-xs text-muted-foreground">
-                    Alt. (cm)
-                  </Label>
-                  <Input
-                    id="product-height"
-                    type="number"
-                    min="0.1"
-                    step="0.1"
-                    placeholder="6"
-                    value={form.heightCm}
-                    onChange={(e) => update('heightCm', e.target.value)}
+                    id="product-sku"
+                    placeholder="Código interno"
+                    value={form.sku}
+                    onChange={(e) => update("sku", e.target.value)}
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Categorias — até MAX_PRODUCT_CATEGORIES, a primeira é a principal */}
-            <div className="space-y-2">
-              <Label>
-                Categorias{' '}
-                <span className="font-normal text-muted-foreground">
-                  ({form.categoryIds.length}/{MAX_PRODUCT_CATEGORIES})
-                </span>
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Um mesmo produto pode aparecer em várias — ex.: chaveiro de comidinha em{' '}
-                <em>Comidas</em> e <em>Acessórios</em>. A marcada como{' '}
-                <strong className="text-foreground">principal</strong> é a usada no link do
-                produto e nas sugestões.
-              </p>
-
-              {categories.length === 0 ? (
-                <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-                  Nenhuma categoria criada ainda — use o campo abaixo.
+              {/* Embalagem / frete Correios */}
+              <div className="space-y-2">
+                <Label>Embalagem (frete Correios)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Usado no cálculo de frete. Se vazio, usa padrão 300g · 16×11×6
+                  cm (photocard/caixa pequena).
                 </p>
-              ) : (
-                <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
-                  {categories.map((cat) => {
-                    const checked = form.categoryIds.includes(cat.id)
-                    const isPrimary = form.categoryIds[0] === cat.id
-                    return (
-                      <div key={cat.id} className="flex items-center gap-2">
-                        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 shrink-0"
-                            checked={checked}
-                            onChange={() => toggleCategory(cat.id)}
-                          />
-                          <span className="truncate">{cat.name}</span>
-                        </label>
-                        {checked &&
-                          (isPrimary ? (
-                            <Badge variant="secondary" className="shrink-0 text-[10px]">
-                              principal
-                            </Badge>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => makePrimaryCategory(cat.id)}
-                              className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
-                              title="Tornar categoria principal"
-                            >
-                              tornar principal
-                            </button>
-                          ))}
-                      </div>
-                    )
-                  })}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="product-weight"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Peso (g)
+                    </Label>
+                    <Input
+                      id="product-weight"
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="300"
+                      value={form.weightG}
+                      onChange={(e) => update("weightG", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="product-len"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Comp. (cm)
+                    </Label>
+                    <Input
+                      id="product-len"
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      placeholder="16"
+                      value={form.lengthCm}
+                      onChange={(e) => update("lengthCm", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="product-width"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Larg. (cm)
+                    </Label>
+                    <Input
+                      id="product-width"
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      placeholder="11"
+                      value={form.widthCm}
+                      onChange={(e) => update("widthCm", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="product-height"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Alt. (cm)
+                    </Label>
+                    <Input
+                      id="product-height"
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      placeholder="6"
+                      value={form.heightCm}
+                      onChange={(e) => update("heightCm", e.target.value)}
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
 
-              {/* Gerenciador de categorias inline */}
-              <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/30">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-xs font-medium text-muted-foreground">Gerenciar categorias</span>
-                </div>
-                {categories.length > 0 && (
-                  <div className="space-y-2">
+              {/* Categorias — até MAX_PRODUCT_CATEGORIES, a primeira é a principal */}
+              <div className="space-y-2">
+                <Label>
+                  Categorias{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({form.categoryIds.length}/{MAX_PRODUCT_CATEGORIES})
+                  </span>
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Um mesmo produto pode aparecer em várias — ex.: chaveiro de
+                  comidinha em <em>Comidas</em> e <em>Acessórios</em>. A marcada
+                  como <strong className="text-foreground">principal</strong> é
+                  a usada no link do produto e nas sugestões.
+                </p>
+
+                {categories.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+                    Nenhuma categoria criada ainda — use o campo abaixo.
+                  </p>
+                ) : (
+                  <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
                     {categories.map((cat) => {
-                      const key = cat.icon ?? guessCategoryIcon(cat.name) ?? ''
-                      const Icon = categoryIcon(key)
+                      const checked = form.categoryIds.includes(cat.id);
+                      const isPrimary = form.categoryIds[0] === cat.id;
                       return (
                         <div key={cat.id} className="flex items-center gap-2">
-                          <Badge variant="secondary" className="gap-1 pr-1">
-                            {Icon && <Icon className="h-3 w-3" aria-hidden />}
-                            {cat.name}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                              className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20"
-                              title="Remover categoria"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                          <select
-                            value={key}
-                            onChange={(e) => handleSetCategoryIcon(cat.id, e.target.value)}
-                            aria-label={`Ícone da categoria ${cat.name}`}
-                            className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                          >
-                            <option value="">Sem ícone</option>
-                            {CATEGORY_ICONS.map((opt) => (
-                              <option key={opt.key} value={opt.key}>
-                                {opt.label}
-                              </option>
+                          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 shrink-0"
+                              checked={checked}
+                              onChange={() => toggleCategory(cat.id)}
+                            />
+                            <span className="truncate">{cat.name}</span>
+                          </label>
+                          {checked &&
+                            (isPrimary ? (
+                              <Badge
+                                variant="secondary"
+                                className="shrink-0 text-[10px]"
+                              >
+                                principal
+                              </Badge>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => makePrimaryCategory(cat.id)}
+                                className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
+                                title="Tornar categoria principal"
+                              >
+                                tornar principal
+                              </button>
                             ))}
-                          </select>
                         </div>
-                      )
+                      );
                     })}
                   </div>
                 )}
+
+                {/* Gerenciador de categorias inline */}
+                <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Gerenciar categorias
+                    </span>
+                  </div>
+                  {categories.length > 0 && (
+                    <div className="space-y-2">
+                      {categories.map((cat) => {
+                        const key =
+                          cat.icon ?? guessCategoryIcon(cat.name) ?? "";
+                        const Icon = categoryIcon(key);
+                        return (
+                          <div key={cat.id} className="flex items-center gap-2">
+                            <Badge variant="secondary" className="gap-1 pr-1">
+                              {Icon && <Icon className="h-3 w-3" aria-hidden />}
+                              {cat.name}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteCategory(cat.id, cat.name)
+                                }
+                                className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20"
+                                title="Remover categoria"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                            <select
+                              value={key}
+                              onChange={(e) =>
+                                handleSetCategoryIcon(cat.id, e.target.value)
+                              }
+                              aria-label={`Ícone da categoria ${cat.name}`}
+                              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                            >
+                              <option value="">Sem ícone</option>
+                              {CATEGORY_ICONS.map((opt) => (
+                                <option key={opt.key} value={opt.key}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Nova categoria"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleCreateCategory();
+                        }
+                      }}
+                      className="h-9"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCreateCategory}
+                      disabled={creatingCategory || !newCategoryName.trim()}
+                    >
+                      {creatingCategory ? (
+                        <Loading size="sm" />
+                      ) : (
+                        <Plus className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Imagens */}
+              <div className="space-y-3">
+                <Label>
+                  Imagens{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({images.length + pendingFiles.length}/{MAX_PRODUCT_IMAGES})
+                  </span>
+                </Label>
+
+                {/* Previews */}
+                {images.length > 0 || pendingFiles.length > 0 ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {images.map((url, i) => (
+                      <div
+                        key={`img-${i}`}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-border group"
+                      >
+                        <img
+                          src={url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeExistingImage(i)}
+                          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remover imagem"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {pendingFiles.map((file, i) => (
+                      <div
+                        key={`file-${i}`}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-primary/60 group"
+                      >
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute bottom-1 left-1 text-[10px] bg-primary/80 text-primary-foreground px-1 rounded">
+                          novo
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removePendingFile(i)}
+                          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Remover imagem"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border rounded-lg text-muted-foreground">
+                    <ImageOff className="h-8 w-8 mb-2" />
+                    <p className="text-xs">Nenhuma imagem adicionada</p>
+                  </div>
+                )}
+
+                {/* Upload de arquivos — <label> + overlay input (iOS Safari bloqueia click() em input hidden). */}
+                <div>
+                  <label
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "relative cursor-pointer overflow-hidden",
+                      (uploadingImages || loading) &&
+                        "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <input
+                      type="file"
+                      accept={PRODUCT_IMAGE_ACCEPT}
+                      multiple
+                      onChange={handlePickFiles}
+                      disabled={uploadingImages || loading}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      aria-label="Enviar imagens"
+                    />
+                    {uploadingImages ? (
+                      <Loading size="sm" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {uploadingImages
+                      ? uploadPhase === "prepare"
+                        ? "Preparando…"
+                        : "Enviando…"
+                      : "Enviar imagens"}
+                  </label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {PRODUCT_IMAGE_ACCEPT_LABEL}
+                    {isEditMode
+                      ? " · envio imediato ao selecionar"
+                      : pendingFiles.length > 0
+                        ? " · serão enviadas ao salvar o produto"
+                        : " · no produto novo, sobem ao salvar"}
+                  </p>
+                </div>
+
+                {/* Colar URL externa */}
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="Nova categoria"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleCreateCategory()
-                      }
-                    }}
-                    className="h-9"
-                  />
+                  <div className="relative flex-1">
+                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Colar URL de imagem externa"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddImageUrl();
+                        }
+                      }}
+                      className="pl-10"
+                    />
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={handleCreateCategory}
-                    disabled={creatingCategory || !newCategoryName.trim()}
+                    onClick={handleAddImageUrl}
+                    aria-label="Adicionar imagem por URL"
                   >
-                    {creatingCategory ? <Loading size="sm" /> : <Plus className="h-4 w-4" />}
+                    Adicionar
                   </Button>
                 </div>
               </div>
-            </div>
 
-            {/* Imagens */}
-            <div className="space-y-3">
-              <Label>
-                Imagens{' '}
-                <span className="font-normal text-muted-foreground">
-                  ({images.length + pendingFiles.length}/{MAX_PRODUCT_IMAGES})
-                </span>
-              </Label>
-
-              {/* Previews */}
-              {(images.length > 0 || pendingFiles.length > 0) ? (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                  {images.map((url, i) => (
-                    <div key={`img-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeExistingImage(i)}
-                        className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Remover imagem"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  {pendingFiles.map((file, i) => (
-                    <div key={`file-${i}`} className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-primary/60 group">
-                      <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
-                      <span className="absolute bottom-1 left-1 text-[10px] bg-primary/80 text-primary-foreground px-1 rounded">
-                        novo
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removePendingFile(i)}
-                        className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Remover imagem"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border rounded-lg text-muted-foreground">
-                  <ImageOff className="h-8 w-8 mb-2" />
-                  <p className="text-xs">Nenhuma imagem adicionada</p>
-                </div>
-              )}
-
-              {/* Upload de arquivos — <label> + overlay input (iOS Safari bloqueia click() em input hidden). */}
-              <div>
-                <label
-                  className={cn(
-                    buttonVariants({ variant: 'outline', size: 'sm' }),
-                    'relative cursor-pointer overflow-hidden',
-                    (uploadingImages || loading) && 'pointer-events-none opacity-50'
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept={PRODUCT_IMAGE_ACCEPT}
-                    multiple
-                    onChange={handlePickFiles}
-                    disabled={uploadingImages || loading}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    aria-label="Enviar imagens"
-                  />
-                  {uploadingImages ? <Loading size="sm" /> : <Upload className="h-4 w-4" />}
-                  {uploadingImages
-                    ? uploadPhase === 'prepare'
-                      ? 'Preparando…'
-                      : 'Enviando…'
-                    : 'Enviar imagens'}
-                </label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {PRODUCT_IMAGE_ACCEPT_LABEL}
-                  {isEditMode
-                    ? ' · envio imediato ao selecionar'
-                    : pendingFiles.length > 0
-                      ? ' · serão enviadas ao salvar o produto'
-                      : ' · no produto novo, sobem ao salvar'}
+              {/* Vídeos — link do YouTube/Instagram ou MP4 hospedado */}
+              <div className="space-y-3">
+                <Label>
+                  Vídeos{" "}
+                  <span className="font-normal text-muted-foreground">
+                    ({videos.length + (pendingVideoFile ? 1 : 0)}/
+                    {MAX_PRODUCT_VIDEOS})
+                  </span>
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Cole o link do YouTube/Instagram ou envie um MP4 (até{" "}
+                  {Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). O
+                  vídeo aparece na galeria do produto na loja.
                 </p>
-              </div>
 
-              {/* Colar URL externa */}
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Colar URL de imagem externa"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddImageUrl()
-                      }
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddImageUrl}
-                  aria-label="Adicionar imagem por URL"
-                >
-                  Adicionar
-                </Button>
-              </div>
-            </div>
-
-            {/* Vídeos — link do YouTube/Instagram ou MP4 hospedado */}
-            <div className="space-y-3">
-              <Label>
-                Vídeos{' '}
-                <span className="font-normal text-muted-foreground">
-                  ({videos.length + (pendingVideoFile ? 1 : 0)}/{MAX_PRODUCT_VIDEOS})
-                </span>
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Cole o link do YouTube/Instagram ou envie um MP4 (até{' '}
-                {Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). O vídeo aparece na galeria
-                do produto na loja.
-              </p>
-
-              {(videos.length > 0 || pendingVideoFile) && (
-                <ul className="space-y-2">
-                  {videos.map((video) => {
-                    const thumb = videoThumbnail(video)
-                    return (
-                      <li
-                        key={video.url}
-                        className="flex items-center gap-3 rounded-md border border-border p-2"
-                      >
-                        <div className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                          {thumb ? (
-                            <img src={thumb} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <Video className="h-4 w-4 text-muted-foreground" />
-                          )}
+                {(videos.length > 0 || pendingVideoFile) && (
+                  <ul className="space-y-2">
+                    {videos.map((video) => {
+                      const thumb = videoThumbnail(video);
+                      return (
+                        <li
+                          key={video.url}
+                          className="flex items-center gap-3 rounded-md border border-border p-2"
+                        >
+                          <div className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <Video className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {videoKindLabel(video.kind)}
+                            </Badge>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {video.url}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeVideo(video.url)}
+                            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            title="Remover vídeo"
+                            aria-label={`Remover vídeo ${video.url}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {pendingVideoFile && (
+                      <li className="flex items-center gap-3 rounded-md border border-dashed border-primary/60 p-2">
+                        <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded bg-muted">
+                          <Video className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <Badge variant="secondary" className="text-[10px]">
-                            {videoKindLabel(video.kind)}
+                            novo
                           </Badge>
-                          <p className="truncate text-xs text-muted-foreground">{video.url}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {pendingVideoFile.name} · sobe ao salvar
+                          </p>
                         </div>
                         <button
                           type="button"
-                          onClick={() => removeVideo(video.url)}
+                          onClick={() => setPendingVideoFile(null)}
                           className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           title="Remover vídeo"
-                          aria-label={`Remover vídeo ${video.url}`}
+                          aria-label="Remover vídeo pendente"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </li>
-                    )
-                  })}
-                  {pendingVideoFile && (
-                    <li className="flex items-center gap-3 rounded-md border border-dashed border-primary/60 p-2">
-                      <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded bg-muted">
-                        <Video className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <Badge variant="secondary" className="text-[10px]">
-                          novo
-                        </Badge>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {pendingVideoFile.name} · sobe ao salvar
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setPendingVideoFile(null)}
-                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        title="Remover vídeo"
-                        aria-label="Remover vídeo pendente"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </li>
-                  )}
-                </ul>
-              )}
-
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Colar link do YouTube ou Instagram"
-                    value={videoUrl}
-                    onChange={(e) => setVideoUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddVideoUrl()
-                      }
-                    }}
-                    className="pl-10"
-                    aria-label="Link do vídeo"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddVideoUrl}
-                  aria-label="Adicionar vídeo por link"
-                >
-                  Adicionar
-                </Button>
-              </div>
-
-              <label
-                className={cn(
-                  buttonVariants({ variant: 'outline', size: 'sm' }),
-                  'relative cursor-pointer overflow-hidden',
-                  (uploadingVideo || loading || videos.length >= MAX_PRODUCT_VIDEOS) &&
-                    'pointer-events-none opacity-50'
+                    )}
+                  </ul>
                 )}
-              >
-                <input
-                  type="file"
-                  accept={PRODUCT_VIDEO_ACCEPT}
-                  onChange={handlePickVideo}
-                  disabled={uploadingVideo || loading}
-                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  aria-label="Enviar vídeo MP4"
-                />
-                {uploadingVideo ? <Loading size="sm" /> : <Video className="h-4 w-4" />}
-                {uploadingVideo ? 'Enviando vídeo…' : 'Enviar MP4'}
-              </label>
-            </div>
 
-            {/* Flags */}
-            <div className="grid sm:grid-cols-2 gap-3">
-              <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(e) => update('active', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <div>
-                  <p className="text-sm font-medium">Ativo</p>
-                  <p className="text-xs text-muted-foreground">Visível na loja</p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Colar link do YouTube ou Instagram"
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddVideoUrl();
+                        }
+                      }}
+                      className="pl-10"
+                      aria-label="Link do vídeo"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddVideoUrl}
+                    aria-label="Adicionar vídeo por link"
+                  >
+                    Adicionar
+                  </Button>
                 </div>
-              </label>
-              <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
-                <input
-                  type="checkbox"
-                  checked={form.featured}
-                  onChange={(e) => update('featured', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <div>
-                  <p className="text-sm font-medium flex items-center gap-1">
-                    <Star className="h-3.5 w-3.5 text-yellow-500" /> Destaque
-                  </p>
-                  <p className="text-xs text-muted-foreground">Aparece em destaque</p>
-                </div>
-              </label>
-              <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50 sm:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={form.wholesaleEnabled}
-                  onChange={(e) => update('wholesaleEnabled', e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Disponível no atacado</p>
-                  <p className="text-xs text-muted-foreground">
-                    Aparece em /atacado (desconto 25% para CNPJ aprovado). Deixe desligado até a
-                    importação se ainda não for vender no atacado.
-                  </p>
-                </div>
-              </label>
-              {form.wholesaleEnabled && (
-                <div className="sm:col-span-2 space-y-1">
-                  <Label htmlFor="wholesaleMinQty">Qtd. mínima no atacado</Label>
-                  <Input
-                    id="wholesaleMinQty"
-                    type="number"
-                    min={1}
-                    value={form.wholesaleMinQty}
-                    onChange={(e) => update('wholesaleMinQty', e.target.value)}
-                  />
-                </div>
-              )}
-            </div>
 
-            {/* Variações: 1 tipo "Cor" + N opções = N SKUs (ilimitado) */}
-            <div className="space-y-3 rounded-lg border p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">Variações (foto por opção, estilo Shopee)</p>
-                  <p className="text-xs text-muted-foreground">
-                    <strong className="text-foreground">Tipo</strong> = o que muda (ex. Cor).{' '}
-                    <strong className="text-foreground">Opções</strong> = cada valor (Rosa, Preto,
-                    Azul…) — <strong className="text-foreground">sem limite</strong>. Clique em{' '}
-                    <strong className="text-foreground">Gerar combinações</strong> e cada linha
-                    ganha campo de <strong className="text-foreground">foto própria</strong>, preço
-                    e estoque.
-                  </p>
-                </div>
-                <label className="flex items-center gap-2 text-sm">
+                <label
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "relative cursor-pointer overflow-hidden",
+                    (uploadingVideo ||
+                      loading ||
+                      videos.length >= MAX_PRODUCT_VIDEOS) &&
+                      "pointer-events-none opacity-50",
+                  )}
+                >
                   <input
-                    type="checkbox"
-                    checked={hasVariants}
-                    onChange={(e) => setHasVariants(e.target.checked)}
-                    aria-label="Ativar variações"
+                    type="file"
+                    accept={PRODUCT_VIDEO_ACCEPT}
+                    onChange={handlePickVideo}
+                    disabled={uploadingVideo || loading}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Enviar vídeo MP4"
                   />
-                  Ativar
+                  {uploadingVideo ? (
+                    <Loading size="sm" />
+                  ) : (
+                    <Video className="h-4 w-4" />
+                  )}
+                  {uploadingVideo ? "Enviando vídeo…" : "Enviar MP4"}
                 </label>
               </div>
 
-              {hasVariants && (
-                <div className="space-y-3">
-                  <div className="space-y-3">
-                    {axisDrafts.map((draft, idx) => {
-                      const options = parseOptionsText(draft.optionsText)
-                      return (
-                        <div key={idx} className="space-y-2 rounded-md border border-border/60 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <Label>
-                              Tipo {idx + 1}
-                              {idx === 0 ? ' (ex.: Cor)' : idx === 1 ? ' (ex.: Tamanho)' : ''}
-                            </Label>
-                            {axisDrafts.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-muted-foreground"
-                                onClick={() => removeAxisDraft(idx)}
-                                aria-label={`Remover tipo ${idx + 1}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                          <Input
-                            value={draft.name}
-                            onChange={(e) => updateAxisDraft(idx, { name: e.target.value })}
-                            placeholder={idx === 0 ? 'Cor' : idx === 1 ? 'Tamanho' : 'Nome do tipo'}
-                          />
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground">
-                              Opções ({options.length}) — digite e adicione uma a uma
-                            </Label>
-                            <div className="flex flex-wrap gap-1.5">
-                              {options.map((opt) => (
-                                <span
-                                  key={opt}
-                                  className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                                >
-                                  {opt}
-                                  <button
-                                    type="button"
-                                    className="rounded-full p-0.5 hover:bg-primary/20"
-                                    onClick={() => removeOptionChip(idx, opt)}
-                                    aria-label={`Remover ${opt}`}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                            <div className="flex gap-2">
-                              <Input
-                                className="h-8"
-                                placeholder="Ex.: Rosa"
-                                value={newOptionByAxis[idx] ?? ''}
-                                onChange={(e) =>
-                                  setNewOptionByAxis((prev) => ({ ...prev, [idx]: e.target.value }))
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault()
-                                    addOptionChip(idx)
-                                  }
-                                }}
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 shrink-0"
-                                onClick={() => addOptionChip(idx)}
-                              >
-                                <Plus className="h-4 w-4" />
-                                Opção
-                              </Button>
-                            </div>
-                            <Input
-                              className="h-8 text-xs"
-                              placeholder="Ou cole várias: Rosa, Preto, Azul"
-                              value={draft.optionsText}
-                              onChange={(e) => updateAxisDraft(idx, { optionsText: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
+              {/* Flags */}
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(e) => update("active", e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium">Ativo</p>
+                    <p className="text-xs text-muted-foreground">
+                      Visível na loja
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={addAxisDraft}>
-                      <Plus className="h-4 w-4" />
-                      Outro tipo (ex. Tamanho)
-                    </Button>
-                    <Button type="button" size="sm" onClick={generateVariantMatrix}>
-                      <Plus className="h-4 w-4" />
-                      Gerar combinações
-                    </Button>
+                </label>
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
+                  <input
+                    type="checkbox"
+                    checked={form.featured}
+                    onChange={(e) => update("featured", e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5 text-yellow-500" /> Destaque
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Aparece em destaque
+                    </p>
                   </div>
+                </label>
+                <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50 sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={form.wholesaleEnabled}
+                    onChange={(e) =>
+                      update("wholesaleEnabled", e.target.checked)
+                    }
+                    className="h-4 w-4"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Disponível no atacado</p>
+                    <p className="text-xs text-muted-foreground">
+                      Aparece em /atacado (desconto 25% para CNPJ aprovado).
+                      Deixe desligado até a importação se ainda não for vender
+                      no atacado.
+                    </p>
+                  </div>
+                </label>
+                {form.wholesaleEnabled && (
+                  <div className="sm:col-span-2 space-y-1">
+                    <Label htmlFor="wholesaleMinQty">
+                      Qtd. mínima no atacado
+                    </Label>
+                    <Input
+                      id="wholesaleMinQty"
+                      type="number"
+                      min={1}
+                      value={form.wholesaleMinQty}
+                      onChange={(e) =>
+                        update("wholesaleMinQty", e.target.value)
+                      }
+                    />
+                  </div>
+                )}
+              </div>
 
-                  {variantRows.length > 0 && (
-                    <div className="max-h-96 space-y-3 overflow-y-auto rounded border p-2">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {variantRows.length} SKU(s) — cada um com fotos próprias (até{' '}
-                        {MAX_VARIANT_IMAGES}), preço, estoque e SKU, como na Shopee
-                      </p>
-                      {variantRows.map((row, idx) => {
-                        const savedImages = row.images ?? []
-                        const previews = pendingVariantPreviews[idx] ?? []
-                        const photoCount = savedImages.length + previews.length
-                        const thumbUrl = savedImages[0] || previews[0] || null
+              {/* Variações: 1 tipo "Cor" + N opções = N SKUs (ilimitado) */}
+              <div className="space-y-3 rounded-lg border p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">
+                      Variações (foto por opção, estilo Shopee)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      <strong className="text-foreground">Tipo</strong> = o que
+                      muda (ex. Cor).{" "}
+                      <strong className="text-foreground">Opções</strong> = cada
+                      valor (Rosa, Preto, Azul…) —{" "}
+                      <strong className="text-foreground">sem limite</strong>.
+                      Clique em{" "}
+                      <strong className="text-foreground">
+                        Gerar combinações
+                      </strong>{" "}
+                      e cada linha ganha campo de{" "}
+                      <strong className="text-foreground">foto própria</strong>,
+                      preço e estoque.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={hasVariants}
+                      onChange={(e) => setHasVariants(e.target.checked)}
+                      aria-label="Ativar variações"
+                    />
+                    Ativar
+                  </label>
+                </div>
+
+                {hasVariants && (
+                  <div className="space-y-3">
+                    <div className="space-y-3">
+                      {axisDrafts.map((draft, idx) => {
+                        const options = parseOptionsText(draft.optionsText);
                         return (
                           <div
-                            key={row.name + idx}
-                            className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2"
+                            key={idx}
+                            className="space-y-2 rounded-md border border-border/60 p-3"
                           >
-                            <div className="grid grid-cols-12 items-center gap-2 text-sm">
-                              {/* Foto da variação */}
-                              <div className="col-span-2 sm:col-span-1">
-                                <label
-                                  className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
-                                  title={`Foto de ${row.name}`}
-                                  aria-label={`Enviar foto da variação ${row.name}`}
-                                >
-                                  <input
-                                    id={`variant-photo-${idx}`}
-                                    type="file"
-                                    accept={PRODUCT_IMAGE_ACCEPT}
-                                    multiple
-                                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                    onChange={(e) => void handleVariantFilePick(e, idx)}
-                                  />
-                                  {thumbUrl ? (
-                                    <img
-                                      src={thumbUrl}
-                                      alt=""
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <Upload className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                  {photoCount > 1 && (
-                                    <span className="absolute bottom-0 right-0 rounded-tl bg-primary px-1 text-[10px] font-medium text-primary-foreground">
-                                      {photoCount}
-                                    </span>
-                                  )}
-                                </label>
-                              </div>
-                              <span
-                                className="col-span-4 truncate font-medium sm:col-span-3"
-                                title={row.name}
-                              >
-                                {row.name}
-                              </span>
-                              <Input
-                                className="col-span-3 h-8 sm:col-span-3"
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                max={MAX_PRODUCT_PRICE}
-                                value={row.price}
-                                onChange={(e) => {
-                                  const price = Number(e.target.value)
-                                  setVariantRows((rows) =>
-                                    rows.map((r, i) => (i === idx ? { ...r, price } : r))
-                                  )
-                                }}
-                                aria-label={`Preço ${row.name}`}
-                              />
-                              <Input
-                                className="col-span-2 h-8"
-                                type="number"
-                                value={row.stock ?? 0}
-                                onChange={(e) => {
-                                  const stock = Number(e.target.value)
-                                  setVariantRows((rows) =>
-                                    rows.map((r, i) => (i === idx ? { ...r, stock } : r))
-                                  )
-                                }}
-                                aria-label={`Estoque ${row.name}`}
-                              />
-                              <Input
-                                className="col-span-12 h-8 sm:col-span-3"
-                                placeholder="SKU"
-                                value={row.sku ?? ''}
-                                onChange={(e) => {
-                                  const sku = e.target.value
-                                  setVariantRows((rows) =>
-                                    rows.map((r, i) => (i === idx ? { ...r, sku } : r))
-                                  )
-                                }}
-                                aria-label={`SKU ${row.name}`}
-                              />
-                            </div>
-
-                            {/* Galeria da variação — várias fotos, como na Shopee */}
-                            {photoCount > 0 && (
-                              <div className="flex flex-wrap gap-1.5 pl-0 sm:pl-14">
-                                {savedImages.map((url) => (
-                                  <div
-                                    key={url}
-                                    className="group relative h-12 w-12 overflow-hidden rounded border border-border"
-                                  >
-                                    <img src={url} alt="" className="h-full w-full object-cover" />
-                                    <button
-                                      type="button"
-                                      onClick={() => removeVariantImage(idx, url)}
-                                      className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                                      title="Remover foto"
-                                      aria-label={`Remover foto da variação ${row.name}`}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                                {previews.map((url, fileIndex) => (
-                                  <div
-                                    key={url}
-                                    className="group relative h-12 w-12 overflow-hidden rounded border border-dashed border-primary/60"
-                                  >
-                                    <img src={url} alt="" className="h-full w-full object-cover" />
-                                    <span className="absolute bottom-0 left-0 rounded-tr bg-primary/80 px-0.5 text-[9px] text-primary-foreground">
-                                      novo
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => removePendingVariantFile(idx, fileIndex)}
-                                      className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                                      title="Remover foto"
-                                      aria-label={`Remover foto pendente da variação ${row.name}`}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Controles de foto da variação */}
-                            <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
-                              <label
-                                htmlFor={`variant-photo-${idx}`}
-                                className={cn(
-                                  buttonVariants({ variant: 'outline', size: 'sm' }),
-                                  'h-7 cursor-pointer text-xs',
-                                  photoCount >= MAX_VARIANT_IMAGES && 'pointer-events-none opacity-50'
-                                )}
-                              >
-                                <Upload className="h-3 w-3" />
-                                {photoCount > 0
-                                  ? `Add fotos (${photoCount}/${MAX_VARIANT_IMAGES})`
-                                  : 'Fotos'}
-                              </label>
-                              {photoCount > 0 && (
+                            <div className="flex items-center justify-between gap-2">
+                              <Label>
+                                Tipo {idx + 1}
+                                {idx === 0
+                                  ? " (ex.: Cor)"
+                                  : idx === 1
+                                    ? " (ex.: Tamanho)"
+                                    : ""}
+                              </Label>
+                              {axisDrafts.length > 1 && (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 text-xs text-muted-foreground"
-                                  onClick={() => clearVariantImages(idx)}
+                                  className="h-7 px-2 text-muted-foreground"
+                                  onClick={() => removeAxisDraft(idx)}
+                                  aria-label={`Remover tipo ${idx + 1}`}
                                 >
-                                  <Trash2 className="h-3 w-3" />
-                                  Limpar
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               )}
-                              <div className="flex min-w-0 flex-1 gap-1">
+                            </div>
+                            <Input
+                              value={draft.name}
+                              onChange={(e) =>
+                                updateAxisDraft(idx, { name: e.target.value })
+                              }
+                              placeholder={
+                                idx === 0
+                                  ? "Cor"
+                                  : idx === 1
+                                    ? "Tamanho"
+                                    : "Nome do tipo"
+                              }
+                            />
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">
+                                Opções ({options.length}) — digite e adicione
+                                uma a uma
+                              </Label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {options.map((opt) => (
+                                  <span
+                                    key={opt}
+                                    className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                  >
+                                    {opt}
+                                    <button
+                                      type="button"
+                                      className="rounded-full p-0.5 hover:bg-primary/20"
+                                      onClick={() => removeOptionChip(idx, opt)}
+                                      aria-label={`Remover ${opt}`}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
+                              <div className="flex gap-2">
                                 <Input
-                                  className="h-7 text-xs"
-                                  placeholder="Ou cole URL da foto desta variação"
-                                  value={variantUrlDraft[idx] ?? ''}
+                                  className="h-8"
+                                  placeholder="Ex.: Rosa"
+                                  value={newOptionByAxis[idx] ?? ""}
                                   onChange={(e) =>
-                                    setVariantUrlDraft((prev) => ({
+                                    setNewOptionByAxis((prev) => ({
                                       ...prev,
                                       [idx]: e.target.value,
                                     }))
                                   }
                                   onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault()
-                                      applyVariantImageUrl(idx)
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      addOptionChip(idx);
                                     }
                                   }}
-                                  aria-label={`URL da foto ${row.name}`}
                                 />
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
-                                  className="h-7 shrink-0 text-xs"
-                                  onClick={() => applyVariantImageUrl(idx)}
+                                  className="h-8 shrink-0"
+                                  onClick={() => addOptionChip(idx)}
                                 >
-                                  OK
+                                  <Plus className="h-4 w-4" />
+                                  Opção
                                 </Button>
                               </div>
+                              <Input
+                                className="h-8 text-xs"
+                                placeholder="Ou cole várias: Rosa, Preto, Azul"
+                                value={draft.optionsText}
+                                onChange={(e) =>
+                                  updateAxisDraft(idx, {
+                                    optionsText: e.target.value,
+                                  })
+                                }
+                              />
                             </div>
-
-                            {/* Atalho: escolher imagem já do produto */}
-                            {images.length > 0 && (
-                              <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-14">
-                                <span className="text-[10px] text-muted-foreground">
-                                  Da galeria:
-                                </span>
-                                {images.slice(0, 12).map((url) => (
-                                  <button
-                                    key={url}
-                                    type="button"
-                                    onClick={() => assignGalleryImageToVariant(idx, url)}
-                                    className={`h-8 w-8 overflow-hidden rounded border transition-colors ${
-                                      savedImages.includes(url)
-                                        ? 'border-primary ring-1 ring-primary'
-                                        : 'border-border hover:border-primary/60'
-                                    }`}
-                                    title="Usar esta imagem na variação"
-                                  >
-                                    <img src={url} alt="" className="h-full w-full object-cover" />
-                                  </button>
-                                ))}
-                              </div>
-                            )}
                           </div>
-                        )
+                        );
                       })}
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addAxisDraft}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Outro tipo (ex. Tamanho)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={generateVariantMatrix}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Gerar combinações
+                      </Button>
+                    </div>
 
-          <CardFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-              Cancelar
-            </Button>
-            <Button type="submit" className="flex-1" disabled={loading}>
-              {loading ? <Loading size="sm" /> : isEditMode ? 'Salvar Alterações' : 'Criar Produto'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
-    {cropSession && (
-      <ImageCropDialog
-        files={cropSession.files}
-        onCancel={() => setCropSession(null)}
-        onComplete={handleCropComplete}
-      />
-    )}
+                    {variantRows.length > 0 && (
+                      <div className="max-h-96 space-y-3 overflow-y-auto rounded border p-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {variantRows.length} SKU(s) — cada um com fotos
+                          próprias (até {MAX_VARIANT_IMAGES}), preço, estoque e
+                          SKU, como na Shopee
+                        </p>
+                        {variantRows.map((row, idx) => {
+                          const savedImages = row.images ?? [];
+                          const previews = pendingVariantPreviews[idx] ?? [];
+                          const photoCount =
+                            savedImages.length + previews.length;
+                          const thumbUrl =
+                            savedImages[0] || previews[0] || null;
+                          return (
+                            <div
+                              key={row.name + idx}
+                              className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2"
+                            >
+                              {/*
+                              No celular a linha empilha: 12 colunas ali davam
+                              33px por célula e a miniatura de 48px vazava.
+                              `sm:contents` dissolve os agrupadores no desktop,
+                              devolvendo os campos ao grid de 12 colunas.
+                            */}
+                              <div className="flex flex-col gap-2 text-sm sm:grid sm:grid-cols-12 sm:items-center">
+                                <div className="flex items-center gap-2 sm:contents">
+                                  {/* Foto da variação */}
+                                  <div className="shrink-0 sm:col-span-1">
+                                    <label
+                                      className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
+                                      title={`Foto de ${row.name}`}
+                                      aria-label={`Enviar foto da variação ${row.name}`}
+                                    >
+                                      <input
+                                        id={`variant-photo-${idx}`}
+                                        type="file"
+                                        accept={PRODUCT_IMAGE_ACCEPT}
+                                        multiple
+                                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                        onChange={(e) =>
+                                          void handleVariantFilePick(e, idx)
+                                        }
+                                      />
+                                      {thumbUrl ? (
+                                        <img
+                                          src={thumbUrl}
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        <Upload className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                      {photoCount > 1 && (
+                                        <span className="absolute bottom-0 right-0 rounded-tl bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                                          {photoCount}
+                                        </span>
+                                      )}
+                                    </label>
+                                  </div>
+                                  <span
+                                    className="min-w-0 flex-1 truncate font-medium sm:col-span-3"
+                                    title={row.name}
+                                  >
+                                    {row.name}
+                                  </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 sm:contents">
+                                  <Input
+                                    className="h-8 sm:col-span-3"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    max={MAX_PRODUCT_PRICE}
+                                    value={row.price}
+                                    onChange={(e) => {
+                                      const price = Number(e.target.value);
+                                      setVariantRows((rows) =>
+                                        rows.map((r, i) =>
+                                          i === idx ? { ...r, price } : r,
+                                        ),
+                                      );
+                                    }}
+                                    aria-label={`Preço ${row.name}`}
+                                  />
+                                  <Input
+                                    className="h-8 sm:col-span-2"
+                                    type="number"
+                                    value={row.stock ?? 0}
+                                    onChange={(e) => {
+                                      const stock = Number(e.target.value);
+                                      setVariantRows((rows) =>
+                                        rows.map((r, i) =>
+                                          i === idx ? { ...r, stock } : r,
+                                        ),
+                                      );
+                                    }}
+                                    aria-label={`Estoque ${row.name}`}
+                                  />
+                                  <Input
+                                    className="col-span-2 h-8 sm:col-span-3"
+                                    placeholder="SKU"
+                                    value={row.sku ?? ""}
+                                    onChange={(e) => {
+                                      const sku = e.target.value;
+                                      setVariantRows((rows) =>
+                                        rows.map((r, i) =>
+                                          i === idx ? { ...r, sku } : r,
+                                        ),
+                                      );
+                                    }}
+                                    aria-label={`SKU ${row.name}`}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Galeria da variação — várias fotos, como na Shopee */}
+                              {photoCount > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pl-0 sm:pl-14">
+                                  {savedImages.map((url) => (
+                                    <div
+                                      key={url}
+                                      className="group relative h-12 w-12 overflow-hidden rounded border border-border"
+                                    >
+                                      <img
+                                        src={url}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeVariantImage(idx, url)
+                                        }
+                                        className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                        title="Remover foto"
+                                        aria-label={`Remover foto da variação ${row.name}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                  {previews.map((url, fileIndex) => (
+                                    <div
+                                      key={url}
+                                      className="group relative h-12 w-12 overflow-hidden rounded border border-dashed border-primary/60"
+                                    >
+                                      <img
+                                        src={url}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                      />
+                                      <span className="absolute bottom-0 left-0 rounded-tr bg-primary/80 px-0.5 text-[9px] text-primary-foreground">
+                                        novo
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removePendingVariantFile(
+                                            idx,
+                                            fileIndex,
+                                          )
+                                        }
+                                        className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                        title="Remover foto"
+                                        aria-label={`Remover foto pendente da variação ${row.name}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Controles de foto da variação */}
+                              <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
+                                <label
+                                  htmlFor={`variant-photo-${idx}`}
+                                  className={cn(
+                                    buttonVariants({
+                                      variant: "outline",
+                                      size: "sm",
+                                    }),
+                                    "h-7 cursor-pointer text-xs",
+                                    photoCount >= MAX_VARIANT_IMAGES &&
+                                      "pointer-events-none opacity-50",
+                                  )}
+                                >
+                                  <Upload className="h-3 w-3" />
+                                  {photoCount > 0
+                                    ? `Add fotos (${photoCount}/${MAX_VARIANT_IMAGES})`
+                                    : "Fotos"}
+                                </label>
+                                {photoCount > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-muted-foreground"
+                                    onClick={() => clearVariantImages(idx)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    Limpar
+                                  </Button>
+                                )}
+                                <div className="flex min-w-0 flex-1 gap-1">
+                                  <Input
+                                    className="h-7 text-xs"
+                                    placeholder="Ou cole URL da foto desta variação"
+                                    value={variantUrlDraft[idx] ?? ""}
+                                    onChange={(e) =>
+                                      setVariantUrlDraft((prev) => ({
+                                        ...prev,
+                                        [idx]: e.target.value,
+                                      }))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        applyVariantImageUrl(idx);
+                                      }
+                                    }}
+                                    aria-label={`URL da foto ${row.name}`}
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 shrink-0 text-xs"
+                                    onClick={() => applyVariantImageUrl(idx)}
+                                  >
+                                    OK
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Atalho: escolher imagem já do produto */}
+                              {images.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-14">
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Da galeria:
+                                  </span>
+                                  {images.slice(0, 12).map((url) => (
+                                    <button
+                                      key={url}
+                                      type="button"
+                                      onClick={() =>
+                                        assignGalleryImageToVariant(idx, url)
+                                      }
+                                      className={`h-8 w-8 overflow-hidden rounded border transition-colors ${
+                                        savedImages.includes(url)
+                                          ? "border-primary ring-1 ring-primary"
+                                          : "border-border hover:border-primary/60"
+                                      }`}
+                                      title="Usar esta imagem na variação"
+                                    >
+                                      <img
+                                        src={url}
+                                        alt=""
+                                        className="h-full w-full object-cover"
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+
+            <CardFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading ? (
+                  <Loading size="sm" />
+                ) : isEditMode ? (
+                  "Salvar Alterações"
+                ) : (
+                  "Criar Produto"
+                )}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+      {cropSession && (
+        <ImageCropDialog
+          files={cropSession.files}
+          onCancel={() => setCropSession(null)}
+          onComplete={handleCropComplete}
+        />
+      )}
     </>
-  )
+  );
 }
