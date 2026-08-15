@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import type { Category } from '../../types'
 import { isProductSort } from '../../lib/product-sort'
 import { cn } from '../../lib/utils'
+import { categoryIcon, guessCategoryIcon } from '../../lib/category-icons'
 import { Skeleton } from '../ui/skeleton'
 
 interface CategoryNavProps {
@@ -67,15 +68,19 @@ export function CategoryNav({
       <Link to={withSort(allHref)} className={pillClass(!activeSlug)}>
         Todos
       </Link>
-      {categories.map((category) => (
-        <Link
-          key={category.id}
-          to={withSort(catHref(category.slug))}
-          className={pillClass(activeSlug === category.slug)}
-        >
-          {category.name}
-        </Link>
-      ))}
+      {categories.map((category) => {
+        const Icon = categoryIcon(category.icon) ?? categoryIcon(guessCategoryIcon(category.name))
+        return (
+          <Link
+            key={category.id}
+            to={withSort(catHref(category.slug))}
+            className={cn(pillClass(activeSlug === category.slug), 'inline-flex items-center gap-1.5')}
+          >
+            {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden />}
+            {category.name}
+          </Link>
+        )
+      })}
     </nav>
   )
 }

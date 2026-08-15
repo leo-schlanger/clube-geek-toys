@@ -454,6 +454,9 @@ export async function ensureSchema(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL`);
 
+    // ─── Ícone por categoria (migration 018) ─────────────────────────────────
+    await query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(40)`);
+
     console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
   } catch (err) {
     // Loud-fail but don't crash the API. The operator should investigate via logs.

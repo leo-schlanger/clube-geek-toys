@@ -4,10 +4,10 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog } from '../utils/audit.js';
 
 /**
- * Controle de estoque do painel (pedido Laura 14/08/2026).
+ * Controle de estoque do painel.
  *
- * O número em si já vivia em `products.stock` / `product_variants.stock`; o que
- * faltava era saber **por que** ele mudou. Toda alteração passa a gravar uma
+ * O número em si vive em `products.stock` / `product_variants.stock`; esta
+ * camada existe para registrar **por que** ele mudou: toda alteração grava uma
  * linha em `stock_movements` — venda, cancelamento ou ajuste manual.
  */
 

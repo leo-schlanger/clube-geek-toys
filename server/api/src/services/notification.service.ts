@@ -3,7 +3,7 @@ import { query } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 
 /**
- * Notificações no perfil do cliente (pedido Laura 14/08/2026).
+ * Notificações no perfil do cliente.
  *
  * Deliberadamente simples: uma linha por aviso, lida/não lida, com um link
  * relativo para a SPA. Não é fila nem push — o cliente vê quando abre a loja.

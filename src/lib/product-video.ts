@@ -1,8 +1,8 @@
 import type { ProductVideo } from '../types'
 
 /**
- * Vídeos de produto (pedido 14/08/2026): link de YouTube/Instagram ou MP4
- * hospedado no próprio volume /uploads.
+ * Vídeos de produto: link de YouTube/Instagram, ou MP4 hospedado no próprio
+ * volume /uploads.
  */
 
 export const MAX_PRODUCT_VIDEOS = 5

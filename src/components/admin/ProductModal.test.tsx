@@ -11,12 +11,14 @@ vi.mock('../../lib/products', () => ({
   updateProduct: vi.fn(),
   uploadProductImages: vi.fn(),
   uploadProductMedia: vi.fn(),
+  uploadProductVideo: vi.fn(),
   createCategory: vi.fn(),
   deleteCategory: vi.fn(),
   replaceProductVariants: vi.fn(),
   MAX_PRODUCT_IMAGES: 30,
   MAX_VARIANT_IMAGES: 10,
   MAX_IMAGE_UPLOAD_BATCH: 20,
+  MAX_PRODUCT_CATEGORIES: 5,
 }))
 
 vi.mock('sonner', () => ({
@@ -197,6 +199,54 @@ describe('ProductModal — foto por variação', () => {
     fireEvent.change(input, { target: { files: [file] } })
     expect(screen.getByRole('dialog', { name: /Cortar imagem/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Aplicar recorte/i })).toBeInTheDocument()
+  })
+})
+
+describe('ProductModal — gerar combinações', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
+
+  it('usa a opção digitada mesmo sem clicar no "+"', () => {
+    // Caminho natural de quem não leu a dica: digita "Rosa" e vai direto em
+    // Gerar combinações. Antes disso o texto era descartado e nada era gerado.
+    render(
+      <ProductModal
+        mode="edit"
+        product={semVariacao}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByLabelText(/Ativar variações/i))
+    fireEvent.change(screen.getByPlaceholderText('Ex.: Rosa'), { target: { value: 'Rosa' } })
+    fireEvent.click(screen.getByRole('button', { name: /Gerar combinações/i }))
+
+    expect(screen.getByText(/1 SKU\(s\)/)).toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
+  it('reclama do nome do tipo, não das opções, quando o tipo está vazio', () => {
+    render(
+      <ProductModal
+        mode="edit"
+        product={semVariacao}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByLabelText(/Ativar variações/i))
+    fireEvent.change(screen.getByPlaceholderText('Cor'), { target: { value: '' } })
+    fireEvent.change(screen.getByPlaceholderText('Ex.: Rosa'), { target: { value: 'Rosa' } })
+    fireEvent.click(screen.getByRole('button', { name: /Gerar combinações/i }))
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/nome ao tipo/i))
   })
 })
 

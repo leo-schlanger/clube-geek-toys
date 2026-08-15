@@ -5,6 +5,7 @@ import {
   Minus,
   Plus,
   ChevronLeft,
+  ChevronRight,
   ImageOff,
   ShieldCheck,
   Sparkles,
@@ -55,6 +56,8 @@ export default function ProductDetail() {
   const [activeImage, setActiveImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [variantSel, setVariantSel] = useState<Record<string, string>>({})
+  /** X inicial do toque, para distinguir arrastar de tocar. */
+  const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
   useEffect(() => {
     if (!slug) return
@@ -128,6 +131,27 @@ export default function ProductDetail() {
   useEffect(() => {
     setActiveImage(0)
   }, [galleryKey])
+
+  /** Avança/volta circularmente na galeria. */
+  function stepImage(delta: number) {
+    const total = displayImages.length
+    if (total < 2) return
+    setActiveImage((current) => (Math.min(current, total - 1) + delta + total) % total)
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    setTouchStartX(e.touches[0]?.clientX ?? null)
+  }
+
+  /** 40px separa um arrastar de um toque acidental durante a rolagem vertical. */
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX == null) return
+    const endX = e.changedTouches[0]?.clientX ?? touchStartX
+    const delta = endX - touchStartX
+    setTouchStartX(null)
+    if (Math.abs(delta) < 40) return
+    stepImage(delta < 0 ? 1 : -1)
+  }
 
   const outOfStock = product
     ? product.hasVariants
@@ -205,7 +229,13 @@ export default function ProductDetail() {
           <div className="grid gap-8 lg:grid-cols-2">
             {/* Galeria */}
             <div className="space-y-3">
-              <div className="aspect-square overflow-hidden rounded-xl border bg-muted">
+              {/* bg-white: foto em outro formato sobra moldura, e cinza sujava o
+                  produto. Branco some com o fundo do card na loja. */}
+              <div
+                className="relative aspect-square touch-pan-y select-none overflow-hidden rounded-xl border bg-white"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+              >
                 {displayImages.length > 0 ? (
                   <img
                     src={displayImages[Math.min(activeImage, displayImages.length - 1)]}
@@ -215,11 +245,46 @@ export default function ProductDetail() {
                         : product.name
                     }
                     className="h-full w-full object-contain transition-opacity duration-200"
+                    draggable={false}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     <ImageOff className="h-16 w-16" />
                   </div>
+                )}
+
+                {displayImages.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => stepImage(-1)}
+                      aria-label="Foto anterior"
+                      className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/40 p-1.5 text-white transition-colors hover:bg-black/60 sm:block"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => stepImage(1)}
+                      aria-label="Próxima foto"
+                      className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/40 p-1.5 text-white transition-colors hover:bg-black/60 sm:block"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                    <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
+                      {displayImages.map((img, i) => (
+                        <span
+                          key={`dot-${img}-${i}`}
+                          className={cn(
+                            'h-1.5 rounded-full transition-all',
+                            i === Math.min(activeImage, displayImages.length - 1)
+                              ? 'w-4 bg-primary'
+                              : 'w-1.5 bg-black/25'
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
 

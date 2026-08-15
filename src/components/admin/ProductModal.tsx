@@ -14,6 +14,7 @@ import {
   uploadProductMedia,
   uploadProductVideo,
   createCategory,
+  updateCategory,
   deleteCategory,
   replaceProductVariants,
   MAX_PRODUCT_IMAGES,
@@ -35,6 +36,7 @@ import {
   PRODUCT_VIDEO_ACCEPT,
   PRODUCT_VIDEO_MAX_BYTES,
 } from '../../lib/product-video'
+import { CATEGORY_ICONS, categoryIcon, guessCategoryIcon } from '../../lib/category-icons'
 import { ImageCropDialog } from './ImageCropDialog'
 import { cn, formatCurrency } from '../../lib/utils'
 import { toast } from 'sonner'
@@ -171,9 +173,24 @@ export function ProductModal({
     return out
   }
 
-  function buildAxes(): VariantAxis[] {
+  /**
+   * Anexa a opção que está digitada e ainda não virou chip.
+   * Quem preenche o campo e clica direto em "Gerar combinações" não pode perder
+   * o que escreveu só por não ter clicado no "+".
+   */
+  function draftsWithPendingOptions(): AxisDraft[] {
+    return axisDrafts.map((draft, idx) => {
+      const pending = (newOptionByAxis[idx] ?? '').trim()
+      if (!pending) return draft
+      const options = parseOptionsText(draft.optionsText)
+      if (options.some((o) => o.toLowerCase() === pending.toLowerCase())) return draft
+      return { ...draft, optionsText: [...options, pending].join(', ') }
+    })
+  }
+
+  function buildAxes(drafts: AxisDraft[] = draftsWithPendingOptions()): VariantAxis[] {
     const axes: VariantAxis[] = []
-    for (const draft of axisDrafts) {
+    for (const draft of drafts) {
       const options = parseOptionsText(draft.optionsText)
       if (draft.name.trim() && options.length) {
         axes.push({ name: draft.name.trim(), options })
@@ -215,10 +232,18 @@ export function ProductModal({
 
   /** Gera matriz de combinações a partir dos eixos. */
   function generateVariantMatrix() {
-    const axes = buildAxes()
+    // Confirma o que está digitado antes de gerar, e reflete isso nos chips.
+    const drafts = draftsWithPendingOptions()
+    setAxisDrafts(drafts)
+    setNewOptionByAxis({})
+
+    const axes = buildAxes(drafts)
     if (!axes.length) {
+      const semNome = drafts.some((d) => !d.name.trim())
       toast.error(
-        'Informe o tipo (ex.: Cor) e as opções (ex.: Rosa, Preto, Azul). Use o botão + para adicionar cada cor.'
+        semNome
+          ? 'Dê um nome ao tipo (ex.: Cor) antes de gerar as combinações.'
+          : 'Adicione ao menos uma opção (ex.: Rosa) no tipo antes de gerar as combinações.'
       )
       return
     }
@@ -652,6 +677,20 @@ export function ProductModal({
     setCreatingCategory(false)
   }
 
+  async function handleSetCategoryIcon(id: string, icon: string) {
+    try {
+      const updated = await updateCategory(id, { icon: icon || null })
+      if (!updated) {
+        toast.error('Erro ao salvar o ícone')
+        return
+      }
+      onCategoriesChange?.()
+    } catch (error) {
+      logger.error('Error setting category icon:', error)
+      toast.error('Erro ao salvar o ícone')
+    }
+  }
+
   async function handleDeleteCategory(id: string, name: string) {
     if (!window.confirm(`Remover a categoria "${name}"? Os produtos vinculados ficarão sem categoria.`)) return
     try {
@@ -1083,20 +1122,40 @@ export function ProductModal({
                   <span className="text-xs font-medium text-muted-foreground">Gerenciar categorias</span>
                 </div>
                 {categories.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {categories.map((cat) => (
-                      <Badge key={cat.id} variant="secondary" className="gap-1 pr-1">
-                        {cat.name}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                          className="ml-0.5 rounded-full hover:bg-destructive/20 p-0.5"
-                          title="Remover categoria"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
+                  <div className="space-y-2">
+                    {categories.map((cat) => {
+                      const key = cat.icon ?? guessCategoryIcon(cat.name) ?? ''
+                      const Icon = categoryIcon(key)
+                      return (
+                        <div key={cat.id} className="flex items-center gap-2">
+                          <Badge variant="secondary" className="gap-1 pr-1">
+                            {Icon && <Icon className="h-3 w-3" aria-hidden />}
+                            {cat.name}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                              className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20"
+                              title="Remover categoria"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                          <select
+                            value={key}
+                            onChange={(e) => handleSetCategoryIcon(cat.id, e.target.value)}
+                            aria-label={`Ícone da categoria ${cat.name}`}
+                            className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                          >
+                            <option value="">Sem ícone</option>
+                            {CATEGORY_ICONS.map((opt) => (
+                              <option key={opt.key} value={opt.key}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
                 <div className="flex gap-2">
@@ -1226,7 +1285,13 @@ export function ProductModal({
                     className="pl-10"
                   />
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddImageUrl}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddImageUrl}
+                  aria-label="Adicionar imagem por URL"
+                >
                   Adicionar
                 </Button>
               </div>
@@ -1324,7 +1389,13 @@ export function ProductModal({
                     aria-label="Link do vídeo"
                   />
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddVideoUrl}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddVideoUrl}
+                  aria-label="Adicionar vídeo por link"
+                >
                   Adicionar
                 </Button>
               </div>
@@ -1426,6 +1497,7 @@ export function ProductModal({
                     type="checkbox"
                     checked={hasVariants}
                     onChange={(e) => setHasVariants(e.target.checked)}
+                    aria-label="Ativar variações"
                   />
                   Ativar
                 </label>

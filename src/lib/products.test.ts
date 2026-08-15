@@ -119,7 +119,8 @@ describe('products API client', () => {
       '/products/p1/images',
       expect.objectContaining({ method: 'POST', noRetry: true, timeoutMs: 120_000 })
     )
-    expect(res).toEqual({ ok: true, product })
+    // skippedOverLimit reporta quantas fotos não couberam no teto da galeria.
+    expect(res).toEqual({ ok: true, product, skippedOverLimit: 0 })
   })
 
   it('uploadProductImages surfaces API error', async () => {

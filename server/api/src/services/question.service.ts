@@ -7,11 +7,11 @@ import { notify } from './notification.service.js';
 import { sendTemplateEmail } from './email.service.js';
 
 /**
- * Perguntas e respostas no produto (pedido Laura 14/08/2026).
+ * Perguntas e respostas no produto.
  *
- * Modelo Mercado Livre: a pergunta aparece na loja assim que é feita, marcada
- * como "aguardando resposta". `status='hidden'` é a alavanca de moderação —
- * como não há aprovação prévia, o limite por usuário abaixo é o que segura spam.
+ * A pergunta aparece na loja assim que é feita, marcada como "aguardando
+ * resposta". Não há aprovação prévia, então `status='hidden'` é a moderação a
+ * posteriori e o limite por usuário abaixo é o que segura spam.
  */
 
 /** Perguntas não respondidas que um usuário pode ter em aberto ao mesmo tempo. */

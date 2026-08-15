@@ -142,6 +142,7 @@ function mapCategory(row: pg.QueryResultRow): Category {
     name: row.name,
     slug: row.slug,
     description: row.description,
+    icon: row.icon ?? null,
     active: row.active,
     sortOrder: row.sort_order,
     createdAt: row.created_at,
@@ -589,9 +590,10 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
 }
 
 /**
- * Duplica um produto (pedido Laura: álbuns com a mesma medida/peso mudam só
- * nome e foto). O clone entra INATIVO para não vazar pro catálogo antes de ser
- * revisado, e reaproveita as URLs das imagens — não copia arquivo no disco.
+ * Duplica um produto para cadastro em série (itens que compartilham medida e
+ * peso e mudam só nome e foto). O clone entra INATIVO para não vazar pro
+ * catálogo antes de ser revisado, e reaproveita as URLs das imagens — não
+ * copia arquivo no disco.
  */
 export async function duplicateProduct(id: string): Promise<Product> {
   const source = await getProductById(id);
@@ -972,14 +974,15 @@ export async function listCategories(includeInactive = false): Promise<Category[
 export async function createCategory(data: {
   name: string;
   description?: string | null;
+  icon?: string | null;
   active?: boolean;
   sortOrder?: number;
 }): Promise<Category> {
   const slug = await uniqueSlug('categories', data.name);
   const result = await query(
-    `INSERT INTO categories (name, slug, description, active, sort_order)
-     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [data.name, slug, data.description ?? null, data.active ?? true, data.sortOrder ?? 0]
+    `INSERT INTO categories (name, slug, description, icon, active, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [data.name, slug, data.description ?? null, data.icon ?? null, data.active ?? true, data.sortOrder ?? 0]
   );
   return mapCategory(result.rows[0]);
 }
@@ -988,6 +991,7 @@ export async function updateCategory(id: string, data: Record<string, unknown>):
   const fieldMap: Record<string, string> = {
     name: 'name',
     description: 'description',
+    icon: 'icon',
     active: 'active',
     sortOrder: 'sort_order',
   };

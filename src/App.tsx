@@ -13,6 +13,7 @@ import { CartProvider } from './contexts/CartContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { getAppMode } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
+import { ScrollToTop } from './components/store/ScrollToTop'
 
 function ThemedToaster() {
   const { resolved } = useTheme()
@@ -273,6 +274,7 @@ function MemberRoutes() {
 function ShopRoutes() {
   return (
     <CartProvider>
+      <ScrollToTop />
       <EventAnnouncementBanner />
       <Routes>
         <Route path="/" element={<ShopHome />} />

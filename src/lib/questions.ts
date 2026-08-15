@@ -1,7 +1,7 @@
 import { api } from './api-client'
 
 /**
- * Perguntas e respostas no produto (pedido Laura 14/08/2026).
+ * Perguntas e respostas no produto.
  * A pergunta aparece na loja assim que é feita — moderação é a posteriori.
  */
 

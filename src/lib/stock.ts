@@ -1,6 +1,6 @@
 import { api } from './api-client'
 
-/** Controle de estoque do painel admin (pedido Laura 14/08/2026). */
+/** Controle de estoque do painel admin. */
 
 export type StockStatus = 'out' | 'low' | 'ok'
 export type StockFilter = 'all' | 'low' | 'out'

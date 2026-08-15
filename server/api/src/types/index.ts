@@ -125,6 +125,8 @@ export interface Category {
   name: string;
   slug: string;
   description: string | null;
+  /** Chave do ícone (ver src/lib/category-icons.ts). */
+  icon?: string | null;
   active: boolean;
   sortOrder: number;
   createdAt: string;

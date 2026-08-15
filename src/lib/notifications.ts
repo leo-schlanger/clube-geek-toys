@@ -1,6 +1,6 @@
 import { api } from './api-client'
 
-/** Notificações no perfil do cliente (pedido Laura 14/08/2026). */
+/** Notificações no perfil do cliente. */
 
 export type NotificationKind = 'question_answered' | 'order_shipped' | 'generic'
 

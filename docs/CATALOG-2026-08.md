@@ -130,3 +130,38 @@ Só o **primeiro nome** de quem perguntou vai pra vitrine.
 `014` categorias múltiplas · `015` estoque · `016` vídeos · `017` perguntas e
 notificações. Todas idempotentes e espelhadas em `ensure-schema.ts`, aplicadas
 no boot da API — não precisa rodar SQL na mão no deploy.
+
+## Correções de 15/08
+
+Relatos da Laura depois do primeiro deploy, e o que cada um era de fato.
+
+### "Não tô conseguindo fazer a variação" — bug real
+
+Reproduzido dirigindo o painel de produção com Playwright. O caminho natural
+— digitar a opção no campo `Ex.: Rosa` e clicar direto em **Gerar combinações** —
+descartava o texto, porque a opção só era confirmada ao clicar no `+`. O toast
+que aparecia mandava usar o botão, mas o esperado é simplesmente funcionar.
+
+Agora `Gerar combinações` recolhe o que está digitado antes de montar a matriz, e
+a mensagem de erro distingue "falta nome do tipo" de "falta opção". Coberto por
+dois casos em `ProductModal.test.tsx`.
+
+### "Não tô conseguindo colocar vídeo" — não era bug
+
+API responde 201 nos dois caminhos (link e MP4) e a UI está publicada e
+funcional — verificado por Playwright no painel real. O problema é achar: o modal
+de produto ficou muito longo. Fica como dívida de UX (agrupar em seções/abas).
+
+### Outros ajustes
+
+- **Galeria da PDP**: arrastar para o lado troca a foto (limiar de 40px separa
+  arrasto de toque), setas no desktop, indicadores de posição, e a moldura de
+  foto em outro formato passou de cinza para branca
+- **Scroll**: `ScrollToTop` leva a janela ao topo ao trocar de rota; voltar (POP)
+  continua restaurando a posição da listagem
+- **Ícone por categoria** (migration 018): `categories.icon` guarda só a chave; o
+  mapa chave → componente vive em `src/lib/category-icons.ts`, e
+  `guessCategoryIcon` dá um palpite por nome para as categorias que ainda não
+  escolheram
+- **Categorias novas** criadas em produção: K-pop (separada de Música), Pokémon,
+  Beleza, Moda, Jogos, Anime

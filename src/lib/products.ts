@@ -268,6 +268,8 @@ export async function uploadProductMedia(
 export interface CategoryInput {
   name: string
   description?: string | null
+  /** Chave do ícone (ver src/lib/category-icons.ts). */
+  icon?: string | null
   active?: boolean
   sortOrder?: number
 }
