@@ -153,4 +153,40 @@ describe('Button', () => {
     render(<Button>Focus</Button>)
     expect(screen.getByRole('button')).toHaveClass('focus-visible:ring-2')
   })
+
+  // --- asChild ---
+
+  it('estiliza o próprio filho em vez de embrulhá-lo num <button>', () => {
+    render(
+      <Button asChild>
+        <a href="/evento">Ver evento</a>
+      </Button>
+    )
+
+    const link = screen.getByRole('link', { name: 'Ver evento' })
+    // O layout depende disso: sem inline-flex no <a>, o ícone (display:block
+    // pelo preflight) joga o texto para a linha de baixo.
+    expect(link).toHaveClass('inline-flex')
+    expect(link).toHaveClass('items-center')
+    // <a> dentro de <button> é HTML inválido — não pode sobrar botão nenhum.
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('mantém as classes que o filho já tinha', () => {
+    render(
+      <Button asChild className="border-primary/40">
+        <a href="/x" className="w-full">
+          Link
+        </a>
+      </Button>
+    )
+    const link = screen.getByRole('link', { name: 'Link' })
+    expect(link).toHaveClass('w-full')
+    expect(link).toHaveClass('border-primary/40')
+  })
+
+  it('volta a renderizar <button> quando asChild não recebe elemento', () => {
+    render(<Button asChild>{'texto solto'}</Button>)
+    expect(screen.getByRole('button', { name: 'texto solto' })).toBeInTheDocument()
+  })
 })

@@ -44,16 +44,32 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild: _asChild, ...props }, ref) => {
-    // asChild is accepted for API compatibility with some call sites;
-    // this component always renders a native <button>.
-    void _asChild
+  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
+    const classes = cn(buttonVariants({ variant, size, className }))
+
+    // asChild aplica o estilo NO filho, em vez de embrulhá-lo num <button>.
+    //
+    // Embrulhar deformava o botão: o <a> virava o único filho do flex, e dentro
+    // dele o <svg> (display:block pelo preflight do Tailwind) empurrava o texto
+    // para a linha de baixo — ícone em cima, texto embaixo. Também gerava
+    // <a> dentro de <button>, que é HTML inválido.
+    if (asChild && React.isValidElement(children)) {
+      const child = children as React.ReactElement<{ className?: string }>
+      // react-hooks/refs alerta porque não distingue encaminhar a ref de ler
+      // ref.current durante o render. Aqui ela só é repassada ao filho, que é
+      // quem vai anexá-la ao nó do DOM.
+      // eslint-disable-next-line react-hooks/refs
+      return React.cloneElement(child, {
+        ...props,
+        ref,
+        className: cn(classes, child.props.className),
+      } as React.Attributes)
+    }
+
     return (
-      <button
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      />
+      <button className={classes} ref={ref} {...props}>
+        {children}
+      </button>
     )
   }
 )
