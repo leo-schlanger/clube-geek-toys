@@ -36,6 +36,8 @@ export default function PrivacyPolicy() {
                                 <li><strong>Dados de Pagamento:</strong> Processados de forma segura pelo Stripe. Não armazenamos dados de cartão de crédito.</li>
                                 <li><strong>Dados de Navegação:</strong> Endereço IP, tipo de navegador, páginas visitadas, data e hora de acesso.</li>
                                 <li><strong>Dados de Contrato:</strong> Assinatura digital, data/hora, IP no momento da assinatura.</li>
+                                <li><strong>Perguntas sobre produtos:</strong> O texto da pergunta e o <strong>primeiro nome</strong> de quem perguntou ficam públicos na página do produto, junto da nossa resposta. Nome completo, e-mail e telefone nunca aparecem.</li>
+                                <li><strong>Imagens de eventos e da loja:</strong> Fotos publicadas na galeria do site institucional podem conter pessoas identificáveis presentes em eventos abertos ou na loja física.</li>
                             </ul>
                         </section>
 
@@ -57,7 +59,25 @@ export default function PrivacyPolicy() {
                                 <li><strong>Dados de pagamento:</strong> Mantidos por 5 anos conforme legislação fiscal.</li>
                                 <li><strong>Contratos assinados:</strong> Mantidos por 10 anos para fins de comprovação legal.</li>
                                 <li><strong>Logs de navegação:</strong> Mantidos por 6 meses para fins de segurança.</li>
+                                <li><strong>Perguntas e respostas:</strong> Mantidas enquanto o produto estiver no catálogo. Ao excluir a conta, o texto é anonimizado e sai da vitrine.</li>
+                                <li><strong>Fotos da galeria:</strong> Mantidas enquanto a divulgação fizer sentido, ou até pedido de remoção.</li>
                             </ul>
+                        </section>
+
+                        <section className="space-y-3">
+                            <h2 className="text-2xl font-semibold text-foreground">Conteúdo público que você cria</h2>
+                            <p>
+                                Perguntas feitas na página de um produto ficam visíveis para outros clientes assim que
+                                enviadas, identificadas apenas pelo primeiro nome. Não inclua dados pessoais no texto.
+                                Você pode pedir a remoção a qualquer momento, e a exclusão da conta anonimiza o que já
+                                foi publicado.
+                            </p>
+                            <p>
+                                As fotos da galeria são registradas em eventos abertos ao público e na loja física, e
+                                publicadas para divulgação. Não são vendidas nem cedidas, e o site não oferece
+                                download. Para retirar uma foto em que você aparece, escreva para o contato abaixo
+                                indicando o álbum — a remoção é feita sem necessidade de justificativa.
+                            </p>
                         </section>
 
                         <section className="space-y-3">
