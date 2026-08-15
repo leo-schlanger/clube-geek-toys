@@ -32,6 +32,18 @@ interface ErrorEvent {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
+/**
+ * Erro que nasceu numa extensão do navegador do visitante, não na loja.
+ *
+ * Em 15/08/2026 esses eventos eram 299 das 485 linhas de `error_logs` — carteira
+ * cripto e afins estourando `unhandledrejection` na home. Enterravam o erro real
+ * e deixavam qualquer visitante escrever no banco pela rota pública de log.
+ */
+export function isExtensionNoise(stack?: string): boolean {
+  if (!stack) return false
+  return /(chrome|moz|safari-web|ms-browser)-extension:\/\//i.test(stack)
+}
+
 class ErrorTrackingService {
   private events: ErrorEvent[] = []
   private maxEvents = 100
@@ -53,7 +65,9 @@ class ErrorTrackingService {
 
     this.addEvent(event)
     this.logToConsole(event)
-    this.sendToBackend(event)
+    if (!isExtensionNoise(event.stack)) {
+      this.sendToBackend(event)
+    }
   }
 
   /**

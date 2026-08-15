@@ -85,6 +85,30 @@ describe('captureException', () => {
     expect(body.message).toBe('test')
   })
 
+  it('should not report errors thrown inside a browser extension', () => {
+    // 299 das 485 linhas de error_logs em 15/08/2026 vinham daqui: extensão do
+    // visitante estourando unhandledrejection na home.
+    const err = new Error("Cannot read properties of undefined (reading 'M_ID')")
+    err.stack =
+      "TypeError: Cannot read properties of undefined (reading 'M_ID')\n" +
+      '    at k (chrome-extension://eppiocemhmnlbhjplcgkofciiegomcon/executors/200.js:1:761)'
+
+    ErrorTracker.captureException(err, { context: 'unhandledrejection' })
+
+    expect(mockFetch).not.toHaveBeenCalled()
+    // Continua no buffer local: útil para depurar, sem sujar o banco.
+    expect(ErrorTracker.getRecentEvents().at(-1)?.message).toContain('M_ID')
+  })
+
+  it('should still report errors from the app itself', () => {
+    const err = new Error('falha real')
+    err.stack = 'Error: falha real\n    at https://shop.geeketoys.com.br/assets/index-abc.js:1:1'
+
+    ErrorTracker.captureException(err)
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
   it('should include auth token when available', () => {
     vi.mocked(localStorage.getItem).mockReturnValue('my-token')
 

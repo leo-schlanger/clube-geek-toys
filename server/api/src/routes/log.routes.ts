@@ -16,10 +16,25 @@ const errorLogSchema = z.object({
   url: z.string().max(2000).optional(),
 });
 
+/**
+ * Erro vindo de extensão do navegador do visitante — não é da loja.
+ *
+ * O front já filtra (ver `isExtensionNoise` em src/lib/error-tracking.ts), mas
+ * esta rota é pública: quem chama não é confiável. Em 15/08/2026 esse ruído era
+ * 299 das 485 linhas de `error_logs` e escondia os erros reais.
+ */
+const EXTENSION_STACK = /(chrome|moz|safari-web|ms-browser)-extension:\/\//i;
+
 // POST /logs/errors — receives frontend errors (auth optional, rate limited, schema validated)
 logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, res, next) => {
   try {
     const { severity, message, stack, context, url } = req.body as z.infer<typeof errorLogSchema>;
+
+    if (stack && EXTENSION_STACK.test(stack)) {
+      // 202: o cliente não precisa saber que foi descartado (nem tentar de novo).
+      res.status(202).json({ logged: false, reason: 'browser_extension' });
+      return;
+    }
 
     // Extract user ID from token if present (optional auth)
     let userId: string | undefined;
