@@ -486,6 +486,21 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 | POST   | `/questions/:id/answer`        | Responde, notifica o cliente e dispara o e-mail          | admin   |
 | PATCH  | `/questions/:id/status`        | Esconde/publica (moderação a posteriori)                 | admin   |
 
+### Gallery (`/gallery`)
+
+| Metodo | Endpoint                              | Descricao                              | Auth    |
+| ------ | ------------------------------------- | -------------------------------------- | ------- |
+| GET    | `/gallery`                            | Álbuns publicados, com capa e contagem | Publico |
+| GET    | `/gallery/:slug`                      | Álbum com as fotos                     | Publico |
+| GET    | `/gallery/admin/albums`               | Inclui álbuns escondidos               | admin   |
+| POST   | `/gallery/albums`                     | Cria pasta                             | admin   |
+| PATCH  | `/gallery/albums/:id`                 | Nome, data, capa, visibilidade         | admin   |
+| DELETE | `/gallery/albums/:id`                 | Apaga a pasta e os arquivos dela       | admin   |
+| POST   | `/gallery/albums/:id/photos`          | Upload em lote                         | admin   |
+| PATCH  | `/gallery/albums/:id/photos/:photoId` | Legenda                                | admin   |
+| DELETE | `/gallery/albums/:id/photos/:photoId` | Remove a foto e o arquivo              | admin   |
+| PUT    | `/gallery/albums/:id/photos/order`    | Regrava a ordem                        | admin   |
+
 ### Notifications (`/notifications`) — JWT
 
 | Metodo | Endpoint                  | Descricao                               |

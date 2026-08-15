@@ -297,6 +297,16 @@
 - [x] **Fase 3 — notificações** - migration 017 `notifications`; sininho no header da loja (sem polling) + e-mail `question-answered` via Resend ao responder
 - [x] **Docs** - `CATALOG-2026-08.md`, PRODUCT-VARIANTS (tetos de imagem), PROJECT (endpoints)
 - [x] **Testes** - `product.service.test.ts` (tetos de imagem e vídeo), `product-video.test.ts` (parse/embed de link), 3 casos novos em `ProductModal.test.tsx`
+- [x] **Fix 15/08 — variação** - "Gerar combinações" descartava a opção digitada quando faltava clicar no "+"; reproduzido no painel de produção com Playwright e corrigido
+- [x] **Fix 15/08 — galeria da PDP** - arrastar para o lado troca a foto, setas no desktop, indicadores, e moldura branca em foto de outro formato
+- [x] **Fix 15/08 — scroll** - produto abre no topo (`ScrollToTop`); voltar mantém a posição da listagem
+- [x] **15/08 — ícone por categoria** (schema 018) + K-pop, Pokémon, Beleza, Moda, Jogos e Anime criadas em produção
+- [x] **15/08 — galeria com pastas** (schema 019) + aba Galeria no admin + página `/galeria` no home; 41 fotos importadas
+- [x] **15/08 — bandeiras de pagamento** - vetores reais no lugar dos badges de texto
+- [x] **15/08 — home** - busca de produtos no Navbar e tema claro/escuro
+- [x] **15/08 — privacidade** - política dos dois sites cobre foto de evento e pergunta pública
+- [ ] **Dívida de UX** - modal de produto ficou longo demais; agrupar em seções/abas (foi o que fez a Laura não achar o campo de vídeo)
+- [ ] **Dívida** - `npm run build` (`tsc -b`) falha por erros de tipo pré-existentes em `MemberModal`, `UserModal`, `ImageCropDialog`, `AuthContext` e vários `*.test.tsx`; o CI usa `vite build` e não é afetado
 - [ ] **Operação** - Laura: revisar os produtos que já passaram de 8 fotos antes do fix (nenhum dado foi perdido; só o save estava travado)
 
 ### Hardening (10/08/2026 — validação de fluxos)

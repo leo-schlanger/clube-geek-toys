@@ -165,3 +165,41 @@ de produto ficou muito longo. Fica como dívida de UX (agrupar em seções/abas)
   escolheram
 - **Categorias novas** criadas em produção: K-pop (separada de Música), Pokémon,
   Beleza, Moda, Jogos, Anime
+
+## Galeria com pastas (15/08)
+
+Migration 019 — `gallery_albums` + `gallery_photos`. Só cria tabelas novas.
+
+A galeria do site institucional passou a ser editável no painel (aba
+**Galeria**), organizada em pastas: "Evento 6/9", "Loja presencial Copacabana".
+As fotos ficam no volume `/uploads/gallery/:albumId`, ao lado das de produto.
+
+| Método            | Path                                  | Auth                      |
+| ----------------- | ------------------------------------- | ------------------------- |
+| GET               | `/gallery`                            | público                   |
+| GET               | `/gallery/:slug`                      | público                   |
+| GET               | `/gallery/admin/albums`               | admin (inclui escondidos) |
+| POST/PATCH/DELETE | `/gallery/albums[/:id]`               | admin                     |
+| POST              | `/gallery/albums/:id/photos`          | admin                     |
+| PATCH/DELETE      | `/gallery/albums/:id/photos/:photoId` | admin                     |
+| PUT               | `/gallery/albums/:id/photos/order`    | admin                     |
+
+Apagar álbum ou foto **remove o arquivo do disco**. URLs externas (fora de
+`/uploads/`) são ignoradas na limpeza, então um álbum pode apontar para imagem
+hospedada em outro lugar sem risco.
+
+A capa é a coluna `cover_url` ou, na falta, a primeira foto — e remover a foto
+que era capa devolve o álbum à capa automática.
+
+**Importação:** as 41 fotos que estavam fixas no repo do home foram enviadas
+para dois álbuns ("Loja GeekPop & Toys" com 6, "GeekPop Night — K-pop" com 35).
+O consumo no site está em `geek-toys-home/docs/GALLERY.md`.
+
+## Privacidade revisada (15/08)
+
+Duas coisas novas expõem dado pessoal e entraram na política dos dois sites:
+
+- **Perguntas de produto** são públicas com o **primeiro nome** de quem
+  perguntou; excluir a conta anonimiza o texto
+- **Fotos da galeria** podem conter pessoas identificáveis de eventos abertos e
+  da loja física; remoção por e-mail, sem exigir justificativa
