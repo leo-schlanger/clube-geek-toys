@@ -22,6 +22,7 @@ const PRODUCT_NAME = `ZZZ E2E ${STAMP}`
 const PRODUCT_PRICE = '99.90'
 const PRODUCT_STOCK = '7'
 const IMAGE_URL = 'https://placehold.co/600x600.png'
+const VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -140,6 +141,57 @@ test.describe('Fluxos admin + loja (produção)', () => {
     } finally {
       await ctx.close()
     }
+  })
+
+  /**
+   * Regressão de 15/08/2026 — o cadastro de variação e vídeo caía no vazio.
+   *
+   * O ponto do teste é usar o caminho de quem NÃO leu a dica: preencher os eixos
+   * e ir direto em Salvar, sem clicar em "Gerar combinações", e colar o link do
+   * vídeo sem clicar em "Adicionar". Era exatamente assim que o painel gravava o
+   * produto sem SKU nenhum e sem vídeo, exibindo "Produto atualizado!".
+   *
+   * Clicar nos botões antes de salvar faria o teste passar mesmo com o bug de
+   * volta — por isso os cliques em "Gerar combinações"/"Adicionar" ficam de fora.
+   */
+  test('3b) admin cadastra variações e vídeo sem clicar em Gerar/Adicionar', async ({ page }) => {
+    await adminLogin(page)
+    await page.getByRole('button', { name: 'Produtos' }).first().click()
+    await expect(page.getByRole('button', { name: /Novo Produto/i })).toBeVisible({ timeout: 15_000 })
+
+    const row = page.getByRole('row', { name: new RegExp(PRODUCT_NAME) })
+    await expect(row.first()).toBeVisible({ timeout: 15_000 })
+    await row.first().getByRole('button', { name: /Editar produto/i }).click()
+    await expect(page.getByText('Editar Produto').first()).toBeVisible()
+
+    // Variações: tipo + opções, e nada de "Gerar combinações".
+    await page.getByLabel(/Ativar variações/i).check()
+    await page.getByPlaceholder('Cor', { exact: true }).fill('Cor')
+    await page.getByPlaceholder(/Ou cole várias/i).fill('Rosa, Preto')
+
+    // Vídeo: link colado e deixado no campo.
+    await page.getByPlaceholder(/Colar link do YouTube/i).fill(VIDEO_URL)
+
+    await page.getByRole('button', { name: /Salvar Alterações/i }).click()
+    await expect(page.getByText(/Produto atualizado!/i)).toBeVisible({ timeout: 20_000 })
+
+    // Reabre: o que importa é o que ficou gravado, não o que a tela mostrava.
+    await row.first().getByRole('button', { name: /Editar produto/i }).click()
+    await expect(page.getByText('Editar Produto').first()).toBeVisible()
+
+    await expect(
+      page.getByText(/2 SKU\(s\)/),
+      'as duas variações precisam ter sido gravadas'
+    ).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText('Rosa', { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Preto', { exact: true }).first()).toBeVisible()
+    await expect(
+      page.getByText(VIDEO_URL, { exact: false }).first(),
+      'o link de vídeo colado precisa ter sido gravado'
+    ).toBeVisible()
+
+    await page.screenshot({ path: 'e2e/screenshots/flow-3b-variants-video.png', fullPage: true })
+    await page.getByRole('button', { name: /Cancelar/i }).first().click().catch(() => {})
   })
 
   test('4) admin edita o produto e desativa; some da loja', async ({ page }) => {
