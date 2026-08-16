@@ -39,7 +39,15 @@ const envSchema = z.object({
   // CORS — comma-separated list of additional allowed origins (optional)
   ALLOWED_ORIGINS: z.string().optional(),
 
-  // Shipping (Melhor Envio + origin). Token optional: without it, table fallback is used.
+  // Shipping (Melhor Envio + origin). Sem credencial, a cotação usa a tabela
+  // de fallback — visível em GET /health (shipping.quotes).
+  //
+  // O painel do Melhor Envio entrega CLIENT_ID + CLIENT_SECRET, e o token da
+  // API sai do fluxo OAuth (melhor-envio-oauth.service.ts). MELHOR_ENVIO_TOKEN
+  // segue existindo só como escape manual e tem precedência quando presente.
+  MELHOR_ENVIO_CLIENT_ID: z.string().min(1).optional(),
+  MELHOR_ENVIO_CLIENT_SECRET: z.string().min(1).optional(),
+  MELHOR_ENVIO_SCOPES: z.string().default('shipping-calculate'),
   MELHOR_ENVIO_TOKEN: z.string().min(1).optional(),
   MELHOR_ENVIO_SANDBOX: z
     .enum(['true', 'false'])

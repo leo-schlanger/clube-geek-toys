@@ -24,7 +24,12 @@ export function verifyHmacToken(token: string): Record<string, unknown> | null {
     .update(encoded)
     .digest('base64url');
 
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+  const given = Buffer.from(signature);
+  const expected = Buffer.from(expectedSig);
+  // timingSafeEqual lança quando os tamanhos diferem, e a assinatura vem de
+  // fora — sem esta guarda, um token malformado virava 500 em vez de rejeição.
+  // Comparar tamanho antes não vaza nada: o comprimento do HMAC é fixo e público.
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
     return null;
   }
 

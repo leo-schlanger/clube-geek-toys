@@ -2,6 +2,10 @@ import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { query } from '../config/database.js';
+// Fonte única do host e do token: se este arquivo tivesse a própria noção de
+// sandbox, um token obtido num ambiente acabaria sendo usado contra o outro —
+// e o 401 resultante sumiria no fallback.
+import { getAccessToken, melhorEnvioBaseUrl } from './melhor-envio-oauth.service.js';
 
 // ─── Defaults (photocard / small K-pop package) ──────────────────────────────
 export const DEFAULT_WEIGHT_G = 300;
@@ -227,12 +231,6 @@ export function pickOptionFromQuote(
 
 // ─── Melhor Envio ────────────────────────────────────────────────────────────
 
-function melhorEnvioBaseUrl(): string {
-  return env.MELHOR_ENVIO_SANDBOX
-    ? 'https://sandbox.melhorenvio.com.br'
-    : 'https://melhorenvio.com.br';
-}
-
 /**
  * Saúde da integração de frete, exposta em `GET /health`.
  *
@@ -254,7 +252,12 @@ let lastSuccessAt: string | null = null;
 
 export function getMelhorEnvioHealth(): MelhorEnvioHealth {
   return {
-    configured: Boolean(env.MELHOR_ENVIO_TOKEN),
+    // "Configurado" agora é credencial OAuth **ou** token manual — com só o
+    // client id/secret e sem autorizar, o health precisa dizer unconfigured.
+    configured: Boolean(
+      env.MELHOR_ENVIO_TOKEN ||
+        (env.MELHOR_ENVIO_CLIENT_ID && env.MELHOR_ENVIO_CLIENT_SECRET)
+    ),
     sandbox: Boolean(env.MELHOR_ENVIO_SANDBOX),
     lastFailure,
     lastSuccessAt,
@@ -288,7 +291,9 @@ async function quoteMelhorEnvio(
   destCep: string,
   pkg: PackageDims
 ): Promise<ShippingOption[] | null> {
-  const token = env.MELHOR_ENVIO_TOKEN;
+  // Vem do OAuth (com refresh) ou do MELHOR_ENVIO_TOKEN manual, nessa ordem de
+  // precedência — ver melhor-envio-oauth.service.ts.
+  const token = await getAccessToken();
   if (!token) return null;
 
   const origin = env.SHIPPING_ORIGIN_CEP;
