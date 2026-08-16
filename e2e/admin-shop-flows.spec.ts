@@ -61,6 +61,16 @@ test.describe('Fluxos admin + loja (produção)', () => {
     await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
   }
 
+  /**
+   * O formulário de produto virou abas em 16/08/2026 (o modal tinha ~1100
+   * linhas de campo numa rolagem só e o bloco de vídeo ficava escondido no
+   * fim). Os painéis inativos ficam com `display:none`, então o Playwright
+   * precisa abrir a aba antes de tocar no campo — igual à Laura.
+   */
+  async function abaDoProduto(page: Page, nome: RegExp) {
+    await page.getByRole('tab', { name: nome }).click()
+  }
+
   test('1) admin cadastra um produto ativo com imagem', async ({ page }) => {
     await adminLogin(page)
     // navega para Produtos pela sidebar (client-side — preserva a sessão)
@@ -75,7 +85,8 @@ test.describe('Fluxos admin + loja (produção)', () => {
     await page.locator('#product-price').fill(PRODUCT_PRICE)
     await page.locator('#product-stock').fill(PRODUCT_STOCK)
 
-    // adiciona imagem por URL externa
+    // adiciona imagem por URL externa (aba Fotos e vídeos)
+    await abaDoProduto(page, /Fotos e vídeos/)
     await page.getByPlaceholder(/Colar URL de imagem externa/i).fill(IMAGE_URL)
     await page.getByRole('button', { name: /^Adicionar$/i }).click()
 
@@ -165,12 +176,16 @@ test.describe('Fluxos admin + loja (produção)', () => {
     await expect(page.getByText('Editar Produto').first()).toBeVisible()
 
     // Variações: tipo + opções, e nada de "Gerar combinações".
+    await abaDoProduto(page, /Variações/)
     await page.getByLabel(/Ativar variações/i).check()
     await page.getByPlaceholder('Cor', { exact: true }).fill('Cor')
     await page.getByPlaceholder(/Ou cole várias/i).fill('Rosa, Preto')
 
-    // Vídeo: link colado e deixado no campo.
+    // Vídeo: link colado e deixado no campo, em OUTRA aba. Salvar da aba
+    // Variações prova de quebra que o rascunho da aba escondida entra no save.
+    await abaDoProduto(page, /Fotos e vídeos/)
     await page.getByPlaceholder(/Colar link do YouTube/i).fill(VIDEO_URL)
+    await abaDoProduto(page, /Variações/)
 
     await page.getByRole('button', { name: /Salvar Alterações/i }).click()
     await expect(page.getByText(/Produto atualizado!/i)).toBeVisible({ timeout: 20_000 })
@@ -179,12 +194,18 @@ test.describe('Fluxos admin + loja (produção)', () => {
     await row.first().getByRole('button', { name: /Editar produto/i }).click()
     await expect(page.getByText('Editar Produto').first()).toBeVisible()
 
+    // O contador da aba é a prova de que a aba não escondeu o trabalho.
+    await expect(page.getByRole('tab', { name: /Variações/ })).toContainText('2')
+
+    await abaDoProduto(page, /Variações/)
     await expect(
       page.getByText(/2 SKU\(s\)/),
       'as duas variações precisam ter sido gravadas'
     ).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText('Rosa', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('Preto', { exact: true }).first()).toBeVisible()
+
+    await abaDoProduto(page, /Fotos e vídeos/)
     await expect(
       page.getByText(VIDEO_URL, { exact: false }).first(),
       'o link de vídeo colado precisa ter sido gravado'

@@ -455,3 +455,120 @@ describe('ProductModal — várias fotos por variação', () => {
     expect(toast.error).toHaveBeenCalledWith('Máximo de 10 fotos por variação')
   })
 })
+
+describe('ProductModal — abas do formulário', () => {
+  // O modal tinha ~1100 linhas de campo numa rolagem só. O bloco de vídeo caía
+  // no terço final e a Laura não achou (15/08/2026). As abas resolvem isso —
+  // mas só valem se não esconderem trabalho nem quebrarem o save.
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockedUpdate.mockResolvedValue(product)
+    mockedReplace.mockResolvedValue(product)
+  })
+
+  function renderEdit(p: Product = product) {
+    render(
+      <ProductModal
+        mode="edit"
+        product={p}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+  }
+
+  function painelDaAba(nome: RegExp): HTMLElement {
+    const aba = screen.getByRole('tab', { name: nome })
+    // O painel é o irmão do tablist na ordem em que os grupos foram montados.
+    const idx = screen.getAllByRole('tab').indexOf(aba)
+    const tablist = aba.closest('[role="tablist"]') as HTMLElement
+    const paineis = Array.from(tablist.parentElement!.children).filter(
+      (el) => el !== tablist
+    ) as HTMLElement[]
+    return paineis[idx]
+  }
+
+  it('abre no Básico e esconde as outras seções', () => {
+    renderEdit()
+
+    expect(screen.getByRole('tab', { name: /Básico/ })).toHaveAttribute('aria-selected', 'true')
+    expect(painelDaAba(/Básico/)).not.toHaveClass('hidden')
+    expect(painelDaAba(/Fotos e vídeos/)).toHaveClass('hidden')
+    expect(painelDaAba(/Variações/)).toHaveClass('hidden')
+  })
+
+  it('o contador da aba mostra que existe conteúdo escondido lá dentro', () => {
+    // Era esse o buraco: sem contador, esconder atrás de aba só troca um
+    // problema de descoberta por outro.
+    renderEdit()
+
+    // 2 fotos no fixture.
+    expect(screen.getByRole('tab', { name: /Fotos e vídeos/ })).toHaveTextContent('2')
+    // 2 SKUs no fixture.
+    expect(screen.getByRole('tab', { name: /Variações/ })).toHaveTextContent('2')
+  })
+
+  it('troca de aba revela a seção sem desmontar as outras', () => {
+    renderEdit()
+
+    fireEvent.click(screen.getByRole('tab', { name: /Fotos e vídeos/ }))
+
+    expect(painelDaAba(/Fotos e vídeos/)).not.toHaveClass('hidden')
+    expect(painelDaAba(/Básico/)).toHaveClass('hidden')
+    // O campo da aba escondida continua no DOM — é o que garante que o
+    // rascunho digitado nela sobrevive à troca de aba e entra no save.
+    expect(screen.getByLabelText(/Nome do Produto/i)).toBeInTheDocument()
+  })
+
+  it('rascunho digitado numa aba sobrevive à troca e entra no save', async () => {
+    const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
+    renderEdit(semVariacao)
+
+    fireEvent.click(screen.getByRole('tab', { name: /Fotos e vídeos/ }))
+    fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
+      target: { value: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+    })
+    // Volta para o Básico e salva de lá — o vídeo não pode se perder.
+    fireEvent.click(screen.getByRole('tab', { name: /Básico/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalled())
+    const payload = mockedUpdate.mock.calls[0][1] as { videos?: { url: string }[] }
+    expect(payload.videos).toHaveLength(1)
+  })
+
+  it('erro de validação leva à aba onde o campo está', async () => {
+    const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
+    renderEdit(semVariacao)
+
+    // Link inválido mora na aba Mídia; o save é disparado da aba Básico.
+    fireEvent.click(screen.getByRole('tab', { name: /Fotos e vídeos/ }))
+    fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
+      target: { value: 'https://vimeo.com/12345' },
+    })
+    fireEvent.click(screen.getByRole('tab', { name: /Básico/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    // Sem o salto, o aviso apontaria para um campo fora da tela.
+    expect(screen.getByRole('tab', { name: /Fotos e vídeos/ })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  })
+
+  it('nome vazio volta para o Básico mesmo tendo saído dele', async () => {
+    renderEdit()
+
+    fireEvent.change(screen.getByLabelText(/Nome do Produto/i), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('tab', { name: /Variações/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Informe o nome do produto')
+    )
+    expect(screen.getByRole('tab', { name: /Básico/ })).toHaveAttribute('aria-selected', 'true')
+  })
+})

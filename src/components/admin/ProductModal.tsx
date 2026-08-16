@@ -67,6 +67,28 @@ import {
 /** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — admin pode precificar livremente. */
 const MAX_PRODUCT_PRICE = 999_999.99;
 
+/**
+ * Abas do formulário.
+ *
+ * Por que existem: o modal tinha ~1100 linhas de campo numa rolagem só, e o
+ * bloco de vídeo caía lá pelo terço final. Em 15/08/2026 a Laura não achou o
+ * campo — não era bug, era o formulário. As seções seguem exatamente as mesmas
+ * de antes; só ganharam um índice em cima.
+ *
+ * Todos os painéis ficam **montados** (escondidos com `hidden`, não
+ * desmontados). O `handleSubmit` lê estado, não DOM, e nenhum campo usa
+ * `required` nativo — então trocar de aba não muda nada do que é salvo, e um
+ * rascunho digitado numa aba continua valendo quando o Salvar acontece de outra.
+ */
+const TABS = [
+  { id: "basico", label: "Básico" },
+  { id: "envio", label: "Categorias e envio" },
+  { id: "midia", label: "Fotos e vídeos" },
+  { id: "variacoes", label: "Variações" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
 interface ProductModalProps {
   mode: "create" | "edit";
   product?: Product | null;
@@ -142,6 +164,7 @@ export function ProductModal({
   const isEditMode = mode === "edit";
 
   const [form, setForm] = useState<FormState>(() => toFormState(product));
+  const [tab, setTab] = useState<TabId>("basico");
   const [loading, setLoading] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [uploadPhase, setUploadPhase] = useState<"prepare" | "upload">(
@@ -894,20 +917,31 @@ export function ProductModal({
     }
   }
 
+  /**
+   * Recusa o save levando à aba onde o campo mora.
+   *
+   * Com o formulário em abas, um toast sozinho vira beco sem saída: "Preço
+   * inválido na variação X" não ajuda ninguém que está olhando para a aba
+   * Básico. Trocar de aba junto com o aviso é o que mantém a mensagem acionável.
+   */
+  function fail(where: TabId, message: string): void {
+    setTab(where);
+    toast.error(message);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     const name = form.name.trim();
     if (name.length < 2) {
-      toast.error("Informe o nome do produto");
-      return;
+      return fail("basico", "Informe o nome do produto");
     }
     const price = Number(form.price);
     if (!Number.isFinite(price) || price < 0 || price > MAX_PRODUCT_PRICE) {
-      toast.error(
+      return fail(
+        "basico",
         `Preço inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
       );
-      return;
     }
 
     const compareAtPrice = form.compareAtPrice.trim()
@@ -919,16 +953,15 @@ export function ProductModal({
         compareAtPrice < 0 ||
         compareAtPrice > MAX_PRODUCT_PRICE)
     ) {
-      toast.error(
+      return fail(
+        "basico",
         `Preço "de" inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
       );
-      return;
     }
 
     const stock = form.stock.trim() ? Number(form.stock) : 0;
     if (!Number.isInteger(stock) || stock < 0) {
-      toast.error("Estoque inválido");
-      return;
+      return fail("basico", "Estoque inválido");
     }
 
     const weightG = form.weightG.trim() ? Number(form.weightG) : null;
@@ -936,29 +969,25 @@ export function ProductModal({
     const widthCm = form.widthCm.trim() ? Number(form.widthCm) : null;
     const lengthCm = form.lengthCm.trim() ? Number(form.lengthCm) : null;
     if (weightG != null && (!Number.isInteger(weightG) || weightG <= 0)) {
-      toast.error("Peso (g) inválido");
-      return;
+      return fail("envio", "Peso (g) inválido");
     }
 
     const wholesaleMinQty = form.wholesaleMinQty.trim()
       ? Math.max(1, Number(form.wholesaleMinQty))
       : 1;
     if (!Number.isInteger(wholesaleMinQty) || wholesaleMinQty < 1) {
-      toast.error("Qtd. mínima atacado inválida");
-      return;
+      return fail("basico", "Qtd. mínima atacado inválida");
     }
 
     // Rascunhos ainda no campo entram no save (ver resolvePending*): digitar e
     // clicar em Salvar tem que valer tanto quanto digitar e clicar no "+".
     const resolvedImages = resolvePendingImages();
     if (resolvedImages.error) {
-      toast.error(resolvedImages.error);
-      return;
+      return fail("midia", resolvedImages.error);
     }
     const resolvedVideos = resolvePendingVideos();
     if (resolvedVideos.error) {
-      toast.error(resolvedVideos.error);
-      return;
+      return fail("midia", resolvedVideos.error);
     }
 
     // Eixos preenchidos sem clicar em "Gerar combinações" também precisam virar
@@ -968,15 +997,14 @@ export function ProductModal({
     let rows = variantRows;
     if (hasVariants) {
       if (!axes.length) {
-        toast.error(
+        return fail(
+          "variacoes",
           'Variações estão ativas mas sem tipo + opções. Preencha (ex.: Cor → Rosa, Preto) ou desmarque "Ativar".',
         );
-        return;
       }
       const merged = mergeVariantMatrix(axes, rows);
       if (!merged.ok) {
-        toast.error(merged.error);
-        return;
+        return fail("variacoes", merged.error);
       }
       // Opção retirada dos eixos não apaga o SKU no save — ele pode ter estoque
       // e foto. Quem quer mesmo remover usa "Gerar combinações", que refaz a
@@ -1005,18 +1033,17 @@ export function ProductModal({
       return !Number.isFinite(p) || p < 0 || p > MAX_PRODUCT_PRICE;
     });
     if (hasVariants && badVariant) {
-      toast.error(
+      return fail(
+        "variacoes",
         `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
       );
-      return;
     }
 
     const variantImages: string[][] = [];
     for (const [idx, row] of rows.entries()) {
       const resolved = resolvePendingVariantImages(row, idx);
       if (resolved.error) {
-        toast.error(resolved.error);
-        return;
+        return fail("variacoes", resolved.error);
       }
       variantImages.push(resolved.value);
     }
@@ -1139,6 +1166,24 @@ export function ProductModal({
     setLoading(false);
   }
 
+  /**
+   * Quanto conteúdo cada aba já tem. Conta o que está **confirmado** e também o
+   * rascunho ainda no campo — o rascunho entra no save (ver `resolvePending*`),
+   * então esconder isso do contador seria mentir para quem está preenchendo.
+   */
+  const tabCounts: Record<TabId, number> = {
+    basico: 0,
+    envio: form.categoryIds.length,
+    midia:
+      images.length +
+      pendingFiles.length +
+      (imageUrl.trim() ? 1 : 0) +
+      videos.length +
+      (videoUrl.trim() ? 1 : 0) +
+      (pendingVideoFile ? 1 : 0),
+    variacoes: hasVariants ? variantRows.length : 0,
+  };
+
   const priceNum = Number(form.price);
   const compareNum = Number(form.compareAtPrice);
   const showDiscountHint =
@@ -1175,1031 +1220,812 @@ export function ProductModal({
 
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
-              {/* Nome */}
-              <div className="space-y-2">
-                <Label htmlFor="product-name">Nome do Produto</Label>
-                <Input
-                  id="product-name"
-                  placeholder="Ex.: Action Figure Goku Super Saiyajin"
-                  value={form.name}
-                  onChange={(e) => update("name", e.target.value)}
-                />
+              {/*
+                Índice das seções. O contador ao lado do rótulo é o que impede a
+                aba de esconder trabalho: quem abre um produto vê "Fotos e
+                vídeos 4" sem precisar entrar para descobrir que tem conteúdo lá.
+              */}
+              <div
+                role="tablist"
+                aria-label="Seções do produto"
+                className="-mx-1 flex gap-1 overflow-x-auto border-b border-border pb-px"
+              >
+                {TABS.map((t) => {
+                  const count = tabCounts[t.id];
+                  const isActive = tab === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setTab(t.id)}
+                      className={cn(
+                        "flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+                        isActive
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {t.label}
+                      {count > 0 && (
+                        <Badge
+                          variant={isActive ? "default" : "secondary"}
+                          className="px-1.5 py-0 text-[10px]"
+                        >
+                          {count}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Descrição */}
-              <div className="space-y-2">
-                <Label htmlFor="product-description">Descrição</Label>
-                <textarea
-                  id="product-description"
-                  rows={3}
-                  placeholder="Detalhes, dimensões, material..."
-                  value={form.description}
-                  onChange={(e) => update("description", e.target.value)}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                />
-              </div>
-
-              {/* Preços */}
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className={cn("space-y-6", tab !== "basico" && "hidden")}>
+                {/* Nome */}
                 <div className="space-y-2">
-                  <Label htmlFor="product-price">Preço (R$)</Label>
+                  <Label htmlFor="product-name">Nome do Produto</Label>
                   <Input
-                    id="product-price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={MAX_PRODUCT_PRICE}
-                    inputMode="decimal"
-                    placeholder="Ex.: 7500 ou 149.90"
-                    value={form.price}
-                    onChange={(e) => update("price", e.target.value)}
+                    id="product-name"
+                    placeholder="Ex.: Action Figure Goku Super Saiyajin"
+                    value={form.name}
+                    onChange={(e) => update("name", e.target.value)}
                   />
                 </div>
+
+                {/* Descrição */}
                 <div className="space-y-2">
-                  <Label htmlFor="product-compare">Preço "de" (opcional)</Label>
-                  <Input
-                    id="product-compare"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={MAX_PRODUCT_PRICE}
-                    inputMode="decimal"
-                    placeholder="Preço original riscado"
-                    value={form.compareAtPrice}
-                    onChange={(e) => update("compareAtPrice", e.target.value)}
+                  <Label htmlFor="product-description">Descrição</Label>
+                  <textarea
+                    id="product-description"
+                    rows={3}
+                    placeholder="Detalhes, dimensões, material..."
+                    value={form.description}
+                    onChange={(e) => update("description", e.target.value)}
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
-                  {showDiscountHint && (
-                    <p className="text-xs text-green-600">
-                      Desconto de{" "}
-                      {Math.round((1 - priceNum / compareNum) * 100)}% ·{" "}
-                      <span className="line-through text-muted-foreground">
-                        {formatCurrency(compareNum)}
-                      </span>{" "}
-                      → {formatCurrency(priceNum)}
-                    </p>
+                </div>
+
+                {/* Preços */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="product-price">Preço (R$)</Label>
+                    <Input
+                      id="product-price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={MAX_PRODUCT_PRICE}
+                      inputMode="decimal"
+                      placeholder="Ex.: 7500 ou 149.90"
+                      value={form.price}
+                      onChange={(e) => update("price", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="product-compare">Preço "de" (opcional)</Label>
+                    <Input
+                      id="product-compare"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={MAX_PRODUCT_PRICE}
+                      inputMode="decimal"
+                      placeholder="Preço original riscado"
+                      value={form.compareAtPrice}
+                      onChange={(e) => update("compareAtPrice", e.target.value)}
+                    />
+                    {showDiscountHint && (
+                      <p className="text-xs text-green-600">
+                        Desconto de{" "}
+                        {Math.round((1 - priceNum / compareNum) * 100)}% ·{" "}
+                        <span className="line-through text-muted-foreground">
+                          {formatCurrency(compareNum)}
+                        </span>{" "}
+                        → {formatCurrency(priceNum)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Estoque + SKU */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="product-stock">Estoque</Label>
+                    <Input
+                      id="product-stock"
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={form.stock}
+                      onChange={(e) => update("stock", e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="product-sku">SKU (opcional)</Label>
+                    <Input
+                      id="product-sku"
+                      placeholder="Código interno"
+                      value={form.sku}
+                      onChange={(e) => update("sku", e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Flags */}
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
+                    <input
+                      type="checkbox"
+                      checked={form.active}
+                      onChange={(e) => update("active", e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Ativo</p>
+                      <p className="text-xs text-muted-foreground">
+                        Visível na loja
+                      </p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
+                    <input
+                      type="checkbox"
+                      checked={form.featured}
+                      onChange={(e) => update("featured", e.target.checked)}
+                      className="h-4 w-4"
+                    />
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Star className="h-3.5 w-3.5 text-yellow-500" /> Destaque
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Aparece em destaque
+                      </p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50 sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={form.wholesaleEnabled}
+                      onChange={(e) =>
+                        update("wholesaleEnabled", e.target.checked)
+                      }
+                      className="h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Disponível no atacado</p>
+                      <p className="text-xs text-muted-foreground">
+                        Aparece em /atacado (desconto 25% para CNPJ aprovado).
+                        Deixe desligado até a importação se ainda não for vender
+                        no atacado.
+                      </p>
+                    </div>
+                  </label>
+                  {form.wholesaleEnabled && (
+                    <div className="sm:col-span-2 space-y-1">
+                      <Label htmlFor="wholesaleMinQty">
+                        Qtd. mínima no atacado
+                      </Label>
+                      <Input
+                        id="wholesaleMinQty"
+                        type="number"
+                        min={1}
+                        value={form.wholesaleMinQty}
+                        onChange={(e) =>
+                          update("wholesaleMinQty", e.target.value)
+                        }
+                      />
+                    </div>
                   )}
                 </div>
+
               </div>
 
-              {/* Estoque + SKU */}
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className={cn("space-y-6", tab !== "envio" && "hidden")}>
+                {/* Embalagem / frete Correios */}
                 <div className="space-y-2">
-                  <Label htmlFor="product-stock">Estoque</Label>
-                  <Input
-                    id="product-stock"
-                    type="number"
-                    min="0"
-                    step="1"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={form.stock}
-                    onChange={(e) => update("stock", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product-sku">SKU (opcional)</Label>
-                  <Input
-                    id="product-sku"
-                    placeholder="Código interno"
-                    value={form.sku}
-                    onChange={(e) => update("sku", e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Embalagem / frete Correios */}
-              <div className="space-y-2">
-                <Label>Embalagem (frete Correios)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Usado no cálculo de frete. Se vazio, usa padrão 300g · 16×11×6
-                  cm (photocard/caixa pequena).
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="product-weight"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Peso (g)
-                    </Label>
-                    <Input
-                      id="product-weight"
-                      type="number"
-                      min="1"
-                      step="1"
-                      placeholder="300"
-                      value={form.weightG}
-                      onChange={(e) => update("weightG", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="product-len"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Comp. (cm)
-                    </Label>
-                    <Input
-                      id="product-len"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      placeholder="16"
-                      value={form.lengthCm}
-                      onChange={(e) => update("lengthCm", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="product-width"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Larg. (cm)
-                    </Label>
-                    <Input
-                      id="product-width"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      placeholder="11"
-                      value={form.widthCm}
-                      onChange={(e) => update("widthCm", e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="product-height"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Alt. (cm)
-                    </Label>
-                    <Input
-                      id="product-height"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      placeholder="6"
-                      value={form.heightCm}
-                      onChange={(e) => update("heightCm", e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Categorias — até MAX_PRODUCT_CATEGORIES, a primeira é a principal */}
-              <div className="space-y-2">
-                <Label>
-                  Categorias{" "}
-                  <span className="font-normal text-muted-foreground">
-                    ({form.categoryIds.length}/{MAX_PRODUCT_CATEGORIES})
-                  </span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Um mesmo produto pode aparecer em várias — ex.: chaveiro de
-                  comidinha em <em>Comidas</em> e <em>Acessórios</em>. A marcada
-                  como <strong className="text-foreground">principal</strong> é
-                  a usada no link do produto e nas sugestões.
-                </p>
-
-                {categories.length === 0 ? (
-                  <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-                    Nenhuma categoria criada ainda — use o campo abaixo.
+                  <Label>Embalagem (frete Correios)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Usado no cálculo de frete. Se vazio, usa padrão 300g · 16×11×6
+                    cm (photocard/caixa pequena).
                   </p>
-                ) : (
-                  <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
-                    {categories.map((cat) => {
-                      const checked = form.categoryIds.includes(cat.id);
-                      const isPrimary = form.categoryIds[0] === cat.id;
-                      return (
-                        <div key={cat.id} className="flex items-center gap-2">
-                          <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 shrink-0"
-                              checked={checked}
-                              onChange={() => toggleCategory(cat.id)}
-                            />
-                            <span className="truncate">{cat.name}</span>
-                          </label>
-                          {checked &&
-                            (isPrimary ? (
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 text-[10px]"
-                              >
-                                principal
-                              </Badge>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => makePrimaryCategory(cat.id)}
-                                className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
-                                title="Tornar categoria principal"
-                              >
-                                tornar principal
-                              </button>
-                            ))}
-                        </div>
-                      );
-                    })}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="product-weight"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Peso (g)
+                      </Label>
+                      <Input
+                        id="product-weight"
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="300"
+                        value={form.weightG}
+                        onChange={(e) => update("weightG", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="product-len"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Comp. (cm)
+                      </Label>
+                      <Input
+                        id="product-len"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        placeholder="16"
+                        value={form.lengthCm}
+                        onChange={(e) => update("lengthCm", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="product-width"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Larg. (cm)
+                      </Label>
+                      <Input
+                        id="product-width"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        placeholder="11"
+                        value={form.widthCm}
+                        onChange={(e) => update("widthCm", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="product-height"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Alt. (cm)
+                      </Label>
+                      <Input
+                        id="product-height"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        placeholder="6"
+                        value={form.heightCm}
+                        onChange={(e) => update("heightCm", e.target.value)}
+                      />
+                    </div>
                   </div>
-                )}
+                </div>
 
-                {/* Gerenciador de categorias inline */}
-                <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Gerenciar categorias
+                {/* Categorias — até MAX_PRODUCT_CATEGORIES, a primeira é a principal */}
+                <div className="space-y-2">
+                  <Label>
+                    Categorias{" "}
+                    <span className="font-normal text-muted-foreground">
+                      ({form.categoryIds.length}/{MAX_PRODUCT_CATEGORIES})
                     </span>
-                  </div>
-                  {categories.length > 0 && (
-                    <div className="space-y-2">
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Um mesmo produto pode aparecer em várias — ex.: chaveiro de
+                    comidinha em <em>Comidas</em> e <em>Acessórios</em>. A marcada
+                    como <strong className="text-foreground">principal</strong> é
+                    a usada no link do produto e nas sugestões.
+                  </p>
+
+                  {categories.length === 0 ? (
+                    <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+                      Nenhuma categoria criada ainda — use o campo abaixo.
+                    </p>
+                  ) : (
+                    <div className="grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
                       {categories.map((cat) => {
-                        const key =
-                          cat.icon ?? guessCategoryIcon(cat.name) ?? "";
-                        const Icon = categoryIcon(key);
+                        const checked = form.categoryIds.includes(cat.id);
+                        const isPrimary = form.categoryIds[0] === cat.id;
                         return (
                           <div key={cat.id} className="flex items-center gap-2">
-                            <Badge variant="secondary" className="gap-1 pr-1">
-                              {Icon && <Icon className="h-3 w-3" aria-hidden />}
-                              {cat.name}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDeleteCategory(cat.id, cat.name)
-                                }
-                                className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20"
-                                title="Remover categoria"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                            <select
-                              value={key}
-                              onChange={(e) =>
-                                handleSetCategoryIcon(cat.id, e.target.value)
-                              }
-                              aria-label={`Ícone da categoria ${cat.name}`}
-                              className="h-7 rounded-md border border-input bg-background px-2 text-xs"
-                            >
-                              <option value="">Sem ícone</option>
-                              {CATEGORY_ICONS.map((opt) => (
-                                <option key={opt.key} value={opt.key}>
-                                  {opt.label}
-                                </option>
+                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 shrink-0"
+                                checked={checked}
+                                onChange={() => toggleCategory(cat.id)}
+                              />
+                              <span className="truncate">{cat.name}</span>
+                            </label>
+                            {checked &&
+                              (isPrimary ? (
+                                <Badge
+                                  variant="secondary"
+                                  className="shrink-0 text-[10px]"
+                                >
+                                  principal
+                                </Badge>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => makePrimaryCategory(cat.id)}
+                                  className="shrink-0 text-[10px] text-muted-foreground underline hover:text-foreground"
+                                  title="Tornar categoria principal"
+                                >
+                                  tornar principal
+                                </button>
                               ))}
-                            </select>
                           </div>
                         );
                       })}
                     </div>
                   )}
+
+                  {/* Gerenciador de categorias inline */}
+                  <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Gerenciar categorias
+                      </span>
+                    </div>
+                    {categories.length > 0 && (
+                      <div className="space-y-2">
+                        {categories.map((cat) => {
+                          const key =
+                            cat.icon ?? guessCategoryIcon(cat.name) ?? "";
+                          const Icon = categoryIcon(key);
+                          return (
+                            <div key={cat.id} className="flex items-center gap-2">
+                              <Badge variant="secondary" className="gap-1 pr-1">
+                                {Icon && <Icon className="h-3 w-3" aria-hidden />}
+                                {cat.name}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteCategory(cat.id, cat.name)
+                                  }
+                                  className="ml-0.5 rounded-full p-0.5 hover:bg-destructive/20"
+                                  title="Remover categoria"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                              <select
+                                value={key}
+                                onChange={(e) =>
+                                  handleSetCategoryIcon(cat.id, e.target.value)
+                                }
+                                aria-label={`Ícone da categoria ${cat.name}`}
+                                className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+                              >
+                                <option value="">Sem ícone</option>
+                                {CATEGORY_ICONS.map((opt) => (
+                                  <option key={opt.key} value={opt.key}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Nova categoria"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCreateCategory();
+                          }
+                        }}
+                        className="h-9"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCreateCategory}
+                        disabled={creatingCategory || !newCategoryName.trim()}
+                      >
+                        {creatingCategory ? (
+                          <Loading size="sm" />
+                        ) : (
+                          <Plus className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className={cn("space-y-6", tab !== "midia" && "hidden")}>
+                {/* Imagens */}
+                <div className="space-y-3">
+                  <Label>
+                    Imagens{" "}
+                    <span className="font-normal text-muted-foreground">
+                      ({images.length + pendingFiles.length}/{MAX_PRODUCT_IMAGES})
+                    </span>
+                  </Label>
+
+                  {/* Previews */}
+                  {images.length > 0 || pendingFiles.length > 0 ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                      {images.map((url, i) => (
+                        <div
+                          key={`img-${i}`}
+                          className="relative aspect-square rounded-lg overflow-hidden border border-border group"
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeExistingImage(i)}
+                            className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remover imagem"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {pendingFiles.map((file, i) => (
+                        <div
+                          key={`file-${i}`}
+                          className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-primary/60 group"
+                        >
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                          <span className="absolute bottom-1 left-1 text-[10px] bg-primary/80 text-primary-foreground px-1 rounded">
+                            novo
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removePendingFile(i)}
+                            className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Remover imagem"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border rounded-lg text-muted-foreground">
+                      <ImageOff className="h-8 w-8 mb-2" />
+                      <p className="text-xs">Nenhuma imagem adicionada</p>
+                    </div>
+                  )}
+
+                  {/* Upload de arquivos — <label> + overlay input (iOS Safari bloqueia click() em input hidden). */}
+                  <div>
+                    <label
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "sm" }),
+                        "relative cursor-pointer overflow-hidden",
+                        (uploadingImages || loading) &&
+                          "pointer-events-none opacity-50",
+                      )}
+                    >
+                      <input
+                        type="file"
+                        accept={PRODUCT_IMAGE_ACCEPT}
+                        multiple
+                        onChange={handlePickFiles}
+                        disabled={uploadingImages || loading}
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        aria-label="Enviar imagens"
+                      />
+                      {uploadingImages ? (
+                        <Loading size="sm" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                      {uploadingImages
+                        ? uploadPhase === "prepare"
+                          ? "Preparando…"
+                          : "Enviando…"
+                        : "Enviar imagens"}
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {PRODUCT_IMAGE_ACCEPT_LABEL}
+                      {isEditMode
+                        ? " · envio imediato ao selecionar"
+                        : pendingFiles.length > 0
+                          ? " · serão enviadas ao salvar o produto"
+                          : " · no produto novo, sobem ao salvar"}
+                    </p>
+                  </div>
+
+                  {/* Colar URL externa */}
                   <div className="flex gap-2">
-                    <Input
-                      placeholder="Nova categoria"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleCreateCategory();
-                        }
-                      }}
-                      className="h-9"
-                    />
+                    <div className="relative flex-1">
+                      <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Colar URL de imagem externa"
+                        value={imageUrl}
+                        onChange={(e) => setImageUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddImageUrl();
+                          }
+                        }}
+                        className="pl-10"
+                      />
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={handleCreateCategory}
-                      disabled={creatingCategory || !newCategoryName.trim()}
+                      onClick={handleAddImageUrl}
+                      aria-label="Adicionar imagem por URL"
                     >
-                      {creatingCategory ? (
-                        <Loading size="sm" />
-                      ) : (
-                        <Plus className="h-4 w-4" />
-                      )}
+                      Adicionar
                     </Button>
                   </div>
                 </div>
-              </div>
 
-              {/* Imagens */}
-              <div className="space-y-3">
-                <Label>
-                  Imagens{" "}
-                  <span className="font-normal text-muted-foreground">
-                    ({images.length + pendingFiles.length}/{MAX_PRODUCT_IMAGES})
-                  </span>
-                </Label>
+                {/* Vídeos — link do YouTube/Instagram ou MP4 hospedado */}
+                <div className="space-y-3">
+                  <Label>
+                    Vídeos{" "}
+                    <span className="font-normal text-muted-foreground">
+                      ({videos.length + (pendingVideoFile ? 1 : 0)}/
+                      {MAX_PRODUCT_VIDEOS})
+                    </span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Cole o link do YouTube/Instagram ou envie um MP4 (até{" "}
+                    {Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). O
+                    vídeo aparece na galeria do produto na loja.
+                  </p>
 
-                {/* Previews */}
-                {images.length > 0 || pendingFiles.length > 0 ? (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {images.map((url, i) => (
-                      <div
-                        key={`img-${i}`}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-border group"
-                      >
-                        <img
-                          src={url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeExistingImage(i)}
-                          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Remover imagem"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                    {pendingFiles.map((file, i) => (
-                      <div
-                        key={`file-${i}`}
-                        className="relative aspect-square rounded-lg overflow-hidden border border-dashed border-primary/60 group"
-                      >
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                        <span className="absolute bottom-1 left-1 text-[10px] bg-primary/80 text-primary-foreground px-1 rounded">
-                          novo
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removePendingFile(i)}
-                          className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Remover imagem"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                  {(videos.length > 0 || pendingVideoFile) && (
+                    <ul className="space-y-2">
+                      {videos.map((video) => {
+                        const thumb = videoThumbnail(video);
+                        return (
+                          <li
+                            key={video.url}
+                            className="flex items-center gap-3 rounded-md border border-border p-2"
+                          >
+                            <div className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
+                              {thumb ? (
+                                <img
+                                  src={thumb}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <Video className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <Badge variant="secondary" className="text-[10px]">
+                                {videoKindLabel(video.kind)}
+                              </Badge>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {video.url}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeVideo(video.url)}
+                              className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              title="Remover vídeo"
+                              aria-label={`Remover vídeo ${video.url}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </li>
+                        );
+                      })}
+                      {pendingVideoFile && (
+                        <li className="flex items-center gap-3 rounded-md border border-dashed border-primary/60 p-2">
+                          <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded bg-muted">
+                            <Video className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <Badge variant="secondary" className="text-[10px]">
+                              novo
+                            </Badge>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {pendingVideoFile.name} · sobe ao salvar
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setPendingVideoFile(null)}
+                            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            title="Remover vídeo"
+                            aria-label="Remover vídeo pendente"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        placeholder="Colar link do YouTube ou Instagram"
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddVideoUrl();
+                          }
+                        }}
+                        className="pl-10"
+                        aria-label="Link do vídeo"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddVideoUrl}
+                      aria-label="Adicionar vídeo por link"
+                    >
+                      Adicionar
+                    </Button>
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border rounded-lg text-muted-foreground">
-                    <ImageOff className="h-8 w-8 mb-2" />
-                    <p className="text-xs">Nenhuma imagem adicionada</p>
-                  </div>
-                )}
 
-                {/* Upload de arquivos — <label> + overlay input (iOS Safari bloqueia click() em input hidden). */}
-                <div>
                   <label
                     className={cn(
                       buttonVariants({ variant: "outline", size: "sm" }),
                       "relative cursor-pointer overflow-hidden",
-                      (uploadingImages || loading) &&
+                      (uploadingVideo ||
+                        loading ||
+                        videos.length >= MAX_PRODUCT_VIDEOS) &&
                         "pointer-events-none opacity-50",
                     )}
                   >
                     <input
                       type="file"
-                      accept={PRODUCT_IMAGE_ACCEPT}
-                      multiple
-                      onChange={handlePickFiles}
-                      disabled={uploadingImages || loading}
+                      accept={PRODUCT_VIDEO_ACCEPT}
+                      onChange={handlePickVideo}
+                      disabled={uploadingVideo || loading}
                       className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                      aria-label="Enviar imagens"
+                      aria-label="Enviar vídeo MP4"
                     />
-                    {uploadingImages ? (
+                    {uploadingVideo ? (
                       <Loading size="sm" />
                     ) : (
-                      <Upload className="h-4 w-4" />
+                      <Video className="h-4 w-4" />
                     )}
-                    {uploadingImages
-                      ? uploadPhase === "prepare"
-                        ? "Preparando…"
-                        : "Enviando…"
-                      : "Enviar imagens"}
-                  </label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {PRODUCT_IMAGE_ACCEPT_LABEL}
-                    {isEditMode
-                      ? " · envio imediato ao selecionar"
-                      : pendingFiles.length > 0
-                        ? " · serão enviadas ao salvar o produto"
-                        : " · no produto novo, sobem ao salvar"}
-                  </p>
-                </div>
-
-                {/* Colar URL externa */}
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Colar URL de imagem externa"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddImageUrl();
-                        }
-                      }}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddImageUrl}
-                    aria-label="Adicionar imagem por URL"
-                  >
-                    Adicionar
-                  </Button>
-                </div>
-              </div>
-
-              {/* Vídeos — link do YouTube/Instagram ou MP4 hospedado */}
-              <div className="space-y-3">
-                <Label>
-                  Vídeos{" "}
-                  <span className="font-normal text-muted-foreground">
-                    ({videos.length + (pendingVideoFile ? 1 : 0)}/
-                    {MAX_PRODUCT_VIDEOS})
-                  </span>
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Cole o link do YouTube/Instagram ou envie um MP4 (até{" "}
-                  {Math.round(PRODUCT_VIDEO_MAX_BYTES / 1024 / 1024)} MB). O
-                  vídeo aparece na galeria do produto na loja.
-                </p>
-
-                {(videos.length > 0 || pendingVideoFile) && (
-                  <ul className="space-y-2">
-                    {videos.map((video) => {
-                      const thumb = videoThumbnail(video);
-                      return (
-                        <li
-                          key={video.url}
-                          className="flex items-center gap-3 rounded-md border border-border p-2"
-                        >
-                          <div className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded bg-muted">
-                            {thumb ? (
-                              <img
-                                src={thumb}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <Video className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <Badge variant="secondary" className="text-[10px]">
-                              {videoKindLabel(video.kind)}
-                            </Badge>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {video.url}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeVideo(video.url)}
-                            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            title="Remover vídeo"
-                            aria-label={`Remover vídeo ${video.url}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </li>
-                      );
-                    })}
-                    {pendingVideoFile && (
-                      <li className="flex items-center gap-3 rounded-md border border-dashed border-primary/60 p-2">
-                        <div className="flex h-10 w-16 shrink-0 items-center justify-center rounded bg-muted">
-                          <Video className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <Badge variant="secondary" className="text-[10px]">
-                            novo
-                          </Badge>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {pendingVideoFile.name} · sobe ao salvar
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setPendingVideoFile(null)}
-                          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          title="Remover vídeo"
-                          aria-label="Remover vídeo pendente"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </li>
-                    )}
-                  </ul>
-                )}
-
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <LinkIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Colar link do YouTube ou Instagram"
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddVideoUrl();
-                        }
-                      }}
-                      className="pl-10"
-                      aria-label="Link do vídeo"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddVideoUrl}
-                    aria-label="Adicionar vídeo por link"
-                  >
-                    Adicionar
-                  </Button>
-                </div>
-
-                <label
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "relative cursor-pointer overflow-hidden",
-                    (uploadingVideo ||
-                      loading ||
-                      videos.length >= MAX_PRODUCT_VIDEOS) &&
-                      "pointer-events-none opacity-50",
-                  )}
-                >
-                  <input
-                    type="file"
-                    accept={PRODUCT_VIDEO_ACCEPT}
-                    onChange={handlePickVideo}
-                    disabled={uploadingVideo || loading}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                    aria-label="Enviar vídeo MP4"
-                  />
-                  {uploadingVideo ? (
-                    <Loading size="sm" />
-                  ) : (
-                    <Video className="h-4 w-4" />
-                  )}
-                  {uploadingVideo ? "Enviando vídeo…" : "Enviar MP4"}
-                </label>
-              </div>
-
-              {/* Flags */}
-              <div className="grid sm:grid-cols-2 gap-3">
-                <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
-                  <input
-                    type="checkbox"
-                    checked={form.active}
-                    onChange={(e) => update("active", e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  <div>
-                    <p className="text-sm font-medium">Ativo</p>
-                    <p className="text-xs text-muted-foreground">
-                      Visível na loja
-                    </p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50">
-                  <input
-                    type="checkbox"
-                    checked={form.featured}
-                    onChange={(e) => update("featured", e.target.checked)}
-                    className="h-4 w-4"
-                  />
-                  <div>
-                    <p className="text-sm font-medium flex items-center gap-1">
-                      <Star className="h-3.5 w-3.5 text-yellow-500" /> Destaque
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Aparece em destaque
-                    </p>
-                  </div>
-                </label>
-                <label className="flex items-center gap-3 p-3 rounded-lg border border-border cursor-pointer hover:border-primary/50 sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    checked={form.wholesaleEnabled}
-                    onChange={(e) =>
-                      update("wholesaleEnabled", e.target.checked)
-                    }
-                    className="h-4 w-4"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Disponível no atacado</p>
-                    <p className="text-xs text-muted-foreground">
-                      Aparece em /atacado (desconto 25% para CNPJ aprovado).
-                      Deixe desligado até a importação se ainda não for vender
-                      no atacado.
-                    </p>
-                  </div>
-                </label>
-                {form.wholesaleEnabled && (
-                  <div className="sm:col-span-2 space-y-1">
-                    <Label htmlFor="wholesaleMinQty">
-                      Qtd. mínima no atacado
-                    </Label>
-                    <Input
-                      id="wholesaleMinQty"
-                      type="number"
-                      min={1}
-                      value={form.wholesaleMinQty}
-                      onChange={(e) =>
-                        update("wholesaleMinQty", e.target.value)
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Variações: 1 tipo "Cor" + N opções = N SKUs (ilimitado) */}
-              <div className="space-y-3 rounded-lg border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">
-                      Variações (foto por opção, estilo Shopee)
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      <strong className="text-foreground">Tipo</strong> = o que
-                      muda (ex. Cor).{" "}
-                      <strong className="text-foreground">Opções</strong> = cada
-                      valor (Rosa, Preto, Azul…) —{" "}
-                      <strong className="text-foreground">sem limite</strong>.
-                      Clique em{" "}
-                      <strong className="text-foreground">
-                        Gerar combinações
-                      </strong>{" "}
-                      e cada linha ganha campo de{" "}
-                      <strong className="text-foreground">foto própria</strong>,
-                      preço e estoque.
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={hasVariants}
-                      onChange={(e) => setHasVariants(e.target.checked)}
-                      aria-label="Ativar variações"
-                    />
-                    Ativar
+                    {uploadingVideo ? "Enviando vídeo…" : "Enviar MP4"}
                   </label>
                 </div>
 
-                {hasVariants && (
-                  <div className="space-y-3">
+              </div>
+
+              <div className={cn("space-y-6", tab !== "variacoes" && "hidden")}>
+                {/* Variações: 1 tipo "Cor" + N opções = N SKUs (ilimitado) */}
+                <div className="space-y-3 rounded-lg border p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">
+                        Variações (foto por opção, estilo Shopee)
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        <strong className="text-foreground">Tipo</strong> = o que
+                        muda (ex. Cor).{" "}
+                        <strong className="text-foreground">Opções</strong> = cada
+                        valor (Rosa, Preto, Azul…) —{" "}
+                        <strong className="text-foreground">sem limite</strong>.
+                        Clique em{" "}
+                        <strong className="text-foreground">
+                          Gerar combinações
+                        </strong>{" "}
+                        e cada linha ganha campo de{" "}
+                        <strong className="text-foreground">foto própria</strong>,
+                        preço e estoque.
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={hasVariants}
+                        onChange={(e) => setHasVariants(e.target.checked)}
+                        aria-label="Ativar variações"
+                      />
+                      Ativar
+                    </label>
+                  </div>
+
+                  {hasVariants && (
                     <div className="space-y-3">
-                      {axisDrafts.map((draft, idx) => {
-                        const options = parseOptionsText(draft.optionsText);
-                        return (
-                          <div
-                            key={idx}
-                            className="space-y-2 rounded-md border border-border/60 p-3"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <Label>
-                                Tipo {idx + 1}
-                                {idx === 0
-                                  ? " (ex.: Cor)"
-                                  : idx === 1
-                                    ? " (ex.: Tamanho)"
-                                    : ""}
-                              </Label>
-                              {axisDrafts.length > 1 && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 px-2 text-muted-foreground"
-                                  onClick={() => removeAxisDraft(idx)}
-                                  aria-label={`Remover tipo ${idx + 1}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                            <Input
-                              value={draft.name}
-                              onChange={(e) =>
-                                updateAxisDraft(idx, { name: e.target.value })
-                              }
-                              placeholder={
-                                idx === 0
-                                  ? "Cor"
-                                  : idx === 1
-                                    ? "Tamanho"
-                                    : "Nome do tipo"
-                              }
-                            />
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground">
-                                Opções ({options.length}) — digite e adicione
-                                uma a uma
-                              </Label>
-                              <div className="flex flex-wrap gap-1.5">
-                                {options.map((opt) => (
-                                  <span
-                                    key={opt}
-                                    className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
-                                  >
-                                    {opt}
-                                    <button
-                                      type="button"
-                                      className="rounded-full p-0.5 hover:bg-primary/20"
-                                      onClick={() => removeOptionChip(idx, opt)}
-                                      aria-label={`Remover ${opt}`}
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="flex gap-2">
-                                <Input
-                                  className="h-8"
-                                  placeholder="Ex.: Rosa"
-                                  value={newOptionByAxis[idx] ?? ""}
-                                  onChange={(e) =>
-                                    setNewOptionByAxis((prev) => ({
-                                      ...prev,
-                                      [idx]: e.target.value,
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      addOptionChip(idx);
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 shrink-0"
-                                  onClick={() => addOptionChip(idx)}
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  Opção
-                                </Button>
-                              </div>
-                              <Input
-                                className="h-8 text-xs"
-                                placeholder="Ou cole várias: Rosa, Preto, Azul"
-                                value={draft.optionsText}
-                                onChange={(e) =>
-                                  updateAxisDraft(idx, {
-                                    optionsText: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={addAxisDraft}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Outro tipo (ex. Tamanho)
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={generateVariantMatrix}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Gerar combinações
-                      </Button>
-                    </div>
-
-                    {variantRows.length > 0 && (
-                      <div className="max-h-96 space-y-3 overflow-y-auto rounded border p-2">
-                        <p className="text-xs font-medium text-muted-foreground">
-                          {variantRows.length} SKU(s) — cada um com fotos
-                          próprias (até {MAX_VARIANT_IMAGES}), preço, estoque e
-                          SKU, como na Shopee
-                        </p>
-                        {variantRows.map((row, idx) => {
-                          const savedImages = row.images ?? [];
-                          const previews = pendingVariantPreviews[idx] ?? [];
-                          const photoCount =
-                            savedImages.length + previews.length;
-                          const thumbUrl =
-                            savedImages[0] || previews[0] || null;
+                      <div className="space-y-3">
+                        {axisDrafts.map((draft, idx) => {
+                          const options = parseOptionsText(draft.optionsText);
                           return (
                             <div
-                              key={row.name + idx}
-                              className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2"
+                              key={idx}
+                              className="space-y-2 rounded-md border border-border/60 p-3"
                             >
-                              {/*
-                              No celular a linha empilha: 12 colunas ali davam
-                              33px por célula e a miniatura de 48px vazava.
-                              `sm:contents` dissolve os agrupadores no desktop,
-                              devolvendo os campos ao grid de 12 colunas.
-                            */}
-                              <div className="flex flex-col gap-2 text-sm sm:grid sm:grid-cols-12 sm:items-center">
-                                <div className="flex items-center gap-2 sm:contents">
-                                  {/* Foto da variação */}
-                                  <div className="shrink-0 sm:col-span-2">
-                                    <label
-                                      className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
-                                      title={`Foto de ${row.name}`}
-                                      aria-label={`Enviar foto da variação ${row.name}`}
-                                    >
-                                      <input
-                                        id={`variant-photo-${idx}`}
-                                        type="file"
-                                        accept={PRODUCT_IMAGE_ACCEPT}
-                                        multiple
-                                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                        onChange={(e) =>
-                                          void handleVariantFilePick(e, idx)
-                                        }
-                                      />
-                                      {thumbUrl ? (
-                                        <img
-                                          src={thumbUrl}
-                                          alt=""
-                                          className="h-full w-full object-cover"
-                                        />
-                                      ) : (
-                                        <Upload className="h-4 w-4 text-muted-foreground" />
-                                      )}
-                                      {photoCount > 1 && (
-                                        <span className="absolute bottom-0 right-0 rounded-tl bg-primary px-1 text-[10px] font-medium text-primary-foreground">
-                                          {photoCount}
-                                        </span>
-                                      )}
-                                    </label>
-                                  </div>
-                                  <span
-                                    className="min-w-0 flex-1 truncate font-medium sm:col-span-3"
-                                    title={row.name}
-                                  >
-                                    {row.name}
-                                  </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2 sm:contents">
-                                  <Input
-                                    className="h-8 sm:col-span-3"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    max={MAX_PRODUCT_PRICE}
-                                    value={row.price}
-                                    onChange={(e) => {
-                                      const price = Number(e.target.value);
-                                      setVariantRows((rows) =>
-                                        rows.map((r, i) =>
-                                          i === idx ? { ...r, price } : r,
-                                        ),
-                                      );
-                                    }}
-                                    aria-label={`Preço ${row.name}`}
-                                  />
-                                  <Input
-                                    className="h-8 sm:col-span-2"
-                                    type="number"
-                                    value={row.stock ?? 0}
-                                    onChange={(e) => {
-                                      const stock = Number(e.target.value);
-                                      setVariantRows((rows) =>
-                                        rows.map((r, i) =>
-                                          i === idx ? { ...r, stock } : r,
-                                        ),
-                                      );
-                                    }}
-                                    aria-label={`Estoque ${row.name}`}
-                                  />
-                                  <Input
-                                    className="col-span-2 h-8 sm:col-span-2"
-                                    placeholder="SKU"
-                                    value={row.sku ?? ""}
-                                    onChange={(e) => {
-                                      const sku = e.target.value;
-                                      setVariantRows((rows) =>
-                                        rows.map((r, i) =>
-                                          i === idx ? { ...r, sku } : r,
-                                        ),
-                                      );
-                                    }}
-                                    aria-label={`SKU ${row.name}`}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Galeria da variação — várias fotos, como na Shopee */}
-                              {photoCount > 0 && (
-                                <div className="flex flex-wrap gap-1.5 pl-0 sm:pl-14">
-                                  {savedImages.map((url) => (
-                                    <div
-                                      key={url}
-                                      className="group relative h-12 w-12 overflow-hidden rounded border border-border"
-                                    >
-                                      <img
-                                        src={url}
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removeVariantImage(idx, url)
-                                        }
-                                        className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                                        title="Remover foto"
-                                        aria-label={`Remover foto da variação ${row.name}`}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                  {previews.map((url, fileIndex) => (
-                                    <div
-                                      key={url}
-                                      className="group relative h-12 w-12 overflow-hidden rounded border border-dashed border-primary/60"
-                                    >
-                                      <img
-                                        src={url}
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                      />
-                                      <span className="absolute bottom-0 left-0 rounded-tr bg-primary/80 px-0.5 text-[9px] text-primary-foreground">
-                                        novo
-                                      </span>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          removePendingVariantFile(
-                                            idx,
-                                            fileIndex,
-                                          )
-                                        }
-                                        className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                                        title="Remover foto"
-                                        aria-label={`Remover foto pendente da variação ${row.name}`}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Controles de foto da variação */}
-                              <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
-                                <label
-                                  htmlFor={`variant-photo-${idx}`}
-                                  className={cn(
-                                    buttonVariants({
-                                      variant: "outline",
-                                      size: "sm",
-                                    }),
-                                    "h-7 cursor-pointer text-xs",
-                                    photoCount >= MAX_VARIANT_IMAGES &&
-                                      "pointer-events-none opacity-50",
-                                  )}
-                                >
-                                  <Upload className="h-3 w-3" />
-                                  {photoCount > 0
-                                    ? `Add fotos (${photoCount}/${MAX_VARIANT_IMAGES})`
-                                    : "Fotos"}
-                                </label>
-                                {photoCount > 0 && (
+                              <div className="flex items-center justify-between gap-2">
+                                <Label>
+                                  Tipo {idx + 1}
+                                  {idx === 0
+                                    ? " (ex.: Cor)"
+                                    : idx === 1
+                                      ? " (ex.: Tamanho)"
+                                      : ""}
+                                </Label>
+                                {axisDrafts.length > 1 && (
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    className="h-7 text-xs text-muted-foreground"
-                                    onClick={() => clearVariantImages(idx)}
+                                    className="h-7 px-2 text-muted-foreground"
+                                    onClick={() => removeAxisDraft(idx)}
+                                    aria-label={`Remover tipo ${idx + 1}`}
                                   >
-                                    <Trash2 className="h-3 w-3" />
-                                    Limpar
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                <div className="flex min-w-0 flex-1 gap-1">
+                              </div>
+                              <Input
+                                value={draft.name}
+                                onChange={(e) =>
+                                  updateAxisDraft(idx, { name: e.target.value })
+                                }
+                                placeholder={
+                                  idx === 0
+                                    ? "Cor"
+                                    : idx === 1
+                                      ? "Tamanho"
+                                      : "Nome do tipo"
+                                }
+                              />
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">
+                                  Opções ({options.length}) — digite e adicione
+                                  uma a uma
+                                </Label>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {options.map((opt) => (
+                                    <span
+                                      key={opt}
+                                      className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
+                                    >
+                                      {opt}
+                                      <button
+                                        type="button"
+                                        className="rounded-full p-0.5 hover:bg-primary/20"
+                                        onClick={() => removeOptionChip(idx, opt)}
+                                        aria-label={`Remover ${opt}`}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="flex gap-2">
                                   <Input
-                                    className="h-7 text-xs"
-                                    placeholder="Ou cole URL da foto desta variação"
-                                    value={variantUrlDraft[idx] ?? ""}
+                                    className="h-8"
+                                    placeholder="Ex.: Rosa"
+                                    value={newOptionByAxis[idx] ?? ""}
                                     onChange={(e) =>
-                                      setVariantUrlDraft((prev) => ({
+                                      setNewOptionByAxis((prev) => ({
                                         ...prev,
                                         [idx]: e.target.value,
                                       }))
@@ -2207,60 +2033,332 @@ export function ProductModal({
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter") {
                                         e.preventDefault();
-                                        applyVariantImageUrl(idx);
+                                        addOptionChip(idx);
                                       }
                                     }}
-                                    aria-label={`URL da foto ${row.name}`}
                                   />
                                   <Button
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    className="h-7 shrink-0 text-xs"
-                                    onClick={() => applyVariantImageUrl(idx)}
+                                    className="h-8 shrink-0"
+                                    onClick={() => addOptionChip(idx)}
                                   >
-                                    OK
+                                    <Plus className="h-4 w-4" />
+                                    Opção
                                   </Button>
                                 </div>
+                                <Input
+                                  className="h-8 text-xs"
+                                  placeholder="Ou cole várias: Rosa, Preto, Azul"
+                                  value={draft.optionsText}
+                                  onChange={(e) =>
+                                    updateAxisDraft(idx, {
+                                      optionsText: e.target.value,
+                                    })
+                                  }
+                                />
                               </div>
-
-                              {/* Atalho: escolher imagem já do produto */}
-                              {images.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-14">
-                                  <span className="text-[10px] text-muted-foreground">
-                                    Da galeria:
-                                  </span>
-                                  {images.slice(0, 12).map((url) => (
-                                    <button
-                                      key={url}
-                                      type="button"
-                                      onClick={() =>
-                                        assignGalleryImageToVariant(idx, url)
-                                      }
-                                      className={`h-8 w-8 overflow-hidden rounded border transition-colors ${
-                                        savedImages.includes(url)
-                                          ? "border-primary ring-1 ring-primary"
-                                          : "border-border hover:border-primary/60"
-                                      }`}
-                                      title="Usar esta imagem na variação"
-                                    >
-                                      <img
-                                        src={url}
-                                        alt=""
-                                        className="h-full w-full object-cover"
-                                      />
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
                             </div>
                           );
                         })}
                       </div>
-                    )}
-                  </div>
-                )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addAxisDraft}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Outro tipo (ex. Tamanho)
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={generateVariantMatrix}
+                        >
+                          <Plus className="h-4 w-4" />
+                          Gerar combinações
+                        </Button>
+                      </div>
+
+                      {variantRows.length > 0 && (
+                        <div className="max-h-96 space-y-3 overflow-y-auto rounded border p-2">
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {variantRows.length} SKU(s) — cada um com fotos
+                            próprias (até {MAX_VARIANT_IMAGES}), preço, estoque e
+                            SKU, como na Shopee
+                          </p>
+                          {variantRows.map((row, idx) => {
+                            const savedImages = row.images ?? [];
+                            const previews = pendingVariantPreviews[idx] ?? [];
+                            const photoCount =
+                              savedImages.length + previews.length;
+                            const thumbUrl =
+                              savedImages[0] || previews[0] || null;
+                            return (
+                              <div
+                                key={row.name + idx}
+                                className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2"
+                              >
+                                {/*
+                                No celular a linha empilha: 12 colunas ali davam
+                                33px por célula e a miniatura de 48px vazava.
+                                `sm:contents` dissolve os agrupadores no desktop,
+                                devolvendo os campos ao grid de 12 colunas.
+                              */}
+                                <div className="flex flex-col gap-2 text-sm sm:grid sm:grid-cols-12 sm:items-center">
+                                  <div className="flex items-center gap-2 sm:contents">
+                                    {/* Foto da variação */}
+                                    <div className="shrink-0 sm:col-span-2">
+                                      <label
+                                        className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
+                                        title={`Foto de ${row.name}`}
+                                        aria-label={`Enviar foto da variação ${row.name}`}
+                                      >
+                                        <input
+                                          id={`variant-photo-${idx}`}
+                                          type="file"
+                                          accept={PRODUCT_IMAGE_ACCEPT}
+                                          multiple
+                                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                          onChange={(e) =>
+                                            void handleVariantFilePick(e, idx)
+                                          }
+                                        />
+                                        {thumbUrl ? (
+                                          <img
+                                            src={thumbUrl}
+                                            alt=""
+                                            className="h-full w-full object-cover"
+                                          />
+                                        ) : (
+                                          <Upload className="h-4 w-4 text-muted-foreground" />
+                                        )}
+                                        {photoCount > 1 && (
+                                          <span className="absolute bottom-0 right-0 rounded-tl bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                                            {photoCount}
+                                          </span>
+                                        )}
+                                      </label>
+                                    </div>
+                                    <span
+                                      className="min-w-0 flex-1 truncate font-medium sm:col-span-3"
+                                      title={row.name}
+                                    >
+                                      {row.name}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-2 sm:contents">
+                                    <Input
+                                      className="h-8 sm:col-span-3"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      max={MAX_PRODUCT_PRICE}
+                                      value={row.price}
+                                      onChange={(e) => {
+                                        const price = Number(e.target.value);
+                                        setVariantRows((rows) =>
+                                          rows.map((r, i) =>
+                                            i === idx ? { ...r, price } : r,
+                                          ),
+                                        );
+                                      }}
+                                      aria-label={`Preço ${row.name}`}
+                                    />
+                                    <Input
+                                      className="h-8 sm:col-span-2"
+                                      type="number"
+                                      value={row.stock ?? 0}
+                                      onChange={(e) => {
+                                        const stock = Number(e.target.value);
+                                        setVariantRows((rows) =>
+                                          rows.map((r, i) =>
+                                            i === idx ? { ...r, stock } : r,
+                                          ),
+                                        );
+                                      }}
+                                      aria-label={`Estoque ${row.name}`}
+                                    />
+                                    <Input
+                                      className="col-span-2 h-8 sm:col-span-2"
+                                      placeholder="SKU"
+                                      value={row.sku ?? ""}
+                                      onChange={(e) => {
+                                        const sku = e.target.value;
+                                        setVariantRows((rows) =>
+                                          rows.map((r, i) =>
+                                            i === idx ? { ...r, sku } : r,
+                                          ),
+                                        );
+                                      }}
+                                      aria-label={`SKU ${row.name}`}
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Galeria da variação — várias fotos, como na Shopee */}
+                                {photoCount > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 pl-0 sm:pl-14">
+                                    {savedImages.map((url) => (
+                                      <div
+                                        key={url}
+                                        className="group relative h-12 w-12 overflow-hidden rounded border border-border"
+                                      >
+                                        <img
+                                          src={url}
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removeVariantImage(idx, url)
+                                          }
+                                          className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                          title="Remover foto"
+                                          aria-label={`Remover foto da variação ${row.name}`}
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                    {previews.map((url, fileIndex) => (
+                                      <div
+                                        key={url}
+                                        className="group relative h-12 w-12 overflow-hidden rounded border border-dashed border-primary/60"
+                                      >
+                                        <img
+                                          src={url}
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                        <span className="absolute bottom-0 left-0 rounded-tr bg-primary/80 px-0.5 text-[9px] text-primary-foreground">
+                                          novo
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removePendingVariantFile(
+                                              idx,
+                                              fileIndex,
+                                            )
+                                          }
+                                          className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                          title="Remover foto"
+                                          aria-label={`Remover foto pendente da variação ${row.name}`}
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Controles de foto da variação */}
+                                <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
+                                  <label
+                                    htmlFor={`variant-photo-${idx}`}
+                                    className={cn(
+                                      buttonVariants({
+                                        variant: "outline",
+                                        size: "sm",
+                                      }),
+                                      "h-7 cursor-pointer text-xs",
+                                      photoCount >= MAX_VARIANT_IMAGES &&
+                                        "pointer-events-none opacity-50",
+                                    )}
+                                  >
+                                    <Upload className="h-3 w-3" />
+                                    {photoCount > 0
+                                      ? `Add fotos (${photoCount}/${MAX_VARIANT_IMAGES})`
+                                      : "Fotos"}
+                                  </label>
+                                  {photoCount > 0 && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 text-xs text-muted-foreground"
+                                      onClick={() => clearVariantImages(idx)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                      Limpar
+                                    </Button>
+                                  )}
+                                  <div className="flex min-w-0 flex-1 gap-1">
+                                    <Input
+                                      className="h-7 text-xs"
+                                      placeholder="Ou cole URL da foto desta variação"
+                                      value={variantUrlDraft[idx] ?? ""}
+                                      onChange={(e) =>
+                                        setVariantUrlDraft((prev) => ({
+                                          ...prev,
+                                          [idx]: e.target.value,
+                                        }))
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          applyVariantImageUrl(idx);
+                                        }
+                                      }}
+                                      aria-label={`URL da foto ${row.name}`}
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 shrink-0 text-xs"
+                                      onClick={() => applyVariantImageUrl(idx)}
+                                    >
+                                      OK
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Atalho: escolher imagem já do produto */}
+                                {images.length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-14">
+                                    <span className="text-[10px] text-muted-foreground">
+                                      Da galeria:
+                                    </span>
+                                    {images.slice(0, 12).map((url) => (
+                                      <button
+                                        key={url}
+                                        type="button"
+                                        onClick={() =>
+                                          assignGalleryImageToVariant(idx, url)
+                                        }
+                                        className={`h-8 w-8 overflow-hidden rounded border transition-colors ${
+                                          savedImages.includes(url)
+                                            ? "border-primary ring-1 ring-primary"
+                                            : "border-border hover:border-primary/60"
+                                        }`}
+                                        title="Usar esta imagem na variação"
+                                      >
+                                        <img
+                                          src={url}
+                                          alt=""
+                                          className="h-full w-full object-cover"
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
             </CardContent>
 
             <CardFooter className="gap-2">

@@ -152,16 +152,26 @@ test.describe('Captura tutorial admin', () => {
       await page.locator('#product-name').fill(d.name)
       await page.locator('#product-price').fill(d.price)
       await page.locator('#product-stock').fill(d.stock)
-      await page.getByPlaceholder(/Colar URL de imagem externa/i).fill('https://placehold.co/600x600.png')
-      await page.getByRole('button', { name: /^Adicionar$/i }).click()
+
+      // O formulário está em abas desde 16/08/2026 — a foto mora em "Fotos e
+      // vídeos", e o tutorial precisa mostrar o caminho, não pular por cima dele.
       if (i === 0) {
         await shot(page, '06-produto-modal', [
           { loc: page.locator('#product-name'), label: 'Nome do produto (obrigatório)' },
           { loc: page.locator('#product-price'), label: 'Preço de venda' },
           { loc: page.locator('#product-stock'), label: 'Quantidade em estoque' },
-          { loc: page.locator('#product-category'), label: 'Categoria (crie novas aqui)' },
-          { loc: page.getByPlaceholder(/URL de imagem/i), label: 'Imagens: por URL ou upload' },
+          { loc: page.getByRole('tablist'), label: 'As seções do produto ficam aqui' },
           { loc: page.getByRole('button', { name: /Criar Produto/i }), label: 'Salvar o novo produto' },
+        ])
+      }
+
+      await page.getByRole('tab', { name: /Fotos e vídeos/ }).click()
+      await page.getByPlaceholder(/Colar URL de imagem externa/i).fill('https://placehold.co/600x600.png')
+      await page.getByRole('button', { name: /^Adicionar$/i }).click()
+      if (i === 0) {
+        await shot(page, '06b-produto-midia', [
+          { loc: page.getByPlaceholder(/URL de imagem/i), label: 'Imagens: por URL ou upload' },
+          { loc: page.getByRole('tab', { name: /Variações/ }), label: 'Variações (cor, tamanho) ficam aqui' },
         ])
       }
       await page.getByRole('button', { name: /Criar Produto/i }).click()
