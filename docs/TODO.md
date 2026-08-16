@@ -47,6 +47,14 @@ Foco: base de dados, estrutura e layout.
       levando à aba certa. 6 testes novos; os 15 antigos passaram sem alteração.
       E2E atualizados.
 
+- [x] **Varredura do padrão "altura chutada"** — dois bloqueios reais achados e
+      corrigidos: na **loja**, o banner de evento (`sticky top-0 z-50`) cobria o
+      `ShopHeader` (`sticky top-0 z-40`) inteiro ao rolar, travando carrinho,
+      login, busca e tema em **todas** as larguras, desktop incluído; e o
+      **aviso de offline** (`fixed top-0 z-[9999]`) cobria a primeira linha do
+      header nas três SPAs enquanto a conexão estivesse caída. Junto saiu a
+      `--shop-event-banner-h`, calculada com números fixos e lida por ninguém.
+
 ### Em aberto
 
 - [ ] **MEDIO** — ~99 erros de tipo em arquivos de teste (mocks do `apiRequest`
