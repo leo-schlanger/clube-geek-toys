@@ -1225,10 +1225,15 @@ export function ProductModal({
                 aba de esconder trabalho: quem abre um produto vê "Fotos e
                 vídeos 4" sem precisar entrar para descobrir que tem conteúdo lá.
               */}
+              {/*
+                Fixa no topo: quem rola a aba Variações (a mais longa) não pode
+                precisar voltar ao começo só para trocar de seção. O container
+                que rola é o próprio Card, então `top-0` gruda no topo dele.
+              */}
               <div
                 role="tablist"
                 aria-label="Seções do produto"
-                className="-mx-1 flex gap-1 overflow-x-auto border-b border-border pb-px"
+                className="sticky top-0 z-10 -mx-1 flex gap-1 overflow-x-auto border-b border-border bg-card pb-px"
               >
                 {TABS.map((t) => {
                   const count = tabCounts[t.id];
