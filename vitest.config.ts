@@ -45,9 +45,19 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json-summary'],
       reportsDirectory: './.coverage',
+      /**
+       * O backend inteiro entra aqui desde 16/08/2026.
+       *
+       * Antes o `include` era `src/**` + `server/api/src/utils/**`, então os
+       * "74% de cobertura" do TODO mediam essencialmente o front. As 10 mil
+       * linhas que mexem em dinheiro e estoque — `order.service` (840),
+       * `webhook.service` (569), `payment.service` (521), `stock.service` (409)
+       * — ficavam fora da conta, todas em 0%. A métrica existia e não olhava
+       * para o lugar de maior risco.
+       */
       include: [
         'src/**/*.{ts,tsx}',
-        'server/api/src/utils/**/*.{ts}',
+        'server/api/src/**/*.ts',
       ],
       exclude: [
         'src/**/*.d.ts',
@@ -59,12 +69,30 @@ export default defineConfig({
         'server/api/src/**/*.test.ts',
         'server/api/src/**/*.spec.ts',
       ],
-      // Meta do projeto: 70% (docs/TODO). Thresholds de CI em 70% lines/statements.
+      /**
+       * Thresholds por área, não um número só.
+       *
+       * O front já sustenta 70% e continua com essa trava. O backend entrou na
+       * medição em 7% — pôr 70% aqui deixaria o CI vermelho para sempre e a
+       * trava viraria ruído que se desliga. O piso é o valor **medido hoje**,
+       * para não regredir, e sobe a cada leva de teste. É catraca, não meta.
+       *
+       * Próximos alvos, por prejuízo se quebrar: `webhook.service` (confirma
+       * pagamento e baixa estoque), `payment.service`, `stock.service`.
+       */
       thresholds: {
-        statements: 70,
-        branches: 60,
-        functions: 70,
-        lines: 70,
+        'src/**': {
+          statements: 70,
+          branches: 60,
+          functions: 70,
+          lines: 70,
+        },
+        'server/api/src/**': {
+          statements: 10,
+          branches: 8,
+          functions: 9,
+          lines: 10,
+        },
       },
     },
   },
