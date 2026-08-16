@@ -1,6 +1,71 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 15 de Agosto de 2026
+> **Ultima atualizacao:** 16 de Agosto de 2026
+
+## Aberto pelo checkup de 16/08/2026
+
+Detalhes e evidências em [`CHECKUP-2026-08-16.md`](CHECKUP-2026-08-16.md).
+Foco: base de dados, estrutura e layout.
+
+### Resolvido em 16/08/2026
+
+- [x] **Schema deixa de falhar em silêncio** — o `ensureSchema()` era um `try`
+      único sobre 460 linhas de DDL: a etapa 12 quebrando abortava as 13–19, com
+      a API servindo tráfego e o `/health` respondendo `ok`. Agora são 19 etapas
+      nomeadas com falha isolada, `schema.status` no `/health`, `GET /logs/schema`
+      no admin e o deploy falhando em `degraded`. Os 113 statements SQL foram
+      conferidos idênticos antes/depois. 5 testes.
+- [x] **Cobertura passa a medir o backend** — o `include` do vitest era
+      `src/**` + `server/api/src/utils/**`, então os "74%" eram do front. Medido
+      com o backend: **7,15%** antes dos testes novos (`order.service` 840 l,
+      `webhook.service` 569, `payment.service` 521 e `stock.service` 409 todos
+      em **0%**), **11,80%** depois. Thresholds agora são dois, por área.
+- [x] **Cobertura do front estava desatualizada** — os 74% eram de 10/08; hoje
+      são **67,55%**. O catálogo (variações, estoque, vídeos, perguntas,
+      galeria, atacado) entrou mais rápido que os testes. O threshold global de
+      70% **já falhava** e ninguém tinha notado, porque a run completa leva
+      ~26 min e não está no CI. Piso passou a ser o valor medido, como catraca.
+- [x] **Checkout ganha teste** — 25 casos em `order.service.test.ts`: preço do
+      banco, membro × atacado sem empilhar, frete fora do desconto, agregação de
+      linhas contra oversell, crédito sem total negativo, variações e atacado.
+      Validados por mutação (3 regressões plantadas, 3 pegas).
+- [x] **`npm run build` volta a proteger** — falhava com 154 erros de tipo e o CI
+      usava `vite build`, que não checa tipo: erro de tipo em produção nunca
+      barrou um deploy. Os 40 erros de produção corrigidos, incluindo 2 bugs
+      reais no `ImageCropDialog` (tamanho padrão como string e `panX/panY`
+      virando `NaN`) e o tipo `Member` desalinhado do schema do backend.
+      Deploy ganhou passo `npx tsc -b`.
+- [x] **`npm run lint` volta a valer** — 99 erros, todos de `server/api/dist`
+      (pasta de build gitignorada que o `globalIgnores(['dist'])` não pegava).
+      **0 erros** agora.
+- [x] **PWA parou de baixar 11 MB** — `globPatterns` incluía `jpg` e as 35 fotos
+      do evento entravam no precache do service worker, na primeira visita de
+      todo mundo. **11.205 KiB → 2.335 KiB**; fotos foram para `runtimeCaching`.
+- [x] **`ProductModal` em abas** — a dívida de UX nº 1 (2297 linhas em rolagem
+      única; foi o que fez a Laura não achar o campo de vídeo). 4 abas com
+      contador, painéis montados (rascunho sobrevive à troca) e erro de validação
+      levando à aba certa. 6 testes novos; os 15 antigos passaram sem alteração.
+      E2E atualizados.
+
+### Em aberto
+
+- [ ] **MEDIO** — ~99 erros de tipo em arquivos de teste (mocks do `apiRequest`
+      sem o campo `status`). Não bloqueiam deploy desde a separação
+      build × typecheck; medir com `npm run typecheck`.
+- [ ] **MEDIO** — Cobertura do backend em **11,80%** (meta 70%). Próximos por
+      prejuízo se quebrarem: `webhook.service` (confirma pagamento e baixa
+      estoque), `payment.service`, `stock.service`.
+- [ ] **MEDIO** — Cobertura do front em **67,55%** (meta 70%). Recuperar os
+      ~2,5 pontos perdidos desde 10/08 — as telas de catálogo que entraram sem
+      teste são o buraco.
+- [ ] **BAIXO** — Rodar cobertura no CI. Hoje a única forma de saber que ela
+      caiu é rodar 26 min na mão, que é por isso que a queda de 74% → 67,55%
+      passou despercebida por seis dias.
+- [ ] **BAIXO** — Tipos duplicados: front (466 linhas) × backend (257). Duas
+      fontes de verdade para o mesmo contrato — foi o que deixou `Member`
+      desalinhado do `updateMemberSchema` sem ninguém perceber.
+- [ ] **BAIXO** — 45 `<img>` sem `loading="lazy"`. Vários estão acima da dobra,
+      onde lazy é errado; vale caso a caso.
 
 ## Aberto pelo checkup de 15/08/2026
 
@@ -274,7 +339,11 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 
 ### MEDIO - Planejado
 
-- [x] **Aumentar cobertura de testes** - Meta 70% atingida (10/08 noite): **stmts 74.0%** · **lines 76.2%** · **funcs 70.1%** · **branches 68.0%** (2192 testes ✓). Shop pages cobertas (`src/pages/shop` ~74% stmts).
+- [x] **Aumentar cobertura de testes** - Meta 70% atingida em 10/08 noite: stmts 74.0% · lines 76.2% · funcs 70.1% · branches 68.0% (2192 testes ✓).
+      **Não vale mais**: remedido em 16/08 com 2278 testes, o front caiu para
+      **67,55% stmts / 69,31% lines** — o catálogo (variações, estoque, vídeos,
+      perguntas, galeria, atacado) entrou mais rápido que os testes. Ver a
+      tabela de métricas no fim deste documento.
 - [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
 - [ ] **Settings/preferencias do membro** - Permitir editar preferencias pessoais e notificacoes
 - [ ] **Structured logging** - Substituir console.log por logger com niveis (Pino/Winston)
@@ -353,8 +422,8 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 - [x] **15/08 — bandeiras de pagamento** - vetores reais no lugar dos badges de texto
 - [x] **15/08 — home** - busca de produtos no Navbar e tema claro/escuro
 - [x] **15/08 — privacidade** - política dos dois sites cobre foto de evento e pergunta pública
-- [ ] **Dívida de UX** - modal de produto ficou longo demais; agrupar em seções/abas (foi o que fez a Laura não achar o campo de vídeo)
-- [ ] **Dívida** - `npm run build` (`tsc -b`) falha por erros de tipo pré-existentes em `MemberModal`, `UserModal`, `ImageCropDialog`, `AuthContext` e vários `*.test.tsx`; o CI usa `vite build` e não é afetado
+- [x] **Dívida de UX** - modal de produto em 4 abas com contador (16/08); painéis ficam montados, então rascunho digitado numa aba entra no save disparado de outra
+- [x] **Dívida** - `npm run build` verde (16/08). Os 40 erros em código de produção foram corrigidos — 2 eram bugs reais no `ImageCropDialog`. Os erros restantes são de `*.test.tsx` e saíram do build para o `npm run typecheck`; o CI agora roda `tsc -b` antes do `vite build`
 - [ ] **Operação** - Laura: revisar os produtos que já passaram de 8 fotos antes do fix (nenhum dado foi perdido; só o save estava travado)
 
 ### Hardening (10/08/2026 — validação de fluxos)
@@ -430,7 +499,7 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 1. MapperUtils usa `any` (necessario para flexibilidade)
 2. Soft-delete de usuarios (role → `disabled`, nao deleta)
 3. vendor-charts bundle (435KB) - Lazy loaded via ReportsTab
-4. Erros TypeScript pre-existentes em payments.ts, reports.ts (tipos `unknown`)
+4. ~~Erros TypeScript pre-existentes~~ — código de produção zerado em 16/08; restam ~99 em arquivos de teste (mocks do `apiRequest` sem `status`), fora do build
 5. ~~Residuos de cor roxo/dourado fora da marca~~ — limpos 08/08/2026 (Subscribe/SubscriptionManagement/RealtimeMetrics/MembershipCard)
 
 ---
@@ -439,11 +508,30 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 
 ### Qualidade
 
-| Metrica           | Atual                             | Meta |
-| ----------------- | --------------------------------- | ---- |
-| Test coverage     | **74% stmts / 76% lines** (10/08) | 70%  |
-| TypeScript strict | Sim                               | Sim  |
-| ESLint errors     | 0                                 | 0    |
+| Metrica                     | Medido em 16/08/2026                  | Meta  |
+| --------------------------- | ------------------------------------- | ----- |
+| Cobertura — front (`src/`)  | **67,55% stmts** / 69,31% lines       | 70%   |
+| Cobertura — API (`server/`) | **11,80% stmts** / 11,78% lines       | 70%   |
+| Cobertura — total           | 49,23% stmts                          | —     |
+| Suíte                       | **2278 testes, 165 arquivos, verdes** | verde |
+| TypeScript strict           | Sim                                   | Sim   |
+| `npm run build` (tsc+vite)  | ✅ verde                              | verde |
+| `npm run typecheck` (test)  | ⚠️ ~99 erros de mock                  | 0     |
+| ESLint errors               | **0**                                 | 0     |
+
+> Duas coisas foram acertadas em 16/08:
+>
+> 1. **O número não cobria o backend.** O `include` do vitest era `src/**` mais
+>    3 arquivos de util, então checkout, webhook, pagamento e estoque não
+>    entravam na conta. Agora entram — e mostram 11,80%.
+> 2. **O número do front estava velho.** Os "74%" eram de 10/08. Com variações,
+>    estoque, vídeos, perguntas, galeria e atacado entrando mais rápido que os
+>    testes, caiu para 67,55% — ou seja, o threshold global de 70%
+>    **já estava falhando** e ninguém tinha visto, porque a run completa leva
+>    ~26 min e não está no CI.
+>
+> Os thresholds agora são o valor medido, por área: **catraca contra regressão**,
+> não meta. A meta segue 70% nos dois lados.
 
 ### Infraestrutura
 
@@ -459,4 +547,4 @@ Paleta oficial: **Hot Pink** `#F04080` + **Pop Yellow** `#FCBE04` | UI dark-firs
 
 ---
 
-_Documento atualizado em 7 de Agosto de 2026_
+_Documento atualizado em 16 de Agosto de 2026_

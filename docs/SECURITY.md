@@ -210,6 +210,22 @@ Em conformidade com a **Lei 14.063/2020** (assinatura eletrônica):
 | `CHECK` constraints                      | Campos enum (status, role, plan, method, order status, stock) |
 | Cascading deletes                        | Onde apropriado para integridade referencial                  |
 
+### Schema aplicado no boot (`ensureSchema`)
+
+O DDL idempotente que roda quando a API sobe está dividido em **19 etapas
+nomeadas**, cada uma com seu próprio `try` (desde 16/08/2026 — antes era um
+`try` único sobre 460 linhas, e uma etapa quebrando abortava as seguintes em
+silêncio, com o `/health` respondendo `ok`).
+
+| Superfície         | Quem vê | O que expõe                                    |
+| ------------------ | ------- | ---------------------------------------------- |
+| `GET /health`      | público | `schema.status` + **quantas** etapas falharam  |
+| `GET /logs/schema` | admin   | **quais** etapas falharam e a mensagem de erro |
+
+A separação é deliberada: nome de tabela e de coluna é informação de dentro e
+não vai na rota pública. O deploy consome o `/health` e **reprova** em
+`degraded` — schema pela metade não passa em verde.
+
 ### Dados Sensíveis
 
 - Senhas: apenas hash bcrypt armazenado

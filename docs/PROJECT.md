@@ -569,13 +569,14 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Logs (`/logs`)
 
-| Metodo | Endpoint             | Descricao                 | Auth                   |
-| ------ | -------------------- | ------------------------- | ---------------------- |
-| POST   | `/logs/errors`       | Registra erro do frontend | Publico (rate-limited) |
-| GET    | `/logs/audit`        | Lista audit logs          | admin                  |
-| GET    | `/logs/email`        | Lista email logs          | admin                  |
-| GET    | `/logs/errors`       | Lista error logs          | admin                  |
-| GET    | `/logs/errors/stats` | Estatisticas de erros     | admin                  |
+| Metodo | Endpoint             | Descricao                                              | Auth                   |
+| ------ | -------------------- | ------------------------------------------------------ | ---------------------- |
+| POST   | `/logs/errors`       | Registra erro do frontend                              | Publico (rate-limited) |
+| GET    | `/logs/audit`        | Lista audit logs                                       | admin                  |
+| GET    | `/logs/email`        | Lista email logs                                       | admin                  |
+| GET    | `/logs/errors`       | Lista error logs                                       | admin                  |
+| GET    | `/logs/errors/stats` | Estatisticas de erros                                  | admin                  |
+| GET    | `/logs/schema`       | Resultado do `ensureSchema()` do boot, etapa por etapa | admin                  |
 
 ### Users (`/users`)
 
@@ -606,9 +607,9 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Health
 
-| Metodo | Endpoint  | Descricao             | Auth    |
-| ------ | --------- | --------------------- | ------- |
-| GET    | `/health` | Status da API + banco | Publico |
+| Metodo | Endpoint  | Descricao                                                           | Auth    |
+| ------ | --------- | ------------------------------------------------------------------- | ------- |
+| GET    | `/health` | Status da API + banco + `schema.status` (`pending`/`ok`/`degraded`) | Publico |
 
 ## 6. Templates de Email (17)
 

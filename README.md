@@ -229,11 +229,15 @@ docker compose -f docker-compose.dev.yml up -d
 
 ```bash
 npm run dev           # Servidor de desenvolvimento (Vite)
-npm run build         # Build de producao
+npm run build         # Build de producao (tsc -b + vite build) — e o que o CI roda
+npm run typecheck     # Tipos dos testes e do E2E (ficam fora do build)
 npm run preview       # Preview local do build
-npm run lint          # Verificar codigo (ESLint)
-npm run test          # Rodar testes
-npm run test:coverage # Cobertura de testes
+npm run lint          # Verificar codigo (ESLint) — 0 erros esperado
+npm run test          # Rodar testes (watch)
+npm run test:changed  # So o que o diff afeta (~3 min) — use antes do commit
+npm run test:api      # Backend (projeto node)
+npm run test:web      # Front (projeto jsdom)
+npm run test:coverage # Cobertura de testes (front + backend)
 ```
 
 ### Backend (Docker)

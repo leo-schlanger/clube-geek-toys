@@ -149,8 +149,24 @@ dois casos em `ProductModal.test.tsx`.
 ### "Não tô conseguindo colocar vídeo" — não era bug
 
 API responde 201 nos dois caminhos (link e MP4) e a UI está publicada e
-funcional — verificado por Playwright no painel real. O problema é achar: o modal
-de produto ficou muito longo. Fica como dívida de UX (agrupar em seções/abas).
+funcional — verificado por Playwright no painel real. O problema era achar: o
+modal tinha ~1100 linhas de campo numa rolagem só, e o bloco de vídeo caía no
+terço final.
+
+**Resolvido em 16/08** — ver [`CHECKUP-2026-08-16.md`](CHECKUP-2026-08-16.md).
+O formulário virou 4 abas: **Básico** · **Categorias e envio** ·
+**Fotos e vídeos** · **Variações**.
+
+Três detalhes que separam "resolver" de "trocar de problema":
+
+| Detalhe                                                | Por quê                                                                                                                                                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Painéis ficam **montados** (`hidden`, não desmontados) | O `handleSubmit` lê estado, não DOM, e nenhum campo usa `required` nativo. Rascunho digitado numa aba entra no save disparado de outra — que é justamente o caminho corrigido em 15/08. |
+| **Contador** no rótulo da aba                          | "Fotos e vídeos 4" mostra que há conteúdo sem precisar entrar. Sem isso, a aba só troca um problema de descoberta por outro. Conta o confirmado **e** o rascunho.                       |
+| Erro de validação **troca de aba**                     | `fail(aba, msg)`: "Preço inválido na variação X" não ajuda quem está olhando o Básico.                                                                                                  |
+
+Os E2E precisaram acompanhar: painel inativo é `display:none`, então o Playwright
+abre a aba antes de tocar no campo — igual à Laura.
 
 ### Outros ajustes
 

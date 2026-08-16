@@ -703,6 +703,25 @@ Migrations 016 e as colunas novas de `products` (`videos`, `low_stock_threshold`
 `has_variants`, `variant_axes`) não criam tabela. Detalhes em
 [`CATALOG-2026-08.md`](CATALOG-2026-08.md).
 
+### Como o schema chega em producao
+
+O `docker-entrypoint-initdb.d` do Postgres so roda na **primeira** criacao do
+volume, e migration manual por SSH e facil de esquecer. Entao o
+`server/api/src/db/ensure-schema.ts` roda DDL idempotente no boot da API.
+
+Desde 16/08/2026 sao **19 etapas nomeadas**, cada uma com seu proprio `try`:
+
+- Uma etapa que falha **nao cancela as seguintes** (antes era um `try` unico em
+  volta de 460 linhas — a etapa 12 quebrando abortava as 13-19, em silencio,
+  com a API servindo trafego e o `/health` respondendo `ok`)
+- A API **nunca cai** por falha de schema; ela sobe degradada e avisa
+- `GET /health` → `schema.status`: `pending` | `ok` | `degraded` + contagem
+- `GET /logs/schema` (admin) → qual etapa falhou e por que
+- O deploy espera sair de `pending` e **falha** se vier `degraded`
+
+Regras ao acrescentar uma etapa: DDL idempotente (`IF NOT EXISTS`), nunca `DROP`
+nem rename (isso e migration de verdade), e uma etapa nova por migration.
+
 ### Recursos do PostgreSQL
 
 - **UUID** como primary keys (extensao `uuid-ossp` + `pgcrypto`)
@@ -752,10 +771,11 @@ Acionado automaticamente no push para `master` via GitHub Actions (`.github/work
   │  1. Checkout                                               │
   │  2. Setup Node.js 20 (com cache npm)                       │
   │  3. npm ci                                                 │
-  │  4. npx vite build --mode production                       │
+  │  4. npx tsc -b  (typecheck do codigo de producao)          │
+  │  5. npx vite build --mode production                       │
   │     (injeta VITE_API_URL, VITE_STRIPE_PUBLISHABLE_KEY,     │
   │      VITE_PIX_KEY, VITE_ENVIRONMENT via env vars)          │
-  │  5. Setup SSH (deploy key)                                 │
+  │  6. Setup SSH (deploy key)                                 │
   │                                                            │
   │  6. rsync server/ → VPS:/opt/clube-geek-toys/server/       │
   │     (exclui node_modules, .env, scripts/)                  │
@@ -769,11 +789,14 @@ Acionado automaticamente no push para `master` via GitHub Actions (`.github/work
   │  9. Health check:                                          │
   │     curl https://api.geeketoys.com.br/health               │
   │     (usa dominio, nao IP — IP nao tem cert SAN)            │
+  │     espera schema.status sair de `pending`;                │
+  │     `degraded` reprova o deploy                            │
   └────────────────────────────────────────────────────────────┘
 ```
 
 ### Pontos de atencao
 
+- **`tsc -b` antes do build (16/08/2026):** ate entao o CI rodava so `vite build`, que transpila sem checar tipo — erro de tipo em codigo de producao **nunca** barrou um deploy neste projeto. O `tsc -b` cobre `src/` sem os testes; a checagem dos testes e o `npm run typecheck`, de proposito fora do caminho do deploy
 - **`--no-cache` no build da API:** qualquer mudanca em validacao de env (Zod) precisa ser testada localmente antes, senao a API entra em restart loop em producao
 - **rsync de `server/` inclui `server/azuracast/`**, mas isso nao afeta o container do AzuraCast (que roda de `/opt/azuracast/`). A pasta no repo serve como fonte-verdade versionada
 - **`--force-recreate`:** necessario porque `docker compose restart` nao re-le o `.env`
