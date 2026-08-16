@@ -111,21 +111,34 @@ jobs:
           #
           # Espera o `ensureSchema()` terminar antes de julgar: ele roda depois do
           # listen(), então logo após o boot `schema.status` ainda é `pending`.
+          # `run:` roda sob `bash -e`, então nada aqui pode devolver != 0 por
+          # acidente: `|| true` nos curl/jq, e `if` em vez de `cond && break`.
+          BODY=""
+          SCHEMA="pending"
           for i in $(seq 1 10); do
             sleep 3
-            BODY=$(curl -sf --max-time 10 https://api.geeketoys.com.br/health) || continue
-            SCHEMA=$(echo "$BODY" | jq -r '.schema.status // "pending"')
-            [ "$SCHEMA" != "pending" ] && break
+            BODY=$(curl -sf --max-time 10 https://api.geeketoys.com.br/health) || BODY=""
+            [ -n "$BODY" ] || continue
+            SCHEMA=$(echo "$BODY" | jq -r '.schema.status // "pending"' 2>/dev/null || echo pending)
+            if [ "$SCHEMA" != "pending" ]; then
+              break
+            fi
           done
 
-          echo "$BODY" | jq .
-          STATUS=$(echo "$BODY" | jq -r '.status')
+          if [ -z "$BODY" ]; then
+            echo "Health check FAILED: /health não respondeu em 10 tentativas"
+            exit 1
+          fi
+
+          echo "$BODY" | jq . || echo "$BODY"
+          STATUS=$(echo "$BODY" | jq -r '.status' 2>/dev/null || echo unknown)
 
           if [ "$SCHEMA" = "degraded" ]; then
             # Migration quebrada no boot. A API serve tráfego, mas com schema
             # incompleto — o deploy não pode passar em verde por cima disso.
             FAILED=$(echo "$BODY" | jq -r '.schema.failedSteps')
-            echo "Health check FAILED: schema DEGRADADO ($FAILED etapa(s)). Veja os logs da API: docker compose logs api | grep '\''\[SCHEMA\]'\''"
+            echo "Health check FAILED: schema DEGRADADO ($FAILED etapa(s))."
+            echo "Detalhe por etapa: docker compose logs api | grep SCHEMA"
             exit 1
           fi
 
