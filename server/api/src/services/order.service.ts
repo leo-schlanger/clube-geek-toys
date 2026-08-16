@@ -86,6 +86,37 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/**
+ * Avisa o admin que um PIX da loja aguarda conferência.
+ *
+ * Nada confirma PIX sozinho — não há webhook, então o pedido fica `pending` até
+ * alguém abrir o extrato e confirmar no painel. Sem este aviso, um cliente paga
+ * e a loja não fica sabendo.
+ *
+ * Roda inteiro dentro de try/catch **de propósito**: a chamada nasce no meio do
+ * `try` do checkout, cujo `catch` cancela o pedido e devolve o crédito. Um erro
+ * ao montar as variáveis ou ao falar com o Resend não pode derrubar um pedido
+ * legítimo por causa de um e-mail.
+ */
+function notifyAdminOfPendingPix(order: Order, txId: string): void {
+  try {
+    void sendTemplateEmail({
+      template: 'admin-pix-order-pending',
+      to: env.ADMIN_EMAIL,
+      variables: {
+        order_number: String(order.orderNumber),
+        customer_name: order.customerName,
+        customer_email: order.customerEmail,
+        total: order.total.toFixed(2).replace('.', ','),
+        tx_id: txId,
+        admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=orders`,
+      },
+    }).catch((err) => console.error('[PIX] admin-pix-order-pending failed', err));
+  } catch (err) {
+    console.error('[PIX] admin-pix-order-pending skipped', err);
+  }
+}
+
 // ─── Create order (checkout) ─────────────────────────────────────────────────
 
 export interface CreateOrderInput {
@@ -493,6 +524,9 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       storeCreditApplied: order.storeCreditApplied,
       paymentMethod: 'pix',
     });
+
+    notifyAdminOfPendingPix(order, txId);
+
     return { order, pixData };
   } catch (err) {
     // Compensate: cancel pending order and restore any store credit.

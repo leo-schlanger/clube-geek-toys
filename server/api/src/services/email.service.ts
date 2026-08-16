@@ -20,6 +20,7 @@ const AVAILABLE_TEMPLATES = [
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'question-answered',
+  'admin-pix-order-pending',
 ];
 
 export function getAvailableTemplates() {
@@ -426,6 +427,27 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Verifique no extrato bancário se o PIX com o TX ID acima foi recebido<br>2. Acesse o painel admin e confirme o pagamento<br>3. O membro será ativado automaticamente após a confirmação')}`,
       cta: { text: 'Abrir Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
+    },
+
+    // ─── ADMIN: PIX PENDENTE (LOJA) ────────────────────
+    // Irmão do 'admin-pix-pending', mas para pedidos da loja: o QR é gerado
+    // localmente e nada confirma sozinho, então sem este aviso um pedido pago
+    // fica 'pending' até alguém abrir o painel por acaso.
+    'admin-pix-order-pending': {
+      subject: '🔔 Pedido PIX aguardando confirmação — Loja GeekPop & Toys',
+      preheader: `Pedido #${v.order_number || ''} de R$ ${v.total || '0,00'} gerou um PIX.`,
+      body: `
+        <h2 style="color:#f59e0b;margin:0 0 12px">Pedido PIX pendente 🔔</h2>
+        <p>Um pedido da loja gerou um código PIX e aguarda confirmação manual.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Cliente', escapeHtml(v.customer_name || '—')],
+          ['Email', v.customer_email || '—'],
+          ['Valor', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
+          ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
+        ])}
+        ${infoBox('📋 <strong>O que fazer:</strong><br>1. Confira no extrato se o PIX com o TX ID acima caiu<br>2. Abra o pedido no painel admin e confirme o pagamento<br>3. O estoque só é baixado depois da confirmação')}`,
+      cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || `${frontendUrl}/admin` },
     },
 
     // ─── ADMIN: NOVO MEMBRO CADASTRADO ─────────────────

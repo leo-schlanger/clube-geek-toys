@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *  6. Produto com variação exige SKU; SKU de outro produto é recusado.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock, sendEmailMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -28,6 +28,7 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     approvedAccountMock: vi.fn(),
     stripeMock: vi.fn(),
     auditMock: vi.fn(),
+    sendEmailMock: vi.fn(),
   }));
 
 vi.mock('../config/database.js', () => ({
@@ -41,6 +42,8 @@ vi.mock('../config/env.js', () => ({
     PIX_MERCHANT_NAME: 'GEEK E TOYS',
     PIX_MERCHANT_CITY: 'RIO DE JANEIRO',
     NODE_ENV: 'test',
+    ADMIN_EMAIL: 'geeketoys@gmail.com',
+    FRONTEND_URL: 'https://club.geeketoys.com.br',
   },
 }));
 
@@ -59,7 +62,7 @@ vi.mock('./wholesale.service.js', () => ({ getApprovedAccountByUserId: approvedA
 vi.mock('../middleware/ownership.js', () => ({ getMemberIdForUser: memberIdMock }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 vi.mock('./stock.service.js', () => ({ recordOrderMovements: vi.fn(async () => {}) }));
-vi.mock('./email.service.js', () => ({ sendTemplateEmail: vi.fn(async () => {}) }));
+vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
 
 import { createOrder } from './order.service.js';
@@ -113,7 +116,15 @@ function insertedOrderValues(): unknown[] {
 }
 
 /** Índices dos parâmetros do INSERT em `orders` (ver order.service.ts). */
-const COL = { subtotal: 6, discount: 7, discountReason: 8, shippingCost: 9, total: 14 };
+const COL = {
+  customerName: 2,
+  customerEmail: 3,
+  subtotal: 6,
+  discount: 7,
+  discountReason: 8,
+  shippingCost: 9,
+  total: 14,
+};
 
 /**
  * Monta o cliente de transação: BEGIN, SELECT de produtos, SELECT de variações,
@@ -125,43 +136,44 @@ function setupTx(opts: {
 }) {
   const products = opts.products ?? [product()];
   const variants = opts.variants ?? [];
+  // Os dois comandos rodam com RETURNING *, então o mock guarda a linha inserida
+  // e o UPDATE a devolve com os campos alterados por cima. Sem isso o UPDATE
+  // "perderia" colunas que o banco real devolve (customer_name, email…) e um
+  // teste do caminho de crédito passaria lendo undefined.
+  let inserted: Record<string, unknown> = {};
   clientQueryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
     if (/^BEGIN|^COMMIT|^ROLLBACK/.test(sql.trim())) return { rows: [] };
     if (sql.includes('FROM products')) return { rows: products };
     if (sql.includes('FROM product_variants')) return { rows: variants };
     if (sql.includes('INSERT INTO orders')) {
       const p = params as unknown[];
-      return {
-        rows: [
-          {
-            id: 'o1',
-            order_number: 1001,
-            subtotal: p[COL.subtotal],
-            discount: p[COL.discount],
-            discount_reason: p[COL.discountReason],
-            shipping_cost: p[COL.shippingCost],
-            store_credit_applied: 0,
-            total: p[COL.total],
-            status: 'pending',
-            payment_method: 'pix',
-            items: [],
-          },
-        ],
+      inserted = {
+        id: 'o1',
+        order_number: 1001,
+        customer_name: p[COL.customerName],
+        customer_email: p[COL.customerEmail],
+        subtotal: p[COL.subtotal],
+        discount: p[COL.discount],
+        discount_reason: p[COL.discountReason],
+        shipping_cost: p[COL.shippingCost],
+        store_credit_applied: 0,
+        total: p[COL.total],
+        status: 'pending',
+        payment_method: 'pix',
+        items: [],
       };
+      return { rows: [inserted] };
     }
     if (sql.includes('UPDATE orders')) {
       const p = params as unknown[];
       return {
         rows: [
           {
-            id: 'o1',
-            order_number: 1001,
+            ...inserted,
             discount: p[0],
             discount_reason: p[1],
             store_credit_applied: p[2],
             total: p[3],
-            status: 'pending',
-            payment_method: 'pix',
           },
         ],
       };
@@ -176,6 +188,7 @@ beforeEach(() => {
   redeemMock.mockResolvedValue(0);
   memberIdMock.mockResolvedValue(null);
   auditMock.mockResolvedValue(undefined);
+  sendEmailMock.mockResolvedValue(undefined);
   pickOptionMock.mockReturnValue({
     id: 'pac',
     name: 'PAC',
@@ -458,5 +471,88 @@ describe('createOrder — validação de entrada', () => {
     const v = insertedOrderValues();
     expect(v[COL.shippingCost]).toBe(41.9);
     expect(v[COL.total]).toBe(141.9);
+  });
+});
+
+// ─── Aviso de PIX pendente ───────────────────────────────────────────────────
+
+/**
+ * PIX da loja não tem webhook: o pedido nasce `pending` e só sai disso quando um
+ * admin confere o extrato e confirma no painel. Até 16/08/2026 esse fluxo não
+ * avisava ninguém — o cliente pagava e a loja não ficava sabendo.
+ */
+describe('createOrder — aviso de PIX pendente', () => {
+  function pixEmail() {
+    return sendEmailMock.mock.calls.find(
+      (c) => (c[0] as { template?: string })?.template === 'admin-pix-order-pending'
+    )?.[0] as { to: string; variables: Record<string, string> } | undefined;
+  }
+
+  it('avisa o admin com pedido, cliente, valor e TX ID', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput());
+
+    const email = pixEmail();
+    expect(email).toBeDefined();
+    expect(email!.to).toBe('geeketoys@gmail.com');
+    expect(email!.variables).toMatchObject({
+      order_number: '1001',
+      customer_name: 'Laura',
+      customer_email: 'laura@example.com',
+    });
+    // TX ID é o que liga o extrato bancário ao pedido — sem ele o aviso é inútil.
+    expect(email!.variables.tx_id).toMatch(/^CGT[A-Z0-9]+$/);
+    expect(email!.variables.total).toMatch(/^\d+,\d{2}$/);
+  });
+
+  it('aponta o CTA para a aba de pedidos do painel admin', async () => {
+    setupTx({});
+
+    await createOrder(baseInput());
+
+    expect(pixEmail()!.variables.admin_url).toBe(
+      'https://admin.geeketoys.com.br/admin?tab=orders'
+    );
+  });
+
+  it('não avisa quando o pagamento é cartão', async () => {
+    setupTx({});
+    stripeMock.mockReturnValue({
+      paymentIntents: { create: async () => ({ id: 'pi_1', client_secret: 'cs_1' }) },
+    });
+
+    await createOrder(baseInput({ paymentMethod: 'credit_card' }));
+
+    expect(pixEmail()).toBeUndefined();
+  });
+
+  // O aviso nasce dentro do try do checkout, cujo catch cancela o pedido e
+  // devolve o crédito. Falha de e-mail não pode derrubar uma compra legítima.
+  it('conclui o pedido mesmo se o envio do e-mail explodir', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+    sendEmailMock.mockImplementation(() => {
+      throw new Error('Resend fora do ar');
+    });
+
+    const result = await createOrder(baseInput());
+
+    expect(result.order.status).toBe('pending');
+    expect(result.pixData?.emvCode).toContain('br.gov.bcb.pix');
+    // nada de UPDATE ... status = 'cancelled'
+    expect(
+      queryMock.mock.calls.some(
+        (c) => typeof c[0] === 'string' && c[0].includes("status = 'cancelled'")
+      )
+    ).toBe(false);
+  });
+
+  it('conclui o pedido mesmo se o e-mail rejeitar a promise', async () => {
+    setupTx({});
+    sendEmailMock.mockRejectedValue(new Error('429 rate limited'));
+
+    const result = await createOrder(baseInput());
+
+    expect(result.order.status).toBe('pending');
   });
 });
