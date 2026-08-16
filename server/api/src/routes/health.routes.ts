@@ -38,12 +38,17 @@ healthRouter.get('/', async (_req, res) => {
         totalSteps: schema.total,
       },
       shipping: {
-        // 'live' = cotação real; 'fallback' = tabela interna assumindo o lugar.
+        // 'live' exige um sucesso observado, não só credencial presente:
+        // anunciar "live" sem nunca ter cotado é o mesmo tipo de sinal
+        // enganoso que este bloco existe para evitar. 'untested' é o estado
+        // honesto entre configurar e a primeira cotação.
         quotes: !shipping.configured
           ? 'unconfigured'
           : shipping.lastFailure
             ? 'fallback'
-            : 'live',
+            : shipping.lastSuccessAt
+              ? 'live'
+              : 'untested',
         sandbox: shipping.sandbox,
         credentialRejected: shipping.lastFailure?.kind === 'auth',
         lastSuccessAt: shipping.lastSuccessAt,
