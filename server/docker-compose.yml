@@ -50,7 +50,11 @@ services:
       HMAC_SECRET: ${HMAC_SECRET}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Nome e cidade aparecem no app do banco na hora de pagar. Sem o repasse
+      # aqui o .env não chega no container e o código cai no default embutido.
       PIX_KEY: ${PIX_KEY:-}
+      PIX_MERCHANT_NAME: ${PIX_MERCHANT_NAME:-}
+      PIX_MERCHANT_CITY: ${PIX_MERCHANT_CITY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       RESEND_API_KEY: ${RESEND_API_KEY}
       FROM_EMAIL: ${FROM_EMAIL}

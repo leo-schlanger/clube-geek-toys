@@ -9,9 +9,31 @@
 
 // ─── EMV TLV helpers ─────────────────────────────────────────────────────────
 
+/**
+ * O comprimento no EMV é contado em **bytes**, não em caracteres. `'Ç'.length`
+ * é 1 em JS mas ocupa 2 bytes em UTF-8, e o CRC também roda sobre bytes — com
+ * acento no nome do recebedor o length declarado sai errado e o app do banco
+ * rejeita o código inteiro. Os campos de texto passam por `toAscii()` antes de
+ * chegar aqui, mas contar bytes mantém a invariante caso algum escape.
+ */
 function tlv(id: string, value: string): string {
-  const len = value.length.toString().padStart(2, '0');
+  const len = Buffer.byteLength(value, 'utf8').toString().padStart(2, '0');
   return `${id}${len}${value}`;
+}
+
+/**
+ * Remove acentos e qualquer caractere fora do ASCII imprimível.
+ *
+ * A spec do BR Code limita nome (25) e cidade (15) em caracteres, e os bancos
+ * exibem ASCII sem problema — normalizar aqui evita truncar no meio de um
+ * caractere multibyte e mantém o campo dentro do limite anunciado.
+ */
+function toAscii(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // marcas de combinação soltas pelo NFD
+    .replace(/[^\x20-\x7E]/g, '')
+    .trim();
 }
 
 // ─── CRC16-CCITT ─────────────────────────────────────────────────────────────
@@ -97,12 +119,12 @@ export function generatePixEMV(opts: {
   // Country Code
   const id58 = tlv('58', 'BR');
 
-  // Merchant Name (trim to 25 chars)
-  const name = merchantName.substring(0, 25);
+  // Merchant Name (ASCII, trim to 25 chars)
+  const name = toAscii(merchantName).substring(0, 25);
   const id59 = tlv('59', name);
 
-  // Merchant City (trim to 15 chars)
-  const city = merchantCity.substring(0, 15);
+  // Merchant City (ASCII, trim to 15 chars)
+  const city = toAscii(merchantCity).substring(0, 15);
   const id60 = tlv('60', city);
 
   // Additional Data Field Template — txId
