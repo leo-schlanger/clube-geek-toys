@@ -167,3 +167,32 @@ export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
 
   return `${protocol}//${parts.join('.')}${port}`
 }
+
+// ─── Domínio canônico para SEO ───────────────────────────────────────────────
+
+/**
+ * Origem canônica de cada app, **fixa** e independente do domínio acessado.
+ *
+ * geeketoys.com.br e geekpoptoys.com.br são espelhos completos: os mesmos
+ * subdomínios respondem nos dois. Para o Google isso é conteúdo duplicado, e a
+ * autoridade de busca se divide entre os dois em vez de somar — a menos que um
+ * seja declarado canônico e o outro aponte para ele.
+ *
+ * Por isso estas constantes não podem sair de `window.location.origin`: derivar
+ * do domínio acessado faz cada um se declarar canônico de si mesmo, que é
+ * exatamente o empate que se quer evitar. Quem entra pelo espelho continua
+ * navegando normalmente; só o canonical aponta para o outro.
+ *
+ * A loja é canônica em **geekpoptoys** porque é por onde o público chega e é a
+ * marca (GeekPop & Toys). O clube segue em geeketoys, que é o nome primário do
+ * certificado e da infraestrutura.
+ */
+export const CANONICAL_ORIGINS = {
+  shop: 'https://shop.geekpoptoys.com.br',
+  club: 'https://club.geeketoys.com.br',
+} as const
+
+/** Origem canônica do app atual; usada no <link rel="canonical"> e no og:url. */
+export function getCanonicalOrigin(): string {
+  return getAppMode() === 'shop' ? CANONICAL_ORIGINS.shop : CANONICAL_ORIGINS.club
+}

@@ -48,6 +48,9 @@ const envSchema = z.object({
   MELHOR_ENVIO_CLIENT_ID: z.string().min(1).optional(),
   MELHOR_ENVIO_CLIENT_SECRET: z.string().min(1).optional(),
   MELHOR_ENVIO_SCOPES: z.string().default('shipping-calculate'),
+  // Callback do OAuth. Separado de API_URL porque aquele é gravado nas URLs de
+  // upload; trocar API_URL só pelo domínio do OAuth misturaria hosts no banco.
+  MELHOR_ENVIO_REDIRECT_URI: z.string().url().optional(),
   MELHOR_ENVIO_TOKEN: z.string().min(1).optional(),
   MELHOR_ENVIO_SANDBOX: z
     .enum(['true', 'false'])
@@ -83,3 +86,13 @@ function loadEnv(): Env {
 }
 
 export const env = loadEnv();
+
+/**
+ * Origem canônica da loja, usada em sitemap, preview de link e notificações.
+ *
+ * geeketoys.com.br e geekpoptoys.com.br são espelhos completos. Para o Google
+ * isso é conteúdo duplicado a menos que um seja canônico — então tudo que gera
+ * URL pública da loja precisa sair daqui, e não de string espalhada pelo
+ * código. Espelha CANONICAL_ORIGINS.shop no front (src/lib/subdomain.ts).
+ */
+export const SHOP_CANONICAL_URL = 'https://shop.geekpoptoys.com.br';

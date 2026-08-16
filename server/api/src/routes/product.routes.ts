@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { env } from '../config/env.js';
+import { env, SHOP_CANONICAL_URL } from '../config/env.js';
 import { isPlayableVideoHeader, FTYP_PROBE_BYTES } from '../utils/video.js';
 import * as productService from '../services/product.service.js';
 
@@ -28,7 +28,7 @@ productRouter.get('/categories', async (_req, res, next) => {
 
 productRouter.get('/sitemap.xml', async (_req, res, next) => {
   try {
-    const xml = await productService.buildProductSitemapXml('https://shop.geeketoys.com.br');
+    const xml = await productService.buildProductSitemapXml(SHOP_CANONICAL_URL);
     res.type('application/xml').send(xml);
   } catch (err) {
     next(err);
@@ -62,7 +62,7 @@ productRouter.get('/:slug/share', async (req, res, next) => {
   try {
     const html = await productService.buildProductShareHtml(
       req.params.slug as string,
-      'https://shop.geeketoys.com.br'
+      SHOP_CANONICAL_URL
     );
     if (!html) {
       res.status(404).type('html').send('<!DOCTYPE html><title>Produto não encontrado</title>');

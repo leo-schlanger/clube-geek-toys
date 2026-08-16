@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 
 const mockMode = vi.hoisted(() => ({ value: 'shop' as 'shop' | 'club' }))
-vi.mock('../../lib/subdomain', () => ({ getAppMode: () => mockMode.value }))
+const CANONICAL = { shop: 'https://shop.geekpoptoys.com.br', club: 'https://club.geeketoys.com.br' }
+vi.mock('../../lib/subdomain', () => ({
+  getAppMode: () => mockMode.value,
+  getCanonicalOrigin: () => CANONICAL[mockMode.value],
+}))
 
 import { SeoHead } from './SeoHead'
 
@@ -54,12 +58,12 @@ describe('SeoHead — título e canonical', () => {
 
   it('aponta o canonical para a própria origem e caminho', () => {
     render(<SeoHead title="Produto" path="/produto/x" />)
-    expect(canonical()).toBe(`${window.location.origin}/produto/x`)
+    expect(canonical()).toBe('https://shop.geekpoptoys.com.br/produto/x')
   })
 
   it('aceita caminho sem barra inicial', () => {
     render(<SeoHead title="X" path="carrinho" />)
-    expect(canonical()).toBe(`${window.location.origin}/carrinho`)
+    expect(canonical()).toBe('https://shop.geekpoptoys.com.br/carrinho')
   })
 })
 
@@ -68,7 +72,7 @@ describe('SeoHead — imagem', () => {
   // foto do produto chegava relativa, sumindo do preview.
   it('torna caminho relativo absoluto', () => {
     render(<SeoHead title="Produto" image="/uploads/a.jpg" />)
-    expect(meta('property', 'og:image')).toBe(`${window.location.origin}/uploads/a.jpg`)
+    expect(meta('property', 'og:image')).toBe('https://shop.geekpoptoys.com.br/uploads/a.jpg')
   })
 
   it('preserva URL já absoluta', () => {
@@ -78,7 +82,7 @@ describe('SeoHead — imagem', () => {
 
   it('cai no og-image padrão quando não há foto', () => {
     render(<SeoHead title="Carrinho" />)
-    expect(meta('property', 'og:image')).toBe(`${window.location.origin}/og-image.png`)
+    expect(meta('property', 'og:image')).toBe('https://shop.geekpoptoys.com.br/og-image.png')
   })
 
   it('mantém twitter:image e og:image iguais', () => {
@@ -132,5 +136,30 @@ describe('SeoHead — meta obsoleta entre navegações', () => {
 
     expect(document.head.querySelectorAll('meta[property="og:title"]')).toHaveLength(1)
     expect(meta('property', 'og:description')).toBe('y')
+  })
+})
+
+describe('SeoHead — domínio canônico', () => {
+  // Regressão: o canonical saía de window.location.origin, então cada domínio
+  // espelho se declarava canônico de si mesmo. Para o Google isso é conteúdo
+  // duplicado, e a autoridade de busca se divide em vez de somar.
+  it('usa o canônico da loja, não o domínio acessado', () => {
+    render(<SeoHead title="Vitrine" path="/" />)
+
+    expect(canonical()).toBe('https://shop.geekpoptoys.com.br/')
+    expect(meta('property', 'og:url')).toBe('https://shop.geekpoptoys.com.br/')
+  })
+
+  it('usa o canônico do clube no modo club', () => {
+    mockMode.value = 'club'
+    render(<SeoHead title="Assinar" path="/assinar" />)
+
+    expect(canonical()).toBe('https://club.geeketoys.com.br/assinar')
+  })
+
+  it('não deixa o canonical variar com o host da janela', () => {
+    // O jsdom serve em localhost; se o canonical o refletisse, sairia daqui.
+    render(<SeoHead title="X" path="/" />)
+    expect(canonical()).not.toContain(window.location.hostname)
   })
 })

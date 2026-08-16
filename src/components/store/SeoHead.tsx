@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { getAppMode } from '../../lib/subdomain'
+import { getAppMode, getCanonicalOrigin } from '../../lib/subdomain'
 
 export interface SeoHeadProps {
   title: string
@@ -25,7 +25,12 @@ export function SeoHead({
   noIndex = false,
 }: SeoHeadProps) {
   useEffect(() => {
-    const origin = window.location.origin
+    // Origem **canônica**, não a acessada. Com dois domínios espelho servindo o
+    // mesmo conteúdo, derivar de window.location.origin fazia cada um se
+    // declarar canônico de si — o Google via conteúdo duplicado e dividia a
+    // autoridade. As imagens seguem a mesma origem para não gerar mais uma URL
+    // do mesmo arquivo.
+    const origin = getCanonicalOrigin()
     const mode = getAppMode()
     const siteName = mode === 'shop' ? 'Loja GeekPop & Toys' : 'Clube GeekPop & Toys'
     // OG exige URL absoluta: foto de produto chega como caminho relativo em

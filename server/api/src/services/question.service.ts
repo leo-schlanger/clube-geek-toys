@@ -2,6 +2,7 @@ import pg from 'pg';
 import { query, getClient } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
+import { SHOP_CANONICAL_URL } from '../config/env.js';
 import { auditLog } from '../utils/audit.js';
 import { notify } from './notification.service.js';
 import { sendTemplateEmail } from './email.service.js';
@@ -296,8 +297,8 @@ async function sendAnswerEmail(question: ProductQuestion): Promise<void> {
       question: question.body,
       answer: question.answerBody || '',
       product_url: question.productSlug
-        ? `https://shop.geeketoys.com.br/produto/${question.productSlug}`
-        : 'https://shop.geeketoys.com.br',
+        ? `${SHOP_CANONICAL_URL}/produto/${question.productSlug}`
+        : SHOP_CANONICAL_URL,
     },
   });
 }

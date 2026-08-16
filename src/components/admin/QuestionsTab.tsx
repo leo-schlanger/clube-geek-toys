@@ -174,7 +174,7 @@ export function QuestionsTab() {
                       {q.productName}
                       {q.productSlug && (
                         <a
-                          href={`https://shop.geeketoys.com.br/produto/${q.productSlug}`}
+                          href={`https://shop.geekpoptoys.com.br/produto/${q.productSlug}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-muted-foreground hover:text-foreground"

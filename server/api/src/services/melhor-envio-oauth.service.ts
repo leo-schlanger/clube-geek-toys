@@ -30,8 +30,18 @@ export function melhorEnvioBaseUrl(): string {
     : 'https://melhorenvio.com.br';
 }
 
-/** Precisa bater **exatamente** com o cadastrado no painel do Melhor Envio. */
+/**
+ * Precisa bater **exatamente** com o cadastrado no painel do Melhor Envio.
+ *
+ * Configurável à parte do `API_URL` de propósito: `API_URL` é gravado dentro
+ * das URLs de foto de produto, perfil e contrato, então mexer nele para trocar
+ * o domínio do OAuth deixaria o banco com hosts misturados para sempre. Os
+ * domínios geeketoys e geekpoptoys são espelhos e os dois funcionam aqui;
+ * o que importa é ser idêntico ao registrado lá.
+ */
 export function redirectUri(): string {
+  const base = (env.MELHOR_ENVIO_REDIRECT_URI || '').trim();
+  if (base) return base;
   return `${env.API_URL}/shipping/melhor-envio/callback`;
 }
 

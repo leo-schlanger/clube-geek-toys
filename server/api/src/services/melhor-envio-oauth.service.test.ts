@@ -19,6 +19,7 @@ const { queryMock, envMock } = vi.hoisted(() => ({
     MELHOR_ENVIO_CLIENT_ID: '28418',
     MELHOR_ENVIO_CLIENT_SECRET: 'segredo-do-app',
     MELHOR_ENVIO_SCOPES: 'shipping-calculate',
+    MELHOR_ENVIO_REDIRECT_URI: undefined as string | undefined,
     MELHOR_ENVIO_TOKEN: undefined as string | undefined,
     MELHOR_ENVIO_SANDBOX: false,
   },
@@ -69,6 +70,7 @@ beforeEach(() => {
   envMock.MELHOR_ENVIO_SANDBOX = false;
   envMock.MELHOR_ENVIO_CLIENT_ID = '28418';
   envMock.MELHOR_ENVIO_CLIENT_SECRET = 'segredo-do-app';
+  envMock.MELHOR_ENVIO_REDIRECT_URI = undefined;
   queryMock.mockResolvedValue({ rows: [] });
 });
 
@@ -243,3 +245,30 @@ describe('getOAuthStatus', () => {
     expect(status.expiresAt).toBeNull();
   });
 });
+
+describe('redirectUri — domínio do callback', () => {
+  it('deriva do API_URL quando não há override', () => {
+    expect(oauth.redirectUri()).toBe(
+      'https://api.geeketoys.com.br/shipping/melhor-envio/callback'
+    );
+  });
+
+  // geeketoys e geekpoptoys são espelhos; o override existe para escolher um
+  // sem mexer no API_URL, que fica gravado nas URLs de upload no banco.
+  it('respeita o override para o domínio espelho', () => {
+    envMock.MELHOR_ENVIO_REDIRECT_URI =
+      'https://api.geekpoptoys.com.br/shipping/melhor-envio/callback';
+
+    expect(oauth.redirectUri()).toBe(
+      'https://api.geekpoptoys.com.br/shipping/melhor-envio/callback'
+    );
+    expect(new URL(oauth.buildAuthorizeUrl()).searchParams.get('redirect_uri')).toBe(
+      'https://api.geekpoptoys.com.br/shipping/melhor-envio/callback'
+    );
+  });
+
+  it('ignora override em branco e volta para o API_URL', () => {
+    envMock.MELHOR_ENVIO_REDIRECT_URI = '   ';
+    expect(oauth.redirectUri()).toContain('api.geeketoys.com.br');
+  });
+})
