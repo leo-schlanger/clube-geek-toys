@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarHeart, Ticket, X } from 'lucide-react'
 import { ACTIVE_EVENT, isEventVisible } from '../../data/event'
@@ -20,29 +20,24 @@ function readBannerVisible(eventId: string): boolean {
 
 /**
  * Banner de evento no topo da loja (shop.*).
- * Ajusta --shop-event-banner-h para o header sticky não cobrir o conteúdo.
+ *
+ * **Fica no fluxo normal, não `sticky`.** Até 16/08/2026 era `sticky top-0
+ * z-50` — e o `ShopHeader` é `sticky top-0 z-40`. Os dois grudavam no mesmo
+ * `top: 0`, e o banner, com z maior, cobria o header **inteiro** assim que a
+ * pessoa rolava: carrinho, login, busca e tema paravam de responder, em todas
+ * as larguras, inclusive no desktop.
+ *
+ * No fluxo normal o banner ocupa espaço no topo da página, rola para fora e o
+ * header assume o `top: 0` sozinho — que é como barra de anúncio funciona em
+ * loja. O X de dispensar continua ali para quem não quiser vê-lo de novo.
+ *
+ * Não existe var de altura aqui de propósito: elemento no fluxo empurra o
+ * conteúdo sozinho. A antiga `--shop-event-banner-h` publicava 44px/72px
+ * fixos e **nenhum arquivo a lia** — foi removida junto.
  */
 export function EventAnnouncementBanner() {
   const event = ACTIVE_EVENT
   const [visible, setVisible] = useState(() => readBannerVisible(event.id))
-
-  // Sincroniza altura CSS do banner (sem setState no mount)
-  useEffect(() => {
-    if (!visible || !isEventVisible(event)) {
-      document.documentElement.style.setProperty('--shop-event-banner-h', '0px')
-      return
-    }
-    const mq = window.matchMedia('(min-width: 768px)')
-    const apply = () => {
-      document.documentElement.style.setProperty(
-        '--shop-event-banner-h',
-        mq.matches ? '44px' : '72px'
-      )
-    }
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [visible, event])
 
   if (!visible || !isEventVisible(event)) return null
 
@@ -62,7 +57,7 @@ export function EventAnnouncementBanner() {
     <div
       role="region"
       aria-label="Anúncio do evento"
-      className="sticky top-0 z-50 border-b border-primary/30 bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-md"
+      className="relative z-50 border-b border-primary/30 bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-md"
     >
       <div className="relative mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 px-4 py-2.5 pr-10 text-center md:flex-row md:gap-4 md:pr-12 md:text-left">
         <p className="flex items-center gap-2 text-sm font-semibold leading-snug md:text-[15px]">
