@@ -39,7 +39,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,jpg,svg,woff2}'],
+        // Sem `jpg`: as 35 fotos de `public/eventos/` caíam no precache e o
+        // service worker baixava 11,2 MB na primeira visita de todo mundo,
+        // inclusive no 4G de quem só queria ver um produto. Foto é conteúdo,
+        // não casca do app — vai por runtimeCaching, sob demanda.
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2MB max per file
         runtimeCaching: [
           {
@@ -50,6 +54,20 @@ export default defineConfig({
               expiration: {
                 maxEntries: 10,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+            },
+          },
+          {
+            // Fotos (evento, galeria, produto) — cacheadas na primeira vez que
+            // a tela pede, não antecipadamente. Teto por entrada para o cache
+            // não crescer sem limite no celular do cliente.
+            urlPattern: ({ request }) => request.destination === 'image',
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'image-cache',
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 dias
               },
             },
           },
