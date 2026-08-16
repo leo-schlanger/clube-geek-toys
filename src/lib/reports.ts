@@ -94,7 +94,9 @@ export async function getRevenueByPlan(): Promise<PlanDistribution[]> {
  */
 export async function getChurnRate(months: number = 6): Promise<ChurnData[]> {
   try {
-    const result = await api.get<ChurnData[]>(`/reports/churn?months=${months}`)
+    // Linha crua: a rota mistura snake_case e camelCase e é o `map` abaixo que
+    // normaliza. Tipar como ChurnData aqui seria mentir sobre o que chegou.
+    const result = await api.get<Record<string, unknown>[]>(`/reports/churn?months=${months}`)
     if (result.error || !result.data) return []
     const rows = Array.isArray(result.data) ? result.data : []
     return rows.map((row: Record<string, unknown>) => ({

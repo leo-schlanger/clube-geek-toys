@@ -691,7 +691,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                               {formatCurrency(Number(subscription.transaction_amount || 0))}
                             </span>
                           </div>
-                          {subscription.next_payment_date && (
+                          {Boolean(subscription.next_payment_date) && (
                             <div>
                               <span className="text-muted-foreground">Próximo pagamento:</span>
                               <span className="ml-2 font-medium">
@@ -800,7 +800,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                                 : String(contract.status)}
                             </Badge>
                           </div>
-                          {contract.hash && (
+                          {Boolean(contract.hash) && (
                             <div className="sm:col-span-2">
                               <span className="text-muted-foreground">Hash:</span>
                               <span className="ml-2 font-mono text-xs">
@@ -810,7 +810,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                           )}
                         </div>
                         <div className="flex gap-2 pt-2">
-                          {contract.pdf_url && (
+                          {Boolean(contract.pdf_url) && (
                             <Button
                               type="button"
                               variant="outline"

@@ -176,5 +176,5 @@ export async function savePendingPayment(
  * Remove informações do pagamento pendente
  */
 export async function clearPendingPayment(memberId: string): Promise<boolean> {
-  return updateMember(memberId, { pendingPayment: null } as Partial<Member>)
+  return updateMember(memberId, { pendingPayment: null })
 }

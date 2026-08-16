@@ -222,7 +222,9 @@ export default function Register() {
   }, [signUp, navigate])
 
   const handleGoogleSuccess = useCallback((data: Record<string, unknown>) => {
-    const result = signInWithGoogle(data)
+    // O botão do Google entrega um objeto solto; `signInWithGoogle` espera a
+    // sessão. A conversão é explícita para o erro aparecer aqui, e não lá dentro.
+    const result = signInWithGoogle(data as unknown as Parameters<typeof signInWithGoogle>[0])
     if (result.success) {
       if (result.isNewUser) {
         setMemberData(prev => ({

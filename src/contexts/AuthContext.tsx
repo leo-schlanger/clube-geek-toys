@@ -29,6 +29,18 @@ interface AuthUser {
   emailVerified: boolean
 }
 
+/**
+ * Shape das rotas de sessão. Existir aqui é o que permite `api.post<AuthSession>`
+ * em vez de `api.post` cru: sem o parâmetro, `result.data` é `unknown` e o
+ * `tsc -b` reprovava o build (o CI usava `vite build`, que não checa tipo, então
+ * isso passava despercebido desde sempre).
+ */
+interface AuthSession {
+  accessToken: string
+  refreshToken: string
+  user: AuthUser
+}
+
 interface GoogleAuthResult {
   success: boolean
   error?: string
@@ -99,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const result = await api.get('/auth/me')
+        const result = await api.get<AuthUser>('/auth/me')
         if (isCurrent) {
           if (result.data) {
             setAuthState({
@@ -140,12 +152,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signIn(email: string, password: string) {
     try {
       setError(null)
-      const result = await api.post('/auth/login', { email, password }, { skipAuth: true })
+      const result = await api.post<AuthSession>('/auth/login', { email, password }, { skipAuth: true })
 
       if (result.error) {
         return { success: false, error: result.error }
       }
 
+      if (!result.data) {
+        return { success: false, error: 'Resposta inválida do servidor' }
+      }
       const { accessToken, refreshToken, user: userData } = result.data
       setTokens(accessToken, refreshToken)
       setAuthState(userData)
@@ -162,7 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null)
       const body: Record<string, string> = { email, password }
       if (turnstileToken) body.turnstileToken = turnstileToken
-      const result = await api.post('/auth/register', body, { skipAuth: true })
+      const result = await api.post<AuthSession>('/auth/register', body, { skipAuth: true })
 
       if (result.error) {
         // Use error codes (stable) instead of error messages (locale-dependent, may have accents)
@@ -174,6 +189,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      if (!result.data) {
+        return { success: false, error: 'Resposta inválida do servidor' }
+      }
       const { accessToken, refreshToken, user: userData } = result.data
       setTokens(accessToken, refreshToken)
       setAuthState(userData)
@@ -244,7 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return
 
     try {
-      const result = await api.get('/auth/me')
+      const result = await api.get<AuthUser>('/auth/me')
       if (result.data) {
         setAuthState({
           id: result.data.id,

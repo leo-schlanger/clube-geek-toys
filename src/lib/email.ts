@@ -145,7 +145,7 @@ export async function sendContractEmail(
   hash: string, pdfBase64: string, adminEmail?: string
 ): Promise<EmailResponse> {
   try {
-    const result = await api.post('/email/send-contract', {
+    const result = await api.post<{ id?: string }>('/email/send-contract', {
       to: email, member_name: memberName, plan, signed_at: signedAt,
       hash, pdf_base64: pdfBase64, admin_email: adminEmail,
     })

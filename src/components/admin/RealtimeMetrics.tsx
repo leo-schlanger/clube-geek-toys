@@ -101,7 +101,7 @@ function useSystemHealth() {
     let cancelled = false
     const check = async () => {
       try {
-        const res = await api.get('/health')
+        const res = await api.get<{ status: string }>('/health')
         if (!cancelled) setHealth({ ok: res.data?.status === 'ok', checkedAt: new Date() })
       } catch {
         if (!cancelled) setHealth({ ok: false, checkedAt: new Date() })

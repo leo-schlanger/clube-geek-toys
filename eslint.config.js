@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'coverage-reports', '.coverage']),
+  // `dist` sozinho só casa a build do Vite na raiz. O `server/api/dist` (saída do
+  // tsc da API, gitignorada) ficava de fora e respondia por 99 dos 99 erros do
+  // `npm run lint` — sinal morto: ninguém mais lia a saída do lint.
+  globalIgnores(['**/dist', 'coverage', 'coverage-reports', '.coverage']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [

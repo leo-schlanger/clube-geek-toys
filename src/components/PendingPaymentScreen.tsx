@@ -430,7 +430,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
           paymentType={member.paymentType}
           memberEmail={member.email}
           memberId={member.id}
-          initialPendingPayment={hasPendingPayment ? member.pendingPayment : undefined}
+          initialPendingPayment={hasPendingPayment ? (member.pendingPayment ?? undefined) : undefined}
           onClose={() => setShowPayment(false)}
           onSuccess={handlePaymentSuccess}
         />

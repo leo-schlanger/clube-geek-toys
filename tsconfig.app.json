@@ -24,5 +24,26 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  /*
+   * Testes fora do build.
+   *
+   * `npm run build` protege o que vai para produção; até 16/08/2026 ele estava
+   * quebrado por 154 erros de tipo e o CI usava `vite build`, que não checa
+   * tipo nenhum — ou seja, erro de tipo em código de produção nunca barrou um
+   * deploy. Os 40 erros de produção foram corrigidos e o build voltou a ser uma
+   * trava real.
+   *
+   * Os testes continuam sendo checados, por `npm run typecheck`
+   * (tsconfig.test.json), que hoje ainda acusa ~99 erros de tipagem de mock.
+   * Separar os dois é o que impede uma dívida de teste de bloquear um deploy —
+   * e o que impede a dívida de voltar a esconder erro de produção.
+   */
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/test"
+  ]
 }

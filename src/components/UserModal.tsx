@@ -93,7 +93,7 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
 
     try {
       // Create user via API (admin endpoint)
-      const result = await api.post('/auth/register', {
+      const result = await api.post<{ user: { id: string } }>('/auth/register', {
         email: data.email,
         password: data.password,
       }, { skipAuth: false })

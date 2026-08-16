@@ -35,6 +35,24 @@ export interface CreateSubscriptionResponse {
   initPoint?: string
 }
 
+const SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
+  'pending',
+  'authorized',
+  'paused',
+  'cancelled',
+]
+
+/**
+ * Estreita o status vindo da API. Antes a string crua era atribuída direto ao
+ * campo tipado — um status novo (ou um typo do backend) atravessava a tipagem e
+ * só aparecia na tela como badge em branco.
+ */
+function toSubscriptionStatus(value: string): SubscriptionStatus {
+  return (SUBSCRIPTION_STATUSES as readonly string[]).includes(value)
+    ? (value as SubscriptionStatus)
+    : 'pending'
+}
+
 /**
  * Create a new subscription via API
  */
@@ -66,7 +84,7 @@ export async function createSubscription(
     }
     return {
       id: data.id,
-      status: data.status,
+      status: toSubscriptionStatus(data.status),
       initPoint: data.init_point,
     }
   } catch (error) {

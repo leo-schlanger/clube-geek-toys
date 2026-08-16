@@ -46,8 +46,17 @@ export interface Member {
   paymentType: PaymentType
   startDate: string
   expiryDate: string
-  pendingPayment?: PendingPaymentInfo // PIX payment waiting for confirmation
+  /** PIX aguardando confirmação. `null` limpa o campo (o PATCH aceita nullable). */
+  pendingPayment?: PendingPaymentInfo | null
   paymentCount: number
+  /**
+   * Ativação manual pelo admin. O `updateMemberSchema` do backend já aceitava os
+   * dois desde a revisão de 10/08/2026, mas o tipo do front nunca acompanhou —
+   * `activateMember()` compilava só porque o `tsc -b` estava quebrado e o CI
+   * usava `vite build`. Deixá-los aqui é o que mantém os dois lados de acordo.
+   */
+  activatedAt?: string | null
+  activatedByPayment?: string | null
   createdAt: string
   updatedAt: string
 }

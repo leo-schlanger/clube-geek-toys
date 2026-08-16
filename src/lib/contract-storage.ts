@@ -14,7 +14,7 @@ export async function uploadContractPDF(
   _timestamp: string
 ): Promise<{ url: string; path: string }> {
   try {
-    const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+    const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' })
     const formData = new FormData()
     formData.append('memberId', memberId)
     formData.append('pdf', blob, `contract-${memberId}.pdf`)
@@ -43,7 +43,7 @@ export async function saveContract(
   _pdfUrl: string,
   _pdfPath: string
 ): Promise<string> {
-  const result = await api.post('/contracts', {
+  const result = await api.post<{ id: string }>('/contracts', {
     memberId: contractData.memberId,
     memberName: contractData.memberName,
     memberCpf: contractData.memberCPF,
@@ -87,7 +87,7 @@ export async function storeContract(
   contractData: ContractData,
   pdfBytes: Uint8Array
 ): Promise<{ contractId: string; pdfUrl: string }> {
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+  const blob = new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' })
   const formData = new FormData()
   // IMPORTANT: Text fields MUST come before the file so multer's destination
   // callback can read req.body.memberId when deciding where to store the file.

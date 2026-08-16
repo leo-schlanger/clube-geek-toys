@@ -57,7 +57,11 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
   const [aspectId, setAspectId] = useState<AspectId>('1:1')
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [sizeMode, setSizeMode] = useState<'auto' | 800 | 1200 | 1600 | 'custom'>('1200')
+  // 1200 é número, não string: a UI compara `sizeMode === px` contra os
+  // SIZE_PRESETS numéricos, e `outputSpec()` repassa esse valor como
+  // `longestSide`. Com a string, o chip padrão abria sem seleção e a conta de
+  // redimensionar recebia texto. Só apareceu quando o `tsc -b` voltou a rodar.
+  const [sizeMode, setSizeMode] = useState<'auto' | 800 | 1200 | 1600 | 'custom'>(1200)
   const [customW, setCustomW] = useState('1200')
   const [customH, setCustomH] = useState('1200')
 
@@ -74,7 +78,7 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
     setZoom(1)
     setPan({ x: 0, y: 0 })
     setAspectId('1:1')
-    setSizeMode('1200')
+    setSizeMode(1200)
     setCustomW('1200')
     setCustomH('1200')
   }, [file])
@@ -86,7 +90,10 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
   const frame = frameBox(ratio)
 
   const clampedPan = useMemo(() => {
-    if (!natural.width) return pan
+    // Mesmo formato nos dois caminhos: quem consome lê `panX`/`panY`. Devolver
+    // `pan` cru ({x,y}) deixava `left`/`top` em NaN enquanto a imagem não tinha
+    // carregado.
+    if (!natural.width) return { panX: pan.x, panY: pan.y }
     return clampCoverPan(natural.width, natural.height, frame.width, frame.height, zoom, pan.x, pan.y)
   }, [natural, frame.width, frame.height, zoom, pan])
 
