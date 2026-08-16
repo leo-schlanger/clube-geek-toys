@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { defaultLimiter } from '../middleware/rate-limit.js';
 import * as logService from '../services/log.service.js';
+import { getSchemaState } from '../db/ensure-schema.js';
 
 export const logRouter = Router();
 
@@ -70,6 +71,16 @@ logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, 
 
 // Admin-only routes below
 logRouter.use(authenticate, requireRole('admin'));
+
+/**
+ * GET /logs/schema — resultado do `ensureSchema()` do boot, etapa por etapa.
+ *
+ * O `/health` público diz só quantas falharam; o nome da tabela/coluna que
+ * quebrou é informação de dentro e fica aqui.
+ */
+logRouter.get('/schema', (_req, res) => {
+  res.json(getSchemaState());
+});
 
 // GET /logs/audit
 logRouter.get('/audit', async (req, res, next) => {

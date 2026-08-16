@@ -13,11 +13,31 @@ import { query } from '../config/database.js';
  *  - Never DROP or rename existing columns here — that's a real migration and needs care.
  *  - Order matters: dependencies (FKs) come last.
  *  - Failures here MUST NOT crash the API. Log loudly and continue — operator can fix manually.
+ *
+ * Por que em etapas: até 15/08/2026 isto era um `try` único em volta de todo o DDL.
+ * Uma etapa que falhasse abortava **todas as seguintes** — em silêncio, com a API
+ * servindo tráfego normalmente e o `/health` respondendo `ok`. Agora cada etapa
+ * falha sozinha, as demais continuam, e o resultado fica legível em
+ * `GET /health` (`schema.status`). Ver `getSchemaState()`.
  */
-export async function ensureSchema(): Promise<void> {
-  const start = Date.now();
-  try {
-    // ─── Wave 1.9 — One-time email verification tokens ────────────────────────
+
+type SchemaStep = { name: string; run: () => Promise<void> };
+
+export type SchemaStepFailure = { step: string; error: string };
+
+export type SchemaState = {
+  /** Nunca rodou ainda (boot em andamento) → `pending`. */
+  status: 'pending' | 'ok' | 'degraded';
+  ranAt: string | null;
+  durationMs: number;
+  total: number;
+  failed: SchemaStepFailure[];
+};
+
+const STEPS: SchemaStep[] = [
+  {
+    name: "Wave 1.9 — One-time email verification tokens",
+    run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS consumed_verification_tokens (
         token_hash VARCHAR(64) PRIMARY KEY,
@@ -29,10 +49,12 @@ export async function ensureSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_consumed_tokens_consumed_at
         ON consumed_verification_tokens(consumed_at)
     `);
-
-    // ─── Wave 2.5 — Settings table (config) is already in schema.sql; no-op here ───
-
-    // ─── Stripe migration — stripe_customer_id on members ────────────────────────
+    },
+  },
+  // Wave 2.5 — a tabela `settings` (config) já vem do schema.sql; não há etapa aqui.
+  {
+    name: "Stripe migration — stripe_customer_id on members",
+    run: async () => {
     await query(`
       ALTER TABLE members ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT
     `);
@@ -40,18 +62,27 @@ export async function ensureSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_members_stripe_customer
         ON members(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL
     `);
-
-    // ─── Refund audit trail — reason column on payments ────────────────────────
+    },
+  },
+  {
+    name: "Refund audit trail — reason column on payments",
+    run: async () => {
     await query(`
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS refund_reason TEXT
     `);
-
-    // ─── Payment count — contador de pagamentos (usado em relatórios/webhook) ────
+    },
+  },
+  {
+    name: "Payment count — contador de pagamentos (usado em relatórios/webhook)",
+    run: async () => {
     await query(`
       ALTER TABLE members ADD COLUMN IF NOT EXISTS payment_count INTEGER NOT NULL DEFAULT 0
     `);
-
-    // ─── Missing indexes for reports and LGPD queries ────────────────────────
+    },
+  },
+  {
+    name: "Missing indexes for reports and LGPD queries",
+    run: async () => {
     await query(`
       CREATE INDEX IF NOT EXISTS idx_subscriptions_status_created
         ON subscriptions(status, created_at DESC)
@@ -60,8 +91,11 @@ export async function ensureSchema(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_audit_user_id
         ON audit_logs(user_id)
     `);
-
-    // ─── Single-plan migration (008) — collapse plans to 'club', drop points ────
+    },
+  },
+  {
+    name: "Single-plan migration (008) — collapse plans to 'club', drop points",
+    run: async () => {
     // Wrapped in its own try/catch so a failure here can NEVER skip later blocks
     // (e.g. the shop tables). Order matters: DROP the legacy CHECK constraints
     // BEFORE normalizing plan→'club', otherwise the UPDATE violates the old
@@ -87,8 +121,11 @@ export async function ensureSchema(): Promise<void> {
     } catch (err) {
       console.error('[SCHEMA] single-plan migration block failed (non-fatal):', err);
     }
-
-    // ─── CHECK constraints for enum columns ────────────────────────
+    },
+  },
+  {
+    name: "CHECK constraints for enum columns",
+    run: async () => {
     await query(`DO $$ BEGIN
       ALTER TABLE members ADD CONSTRAINT chk_members_status CHECK (status IN ('active','pending','inactive','expired'));
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
@@ -101,8 +138,11 @@ export async function ensureSchema(): Promise<void> {
     await query(`DO $$ BEGIN
       ALTER TABLE payments ADD CONSTRAINT chk_payments_status CHECK (status IN ('pending','paid','failed','refunded'));
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-
-    // ─── Shop / e-commerce (migration 009) ───────────────────────────────────
+    },
+  },
+  {
+    name: "Shop / e-commerce (migration 009)",
+    run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS categories (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -189,8 +229,11 @@ export async function ensureSchema(): Promise<void> {
     await query(`DO $$ BEGIN
       CREATE TRIGGER tr_orders_updated_at BEFORE UPDATE ON orders FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-
-    // ─── Shop shipping / reviews / credit (migration 010) ────────────────────
+    },
+  },
+  {
+    name: "Shop shipping / reviews / credit (migration 010)",
+    run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_g INTEGER`);
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS height_cm NUMERIC(6,1)`);
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS width_cm NUMERIC(6,1)`);
@@ -253,8 +296,11 @@ export async function ensureSchema(): Promise<void> {
       INSERT INTO config (key, value) VALUES ('review_reward_amount', '1.00'::jsonb)
       ON CONFLICT (key) DO NOTHING
     `);
-
-    // ─── Shop data integrity (migration 011) ─────────────────────────────────
+    },
+  },
+  {
+    name: "Shop data integrity (migration 011)",
+    run: async () => {
     await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`);
     await query(`CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id) WHERE user_id IS NOT NULL`);
     await query(`
@@ -267,8 +313,11 @@ export async function ensureSchema(): Promise<void> {
         ON store_credit_ledger (order_id)
         WHERE reason = 'order_refund_credit' AND order_id IS NOT NULL
     `);
-
-    // ─── Wholesale / Atacado (migration 012) ──────────────────────────────────
+    },
+  },
+  {
+    name: "Wholesale / Atacado (migration 012)",
+    run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS wholesale_accounts (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -333,8 +382,11 @@ export async function ensureSchema(): Promise<void> {
         ('wholesale.discount_percent', '25'::jsonb)
       ON CONFLICT (key) DO NOTHING
     `);
-
-    // ─── Product variants / Shopee-style (migration 013) ─────────────────────
+    },
+  },
+  {
+    name: "Product variants / Shopee-style (migration 013)",
+    run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants BOOLEAN NOT NULL DEFAULT FALSE`);
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_axes JSONB NOT NULL DEFAULT '[]'::jsonb`);
     await query(`
@@ -366,8 +418,11 @@ export async function ensureSchema(): Promise<void> {
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     await query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL`);
     await query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label VARCHAR(200)`);
-
-    // ─── Múltiplas categorias por produto (migration 014) ─────────────────────
+    },
+  },
+  {
+    name: "Múltiplas categorias por produto (migration 014)",
+    run: async () => {
     // products.category_id segue sendo a principal (position 0).
     await query(`
       CREATE TABLE IF NOT EXISTS product_categories (
@@ -384,8 +439,11 @@ export async function ensureSchema(): Promise<void> {
       SELECT id, category_id, 0 FROM products WHERE category_id IS NOT NULL
       ON CONFLICT (product_id, category_id) DO NOTHING
     `);
-
-    // ─── Controle de estoque (migration 015) ─────────────────────────────────
+    },
+  },
+  {
+    name: "Controle de estoque (migration 015)",
+    run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 3`);
     await query(`
       CREATE TABLE IF NOT EXISTS stock_movements (
@@ -408,11 +466,17 @@ export async function ensureSchema(): Promise<void> {
     await query(`CREATE INDEX IF NOT EXISTS idx_stock_movements_order ON stock_movements(order_id)
       WHERE order_id IS NOT NULL`);
     await query(`CREATE INDEX IF NOT EXISTS idx_stock_movements_created ON stock_movements(created_at DESC)`);
-
-    // ─── Vídeos de produto (migration 016) ───────────────────────────────────
+    },
+  },
+  {
+    name: "Vídeos de produto (migration 016)",
+    run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS videos JSONB NOT NULL DEFAULT '[]'::jsonb`);
-
-    // ─── Perguntas + notificações (migration 017) ────────────────────────────
+    },
+  },
+  {
+    name: "Perguntas + notificações (migration 017)",
+    run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS product_questions (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -453,11 +517,17 @@ export async function ensureSchema(): Promise<void> {
     `);
     await query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL`);
-
-    // ─── Ícone por categoria (migration 018) ─────────────────────────────────
+    },
+  },
+  {
+    name: "Ícone por categoria (migration 018)",
+    run: async () => {
     await query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(40)`);
-
-    // ─── Galeria com álbuns (migration 019) ──────────────────────────────────
+    },
+  },
+  {
+    name: "Galeria com álbuns (migration 019)",
+    run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS gallery_albums (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -491,10 +561,55 @@ export async function ensureSchema(): Promise<void> {
         BEFORE UPDATE ON gallery_albums
         FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    },
+  },
+];
 
-    console.log(`[SCHEMA] ensureSchema completed in ${Date.now() - start}ms`);
-  } catch (err) {
-    // Loud-fail but don't crash the API. The operator should investigate via logs.
-    console.error('[SCHEMA] ⚠ ensureSchema failed — some features may be degraded:', err);
+let state: SchemaState = {
+  status: 'pending',
+  ranAt: null,
+  durationMs: 0,
+  total: STEPS.length,
+  failed: [],
+};
+
+/** Estado da última execução — exposto em `GET /health`. */
+export function getSchemaState(): SchemaState {
+  return state;
+}
+
+export async function ensureSchema(): Promise<SchemaState> {
+  const start = Date.now();
+  const failed: SchemaStepFailure[] = [];
+
+  for (const step of STEPS) {
+    try {
+      await step.run();
+    } catch (err) {
+      // Uma etapa quebrada não cancela as outras: elas são independentes na
+      // prática, e abortar tudo foi exatamente o modo de falha silenciosa antigo.
+      const message = err instanceof Error ? err.message : String(err);
+      failed.push({ step: step.name, error: message });
+      console.error(`[SCHEMA] ✗ etapa falhou: ${step.name} — ${message}`);
+    }
   }
+
+  state = {
+    status: failed.length ? 'degraded' : 'ok',
+    ranAt: new Date().toISOString(),
+    durationMs: Date.now() - start,
+    total: STEPS.length,
+    failed,
+  };
+
+  if (failed.length) {
+    console.error(
+      `[SCHEMA] ⚠ ${failed.length} de ${STEPS.length} etapas falharam em ${state.durationMs}ms — ` +
+        `o schema está DEGRADADO. Etapas: ${failed.map((f) => f.step).join(' | ')}`
+    );
+  } else {
+    console.log(`[SCHEMA] ✓ ${STEPS.length} etapas em ${state.durationMs}ms`);
+  }
+
+  return state;
 }
