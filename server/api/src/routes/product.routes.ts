@@ -7,6 +7,7 @@ import fs from 'fs';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { env } from '../config/env.js';
+import { isPlayableVideoHeader, FTYP_PROBE_BYTES } from '../utils/video.js';
 import * as productService from '../services/product.service.js';
 
 export const productRouter = Router();
@@ -521,16 +522,22 @@ const videoUpload = multer({
 
 /** Só MP4/MOV: o navegador precisa conseguir tocar sem transcodificação. */
 function isPlayableVideo(filePath: string): boolean {
+  let fd: number | undefined;
   try {
-    const fd = fs.openSync(filePath, 'r');
-    const buf = Buffer.alloc(12);
-    fs.readSync(fd, buf, 0, 12, 0);
-    fs.closeSync(fd);
-    // Caixa ISO-BMFF: bytes 4..8 = 'ftyp'; marca em 8..12 (isom, mp42, qt  …)
-    if (buf.toString('ascii', 4, 8) !== 'ftyp') return false;
-    return /^(isom|iso2|mp4|avc1|m4v|qt)/i.test(buf.toString('ascii', 8, 12));
+    fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(FTYP_PROBE_BYTES);
+    const read = fs.readSync(fd, buf, 0, FTYP_PROBE_BYTES, 0);
+    return isPlayableVideoHeader(buf.subarray(0, read));
   } catch {
     return false;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* já fechado */
+      }
+    }
   }
 }
 
