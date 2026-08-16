@@ -33,8 +33,11 @@ const probe = () => {
     if (!p) continue
     // <option> não participa do layout do pai: a caixa dele sempre "vaza".
     if (el.tagName === 'OPTION' || p.tagName === 'SELECT') continue
-    // display:contents não gera caixa — comparar contra ela acusa qualquer filho.
+    // display:contents não gera caixa. Vale para os dois lados: como pai,
+    // acusaria qualquer filho; como elemento, tem rect degenerado e parece
+    // estar vazando do próprio pai.
     if (getComputedStyle(p).display === 'contents') continue
+    if (getComputedStyle(el).display === 'contents') continue
     const a = el.getBoundingClientRect()
     const b = p.getBoundingClientRect()
     if (b.width > 0 && (a.right > b.right + 2 || a.left < b.left - 2)) {
