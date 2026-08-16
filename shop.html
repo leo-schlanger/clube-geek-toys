@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!--
+      Shell da LOJA (shop.geeketoys.com.br). Carrega o mesmo bundle do clube —
+      a SPA decide o modo por subdomínio (src/lib/subdomain.ts) — mas com meta e
+      dados estruturados próprios.
+
+      Por que um arquivo separado, e não sub_filter no HTML do clube: o nginx
+      fazia troca de string no index.html e isso quebrou de três formas ao mesmo
+      tempo — og:description ficou com o texto do plano do clube, a description
+      virou "Plano do Clube com de R$ 149,99" (frase quebrada), e nenhum dos
+      JSON-LD era tocado, então a loja se declarava ao Google como a assinatura
+      de R$ 149,99, com FAQ do clube. Qualquer edição de copy no index.html
+      voltaria a quebrar isto silenciosamente.
+    -->
+
+    <script src="/boot.js"></script>
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-256.png" />
+    <meta name="theme-color" content="#F04080" />
+    <meta name="msapplication-TileColor" content="#F04080" />
+
+    <!-- SEO: Primary Meta Tags -->
+    <title>Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ</title>
+    <meta name="title" content="Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ" />
+    <meta name="description" content="Loja de K-pop e cultura pop no Rio de Janeiro. Photocards, álbuns, chaveiros e colecionáveis com envio pelos Correios para todo o Brasil. Pague com PIX ou cartão." />
+    <meta name="keywords" content="loja k-pop, photocards, comprar photocard, álbum kpop, colecionáveis, geekpop toys, loja kpop rio de janeiro, copacabana, k-pop brasil, merch kpop, funko pop" />
+    <meta name="author" content="GeekPop & Toys LTDA" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://shop.geeketoys.com.br" />
+
+    <!-- Open Graph / Facebook / WhatsApp / Telegram -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://shop.geeketoys.com.br" />
+    <meta property="og:site_name" content="Loja GeekPop & Toys" />
+    <meta property="og:title" content="Loja GeekPop & Toys — K-pop e Colecionáveis" />
+    <meta property="og:description" content="Photocards, álbuns e colecionáveis de K-pop com envio pelos Correios para todo o Brasil. PIX ou cartão." />
+    <meta property="og:image" content="https://shop.geeketoys.com.br/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Loja GeekPop & Toys — K-pop, photocards e colecionáveis" />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://shop.geeketoys.com.br" />
+    <meta name="twitter:title" content="Loja GeekPop & Toys — K-pop e Colecionáveis" />
+    <meta name="twitter:description" content="Photocards, álbuns e colecionáveis de K-pop com envio pelos Correios. PIX ou cartão." />
+    <meta name="twitter:image" content="https://shop.geeketoys.com.br/og-image.png" />
+    <meta name="twitter:image:alt" content="Loja GeekPop & Toys" />
+
+    <!-- Schema.org / JSON-LD: Store.
+         É uma loja física com e-commerce, não uma Organization genérica nem o
+         Product da assinatura — este último é do clube e não pertence aqui. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Store",
+      "name": "GeekPop & Toys",
+      "description": "Loja de K-pop e cultura pop no Rio de Janeiro. Photocards, álbuns, chaveiros e colecionáveis, com envio pelos Correios para todo o Brasil.",
+      "url": "https://shop.geeketoys.com.br",
+      "logo": "https://shop.geeketoys.com.br/logo-vip.png",
+      "image": "https://shop.geeketoys.com.br/og-image.png",
+      "priceRange": "R$",
+      "currenciesAccepted": "BRL",
+      "paymentAccepted": "PIX, Cartão de crédito",
+      "sameAs": [
+        "https://www.instagram.com/geeketoys",
+        "https://www.facebook.com/geeketoys",
+        "https://geeketoys.com.br"
+      ],
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Rua Barata Ribeiro, 181, Loja J",
+        "addressLocality": "Rio de Janeiro",
+        "addressRegion": "RJ",
+        "postalCode": "22011-001",
+        "addressCountry": "BR"
+      },
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "email": "contato@geeketoys.com.br",
+        "contactType": "customer service",
+        "availableLanguage": "Portuguese"
+      }
+    }
+    </script>
+
+    <!-- Schema.org / JSON-LD: WebSite + busca interna.
+         Permite ao Google oferecer a caixa de busca da loja no resultado. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Loja GeekPop & Toys",
+      "url": "https://shop.geeketoys.com.br",
+      "inLanguage": "pt-BR",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://shop.geeketoys.com.br/?search={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Cloudflare Turnstile (CAPTCHA) — async, usado só no cadastro -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+
+    <!-- DNS Prefetch / Preconnect -->
+    <link rel="dns-prefetch" href="https://api.geeketoys.com.br" />
+    <link rel="preconnect" href="https://api.geeketoys.com.br" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <link rel="preload" as="image" href="/logo-vip.png" />
+  </head>
+  <body>
+    <div id="root">
+      <div id="initial-loader" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#FDFBFC;font-family:Inter,sans-serif;">
+        <div style="text-align:center;">
+          <img src="/logo-vip.png" alt="GeekPop & Toys" style="height:80px;margin-bottom:16px;" width="80" height="80" />
+          <div style="color:#F04080;font-size:14px;font-weight:600;">Carregando...</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

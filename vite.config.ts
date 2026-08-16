@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -77,6 +78,13 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
+      // Duas shells HTML, um único bundle: o clube e a loja compartilham a SPA
+      // (o modo sai do subdomínio), mas precisam de <head> diferentes porque
+      // crawler de link não roda JS — ver o comentário no topo de shop.html.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        shop: resolve(__dirname, 'shop.html'),
+      },
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
