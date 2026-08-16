@@ -233,6 +233,57 @@ function melhorEnvioBaseUrl(): string {
     : 'https://melhorenvio.com.br';
 }
 
+/**
+ * Saúde da integração de frete, exposta em `GET /health`.
+ *
+ * Existe porque a falha aqui é silenciosa por natureza: quando o Melhor Envio
+ * recusa, a cotação cai na tabela interna e o cliente vê um preço plausível.
+ * Ninguém percebe até a diferença aparecer no caixa. Um token inválido, ou de
+ * sandbox com a flag de produção, some exatamente assim.
+ */
+export interface MelhorEnvioHealth {
+  configured: boolean;
+  sandbox: boolean;
+  /** 'auth' separa credencial errada de instabilidade da API — o tratamento difere. */
+  lastFailure: { at: string; status: number; kind: 'auth' | 'other'; detail: string } | null;
+  lastSuccessAt: string | null;
+}
+
+let lastFailure: MelhorEnvioHealth['lastFailure'] = null;
+let lastSuccessAt: string | null = null;
+
+export function getMelhorEnvioHealth(): MelhorEnvioHealth {
+  return {
+    configured: Boolean(env.MELHOR_ENVIO_TOKEN),
+    sandbox: Boolean(env.MELHOR_ENVIO_SANDBOX),
+    lastFailure,
+    lastSuccessAt,
+  };
+}
+
+function recordMelhorEnvioFailure(status: number, body: string): void {
+  const kind = status === 401 || status === 403 ? 'auth' : 'other';
+  lastFailure = {
+    at: new Date().toISOString(),
+    status,
+    kind,
+    detail: body.slice(0, 200),
+  };
+
+  if (kind === 'auth') {
+    // Grito deliberado: sem isto a linha se perde entre os warnings e o frete
+    // segue saindo da tabela de fallback por semanas.
+    console.error(
+      `[shipping] CREDENCIAL DO MELHOR ENVIO RECUSADA (HTTP ${status}) — ` +
+        `ambiente=${env.MELHOR_ENVIO_SANDBOX ? 'sandbox' : 'producao'}. ` +
+        `O frete está saindo da TABELA DE FALLBACK, não da cotação real. ` +
+        `Confira MELHOR_ENVIO_TOKEN e se MELHOR_ENVIO_SANDBOX bate com o ambiente do token.`
+    );
+    return;
+  }
+  console.warn('[shipping] Melhor Envio error', status, body.slice(0, 300));
+}
+
 async function quoteMelhorEnvio(
   destCep: string,
   pkg: PackageDims
@@ -272,7 +323,7 @@ async function quoteMelhorEnvio(
 
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      console.warn('[shipping] Melhor Envio error', res.status, text.slice(0, 300));
+      recordMelhorEnvioFailure(res.status, text);
       return null;
     }
 
@@ -306,6 +357,14 @@ async function quoteMelhorEnvio(
         days: Number.isFinite(days) && days > 0 ? days : 10,
         service: name,
       });
+    }
+
+    // Só conta como sucesso se veio opção utilizável: um 200 com lista vazia
+    // ainda manda o cliente para o fallback, e registrar isso como "ok"
+    // esconderia justamente o caso que queremos enxergar.
+    if (options.length > 0) {
+      lastSuccessAt = new Date().toISOString();
+      lastFailure = null;
     }
 
     // Prefer Correios-branded options when present

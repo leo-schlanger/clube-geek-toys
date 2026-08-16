@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../config/database.js';
 import { getSchemaState } from '../db/ensure-schema.js';
+import { getMelhorEnvioHealth } from '../services/shipping.service.js';
 
 export const healthRouter = Router();
 
@@ -15,9 +16,15 @@ export const healthRouter = Router();
  *
  * A lista de etapas que falharam **não** é exposta aqui — nome de tabela/coluna
  * é informação de dentro. O detalhe fica no log e em `GET /logs/schema` (admin).
+ *
+ * `shipping` segue a mesma regra: diz **se** a cotação real está de pé, sem o
+ * corpo da resposta do Melhor Envio. Está aqui porque a falha dessa integração
+ * é invisível por natureza — credencial recusada faz o frete cair na tabela
+ * interna e o cliente vê um preço plausível, errado, sem nenhum sinal.
  */
 healthRouter.get('/', async (_req, res) => {
   const schema = getSchemaState();
+  const shipping = getMelhorEnvioHealth();
   try {
     await pool.query('SELECT 1');
     res.json({
@@ -29,6 +36,17 @@ healthRouter.get('/', async (_req, res) => {
         ranAt: schema.ranAt,
         failedSteps: schema.failed.length,
         totalSteps: schema.total,
+      },
+      shipping: {
+        // 'live' = cotação real; 'fallback' = tabela interna assumindo o lugar.
+        quotes: !shipping.configured
+          ? 'unconfigured'
+          : shipping.lastFailure
+            ? 'fallback'
+            : 'live',
+        sandbox: shipping.sandbox,
+        credentialRejected: shipping.lastFailure?.kind === 'auth',
+        lastSuccessAt: shipping.lastSuccessAt,
       },
     });
   } catch {
