@@ -1,0 +1,26 @@
+# Hits atuais K-pop — complemento ago/2026 (Geek E Toys Radio)
+# Formato: Artista — Título (travessão U+2014)
+# Fonte: Billboard Korea Global K-Songs, Hot 100/Global 200, Best of 2026 so far, Melon
+# Fluxo: download-batch → validar ID3+capa → upload → attach playlist 1
+
+# === Charts / mega-hits 2026 ===
+BTS — SWIM
+BTS — Normal
+KATSEYE — Animal
+LE SSERAFIM ILLIT KATSEYE — Iconic by Mistake
+ILLIT — It's Me
+ILLIT — Magnetic
+ATEEZ — BAD
+JENNIE — Less Than a Lover
+BLACKPINK — GO
+aespa — LEMONADE
+CORTIS — REDRED
+EXO — CROWN
+KiiiKiii — 404 New Era
+RESCENE — Love Attack
+BABYMONSTER — I LIKE IT
+NMIXX — Crescendo
+RIIZE — SOAR
+NewJeans — Ditto
+LE SSERAFIM — CRAZY
+aespa — Whiplash
