@@ -1,8 +1,16 @@
 /**
- * OfflineBanner - Exibe aviso quando o usuário está offline
+ * OfflineBanner — aviso de conexão caída.
  *
- * Mostra uma barra no topo da página indicando que não há conexão.
- * Automaticamente desaparece quando a conexão é restaurada.
+ * **Fica no rodapé, não no topo.** Até 16/08/2026 era `fixed top-0 z-[9999]`,
+ * e as três SPAs têm cabeçalho em `top: 0` (loja e membro por `sticky`, admin
+ * por `fixed`). Com a página rolada, esta faixa de 39px cobria a primeira
+ * linha do cabeçalho e **bloqueava carrinho, login, busca e tema** enquanto a
+ * conexão estivesse caída — medido com `elementFromPoint` a 390px e 1440px.
+ *
+ * No rodapé não disputa espaço com navegação nenhuma. O z fica **abaixo** do
+ * `CookieConsent` (z-[9998], também `bottom-0`): se os dois aparecerem juntos,
+ * o consentimento vence, porque é decisão bloqueante de uma vez só. O
+ * `RadioMiniPlayer` mora em `bottom-20`, acima desta faixa, sem colidir.
  */
 
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
@@ -33,7 +41,7 @@ export function OfflineBanner() {
     <div
       role="alert"
       aria-live="polite"
-      className={`fixed top-0 left-0 right-0 z-[9999] px-4 py-2 text-center text-sm font-medium transition-colors ${
+      className={`fixed bottom-0 left-0 right-0 z-[9997] px-4 py-2 text-center text-sm font-medium transition-colors ${
         isOnline
           ? 'bg-green-500 text-white'
           : 'bg-yellow-500 text-yellow-900'
