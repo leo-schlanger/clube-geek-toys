@@ -9,6 +9,7 @@ import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
+import { SaveProductButton } from './SaveProductButton'
 
 interface ProductCardProps {
   product: Product
@@ -53,7 +54,7 @@ export function ProductCard({
   }
 
   return (
-    <Card className="group flex h-full flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-lg">
+    <Card className="group relative flex h-full flex-col overflow-hidden transition-all hover:border-primary/50 hover:shadow-lg">
       <Link to={href} className="relative block aspect-square overflow-hidden bg-muted">
         {image ? (
           <img
@@ -95,6 +96,17 @@ export function ProductCard({
           </div>
         )}
       </Link>
+
+      {/* Fora do <Link>: aninhar botão dentro de âncora é HTML inválido e o
+          clique acabaria navegando. Fica sobre a imagem, no canto oposto às
+          badges. Atacado não salva — a compra ali é por CNPJ aprovado. */}
+      {!isWholesale && (
+        <SaveProductButton
+          productId={product.id}
+          productName={product.name}
+          className="absolute right-2 top-2 z-10 shadow-sm"
+        />
+      )}
 
       <CardContent className="flex flex-1 flex-col gap-2 p-4">
         <Link to={href} className="flex-1">

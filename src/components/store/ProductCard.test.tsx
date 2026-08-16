@@ -8,7 +8,18 @@ vi.mock('../../contexts/CartContext', () => ({
   useCart: () => ({ addItem, items: [], count: 0, subtotal: 0, channel: 'retail', removeItem: vi.fn(), setQuantity: vi.fn(), clear: vi.fn() }),
 }))
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }))
+
+// O card carrega o botão de salvar, que lê a conta e consulta os salvos. Aqui o
+// foco é a vitrine, então o botão entra como visitante (comportamento próprio
+// coberto em SaveProductButton.test.tsx).
+vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }))
+vi.mock('../../lib/profile', () => ({
+  saveProduct: vi.fn(),
+  unsaveProduct: vi.fn(),
+  loadSavedIds: vi.fn(async () => new Set<string>()),
+  markSavedInCache: vi.fn(),
+}))
 
 import { ProductCard } from './ProductCard'
 import { toast } from 'sonner'
@@ -78,5 +89,40 @@ describe('ProductCard', () => {
       </MemoryRouter>
     )
     expect(screen.getAllByText(/Esgotado/i).length).toBeGreaterThan(0)
+  })
+})
+
+describe('ProductCard — salvar para depois', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('mostra o coração no varejo', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('button', { name: /Salvar Photocard X/i })).toBeInTheDocument()
+  })
+
+  // Atacado compra por CNPJ aprovado; salvar ali não faz sentido.
+  it('esconde o coração no atacado', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} isWholesale isWholesaleApproved />
+      </MemoryRouter>
+    )
+    expect(screen.queryByRole('button', { name: /Salvar/i })).not.toBeInTheDocument()
+  })
+
+  // Botão dentro de <a> é HTML inválido e o clique navegaria em vez de salvar.
+  it('não fica aninhado dentro do link do produto', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ProductCard product={product} />
+      </MemoryRouter>
+    )
+    const save = screen.getByRole('button', { name: /Salvar Photocard X/i })
+    expect(save.closest('a')).toBeNull()
+    expect(container.querySelector('a button')).toBeNull()
   })
 })
