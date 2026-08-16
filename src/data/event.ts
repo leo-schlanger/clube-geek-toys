@@ -49,8 +49,12 @@ export const ACTIVE_EVENT: EventConfig = {
   enabled: true,
   title: 'GeekPop Night — Encontro K-pop & Collectibles',
   shortTitle: 'GeekPop Night',
-  bannerText:
-    '🎉 GeekPop Night no dia 6 de setembro (domingo), 14h–18h! Ingresso R$ 20 — reserve já.',
+  /**
+   * Mesmo texto do site institucional (`geek-toys-home/src/data/event.ts`).
+   * São duas cópias do mesmo conteúdo — ao editar aqui, edite lá também, senão
+   * a mesma campanha aparece com frases diferentes nos dois domínios.
+   */
+  bannerText: '🎉 GeekPop Night · domingo 6/set, 14h–18h · Ingresso R$ 20',
   startsAt: '2026-09-06T14:00:00-03:00',
   endsAt: '2026-09-06T18:00:00-03:00',
   location: {
