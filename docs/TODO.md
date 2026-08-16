@@ -10,8 +10,8 @@ Foco: base de dados, estrutura e layout.
 ### Resolvido em 16/08/2026
 
 - [x] **Schema deixa de falhar em silêncio** — o `ensureSchema()` era um `try`
-      único sobre 460 linhas de DDL: a etapa 12 quebrando abortava as 13–19, com
-      a API servindo tráfego e o `/health` respondendo `ok`. Agora são 19 etapas
+      único sobre 460 linhas de DDL: a etapa 12 quebrando abortava as 13–18, com
+      a API servindo tráfego e o `/health` respondendo `ok`. Agora são 18 etapas
       nomeadas com falha isolada, `schema.status` no `/health`, `GET /logs/schema`
       no admin e o deploy falhando em `degraded`. Os 113 statements SQL foram
       conferidos idênticos antes/depois. 5 testes.

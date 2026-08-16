@@ -43,7 +43,7 @@ variações/vídeos, CRUD do painel, infra, segurança e integrações.
 | Token Melhor Envio prod         | TODO / SHOP-ORDERS                   | ⚠️ ops       | Sem token = fallback                         |
 | Site home SEO K-pop             | SHOP-ORDERS                          | ✅           | Vercel www                                   |
 | Design pink/yellow              | DESIGN / TODO                        | ✅           | Residual purple limpo 08/08                  |
-| **Schema no boot (19 etapas)**  | CHECKUP-2026-08-16                   | ✅           | Falha isolada + `schema.status` no `/health` |
+| **Schema no boot (18 etapas)**  | CHECKUP-2026-08-16                   | ✅           | Falha isolada + `schema.status` no `/health` |
 | **Cobertura mede o backend**    | CHECKUP-2026-08-16 + TODO            | ✅           | Era só front; API entrou em 7,15%            |
 | **`build` / `lint` como trava** | CHECKUP-2026-08-16 + TODO            | ✅           | `tsc -b` no CI; lint em 0 erros              |
 | **Modal de produto em abas**    | CHECKUP-2026-08-16 + CATALOG-2026-08 | ✅           | 4 abas com contador; painéis montados        |

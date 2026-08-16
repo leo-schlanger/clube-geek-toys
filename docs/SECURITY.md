@@ -212,7 +212,7 @@ Em conformidade com a **Lei 14.063/2020** (assinatura eletrônica):
 
 ### Schema aplicado no boot (`ensureSchema`)
 
-O DDL idempotente que roda quando a API sobe está dividido em **19 etapas
+O DDL idempotente que roda quando a API sobe está dividido em **18 etapas
 nomeadas**, cada uma com seu próprio `try` (desde 16/08/2026 — antes era um
 `try` único sobre 460 linhas, e uma etapa quebrando abortava as seguintes em
 silêncio, com o `/health` respondendo `ok`).

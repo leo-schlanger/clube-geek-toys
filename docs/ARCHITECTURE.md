@@ -709,10 +709,11 @@ O `docker-entrypoint-initdb.d` do Postgres so roda na **primeira** criacao do
 volume, e migration manual por SSH e facil de esquecer. Entao o
 `server/api/src/db/ensure-schema.ts` roda DDL idempotente no boot da API.
 
-Desde 16/08/2026 sao **19 etapas nomeadas**, cada uma com seu proprio `try`:
+Desde 16/08/2026 sao **18 etapas nomeadas**, cada uma com seu proprio `try`
+(as migrations vao ate a 019; a Wave 2.5 e so um comentario e nao gera etapa):
 
 - Uma etapa que falha **nao cancela as seguintes** (antes era um `try` unico em
-  volta de 460 linhas — a etapa 12 quebrando abortava as 13-19, em silencio,
+  volta de 460 linhas — a etapa 12 quebrando abortava as 13-18, em silencio,
   com a API servindo trafego e o `/health` respondendo `ok`)
 - A API **nunca cai** por falha de schema; ela sobe degradada e avisa
 - `GET /health` → `schema.status`: `pending` | `ok` | `degraded` + contagem
