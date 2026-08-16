@@ -113,6 +113,32 @@ export async function exportUserData(userId: string) {
     // migration 012 not applied yet
   }
 
+  // Customer profile + saved products (020) — the profile holds birth date,
+  // gender and address for accounts that never subscribed, so it is exactly the
+  // kind of PII an access request is about. Table may not exist on pre-020 DBs.
+  let customerProfile: Record<string, unknown> | null = null;
+  let savedProducts: Record<string, unknown>[] = [];
+  try {
+    const profileResult = await query(
+      `SELECT user_id, full_name, phone, birth_date, gender, photo_url, address,
+              marketing_consent, created_at, updated_at
+       FROM customer_profiles WHERE user_id = $1`,
+      [userId]
+    );
+    customerProfile = profileResult.rows[0] || null;
+
+    const savedResult = await query(
+      `SELECT s.product_id, p.name AS product_name, s.created_at
+       FROM saved_products s
+       LEFT JOIN products p ON p.id = s.product_id
+       WHERE s.user_id = $1 ORDER BY s.created_at DESC`,
+      [userId]
+    );
+    savedProducts = savedResult.rows;
+  } catch {
+    // migration 020 not applied yet
+  }
+
   const auditResult = await query(
     `SELECT * FROM audit_logs
      WHERE user_id = $1 OR ($2::uuid IS NOT NULL AND member_id = $2)
@@ -158,6 +184,8 @@ export async function exportUserData(userId: string) {
     productQuestions: questions,
     notifications,
     wholesaleAccount,
+    customerProfile,
+    savedProducts,
     auditLogs: auditResult.rows,
     emailLogs: emailResult.rows,
   };
@@ -256,6 +284,26 @@ export async function deleteUserAccount(userId: string, password: string) {
          WHERE member_id = $1 AND status IN ('authorized', 'pending', 'paused')`,
         [memberId]
       );
+    }
+
+    // Customer profile (020): pure PII with no accounting value — unlike orders,
+    // there is nothing worth keeping, so it goes entirely. The users row is only
+    // anonymized (never deleted), so ON DELETE CASCADE never fires here and both
+    // tables need an explicit delete.
+    //
+    // Guarded by to_regclass because ensureSchema runs after listen() and is not
+    // awaited: on a pre-020 database the table may still be missing, and a plain
+    // DELETE against it would abort this whole transaction, blocking the erasure
+    // request entirely. to_regclass returns NULL instead of raising.
+    const profileTables = await client.query(
+      `SELECT to_regclass('public.customer_profiles') AS profiles,
+              to_regclass('public.saved_products') AS saved`
+    );
+    if (profileTables.rows[0]?.profiles) {
+      await client.query(`DELETE FROM customer_profiles WHERE user_id = $1`, [userId]);
+    }
+    if (profileTables.rows[0]?.saved) {
+      await client.query(`DELETE FROM saved_products WHERE user_id = $1`, [userId]);
     }
 
     // Anonymize shop orders (keep financial rows for accounting, strip PII)

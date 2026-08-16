@@ -563,6 +563,42 @@ const STEPS: SchemaStep[] = [
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     },
   },
+  {
+    name: "Perfil de cliente sem assinatura + salvos (migration 020)",
+    run: async () => {
+    await query(`
+      CREATE TABLE IF NOT EXISTS customer_profiles (
+        user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        full_name VARCHAR(200),
+        phone VARCHAR(20),
+        birth_date DATE,
+        gender VARCHAR(20) CHECK (gender IN (
+          'feminino', 'masculino', 'nao_binario', 'outro', 'prefiro_nao_dizer'
+        )),
+        photo_url TEXT,
+        address JSONB,
+        marketing_consent BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`
+      CREATE TABLE IF NOT EXISTS saved_products (
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, product_id)
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_saved_products_user
+      ON saved_products(user_id, created_at DESC)`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_customer_profiles_updated_at
+        BEFORE UPDATE ON customer_profiles
+        FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    },
+  },
 ];
 
 let state: SchemaState = {

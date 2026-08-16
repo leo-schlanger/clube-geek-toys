@@ -43,6 +43,8 @@ const Cart = lazy(() => import('./pages/shop/Cart'))
 const ShopCheckout = lazy(() => import('./pages/shop/ShopCheckout'))
 const OrderConfirmation = lazy(() => import('./pages/shop/OrderConfirmation'))
 const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
+const ShopRegister = lazy(() => import('./pages/shop/ShopRegister'))
+const ShopProfile = lazy(() => import('./pages/shop/ShopProfile'))
 const EventPage = lazy(() => import('./pages/shop/EventPage'))
 const MyOrders = lazy(() => import('./pages/shop/MyOrders'))
 const MyOrderDetail = lazy(() => import('./pages/shop/MyOrderDetail'))
@@ -286,6 +288,9 @@ function ShopRoutes() {
         <Route path="/minhas-compras" element={<MyOrders />} />
         <Route path="/minhas-compras/:id" element={<MyOrderDetail />} />
         <Route path="/entrar" element={<ShopLogin />} />
+        {/* Conta da loja: cadastro e perfil não exigem assinatura do clube. */}
+        <Route path="/cadastro" element={<ShopRegister />} />
+        <Route path="/perfil" element={<ShopProfile />} />
         <Route path="/evento" element={<EventPage />} />
         {/* Canal Atacado (aba dedicada + CNPJ) */}
         <Route path="/atacado" element={<WholesaleHome />} />

@@ -240,6 +240,13 @@ export default function ShopLogin() {
               </Button>
 
               <div className="w-full text-center text-sm text-muted-foreground">
+                Ainda não tem conta?{' '}
+                <Link to="/cadastro" className="font-semibold text-primary hover:underline">
+                  Criar conta grátis
+                </Link>
+              </div>
+
+              <div className="w-full text-center text-sm text-muted-foreground">
                 Não é membro?{' '}
                 <a
                   href="https://club.geeketoys.com.br/assinar"

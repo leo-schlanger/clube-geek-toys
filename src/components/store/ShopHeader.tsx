@@ -228,8 +228,8 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
 
             {/* Login / conta */}
             {user ? (
-              <Button variant="ghost" size="icon" asChild aria-label="Minha conta">
-                <Link to="/minhas-compras">
+              <Button variant="ghost" size="icon" asChild aria-label="Meu perfil">
+                <Link to="/perfil">
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <User className="h-4 w-4" />
                   </span>

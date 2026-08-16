@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { api, setTokens, clearTokens, getAccessToken } from '../lib/api-client'
 import { authLogger } from '../lib/logger'
+import { clearSavedIdsCache } from '../lib/profile'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import { toast } from 'sonner'
 import type { UserRole } from '../types'
@@ -285,6 +286,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearTokens()
       setAuthState(null)
+      // Os produtos salvos são por conta: sem isto o próximo login herdaria
+      // os corações do usuário anterior nesta mesma aba.
+      clearSavedIdsCache()
     }
     return { success: true }
   }

@@ -473,3 +473,78 @@ export interface Contract {
   status: ContractStatus
   createdAt: string
 }
+
+// ─── Perfil de cliente (loja, sem assinatura) ────────────────────────────────
+
+/**
+ * Quem compra na loja sem assinar o clube. Não confundir com `Member`, que é o
+ * registro da assinatura (exige CPF, tem plano e validade). Uma conta pode ter
+ * perfil, assinatura, os dois, ou nenhum.
+ */
+export const GENDERS = [
+  'feminino',
+  'masculino',
+  'nao_binario',
+  'outro',
+  'prefiro_nao_dizer',
+] as const
+
+export type Gender = (typeof GENDERS)[number]
+
+/** Rótulos em pt-BR para os selects. */
+export const GENDER_LABELS: Record<Gender, string> = {
+  feminino: 'Feminino',
+  masculino: 'Masculino',
+  nao_binario: 'Não binário',
+  outro: 'Outro',
+  prefiro_nao_dizer: 'Prefiro não dizer',
+}
+
+export interface ProfileAddress {
+  cep: string
+  street: string
+  number: string
+  complement?: string
+  neighborhood: string
+  city: string
+  state: string
+}
+
+export interface CustomerProfile {
+  userId: string
+  email: string
+  fullName: string | null
+  phone: string | null
+  /** YYYY-MM-DD — sem hora, para fuso não mudar o dia do aniversário. */
+  birthDate: string | null
+  gender: Gender | null
+  photoUrl: string | null
+  address: ProfileAddress | null
+  marketingConsent: boolean
+  /** True quando a conta também assina o clube. */
+  isMember: boolean
+  createdAt: string | null
+  updatedAt: string | null
+}
+
+/** Omitir a chave = não mexe. `null` = apagar o campo. */
+export interface UpdateProfilePayload {
+  fullName?: string | null
+  phone?: string | null
+  birthDate?: string | null
+  gender?: Gender | null
+  address?: ProfileAddress | null
+  marketingConsent?: boolean
+}
+
+/** Produto salvo, com preço e estoque **atuais** — não os de quando salvou. */
+export interface SavedProduct {
+  productId: string
+  name: string
+  slug: string
+  price: number
+  imageUrl: string | null
+  active: boolean
+  stock: number
+  savedAt: string
+}

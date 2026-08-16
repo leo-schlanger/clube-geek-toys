@@ -20,6 +20,7 @@ import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
+import { SaveProductButton } from '../../components/store/SaveProductButton'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
@@ -479,6 +480,13 @@ export default function ProductDetail() {
                   <ShoppingCart className="h-5 w-5" />
                   {outOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
                 </Button>
+
+                {/* Esgotado é justamente quando salvar mais importa. */}
+                <SaveProductButton
+                  productId={product.id}
+                  productName={product.name}
+                  variant="full"
+                />
               </div>
 
               <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
