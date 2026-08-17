@@ -56,7 +56,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [activeChannel, setActiveChannel] = useState<ShopChannel>(channel)
   const [items, setItems] = useState<CartItem[]>(() => loadCart(channel))
 
-  // Swap cart when navigating between loja and atacado (async to avoid cascading render lint).
+  // Swap the cart when moving between retail and wholesale; async avoids the
+  // cascading-render lint.
   useEffect(() => {
     if (channel === activeChannel) return
     let cancelled = false

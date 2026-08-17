@@ -110,7 +110,7 @@ describe('MembersTable', () => {
 
     it('renders the single club plan badge for every member', () => {
       render(<MembersTable {...defaultProps} />)
-      // Todos os membros têm o plano único 'club'
+    // Every member is on the single 'club' plan
       expect(screen.getAllByText('Clube GeekPop & Toys')).toHaveLength(3)
       expect(screen.queryByText('Silver')).not.toBeInTheDocument()
       expect(screen.queryByText('Gold')).not.toBeInTheDocument()

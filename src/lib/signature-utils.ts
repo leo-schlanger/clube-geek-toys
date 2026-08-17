@@ -1,6 +1,6 @@
 /**
  * Signature Utilities
- * Hash SHA-256 e utilitários para assinatura digital
+ * SHA-256 hashing and helpers for the digital signature.
  */
 
 /**

@@ -1,15 +1,11 @@
 /**
- * Logger utilitário - só exibe logs em desenvolvimento
+ * Development-only logging. Silenced in production so nothing sensitive
+ * reaches the console and the user's browser stays quiet.
  *
- * Em produção, os logs são silenciados para:
- * - Não expor informações sensíveis no console
- * - Reduzir ruído no navegador do usuário
- * - Melhorar performance (marginalmente)
- *
- * Uso:
+ * Usage:
  *   import { logger } from '@/lib/logger'
- *   logger.info('Mensagem normal')
- *   logger.warn('Aviso')
+ *   logger.info('...')
+ *   logger.warn('...')
  *   logger.error('Erro', error)
  *   logger.debug('Debug detalhado')
  */
@@ -57,10 +53,10 @@ function createLogger(options: LoggerOptions = {}) {
       }
     },
 
-    // Para criar um logger com prefixo específico
+    // Creates a logger with its own prefix
     withPrefix: (newPrefix: string) => createLogger({ ...options, prefix: newPrefix }),
 
-    // Para forçar log mesmo em produção (usar com moderação)
+    // Forces output even in production; use sparingly
     force: {
       error: (message: string, ...args: unknown[]) => {
         console.error(formatMessage('error', prefix, message), ...args)
@@ -69,10 +65,10 @@ function createLogger(options: LoggerOptions = {}) {
   }
 }
 
-// Logger padrão
+// Default logger
 export const logger = createLogger()
 
-// Loggers pré-configurados para módulos específicos
+// Preconfigured per-module loggers
 export const authLogger = createLogger({ prefix: 'Auth' })
 export const paymentLogger = createLogger({ prefix: 'Payment' })
 export const dbLogger = createLogger({ prefix: 'Database' })

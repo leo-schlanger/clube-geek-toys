@@ -109,7 +109,7 @@ describe('RadioMiniPlayer', () => {
     const RadioMiniPlayer = (await import('./RadioMiniPlayer')).default
     render(<RadioMiniPlayer />)
 
-    // Collapsed shows "Ouça a rádio geek" text
+    // Collapsed shows the invite label
     expect(screen.getByText(/Ouça a rádio geek/)).toBeInTheDocument()
     // Should have a button to expand
     expect(screen.getByLabelText('Abrir player da rádio')).toBeInTheDocument()
@@ -374,7 +374,7 @@ describe('RadioMiniPlayer', () => {
     const RadioMiniPlayer = (await import('./RadioMiniPlayer')).default
     render(<RadioMiniPlayer />)
 
-    // Collapsed state shows "Rádio" label
+    // Collapsed state shows the short label
     expect(screen.getByText('Rádio')).toBeInTheDocument()
   })
 })

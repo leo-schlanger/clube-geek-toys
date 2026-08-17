@@ -10,9 +10,9 @@ vi.mock('../../contexts/CartContext', () => ({
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }))
 
-// O card carrega o botão de salvar, que lê a conta e consulta os salvos. Aqui o
-// foco é a vitrine, então o botão entra como visitante (comportamento próprio
-// coberto em SaveProductButton.test.tsx).
+// The card carries the save button, which reads the account and fetches saved
+// ids. The focus here is the storefront, so it renders as a visitor; its own
+// behaviour is covered in SaveProductButton.test.tsx.
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }))
 vi.mock('../../lib/profile', () => ({
   saveProduct: vi.fn(),
@@ -104,7 +104,7 @@ describe('ProductCard — salvar para depois', () => {
     expect(screen.getByRole('button', { name: /Salvar Photocard X/i })).toBeInTheDocument()
   })
 
-  // Atacado compra por CNPJ aprovado; salvar ali não faz sentido.
+  // Wholesale buys through an approved CNPJ; saving makes no sense there.
   it('esconde o coração no atacado', () => {
     render(
       <MemoryRouter>
@@ -114,7 +114,7 @@ describe('ProductCard — salvar para depois', () => {
     expect(screen.queryByRole('button', { name: /Salvar/i })).not.toBeInTheDocument()
   })
 
-  // Botão dentro de <a> é HTML inválido e o clique navegaria em vez de salvar.
+  // A button inside an <a> is invalid HTML and the click would navigate.
   it('não fica aninhado dentro do link do produto', () => {
     const { container } = render(
       <MemoryRouter>

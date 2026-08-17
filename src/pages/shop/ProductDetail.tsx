@@ -57,7 +57,7 @@ export default function ProductDetail() {
   const [activeImage, setActiveImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
   const [variantSel, setVariantSel] = useState<Record<string, string>>({})
-  /** X inicial do toque, para distinguir arrastar de tocar. */
+  /** Initial touch X, to tell a drag from a tap. */
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
 
   useEffect(() => {
@@ -76,13 +76,13 @@ export default function ProductDetail() {
       try {
         const p = await getProductBySlug(productSlug)
         if (!active) return
-        // No canal atacado, só exibir SKUs liberados (wholesale_enabled)
+        // Wholesale channel shows only wholesale_enabled SKUs
         if (!p || (isWholesale && p.wholesaleEnabled === false)) {
           setNotFound(true)
           setProduct(null)
         } else {
           setProduct(p)
-          // Pré-seleciona 1ª opção de cada eixo se houver
+          // Preselect the first option of each axis
           if (p.hasVariants && p.variantAxes?.length) {
             const init: Record<string, string> = {}
             for (const axis of p.variantAxes) {
@@ -127,13 +127,13 @@ export default function ProductDetail() {
     [product, variantSel, matched]
   )
 
-  // Ao trocar variação, volta para a 1ª foto da galeria da variante (Shopee).
+  // Switching variant returns to the first photo of that variant's gallery.
   const galleryKey = displayImages[0] ?? ''
   useEffect(() => {
     setActiveImage(0)
   }, [galleryKey])
 
-  /** Avança/volta circularmente na galeria. */
+  /** Steps through the gallery, wrapping at both ends. */
   function stepImage(delta: number) {
     const total = displayImages.length
     if (total < 2) return

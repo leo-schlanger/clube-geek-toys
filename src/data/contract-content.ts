@@ -1,6 +1,6 @@
 /**
  * Contract Content - Regulamento do Clube GeekPop & Toys
- * Estruturado para geração de PDF com pdf-lib
+ * Structured for PDF generation with pdf-lib.
  */
 
 export interface ContractSection {

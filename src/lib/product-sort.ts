@@ -1,6 +1,6 @@
 /**
- * Ordenação do catálogo (loja, atacado e aba admin).
- * `newest` é o padrão atual da API: destaques primeiro, depois data de postagem.
+ * Catalogue ordering for the shop, wholesale and the admin tab.
+ * `newest` is the API default: featured first, then posting date.
  */
 
 export const PRODUCT_SORTS = [
@@ -16,9 +16,9 @@ export type ProductSort = (typeof PRODUCT_SORTS)[number]
 
 export const DEFAULT_PRODUCT_SORT: ProductSort = 'newest'
 
-/** Página do catálogo da loja / atacado (ORDER BY + LIMIT/OFFSET no banco). */
+/** Shop and wholesale catalogue page; ORDER BY and LIMIT/OFFSET run in the database. */
 export const SHOP_CATALOG_PAGE_SIZE = 24
-/** Página da aba admin de produtos. */
+/** Admin products tab page. */
 export const ADMIN_CATALOG_PAGE_SIZE = 25
 
 export function parseCatalogPage(value: string | null | undefined): number {
@@ -60,7 +60,7 @@ function timeValue(iso: string): number {
   return Number.isFinite(t) ? t : 0
 }
 
-/** Ordena uma lista já carregada (admin / testes). A loja ordena no servidor. */
+/** Sorts an already-loaded list (admin and tests). The shop sorts server-side. */
 export function sortProducts<T extends SortableProduct>(products: T[], sort: ProductSort): T[] {
   const copy = products.slice()
   copy.sort((a, b) => {

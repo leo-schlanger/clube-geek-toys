@@ -19,8 +19,8 @@ import {
 } from 'lucide-react'
 
 /**
- * Ícones que o admin pode escolher por categoria. O banco guarda só a chave;
- * o componente fica aqui, então trocar a biblioteca não mexe no schema.
+ * Icons an admin can pick per category. The database stores only the key and
+ * the component lives here, so swapping icon libraries never touches the schema.
  */
 export const CATEGORY_ICONS: { key: string; label: string; Icon: LucideIcon }[] = [
   { key: 'sparkles', label: 'Brilho', Icon: Sparkles },
@@ -48,8 +48,8 @@ export function categoryIcon(key?: string | null): LucideIcon | null {
 }
 
 /**
- * Sugere um ícone pelo nome da categoria, para as que já existem sem escolha
- * feita. É só um palpite inicial — o admin pode trocar.
+ * Guesses an icon from the category name, for those created before the field
+ * existed. Only an opening guess; the admin can change it.
  */
 export function guessCategoryIcon(name: string): string | null {
   const n = name

@@ -140,7 +140,7 @@ describe('MemberModal', () => {
 
     it('shows the single fixed club plan (Anual)', () => {
       render(<MemberModal mode="create" {...defaultProps} />)
-      // Plano único e anual, sem seletor de Silver/Gold/Black
+    // Single annual plan, with no Silver/Gold/Black selector
       expect(screen.getByText(/Clube GeekPop & Toys — Anual/)).toBeInTheDocument()
       expect(screen.queryByText('Silver')).not.toBeInTheDocument()
       expect(screen.queryByText('Gold')).not.toBeInTheDocument()

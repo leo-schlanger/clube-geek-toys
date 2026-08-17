@@ -2,10 +2,10 @@ import { api, apiRequest } from './api-client'
 import type { CustomerProfile, SavedProduct, UpdateProfilePayload } from '../types'
 
 /**
- * Perfil da loja — a conta que compra sem assinar o clube.
+ * Shop profile: the account that buys without subscribing.
  *
- * Todas as rotas agem sobre o usuário do token; não existe id na URL, então não
- * há como pedir o perfil de outra pessoa.
+ * Every route acts on the token's user. There is no id in the URL, so no way to
+ * request someone else's profile.
  */
 
 export async function fetchProfile(): Promise<CustomerProfile> {
@@ -17,10 +17,9 @@ export async function fetchProfile(): Promise<CustomerProfile> {
 }
 
 /**
- * Salva só o que mudou.
- *
- * Omitir a chave = não mexe; mandar `null` = apagar. A tela salva por seção, e
- * enviar o objeto inteiro apagaria campos que a pessoa nem abriu.
+ * Omitting a key leaves the field alone; sending `null` clears it. The screen
+ * saves per section, and sending the whole object would wipe fields the person
+ * never opened.
  */
 export async function updateProfile(payload: UpdateProfilePayload): Promise<CustomerProfile> {
   const result = await api.patch<CustomerProfile>(
@@ -37,7 +36,7 @@ export type UploadPhotoResult =
   | { ok: true; profile: CustomerProfile }
   | { ok: false; error: string }
 
-/** Foto é opcional — o erro volta tratável em vez de estourar. */
+/** The photo is optional, so failure returns a value instead of throwing. */
 export async function uploadProfilePhoto(file: File): Promise<UploadPhotoResult> {
   const form = new FormData()
   form.append('photo', file)
@@ -67,18 +66,18 @@ export async function fetchSavedProducts(): Promise<SavedProduct[]> {
   return result.data ?? []
 }
 
-/** Só os ids — o catálogo usa para pintar o coração sem uma chamada por card. */
+/** Ids only, so the catalogue can fill in hearts without a call per card. */
 export async function fetchSavedProductIds(): Promise<string[]> {
   const result = await api.get<string[]>('/profile/saved/ids')
   return result.data ?? []
 }
 
 /**
- * Cache dos ids salvos, por sessão.
+ * Session cache of saved ids.
  *
- * Uma vitrine renderiza dezenas de cards e cada um precisa saber se está salvo;
- * sem isto seria uma chamada por card. Fica aqui, e não no componente, para o
- * AuthContext poder limpar no logout sem importar de `components/`.
+ * A storefront renders dozens of cards and each needs to know its state; without
+ * this it would be one call per card. It lives here rather than in the component
+ * so AuthContext can clear it on logout without importing from `components/`.
  */
 let savedIdsCache: Set<string> | null = null
 let inFlight: Promise<Set<string>> | null = null
@@ -98,20 +97,20 @@ export async function loadSavedIds(): Promise<Set<string>> {
   return inFlight
 }
 
-/** Mantém o cache coerente após salvar/remover, sem refazer a chamada. */
+/** Keeps the cache in step after a save or removal, without refetching. */
 export function markSavedInCache(productId: string, saved: boolean): void {
   if (!savedIdsCache) return
   if (saved) savedIdsCache.add(productId)
   else savedIdsCache.delete(productId)
 }
 
-/** Chamado no logout: o próximo usuário não pode herdar os salvos do anterior. */
+/** Called on logout: the next user must not inherit the previous one's saves. */
 export function clearSavedIdsCache(): void {
   savedIdsCache = null
   inFlight = null
 }
 
-/** Salvar e remover são idempotentes no servidor: repetir não quebra. */
+/** Save and remove are idempotent server-side; repeating is harmless. */
 export async function saveProduct(productId: string): Promise<boolean> {
   const result = await apiRequest(`/profile/saved/${productId}`, { method: 'PUT' })
   return !result.error

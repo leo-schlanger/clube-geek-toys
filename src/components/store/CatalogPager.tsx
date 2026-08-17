@@ -9,7 +9,7 @@ interface CatalogPagerProps {
   onPageChange: (page: number) => void
 }
 
-/** Paginação da vitrine: só aparece quando o total passa de uma página. */
+/** Storefront pager; only rendered when the total exceeds one page. */
 export function CatalogPager({ page, total, pageSize, onPageChange }: CatalogPagerProps) {
   const totalPages = catalogPageCount(total, pageSize)
   if (total <= pageSize) return null

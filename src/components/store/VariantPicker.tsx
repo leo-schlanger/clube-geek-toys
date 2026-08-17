@@ -7,14 +7,14 @@ interface VariantPickerProps {
   product: Product
   selected: Record<string, string>
   onChange: (next: Record<string, string>) => void
-  /** Variante resolvida pela seleção atual (ou null se incompleta/esgotada). */
+  /** Variant resolved from the current selection; null if incomplete or sold out. */
   matched: ProductVariant | null
 }
 
 /**
- * Seletor de variações estilo Shopee: eixos (Cor, Tamanho…) com botões de opção.
- * Opções com foto da variante viram swatches (miniatura + rótulo).
- * Preço/estoque da combinação quando completa.
+ * Variant picker: one row of option buttons per axis. Options whose variant has
+ * a photo render as swatches, and price and stock appear once the combination
+ * is complete.
  */
 export function VariantPicker({ product, selected, onChange, matched }: VariantPickerProps) {
   const axes = useMemo(() => product.variantAxes ?? [], [product.variantAxes])
@@ -24,7 +24,7 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
   )
 
   const availableFor = useMemo(() => {
-    // Para cada eixo, quais opções ainda têm estoque dado o restante da seleção
+    // Per axis: which options still have stock given the rest of the selection
     const map: Record<string, Set<string>> = {}
     for (const axis of axes) {
       map[axis.name] = new Set()
@@ -46,8 +46,8 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
   }, [axes, variants, selected])
 
   /**
-   * Miniatura da opção (Shopee): prioriza variante compatível com a seleção atual;
-   * se não houver, usa qualquer variante ativa com foto nessa opção (ex.: outra cor).
+   * Prefers a variant matching the current selection; failing that, any active
+   * variant with a photo for this option.
    */
   const optionImage = useMemo(() => {
     const map: Record<string, Record<string, string | null>> = {}
@@ -162,7 +162,7 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
   )
 }
 
-/** Resolve variante ativa a partir da seleção de eixos. */
+/** Resolves the active variant from the axis selection. */
 export function matchVariant(
   product: Product,
   selected: Record<string, string>
@@ -177,10 +177,10 @@ export function matchVariant(
 }
 
 /**
- * Galeria a exibir na PDP (estilo Shopee):
- * 1) combinação completa com fotos próprias → fotos da variante
- * 2) seleção parcial → 1ª variante compatível com foto
- * 3) fallback → fotos do listing
+ * Gallery shown on the product page, in order of preference:
+ * 1) complete combination with its own photos → the variant's photos
+ * 2) partial selection → first matching variant that has photos
+ * 3) fallback → the listing's photos
  */
 export function resolveVariantImages(
   product: Product,

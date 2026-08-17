@@ -51,7 +51,7 @@ export default function Login() {
     return () => clearInterval(timer)
   }, [lockoutTime])
 
-  // Verificar bloqueio quando email muda (usando callback para evitar cascading renders)
+  // Re-check the lockout when the email changes; the callback avoids cascading renders
   useEffect(() => {
     if (email) {
       const { blocked, remainingTime } = isBlocked(email)
@@ -62,7 +62,7 @@ export default function Login() {
     }
   }, [email])
 
-  // Redirecionar quando autenticado com role
+  // Redirect once authenticated with a role
   useEffect(() => {
     if (!loading && user && role) {
       const path = getLoginRedirectPath(role, getAppMode())
@@ -102,7 +102,7 @@ export default function Login() {
         setFormError(result.error || 'Erro ao fazer login')
       }
     } else {
-      // Limpar tentativas após sucesso
+      // Clear attempts after a success
       clearAttempts(normalizedEmail)
     }
 

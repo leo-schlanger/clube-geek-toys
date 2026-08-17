@@ -19,20 +19,19 @@ function readBannerVisible(eventId: string): boolean {
 }
 
 /**
- * Banner de evento no topo da loja (shop.*).
+ * Event announcement bar at the top of the shop.
  *
- * **Fica no fluxo normal, não `sticky`.** Até 16/08/2026 era `sticky top-0
- * z-50` — e o `ShopHeader` é `sticky top-0 z-40`. Os dois grudavam no mesmo
- * `top: 0`, e o banner, com z maior, cobria o header **inteiro** assim que a
- * pessoa rolava: carrinho, login, busca e tema paravam de responder, em todas
- * as larguras, inclusive no desktop.
+ * **In normal flow, not `sticky`.** It used to be `sticky top-0 z-50` while
+ * `ShopHeader` is `sticky top-0 z-40`: both stuck to the same `top: 0` and the
+ * banner, with the higher z, covered the entire header once the page scrolled,
+ * killing cart, login, search and theme at every width.
  *
- * No fluxo normal o banner ocupa espaço no topo da página, rola para fora e o
- * header assume o `top: 0` sozinho — que é como barra de anúncio funciona em
- * loja. O X de dispensar continua ali para quem não quiser vê-lo de novo.
+ * In normal flow it takes space at the top, scrolls away, and the header owns
+ * `top: 0` alone — which is how an announcement bar behaves. Dismissing it is
+ * still possible.
  *
- * Não existe var de altura aqui de propósito: elemento no fluxo empurra o
- * conteúdo sozinho. A antiga `--shop-event-banner-h` publicava 44px/72px
+ * There is deliberately no height variable: an in-flow element pushes content
+ * by itself. The old `--shop-event-banner-h` published 44px/72px
  * fixos e **nenhum arquivo a lia** — foi removida junto.
  */
 export function EventAnnouncementBanner() {

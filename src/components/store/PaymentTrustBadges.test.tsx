@@ -5,7 +5,7 @@ import { PaymentTrustBadges } from './PaymentTrustBadges'
 describe('PaymentTrustBadges', () => {
   it('mostra cada bandeira como selo acessível', () => {
     render(<PaymentTrustBadges />)
-    // As marcas são SVG, então o nome acessível é o que resta para leitor de tela.
+    // The marks are SVG, so the accessible name is all a screen reader has.
     for (const brand of ['PIX', 'Visa', 'Mastercard', 'Elo', 'Stripe']) {
       expect(screen.getByRole('img', { name: brand })).toBeInTheDocument()
     }

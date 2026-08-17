@@ -102,7 +102,7 @@ export function ProductsTab() {
         toast.error('Erro ao duplicar produto')
         return
       }
-      // Abre o clone já em edição: o fluxo é trocar nome e foto e salvar.
+      // Opens the clone in edit mode: the flow is swap name and photo, then save.
       toast.success('Cópia criada (inativa) — ajuste nome e fotos')
       setModal({ mode: 'edit', product: clone })
     } catch (error) {

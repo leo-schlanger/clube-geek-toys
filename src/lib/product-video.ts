@@ -1,7 +1,7 @@
 import type { ProductVideo } from '../types'
 
 /**
- * Vídeos de produto: link de YouTube/Instagram, ou MP4 hospedado no próprio
+ * Product videos: a YouTube/Instagram link, or an MP4 hosted on our own
  * volume /uploads.
  */
 
@@ -9,7 +9,7 @@ export const MAX_PRODUCT_VIDEOS = 5
 export const PRODUCT_VIDEO_MAX_BYTES = 100 * 1024 * 1024
 export const PRODUCT_VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/*'
 
-/** Extrai o id do vídeo das formas que o YouTube usa (watch, youtu.be, shorts, embed). */
+/** Extracts the video id from every YouTube URL shape (watch, youtu.be, shorts, embed). */
 export function youtubeId(url: string): string | null {
   const patterns = [
     /[?&]v=([\w-]{11})/,
@@ -31,7 +31,7 @@ function instagramPermalink(url: string): string | null {
 
 export type ParsedVideo = { ok: true; video: ProductVideo } | { ok: false; error: string }
 
-/** Classifica a URL colada pelo admin. Só aceita o que a loja sabe exibir. */
+/** Classifies a pasted URL, accepting only what the storefront can display. */
 export function parseVideoUrl(raw: string, title?: string): ParsedVideo {
   const url = raw.trim()
   if (!url) return { ok: false, error: 'Cole o link do vídeo.' }
@@ -63,7 +63,7 @@ export function parseVideoUrl(raw: string, title?: string): ParsedVideo {
   }
 }
 
-/** URL de embed para o iframe; null quando o vídeo toca em <video> nativo. */
+/** Embed URL for the iframe; null when the video plays in a native <video>. */
 export function embedUrl(video: ProductVideo): string | null {
   if (video.kind === 'youtube') {
     const id = youtubeId(video.url)
@@ -76,7 +76,7 @@ export function embedUrl(video: ProductVideo): string | null {
   return null
 }
 
-/** Miniatura para a faixa da galeria; null cai no placeholder de vídeo. */
+/** Gallery thumbnail; null falls back to the video placeholder. */
 export function videoThumbnail(video: ProductVideo): string | null {
   if (video.kind === 'youtube') {
     const id = youtubeId(video.url)

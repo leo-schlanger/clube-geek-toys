@@ -1,6 +1,6 @@
 import { api, apiRequest } from './api-client'
 
-/** Galeria do site institucional, organizada em álbuns ("pastas"). */
+/** Institutional-site gallery, organised into albums. */
 
 export const MAX_PHOTO_UPLOAD_BATCH = 20
 
@@ -19,7 +19,7 @@ export interface GalleryAlbum {
   slug: string
   description: string | null
   coverUrl: string | null
-  /** YYYY-MM-DD, quando o álbum é de um evento. */
+  /** YYYY-MM-DD when the album belongs to an event. */
   eventDate: string | null
   active: boolean
   sortOrder: number
@@ -76,7 +76,7 @@ export type UploadPhotosResult =
   | { ok: true; photos: GalleryPhoto[]; skippedOverLimit: number }
   | { ok: false; error: string }
 
-/** Sobe fotos em lotes do tamanho que o multer aceita por requisição. */
+/** Uploads in batches of the size multer accepts per request. */
 export async function uploadPhotos(albumId: string, files: File[]): Promise<UploadPhotosResult> {
   if (!files.length) return { ok: false, error: 'Nenhuma foto selecionada.' }
 

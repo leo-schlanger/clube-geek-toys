@@ -166,7 +166,7 @@ describe('MemberFilters', () => {
     expect(screen.getByText('Cadastro (até)')).toBeInTheDocument()
     expect(screen.getByText('Ordenar por')).toBeInTheDocument()
     expect(screen.getByText('Ordem')).toBeInTheDocument()
-    // Sem filtros de pontos (não há mais programa de pontos)
+    // No points filters: the points programme is gone
     expect(screen.queryByText('Pontos (mínimo)')).not.toBeInTheDocument()
     expect(screen.queryByText('Pontos (máximo)')).not.toBeInTheDocument()
   })

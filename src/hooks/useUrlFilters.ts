@@ -1,8 +1,6 @@
 /**
- * useUrlFilters - Sincroniza filtros com query params da URL
- *
- * Permite compartilhar links com filtros aplicados e
- * manter filtros após refresh da página.
+ * Keeps filters in the URL query string, so a filtered view can be shared and
+ * survives a refresh.
  *
  * @example
  * const { filters, setFilters, resetFilters } = useUrlFilters(DEFAULT_FILTERS)
@@ -13,11 +11,7 @@ import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { MemberFiltersState } from '../components/MemberFilters'
 
-/**
- * Converte filtros para query params
- * @param filters - Estado dos filtros
- * @returns URLSearchParams com os filtros não-vazios
- */
+/** Non-empty filters only; empty ones stay out of the URL. */
 function filtersToParams(filters: MemberFiltersState): URLSearchParams {
   const params = new URLSearchParams()
 
@@ -35,10 +29,7 @@ function filtersToParams(filters: MemberFiltersState): URLSearchParams {
 }
 
 /**
- * Converte query params para filtros
  * @param params - URLSearchParams
- * @param defaults - Valores padrão dos filtros
- * @returns Estado dos filtros
  */
 function paramsToFilters(
   params: URLSearchParams,
@@ -64,21 +55,17 @@ interface UseUrlFiltersReturn {
   activeFiltersCount: number
 }
 
-/**
- * Hook para sincronizar filtros com URL
- * @param defaultFilters - Valores padrão dos filtros
- * @returns Objeto com filtros, setters e contador de filtros ativos
- */
+
 export function useUrlFilters(defaultFilters: MemberFiltersState): UseUrlFiltersReturn {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Converter params para filtros
+
   const filters = useMemo(
     () => paramsToFilters(searchParams, defaultFilters),
     [searchParams, defaultFilters]
   )
 
-  // Atualizar URL quando filtros mudam
+
   const setFilters = useCallback(
     (newFilters: MemberFiltersState) => {
       const params = filtersToParams(newFilters)
@@ -92,7 +79,7 @@ export function useUrlFilters(defaultFilters: MemberFiltersState): UseUrlFilters
     setSearchParams({}, { replace: true })
   }, [setSearchParams])
 
-  // Contar filtros ativos (excluindo valores padrão)
+  // Active means different from the default
   const activeFiltersCount = useMemo(() => {
     let count = 0
     if (filters.search) count++

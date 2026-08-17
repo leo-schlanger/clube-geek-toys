@@ -5,16 +5,14 @@ import { EventAnnouncementBanner } from './EventAnnouncementBanner'
 import { ACTIVE_EVENT, isEventVisible } from '../../data/event'
 
 /**
- * O bug que este teste tranca (encontrado na varredura de 16/08/2026):
+ * The bug this pins: the banner was `sticky top-0 z-50` and `ShopHeader` is
+ * `sticky top-0 z-40`. Both stuck to the SAME `top: 0`, and the banner, with
+ * the higher z, covered the whole header as soon as the page scrolled. Cart,
+ * login, search, theme and the wholesale link stopped responding at every
+ * width tested, not only on mobile.
  *
- * O banner era `sticky top-0 z-50` e o `ShopHeader` é `sticky top-0 z-40`. Os
- * dois grudavam no MESMO `top: 0`, e o banner — com z maior — cobria o header
- * inteiro assim que a pessoa rolava a página. Medido com `elementFromPoint`:
- * carrinho, login, busca, tema e o link do atacado paravam de responder, em
- * todas as larguras testadas (360, 390, 768 e 1440px), não só no celular.
- *
- * A correção é o banner ficar no **fluxo normal**: ele ocupa espaço no topo,
- * rola para fora, e o header assume o `top: 0` sozinho.
+ * The fix is keeping the banner in **normal flow**: it takes space at the top,
+ * scrolls away, and the header owns `top: 0` alone.
  */
 
 beforeEach(() => {
@@ -45,16 +43,16 @@ describe('EventAnnouncementBanner da loja — empilhamento', () => {
 
   it('não publica mais a var de altura — ela era lida por ninguém', () => {
     renderBanner()
-    // Elemento no fluxo empurra o conteúdo sozinho; a var antiga carregava dois
-    // números fixos (44px/72px) que nunca acompanhavam o texto real.
+    // An in-flow element pushes content by itself; the old variable carried two
+    // fixed numbers that never tracked the real text.
     expect(
       document.documentElement.style.getPropertyValue('--shop-event-banner-h')
     ).toBe('')
   })
 
   it('some quando o visitante dispensa', () => {
-    // `localStorage` é um mock de vi.fn() no setup deste repo (src/test/setup.ts),
-    // então `setItem` não guarda nada — o jeito é ensinar o `getItem`.
+    // `localStorage` is a vi.fn() mock in this repo's setup, so `setItem` stores
+    // nothing; the way in is teaching `getItem`.
     vi.mocked(localStorage.getItem).mockImplementation((k: string) =>
       k === `shop-event-banner-dismissed:${ACTIVE_EVENT.id}` ? '1' : null
     )

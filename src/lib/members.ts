@@ -8,9 +8,7 @@ export interface PaginatedResult<T> {
   totalCount?: number
 }
 
-/**
- * Busca membro pelo CPF
- */
+
 export async function getMemberByCPF(cpf: string): Promise<Member | null> {
   const cleanCpf = cpf.replace(/\D/g, '')
   const result = await api.get<Member>(`/members/by-cpf/${cleanCpf}`)
@@ -18,8 +16,7 @@ export async function getMemberByCPF(cpf: string): Promise<Member | null> {
 }
 
 /**
- * Verifica se CPF já está cadastrado no sistema.
- * Uses a public endpoint that doesn't require authentication.
+ * Uses a public endpoint that does not require authentication.
  */
 export async function isCPFRegistered(cpf: string): Promise<boolean> {
   const cleanCpf = cpf.replace(/\D/g, '')
@@ -43,16 +40,16 @@ export async function getMemberById(id: string): Promise<Member | null> {
   return result.data || null
 }
 
-/** Teto por página aceito por GET /members (listQuerySchema no back). */
+/** Per-page cap accepted by GET /members. */
 const MEMBER_PAGE_SIZE = 100
-/** Trava de segurança: 100 páginas = 10k membros. */
+/** Safety stop: 100 pages is 10k members. */
 const MEMBER_MAX_PAGES = 100
 
 /**
  * Get all members (admin/seller).
  *
- * Pagina em lotes de 100 porque a API rejeita `limit` acima disso — pedir 1000
- * de uma vez devolvia 400 e a lista de membros do admin ficava vazia.
+ * Pages in batches of 100 because the API rejects a larger `limit`: asking for
+ * 1000 at once returned 400 and left the admin member list empty.
  */
 export async function getAllMembers(): Promise<Member[]> {
   const all: Member[] = []
@@ -97,7 +94,6 @@ export async function getMembersCount(): Promise<number> {
 }
 
 /**
- * Cria novo membro no sistema.
  * userId is extracted from the JWT on the backend (req.user.userId),
  * so we only send the member data in the body.
  */
@@ -117,7 +113,6 @@ export async function createMember(
 }
 
 /**
- * Atualiza dados de um membro
  */
 export async function updateMember(
   id: string,
@@ -128,7 +123,7 @@ export async function updateMember(
 }
 
 /**
- * Ativa membro (admin/manual). API preenche start/expiry anual se faltarem.
+ * Manual activation by an admin. The API fills the annual start/expiry when absent.
  */
 export async function activateMember(id: string): Promise<boolean> {
   const start = new Date()
@@ -144,9 +139,7 @@ export async function activateMember(id: string): Promise<boolean> {
   } as Partial<Member>)
 }
 
-/**
- * Verifica se membro está ativo (status + data de expiração)
- */
+/** Active means both the status and the expiry date agree. */
 export function isMemberActive(member: Member): boolean {
   if (member.status !== 'active') return false
   if (!member.expiryDate) return false
@@ -155,16 +148,12 @@ export function isMemberActive(member: Member): boolean {
   return expiryDate >= new Date()
 }
 
-/**
- * Desconto do membro do clube: 15% em qualquer produto.
- */
+
 export function getMemberDiscount(): number {
   return CLUB_PLAN.discount
 }
 
-/**
- * Salva informações do pagamento PIX pendente no registro do membro
- */
+
 export async function savePendingPayment(
   memberId: string,
   paymentInfo: PendingPaymentInfo
@@ -172,9 +161,7 @@ export async function savePendingPayment(
   return updateMember(memberId, { pendingPayment: paymentInfo } as Partial<Member>)
 }
 
-/**
- * Remove informações do pagamento pendente
- */
+
 export async function clearPendingPayment(memberId: string): Promise<boolean> {
   return updateMember(memberId, { pendingPayment: null })
 }

@@ -129,9 +129,9 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
       }
 
       // Update member profile data.
-      // Só os campos que PATCH /members aceita: o schema é strict e rejeitava a
-      // requisição inteira por causa de `updatedAt`/`email` — e o e-mail já foi
-      // gravado (em users e members) pelo /auth/update-profile acima.
+      // Only the fields PATCH /members accepts: the schema is strict and used
+      // to reject the whole request over `updatedAt`/`email`. The email was
+      // already written by /auth/update-profile above.
       const updateData: Partial<Member> = {
         fullName: data.fullName,
         phone: data.phone.replace(/\D/g, ''),

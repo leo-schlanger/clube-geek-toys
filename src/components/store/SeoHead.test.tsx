@@ -11,9 +11,10 @@ vi.mock('../../lib/subdomain', () => ({
 import { SeoHead } from './SeoHead'
 
 /**
- * SEO da SPA. Vale lembrar o alcance: crawler de link (WhatsApp, Facebook) não
- * roda JS e nunca vê nada disto — para eles quem responde é `shop.html` /
- * `index.html` e o `/__share/` do nginx. Aqui é o Google, que executa JS.
+ * SPA-side SEO. Worth remembering the reach: link crawlers (WhatsApp,
+ * Facebook) do not run JS and never see any of this — they are served by
+ * `shop.html` / `index.html` and the nginx `/__share/` route. This covers
+ * Google, which does execute JS.
  */
 
 function meta(attr: 'name' | 'property', key: string): string | null {
@@ -68,8 +69,8 @@ describe('SeoHead — título e canonical', () => {
 })
 
 describe('SeoHead — imagem', () => {
-  // Regressão: o default vinha de um ternário com os dois lados idênticos, e a
-  // foto do produto chegava relativa, sumindo do preview.
+  // Regression: the default came from a ternary with identical branches, and
+  // product photos arrived relative, vanishing from the preview.
   it('torna caminho relativo absoluto', () => {
     render(<SeoHead title="Produto" image="/uploads/a.jpg" />)
     expect(meta('property', 'og:image')).toBe('https://shop.geekpoptoys.com.br/uploads/a.jpg')
@@ -109,8 +110,8 @@ describe('SeoHead — indexação', () => {
 })
 
 describe('SeoHead — meta obsoleta entre navegações', () => {
-  // O bug: valor vazio saía cedo da função e a tag anterior ficava no head.
-  // Indo de um produto para o carrinho, a description continuava a do produto.
+  // The bug: an empty value returned early and the previous tag stayed in the
+  // head. Going from a product to the cart kept the product's description.
   it('apaga a description quando a nova página não tem uma', () => {
     const { unmount } = render(<SeoHead title="Produto" description="Photocard raro" />)
     expect(meta('name', 'description')).toBe('Photocard raro')
@@ -140,9 +141,9 @@ describe('SeoHead — meta obsoleta entre navegações', () => {
 })
 
 describe('SeoHead — domínio canônico', () => {
-  // Regressão: o canonical saía de window.location.origin, então cada domínio
-  // espelho se declarava canônico de si mesmo. Para o Google isso é conteúdo
-  // duplicado, e a autoridade de busca se divide em vez de somar.
+  // Regression: the canonical came from window.location.origin, so each mirror
+  // declared itself canonical. Google reads that as duplicate content and
+  // splits the ranking authority instead of adding it up.
   it('usa o canônico da loja, não o domínio acessado', () => {
     render(<SeoHead title="Vitrine" path="/" />)
 
@@ -158,7 +159,7 @@ describe('SeoHead — domínio canônico', () => {
   })
 
   it('não deixa o canonical variar com o host da janela', () => {
-    // O jsdom serve em localhost; se o canonical o refletisse, sairia daqui.
+    // jsdom serves on localhost; a canonical reflecting it would show up here.
     render(<SeoHead title="X" path="/" />)
     expect(canonical()).not.toContain(window.location.hostname)
   })

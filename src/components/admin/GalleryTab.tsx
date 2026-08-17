@@ -23,8 +23,8 @@ import {
 import { Images, Plus, Trash2, Upload, ArrowLeft, Star, EyeOff, Eye } from 'lucide-react'
 
 /**
- * Galeria do site institucional. Duas telas: lista de álbuns e o álbum aberto
- * com as fotos.
+ * Institutional-site gallery. Two screens: the album list, and an open album
+ * with its photos.
  */
 export function GalleryTab() {
   const [albums, setAlbums] = useState<GalleryAlbum[]>([])
@@ -128,7 +128,7 @@ export function GalleryTab() {
 
     setUploading(true)
     try {
-      // Mesmo preparo das fotos de produto: 4K do celular é redimensionada.
+      // Same preparation as product photos: 4K phone shots are resized.
       const { files, errors } = await prepareProductImages(picked)
       for (const msg of errors) toast.error(msg)
       if (files.length === 0) return
@@ -182,7 +182,7 @@ export function GalleryTab() {
     }
   }
 
-  // ─── Álbum aberto ──────────────────────────────────────────────────────────
+  // ─── Open album ────────────────────────────────────────────────────────────
   if (open) {
     return (
       <Card>

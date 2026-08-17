@@ -22,7 +22,7 @@ import { Boxes, Search, History, X, ImageOff, AlertTriangle } from 'lucide-react
 
 const PAGE_SIZE = 50
 
-/** Identidade da linha: produto simples ou variação. */
+/** Row identity: a plain product or a variant. */
 function rowKey(row: StockRow): string {
   return row.variantId ?? row.productId
 }
@@ -44,7 +44,7 @@ export function StockTab() {
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const debouncedSearch = useDebounce(search, 300)
 
-  /** Valor sendo digitado por linha (só grava no blur/Enter). */
+  /** Value being typed per row; only written on blur or Enter. */
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState<string | null>(null)
   const [history, setHistory] = useState<{ row: StockRow; movements: StockMovement[] } | null>(null)
@@ -130,7 +130,7 @@ export function StockTab() {
         toast.error('Erro ao salvar o limite')
         return
       }
-      // O limiar é do produto: todas as variações dele acompanham.
+      // The threshold belongs to the product; its variants follow it.
       setRows((prev) =>
         prev.map((r) =>
           r.productId === row.productId

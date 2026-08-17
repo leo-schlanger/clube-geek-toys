@@ -64,8 +64,8 @@ function TabLoadingFallback() {
   )
 }
 
-// Precisa listar toda aba de AdminTab: é o que permite recarregar em ?tab=... e
-// cair na mesma aba em vez de voltar ao dashboard.
+// Must list every AdminTab: this is what lets a reload on ?tab=... land on the
+// same tab instead of bouncing back to the dashboard.
 const VALID_TABS: AdminTab[] = [
   'dashboard',
   'members',
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
     }
 
     try {
-      // Soft-delete: marca como 'disabled' em vez de deletar
+      // Soft delete: marks as 'disabled' rather than removing
       const result = await api.patch(`/users/${userId}/role`, { role: 'disabled' })
       if (result.error) throw new Error(result.error)
       toast.success('Usuário desativado com sucesso')
@@ -280,7 +280,8 @@ export default function AdminDashboard() {
         if (result.error) throw new Error(result.error)
         toast.success('Pagamento PIX confirmado e membro ativado!')
       } else {
-        // Manual/admin override: set active + annual window so PDV/desconto loja funcionam.
+        // Manual admin override: sets active plus the annual window so the PDV
+      // and the shop discount work.
         const start = new Date()
         const expiry = new Date(start)
         expiry.setFullYear(expiry.getFullYear() + 1)

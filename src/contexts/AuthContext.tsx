@@ -31,10 +31,9 @@ interface AuthUser {
 }
 
 /**
- * Shape das rotas de sessão. Existir aqui é o que permite `api.post<AuthSession>`
- * em vez de `api.post` cru: sem o parâmetro, `result.data` é `unknown` e o
- * `tsc -b` reprovava o build (o CI usava `vite build`, que não checa tipo, então
- * isso passava despercebido desde sempre).
+ * Shape of the session routes. Declaring it is what allows
+ * `api.post<AuthSession>` instead of a bare `api.post`: without the parameter
+ * `result.data` is `unknown` and `tsc -b` fails the build.
  */
 interface AuthSession {
   accessToken: string
@@ -286,8 +285,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearTokens()
       setAuthState(null)
-      // Os produtos salvos são por conta: sem isto o próximo login herdaria
-      // os corações do usuário anterior nesta mesma aba.
+      // Saved products are per account: without this the next login would
+      // inherit the previous user's hearts in this same tab.
       clearSavedIdsCache()
     }
     return { success: true }

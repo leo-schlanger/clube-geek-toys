@@ -7,8 +7,8 @@ interface MemberDiscountBadgeProps {
 }
 
 /**
- * Pequeno selo verde indicando o desconto de 15% para membros do clube.
- * O valor é apenas de exibição (preview) — o total real vem do backend.
+ * Small badge for the club member discount. Display only: the real total
+ * comes from the backend.
  */
 export function MemberDiscountBadge({ className }: MemberDiscountBadgeProps) {
   return (

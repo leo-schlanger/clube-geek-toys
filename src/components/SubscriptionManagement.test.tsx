@@ -169,7 +169,7 @@ describe('SubscriptionManagement', () => {
     expect(screen.getByText('Ativa')).toBeInTheDocument()
   })
 
-  // ---------- Plan gradient (fixo para o plano único) ----------
+// ---------- Plan gradient (fixed, single plan) ----------
   it('should apply the club plan gradient', async () => {
     mockGetSubscriptionByMemberId.mockResolvedValue(makeSub())
     mockGetSubscriptionPayments.mockResolvedValue([])

@@ -86,8 +86,8 @@ describe('captureException', () => {
   })
 
   it('should not report errors thrown inside a browser extension', () => {
-    // 299 das 485 linhas de error_logs em 15/08/2026 vinham daqui: extensão do
-    // visitante estourando unhandledrejection na home.
+    // 299 of 485 error_logs rows once came from here: a visitor's extension
+    // throwing unhandledrejection on the home page.
     const err = new Error("Cannot read properties of undefined (reading 'M_ID')")
     err.stack =
       "TypeError: Cannot read properties of undefined (reading 'M_ID')\n" +
@@ -96,7 +96,7 @@ describe('captureException', () => {
     ErrorTracker.captureException(err, { context: 'unhandledrejection' })
 
     expect(mockFetch).not.toHaveBeenCalled()
-    // Continua no buffer local: útil para depurar, sem sujar o banco.
+    // Still buffered locally: useful for debugging without polluting the database.
     expect(ErrorTracker.getRecentEvents().at(-1)?.message).toContain('M_ID')
   })
 

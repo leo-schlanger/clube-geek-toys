@@ -20,8 +20,8 @@ import {
 import { CreatorCredit } from '../../components/CreatorCredit'
 
 /**
- * Página do evento na loja: infos + reserva.
- * Fotos ficam na galeria geral do site principal (geeketoys.com.br#galeria).
+ * Event page in the shop: details and reservation. Photos live in the main
+ * site's gallery.
  */
 export default function EventPage() {
   const { isMember } = useShopMember()

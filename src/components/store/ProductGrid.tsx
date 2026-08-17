@@ -9,7 +9,7 @@ interface ProductGridProps {
   isMember?: boolean
   isWholesale?: boolean
   isWholesaleApproved?: boolean
-  /** Mensagem exibida quando não há produtos. */
+  /** Shown when there are no products. */
   emptyMessage?: string
 }
 
@@ -30,7 +30,7 @@ function ProductGridSkeleton() {
 
 /**
  * Grade responsiva de produtos. Renderiza skeletons enquanto carrega
- * e um estado vazio amigável quando não há resultados.
+ * plus a friendly empty state.
  */
 export function ProductGrid({
   products,

@@ -50,8 +50,8 @@ export default function Register() {
     memberId: '',
   })
 
-  // O clube tem plano único e anual. Os params legados (?plano=...&tipo=...)
-  // ainda são lidos por compatibilidade, mas normalizados para 'club'/'annual'.
+  // The club has a single annual plan. Legacy params are still read for
+  // compatibility but normalised to 'club'/'annual'.
   const selectedPlan: PlanType = 'club'
   const paymentType: PaymentType = 'annual'
 
@@ -222,8 +222,8 @@ export default function Register() {
   }, [signUp, navigate])
 
   const handleGoogleSuccess = useCallback((data: Record<string, unknown>) => {
-    // O botão do Google entrega um objeto solto; `signInWithGoogle` espera a
-    // sessão. A conversão é explícita para o erro aparecer aqui, e não lá dentro.
+    // The Google button hands back a loose object while `signInWithGoogle`
+    // expects a session. The cast is explicit so a mismatch surfaces here.
     const result = signInWithGoogle(data as unknown as Parameters<typeof signInWithGoogle>[0])
     if (result.success) {
       if (result.isNewUser) {

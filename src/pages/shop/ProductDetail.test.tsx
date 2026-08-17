@@ -182,7 +182,7 @@ describe('ProductDetail', () => {
       expect(screen.getByRole('heading', { name: 'Bolsa colorida' })).toBeInTheDocument()
     })
 
-    // Pré-seleciona 1ª opção (Rosa) — galeria da variante Rosa
+    // Preselects the first option, showing that variant's gallery
     const main = screen.getByRole('img', { name: /Bolsa colorida/i })
     expect(main.getAttribute('src')).toBe('https://example.com/rosa.jpg')
 
@@ -199,7 +199,7 @@ describe('ProductDetail', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Bolsa colorida' })).toBeInTheDocument()
     })
-    // Desmarca Rosa (toggle) → matched null → botão esgotado/desabilitado
+    // Toggling it off leaves no match, so the button is disabled
     fireEvent.click(screen.getByRole('button', { name: /Rosa/i }))
     const addBtn = screen.getByRole('button', { name: /Esgotado|Adicionar/i })
     expect(addBtn).toBeDisabled()

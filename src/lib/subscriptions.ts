@@ -21,7 +21,7 @@ export function calculateSubscriptionPrice(
   _plan: PlanType,
   _frequencyType: SubscriptionFrequencyType
 ): number {
-  // Plano único e anual: preço fixo do clube.
+  // Single annual plan at a fixed price.
   return CLUB_PLAN.price
 }
 
@@ -43,9 +43,9 @@ const SUBSCRIPTION_STATUSES: readonly SubscriptionStatus[] = [
 ]
 
 /**
- * Estreita o status vindo da API. Antes a string crua era atribuída direto ao
- * campo tipado — um status novo (ou um typo do backend) atravessava a tipagem e
- * só aparecia na tela como badge em branco.
+ * Narrows the status coming from the API. The raw string used to be assigned
+ * straight to the typed field, so a new status — or a backend typo — slipped
+ * through the types and surfaced only as a blank badge.
  */
 function toSubscriptionStatus(value: string): SubscriptionStatus {
   return (SUBSCRIPTION_STATUSES as readonly string[]).includes(value)

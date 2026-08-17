@@ -94,8 +94,8 @@ export async function getRevenueByPlan(): Promise<PlanDistribution[]> {
  */
 export async function getChurnRate(months: number = 6): Promise<ChurnData[]> {
   try {
-    // Linha crua: a rota mistura snake_case e camelCase e é o `map` abaixo que
-    // normaliza. Tipar como ChurnData aqui seria mentir sobre o que chegou.
+    // Raw row: the route mixes snake_case and camelCase and the `map` below is
+    // what normalises it. Typing this as ChurnData would misstate what arrived.
     const result = await api.get<Record<string, unknown>[]>(`/reports/churn?months=${months}`)
     if (result.error || !result.data) return []
     const rows = Array.isArray(result.data) ? result.data : []

@@ -1,12 +1,12 @@
 /**
  * Skip Link - Componente de acessibilidade
  *
- * Permite que usuários de teclado pulem diretamente para o conteúdo principal,
- * evitando ter que navegar por todos os elementos do header/menu.
+ * Lets keyboard users jump straight to the main content instead of tabbing
+ * through the whole header and menu.
  *
  * Uso:
- * 1. Adicione <SkipLink /> no início do App
- * 2. Adicione id="main-content" no elemento principal da página
+ * 1. Add <SkipLink /> at the top of App
+ * 2. Add id="main-content" to the page's main element
  */
 
 interface SkipLinkProps {

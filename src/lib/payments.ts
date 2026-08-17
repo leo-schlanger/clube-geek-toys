@@ -25,7 +25,7 @@ export function isPaymentConfigured(): boolean {
 // ============================================
 
 export function calculatePlanPrice(_plan: PlanType, _paymentType: PaymentType): number {
-  // Plano único e anual: preço fixo do clube.
+  // Single annual plan at a fixed price.
   return CLUB_PLAN.price
 }
 

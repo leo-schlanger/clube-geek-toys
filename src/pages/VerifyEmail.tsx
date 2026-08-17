@@ -22,7 +22,7 @@ export default function VerifyEmail() {
   const token = searchParams.get('token')
   const verificationAttempted = useRef(false)
 
-  // Verificar token da URL automaticamente (executa apenas uma vez)
+  // Verify the URL token automatically, once
   useEffect(() => {
     async function verifyToken() {
       if (!token || verificationAttempted.current) return
@@ -41,7 +41,7 @@ export default function VerifyEmail() {
             text: 'Email verificado com sucesso!',
           })
 
-          // Atualizar estado do usuário
+          // Refresh the user state
           await refreshUser()
 
           setTimeout(() => {
@@ -81,9 +81,8 @@ export default function VerifyEmail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
-  // Redirecionar se não autenticado (apenas se não tem token).
-  // Se houver rascunho de cadastro em andamento, voltar pro fluxo de cadastro
-  // (preserva contexto). Caso contrário, vai pro login.
+  // Unauthenticated and no token: an in-progress signup draft returns to the
+  // signup flow to keep its context; otherwise go to login.
   useEffect(() => {
     if (!loading && !user && !token) {
       const hasDraft = localStorage.getItem('clube_geek_register_draft')
@@ -95,14 +94,14 @@ export default function VerifyEmail() {
     }
   }, [loading, user, token, navigate])
 
-  // Redirecionar se email já verificado
+  // Already verified
   useEffect(() => {
     if (!loading && emailVerified && !token) {
       navigate('/membro', { replace: true })
     }
   }, [loading, emailVerified, token, navigate])
 
-  // Countdown do cooldown
+  // Cooldown countdown
   useEffect(() => {
     if (cooldown <= 0) return
 
@@ -149,7 +148,7 @@ export default function VerifyEmail() {
 
     await refreshUser()
 
-    // Pequeno delay para a UI atualizar
+    // Small delay so the UI can catch up
     setTimeout(() => {
       setChecking(false)
       if (!emailVerified) {
@@ -176,7 +175,7 @@ export default function VerifyEmail() {
     )
   }
 
-  // Se tem token e foi verificado com sucesso
+  // Token present and verified
   if (token && tokenVerified) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -202,7 +201,7 @@ export default function VerifyEmail() {
     )
   }
 
-  // Se tem token mas falhou
+  // Token present but verification failed
   if (token && message?.type === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">

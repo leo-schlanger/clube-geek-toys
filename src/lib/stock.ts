@@ -1,6 +1,6 @@
 import { api } from './api-client'
 
-/** Controle de estoque do painel admin. */
+/** Admin stock control. */
 
 export type StockStatus = 'out' | 'low' | 'ok'
 export type StockFilter = 'all' | 'low' | 'out'
@@ -26,7 +26,7 @@ export interface StockMovement {
   variantId: string | null
   orderId: string | null
   kind: StockMovementKind
-  /** Assinado: negativo = saída. */
+  /** Signed: negative means stock leaving. */
   quantity: number
   stockAfter: number | null
   note: string | null
@@ -95,7 +95,7 @@ export async function listStockMovements(productId: string): Promise<StockMoveme
   return result.data?.movements ?? []
 }
 
-/** Rótulo do movimento na tela de histórico. */
+/** Movement label for the history screen. */
 export function movementLabel(kind: StockMovementKind): string {
   switch (kind) {
     case 'sale':

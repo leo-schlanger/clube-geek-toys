@@ -24,8 +24,8 @@ import { Button } from '../../components/ui/button'
 import { isEventVisible } from '../../data/event'
 
 /**
- * Vitrine principal da loja. Serve tanto a rota "/" quanto "/categoria/:slug",
- * e lê ?search=... do query param para filtrar por busca.
+ * Main storefront, serving both "/" and "/categoria/:slug", and reading
+ * ?search= from the query string.
  */
 export default function ShopHome() {
   const { slug: categorySlug } = useParams<{ slug: string }>()
@@ -44,7 +44,7 @@ export default function ShopHome() {
   const [featured, setFeatured] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Categorias (carregadas uma vez).
+  // Categories, loaded once.
   useEffect(() => {
     let active = true
     listCategories()
@@ -62,7 +62,7 @@ export default function ShopHome() {
     }
   }, [])
 
-  // Destaques — só na home sem filtros de categoria/busca.
+  // Featured only on the unfiltered home.
   useEffect(() => {
     let active = true
 

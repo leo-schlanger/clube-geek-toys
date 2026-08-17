@@ -10,7 +10,7 @@ export type AppMode = 'admin' | 'member' | 'shop'
 /**
  * Known app subdomains (first label). Used when swapping host labels.
  * "admin" still detects as admin mode, but canonical public host is always "adm"
- * (nginx 301 admin.* → adm.* — evita filtros que bloqueiam o label "admin").
+ * nginx 301s admin.* to adm.*, avoiding filters that block the "admin" label.
  */
 const KNOWN_APP_SUBDOMAINS = new Set([
   'adm',
@@ -54,7 +54,7 @@ export function isAdminSubdomain(): boolean {
 }
 
 /**
- * Check if running on the store subdomain (shop.geeketoys.com.br)
+ * Whether we are on the store subdomain.
  */
 export function isShopSubdomain(): boolean {
   return getSubdomain() === 'shop'
@@ -70,7 +70,7 @@ export function getAppMode(): AppMode {
 }
 
 /**
- * URL absoluta da loja (shop.geeketoys.com.br em produção; ?subdomain=shop no localhost).
+ * Absolute store URL; on localhost it falls back to ?subdomain=shop.
  */
 export function getShopUrl(): string {
   const hostname = window.location.hostname
@@ -138,7 +138,7 @@ export function isRoleAllowedOnSubdomain(role: string | null, appMode: AppMode):
 
 /**
  * Get URL for a different subdomain (for cross-linking).
- * Admin canônico = `adm.*` (não `admin.*`) — ver redirect nginx.
+ * The canonical admin host is `adm.*`, not `admin.*`; see the nginx redirect.
  */
 export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
   const hostname = window.location.hostname
@@ -153,7 +153,7 @@ export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
       : `${protocol}//${hostname}${port}`
   }
 
-  // Handle production domains (incl. mirror geekpoptoys.com.br)
+  // Production domains, including the geekpoptoys mirror
   const parts = hostname.split('.')
 
   if (parts.length >= 2) {
@@ -168,31 +168,29 @@ export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
   return `${protocol}//${parts.join('.')}${port}`
 }
 
-// ─── Domínio canônico para SEO ───────────────────────────────────────────────
+// ─── Canonical domain for SEO ────────────────────────────────────────────────
 
 /**
- * Origem canônica de cada app, **fixa** e independente do domínio acessado.
+ * Canonical origin per app, **fixed** and independent of the host in use.
  *
- * geeketoys.com.br e geekpoptoys.com.br são espelhos completos: os mesmos
- * subdomínios respondem nos dois. Para o Google isso é conteúdo duplicado, e a
- * autoridade de busca se divide entre os dois em vez de somar — a menos que um
- * seja declarado canônico e o outro aponte para ele.
+ * The two domains are full mirrors: the same subdomains answer on both. Google
+ * reads that as duplicate content and splits ranking authority between them
+ * unless one is declared canonical.
  *
- * Por isso estas constantes não podem sair de `window.location.origin`: derivar
- * do domínio acessado faz cada um se declarar canônico de si mesmo, que é
- * exatamente o empate que se quer evitar. Quem entra pelo espelho continua
- * navegando normalmente; só o canonical aponta para o outro.
+ * Hence these cannot derive from `window.location.origin`: doing so makes each
+ * mirror declare itself canonical, which is exactly the tie to avoid. Visitors
+ * arriving through the mirror browse normally; only the canonical points away.
  *
- * A loja é canônica em **geekpoptoys** porque é por onde o público chega e é a
- * marca (GeekPop & Toys). O clube segue em geeketoys, que é o nome primário do
- * certificado e da infraestrutura.
+ * The shop settles on geekpoptoys, where the audience arrives and which matches
+ * the wordmark; the club stays on geeketoys, the primary name on the
+ * certificate and the infrastructure.
  */
 export const CANONICAL_ORIGINS = {
   shop: 'https://shop.geekpoptoys.com.br',
   club: 'https://club.geeketoys.com.br',
 } as const
 
-/** Origem canônica do app atual; usada no <link rel="canonical"> e no og:url. */
+/** Canonical origin of the current app, used by canonical and og:url. */
 export function getCanonicalOrigin(): string {
   return getAppMode() === 'shop' ? CANONICAL_ORIGINS.shop : CANONICAL_ORIGINS.club
 }

@@ -1,7 +1,7 @@
 /**
- * Evento ativo — loja (shop.geeketoys.com.br) e documentação do clube.
+ * Active event, for the shop and the club docs.
  *
- * Manter alinhado com geek-toys-home/src/data/event.ts quando o evento mudar.
+ * Keep in step with geek-toys-home/src/data/event.ts when the event changes.
  * Fotos: public/eventos/<slug>/
  * Guia: docs/EVENTS.md
  */
@@ -50,9 +50,8 @@ export const ACTIVE_EVENT: EventConfig = {
   title: 'GeekPop Night — Encontro K-pop & Collectibles',
   shortTitle: 'GeekPop Night',
   /**
-   * Mesmo texto do site institucional (`geek-toys-home/src/data/event.ts`).
-   * São duas cópias do mesmo conteúdo — ao editar aqui, edite lá também, senão
-   * a mesma campanha aparece com frases diferentes nos dois domínios.
+   * Same copy as the institutional site. Two copies of one message: edit here
+   * and there together, or the campaign reads differently per domain.
    */
   bannerText: '🎉 GeekPop Night · domingo 6/set, 14h–18h · Ingresso R$ 20',
   startsAt: '2026-09-06T14:00:00-03:00',

@@ -23,7 +23,7 @@ questionRouter.get('/product/:slugOrId', publicLookupLimiter, async (req, res, n
   }
 });
 
-// ─── Cliente logado ──────────────────────────────────────────────────────────
+// ─── Signed-in customer ──────────────────────────────────────────────────────
 
 const askSchema = z.object({
   productId: z.string().min(1),

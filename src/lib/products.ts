@@ -17,11 +17,11 @@ export interface ProductListParams {
   featured?: boolean
   page?: number
   limit?: number
-  /** Canal atacado: só produtos com wholesale_enabled. */
+  /** Wholesale channel: only wholesale_enabled products. */
   wholesale?: boolean
-  /** Ordenação do catálogo. Padrão: mais recentes. */
+  /** Catalogue ordering; defaults to newest. */
   sort?: ProductSort
-  /** Pedir contagem de produtos ativos sem foto (admin). */
+  /** Ask for the count of active products with no photo (admin). */
   stats?: boolean
 }
 
@@ -61,7 +61,7 @@ export interface ProductInput {
   price: number
   compareAtPrice?: number | null
   categoryId?: string | null
-  /** Múltiplas categorias; a primeira vira a principal. Prevalece sobre categoryId. */
+  /** First entry becomes primary. Takes precedence over categoryId. */
   categoryIds?: string[]
   images?: string[]
   videos?: ProductVideo[]
@@ -112,7 +112,7 @@ export async function listProductVariants(productId: string): Promise<ProductVar
   return result.data?.variants ?? []
 }
 
-/** Public: related products for PDP "Você também pode gostar". */
+/** Public: related products for the "you may also like" block. */
 export async function listRelatedProducts(slug: string): Promise<Product[]> {
   const result = await api.get<{ products: Product[] }>(`/products/${slug}/related`, {
     skipAuth: true,
@@ -126,11 +126,9 @@ export async function adminListProducts(params: ProductListParams = {}): Promise
 }
 
 /**
- * Admin: produto completo para o modal de edição.
- *
- * Usa a rota admin (e não o detalhe público por slug) porque aquela esconde
- * produto inativo e variação inativa — o modal abria sem as variações e o save
- * seguinte apagava as que não vieram.
+ * Uses the admin route rather than the public slug detail, which hides inactive
+ * products and variants: the modal opened without them and the next save wiped
+ * whatever had not loaded.
  */
 export async function getProductForEdit(id: string): Promise<Product | null> {
   const result = await api.get<Product>(`/products/${id}/edit`)
@@ -156,7 +154,7 @@ export type UploadProductVideoResult =
   | { ok: true; product: Product }
   | { ok: false; error: string }
 
-/** Sobe um MP4 e anexa em products.videos. Links externos vão pelo PATCH normal. */
+/** Uploads an MP4 and appends it to products.videos. External links go through the PATCH. */
 export async function uploadProductVideo(
   id: string,
   file: File
@@ -167,7 +165,7 @@ export async function uploadProductVideo(
     method: 'POST',
     body: form,
     noRetry: true,
-    // Vídeo é bem maior que foto — a rede da loja pode ser lenta.
+    // Video is far larger than a photo and the shop's uplink can be slow.
     timeoutMs: 300_000,
   })
   return result.data
@@ -175,7 +173,7 @@ export async function uploadProductVideo(
     : { ok: false, error: result.error || 'Falha no upload do vídeo.' }
 }
 
-/** Clona o produto (inativo) para cadastro em série. */
+/** Clones the product, inactive, for bulk entry. */
 export async function duplicateProduct(id: string): Promise<Product | null> {
   const result = await api.post<Product>(`/products/${id}/duplicate`, {})
   return result.data ?? null
@@ -195,7 +193,7 @@ export type UploadProductMediaResult =
   | { ok: true; urls: string[] }
   | { ok: false; error: string }
 
-/** Fatia a seleção no teto que o multer aceita por requisição. */
+/** Splits the selection at the per-request cap multer accepts. */
 function chunkFiles(files: File[]): File[][] {
   const chunks: File[][] = []
   for (let i = 0; i < files.length; i += MAX_IMAGE_UPLOAD_BATCH) {
@@ -221,7 +219,7 @@ function postImages<T>(path: string, files: File[]) {
 /**
  * Upload product images (multipart). Returns the updated product or a clear error.
  * Uses a longer timeout — phone photos can be multi-MB even after compression.
- * Seleções acima de MAX_IMAGE_UPLOAD_BATCH viram várias requisições.
+ * Selections above MAX_IMAGE_UPLOAD_BATCH become several requests.
  */
 export async function uploadProductImages(
   id: string,
@@ -236,8 +234,8 @@ export async function uploadProductImages(
   for (const chunk of chunkFiles(files)) {
     const result = await postImages<Product>(`/products/${id}/images`, chunk)
     if (!result.data) {
-      // Um lote falhou: os anteriores já ficaram salvos, então devolve o erro
-      // sem descartar o que foi gravado.
+      // A batch failed: earlier ones are already saved, so report the error
+      // without discarding what was written.
       return { ok: false, error: result.error || 'Falha no upload das imagens.' }
     }
     product = result.data
@@ -250,9 +248,10 @@ export async function uploadProductImages(
 }
 
 /**
- * Sobe arquivos e devolve só as URLs, sem anexar na galeria do listing.
- * É o caminho das fotos de variação: elas são gravadas em product_variants.images
- * pelo PUT /variants, então não podem inflar products.images.
+ * Uploads files and returns only the URLs, without touching the listing
+ * gallery. This is the variant-photo path: those are written to
+ * product_variants.images by PUT /variants and must not inflate
+ * products.images.
  */
 export async function uploadProductMedia(
   productId: string,
@@ -275,7 +274,7 @@ export async function uploadProductMedia(
 export interface CategoryInput {
   name: string
   description?: string | null
-  /** Chave do ícone (ver src/lib/category-icons.ts). */
+  /** Icon key; see src/lib/category-icons.ts. */
   icon?: string | null
   active?: boolean
   sortOrder?: number

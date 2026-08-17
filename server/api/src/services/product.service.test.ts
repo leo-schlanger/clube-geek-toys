@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // env.ts chama process.exit(1) fora de um container configurado, e database.ts
-// abre um pool no import — os dois precisam ser trocados antes do service entrar.
+// opens a pool at import time; both must be replaced before the service loads.
 vi.mock('../config/env.js', () => ({
   env: { API_URL: 'https://api.test', NODE_ENV: 'test' },
 }));
@@ -74,7 +74,7 @@ describe('addProductImages — teto da galeria do listing', () => {
 
     expect(result.accepted).toEqual(novas.slice(0, 2));
     expect(result.rejected).toEqual(novas.slice(2));
-    // O UPDATE só grava o que coube.
+    // The UPDATE writes only what fitted.
     const updateArgs = query.mock.calls[1];
     expect(JSON.parse(updateArgs[1][1] as string)).toEqual(novas.slice(0, 2));
   });

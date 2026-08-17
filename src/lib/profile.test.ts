@@ -56,8 +56,8 @@ describe('fetchProfile', () => {
 })
 
 describe('updateProfile', () => {
-  // A semântica parcial é o coração da tela: ela salva por seção, então o PATCH
-  // não pode carregar chaves que a pessoa não tocou.
+  // Partial semantics are the heart of the screen: it saves per section, so the
+  // PATCH must not carry keys the person never touched.
   it('envia só as chaves informadas', async () => {
     mockedApi.patch.mockResolvedValue({ data: PROFILE, status: 200 })
 
@@ -94,7 +94,7 @@ describe('foto de perfil', () => {
     expect((opts?.body as FormData).get('photo')).toBe(file)
   })
 
-  // Foto é opcional: o erro volta tratável em vez de derrubar a tela.
+  // The photo is optional: failure returns a value instead of breaking the page.
   it('devolve erro sem lançar quando o upload falha', async () => {
     mockedRequest.mockResolvedValue({ error: 'Foto muito grande', status: 400 })
 

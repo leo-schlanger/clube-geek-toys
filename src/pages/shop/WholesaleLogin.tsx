@@ -22,7 +22,7 @@ import { Loading } from '../../components/ui/loading'
 import { SeoHead } from '../../components/store/SeoHead'
 
 /**
- * Login do canal atacado: e-mail + senha + CNPJ (deve bater com o cadastro).
+ * Wholesale login: email, password and the CNPJ on the account.
  */
 export default function WholesaleLogin() {
   const [email, setEmail] = useState('')

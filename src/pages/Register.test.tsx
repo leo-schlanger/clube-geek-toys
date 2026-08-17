@@ -183,7 +183,7 @@ describe('Register', () => {
   })
 
   it('always shows the club plan regardless of legacy plano/tipo params', () => {
-    // Params legados são ignorados: o clube tem plano único e anual.
+    // Legacy params are ignored: the club has a single annual plan.
     mockSearchParamsMap.set('plano', 'gold')
     mockSearchParamsMap.set('tipo', 'monthly')
     render(<Register />)

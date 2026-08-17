@@ -22,12 +22,12 @@ import { Loading } from '../../components/ui/loading'
 import { SeoHead } from '../../components/store/SeoHead'
 
 /**
- * Cadastro da loja — cria conta **sem** assinar o clube.
+ * Shop signup: creates an account **without** subscribing.
  *
- * Só e-mail e senha são obrigatórios: exigir o resto aqui derrubaria a
- * conversão. Os campos de perfil ficam nesta mesma tela como opcionais porque é
- * onde a pessoa está mais disposta a preencher; endereço e foto ficam para
- * `/perfil`, já que endereço o checkout coleta de qualquer forma.
+ * Only email and password are required; demanding the rest here would cost
+ * conversion. The profile fields sit on this screen as optional because this is
+ * where people are most willing to fill them in. Address and photo are left to
+ * `/perfil`, since checkout collects the address anyway.
  */
 export default function ShopRegister() {
   const [email, setEmail] = useState('')
@@ -76,8 +76,8 @@ export default function ShopRegister() {
         return
       }
 
-      // A conta já existe e está autenticada. O perfil é um passo separado, e
-      // uma falha aqui não pode desfazer o cadastro — a pessoa completa depois.
+      // The account exists and is authenticated. The profile is a separate
+      // step, and a failure here must not undo the signup.
       const profileFields = {
         ...(fullName.trim() ? { fullName: fullName.trim() } : {}),
         ...(phone.trim() ? { phone: phone.trim() } : {}),

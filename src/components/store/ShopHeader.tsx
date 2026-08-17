@@ -16,14 +16,14 @@ import { useWholesaleAccount } from './useWholesaleAccount'
 import { NotificationBell } from './NotificationBell'
 
 interface ShopHeaderProps {
-  /** Membro ativo — mostra selo de desconto no cabeçalho. */
+  /** Active member: shows the discount badge in the header. */
   isMember?: boolean
   /** Canal atacado — branding e busca em /atacado. */
   isWholesale?: boolean
 }
 
 /**
- * Cabeçalho da loja estilo Shopee: logo, busca sempre visível com botão,
+ * Shop header: logo, a always-visible search with its button,
  * carrinho (gaveta) e login/avatar. Busca → /?search=... (ou /atacado?search=).
  */
 export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeaderProps) {
@@ -38,8 +38,8 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
   const [creditBalance, setCreditBalance] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
-  // Mantém o campo em sincronia quando o query param muda (ex.: navegação por link).
-  // queueMicrotask evita o setState síncrono no corpo do efeito (cascading renders).
+  // Keeps the field in step when the query param changes, e.g. link navigation.
+  // queueMicrotask avoids a synchronous setState in the effect body.
   useEffect(() => {
     queueMicrotask(() => setTerm(searchParams.get('search') ?? ''))
   }, [searchParams])

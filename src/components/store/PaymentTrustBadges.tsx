@@ -3,20 +3,19 @@ import { cn } from '../../lib/utils'
 interface PaymentTrustBadgesProps {
   className?: string
   compact?: boolean
-  /** Centraliza o bloco — usado no rodapé, onde o texto ao redor é centralizado. */
+  /** Centres the block, for the footer where surrounding text is centred. */
   center?: boolean
 }
 
 /**
- * Selos de pagamento + envio.
+ * Payment and shipping badges.
  *
- * Os logotipos são SVG inline com o traçado real de cada marca (vetores do
- * simple-icons, MIT; as marcas seguem sendo dos titulares — o uso aqui é o
- * padrão de indicar meios de pagamento aceitos). Inline evita requisição extra
- * e mantém a marca nítida em qualquer densidade de tela.
+ * Logos are inline SVG with each brand's real path (simple-icons, MIT; the
+ * marks remain their owners'). Inline avoids an extra request and stays sharp
+ * at any pixel density.
  *
- * O cartão é sempre claro de propósito: essas marcas foram desenhadas para
- * fundo claro e sumiriam no tema escuro.
+ * The card is deliberately always light: these marks were drawn for light
+ * backgrounds and would disappear in the dark theme.
  */
 export function PaymentTrustBadges({
   className,
@@ -54,7 +53,7 @@ export function PaymentTrustBadges({
   )
 }
 
-/** Moldura branca de tamanho fixo — é o que mantém a fileira alinhada. */
+/** Fixed-size white frame; this is what keeps the row aligned. */
 function Card({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <span
@@ -83,8 +82,8 @@ function BrandPath({ d, fill, wide = false }: { d: string; fill: string; wide?: 
 }
 
 /**
- * Mastercard é bicolor: o traçado oficial monocromático perderia a identidade,
- * então os dois discos e a interseção são desenhados na cor de cada um.
+ * Mastercard is two-tone: the official monochrome path would lose the identity,
+ * so both discs and their intersection are drawn in their own colours.
  */
 function MastercardMark() {
   return (
@@ -100,8 +99,8 @@ function MastercardMark() {
 }
 
 /**
- * A Elo não publica vetor em conjunto aberto, então a marca é reconstruída: os
- * três discos coloridos do símbolo, mais o logotipo.
+ * Elo publishes no vector in an open set, so the mark is reconstructed: the
+ * three coloured discs plus the wordmark.
  */
 function EloMark() {
   return (

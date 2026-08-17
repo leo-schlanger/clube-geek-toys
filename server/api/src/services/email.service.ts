@@ -429,7 +429,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Abrir Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
     },
 
-    // ─── ADMIN: PIX PENDENTE (LOJA) ────────────────────
+    // ─── ADMIN: SHOP PIX PENDING ───────────────────────
     // Sibling of 'admin-pix-pending' for shop orders: the QR is generated
     // locally and nothing confirms it, so without this a paid order sits
     // 'pending' until someone opens the panel by chance.
@@ -450,7 +450,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || `${frontendUrl}/admin` },
     },
 
-    // ─── ADMIN: PEDIDO CANCELADO PELO CLIENTE ──────────
+    // ─── ADMIN: ORDER CANCELLED BY CUSTOMER ────────────
     'admin-order-cancelled': {
       subject: '❌ Pedido cancelado pelo cliente — Loja GeekPop & Toys',
       preheader: `Pedido #${v.order_number || ''} de R$ ${v.total || '0,00'} foi cancelado.`,
@@ -467,7 +467,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Abrir Pedidos no Painel', url: v.admin_url || `${frontendUrl}/admin` },
     },
 
-    // ─── ADMIN: NOVO MEMBRO CADASTRADO ─────────────────
+    // ─── ADMIN: NEW MEMBER ─────────────────────────────
     'admin-new-member': {
       subject: '👤 Novo membro cadastrado — Clube GeekPop & Toys',
       preheader: `${v.member_name || 'Novo membro'} se cadastrou no plano ${v.plan || ''}.`,

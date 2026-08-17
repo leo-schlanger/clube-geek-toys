@@ -12,7 +12,7 @@ import { Card, CardContent } from '../../components/ui/card'
 const POLL_INTERVAL_MS = 4000
 const POLL_TIMEOUT_MS = 5 * 60 * 1000 // desiste de esperar após 5 min
 
-// Estados que consideramos "resolvidos" — param o polling.
+// Settled states, which stop the polling.
 const TERMINAL_STATUSES: OrderStatus[] = [
   'paid',
   'processing',
@@ -59,7 +59,7 @@ export default function OrderConfirmation() {
 
         const isPaid = info.status === 'paid' || TERMINAL_STATUSES.includes(info.status)
 
-        // Limpa o carrinho assim que o pedido é confirmado (uma única vez).
+        // Clear the cart once, as soon as the order is confirmed.
         if (
           !clearedRef.current &&
           info.status !== 'pending' &&
@@ -80,7 +80,7 @@ export default function OrderConfirmation() {
         timer = setTimeout(poll, POLL_INTERVAL_MS)
       } catch {
         if (!active) return
-        // Erro transitório — tenta de novo dentro do timeout.
+        // Transient error: retry within the timeout.
         if (Date.now() - startRef.current > POLL_TIMEOUT_MS) {
           setTimedOut(true)
           setLoading(false)
@@ -150,7 +150,7 @@ export default function OrderConfirmation() {
                 </div>
               </>
             ) : (
-              /* Pendente (PIX aguardando confirmação) ou timeout */
+              /* Pending (PIX awaiting confirmation) or timed out */
               <>
                 <div className="relative">
                   <Clock className="h-16 w-16 text-yellow-500" />

@@ -13,9 +13,9 @@ import {
 import { logger } from '../../lib/logger'
 
 /**
- * Sininho do header da loja. Busca na montagem e ao abrir — sem polling:
- * a resposta de uma pergunta não é urgente a ponto de justificar tráfego
- * constante, e o e-mail cobre quem não está com a loja aberta.
+ * Header bell. Fetches on mount and on open, with no polling: an answered
+ * question is not urgent enough to justify constant traffic, and email covers
+ * anyone without the shop open.
  */
 export function NotificationBell() {
   const navigate = useNavigate()
@@ -39,7 +39,7 @@ export function NotificationBell() {
     void refresh()
   }, [refresh])
 
-  // Fecha ao clicar fora — o painel é um dropdown simples, sem portal.
+  // Closes on outside click; the panel is a plain dropdown, no portal.
   useEffect(() => {
     if (!open) return
     function onClickOutside(e: MouseEvent) {

@@ -14,12 +14,12 @@ export type ResolvedTheme = 'light' | 'dark'
 const STORAGE_KEY = 'geekpop-theme'
 
 type ThemeContextValue = {
-  /** Preferência salva pelo usuário (inclui "system"). */
+  /** The user's stored preference, including "system". */
   theme: ThemePreference
   /** Tema efetivo aplicado no DOM. */
   resolved: ResolvedTheme
   setTheme: (theme: ThemePreference) => void
-  /** Alterna entre light e dark (ignora system → vai para o oposto do atual). */
+  /** Toggles light/dark, resolving 'system' to the opposite of the current look. */
   toggle: () => void
 }
 

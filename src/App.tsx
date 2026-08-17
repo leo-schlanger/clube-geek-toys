@@ -36,7 +36,7 @@ const AdminLogin = lazy(() => import('./pages/AdminLogin'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const PDV = lazy(() => import('./pages/PDV'))
 
-// Lazy loaded pages - Shop (shop.geeketoys.com.br)
+// Lazy loaded pages — Shop
 const ShopHome = lazy(() => import('./pages/shop/ShopHome'))
 const ProductDetail = lazy(() => import('./pages/shop/ProductDetail'))
 const Cart = lazy(() => import('./pages/shop/Cart'))
@@ -66,7 +66,7 @@ const queryClient = new QueryClient({
 const APP_MODE = getAppMode()
 
 /**
- * Rota Protegida - requer autenticação e role específica
+ * Requires authentication and a specific role.
  */
 function ProtectedRoute({
   children,
@@ -95,7 +95,7 @@ function ProtectedRoute({
     return <Navigate to="/acesso-negado" replace />
   }
 
-  // Membros sem email verificado vão para o cadastro (retoma o fluxo)
+  // Members with an unverified email return to signup to finish the flow
   if (requireEmailVerification && role === 'member' && !emailVerified) {
     return <Navigate to="/cadastro" replace />
   }
@@ -104,7 +104,7 @@ function ProtectedRoute({
 }
 
 /**
- * Erro de Role - usuário autenticado mas não cadastrado
+ * Authenticated but with no matching record.
  */
 function RoleError() {
   const { signOut } = useAuth()
@@ -270,8 +270,7 @@ function MemberRoutes() {
 }
 
 /**
- * Rotas da Loja (shop.geeketoys.com.br) — públicas, com carrinho.
- * Banner de evento fica acima de todas as páginas da loja.
+ * Shop routes: public, with the cart. The event banner sits above them all.
  */
 function ShopRoutes() {
   return (

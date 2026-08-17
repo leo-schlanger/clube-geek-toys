@@ -4,10 +4,10 @@ import * as notificationService from '../services/notification.service.js';
 
 export const notificationRouter = Router();
 
-// Notificação é sempre do próprio usuário — o id vem do JWT, nunca da query.
+// Notifications are always the caller's own: the id comes from the JWT.
 notificationRouter.use(authenticate);
 
-// GET /notifications — lista + contador de não lidas (sininho)
+// GET /notifications — list plus the unread count for the bell
 notificationRouter.get('/', async (req, res, next) => {
   try {
     res.json(

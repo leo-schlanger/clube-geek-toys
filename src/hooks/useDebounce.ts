@@ -1,18 +1,8 @@
-/**
- * useDebounce - Hook para debouncing de valores e funções
- *
- * Útil para:
- * - Reduzir chamadas de API durante digitação
- * - Evitar validações excessivas
- * - Otimizar performance em inputs
- */
+/** Debouncing for values and callbacks, mainly to spare the API while typing. */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-/**
- * Hook para debounce de valores
- * Retorna o valor após o delay especificado
- */
+/** Returns the value once it has been stable for `delay`. */
 export function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
 
@@ -29,10 +19,7 @@ export function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue
 }
 
-/**
- * Hook para debounce de funções
- * Retorna uma versão debounced da função
- */
+/** Returns a debounced version of the callback. */
 export function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
   delay: number

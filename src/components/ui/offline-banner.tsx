@@ -1,16 +1,15 @@
 /**
- * OfflineBanner — aviso de conexão caída.
+ * Offline notice.
  *
- * **Fica no rodapé, não no topo.** Até 16/08/2026 era `fixed top-0 z-[9999]`,
- * e as três SPAs têm cabeçalho em `top: 0` (loja e membro por `sticky`, admin
- * por `fixed`). Com a página rolada, esta faixa de 39px cobria a primeira
- * linha do cabeçalho e **bloqueava carrinho, login, busca e tema** enquanto a
- * conexão estivesse caída — medido com `elementFromPoint` a 390px e 1440px.
+ * **Sits at the bottom, not the top.** It used to be `fixed top-0 z-[9999]`,
+ * and all three SPAs put their header at `top: 0`. With the page scrolled, this
+ * 39px strip covered the header's first row and blocked cart, login, search and
+ * theme for as long as the connection was down.
  *
- * No rodapé não disputa espaço com navegação nenhuma. O z fica **abaixo** do
- * `CookieConsent` (z-[9998], também `bottom-0`): se os dois aparecerem juntos,
- * o consentimento vence, porque é decisão bloqueante de uma vez só. O
- * `RadioMiniPlayer` mora em `bottom-20`, acima desta faixa, sem colidir.
+ * At the bottom it competes with no navigation. Its z sits **below**
+ * `CookieConsent` (also `bottom-0`): if both appear, consent wins, being a
+ * one-off blocking decision. `RadioMiniPlayer` lives at `bottom-20`, clear of
+ * this strip.
  */
 
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
@@ -21,7 +20,7 @@ export function OfflineBanner() {
   const { isOnline, wasOffline } = useOnlineStatus()
   const [showReconnected, setShowReconnected] = useState(false)
 
-  // Mostrar mensagem de reconexão por 3 segundos
+  // Show the reconnected message for 3s
   useEffect(() => {
     if (isOnline && wasOffline) {
       queueMicrotask(() => setShowReconnected(true))
@@ -32,7 +31,7 @@ export function OfflineBanner() {
     }
   }, [isOnline, wasOffline])
 
-  // Não mostrar nada se online e não foi reconectado recentemente
+  // Nothing to show when online and not recently reconnected
   if (isOnline && !showReconnected) {
     return null
   }

@@ -1,6 +1,6 @@
 import { api } from './api-client'
 
-/** Notificações no perfil do cliente. */
+/** In-app customer notifications. */
 
 export type NotificationKind = 'question_answered' | 'order_shipped' | 'generic'
 

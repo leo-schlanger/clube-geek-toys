@@ -1,14 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 
 /**
- * Hook leve pra consumir o "agora tocando" da Rádio GeekPop & Toys (AzuraCast).
+ * Reads "now playing" from AzuraCast.
  *
- * Usa o endpoint estático (`nowplaying_static`), que é um JSON cacheado
- * servido direto pelo nginx da rádio — ~10x mais leve que o dinâmico e
- * cobre nosso caso (rádio auto-DJ em shuffle, sem shows ao vivo).
- *
- * Refetch a cada 15s, pausa automaticamente quando a aba está em background.
- * CORS já liberado pela AzuraCast (`Access-Control-Allow-Origin: *`).
+ * Uses the static endpoint, a cached JSON served straight by the radio's nginx:
+ * far lighter than the dynamic one and enough for an auto-DJ shuffle with no
+ * live shows. Refetches every 15s and pauses while the tab is backgrounded.
  */
 
 const API_URL =

@@ -1,13 +1,12 @@
 /**
- * LazyImage - Componente de imagem com lazy loading
  *
- * Utiliza loading="lazy" nativo do navegador e exibe
+ * Uses the browser's native loading="lazy" and shows
  * um placeholder enquanto a imagem carrega.
  *
  * @example
  * <LazyImage
  *   src="/images/photo.jpg"
- *   alt="Foto do usuário"
+ *   alt="..."
  *   className="w-32 h-32 rounded-full"
  * />
  */
@@ -20,17 +19,15 @@ interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string
   /** Texto alternativo */
   alt: string
-  /** URL da imagem de fallback em caso de erro */
+  /** Fallback image URL on error. */
   fallbackSrc?: string
   /** Mostrar skeleton enquanto carrega */
   showSkeleton?: boolean
-  /** Classes do container */
+  /** Container classes. */
   containerClassName?: string
 }
 
-/**
- * Componente de imagem com lazy loading e fallback
- */
+
 export function LazyImage({
   src,
   alt,
@@ -86,9 +83,7 @@ export function LazyImage({
   )
 }
 
-/**
- * Avatar com lazy loading
- */
+
 interface LazyAvatarProps {
   src?: string | null
   alt: string
@@ -113,7 +108,7 @@ export function LazyAvatar({
 }: LazyAvatarProps) {
   const [hasError, setHasError] = useState(false)
 
-  // Se não tem src ou deu erro, mostra iniciais
+  // No src, or it failed: fall back to initials
   if (!src || hasError) {
     const initials = fallback || alt
       .split(' ')

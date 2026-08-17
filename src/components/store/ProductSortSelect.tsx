@@ -9,7 +9,7 @@ interface ProductSortSelectProps {
   id?: string
 }
 
-/** Select nativo de ordenação do catálogo (A–Z, postagem, preço). */
+/** Native select for catalogue ordering. */
 export function ProductSortSelect({ value, onChange, className, id = 'product-sort' }: ProductSortSelectProps) {
   return (
     <label

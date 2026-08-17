@@ -2,7 +2,8 @@ import { api } from './api-client'
 
 /**
  * Perguntas e respostas no produto.
- * A pergunta aparece na loja assim que é feita — moderação é a posteriori.
+ * A question appears on the storefront as soon as it is asked; moderation is
+ * after the fact.
  */
 
 export interface ProductQuestion {

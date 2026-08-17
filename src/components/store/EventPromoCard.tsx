@@ -8,7 +8,7 @@ import {
 } from '../../data/event'
 
 /**
- * Card de destaque do evento na home da loja.
+ * Featured event card on the shop home.
  */
 export function EventPromoCard() {
   const event = ACTIVE_EVENT

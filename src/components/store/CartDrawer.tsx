@@ -16,7 +16,7 @@ import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 interface CartDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** Membro ativo — exibe estimativa de desconto (preview; total real no checkout). */
+  /** Active member: shows an estimated discount; the real total comes at checkout. */
   isMember?: boolean
   /** Conta atacadista aprovada — preview −25%. */
   isWholesaleApproved?: boolean

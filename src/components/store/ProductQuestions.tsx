@@ -16,7 +16,7 @@ const MAX_LENGTH = 1000
 
 /**
  * Bloco de perguntas na PDP. A pergunta entra publicada na hora (modelo
- * Mercado Livre), marcada como "aguardando resposta" até a loja responder.
+ * marked "awaiting answer" until the store replies.
  */
 export function ProductQuestions({ productSlug, productId }: ProductQuestionsProps) {
   const { user } = useAuth()

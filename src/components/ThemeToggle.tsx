@@ -4,14 +4,14 @@ import { useTheme, type ThemePreference } from '../contexts/ThemeContext'
 import { cn } from '../lib/utils'
 
 type Props = {
-  /** compact = só ícone; full = 3 opções light/dark/system */
+  /** compact = icon only; full = light/dark/system. */
   variant?: 'icon' | 'segmented'
   className?: string
 }
 
 /**
  * Controle de tema light / dark / system.
- * Preferência em localStorage (`geekpop-theme`).
+ * Preference stored in localStorage (`geekpop-theme`).
  */
 export function ThemeToggle({ variant = 'icon', className }: Props) {
   const { theme, resolved, setTheme, toggle } = useTheme()
@@ -47,7 +47,7 @@ export function ThemeToggle({ variant = 'icon', className }: Props) {
       role="group"
       aria-label="Tema da interface"
       className={cn(
-        // 3 colunas iguais — labels completos empilhados sob o ícone (cabem na sidebar)
+        // Three equal columns, full labels stacked under the icon to fit the sidebar
         'grid w-full grid-cols-3 gap-0.5 rounded-lg border border-border bg-muted/50 p-0.5',
         className
       )}

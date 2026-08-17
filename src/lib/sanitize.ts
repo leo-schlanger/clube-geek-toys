@@ -22,9 +22,7 @@ export function sanitizeString(input: string): string {
 }
 
 /**
- * Normaliza email: trim, lowercase, remove espaços internos
  * @param email - Email a normalizar
- * @returns Email normalizado em lowercase
  * @example
  * normalizeEmail(' User@Email.COM ') // 'user@email.com'
  */
@@ -47,8 +45,8 @@ export function normalizeEmail(email: string): string {
  * @param name - Nome a sanitizar
  * @returns Nome limpo, capitalizado e limitado a 200 caracteres
  * @example
- * sanitizeName('joão da silva') // 'João Da Silva'
- * sanitizeName('<script>alert(1)</script>João') // 'João'
+ * sanitizeName('joao da silva') // 'Joao Da Silva'
+ * sanitizeName('<script>alert(1)</script>Ana') // 'Ana'
  */
 export function sanitizeName(name: string): string {
   if (!name) return ''

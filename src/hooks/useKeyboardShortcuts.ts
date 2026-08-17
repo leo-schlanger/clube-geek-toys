@@ -1,5 +1,5 @@
 /**
- * useKeyboardShortcuts - Hook para gerenciar atalhos de teclado
+ * Keyboard shortcut registration.
  *
  * @example
  * useKeyboardShortcuts({
@@ -18,9 +18,7 @@ interface ShortcutMap {
 }
 
 /**
- * Normaliza a combinação de teclas para comparação
- * @param e - Evento de teclado
- * @returns String normalizada (ex: 'ctrl+shift+s')
+ * Normalises a key combination for comparison, e.g. 'ctrl+shift+s'.
  */
 function getKeyCombo(e: KeyboardEvent): string {
   const parts: string[] = []
@@ -43,9 +41,6 @@ function getKeyCombo(e: KeyboardEvent): string {
 }
 
 /**
- * Hook para registrar atalhos de teclado
- * @param shortcuts - Mapa de atalhos para handlers
- * @param enabled - Se os atalhos estão habilitados (default: true)
  *
  * @example
  * useKeyboardShortcuts({
@@ -62,14 +57,14 @@ export function useKeyboardShortcuts(
 ): void {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Ignorar se estiver digitando em input/textarea
+      // Ignore while typing in an input or textarea
       const target = e.target as HTMLElement
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
         target.isContentEditable
       ) {
-        // Permitir apenas Escape em inputs
+        // Escape is the only one allowed inside inputs
         if (e.key !== 'Escape') return
       }
 
@@ -91,9 +86,7 @@ export function useKeyboardShortcuts(
   }, [handleKeyDown, enabled])
 }
 
-/**
- * Atalhos padrão do admin
- */
+/** Default admin shortcuts. */
 export const ADMIN_SHORTCUTS = {
   SAVE: 'ctrl+s',
   NEW: 'ctrl+n',
@@ -103,9 +96,7 @@ export const ADMIN_SHORTCUTS = {
 } as const
 
 /**
- * Formata atalho para exibição
  * @param shortcut - Atalho (ex: 'ctrl+s')
- * @returns String formatada para UI (ex: 'Ctrl+S')
  */
 export function formatShortcut(shortcut: string): string {
   return shortcut

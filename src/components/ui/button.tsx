@@ -3,9 +3,9 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
 const buttonVariants = cva(
-  // gap-2: espaçamento estável entre ícone e texto
-  // shrink-0 no svg: ícone não esmaga nem quebra de linha sozinho
-  // whitespace-nowrap: texto do botão não quebra no meio
+  // gap-2 keeps icon and label evenly spaced; shrink-0 on the svg stops the
+  // icon collapsing or wrapping on its own; whitespace-nowrap keeps the label
+  // on one line.
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
@@ -47,17 +47,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, children, ...props }, ref) => {
     const classes = cn(buttonVariants({ variant, size, className }))
 
-    // asChild aplica o estilo NO filho, em vez de embrulhá-lo num <button>.
+    // asChild applies the styles TO the child instead of wrapping it.
     //
-    // Embrulhar deformava o botão: o <a> virava o único filho do flex, e dentro
-    // dele o <svg> (display:block pelo preflight do Tailwind) empurrava o texto
-    // para a linha de baixo — ícone em cima, texto embaixo. Também gerava
-    // <a> dentro de <button>, que é HTML inválido.
+    // Wrapping deformed the button: the <a> became the flex container's only
+    // child, and the <svg> inside it (display:block via Tailwind preflight)
+    // pushed the label onto a second line. It also produced an <a> inside a
+    // <button>, which is invalid HTML.
     if (asChild && React.isValidElement(children)) {
       const child = children as React.ReactElement<{ className?: string }>
-      // react-hooks/refs alerta porque não distingue encaminhar a ref de ler
-      // ref.current durante o render. Aqui ela só é repassada ao filho, que é
-      // quem vai anexá-la ao nó do DOM.
+      // react-hooks/refs warns because it cannot tell forwarding a ref from
+      // reading ref.current during render. Here it is only passed to the child,
+      // which is what attaches it to the DOM node.
       // eslint-disable-next-line react-hooks/refs
       return React.cloneElement(child, {
         ...props,

@@ -488,7 +488,7 @@ export async function createProduct(data: {
   return { ...created, categoryIds, categoryNames: created.categoryNames };
 }
 
-/** Normaliza a entrada de categorias: aceita a lista nova ou o campo antigo. */
+/** Accepts either the new category list or the legacy single field. */
 function resolveCategoryIds(
   categoryIds: string[] | undefined,
   categoryId: string | null | undefined
@@ -973,7 +973,7 @@ ${urls}
 `;
 }
 
-/** "Você também pode gostar" — same category first, then featured. */
+/** Related products: same category first, then featured. */
 export async function listRelatedProducts(slug: string, limit = 8): Promise<Product[]> {
   const base = await getProductBySlug(slug, false);
   if (!base) return [];

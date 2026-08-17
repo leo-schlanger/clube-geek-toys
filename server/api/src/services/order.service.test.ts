@@ -273,7 +273,7 @@ describe('createOrder — dinheiro', () => {
   });
 });
 
-// ─── Estoque ─────────────────────────────────────────────────────────────────
+// ─── Stock ───────────────────────────────────────────────────────────────
 
 describe('createOrder — estoque', () => {
   it('soma linhas repetidas do mesmo SKU antes de checar o estoque', async () => {

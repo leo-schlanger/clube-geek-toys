@@ -23,9 +23,9 @@ import { Badge } from '../../components/ui/badge'
 import { formatCurrency } from '../../lib/utils'
 
 /**
- * Catálogo do canal atacado (/atacado).
- * Só lista produtos com wholesale_enabled; desconto 25% para conta aprovada (server-side).
- * Pronto antes da importação: se não houver SKUs, mostra estado vazio com CTA de cadastro.
+ * Wholesale catalogue. Lists only wholesale_enabled products, with the 25%
+ * discount applied server-side for approved accounts. With no SKUs it renders
+ * an empty state with a signup call to action.
  */
 export default function WholesaleHome() {
   const [searchParams, setSearchParams] = useSearchParams()

@@ -20,9 +20,9 @@ import {
 import { Loading } from '../../components/ui/loading'
 
 /**
- * Login opcional da loja. Espelha src/pages/Login.tsx (mesmo AuthContext),
- * mas redireciona para "/" (vitrine da loja) após o sucesso — não para /membro.
- * Serve para o cliente ganhar 15% de desconto de membro.
+ * Optional shop login. Mirrors src/pages/Login.tsx and its AuthContext,
+ * but lands on the storefront after success rather than /membro, so a member
+ * gets their discount while shopping.
  */
 export default function ShopLogin() {
   const [email, setEmail] = useState('')
@@ -35,7 +35,7 @@ export default function ShopLogin() {
   const { user, loading, signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
-  // Countdown do lockout
+  // Lockout countdown
   useEffect(() => {
     if (lockoutTime <= 0) return
     const timer = setInterval(() => {
@@ -50,7 +50,7 @@ export default function ShopLogin() {
     return () => clearInterval(timer)
   }, [lockoutTime])
 
-  // Já autenticado → volta para a loja.
+  // Already authenticated: back to the shop.
   useEffect(() => {
     if (!loading && user) {
       navigate('/', { replace: true })
@@ -87,7 +87,7 @@ export default function ShopLogin() {
       setIsSubmitting(false)
     } else {
       clearAttempts(normalizedEmail)
-      // Redirecionamento tratado pelo useEffect que observa `user`.
+      // The useEffect watching `user` handles the redirect.
     }
   }
 
@@ -150,7 +150,7 @@ export default function ShopLogin() {
                   if (!result.success) {
                     setFormError(result.error || 'Erro ao autenticar com Google')
                   }
-                  // Redirect tratado pelo useEffect.
+                  // Redirect handled by the useEffect.
                 }}
                 onError={(err) => setFormError(err)}
               />

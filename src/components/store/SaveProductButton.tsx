@@ -8,17 +8,17 @@ import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 
 /**
- * Botão de "salvar para depois" — alimenta as compras salvas do perfil.
+ * "Save for later", which feeds the saved products on the profile.
  *
- * Salvar exige conta (o salvo pertence a alguém), então para visitante o botão
- * leva ao cadastro em vez de sumir: é justamente o gancho que faz a pessoa
- * criar perfil sem precisar assinar o clube.
+ * Saving requires an account, so for a visitor the button leads to signup
+ * rather than disappearing: that is the hook which gets someone to create a
+ * profile without subscribing.
  */
 
 export interface SaveProductButtonProps {
   productId: string
   productName: string
-  /** `icon` para o card do catálogo; `full` para a página do produto. */
+  /** `icon` for the catalogue card; `full` for the product page. */
   variant?: 'icon' | 'full'
   className?: string
 }
@@ -55,7 +55,7 @@ export function SaveProductButton({
       return
     }
 
-    // Otimista: o coração responde na hora e reverte se o servidor recusar.
+    // Optimistic: the heart responds at once and reverts if the server refuses.
     const next = !saved
     setSaved(next)
     setBusy(true)
@@ -100,7 +100,7 @@ export function SaveProductButton({
       aria-pressed={saved}
       disabled={busy}
       onClick={(e) => {
-        // O card inteiro é um link: salvar não pode navegar para o produto.
+        // The whole card is a link; saving must not navigate to the product.
         e.preventDefault()
         e.stopPropagation()
         handleClick()

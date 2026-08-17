@@ -4,17 +4,16 @@ import { getMemberByUserId, isMemberActive } from '../../lib/members'
 import type { Member } from '../../types'
 
 export interface ShopMemberState {
-  /** Registro do membro (se o usuário logado for membro). */
+  /** The member record, when the signed-in user has one. */
   member: Member | null
-  /** True quando há membro com assinatura ativa. */
+  /** True when a member with an active subscription exists. */
   isMember: boolean
   loading: boolean
 }
 
 /**
- * Detecta se o usuário autenticado é um membro ativo do clube.
- * Usado na loja para exibir o preview de desconto de 15%.
- * O desconto real é sempre aplicado no backend em createOrder.
+ * Whether the signed-in user is an active club member, used to preview the
+ * discount. The real discount is always applied by createOrder server-side.
  */
 export function useShopMember(): ShopMemberState {
   const { user, loading: authLoading } = useAuth()

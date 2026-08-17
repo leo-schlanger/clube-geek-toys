@@ -166,7 +166,7 @@ describe('RenewModal', () => {
       expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringContaining('Pagamento processado'))
       expect(onSuccess).toHaveBeenCalled()
     })
-    // Renovação anual não altera paymentType — não chama updateMember
+  // An annual renewal does not change paymentType, so updateMember is not called
     expect(mockUpdateMember).not.toHaveBeenCalled()
   })
 

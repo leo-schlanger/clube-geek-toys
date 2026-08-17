@@ -52,7 +52,7 @@ export function clampCoverPan(
   }
 }
 
-/** Converte zoom + pan do preview (object-cover) em retângulo na imagem fonte. */
+/** Turns the preview's zoom and pan into a rectangle on the source image. */
 export function computeCoverCrop(input: CoverCropInput): ImageCropRect {
   const imageWidth = Math.max(1, input.imageWidth)
   const imageHeight = Math.max(1, input.imageHeight)
@@ -81,7 +81,7 @@ export function computeCoverCrop(input: CoverCropInput): ImageCropRect {
   return { x, y, width: Math.max(1, width), height: Math.max(1, height) }
 }
 
-/** Lado maior → largura/altura respeitando a proporção do recorte. */
+/** Longest side to width/height, keeping the crop's aspect ratio. */
 export function sizeFromLongestSide(
   cropWidth: number,
   cropHeight: number,
@@ -273,7 +273,7 @@ async function compressImageFile(file: File, targetBytes: number): Promise<File 
 }
 
 /**
- * Recorta a imagem e redimensiona para o tamanho de saída (JPEG).
+ * Crops and resizes to the output size, as JPEG.
  */
 export async function cropProductImage(
   file: File,

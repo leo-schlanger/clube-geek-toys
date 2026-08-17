@@ -22,7 +22,7 @@ import { SeoHead } from '../../components/store/SeoHead'
 
 /**
  * Cadastro atacadista: CNPJ + dados da empresa.
- * Status inicial pending — admin aprova se o objeto social bater com a compra.
+ * Starts as pending; an admin approves when the company's activity matches.
  */
 export default function WholesaleRegister() {
   const navigate = useNavigate()

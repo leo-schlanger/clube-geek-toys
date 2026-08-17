@@ -115,7 +115,7 @@ describe('ProductModal — foto por variação', () => {
     expect(listingInput.className).not.toMatch(/\bhidden\b/)
     expect(screen.getByLabelText(/Enviar foto da variação Rosa/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/Enviar foto da variação Preto/i)).toBeInTheDocument()
-    // Galeria do listing disponível para atribuir
+    // Listing gallery available to assign from
     expect(screen.getAllByText(/Da galeria/i).length).toBeGreaterThan(0)
     expect(screen.getAllByTitle('Usar esta imagem na variação').length).toBeGreaterThan(0)
   })
@@ -210,8 +210,8 @@ describe('ProductModal — gerar combinações', () => {
   const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
 
   it('usa a opção digitada mesmo sem clicar no "+"', () => {
-    // Caminho natural de quem não leu a dica: digita "Rosa" e vai direto em
-    // Gerar combinações. Antes disso o texto era descartado e nada era gerado.
+    // The natural path for someone who skipped the hint: type "Rosa" and go
+    // straight to generate. That text used to be discarded, generating nothing.
     render(
       <ProductModal
         mode="edit"
@@ -251,8 +251,8 @@ describe('ProductModal — gerar combinações', () => {
 })
 
 describe('ProductModal — rascunho pendente no Salvar', () => {
-  // Todos estes casos caíam no vazio: o admin digitava, clicava em Salvar, via
-  // "Produto atualizado!" e o dado não existia. Nada de erro na tela.
+  // All of these silently dropped data: the admin typed, hit save, saw
+  // "product updated" and the value did not exist. No error anywhere.
   beforeEach(() => {
     vi.clearAllMocks()
     mockedUpdate.mockResolvedValue(product)
@@ -319,8 +319,8 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
   it('acrescenta a opção nova ao produto que já tem variações', async () => {
     renderModal(product)
 
-    // "Azul" entra nos eixos sem regerar a matriz; Rosa e Preto continuam com
-    // os seus ids, preço e foto.
+    // "Azul" joins the axes without regenerating; the existing rows keep their
+    // ids, prices and photos.
     fireEvent.change(screen.getByPlaceholderText(/Ou cole várias/i), {
       target: { value: 'Rosa, Preto, Azul' },
     })
@@ -388,7 +388,7 @@ describe('ProductModal — várias fotos por variação', () => {
     mockedReplace.mockResolvedValue(product)
     renderEdit()
 
-    // "Preto" já tem uma foto no fixture; colar uma URL deve somar, não trocar.
+    // "Preto" already has a photo in the fixture; pasting a URL must add, not replace.
     const urlInputs = screen.getAllByPlaceholderText(/cole URL da foto desta variação/i)
     fireEvent.change(urlInputs[1], { target: { value: 'https://cdn.example.com/preto-2.jpg' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'OK' })[1])
@@ -415,7 +415,7 @@ describe('ProductModal — várias fotos por variação', () => {
     fireEvent.change(urlInputs[0], { target: { value: 'https://cdn.example.com/rosa.jpg' } })
     fireEvent.click(screen.getAllByRole('button', { name: 'OK' })[0])
 
-    // Contador da galeria do listing não se mexe — era exatamente o que estourava o teto.
+    // The listing gallery count must not move: that is what used to blow the cap.
     expect(screen.getByText(/^\(2\/30\)$/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
@@ -457,9 +457,9 @@ describe('ProductModal — várias fotos por variação', () => {
 })
 
 describe('ProductModal — abas do formulário', () => {
-  // O modal tinha ~1100 linhas de campo numa rolagem só. O bloco de vídeo caía
-  // no terço final e a Laura não achou (15/08/2026). As abas resolvem isso —
-  // mas só valem se não esconderem trabalho nem quebrarem o save.
+  // The modal was ~1100 lines of fields in one scroll and the video block sat
+  // in the final third, where it went unfound. Tabs fix that, but only if they
+  // hide no work and break no save.
   beforeEach(() => {
     vi.clearAllMocks()
     mockedUpdate.mockResolvedValue(product)
@@ -480,7 +480,7 @@ describe('ProductModal — abas do formulário', () => {
 
   function painelDaAba(nome: RegExp): HTMLElement {
     const aba = screen.getByRole('tab', { name: nome })
-    // O painel é o irmão do tablist na ordem em que os grupos foram montados.
+    // The panel is the tablist's sibling, in the order the groups were mounted.
     const idx = screen.getAllByRole('tab').indexOf(aba)
     const tablist = aba.closest('[role="tablist"]') as HTMLElement
     const paineis = Array.from(tablist.parentElement!.children).filter(
@@ -499,13 +499,13 @@ describe('ProductModal — abas do formulário', () => {
   })
 
   it('o contador da aba mostra que existe conteúdo escondido lá dentro', () => {
-    // Era esse o buraco: sem contador, esconder atrás de aba só troca um
+    // This was the gap: with no counter, hiding behind a tab merely swaps one
     // problema de descoberta por outro.
     renderEdit()
 
-    // 2 fotos no fixture.
+    // 2 photos in the fixture.
     expect(screen.getByRole('tab', { name: /Fotos e vídeos/ })).toHaveTextContent('2')
-    // 2 SKUs no fixture.
+    // 2 SKUs in the fixture.
     expect(screen.getByRole('tab', { name: /Variações/ })).toHaveTextContent('2')
   })
 
@@ -516,8 +516,8 @@ describe('ProductModal — abas do formulário', () => {
 
     expect(painelDaAba(/Fotos e vídeos/)).not.toHaveClass('hidden')
     expect(painelDaAba(/Básico/)).toHaveClass('hidden')
-    // O campo da aba escondida continua no DOM — é o que garante que o
-    // rascunho digitado nela sobrevive à troca de aba e entra no save.
+    // The hidden tab's field stays in the DOM, which is what lets a draft typed
+    // there survive the tab switch and reach the save.
     expect(screen.getByLabelText(/Nome do Produto/i)).toBeInTheDocument()
   })
 
@@ -529,7 +529,7 @@ describe('ProductModal — abas do formulário', () => {
     fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
       target: { value: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
     })
-    // Volta para o Básico e salva de lá — o vídeo não pode se perder.
+    // Return to Basics and save from there; the video must not be lost.
     fireEvent.click(screen.getByRole('tab', { name: /Básico/ }))
     fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
 
@@ -542,7 +542,7 @@ describe('ProductModal — abas do formulário', () => {
     const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
     renderEdit(semVariacao)
 
-    // Link inválido mora na aba Mídia; o save é disparado da aba Básico.
+    // The invalid link lives on Media; the save fires from Basics.
     fireEvent.click(screen.getByRole('tab', { name: /Fotos e vídeos/ }))
     fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
       target: { value: 'https://vimeo.com/12345' },
@@ -552,7 +552,7 @@ describe('ProductModal — abas do formulário', () => {
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled())
     expect(mockedUpdate).not.toHaveBeenCalled()
-    // Sem o salto, o aviso apontaria para um campo fora da tela.
+    // Without the jump, the warning would point at an off-screen field.
     expect(screen.getByRole('tab', { name: /Fotos e vídeos/ })).toHaveAttribute(
       'aria-selected',
       'true'

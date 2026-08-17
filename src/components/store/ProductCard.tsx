@@ -13,17 +13,17 @@ import { SaveProductButton } from './SaveProductButton'
 
 interface ProductCardProps {
   product: Product
-  /** Se o usuário logado é membro ativo — mostra preço com preview de desconto. */
+  /** Active member: shows the price with a discount preview. */
   isMember?: boolean
   /** Canal atacado: link /atacado/produto, preview 25%, min qty. */
   isWholesale?: boolean
-  /** Conta atacadista aprovada — mostra preço com −25%. */
+  /** Approved wholesale account: shows the price at -25%. */
   isWholesaleApproved?: boolean
 }
 
 /**
- * Card de vitrine de um produto. Linka para /produto/:slug (ou /atacado/produto)
- * e permite adicionar direto ao carrinho. Descontos exibidos são só preview.
+ * Storefront card. Links to the product page and adds straight to the cart.
+ * Any discount shown is a preview; the real one is computed server-side.
  */
 export function ProductCard({
   product,

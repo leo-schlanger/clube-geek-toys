@@ -23,8 +23,8 @@ vi.mock('../../lib/profile', () => ({
   markSavedInCache: (...args: unknown[]) => mockMark(...args),
 }))
 
-// vi.mock é içado para o topo do arquivo, então o objeto precisa nascer em
-// vi.hoisted — um const comum ainda não existe quando a factory roda.
+// vi.mock is hoisted to the top of the file, so the object has to come from
+// vi.hoisted: a plain const does not exist yet when the factory runs.
 const { mockToast } = vi.hoisted(() => ({
   mockToast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
 }))
@@ -47,7 +47,7 @@ function renderButton(props: Partial<React.ComponentProps<typeof SaveProductButt
 }
 
 describe('SaveProductButton — visitante', () => {
-  // É o gancho do cadastro: em vez de esconder o botão, ele leva a criar conta.
+  // The signup hook: instead of hiding the button, it leads to creating an account.
   it('manda para o cadastro em vez de salvar', async () => {
     mockUser = null
     renderButton()
@@ -101,7 +101,7 @@ describe('SaveProductButton — logado', () => {
     expect(mockMark).toHaveBeenCalledWith('p1', false)
   })
 
-  // O otimismo precisa reverter, senão a UI mente sobre o que foi salvo.
+  // The optimism must revert, or the UI lies about what was saved.
   it('desfaz o coração quando o servidor recusa', async () => {
     mockSave.mockResolvedValue(false)
     renderButton()

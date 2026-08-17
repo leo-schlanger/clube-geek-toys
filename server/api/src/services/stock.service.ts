@@ -206,7 +206,7 @@ export async function listStock(opts: ListStockOptions = {}): Promise<{
   const page = Math.max(1, opts.page || 1);
   const offset = (page - 1) * limit;
 
-  // Produto simples e variação viram a mesma forma de linha.
+  // Plain products and variants collapse into the same row shape.
   const base = `
     SELECT p.id AS product_id, p.name AS product_name, p.slug AS product_slug,
            NULL::uuid AS variant_id, NULL::varchar AS variant_name,

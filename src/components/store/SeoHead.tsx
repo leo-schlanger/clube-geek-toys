@@ -13,8 +13,9 @@ export interface SeoHeadProps {
 /**
  * Client-side SEO tags for shop/club SPAs.
  * Updates document title + meta/OG. Absolute URLs use the current host
- * so shop.geeketoys.com.br previews don't inherit club meta after JS runs.
- * (Crawlers that don't execute JS still need host-aware static HTML/nginx — see plan.)
+ * so shop previews do not inherit club meta once JS runs.
+ * Crawlers that do not run JS are served by shop.html / index.html and the
+ * nginx /__share/ route instead.
  */
 export function SeoHead({
   title,
@@ -25,16 +26,15 @@ export function SeoHead({
   noIndex = false,
 }: SeoHeadProps) {
   useEffect(() => {
-    // Origem **canônica**, não a acessada. Com dois domínios espelho servindo o
-    // mesmo conteúdo, derivar de window.location.origin fazia cada um se
-    // declarar canônico de si — o Google via conteúdo duplicado e dividia a
-    // autoridade. As imagens seguem a mesma origem para não gerar mais uma URL
-    // do mesmo arquivo.
+    // The **canonical** origin, not the one in use. With two mirrors serving
+    // the same content, deriving from window.location.origin made each declare
+    // itself canonical and split the ranking authority. Images follow the same
+    // origin so the file does not gain a second URL.
     const origin = getCanonicalOrigin()
     const mode = getAppMode()
     const siteName = mode === 'shop' ? 'Loja GeekPop & Toys' : 'Clube GeekPop & Toys'
-    // OG exige URL absoluta: foto de produto chega como caminho relativo em
-    // parte dos casos, e um "/uploads/x.jpg" cru some do preview.
+    // OG requires an absolute URL: product photos sometimes arrive relative,
+    // and a bare "/uploads/x.jpg" vanishes from the preview.
     const ogImage = absolute(image, origin) ?? `${origin}/og-image.png`
     const url = `${origin}${path.startsWith('/') ? path : `/${path}`}`
     const fullTitle = title.includes('GeekPop') ? title : `${title} | ${siteName}`
@@ -63,7 +63,7 @@ export function SeoHead({
   return null
 }
 
-/** Resolve caminho relativo contra a origem; devolve undefined se não houver. */
+/** Resolves a relative path against the origin. */
 function absolute(src: string | undefined, origin: string): string | undefined {
   if (!src) return undefined
   if (/^https?:\/\//i.test(src)) return src
@@ -71,11 +71,11 @@ function absolute(src: string | undefined, origin: string): string | undefined {
 }
 
 /**
- * Escreve — ou **apaga** — a tag.
+ * Writes — or **removes** — the tag.
  *
- * Apagar importa: antes um valor vazio saía pela porta dos fundos e a tag da
- * página anterior continuava no head. Navegando de um produto para o carrinho,
- * a description seguia sendo a do produto.
+ * Removal matters: an empty value used to return early, leaving the previous
+ * page's tag in the head. Going from a product to the cart kept the product's
+ * description.
  */
 function setMeta(attr: 'name' | 'property', key: string, content: string | undefined) {
   const el = document.head.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null

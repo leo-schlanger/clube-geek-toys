@@ -33,11 +33,11 @@ interface ErrorEvent {
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 /**
- * Erro que nasceu numa extensão do navegador do visitante, não na loja.
+ * An error raised by a visitor's browser extension, not by the store.
  *
- * Em 15/08/2026 esses eventos eram 299 das 485 linhas de `error_logs` — carteira
+ * These once accounted for 299 of 485 `error_logs` rows — wallet
  * cripto e afins estourando `unhandledrejection` na home. Enterravam o erro real
- * e deixavam qualquer visitante escrever no banco pela rota pública de log.
+ * and let any visitor write to the database through the public log route.
  */
 export function isExtensionNoise(stack?: string): boolean {
   if (!stack) return false

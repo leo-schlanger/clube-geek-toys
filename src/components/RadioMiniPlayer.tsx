@@ -3,20 +3,15 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Music, Pause, Play, Radio, Users, Volume2, VolumeX, X } from 'lucide-react'
 import { useNowPlaying } from '../hooks/useNowPlaying'
 
-// Backoff pra reconexão após drop do stream (ms)
+// Reconnection backoff after a stream drop (ms)
 const RECONNECT_BACKOFF_MS = [1000, 2000, 4000, 8000]
 
 /**
- * Mini-player flutuante (dock) pra Rádio GeekPop & Toys.
+ * Floating radio dock.
  *
- * Pensado pra landing page de conversão: fica visível sem invadir o espaço
- * do CTA principal. Três estados:
- *   - hidden      → nunca renderizado (ex.: usuário fechou)
- *   - collapsed   → pílula discreta no bottom-right com play + "Ouça a rádio"
- *   - expanded    → card com cover, título, artista, play/pause, volume
- *
- * Começa colapsado. Ao dar play o card expande automaticamente. Pode ser
- * minimizado sem parar o stream (áudio continua tocando em background).
+ * Three states: hidden (dismissed), collapsed (a pill bottom-right) and
+ * expanded (cover, track, transport, volume). It starts collapsed, expands on
+ * play, and minimising it does **not** stop the stream.
  */
 export default function RadioMiniPlayer() {
   const { song, listeners, streamUrl, loading } = useNowPlaying()
@@ -32,8 +27,8 @@ export default function RadioMiniPlayer() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const userActionRef = useRef(false)
-  // Ref estável pra attemptReconnect — evita recursão direta, que
-  // dispara a regra react-hooks/immutability do ESLint.
+  // Stable ref for attemptReconnect: direct recursion trips the ESLint
+  // react-hooks/immutability rule.
   const attemptReconnectRef = useRef<() => void>(() => {})
 
   useEffect(() => {
@@ -73,18 +68,18 @@ export default function RadioMiniPlayer() {
         audioRef.current.load()
         await audioRef.current.play()
       } catch {
-        // Chamada via ref pra evitar recursão direta no useCallback
+        // Called through the ref to avoid direct recursion in the useCallback
         attemptReconnectRef.current()
       }
     }, RECONNECT_BACKOFF_MS[attempt])
   }, [streamUrl])
 
-  // Mantém a ref apontando pra versão atual do callback
+  // Keep the ref on the current callback
   useEffect(() => {
     attemptReconnectRef.current = attemptReconnect
   }, [attemptReconnect])
 
-  // Listeners do <audio> pra reconexão automática e sync de pause externo
+  // <audio> listeners for auto-reconnect and external pause sync
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -104,7 +99,7 @@ export default function RadioMiniPlayer() {
       if (isPlayingRef.current) attemptReconnect()
     }
     const onEnded = () => {
-      // Livestream não deveria "terminar" — tratar como drop
+      // A livestream should never "end", so treat it as a drop
       if (isPlayingRef.current) attemptReconnect()
     }
     const onPause = () => {

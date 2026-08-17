@@ -72,7 +72,7 @@ profileRouter.patch('/', authenticate, validate(updateSchema), async (req, res, 
   }
 });
 
-// ─── Foto de perfil (opcional) ───────────────────────────────────────────────
+// ─── Profile photo (optional) ────────────────────────────────────────────────
 
 const photoStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -110,7 +110,7 @@ function discard(filePath: string): void {
   fs.promises.unlink(filePath).catch(() => {});
 }
 
-// POST /profile/photo — sobe a foto de perfil
+// POST /profile/photo
 profileRouter.post(
   '/photo',
   authenticate,
@@ -192,7 +192,7 @@ profileRouter.delete('/photo', authenticate, async (req, res, next) => {
   }
 });
 
-// ─── Produtos salvos ─────────────────────────────────────────────────────────
+// ─── Saved products ──────────────────────────────────────────────────────────
 
 // GET /profile/saved
 profileRouter.get('/saved', authenticate, async (req, res, next) => {
@@ -212,7 +212,7 @@ profileRouter.get('/saved/ids', authenticate, async (req, res, next) => {
   }
 });
 
-// PUT /profile/saved/:productId — salvar (idempotente)
+// PUT /profile/saved/:productId — idempotent
 profileRouter.put('/saved/:productId', authenticate, async (req, res, next) => {
   try {
     await profileService.saveProduct(req.user!.userId, req.params.productId as string);
@@ -222,7 +222,7 @@ profileRouter.put('/saved/:productId', authenticate, async (req, res, next) => {
   }
 });
 
-// DELETE /profile/saved/:productId — remover (idempotente)
+// DELETE /profile/saved/:productId — idempotent
 profileRouter.delete('/saved/:productId', authenticate, async (req, res, next) => {
   try {
     await profileService.unsaveProduct(req.user!.userId, req.params.productId as string);

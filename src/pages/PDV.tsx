@@ -12,7 +12,7 @@ import { CLUB_PLAN, type Member } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
 import { getMemberByCPF, isMemberActive } from '../lib/members'
 
-// Schema de validação para QR Code do membro
+// Validation schema for the member QR code
 const qrCodeSchema = z.object({
   cpf: z.string().min(11).max(14),
   id: z.string().optional(),
@@ -58,13 +58,13 @@ export default function PDV() {
     setResult(null)
 
     try {
-      // Parse e valida com Zod
+  
       const parsed = JSON.parse(data)
       const qrData = qrCodeSchema.parse(parsed)
 
       await verifyMember(qrData.cpf)
     } catch (error) {
-      // Diferencia erros de validação de outros erros
+      // Separate validation errors from everything else
       if (error instanceof z.ZodError) {
         setResult({
           member: null,

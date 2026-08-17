@@ -65,9 +65,9 @@ export interface DataTableProps<T> {
   loading?: boolean
   exportFilename?: string
   exportData?: (items: T[]) => string[][]
-  /** Estado inicial da tabela (para sincronizar com URL) */
+  /** Initial table state, for URL sync. */
   initialState?: Partial<TableState>
-  /** Callback quando o estado muda (para sincronizar com URL) */
+  /** Fired when the state changes, for URL sync. */
   onStateChange?: (state: TableState) => void
 }
 

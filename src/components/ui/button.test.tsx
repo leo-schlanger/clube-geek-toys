@@ -164,11 +164,11 @@ describe('Button', () => {
     )
 
     const link = screen.getByRole('link', { name: 'Ver evento' })
-    // O layout depende disso: sem inline-flex no <a>, o ícone (display:block
-    // pelo preflight) joga o texto para a linha de baixo.
+    // Layout depends on this: without inline-flex on the <a>, the icon
+    // (display:block via preflight) pushes the label onto the next line.
     expect(link).toHaveClass('inline-flex')
     expect(link).toHaveClass('items-center')
-    // <a> dentro de <button> é HTML inválido — não pode sobrar botão nenhum.
+    // An <a> inside a <button> is invalid HTML; no button may remain.
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 

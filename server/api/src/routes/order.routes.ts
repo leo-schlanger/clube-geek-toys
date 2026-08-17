@@ -23,9 +23,9 @@ const createOrderSchema = z.object({
     .array(
       z.object({
         productId: z.string().uuid(),
-        // Variante (Shopee): obrigatória se o produto has_variants
+        // Variant: required when the product has_variants
         variantId: z.string().uuid().optional(),
-        // Atacado pode precisar de volumes maiores que o varejo (cap 999)
+        // Wholesale may need larger quantities than retail (cap 999)
         quantity: z.number().int().positive().max(999),
       })
     )

@@ -2,13 +2,13 @@
 // CLUBE GEEKPOP & TOYS - TYPE DEFINITIONS
 // ============================================
 
-// Plano único do clube
+// The club has a single plan
 export type PlanType = 'club'
 
 // Member status
 export type MemberStatus = 'active' | 'pending' | 'inactive' | 'expired'
 
-// Payment frequency — o clube é anual
+// Payment frequency — the club bills annually
 export type PaymentType = 'annual'
 
 // Payment status
@@ -46,14 +46,14 @@ export interface Member {
   paymentType: PaymentType
   startDate: string
   expiryDate: string
-  /** PIX aguardando confirmação. `null` limpa o campo (o PATCH aceita nullable). */
+  /** PIX awaiting confirmation. `null` clears it; the PATCH accepts nullable. */
   pendingPayment?: PendingPaymentInfo | null
   paymentCount: number
   /**
-   * Ativação manual pelo admin. O `updateMemberSchema` do backend já aceitava os
-   * dois desde a revisão de 10/08/2026, mas o tipo do front nunca acompanhou —
-   * `activateMember()` compilava só porque o `tsc -b` estava quebrado e o CI
-   * usava `vite build`. Deixá-los aqui é o que mantém os dois lados de acordo.
+   * Manual activation by an admin. The backend schema accepted both fields
+   * long before this type did: `activateMember()` only compiled because
+   * `tsc -b` was broken and CI ran `vite build`. Declaring them keeps the two
+   * sides in agreement.
    */
   activatedAt?: string | null
   activatedByPayment?: string | null
@@ -93,7 +93,7 @@ export interface Plan {
 // PLANS CONFIGURATION
 // ============================================
 
-// Plano único e anual do clube.
+// Single annual club plan.
 export const CLUB_PLAN: Plan = {
   id: 'club',
   name: 'Clube GeekPop & Toys',
@@ -108,16 +108,16 @@ export const CLUB_PLAN: Plan = {
   icon: '🎮',
 }
 
-// Mapa mantido para acessos por plano (o plano é sempre 'club').
+// Kept for per-plan lookups, though the plan is always 'club'.
 export const PLANS: Record<PlanType, Plan> = {
   club: CLUB_PLAN,
 }
 
-// Desconto do membro na loja, como fração (uso de exibição no front — o valor
-// real é sempre recalculado no backend). Ver server/api/src/types MEMBER_SHOP_DISCOUNT.
+// Display only: the real figure is always recomputed server-side.
+// See MEMBER_SHOP_DISCOUNT in server/api/src/types.
 export const MEMBER_SHOP_DISCOUNT = 0.15
 
-// Desconto atacadista (fração) — canal /atacado, conta CNPJ aprovada. Server-side only.
+// Wholesale channel, approved CNPJ account. Applied server-side only.
 export const WHOLESALE_SHOP_DISCOUNT = 0.25
 
 export type ShopChannel = 'retail' | 'wholesale'
@@ -134,7 +134,7 @@ export interface Category {
   name: string
   slug: string
   description: string | null
-  /** Chave do ícone (ver src/lib/category-icons.ts). */
+  /** Icon key; see src/lib/category-icons.ts. */
   icon?: string | null
   active: boolean
   sortOrder: number
@@ -152,7 +152,7 @@ export interface Product {
   /** Categoria principal (espelha product_categories position 0). */
   categoryId: string | null
   categoryName?: string | null
-  /** Todas as categorias do produto, principal primeiro (até 5). */
+  /** Primary category first, up to 5. */
   categoryIds?: string[]
   categoryNames?: string[]
   videos?: ProductVideo[]
@@ -169,7 +169,6 @@ export interface Product {
   ratingCount?: number
   wholesaleEnabled?: boolean
   wholesaleMinQty?: number
-  /** Shopee-style: listing com variações */
   hasVariants?: boolean
   variantAxes?: VariantAxis[]
   variants?: ProductVariant[]
@@ -180,8 +179,8 @@ export interface Product {
 }
 
 /**
- * Vídeo do produto. `file` = MP4 no volume /uploads; os demais são links
- * externos que a loja embeda.
+ * `file` is an MP4 on the /uploads volume; the others are external links the
+ * storefront embeds.
  */
 export interface ProductVideo {
   kind: 'youtube' | 'instagram' | 'file'
@@ -189,13 +188,11 @@ export interface ProductVideo {
   title?: string
 }
 
-/** Eixo de variação (Cor, Tamanho, Material…). Sem limite de quantidade. */
 export interface VariantAxis {
   name: string
   options: string[]
 }
 
-/** SKU de uma combinação de opções */
 export interface ProductVariant {
   id: string
   productId: string
@@ -297,7 +294,7 @@ export const MY_ORDERS_TAB_STATUSES: Record<MyOrdersTab, OrderStatus[] | null> =
   cancelled: ['cancelled', 'refunded'],
 }
 
-// Dados do QR PIX retornados pelo backend (EMV code para renderizar/copiar)
+// PIX QR data from the backend: EMV code to render and to copy
 export interface PixQRData {
   emvCode: string
   pixKey: string
@@ -306,10 +303,10 @@ export interface PixQRData {
   expiresAt: string
 }
 
-// Item do carrinho (persistido em localStorage no subdomínio da loja)
+// Cart item, persisted in localStorage on the shop subdomain
 export interface CartItem {
   productId: string
-  /** SKU de variação (Shopee); undefined = produto simples */
+  /** Variant SKU; undefined means a plain product. */
   variantId?: string | null
   /** Ex.: "Rosa / M" */
   variantLabel?: string | null
@@ -474,12 +471,12 @@ export interface Contract {
   createdAt: string
 }
 
-// ─── Perfil de cliente (loja, sem assinatura) ────────────────────────────────
+// ─── Customer profile (shop, no subscription) ────────────────────────────────
 
 /**
- * Quem compra na loja sem assinar o clube. Não confundir com `Member`, que é o
- * registro da assinatura (exige CPF, tem plano e validade). Uma conta pode ter
- * perfil, assinatura, os dois, ou nenhum.
+ * Someone who buys without subscribing. Not to be confused with `Member`, the
+ * subscription record, which requires a CPF and carries a plan and an expiry.
+ * An account may have a profile, a membership, both, or neither.
  */
 export const GENDERS = [
   'feminino',
@@ -491,7 +488,7 @@ export const GENDERS = [
 
 export type Gender = (typeof GENDERS)[number]
 
-/** Rótulos em pt-BR para os selects. */
+/** pt-BR labels for the selects. */
 export const GENDER_LABELS: Record<Gender, string> = {
   feminino: 'Feminino',
   masculino: 'Masculino',
@@ -515,19 +512,19 @@ export interface CustomerProfile {
   email: string
   fullName: string | null
   phone: string | null
-  /** YYYY-MM-DD — sem hora, para fuso não mudar o dia do aniversário. */
+  /** YYYY-MM-DD, no time, so a timezone cannot shift the birthday. */
   birthDate: string | null
   gender: Gender | null
   photoUrl: string | null
   address: ProfileAddress | null
   marketingConsent: boolean
-  /** True quando a conta também assina o clube. */
+  /** True when the account also holds a membership. */
   isMember: boolean
   createdAt: string | null
   updatedAt: string | null
 }
 
-/** Omitir a chave = não mexe. `null` = apagar o campo. */
+/** Omitting a key leaves it alone; `null` clears the field. */
 export interface UpdateProfilePayload {
   fullName?: string | null
   phone?: string | null
@@ -537,7 +534,7 @@ export interface UpdateProfilePayload {
   marketingConsent?: boolean
 }
 
-/** Produto salvo, com preço e estoque **atuais** — não os de quando salvou. */
+/** Price and stock are the **current** ones, not those at save time. */
 export interface SavedProduct {
   productId: string
   name: string

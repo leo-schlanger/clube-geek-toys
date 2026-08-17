@@ -2,12 +2,12 @@ import { useEffect } from 'react'
 import { useLocation, useNavigationType } from 'react-router-dom'
 
 /**
- * Leva a janela ao topo quando a rota muda.
+ * Scrolls to the top on route change.
  *
- * Sem isso, abrir um produto a partir do meio da vitrine mantinha a rolagem
- * anterior e a página aparecia já cortada no meio. Voltar (POP) é exceção: ali
- * o esperado é cair de novo onde a pessoa estava na listagem, e o navegador
- * restaura isso sozinho.
+ * Without it, opening a product from mid-catalogue kept the previous scroll and
+ * the page appeared already cut in half. Back navigation (POP) is the
+ * exception: there the expectation is landing where you were, and the browser
+ * restores that itself.
  */
 export function ScrollToTop() {
   const { pathname } = useLocation()

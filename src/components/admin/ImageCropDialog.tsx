@@ -42,8 +42,8 @@ function frameBox(ratio: number): { width: number; height: number } {
 }
 
 /**
- * Recorte interativo (zoom + arrastar) com proporção e tamanho de saída em pixels.
- * Processa uma fila quando várias fotos são selecionadas.
+ * Interactive crop (zoom and drag) with a fixed ratio and pixel output size.
+ * Works through a queue when several photos are selected.
  */
 export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialogProps) {
   const [index, setIndex] = useState(0)
@@ -57,10 +57,10 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
   const [aspectId, setAspectId] = useState<AspectId>('1:1')
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  // 1200 é número, não string: a UI compara `sizeMode === px` contra os
-  // SIZE_PRESETS numéricos, e `outputSpec()` repassa esse valor como
-  // `longestSide`. Com a string, o chip padrão abria sem seleção e a conta de
-  // redimensionar recebia texto. Só apareceu quando o `tsc -b` voltou a rodar.
+  // A number, not a string: the UI compares `sizeMode` against the numeric
+  // SIZE_PRESETS and `outputSpec()` forwards it as `longestSide`. As a string
+  // the default chip opened unselected and the
+  // resize maths received text. It only surfaced once `tsc -b` ran again.
   const [sizeMode, setSizeMode] = useState<'auto' | 800 | 1200 | 1600 | 'custom'>(1200)
   const [customW, setCustomW] = useState('1200')
   const [customH, setCustomH] = useState('1200')
@@ -90,8 +90,8 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
   const frame = frameBox(ratio)
 
   const clampedPan = useMemo(() => {
-    // Mesmo formato nos dois caminhos: quem consome lê `panX`/`panY`. Devolver
-    // `pan` cru ({x,y}) deixava `left`/`top` em NaN enquanto a imagem não tinha
+    // Same shape on both paths: consumers read `panX`/`panY`. Returning a raw
+    // `pan` ({x,y}) left `left`/`top` as NaN while the image had no
     // carregado.
     if (!natural.width) return { panX: pan.x, panY: pan.y }
     return clampCoverPan(natural.width, natural.height, frame.width, frame.height, zoom, pan.x, pan.y)

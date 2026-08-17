@@ -17,8 +17,8 @@ interface CategoryNavProps {
 }
 
 /**
- * Navegação horizontal de categorias. Cada item linka para /categoria/:slug,
- * e "Todos" volta para a raiz da loja (ou basePath).
+ * Horizontal category navigation. Each item links to /categoria/:slug, and
+ * "all" returns to the shop root.
  */
 export function CategoryNav({
   categories,

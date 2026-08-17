@@ -601,7 +601,7 @@ describe('End-to-End Registration Flow Simulation', () => {
     expect(memberPayload.email).toContain('@')
     expect(memberPayload.plan).toBe('club')
 
-    // Step 3: Payment calculation — sempre anual, plano único
+    // Step 3: payment calculation — always annual, single plan
     const plan = PLANS[memberPayload.plan]
     const price = plan.price
     expect(price).toBe(PLANS.club.price)
@@ -665,12 +665,12 @@ describe('Edge Cases & Error Scenarios', () => {
   })
 
   it('should handle missing URL params gracefully', () => {
-    // Plano único: sempre 'club'
+    // Single plan: always 'club'
     const urlPlan = null as string | null
     const selectedPlan = (urlPlan as 'club') || 'club'
     expect(selectedPlan).toBe('club')
 
-    // Cobrança sempre anual
+    // Always billed annually
     const urlType = null as string | null
     const paymentType = (urlType as 'annual') || 'annual'
     expect(paymentType).toBe('annual')

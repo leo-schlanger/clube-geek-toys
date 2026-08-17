@@ -10,9 +10,9 @@ interface ProductVideoGalleryProps {
 }
 
 /**
- * Vídeos do produto abaixo da galeria de fotos. Fica separado das imagens de
- * propósito: o índice da galeria já governa a troca de foto por variação, e
- * misturar vídeo ali quebraria essa correspondência.
+ * Product videos, below the photo gallery. Kept separate on purpose: the
+ * gallery index already drives the per-variant photo switch, and mixing videos
+ * in would break that correspondence.
  */
 export function ProductVideoGallery({ videos, productName }: ProductVideoGalleryProps) {
   const [active, setActive] = useState(0)

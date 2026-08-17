@@ -34,11 +34,10 @@ import { Loading } from '../../components/ui/loading'
 import { LazyImage } from '../../components/ui/lazy-image'
 
 /**
- * Perfil da loja — funciona para qualquer conta, assine o clube ou não.
+ * Shop profile, for any account with or without a subscription.
  *
- * Salva por seção, não a página inteira: o PATCH manda só as chaves da seção
- * tocada, então salvar o endereço não pode apagar o nascimento (ver
- * `upsertProfile`, onde `undefined` = não mexe).
+ * Saves per section rather than per page: the PATCH carries only the keys of
+ * the section touched, so saving the address cannot clear the birth date.
  */
 export default function ShopProfile() {
   const { user, loading: authLoading } = useAuth()
@@ -59,7 +58,7 @@ export default function ShopProfile() {
   const [gender, setGender] = useState<Gender | ''>('')
   const [marketingConsent, setMarketingConsent] = useState(false)
 
-  // Endereço
+  // Address
   const [cep, setCep] = useState('')
   const [street, setStreet] = useState('')
   const [number, setNumber] = useState('')
@@ -133,7 +132,7 @@ export default function ShopProfile() {
     e.preventDefault()
     setSavingPersonal(true)
     try {
-      // String vazia vira null: é "apagar", não "não mexer".
+      // An empty string becomes null: that means clear, not leave alone.
       const updated = await updateProfile({
         fullName: fullName.trim() || null,
         phone: phone.trim() || null,
@@ -171,8 +170,8 @@ export default function ShopProfile() {
   async function handleSaveAddress(e: React.FormEvent) {
     e.preventDefault()
 
-    // Endereço é tudo-ou-nada: meio endereço não serve para entregar nem para
-    // pré-preencher o checkout. Vazio por completo = apagar.
+    // Address is all-or-nothing: half an address neither delivers nor
+    // prefills the checkout. Entirely empty means clear it.
     const filled = [cep, street, number, neighborhood, city, uf].some((v) => v.trim())
     if (!filled) {
       setSavingAddress(true)
@@ -250,7 +249,7 @@ export default function ShopProfile() {
   }
 
   async function handleUnsave(productId: string) {
-    // Otimista: o coração some na hora e volta se o servidor recusar.
+    // Optimistic: the heart clears at once and returns if the server refuses.
     const previous = saved
     setSaved((items) => items.filter((i) => i.productId !== productId))
     const ok = await unsaveProduct(productId)

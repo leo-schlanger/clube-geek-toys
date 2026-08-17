@@ -1,11 +1,8 @@
 /**
- * useOnlineStatus - Hook para detectar status de conexão
+ * Connection status from navigator.onLine plus the online/offline events.
  *
- * Usa a API navigator.onLine e eventos online/offline do navegador.
- *
- * Limitações:
- * - navigator.onLine pode ter falsos positivos (conectado ao wifi mas sem internet)
- * - Para verificação mais precisa, seria necessário fazer ping a um servidor
+ * Known limit: navigator.onLine reports true for a wifi connection with no
+ * internet behind it. Detecting that would require pinging a server.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -31,7 +28,7 @@ export function useOnlineStatus(): UseOnlineStatusReturn {
   }, [])
 
   useEffect(() => {
-    // Adicionar listeners para mudanças de status
+
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
