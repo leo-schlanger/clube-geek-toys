@@ -87,16 +87,15 @@ function round2(n: number): number {
 }
 
 /**
- * Avisa o admin que um PIX da loja aguarda conferência.
+ * Tells the admin a shop PIX is awaiting confirmation.
  *
- * Nada confirma PIX sozinho — não há webhook, então o pedido fica `pending` até
- * alguém abrir o extrato e confirmar no painel. Sem este aviso, um cliente paga
- * e a loja não fica sabendo.
+ * Nothing confirms PIX on its own: with no webhook the order stays `pending`
+ * until someone checks the statement. Without this notice a customer pays and
+ * the store never finds out.
  *
- * Roda inteiro dentro de try/catch **de propósito**: a chamada nasce no meio do
- * `try` do checkout, cujo `catch` cancela o pedido e devolve o crédito. Um erro
- * ao montar as variáveis ou ao falar com o Resend não pode derrubar um pedido
- * legítimo por causa de um e-mail.
+ * Wrapped in try/catch **deliberately**: it is called from inside the checkout
+ * `try`, whose `catch` cancels the order and restores credit. A failure while
+ * building variables or reaching Resend must not drop a legitimate order.
  */
 function notifyAdminOfPendingPix(order: Order, txId: string): void {
   try {
@@ -637,6 +636,94 @@ export async function listMyOrders(
   return { orders, total: count.rows[0].total as number, page, limit };
 }
 
+/** Statuses a customer may cancel without an admin or a refund. */
+const CUSTOMER_CANCELLABLE = ['pending'];
+
+/**
+ * Customer-initiated cancellation of their own order.
+ *
+ * Restricted to `pending` because that is the only state where nothing has to
+ * be undone outside our database: no payment was captured and stock is only
+ * decremented on confirmation. Anything already paid needs a real refund
+ * through Stripe, which stays an admin action.
+ *
+ * Ownership is enforced in the WHERE clause rather than by reading the order
+ * first, so a guessed id cannot cancel someone else's purchase.
+ */
+export async function cancelMyOrder(userId: string, orderId: string): Promise<Order> {
+  const memberId = await getMemberIdForUser(userId);
+  const existing = await query(
+    `SELECT * FROM orders
+     WHERE id = $1 AND (user_id = $2 OR ($3::uuid IS NOT NULL AND member_id = $3))`,
+    [orderId, userId, memberId]
+  );
+  if (existing.rows.length === 0) {
+    throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+  }
+
+  const current = mapOrder(existing.rows[0]);
+  if (current.status === 'cancelled') return current;
+
+  if (!CUSTOMER_CANCELLABLE.includes(current.status)) {
+    throw new AppError(
+      409,
+      'Este pedido já foi pago e não pode ser cancelado por aqui. Fale com a gente para pedir o reembolso.',
+      'ORDER_NOT_CANCELLABLE'
+    );
+  }
+
+  // Conditioned on the status so two clicks, or a race with an admin, cannot
+  // cancel twice and restore credit twice.
+  const result = await query(
+    `UPDATE orders SET status = 'cancelled', updated_at = NOW()
+     WHERE id = $1 AND status = 'pending'
+     RETURNING *`,
+    [orderId]
+  );
+  if (result.rows.length === 0) {
+    throw new AppError(409, 'O pedido mudou de status. Recarregue a página.', 'ORDER_NOT_CANCELLABLE');
+  }
+
+  const order = mapOrder(result.rows[0]);
+
+  if ((order.storeCreditApplied ?? 0) > 0) {
+    const restored = await restoreCreditForOrder(orderId, {
+      note: 'Crédito devolvido (pedido cancelado pelo cliente)',
+    });
+    if (restored > 0) {
+      await auditLog('order.credit_restored', userId, { orderId, amount: restored, status: 'cancelled' });
+    }
+  }
+
+  await auditLog('order.cancelled_by_customer', userId, {
+    orderId,
+    orderNumber: order.orderNumber,
+    total: order.total,
+  });
+
+  notifyAdminOfCustomerCancellation(order);
+  return order;
+}
+
+/** Non-blocking, for the same reason as the pending-PIX notice. */
+function notifyAdminOfCustomerCancellation(order: Order): void {
+  try {
+    void sendTemplateEmail({
+      template: 'admin-order-cancelled',
+      to: env.ADMIN_EMAIL,
+      variables: {
+        order_number: String(order.orderNumber),
+        customer_name: order.customerName,
+        customer_email: order.customerEmail,
+        total: order.total.toFixed(2).replace('.', ','),
+        admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=orders`,
+      },
+    }).catch((err) => console.error('[order] admin-order-cancelled failed', err));
+  } catch (err) {
+    console.error('[order] admin-order-cancelled skipped', err);
+  }
+}
+
 export async function getMyOrderById(userId: string, orderId: string): Promise<Order | null> {
   const memberId = await getMemberIdForUser(userId);
   const result = await query(
@@ -848,7 +935,7 @@ export async function decrementStockForOrder(client: pg.PoolClient, orderId: str
     [orderId]
   );
   await syncParentStockFromVariants(client, orderId);
-  // Histórico do painel — mesma transação, some junto no rollback.
+  // Admin history: same transaction, so it rolls back with the decrement.
   await recordOrderMovements(client, orderId, -1);
 }
 

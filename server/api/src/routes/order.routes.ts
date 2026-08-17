@@ -97,6 +97,17 @@ orderRouter.get('/me/:id', authenticate, async (req, res, next) => {
   }
 });
 
+// POST /orders/me/:id/cancel — customer cancels their own unpaid order.
+// Under /me so it can never collide with the admin routes below, which are the
+// ones allowed to touch a paid order.
+orderRouter.post('/me/:id/cancel', authenticate, async (req, res, next) => {
+  try {
+    res.json(await orderService.cancelMyOrder(req.user!.userId, req.params.id as string));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /orders/:id/status — public polling for the order-confirmation page.
 orderRouter.get('/:id/status', async (req, res, next) => {
   try {

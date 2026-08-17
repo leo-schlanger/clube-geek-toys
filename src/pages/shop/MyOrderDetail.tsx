@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -10,7 +11,7 @@ import {
   Truck,
 } from 'lucide-react'
 import type { Order } from '../../types'
-import { getMyOrder } from '../../lib/orders'
+import { getMyOrder, cancelMyOrder } from '../../lib/orders'
 import { getStoreCredit, listOrderReviews } from '../../lib/reviews'
 import { formatCurrency } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
@@ -50,6 +51,8 @@ export default function MyOrderDetail() {
   const [loading, setLoading] = useState(true)
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set())
   const [rewardAmount, setRewardAmount] = useState(1)
+  const [cancelling, setCancelling] = useState(false)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
   const [reviewDone, setReviewDone] = useState(false)
 
   useEffect(() => {
@@ -87,6 +90,21 @@ export default function MyOrderDetail() {
       active = false
     }
   }, [user, id])
+
+  async function handleCancel() {
+    if (!order) return
+    setCancelling(true)
+    try {
+      setOrder(await cancelMyOrder(order.id))
+      setConfirmingCancel(false)
+      toast.success('Pedido cancelado.')
+    } catch (err) {
+      // The server explains why (already paid, status changed); show it as-is.
+      toast.error(err instanceof Error ? err.message : 'Não foi possível cancelar.')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   const meta = order ? ORDER_STATUS_META[order.status] : null
   const rank = order ? STATUS_RANK[order.status] ?? 0 : 0
@@ -273,6 +291,53 @@ export default function MyOrderDetail() {
               <p className="text-center text-sm text-muted-foreground">
                 Obrigado pela avaliação!
               </p>
+            )}
+
+            {/* Only unpaid orders: once paid it is a refund, which an admin runs. */}
+            {order.status === 'pending' && (
+              <Card className="border-destructive/30">
+                <CardContent className="pt-6">
+                  {confirmingCancel ? (
+                    <div className="space-y-3">
+                      <p className="text-sm">
+                        Cancelar o pedido <strong>#{order.orderNumber}</strong>? Não dá
+                        para desfazer — se mudar de ideia, é só fazer um novo pedido.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={cancelling}
+                          onClick={handleCancel}
+                        >
+                          {cancelling ? 'Cancelando...' : 'Sim, cancelar pedido'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={cancelling}
+                          onClick={() => setConfirmingCancel(false)}
+                        >
+                          Manter pedido
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        Ainda não pagou? Você pode cancelar este pedido.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConfirmingCancel(true)}
+                      >
+                        Cancelar pedido
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
           </div>
         )}

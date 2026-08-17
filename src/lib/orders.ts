@@ -132,3 +132,16 @@ export async function getMyOrder(id: string): Promise<Order | null> {
   const result = await api.get<Order>(`/orders/me/${id}`)
   return result.data ?? null
 }
+
+/**
+ * Cancels the caller's own order. Only unpaid orders qualify; anything already
+ * paid needs a refund, which stays with an admin. The server's message is
+ * surfaced as-is so the customer reads the real reason.
+ */
+export async function cancelMyOrder(id: string): Promise<Order> {
+  const result = await api.post<Order>(`/orders/me/${id}/cancel`)
+  if (result.error || !result.data) {
+    throw new Error(result.error || 'Não foi possível cancelar o pedido.')
+  }
+  return result.data
+}

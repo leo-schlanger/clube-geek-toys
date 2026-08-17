@@ -1,23 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Checkout da loja — o caminho que decide **quanto o cliente paga** e **quanto
- * estoque sai**. Até 16/08/2026 estava em 0% de cobertura: 840 linhas sem um
- * único teste, porque o `coverage.include` do vitest só media `src/**` e
- * `server/api/src/utils/**` — o backend inteiro ficava fora da conta dos "74%".
+ * Shop checkout — the path that decides **what the customer pays** and **how
+ * much stock leaves**. What these tests protect, ordered by how much a
+ * regression would cost:
  *
- * O que estes testes protegem, em ordem de prejuízo:
- *
- *  1. Preço vem do banco, nunca do cliente.
- *  2. Desconto de membro e de atacado **não** empilham.
- *  3. Frete nunca entra no desconto.
- *  4. Linhas repetidas do mesmo SKU somam antes da checagem de estoque
- *     (senão 2×"3 unidades" passa por um estoque de 5).
- *  5. Crédito de loja não deixa o total ficar negativo.
- *  6. Produto com variação exige SKU; SKU de outro produto é recusado.
+ *  1. Price comes from the database, never from the client.
+ *  2. Member and wholesale discounts do **not** stack.
+ *  3. Shipping never enters the discount base.
+ *  4. Repeated lines of the same SKU are summed before the stock check,
+ *     otherwise 2x"3 units" slips past a stock of 5.
+ *  5. Store credit cannot drive the total negative.
+ *  6. A product with variants requires a SKU, and a SKU from another product
+ *     is rejected.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock, sendEmailMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -29,6 +27,7 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     stripeMock: vi.fn(),
     auditMock: vi.fn(),
     sendEmailMock: vi.fn(),
+    restoreCreditMock: vi.fn(),
   }));
 
 vi.mock('../config/database.js', () => ({
@@ -55,7 +54,7 @@ vi.mock('./shipping.service.js', () => ({
 
 vi.mock('./store-credit.service.js', () => ({
   redeemForOrder: redeemMock,
-  restoreCreditForOrder: vi.fn(async () => {}),
+  restoreCreditForOrder: restoreCreditMock,
 }));
 
 vi.mock('./wholesale.service.js', () => ({ getApprovedAccountByUserId: approvedAccountMock }));
@@ -65,7 +64,7 @@ vi.mock('./stock.service.js', () => ({ recordOrderMovements: vi.fn(async () => {
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
 
-import { createOrder } from './order.service.js';
+import { createOrder, cancelMyOrder } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -106,7 +105,7 @@ function product(over: Record<string, unknown> = {}) {
   };
 }
 
-/** Captura o INSERT em `orders` para conferir os valores gravados. */
+/** Captures the `orders` INSERT so the written values can be asserted. */
 function insertedOrderValues(): unknown[] {
   const call = clientQueryMock.mock.calls.find(
     (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO orders')
@@ -115,7 +114,7 @@ function insertedOrderValues(): unknown[] {
   return call[1] as unknown[];
 }
 
-/** Índices dos parâmetros do INSERT em `orders` (ver order.service.ts). */
+/** Parameter indexes of the `orders` INSERT; see order.service.ts. */
 const COL = {
   customerName: 2,
   customerEmail: 3,
@@ -126,20 +125,17 @@ const COL = {
   total: 14,
 };
 
-/**
- * Monta o cliente de transação: BEGIN, SELECT de produtos, SELECT de variações,
- * INSERT do pedido, INSERTs de item, COMMIT.
- */
+/** Wires the transaction client: BEGIN, product and variant SELECTs, order and item INSERTs, COMMIT. */
 function setupTx(opts: {
   products?: Record<string, unknown>[];
   variants?: Record<string, unknown>[];
 }) {
   const products = opts.products ?? [product()];
   const variants = opts.variants ?? [];
-  // Os dois comandos rodam com RETURNING *, então o mock guarda a linha inserida
-  // e o UPDATE a devolve com os campos alterados por cima. Sem isso o UPDATE
-  // "perderia" colunas que o banco real devolve (customer_name, email…) e um
-  // teste do caminho de crédito passaria lendo undefined.
+  // Both statements use RETURNING *, so the mock keeps the inserted row and the
+  // UPDATE returns it with changed fields on top. Otherwise the UPDATE would
+  // "lose" columns the real database returns, and a store-credit test would
+  // pass while reading undefined.
   let inserted: Record<string, unknown> = {};
   clientQueryMock.mockImplementation(async (sql: string, params?: unknown[]) => {
     if (/^BEGIN|^COMMIT|^ROLLBACK/.test(sql.trim())) return { rows: [] };
@@ -189,6 +185,7 @@ beforeEach(() => {
   memberIdMock.mockResolvedValue(null);
   auditMock.mockResolvedValue(undefined);
   sendEmailMock.mockResolvedValue(undefined);
+  restoreCreditMock.mockResolvedValue(0);
   pickOptionMock.mockReturnValue({
     id: 'pac',
     name: 'PAC',
@@ -198,13 +195,13 @@ beforeEach(() => {
   });
 });
 
-// ─── Preço e desconto ────────────────────────────────────────────────────────
+// ─── Pricing and discounts ───────────────────────────────────────────────────
 
 describe('createOrder — dinheiro', () => {
   it('usa o preço do banco, ignorando qualquer coisa vinda do cliente', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
 
-    // O cliente manda um preço na linha; o serviço só aceita productId+quantity.
+    // The client sends a price on the line; the service takes only productId + quantity.
     await createOrder(baseInput({ items: [{ productId: 'p1', quantity: 2, price: 1 }] }));
 
     const v = insertedOrderValues();
@@ -222,7 +219,7 @@ describe('createOrder — dinheiro', () => {
     const v = insertedOrderValues();
     expect(v[COL.discount]).toBe(15);
     expect(v[COL.discountReason]).toBe('member_15');
-    // 100 − 15 + 24 = 109. Se o frete entrasse no desconto daria 105,40.
+    // 100 - 15 + 24 = 109. Had shipping entered the discount base it would be 105.40.
     expect(v[COL.total]).toBe(109);
     expect(v[COL.shippingCost]).toBe(24);
   });
@@ -258,13 +255,13 @@ describe('createOrder — dinheiro', () => {
 
   it('crédito de loja entra depois do desconto do canal e nunca deixa o total negativo', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
-    // Teto passado ao redeem é o valor dos produtos após desconto, não o total.
+    // The redeem cap is the post-discount goods value, not the order total.
     redeemMock.mockImplementation(async (_c: unknown, _u: string, cap: number) => cap);
 
     const res = await createOrder(baseInput({ applyStoreCredit: true }), { userId: 'u1' } as never);
 
     expect(redeemMock).toHaveBeenCalledWith(expect.anything(), 'u1', 100, 'o1');
-    // Crédito cobre os produtos; o frete continua a pagar.
+    // Credit covers the goods; shipping is still payable.
     expect(res.order.total).toBe(24);
     expect(res.order.total).toBeGreaterThanOrEqual(0);
   });
@@ -280,7 +277,7 @@ describe('createOrder — dinheiro', () => {
 
 describe('createOrder — estoque', () => {
   it('soma linhas repetidas do mesmo SKU antes de checar o estoque', async () => {
-    // 5 em estoque, o carrinho manda 3 + 3 em linhas separadas.
+    // Stock of 5, cart sends 3 + 3 on separate lines.
     setupTx({ products: [product({ stock: 5 })] });
 
     await expect(
@@ -322,7 +319,7 @@ describe('createOrder — estoque', () => {
   });
 });
 
-// ─── Variações ───────────────────────────────────────────────────────────────
+// ─── Variants ────────────────────────────────────────────────────────────────
 
 describe('createOrder — variações', () => {
   const parent = product({ has_variants: true, price: '100.00', stock: 0 });
@@ -477,9 +474,9 @@ describe('createOrder — validação de entrada', () => {
 // ─── Aviso de PIX pendente ───────────────────────────────────────────────────
 
 /**
- * PIX da loja não tem webhook: o pedido nasce `pending` e só sai disso quando um
- * admin confere o extrato e confirma no painel. Até 16/08/2026 esse fluxo não
- * avisava ninguém — o cliente pagava e a loja não ficava sabendo.
+ * Shop PIX has no webhook: the order is born `pending` and leaves that state
+ * only when an admin checks the bank statement and confirms. Without a
+ * notification the customer pays and the store never finds out.
  */
 describe('createOrder — aviso de PIX pendente', () => {
   function pixEmail() {
@@ -501,7 +498,7 @@ describe('createOrder — aviso de PIX pendente', () => {
       customer_name: 'Laura',
       customer_email: 'laura@example.com',
     });
-    // TX ID é o que liga o extrato bancário ao pedido — sem ele o aviso é inútil.
+    // The TX ID is what ties the bank statement to the order.
     expect(email!.variables.tx_id).toMatch(/^CGT[A-Z0-9]+$/);
     expect(email!.variables.total).toMatch(/^\d+,\d{2}$/);
   });
@@ -527,8 +524,8 @@ describe('createOrder — aviso de PIX pendente', () => {
     expect(pixEmail()).toBeUndefined();
   });
 
-  // O aviso nasce dentro do try do checkout, cujo catch cancela o pedido e
-  // devolve o crédito. Falha de e-mail não pode derrubar uma compra legítima.
+  // The notification is raised inside the checkout try, whose catch cancels the
+  // order and restores credit. A failed email must not drop a real purchase.
   it('conclui o pedido mesmo se o envio do e-mail explodir', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
     sendEmailMock.mockImplementation(() => {
@@ -554,5 +551,117 @@ describe('createOrder — aviso de PIX pendente', () => {
     const result = await createOrder(baseInput());
 
     expect(result.order.status).toBe('pending');
+  });
+});
+
+// ─── Customer cancellation ───────────────────────────────────────────────────
+
+/**
+ * Until 17/08/2026 every order mutation was admin-only: a customer could not
+ * cancel even an unpaid order. Cancellation is limited to `pending` because
+ * that is the only state where nothing has to be undone outside our database.
+ */
+describe('cancelMyOrder', () => {
+  function orderRow(over: Record<string, unknown> = {}) {
+    return {
+      id: 'o1',
+      order_number: 1001,
+      user_id: 'u1',
+      customer_name: 'Laura',
+      customer_email: 'laura@example.com',
+      status: 'pending',
+      payment_method: 'pix',
+      subtotal: '100.00',
+      discount: '0',
+      shipping_cost: '24.00',
+      store_credit_applied: '0',
+      total: '124.00',
+      ...over,
+    };
+  }
+
+  it('cancela um pedido pendente do próprio usuário', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow()] })
+      .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled' })] });
+
+    const order = await cancelMyOrder('u1', 'o1');
+
+    expect(order.status).toBe('cancelled');
+    expect(auditMock).toHaveBeenCalledWith(
+      'order.cancelled_by_customer',
+      'u1',
+      expect.objectContaining({ orderId: 'o1' })
+    );
+  });
+
+  // Ownership lives in the WHERE clause, so a guessed id finds nothing.
+  it('não encontra pedido de outra pessoa', async () => {
+    queryMock.mockResolvedValue({ rows: [] });
+    await expect(cancelMyOrder('u1', 'alheio')).rejects.toBeInstanceOf(AppError);
+  });
+
+  it('recusa pedido já pago — reembolso é ação de admin', async () => {
+    queryMock.mockResolvedValue({ rows: [orderRow({ status: 'paid' })] });
+
+    await expect(cancelMyOrder('u1', 'o1')).rejects.toThrow(/não pode ser cancelado/i);
+    expect(
+      queryMock.mock.calls.some(
+        (c) => typeof c[0] === 'string' && c[0].includes("status = 'cancelled'")
+      )
+    ).toBe(false);
+  });
+
+  it.each(['shipped', 'delivered', 'refunded'])('recusa pedido %s', async (status) => {
+    queryMock.mockResolvedValue({ rows: [orderRow({ status })] });
+    await expect(cancelMyOrder('u1', 'o1')).rejects.toBeInstanceOf(AppError);
+  });
+
+  it('é idempotente: cancelar de novo devolve o pedido sem reescrever', async () => {
+    queryMock.mockResolvedValue({ rows: [orderRow({ status: 'cancelled' })] });
+
+    const order = await cancelMyOrder('u1', 'o1');
+
+    expect(order.status).toBe('cancelled');
+    expect(
+      queryMock.mock.calls.some(
+        (c) => typeof c[0] === 'string' && c[0].includes('UPDATE orders SET status')
+      )
+    ).toBe(false);
+  });
+
+  // The UPDATE is conditioned on status so a double click, or a race with an
+  // admin, cannot cancel twice and restore credit twice.
+  it('detecta corrida quando o status muda entre a leitura e o UPDATE', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow()] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(cancelMyOrder('u1', 'o1')).rejects.toThrow(/mudou de status/i);
+  });
+
+  it('devolve o crédito de loja gasto no pedido', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow({ store_credit_applied: '30.00' })] })
+      .mockResolvedValueOnce({
+        rows: [orderRow({ status: 'cancelled', store_credit_applied: '30.00' })],
+      });
+
+    await cancelMyOrder('u1', 'o1');
+
+    expect(restoreCreditMock).toHaveBeenCalledWith('o1', expect.any(Object));
+  });
+
+  it('avisa o admin sem deixar a falha do e-mail derrubar o cancelamento', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow()] })
+      .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled' })] });
+    sendEmailMock.mockImplementation(() => {
+      throw new Error('Resend fora do ar');
+    });
+
+    const order = await cancelMyOrder('u1', 'o1');
+
+    expect(order.status).toBe('cancelled');
   });
 });
