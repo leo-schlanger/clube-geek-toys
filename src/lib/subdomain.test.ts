@@ -411,3 +411,12 @@ describe('AppMode type', () => {
     expect(mode).toBe('member')
   })
 })
+
+describe('getMemberVerifyUrl', () => {
+  it('encodes the canonical club URL with the member id', async () => {
+    const { getMemberVerifyUrl, CANONICAL_ORIGINS } = await loadModule()
+    expect(getMemberVerifyUrl('abcd1234-5678-9012-3456-789012345678')).toBe(
+      `${CANONICAL_ORIGINS.club}/verificar/abcd1234-5678-9012-3456-789012345678`,
+    )
+  })
+})

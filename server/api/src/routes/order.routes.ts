@@ -47,7 +47,7 @@ const createOrderSchema = z.object({
 });
 
 // POST /orders — create order + charge (guest or logged-in member). optionalAuth applies the
-// 15% member discount (retail) or 25% wholesale discount (channel=wholesale + approved CNPJ).
+// 10% member discount (retail) or 25% wholesale discount (channel=wholesale + approved CNPJ).
 orderRouter.post('/', optionalAuth, paymentLimiter, validate(createOrderSchema), async (req, res, next) => {
   try {
     const result = await orderService.createOrder(req.body, req.user);

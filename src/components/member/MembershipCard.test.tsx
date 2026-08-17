@@ -84,14 +84,19 @@ describe('MembershipCard', () => {
     expect(screen.getByText('Ver carteirinha')).toBeInTheDocument()
   })
 
-  it('renders QR code on the back of the card', () => {
-    render(<MembershipCard member={createMember()} />)
-    expect(screen.getByTestId('qr-code')).toBeInTheDocument()
+  it('renders QR code on the back of the card pointing at the public verify URL', () => {
+    const member = createMember()
+    render(<MembershipCard member={member} />)
+    const qr = screen.getByTestId('qr-code')
+    expect(qr).toBeInTheDocument()
+    expect(qr.getAttribute('data-value')).toBe(
+      `https://club.geeketoys.com.br/verificar/${member.id}`,
+    )
   })
 
-  it('shows the single 15% discount badge on the back', () => {
+  it('shows the single 10% discount badge on the back', () => {
     render(<MembershipCard member={createMember()} />)
-    expect(screen.getByText('15%')).toBeInTheDocument()
+    expect(screen.getByText('10%')).toBeInTheDocument()
     expect(screen.getByText('em qualquer produto')).toBeInTheDocument()
   })
 
@@ -101,9 +106,9 @@ describe('MembershipCard', () => {
     expect(screen.getByText(/CPF: \*\*\*\. \*\*\*/)).toBeInTheDocument()
   })
 
-  it('shows active status label on the back', () => {
+  it('shows EM DIA on the back for an active current member', () => {
     render(<MembershipCard member={createMember({ status: 'active' })} />)
-    expect(screen.getByText('Ativo')).toBeInTheDocument()
+    expect(screen.getByText('EM DIA')).toBeInTheDocument()
   })
 
   it('shows pending status label', () => {
@@ -135,7 +140,7 @@ describe('MembershipCard', () => {
 
   it('renders scan instruction text', () => {
     render(<MembershipCard member={createMember()} />)
-    expect(screen.getByText('Apresente na loja para aplicar seus descontos')).toBeInTheDocument()
+    expect(screen.getByText('Escaneie para ver se o membro está em dia')).toBeInTheDocument()
   })
 
   it('renders labels for front of card', () => {

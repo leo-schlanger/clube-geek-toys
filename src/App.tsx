@@ -26,6 +26,7 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
 const Subscribe = lazy(() => import('./pages/Subscribe'))
 const Register = lazy(() => import('./pages/Register'))
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
+const MemberVerify = lazy(() => import('./pages/MemberVerify'))
 const MemberDashboard = lazy(() => import('./pages/MemberDashboard'))
 const PaymentResult = lazy(() => import('./pages/PaymentResult'))
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'))
@@ -227,6 +228,7 @@ function MemberRoutes() {
       <Route path="/cadastro" element={<Register />} />
       <Route path="/recuperar-senha" element={<ForgotPassword />} />
       <Route path="/verificar-email" element={<VerifyEmail />} />
+      <Route path="/verificar/:id" element={<MemberVerify />} />
       <Route path="/termos" element={<TermsOfUse />} />
       <Route path="/privacidade" element={<PrivacyPolicy />} />
 

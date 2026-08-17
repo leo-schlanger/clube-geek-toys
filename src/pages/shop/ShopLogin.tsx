@@ -129,7 +129,7 @@ export default function ShopLogin() {
             <CardTitle className="font-heading text-2xl">Entrar</CardTitle>
             <CardDescription>
               Login é opcional — entre para ganhar{' '}
-              <strong className="text-green-600">15% de desconto</strong> de membro.
+              <strong className="text-green-600">10% de desconto</strong> de membro.
             </CardDescription>
           </CardHeader>
 
@@ -138,7 +138,7 @@ export default function ShopLogin() {
               {/* Selo de benefício */}
               <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
                 <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                <span>Membros do clube pagam 15% menos em qualquer produto.</span>
+                <span>Membros do clube pagam 10% menos em qualquer produto.</span>
               </div>
 
               {/* Google Sign-In */}

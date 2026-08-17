@@ -19,9 +19,11 @@ vi.mock('../lib/logger', () => ({
 }))
 
 const mockGetMemberByCPF = vi.fn()
+const mockGetMemberById = vi.fn()
 const mockIsMemberActive = vi.fn()
 vi.mock('../lib/members', () => ({
   getMemberByCPF: (...args: unknown[]) => mockGetMemberByCPF(...args),
+  getMemberById: (...args: unknown[]) => mockGetMemberById(...args),
   isMemberActive: (...args: unknown[]) => mockIsMemberActive(...args),
 }))
 
@@ -70,6 +72,12 @@ vi.mock('../components/QRScanner', () => ({
   QRScanner: ({ onScan, onClose }: { onScan: (d: string) => void; onClose: () => void }) => (
     <div data-testid="qr-scanner">
       <button data-testid="qr-scan-trigger" onClick={() => onScan('{"cpf":"12345678901"}')}>Scan</button>
+      <button
+        data-testid="qr-scan-url"
+        onClick={() => onScan('https://club.geeketoys.com.br/verificar/abcd1234-5678-9012-3456-789012345678')}
+      >
+        Scan URL
+      </button>
       <button data-testid="qr-close" onClick={onClose}>Close</button>
     </div>
   ),
@@ -169,18 +177,18 @@ describe('PDV', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Member Test')).toBeInTheDocument()
-      expect(screen.getByText('Membro ativo - pode aplicar desconto!')).toBeInTheDocument()
+      expect(screen.getByText('EM DIA — pode aplicar o desconto!')).toBeInTheDocument()
     })
   })
 
-  it('shows the 15% product discount for active member', async () => {
+  it('shows the 10% product discount for active member', async () => {
     render(<PDV />)
 
     await userEvent.type(screen.getByPlaceholderText('Digite o CPF...'), '12345678901')
     fireEvent.submit(screen.getByPlaceholderText('Digite o CPF...').closest('form')!)
 
     await waitFor(() => {
-      expect(screen.getByText('15%')).toBeInTheDocument()
+      expect(screen.getByText('10%')).toBeInTheDocument()
       expect(screen.getByText('de desconto em qualquer produto')).toBeInTheDocument()
     })
   })
@@ -222,7 +230,7 @@ describe('PDV', () => {
     fireEvent.submit(screen.getByPlaceholderText('Digite o CPF...').closest('form')!)
 
     await waitFor(() => {
-      expect(screen.getByText('Assinatura expirada - desconto não disponível')).toBeInTheDocument()
+      expect(screen.getByText('NÃO ESTÁ EM DIA — assinatura expirada')).toBeInTheDocument()
     })
   })
 
@@ -273,6 +281,19 @@ describe('PDV', () => {
 
     await waitFor(() => {
       expect(mockGetMemberByCPF).toHaveBeenCalledWith('12345678901')
+    })
+  })
+
+  it('processes a URL QR and looks up the member by id', async () => {
+    mockGetMemberById.mockResolvedValue(activeMember)
+    render(<PDV />)
+
+    fireEvent.click(screen.getByText('Scanner QR'))
+    fireEvent.click(screen.getByTestId('qr-scan-url'))
+
+    await waitFor(() => {
+      expect(mockGetMemberById).toHaveBeenCalledWith('abcd1234-5678-9012-3456-789012345678')
+      expect(screen.getByText('EM DIA — pode aplicar o desconto!')).toBeInTheDocument()
     })
   })
 })

@@ -15,6 +15,21 @@ export async function getMemberByCPF(cpf: string): Promise<Member | null> {
   return result.data || null
 }
 
+export interface MemberCardPublic {
+  fullName: string
+  status: string
+  expiryDate: string
+  isCurrent: boolean
+  discountPercent: number
+  planName: string
+}
+
+/** Public card check — no auth. Used by /verificar/:id and phone-camera QR scans. */
+export async function verifyMemberCard(id: string): Promise<MemberCardPublic | null> {
+  const result = await api.get<MemberCardPublic>(`/members/verify/${id}`, { skipAuth: true })
+  return result.data || null
+}
+
 /**
  * Uses a public endpoint that does not require authentication.
  */

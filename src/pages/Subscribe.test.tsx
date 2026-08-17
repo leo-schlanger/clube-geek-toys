@@ -109,8 +109,8 @@ describe('Subscribe', () => {
   it('renders the club plan name and discount', () => {
     render(<Subscribe />)
     expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
-    // "15% em qualquer produto" aparece no card do plano e no hero
-    expect(screen.getAllByText('15% em qualquer produto').length).toBeGreaterThanOrEqual(1)
+    // "10% em qualquer produto" aparece no card do plano e no hero
+    expect(screen.getAllByText('10% em qualquer produto').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders the annual price on the plan card', () => {
@@ -158,9 +158,9 @@ describe('Subscribe', () => {
 
   it('renders the club plan benefits list', () => {
     render(<Subscribe />)
-    expect(screen.getByText('15% de desconto em qualquer produto')).toBeInTheDocument()
-    expect(screen.getByText('Brinde especial de boas-vindas')).toBeInTheDocument()
-    expect(screen.getByText('Entrada gratuita em eventos participantes')).toBeInTheDocument()
+    expect(screen.getByText('10% de desconto em qualquer produto')).toBeInTheDocument()
+    expect(screen.getByText('50% de desconto nos ingressos dos eventos')).toBeInTheDocument()
+    expect(screen.getByText('Brinde na primeira compra da loja')).toBeInTheDocument()
   })
 
   it('renders extra benefits (QR Code carteirinha, sem fidelidade)', () => {
@@ -175,8 +175,8 @@ describe('Subscribe', () => {
   it('renders the "Por que ser VIP?" section with feature cards', () => {
     render(<Subscribe />)
     expect(screen.getByText('Por que ser VIP?')).toBeInTheDocument()
-    expect(screen.getByText('15% de desconto')).toBeInTheDocument()
-    expect(screen.getByText('Brinde especial')).toBeInTheDocument()
+    expect(screen.getByText('10% de desconto')).toBeInTheDocument()
+    expect(screen.getByText('Brinde na 1ª compra')).toBeInTheDocument()
     expect(screen.getByText('Eventos participantes')).toBeInTheDocument()
     expect(screen.getByText('Carteirinha digital')).toBeInTheDocument()
   })

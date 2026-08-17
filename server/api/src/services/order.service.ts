@@ -9,6 +9,7 @@ import { auditLog } from '../utils/audit.js';
 import { recordOrderMovements } from './stock.service.js';
 import {
   MEMBER_SHOP_DISCOUNT,
+  MEMBER_DISCOUNT_REASON,
   WHOLESALE_SHOP_DISCOUNT,
   type Order,
   type OrderItem,
@@ -147,7 +148,7 @@ export interface CreateOrderResult {
  * decremented on payment confirmation (webhook / admin PIX confirm).
  *
  * Channels:
- * - retail: optional member_15 when active member
+ * - retail: optional member_10 when active member
  * - wholesale: requires auth + approved CNPJ account; wholesale_25; only wholesale_enabled products
  */
 export async function createOrder(input: CreateOrderInput, user?: JwtPayload): Promise<CreateOrderResult> {
@@ -219,7 +220,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     recipientName: addr.recipientName?.trim() || input.customer.name,
   };
 
-  // Resolve active membership (for the 15% discount) — never trust the client.
+  // Resolve active membership (for the 10% discount) — never trust the client.
   // Wholesale channel does NOT stack member discount (uses wholesale_25 only).
   // Always persist user_id when authenticated so "Minhas compras" works even without active plan.
   let memberId: string | null = null;
@@ -369,7 +370,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     }
     subtotal = round2(subtotal);
 
-    // Discounts: wholesale_25 XOR member_15 (never both).
+    // Discounts: wholesale_25 XOR member_10 (never both).
     const wholesaleDiscount = isWholesale ? round2(subtotal * WHOLESALE_SHOP_DISCOUNT) : 0;
     const memberDiscount = !isWholesale && memberId ? round2(subtotal * MEMBER_SHOP_DISCOUNT) : 0;
     const baseDiscount = isWholesale ? wholesaleDiscount : memberDiscount;
@@ -378,7 +379,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         ? 'wholesale_25'
         : null
       : memberDiscount > 0
-        ? 'member_15'
+        ? MEMBER_DISCOUNT_REASON
         : null;
     const goodsAfterDiscount = round2(subtotal - baseDiscount);
     // Provisional total without store credit (frete never discounted).

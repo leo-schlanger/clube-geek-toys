@@ -187,7 +187,7 @@ export default function ShopHome() {
               </h1>
               <p className="mt-2 text-muted-foreground">
                 Envio pelos Correios para todo o Brasil. Membros do clube ganham{' '}
-                <strong className="text-accent">15% de desconto</strong> em qualquer produto.
+                <strong className="text-accent">10% de desconto</strong> em qualquer produto.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button asChild size="sm" variant="outline" className="gap-2 border-primary/40">

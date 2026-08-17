@@ -667,7 +667,7 @@ export default function ShopCheckout() {
                             ? 'Descontos'
                             : order.discountReason === 'store_credit'
                               ? 'Crédito de avaliação'
-                              : 'Desconto clube 15%'}
+                              : `Desconto clube ${Math.round(MEMBER_SHOP_DISCOUNT * 100)}%`}
                         </span>
                         <span className="tabular-nums">-{formatCurrency(order.discount)}</span>
                       </div>
@@ -763,7 +763,7 @@ export default function ShopCheckout() {
                   >
                     <Sparkles className="h-4 w-4 shrink-0 text-primary" />
                     <span>
-                      Membros ganham 15% de desconto.{' '}
+                      Membros ganham 10% de desconto.{' '}
                       <strong className="text-primary">Entrar</strong>
                     </span>
                   </Link>

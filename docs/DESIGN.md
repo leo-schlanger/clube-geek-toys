@@ -194,7 +194,7 @@ Base **shadcn/ui** + CVA. Cores via tokens CSS (`bg-primary`, `text-muted-foregr
 | **MembershipCard**                                                | `member/MembershipCard.tsx`     | **Gradiente roxo metálico** (`#6d28d9`, glow `#7c3aed`) — **fora da marca** |
 | SubscriptionCard                                                  | `member/SubscriptionCard.tsx`   | `border-primary`, ícones primary                                            |
 | WelcomeCelebration                                                | `member/WelcomeCelebration.tsx` | Confetti com pink/gold + primary                                            |
-| DiscountStrip                                                     | `member/DiscountStrip.tsx`      | Destaque de 15%                                                             |
+| DiscountStrip                                                     | `member/DiscountStrip.tsx`      | Destaque de 10%                                                             |
 | BenefitsSection / QuickActions / AccountSection / OnboardingGuide | `member/*`                      | Tokens + primary                                                            |
 
 ### 5.3 Domínio — admin / PDV / relatórios
@@ -212,7 +212,7 @@ Base **shadcn/ui** + CVA. Cores via tokens CSS (`bg-primary`, `text-muted-foregr
 | Componente                                           | Arquivo                         | Notas                                                          |
 | ---------------------------------------------------- | ------------------------------- | -------------------------------------------------------------- |
 | ShopHeader / CategoryNav / ProductGrid / ProductCard | `store/*`                       | Primary + cards                                                |
-| MemberDiscountBadge                                  | `store/MemberDiscountBadge.tsx` | Badge de 15%                                                   |
+| MemberDiscountBadge                                  | `store/MemberDiscountBadge.tsx` | Badge de 10%                                                   |
 | CartDrawer                                           | `store/CartDrawer.tsx`          |                                                                |
 | Páginas                                              | `pages/shop/*`                  | Hero com `from-primary/10` + **violet residual** em `ShopHome` |
 

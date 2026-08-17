@@ -1,6 +1,13 @@
 import { env } from '../config/env.js';
 import { query } from '../config/database.js';
 
+/** User-facing plan name. Emails used to print the slug "club". */
+function planLabel(plan?: string): string {
+  if (!plan) return '—';
+  if (plan === 'club') return 'Clube GeekPop & Toys';
+  return plan;
+}
+
 /** Escape HTML special characters for safe use in email templates. */
 function escapeHtml(str: string): string {
   return str
@@ -190,14 +197,15 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // ─── ONBOARDING ─────────────────────────────────────
     'welcome': {
       subject: 'Bem-vindo ao Clube GeekPop & Toys! 🎮',
-      preheader: `${name}, você agora é membro ${v.plan || ''} do clube!`,
+      preheader: `${name}, você agora é membro do ${planLabel(v.plan)}!`,
       body: `
         <h2 style="color:#F04080;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
-        <p>Sua conta no <strong>Clube GeekPop & Toys</strong> foi ativada com sucesso${v.plan ? ` no plano <strong>${v.plan}</strong>` : ''}. Você agora faz parte da nossa comunidade geek!</p>
+        <p>Sua conta no <strong>Clube GeekPop & Toys</strong> foi ativada com sucesso. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>
         ${featureList([
-          '🏷️ 15% de desconto em qualquer produto',
-          '🎁 Brinde especial + eventos',
+          '🏷️ 10% de desconto em qualquer produto',
+          '🎟️ 50% de desconto nos ingressos dos eventos',
+          '🎁 Brinde na primeira compra da loja',
           '📋 Carteirinha digital com QR Code',
         ])}`,
       cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
@@ -213,7 +221,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Seu pagamento foi processado com sucesso. Confira os detalhes:</p>
         ${dataTable([
           ['Valor', `<strong style="color:#4ade80">R$ ${v.amount || '0,00'}</strong>`],
-          ['Plano', v.plan || '—'],
+          ['Plano', planLabel(v.plan)],
           ...(v.expiry_date ? [['Válido até', v.expiry_date]] : []),
         ])}
         <p style="margin-top:16px">Sua carteirinha digital já está disponível!</p>`,
@@ -284,13 +292,13 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // ─── ASSINATURA ─────────────────────────────────────
     'subscription-created': {
       subject: 'Assinatura ativada — Clube GeekPop & Toys',
-      preheader: `${name}, sua assinatura do plano ${v.plan || ''} está ativa!`,
+      preheader: `${name}, sua assinatura do ${planLabel(v.plan)} está ativa!`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Assinatura ativada! 🎉</h2>
         <p>Olá, <strong>${name}</strong>!</p>
         <p>Sua assinatura recorrente foi ativada com sucesso:</p>
         ${dataTable([
-          ['Plano', `<strong>${v.plan || '—'}</strong>`],
+          ['Plano', `<strong>${planLabel(v.plan)}</strong>`],
           ['Valor mensal', `R$ ${v.amount || '0,00'}`],
           ['Cartão', `•••• ${v.card_last_four || '****'}`],
         ])}
@@ -307,7 +315,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Sua cobrança recorrente foi processada com sucesso:</p>
         ${dataTable([
           ['Valor', `<strong style="color:#4ade80">R$ ${v.amount || '0,00'}</strong>`],
-          ['Plano', v.plan || '—'],
+          ['Plano', planLabel(v.plan)],
           ['Próxima cobrança', v.next_payment || '—'],
         ])}
         <p style="margin-top:12px">Sua assinatura continua ativa. Obrigado pela confiança!</p>`,
@@ -369,12 +377,12 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       body: `
         <h2 style="color:#fbbf24;margin:0 0 12px">Sua assinatura expira em breve ⚠️</h2>
         <p>Olá, <strong>${name}</strong>!</p>
-        <p>Sua assinatura do plano <strong>${v.plan || ''}</strong> expira em <strong>${v.expiry_date || 'alguns dias'}</strong>.</p>
+        <p>Sua assinatura do <strong>${planLabel(v.plan)}</strong> expira em <strong>${v.expiry_date || 'alguns dias'}</strong>.</p>
         <p>Renove agora para não perder seus benefícios:</p>
         ${featureList([
-          '🏷️ 15% de desconto em qualquer produto',
-          '🎁 Brinde especial',
-          '🎮 Acesso a eventos especiais',
+          '🏷️ 10% de desconto em qualquer produto',
+          '🎟️ 50% de desconto nos ingressos dos eventos',
+          '🎁 Brinde na primeira compra da loja',
         ])}`,
       cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
     },
@@ -385,7 +393,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       body: `
         <h2 style="color:#f87171;margin:0 0 12px">Assinatura expirada</h2>
         <p>Olá, <strong>${name}</strong>.</p>
-        <p>Sua assinatura do plano <strong>${v.plan || ''}</strong> expirou. Enquanto inativa, você não poderá aproveitar os benefícios do clube:</p>
+        <p>Sua assinatura do <strong>${planLabel(v.plan)}</strong> expirou. Enquanto inativa, você não poderá aproveitar os benefícios do clube:</p>
         ${featureList([
           '❌ Desconto do clube suspenso enquanto a assinatura estiver inativa',
         ])}
@@ -396,13 +404,13 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // ─── CONTRATO ───────────────────────────────────────
     'contract-signed': {
       subject: 'Contrato assinado — Clube GeekPop & Toys',
-      preheader: `${name}, seu contrato do plano ${v.plan || ''} foi assinado digitalmente.`,
+      preheader: `${name}, seu contrato do ${planLabel(v.plan)} foi assinado digitalmente.`,
       body: `
         <h2 style="color:#4ade80;margin:0 0 12px">Contrato assinado com sucesso! 📋</h2>
         <p>Olá, <strong>${name}</strong>!</p>
         <p>Seu contrato digital foi assinado eletronicamente conforme a <strong>Lei 14.063/2020</strong>.</p>
         ${dataTable([
-          ['Plano', v.plan || '—'],
+          ['Plano', planLabel(v.plan)],
           ['Data da assinatura', v.signed_at || '—'],
           ['Hash do documento', `<span style="font-family:monospace;font-size:11px;word-break:break-all">${v.hash || '—'}</span>`],
         ])}
@@ -420,7 +428,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ${dataTable([
           ['Membro', escapeHtml(v.member_name || '—')],
           ['Email', v.member_email || '—'],
-          ['Plano', v.plan || '—'],
+          ['Plano', planLabel(v.plan)],
           ['Valor', `<strong style="color:#4ade80">R$ ${v.amount || '0,00'}</strong>`],
           ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
           ['Payment ID', `<span style="font-family:monospace;font-size:11px">${v.payment_id || '—'}</span>`],
@@ -470,7 +478,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // ─── ADMIN: NEW MEMBER ─────────────────────────────
     'admin-new-member': {
       subject: '👤 Novo membro cadastrado — Clube GeekPop & Toys',
-      preheader: `${v.member_name || 'Novo membro'} se cadastrou no plano ${v.plan || ''}.`,
+      preheader: `${v.member_name || 'Novo membro'} se cadastrou no ${planLabel(v.plan)}.`,
       body: `
         <h2 style="color:#3b82f6;margin:0 0 12px">Novo membro cadastrado 👤</h2>
         <p>Um novo membro completou o cadastro no clube.</p>
@@ -479,7 +487,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Email', v.member_email || '—'],
           ['CPF', v.member_cpf || '—'],
           ['Telefone', v.member_phone || '—'],
-          ['Plano', v.plan || '—'],
+          ['Plano', planLabel(v.plan)],
           ['Pagamento', v.payment_type || '—'],
         ])}
         <p style="margin-top:12px;font-size:13px;color:#94a3b8">O membro está aguardando pagamento para ativação.</p>`,

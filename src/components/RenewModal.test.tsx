@@ -92,7 +92,7 @@ describe('RenewModal', () => {
 
   it('renders plan benefits', () => {
     renderModal()
-    expect(screen.getByText(/15% de desconto em qualquer produto/)).toBeInTheDocument()
+    expect(screen.getByText(/10% de desconto em qualquer produto/)).toBeInTheDocument()
   })
 
   it('shows annual price (R$ 149,99)', () => {

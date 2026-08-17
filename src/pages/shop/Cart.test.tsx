@@ -23,7 +23,7 @@ vi.mock('../../components/store/ShopHeader', () => ({
 }))
 
 vi.mock('../../components/store/MemberDiscountBadge', () => ({
-  MemberDiscountBadge: () => <span>15% membro</span>,
+  MemberDiscountBadge: () => <span>10% membro</span>,
 }))
 
 import Cart from './Cart'
@@ -128,7 +128,7 @@ describe('Cart', () => {
         <Cart />
       </MemoryRouter>
     )
-    // 15% of 100
-    expect(screen.getByText(/15%/)).toBeInTheDocument()
+    // 10% of 100
+    expect(screen.getByText(/10%/)).toBeInTheDocument()
   })
 })

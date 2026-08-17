@@ -160,7 +160,7 @@ export function CartDrawer({
                   <>
                     <div className="flex justify-between text-green-600">
                       <span>
-                        {isWholesale ? 'Desconto atacado (25%)' : 'Desconto membro (15%)'}
+                        {isWholesale ? 'Desconto atacado (25%)' : `Desconto membro (${Math.round(MEMBER_SHOP_DISCOUNT * 100)}%)`}
                       </span>
                       <span className="tabular-nums">-{formatCurrency(estimatedDiscount)}</span>
                     </div>

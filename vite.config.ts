@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'Clube GeekPop & Toys',
         short_name: 'GeekPop',
-        description: 'Clube de vantagens — 15% de desconto em qualquer produto, na loja física e online',
+        description: 'Clube de vantagens — 10% de desconto em qualquer produto, na loja física e online',
         theme_color: '#F04080',
         background_color: '#FDFBFC',
         display: 'standalone',

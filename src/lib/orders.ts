@@ -30,7 +30,7 @@ export interface CreateOrderResult {
   pixData?: PixQRData
 }
 
-/** Create an order + charge. Member 15% or wholesale 25% applied server-side by channel. */
+/** Create an order + charge. Member 10% or wholesale 25% applied server-side by channel. */
 export async function createOrder(payload: CreateOrderPayload): Promise<CreateOrderResult> {
   const result = await api.post<CreateOrderResult>('/orders', payload as unknown as Record<string, unknown>)
   if (result.error || !result.data) {

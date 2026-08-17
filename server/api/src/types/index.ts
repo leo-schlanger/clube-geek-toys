@@ -108,9 +108,10 @@ export interface AuditLog {
 export const CLUB_PLAN_PRICE = 149.99;
 
 // Active-member shop discount, applied server-side at checkout.
-export const MEMBER_SHOP_DISCOUNT = 0.15;
+export const MEMBER_SHOP_DISCOUNT = 0.10;
+export const MEMBER_DISCOUNT_REASON = 'member_10';
 
-// Approved wholesale discount. Wholesale channel only; never stacks with member_15.
+// Approved wholesale discount. Wholesale channel only; never stacks with member_10.
 export const WHOLESALE_SHOP_DISCOUNT = 0.25;
 
 export type ShopChannel = 'retail' | 'wholesale';

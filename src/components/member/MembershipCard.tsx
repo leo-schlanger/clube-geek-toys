@@ -2,6 +2,8 @@ import { useState, useCallback, useRef } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { PLANS, CLUB_PLAN, type Member, type PlanType } from '../../types'
 import { formatCPF, getStatusLabel } from '../../lib/utils'
+import { isMemberActive } from '../../lib/members'
+import { getMemberVerifyUrl } from '../../lib/subdomain'
 import { toast } from 'sonner'
 import {
   Sparkles,
@@ -64,14 +66,8 @@ export function MembershipCard({ member }: MembershipCardProps) {
   const plan = PLANS[member.plan as PlanType]
   const style = planStyles[member.plan as PlanType]
 
-  const qrData = JSON.stringify({
-    id: member.id,
-    cpf: member.cpf,
-    plan: member.plan,
-    status: member.status,
-    expiry: member.expiryDate,
-    v: 1,
-  })
+  const qrData = getMemberVerifyUrl(member.id)
+  const emDia = isMemberActive(member)
 
   const copyMemberId = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -291,7 +287,7 @@ export function MembershipCard({ member }: MembershipCardProps) {
 
               {/* Scan instruction */}
               <p className="text-[10px] text-center tracking-wide" style={{ color: style.mutedText }}>
-                Apresente na loja para aplicar seus descontos
+                Escaneie para ver se o membro está em dia
               </p>
 
               {/* Discount badge */}
@@ -315,10 +311,10 @@ export function MembershipCard({ member }: MembershipCardProps) {
                 </span>
                 <span
                   className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
-                  style={{ color: member.status === 'active' ? '#4ade80' : '#fbbf24' }}
+                  style={{ color: emDia ? '#4ade80' : '#f87171' }}
                 >
-                  {member.status === 'active'
-                    ? <><CheckCircle className="h-3 w-3" />{getStatusLabel(member.status)}</>
+                  {emDia
+                    ? <><CheckCircle className="h-3 w-3" />EM DIA</>
                     : getStatusLabel(member.status)
                   }
                 </span>

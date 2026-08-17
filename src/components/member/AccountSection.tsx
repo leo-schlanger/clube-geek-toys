@@ -5,6 +5,7 @@ import { Loading } from '../ui/loading'
 import { PLANS, type Member, type PlanType } from '../../types'
 import type { Contract } from '../../types'
 import { resendContractEmail } from '../../lib/email'
+import { generateAdhesionPDF, downloadPDF } from '../../lib/contract-generator'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
 import {
@@ -28,6 +29,7 @@ interface AccountSectionProps {
 
 export function AccountSection({ member, contract, onEditProfile }: AccountSectionProps) {
   const [resendingContract, setResendingContract] = useState(false)
+  const [downloadingAdhesion, setDownloadingAdhesion] = useState(false)
   const plan = PLANS[member.plan as PlanType]
 
   const handleResendContract = useCallback(async () => {
@@ -56,6 +58,27 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
       setResendingContract(false)
     }
   }, [contract, member.email, plan.name])
+
+  const handleDownloadAdhesion = useCallback(async () => {
+    setDownloadingAdhesion(true)
+    try {
+      const pdf = await generateAdhesionPDF({
+        id: member.id,
+        fullName: member.fullName,
+        cpf: member.cpf,
+        email: member.email,
+        phone: member.phone,
+      })
+      const slug = member.fullName.replace(/\s+/g, '-').toLowerCase()
+      downloadPDF(pdf, `termo-adesao-geekpop-${slug}.pdf`)
+      toast.success('Termo de adesão baixado')
+    } catch (error) {
+      logger.error('Error generating adhesion PDF:', error)
+      toast.error('Erro ao gerar o termo de adesão')
+    } finally {
+      setDownloadingAdhesion(false)
+    }
+  }, [member])
 
   return (
     <div className="space-y-6">
@@ -165,12 +188,27 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
               </div>
             </div>
           ) : (
-            <div className="text-center py-4">
+            <div className="text-center py-4 space-y-3">
               <FileText className="h-10 w-10 mx-auto mb-2 text-muted-foreground opacity-30" />
-              <p className="text-muted-foreground">Nenhum contrato encontrado</p>
+              <p className="text-muted-foreground">Termo de adesão do Clube</p>
               <p className="text-sm text-muted-foreground">
-                Entre em contato com o suporte se precisar de uma cópia.
+                Baixe o regulamento vigente com os seus dados de membro.
               </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadAdhesion}
+                disabled={downloadingAdhesion}
+              >
+                {downloadingAdhesion ? (
+                  <Loading size="sm" />
+                ) : (
+                  <>
+                    <Download className="h-4 w-4" />
+                    Baixar termo de adesão
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </CardContent>

@@ -34,6 +34,8 @@ interface ContractParams {
   ipAddress: string
   userAgent: string
   documentHash: string
+  /** Skip digital-signature + hash footer — used for the downloadable adhesion term. */
+  unsigned?: boolean
 }
 
 /**
@@ -304,7 +306,9 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
 
   // Signature date
   const signedDate = new Date(params.signedAt)
-  const dateText = `Assinado digitalmente em ${formatDateExtensive(signedDate)}`
+  const dateText = params.unsigned
+    ? `Termo de adesão — regulamento vigente emitido em ${formatDateExtensive(signedDate)}`
+    : `Assinado digitalmente em ${formatDateExtensive(signedDate)}`
   currentPage.drawText(dateText, {
     x: MARGIN,
     y: yPosition,
@@ -315,7 +319,7 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
   yPosition -= 25
 
   // Signature image
-  if (signatureImageEmbed) {
+  if (signatureImageEmbed && !params.unsigned) {
     const sigWidth = 200
     const sigHeight = (signatureImageEmbed.height / signatureImageEmbed.width) * sigWidth
     const maxHeight = 80
@@ -364,56 +368,86 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
   // VALIDATION FOOTER
   // ============================================
 
-  checkNewPage(100)
+  if (!params.unsigned) {
+    checkNewPage(100)
 
-  // Validation box
-  const footerBoxHeight = 70
-  currentPage.drawRectangle({
-    x: MARGIN,
-    y: yPosition - footerBoxHeight + 15,
-    width: CONTENT_WIDTH,
-    height: footerBoxHeight,
-    color: rgb(250 / 255, 250 / 255, 250 / 255),
-    borderColor: rgb(200 / 255, 200 / 255, 200 / 255),
-    borderWidth: 0.5,
-  })
+    // Validation box
+    const footerBoxHeight = 70
+    currentPage.drawRectangle({
+      x: MARGIN,
+      y: yPosition - footerBoxHeight + 15,
+      width: CONTENT_WIDTH,
+      height: footerBoxHeight,
+      color: rgb(250 / 255, 250 / 255, 250 / 255),
+      borderColor: rgb(200 / 255, 200 / 255, 200 / 255),
+      borderWidth: 0.5,
+    })
 
-  let footerY = yPosition
+    let footerY = yPosition
 
-  currentPage.drawText('REGISTRO DE VALIDAÇÃO', {
-    x: MARGIN + 10,
-    y: footerY,
-    size: 8,
-    font: helveticaBold,
-    color: MUTED_COLOR,
-  })
-  footerY -= 14
-
-  // Truncate user agent for display
-  const userAgentDisplay = params.userAgent.length > 80
-    ? params.userAgent.substring(0, 80) + '...'
-    : params.userAgent
-
-  const validationLines = [
-    `IP: ${params.ipAddress}`,
-    `User-Agent: ${userAgentDisplay}`,
-    `Hash SHA-256: ${params.documentHash}`,
-  ]
-
-  for (const line of validationLines) {
-    currentPage.drawText(line, {
+    currentPage.drawText('REGISTRO DE VALIDAÇÃO', {
       x: MARGIN + 10,
       y: footerY,
-      size: 7,
-      font: helvetica,
+      size: 8,
+      font: helveticaBold,
       color: MUTED_COLOR,
     })
-    footerY -= 12
+    footerY -= 14
+
+    // Truncate user agent for display
+    const userAgentDisplay = params.userAgent.length > 80
+      ? params.userAgent.substring(0, 80) + '...'
+      : params.userAgent
+
+    const validationLines = [
+      `IP: ${params.ipAddress}`,
+      `User-Agent: ${userAgentDisplay}`,
+      `Hash SHA-256: ${params.documentHash}`,
+    ]
+
+    for (const line of validationLines) {
+      currentPage.drawText(line, {
+        x: MARGIN + 10,
+        y: footerY,
+        size: 7,
+        font: helvetica,
+        color: MUTED_COLOR,
+      })
+      footerY -= 12
+    }
   }
 
   // Generate PDF bytes
   const pdfBytes = await pdfDoc.save()
   return pdfBytes
+}
+
+/**
+ * Regulamento + dados do membro, sem assinatura digital.
+ * Used when the member paid but never went through ContractModal.
+ */
+export async function generateAdhesionPDF(member: {
+  id: string
+  fullName: string
+  cpf: string
+  email: string
+  phone?: string
+}): Promise<Uint8Array> {
+  return generateContractPDF({
+    memberId: member.id,
+    memberName: member.fullName,
+    memberCPF: member.cpf,
+    memberEmail: member.email,
+    memberPhone: member.phone || '',
+    plan: 'club',
+    paymentType: 'annual',
+    signatureImage: '',
+    signedAt: new Date().toISOString(),
+    ipAddress: '',
+    userAgent: '',
+    documentHash: '',
+    unsigned: true,
+  })
 }
 
 /**

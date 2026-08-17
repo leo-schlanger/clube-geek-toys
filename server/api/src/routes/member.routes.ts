@@ -7,8 +7,11 @@ import * as memberService from '../services/member.service.js';
 import * as paymentService from '../services/payment.service.js';
 import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
+import { MEMBER_SHOP_DISCOUNT } from '../types/index.js';
 
 export const memberRouter = Router();
+
+const MEMBER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Public endpoint: check if CPF is already registered (used during registration).
 // Returns only { exists: boolean } — never exposes member data.
@@ -22,6 +25,39 @@ memberRouter.get('/cpf-exists/:cpf', publicLookupLimiter, async (req, res, next)
     }
     const member = await memberService.getMemberByCpf(cpf);
     res.json({ exists: member !== null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Public card check: phone-camera scan of the membership QR.
+// Returns only what a physical card would show — never CPF, email or user id.
+memberRouter.get('/verify/:id', publicLookupLimiter, async (req, res, next) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!MEMBER_ID_RE.test(id)) {
+      res.status(400).json({ error: 'Identificador inválido' });
+      return;
+    }
+    const member = await memberService.getMemberById(id);
+    if (!member) {
+      res.status(404).json({ error: 'Carteirinha não encontrada' });
+      return;
+    }
+    const expiry = member.expiryDate ? new Date(member.expiryDate) : null;
+    const isCurrent =
+      member.status === 'active' &&
+      expiry !== null &&
+      !Number.isNaN(expiry.getTime()) &&
+      expiry >= new Date();
+    res.json({
+      fullName: member.fullName,
+      status: member.status,
+      expiryDate: member.expiryDate,
+      isCurrent,
+      discountPercent: Math.round(MEMBER_SHOP_DISCOUNT * 100),
+      planName: 'Clube GeekPop & Toys',
+    });
   } catch (err) {
     next(err);
   }

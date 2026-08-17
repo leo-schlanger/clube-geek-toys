@@ -18,7 +18,7 @@ export function MemberDiscountBadge({ className }: MemberDiscountBadgeProps) {
       title="Desconto de membro do Clube GeekPop & Toys"
     >
       <BadgePercent className="h-3.5 w-3.5" />
-      Membro -15%
+      Membro -10%
     </Badge>
   )
 }

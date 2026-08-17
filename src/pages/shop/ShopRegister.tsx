@@ -279,7 +279,7 @@ export default function ShopRegister() {
 
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-accent" />
-                  Membros do clube têm 15% de desconto na loja
+                  Membros do clube têm 10% de desconto na loja
                 </p>
               </CardFooter>
             </form>

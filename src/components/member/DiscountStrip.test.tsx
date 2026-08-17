@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react'
 import { DiscountStrip } from './DiscountStrip'
 
 describe('DiscountStrip', () => {
-  it('renders the single 15% discount', () => {
+  it('renders the single 10% discount', () => {
     render(<DiscountStrip />)
-    expect(screen.getByText('15%')).toBeInTheDocument()
+    expect(screen.getByText('10%')).toBeInTheDocument()
   })
 
   it('shows the "em qualquer produto" copy', () => {

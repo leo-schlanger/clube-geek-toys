@@ -98,11 +98,11 @@ export const CLUB_PLAN: Plan = {
   id: 'club',
   name: 'Clube GeekPop & Toys',
   price: 149.99,
-  discount: 15,
+  discount: 10,
   benefits: [
-    '15% de desconto em qualquer produto',
-    'Brinde especial de boas-vindas',
-    'Entrada gratuita em eventos participantes',
+    '10% de desconto em qualquer produto',
+    '50% de desconto nos ingressos dos eventos',
+    'Brinde na primeira compra da loja',
   ],
   color: '#F04080',
   icon: '🎮',
@@ -115,7 +115,7 @@ export const PLANS: Record<PlanType, Plan> = {
 
 // Display only: the real figure is always recomputed server-side.
 // See MEMBER_SHOP_DISCOUNT in server/api/src/types.
-export const MEMBER_SHOP_DISCOUNT = 0.15
+export const MEMBER_SHOP_DISCOUNT = 0.10
 
 // Wholesale channel, approved CNPJ account. Applied server-side only.
 export const WHOLESALE_SHOP_DISCOUNT = 0.25

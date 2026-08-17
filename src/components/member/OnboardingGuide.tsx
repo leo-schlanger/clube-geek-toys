@@ -34,13 +34,13 @@ export function OnboardingGuide({ memberStartDate }: OnboardingGuideProps) {
     },
     {
       icon: <ShoppingBag className="h-5 w-5 text-primary" />,
-      title: 'Ganhe 15% em qualquer produto',
+      title: 'Ganhe 10% em qualquer produto',
       description: 'Seu desconto de membro vale na loja física e na loja online — em toda a sua compra.',
     },
     {
       icon: <Gift className="h-5 w-5 text-primary" />,
       title: 'Brinde e eventos',
-      description: 'Retire seu brinde especial e entre de graça nos eventos participantes.',
+      description: 'Na primeira compra da loja você ganha um brinde. Nos eventos, o ingresso sai com 50% de desconto.',
     },
   ]
 

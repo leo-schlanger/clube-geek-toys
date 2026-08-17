@@ -109,3 +109,6 @@ server/scripts/sftp_upload.py
 
 # Vitest coverage (reportsDirectory em vitest.config.ts)
 .coverage/
+
+# graphify generated output (graph.html, graph.json, obsidian vault, cache)
+graphify-out/

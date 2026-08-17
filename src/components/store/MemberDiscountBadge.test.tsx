@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 
 describe('MemberDiscountBadge', () => {
-  it('shows 15% member label', () => {
+  it('shows 10% member label', () => {
     render(<MemberDiscountBadge />)
-    expect(screen.getByText(/Membro -15%/)).toBeInTheDocument()
+    expect(screen.getByText(/Membro -10%/)).toBeInTheDocument()
   })
 })

@@ -47,7 +47,7 @@ Cliente                Shop /atacado              API                     Admin
 
 | Regra                 | Detalhe                                                             |
 | --------------------- | ------------------------------------------------------------------- |
-| Não empilha com clube | Canal atacado **não** aplica `member_15`                            |
+| Não empilha com clube | Canal atacado **não** aplica `member_10`                            |
 | Frete                 | Nunca recebe desconto                                               |
 | Estoque               | Mesmo estoque do varejo; valida no create, baixa no paid            |
 | Produto               | Sem `wholesale_enabled` → fora do catálogo e rejeitado no checkout  |

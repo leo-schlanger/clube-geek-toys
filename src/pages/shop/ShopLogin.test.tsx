@@ -81,7 +81,7 @@ describe('ShopLogin', () => {
       </MemoryRouter>
     )
     expect(screen.getByRole('heading', { name: /Entrar/i })).toBeInTheDocument()
-    expect(screen.getByText(/15% de desconto/i)).toBeInTheDocument()
+    expect(screen.getByText(/10% de desconto/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
   })
 

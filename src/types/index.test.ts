@@ -28,8 +28,8 @@ describe('CLUB_PLAN', () => {
     expect(CLUB_PLAN.price).toBe(149.99)
   })
 
-  it('has a 15% discount', () => {
-    expect(CLUB_PLAN.discount).toBe(15)
+  it('has a 10% discount', () => {
+    expect(CLUB_PLAN.discount).toBe(10)
   })
 
   it('has three benefits', () => {
@@ -60,8 +60,8 @@ describe('CLUB_PLAN', () => {
 // ============================================
 
 describe('MEMBER_SHOP_DISCOUNT', () => {
-  it('is 0.15, i.e. 15% as a fraction', () => {
-    expect(MEMBER_SHOP_DISCOUNT).toBe(0.15)
+  it('is 0.10, i.e. 10% as a fraction', () => {
+    expect(MEMBER_SHOP_DISCOUNT).toBe(0.10)
   })
 
   it('matches the CLUB_PLAN discount', () => {

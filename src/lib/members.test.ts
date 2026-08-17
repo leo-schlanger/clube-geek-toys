@@ -22,6 +22,7 @@ import { api } from './api-client'
 import {
   getMemberByCPF,
   isCPFRegistered,
+  verifyMemberCard,
   getMemberByUserId,
   getMemberById,
   getAllMembers,
@@ -95,6 +96,37 @@ describe('Members API client', () => {
 
       const result = await getMemberByCPF('52998224725')
 
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('verifyMemberCard', () => {
+    it('calls GET /members/verify/:id with skipAuth', async () => {
+      mockedApi.get.mockResolvedValue({
+        data: {
+          fullName: 'Maria',
+          status: 'active',
+          expiryDate: '2027-01-01',
+          isCurrent: true,
+          discountPercent: 10,
+          planName: 'Clube GeekPop & Toys',
+        },
+        status: 200,
+      })
+
+      const result = await verifyMemberCard('abcd1234-5678-9012-3456-789012345678')
+
+      expect(mockedApi.get).toHaveBeenCalledWith(
+        '/members/verify/abcd1234-5678-9012-3456-789012345678',
+        { skipAuth: true },
+      )
+      expect(result?.isCurrent).toBe(true)
+      expect(result?.discountPercent).toBe(10)
+    })
+
+    it('returns null when the card is not found', async () => {
+      mockedApi.get.mockResolvedValue({ data: undefined, status: 404 })
+      const result = await verifyMemberCard('abcd1234-5678-9012-3456-789012345678')
       expect(result).toBeNull()
     })
   })
@@ -456,8 +488,8 @@ describe('Members API client', () => {
   // ---- getMemberDiscount ----
 
   describe('getMemberDiscount', () => {
-    it('returns 15, the single club discount', () => {
-      expect(getMemberDiscount()).toBe(15)
+    it('returns 10, the single club discount', () => {
+      expect(getMemberDiscount()).toBe(10)
     })
 
     it('always returns the same value', () => {

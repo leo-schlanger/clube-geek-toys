@@ -10,7 +10,7 @@ import { Loading } from '../components/ui/loading'
 import { QRScanner } from '../components/QRScanner'
 import { CLUB_PLAN, type Member } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
-import { getMemberByCPF, isMemberActive } from '../lib/members'
+import { getMemberByCPF, getMemberById, isMemberActive } from '../lib/members'
 
 // Validation schema for the member QR code
 const qrCodeSchema = z.object({
@@ -58,7 +58,14 @@ export default function PDV() {
     setResult(null)
 
     try {
-  
+      const urlMatch = data.match(
+        /\/verificar\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
+      )
+      if (urlMatch) {
+        await verifyMemberById(urlMatch[1])
+        return
+      }
+
       const parsed = JSON.parse(data)
       const qrData = qrCodeSchema.parse(parsed)
 
@@ -114,6 +121,34 @@ export default function PDV() {
     }
   }
 
+  function applyVerification(member: Member) {
+    const isActive = isMemberActive(member)
+    const isExpired = new Date(member.expiryDate) < new Date()
+
+    setResult({
+      member,
+      isValid: isActive,
+      message: isActive
+        ? 'EM DIA — pode aplicar o desconto!'
+        : isExpired
+          ? 'NÃO ESTÁ EM DIA — assinatura expirada'
+          : 'NÃO ESTÁ EM DIA — assinatura pendente',
+    })
+  }
+
+  async function verifyMemberById(id: string) {
+    const member = await getMemberById(id)
+    if (!member) {
+      setResult({
+        member: null,
+        isValid: false,
+        message: 'Carteirinha não encontrada no sistema',
+      })
+      return
+    }
+    applyVerification(member)
+  }
+
   /**
    * Verify member by CPF
    */
@@ -130,18 +165,7 @@ export default function PDV() {
         return
       }
 
-      const isActive = isMemberActive(member)
-      const isExpired = new Date(member.expiryDate) < new Date()
-
-      setResult({
-        member,
-        isValid: isActive,
-        message: isActive
-          ? 'Membro ativo - pode aplicar desconto!'
-          : isExpired
-            ? 'Assinatura expirada - desconto não disponível'
-            : 'Assinatura pendente - desconto não disponível',
-      })
+      applyVerification(member)
     } catch (error) {
       logger.error('Error verifying member:', error)
       setResult({

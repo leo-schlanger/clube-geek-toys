@@ -200,7 +200,7 @@ export default function Cart() {
                           >
                             <Sparkles className="h-4 w-4 shrink-0 text-primary" />
                             <span>
-                              Membros economizam 15%.{' '}
+                              Membros economizam 10%.{' '}
                               <strong className="text-primary">Entrar</strong>
                             </span>
                           </Link>

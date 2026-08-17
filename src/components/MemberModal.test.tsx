@@ -150,7 +150,7 @@ describe('MemberModal', () => {
     it('shows the plan price and product discount', () => {
       render(<MemberModal mode="create" {...defaultProps} />)
       expect(screen.getByText(/R\$\s*149,99/)).toBeInTheDocument()
-      expect(screen.getByText(/15% de desconto em qualquer produto/)).toBeInTheDocument()
+      expect(screen.getByText(/10% de desconto em qualquer produto/)).toBeInTheDocument()
     })
 
     it('does not show a monthly/annual payment type selector', () => {

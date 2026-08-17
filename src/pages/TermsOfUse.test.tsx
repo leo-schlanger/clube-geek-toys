@@ -100,9 +100,9 @@ describe('TermsOfUse', () => {
     expect(screen.getByText(/Stripe/)).toBeInTheDocument()
   })
 
-  it('mentions the 15% product discount benefit', () => {
+  it('mentions the 10% product discount benefit', () => {
     renderPage()
-    expect(screen.getByText(/15% de desconto em qualquer produto/i)).toBeInTheDocument()
+    expect(screen.getByText(/10% de desconto em qualquer produto/i)).toBeInTheDocument()
   })
 })
 

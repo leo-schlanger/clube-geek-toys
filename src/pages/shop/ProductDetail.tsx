@@ -405,7 +405,7 @@ export default function ProductDetail() {
                   >
                     <Sparkles className="h-4 w-4 shrink-0 text-primary" />
                     <span>
-                      Entre e ganhe <strong className="text-primary">15% de desconto</strong> de
+                      Entre e ganhe <strong className="text-primary">10% de desconto</strong> de
                       membro ({formatCurrency(memberPrice)})
                     </span>
                   </Link>

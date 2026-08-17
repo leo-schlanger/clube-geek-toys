@@ -107,5 +107,5 @@ function setLink(rel: string, href: string) {
 export const SHOP_DEFAULT_SEO = {
   title: 'Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ',
   description:
-    'Loja de K-pop no Rio de Janeiro. Photocards, merch e colecionáveis com envio pelos Correios. Membros do Clube ganham 15% de desconto. PIX e cartão.',
+    'Loja de K-pop no Rio de Janeiro. Photocards, merch e colecionáveis com envio pelos Correios. Membros do Clube ganham 10% de desconto. PIX e cartão.',
 } as const

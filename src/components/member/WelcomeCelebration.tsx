@@ -102,7 +102,7 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
             className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto"
           >
             Sua conta no Clube GeekPop & Toys está ativa!
-            Aproveite 15% de desconto em qualquer produto e os benefícios do clube.
+            Aproveite 10% de desconto em qualquer produto e os benefícios do clube.
           </motion.p>
 
           <motion.div

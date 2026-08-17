@@ -209,7 +209,7 @@ describe('createOrder — dinheiro', () => {
     expect(v[COL.total]).toBe(224); // 200 + 24 de frete
   });
 
-  it('applies the 15% member discount to goods, never to shipping', async () => {
+  it('applies the 10% member discount to goods, never to shipping', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
     memberIdMock.mockResolvedValue('m1');
     queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] }); // membership ativa
@@ -217,10 +217,10 @@ describe('createOrder — dinheiro', () => {
     await createOrder(baseInput(), { userId: 'u1' } as never);
 
     const v = insertedOrderValues();
-    expect(v[COL.discount]).toBe(15);
-    expect(v[COL.discountReason]).toBe('member_15');
-    // 100 - 15 + 24 = 109. Had shipping entered the discount base it would be 105.40.
-    expect(v[COL.total]).toBe(109);
+    expect(v[COL.discount]).toBe(10);
+    expect(v[COL.discountReason]).toBe('member_10');
+    // 100 - 10 + 24 = 114. Had shipping entered the discount base it would be 102.60.
+    expect(v[COL.total]).toBe(114);
     expect(v[COL.shippingCost]).toBe(24);
   });
 
@@ -236,7 +236,7 @@ describe('createOrder — dinheiro', () => {
     expect(v[COL.discountReason]).toBeNull();
   });
 
-  it('wholesale uses 25% and does NOT stack with the member 15%', async () => {
+  it('wholesale uses 25% and does NOT stack with the member 10%', async () => {
     setupTx({ products: [product({ price: '100.00', wholesale_enabled: true })] });
     approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11222333000181' });
     memberIdMock.mockResolvedValue('m1'); // é membro também — não pode somar

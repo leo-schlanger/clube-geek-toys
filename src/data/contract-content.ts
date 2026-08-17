@@ -21,8 +21,8 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
     title: '2. PLANO E BENEFÍCIOS',
     content: [
       'O Clube GeekPop & Toys possui um único plano, de vigência anual, no valor vigente no momento da adesão.',
-      'BENEFÍCIO PRINCIPAL: 15% (quinze por cento) de desconto em qualquer produto, válido tanto na loja física quanto na loja online do Clube GeekPop & Toys.',
-      'BENEFÍCIOS ADICIONAIS: brinde especial de boas-vindas e entrada gratuita nos eventos participantes promovidos ou apoiados pela loja.',
+      'BENEFÍCIO PRINCIPAL: 10% (dez por cento) de desconto em qualquer produto, válido tanto na loja física quanto na loja online do Clube GeekPop & Toys.',
+      'BENEFÍCIOS ADICIONAIS: 50% (cinquenta por cento) de desconto nos ingressos dos eventos promovidos ou apoiados pela loja, e um brinde na primeira compra realizada na loja física ou online.',
       'Os benefícios são válidos apenas durante a vigência da assinatura e não são cumulativos com outras promoções, salvo indicação expressa.',
     ],
   },

@@ -53,7 +53,7 @@ vi.mock('./logger', () => ({
   },
 }))
 
-import { generateContractPDF, pdfToBase64, createPDFBlob, downloadPDF } from './contract-generator'
+import { generateContractPDF, generateAdhesionPDF, pdfToBase64, createPDFBlob, downloadPDF } from './contract-generator'
 import { PDFDocument } from 'pdf-lib'
 
 describe('contract-generator', () => {
@@ -124,6 +124,20 @@ describe('contract-generator', () => {
       const longUA = 'A'.repeat(200)
       const result = await generateContractPDF({ ...defaultParams, userAgent: longUA })
       expect(result).toBeInstanceOf(Uint8Array)
+    })
+  })
+
+  describe('generateAdhesionPDF', () => {
+    it('returns a PDF without requiring a signature image', async () => {
+      const result = await generateAdhesionPDF({
+        id: 'm1',
+        fullName: 'Maria Silva',
+        cpf: '12345678900',
+        email: 'maria@test.com',
+        phone: '21999999999',
+      })
+      expect(result).toBeInstanceOf(Uint8Array)
+      expect(result.length).toBeGreaterThan(0)
     })
   })
 

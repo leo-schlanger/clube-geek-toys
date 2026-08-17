@@ -105,7 +105,7 @@ export default function TermsOfUse() {
                             <h2 className="text-2xl font-semibold text-foreground">8. Limitação de Responsabilidade</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Os descontos são válidos apenas durante a vigência da assinatura e conforme disponibilidade.</li>
-                                <li>Os benefícios do plano incluem 15% de desconto em qualquer produto (loja física e online), brinde especial e entrada gratuita em eventos participantes.</li>
+                                <li>Os benefícios do plano incluem 10% de desconto em qualquer produto (loja física e online), 50% de desconto nos ingressos dos eventos e um brinde na primeira compra da loja.</li>
                                 <li>Não nos responsabilizamos por indisponibilidades temporárias do sistema por motivos técnicos ou de força maior.</li>
                                 <li>Esta limitação não se aplica a direitos garantidos pelo Código de Defesa do Consumidor.</li>
                             </ul>

@@ -65,7 +65,7 @@ export const ACTIVE_EVENT: EventConfig = {
   },
   description: [
     'Um encontro especial no Copacabana Mar Hotel para fãs de K-pop, colecionáveis e cultura pop. Música ambiente, ambiente temático, lançamentos e muita interação com a equipe GeekPop.',
-    'Ingresso: R$ 20 por pessoa. Criança de colo e criança com deficiência (PCD) não pagam. Membros do Clube GeekPop & Toys têm entrada gratuita nos eventos participantes — apresente a carteirinha digital ou o CPF na porta.',
+    'Ingresso: R$ 20 por pessoa. Criança de colo e criança com deficiência (PCD) não pagam. Membros do Clube GeekPop & Toys têm 50% de desconto no ingresso (R$ 10) — apresente a carteirinha digital ou o CPF na porta.',
   ],
   highlights: [
     'Domingo, 6 de setembro · 14h às 18h',
@@ -75,7 +75,7 @@ export const ACTIVE_EVENT: EventConfig = {
     'Fotos na galeria do site (geeketoys.com.br#galeria)',
   ],
   memberPerk:
-    'Membros do Clube: entrada gratuita (eventos participantes). Criança de colo e PCD: isentos.',
+    'Membros do Clube: 50% de desconto no ingresso (R$ 10). Criança de colo e PCD: isentos.',
   ticketReservation: {
     enabled: true,
     priceBRL: 20,
@@ -83,7 +83,7 @@ export const ACTIVE_EVENT: EventConfig = {
     maxPerReservation: 6,
     whatsappNumber: '5511914662881',
     notes:
-      'Ingresso R$ 20/pessoa. Criança de colo e criança com deficiência não pagam — informe na observação. A reserva é enviada pelo WhatsApp da loja para confirmação. Pagamento e retirada conforme orientação da equipe.',
+      'Ingresso R$ 20/pessoa (membros do Clube: R$ 10). Criança de colo e criança com deficiência não pagam — informe na observação. A reserva é enviada pelo WhatsApp da loja para confirmação. Pagamento e retirada conforme orientação da equipe.',
   },
   photos: [],
   ctaPrimary: { label: 'Reservar ingresso', href: '/evento#ingressos' },

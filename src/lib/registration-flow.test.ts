@@ -297,7 +297,7 @@ describe('Plans Configuration — Registration Flow', () => {
 
   it('should have a positive discount', () => {
     expect(PLANS.club.discount).toBeGreaterThan(0)
-    expect(PLANS.club.discount).toBe(15)
+    expect(PLANS.club.discount).toBe(10)
   })
 
   it('should format prices correctly', () => {

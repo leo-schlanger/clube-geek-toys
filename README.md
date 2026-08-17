@@ -8,7 +8,7 @@ Plataforma completa de clube de vantagens para a loja **GeekPop & Toys** -- cada
 
 ## Sobre o Projeto
 
-A **GeekPop & Toys** é uma loja de K-pop e cultura pop em Copacabana, Rio de Janeiro, com mais de 15 anos no mercado geek. Nasceu como referência em colecionáveis e hoje tem foco em photocards, merch e a cena K-pop, com envio pelos Correios para todo o Brasil. O **Clube GeekPop & Toys** é o programa de fidelidade digital da loja, com 15% de desconto em qualquer produto, brinde especial e entrada gratuita em eventos participantes.
+A **GeekPop & Toys** é uma loja de K-pop e cultura pop em Copacabana, Rio de Janeiro, com mais de 15 anos no mercado geek. Nasceu como referência em colecionáveis e hoje tem foco em photocards, merch e a cena K-pop, com envio pelos Correios para todo o Brasil. O **Clube GeekPop & Toys** é o programa de fidelidade digital da loja, com 10% de desconto em qualquer produto, 50% de desconto nos ingressos dos eventos e brinde na primeira compra da loja.
 
 A plataforma inclui:
 
@@ -26,9 +26,9 @@ A plataforma inclui:
 
 Um único plano anual, sem opção mensal e sem tiers.
 
-| Plano                    | Anual     | Benefícios                                                                                                               |
-| ------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------ |
-| **Clube GeekPop & Toys** | R$ 149,99 | 15% de desconto em qualquer produto (loja física e online) + brinde especial + entrada gratuita em eventos participantes |
+| Plano                    | Anual     | Benefícios                                                                                                                     |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Clube GeekPop & Toys** | R$ 149,99 | 10% de desconto em qualquer produto (loja física e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
 
 ---
 
@@ -63,7 +63,7 @@ Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdom
 - Variações de produto (cor/tamanho etc.) com preco/estoque e **foto por SKU** (admin + PDP)
 - Carrinho persistido em `localStorage` (`CartContext`)
 - Checkout com cartão (Stripe) ou PIX local
-- **Desconto de 15% do membro aplicado server-side no checkout** (`discount_reason = 'member_15'`) — nunca confiando no valor enviado pelo cliente
+- **Desconto de 10% do membro aplicado server-side no checkout** (`discount_reason = 'member_10'`) — nunca confiando no valor enviado pelo cliente
 - Webhook confirma o pagamento e baixa o estoque automaticamente; PIX de loja é confirmado manualmente pelo admin
 
 ### Canal Atacado (B2B)
@@ -111,7 +111,7 @@ Pergunta pública na página do produto, identificada pelo primeiro nome. A resp
 Interface para vendedores na loja física:
 
 - Verificação de membro por CPF ou QR Code da carteirinha
-- Visualização do status do membro e do desconto de 15% aplicável
+- Visualização do status do membro (EM DIA) e do desconto de 10% aplicável
 - Apenas verificação — o PDV não registra pontos nem compras
 
 ### Admin Dashboard

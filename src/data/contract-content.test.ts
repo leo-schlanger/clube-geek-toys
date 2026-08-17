@@ -66,9 +66,9 @@ describe('contract-content', () => {
     const planSection = CONTRACT_SECTIONS.find(s => s.title.includes('PLANO E BENEFÍCIOS'))
     expect(planSection).toBeDefined()
     const allContent = planSection!.content.join(' ')
-    // Single annual plan with 15% off any product
+    // Single annual plan with 10% off any product
     expect(allContent).toContain('único plano')
-    expect(allContent).toContain('15%')
+    expect(allContent).toContain('10%')
     expect(allContent).toContain('qualquer produto')
     // The Silver/Gold/Black plans are gone
     expect(allContent).not.toContain('SILVER')

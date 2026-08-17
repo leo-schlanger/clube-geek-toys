@@ -21,7 +21,7 @@ describe('OnboardingGuide', () => {
   it('renders the three onboarding steps', () => {
     render(<OnboardingGuide memberStartDate={recentDate(5)} />)
     expect(screen.getByText('Mostre sua carteirinha')).toBeInTheDocument()
-    expect(screen.getByText('Ganhe 15% em qualquer produto')).toBeInTheDocument()
+    expect(screen.getByText('Ganhe 10% em qualquer produto')).toBeInTheDocument()
     expect(screen.getByText('Brinde e eventos')).toBeInTheDocument()
   })
 
@@ -29,7 +29,7 @@ describe('OnboardingGuide', () => {
     render(<OnboardingGuide memberStartDate={recentDate(5)} />)
     expect(screen.getByText(/Toque no cartão acima para ver o QR Code/)).toBeInTheDocument()
     expect(screen.getByText(/Seu desconto de membro vale na loja física e na loja online/)).toBeInTheDocument()
-    expect(screen.getByText(/Retire seu brinde especial e entre de graça nos eventos participantes/)).toBeInTheDocument()
+    expect(screen.getByText(/Na primeira compra da loja você ganha um brinde/)).toBeInTheDocument()
   })
 
   it('does not mention points anywhere', () => {

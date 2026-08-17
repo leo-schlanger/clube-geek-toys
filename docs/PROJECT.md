@@ -19,17 +19,17 @@
 
 ## 2. Visao do Produto
 
-Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano anual e recebem desconto exclusivo em qualquer produto, brinde especial, entrada gratuita em eventos participantes e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
+Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano anual e recebem 10% de desconto em qualquer produto, 50% nos ingressos dos eventos, brinde na primeira compra da loja e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
 
 ### Plano de Assinatura
 
 Um unico plano anual, sem opcao mensal e sem tiers (Silver/Gold/Black foram descontinuados).
 
-| Plano                | Anual     | Beneficios                                                                                                               |
-| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Clube GeekPop & Toys | R$ 149,99 | 15% de desconto em qualquer produto (loja fisica e online) + brinde especial + entrada gratuita em eventos participantes |
+| Plano                | Anual     | Beneficios                                                                                                                     |
+| -------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Clube GeekPop & Toys | R$ 149,99 | 10% de desconto em qualquer produto (loja fisica e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
 
-O desconto de 15% do membro na loja online e aplicado **server-side** no checkout (nunca confiando no cliente), registrado em `orders.discount_reason = 'member_15'`.
+O desconto de 10% do membro na loja online e aplicado **server-side** no checkout (nunca confiando no cliente), registrado em `orders.discount_reason = 'member_10'`.
 
 ## 3. Modulos do Sistema
 
@@ -43,11 +43,11 @@ Painel administrativo com gestao de membros (filtros, busca, paginacao server-si
 
 ### 3.3 Modulo PDV (Ponto de Venda)
 
-Verificacao de membros por CPF ou QR Code e visualizacao do status do membro e do desconto de 15% aplicavel. E apenas verificacao — o PDV nao registra compras nem pontos.
+Verificacao de membros por CPF ou QR Code e visualizacao se o membro esta EM DIA e do desconto de 10% aplicavel. E apenas verificacao — o PDV nao registra compras nem pontos.
 
 ### 3.4 Modulo Loja (E-commerce)
 
-Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=` — e **ordenacao** A–Z / postagem / preco via `?sort=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 15% do membro e aplicado server-side no checkout (`discount_reason = 'member_15'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`. No admin, o envio de foto abre um **recorte** (proporcao + tamanho em pixels) antes do upload.
+Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=` — e **ordenacao** A–Z / postagem / preco via `?sort=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 10% do membro e aplicado server-side no checkout (`discount_reason = 'member_10'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`. No admin, o envio de foto abre um **recorte** (proporcao + tamanho em pixels) antes do upload.
 
 ### 3.4.1 Canal Atacado (B2B)
 
@@ -242,8 +242,8 @@ As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
 | customer_phone               | VARCHAR(20)   | Nullable                                                                                              |
 | shipping_address             | JSONB         | `{ cep, street, number, complement?, neighborhood, city, state, recipientName? }`                     |
 | subtotal                     | DECIMAL(10,2) | NOT NULL, CHECK >= 0                                                                                  |
-| discount                     | DECIMAL(10,2) | NOT NULL, DEFAULT 0 — member_15 e/ou wholesale_25 e/ou store_credit                                   |
-| discount_reason              | VARCHAR(40)   | `'member_15' \| 'wholesale_25' \| 'store_credit' \| combinacoes com +store_credit`                    |
+| discount                     | DECIMAL(10,2) | NOT NULL, DEFAULT 0 — member_10 e/ou wholesale_25 e/ou store_credit                                   |
+| discount_reason              | VARCHAR(40)   | `'member_10' \| 'wholesale_25' \| 'store_credit' \| combinacoes com +store_credit`                    |
 | shipping_cost                | DECIMAL(10,2) | NOT NULL, DEFAULT 0 (frete revalidado server-side)                                                    |
 | shipping_service             | VARCHAR(40)   | PAC/SEDEX etc.                                                                                        |
 | shipping_service_id          | TEXT          | Id Melhor Envio / fallback                                                                            |
@@ -513,7 +513,7 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 | Metodo | Endpoint                  | Descricao                                                                              | Auth                 |
 | ------ | ------------------------- | -------------------------------------------------------------------------------------- | -------------------- |
-| POST   | `/orders`                 | Checkout: `member_15` (retail) ou `wholesale_25` (`channel=wholesale` + CNPJ aprovado) | Publico/JWT opcional |
+| POST   | `/orders`                 | Checkout: `member_10` (retail) ou `wholesale_25` (`channel=wholesale` + CNPJ aprovado) | Publico/JWT opcional |
 | GET    | `/orders/me`              | Minhas compras (ownership user_id / member_id)                                         | JWT                  |
 | GET    | `/orders/:id/status`      | Consulta status do pedido (polling)                                                    | Publico              |
 | GET    | `/orders`                 | Lista pedidos (filtros, paginacao)                                                     | admin                |
@@ -770,7 +770,7 @@ clube-geek-toys/
 │   │       │   ├── payment.service.ts
 │   │       │   ├── subscription.service.ts
 │   │       │   ├── product.service.ts   # Catalogo, estoque, imagens, wholesale flags
-│   │       │   ├── order.service.ts     # Pedidos, member_15 / wholesale_25, baixa de estoque
+│   │       │   ├── order.service.ts     # Pedidos, member_10 / wholesale_25, baixa de estoque
 │   │       │   ├── wholesale.service.ts # Contas B2B, CNPJ, aprovacao
 │   │       │   ├── contract.service.ts
 │   │       │   ├── email.service.ts     # 17 templates HTML
