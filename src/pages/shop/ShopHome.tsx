@@ -289,6 +289,11 @@ export default function ShopHome() {
         <p className="text-xs">
           R. Barata Ribeiro, 181 - loja J · Copacabana, RJ · Envio Correios para todo o Brasil
         </p>
+        <p className="text-xs">
+          <Link to="/termos" className="hover:underline">Termos de Uso</Link>
+          {' · '}
+          <Link to="/privacidade" className="hover:underline">Política de Privacidade</Link>
+        </p>
         <CreatorCredit />
       </footer>
     </div>

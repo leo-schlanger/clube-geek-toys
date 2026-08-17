@@ -15,7 +15,7 @@ export default function TermsOfUse() {
                 <div className="glass p-8 md:p-12 rounded-2xl border border-border shadow-2xl">
                     <h1 className="text-4xl font-heading font-bold mb-8 gradient-text">Termos de Uso</h1>
                     <div className="prose max-w-none space-y-6 text-muted-foreground">
-                        <p className="text-sm"><strong>Última atualização:</strong> 26 de março de 2026</p>
+                        <p className="text-sm"><strong>Última atualização:</strong> 17 de agosto de 2026</p>
 
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Identificação</h2>
@@ -57,14 +57,29 @@ export default function TermsOfUse() {
                             <h2 className="text-2xl font-semibold text-foreground">4. Cancelamento e Rescisão</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>O cancelamento pode ser solicitado a qualquer momento pela área do membro ou por e-mail.</li>
-                                <li>A assinatura anual não possui fidelidade além do período já pago; o direito de arrependimento é de 7 (sete) dias a contar da assinatura.</li>
+                                <li>A assinatura anual não possui fidelidade além do período já pago; o direito de arrependimento da <strong>assinatura</strong> é de 7 (sete) dias a contar da contratação. Para compra de produtos, o prazo conta do recebimento — ver a seção 5.</li>
                                 <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas o período anual já pago não é reembolsável.</li>
                                 <li>Reservamo-nos o direito de cancelar assinaturas em caso de fraude, uso indevido ou violação destes termos.</li>
                             </ul>
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">5. Uso do Site</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">5. Compras na Loja Online</h2>
+                            <p>As regras abaixo valem para a compra de produtos na loja, seja você membro do clube ou não.</p>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li><strong>Preço e disponibilidade:</strong> O preço cobrado é o exibido no momento da finalização do pedido. Em caso de erro evidente de preço ou de indisponibilidade do item, entramos em contato e você escolhe entre a devolução integral do valor ou a substituição do produto.</li>
+                                <li><strong>Pagamento:</strong> PIX ou cartão. O pedido só é preparado após a confirmação do pagamento; no PIX, a confirmação é feita mediante conferência do recebimento.</li>
+                                <li><strong>Cancelamento antes do pagamento:</strong> Enquanto o pedido estiver aguardando pagamento, você pode cancelá-lo sozinho em "Minhas compras", sem custo e sem precisar falar com a gente.</li>
+                                <li><strong>Direito de arrependimento (Art. 49, CDC):</strong> Em compras feitas fora do estabelecimento físico, você pode desistir em até <strong>7 (sete) dias corridos contados do recebimento do produto</strong>, sem precisar justificar. Basta avisar pelos canais de contato. Devolvemos o valor pago, incluindo o frete, e os custos de devolução são por nossa conta.</li>
+                                <li><strong>Condição do produto devolvido:</strong> O item deve ser devolvido com todos os acessórios e, quando houver, a embalagem original. Colecionáveis e photocards não podem ter sido retirados de embalagem lacrada quando o lacre for parte do valor do produto — nesse caso, informe antes de abrir.</li>
+                                <li><strong>Produto com defeito ou avaria no transporte:</strong> Avise em até 7 dias do recebimento, com fotos. Trocamos o produto ou devolvemos o valor, à sua escolha, conforme o Art. 18 do CDC.</li>
+                                <li><strong>Prazos de entrega:</strong> Os prazos exibidos no checkout são estimativas informadas pela transportadora e contam a partir da postagem, não da compra. Greves, ocorrências dos Correios e endereço incorreto podem atrasar a entrega.</li>
+                                <li><strong>Endereço de entrega:</strong> É sua responsabilidade conferir o endereço antes de finalizar. Pedido devolvido por endereço incorreto ou ausência do destinatário pode ter novo frete cobrado para reenvio.</li>
+                            </ul>
+                        </section>
+
+                        <section className="space-y-3">
+                            <h2 className="text-2xl font-semibold text-foreground">6. Uso do Site</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>É proibido o uso do site para fins ilegais ou para tentar comprometer a segurança da plataforma.</li>
                                 <li>Reservamo-nos o direito de suspender ou cancelar contas que violem estes termos.</li>
@@ -73,7 +88,7 @@ export default function TermsOfUse() {
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">6. Limitação de Responsabilidade</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">7. Limitação de Responsabilidade</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Os descontos são válidos apenas durante a vigência da assinatura e conforme disponibilidade.</li>
                                 <li>Os benefícios do plano incluem 15% de desconto em qualquer produto (loja física e online), brinde especial e entrada gratuita em eventos participantes.</li>
@@ -83,17 +98,17 @@ export default function TermsOfUse() {
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">7. Propriedade Intelectual</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">8. Propriedade Intelectual</h2>
                             <p>Todo o conteúdo (logos, textos, imagens, software) é propriedade da GeekPop & Toys ou de seus licenciadores, protegido pela Lei de Direitos Autorais (Lei nº 9.610/98). É proibida a reprodução sem autorização expressa.</p>
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">8. Alterações nos Termos</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">9. Alterações nos Termos</h2>
                             <p>Estes termos podem ser alterados a qualquer momento. Alterações significativas serão comunicadas por e-mail com antecedência mínima de 15 dias. O uso continuado após a notificação implica aceitação das novas condições.</p>
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">9. Foro e Legislação Aplicável</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">10. Foro e Legislação Aplicável</h2>
                             <p>Este contrato é regido pelas leis brasileiras. Fica eleito o foro da Comarca do Rio de Janeiro - RJ para dirimir controvérsias, sem prejuízo do direito do consumidor de optar pelo foro de seu domicílio (Art. 101, I, CDC).</p>
                         </section>
                     </div>

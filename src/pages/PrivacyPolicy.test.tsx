@@ -71,7 +71,7 @@ describe('PrivacyPolicy', () => {
   it('renders last-updated date', () => {
     renderPage()
     expect(screen.getByText(/Última atualização:/)).toBeInTheDocument()
-    expect(screen.getByText(/26 de março de 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/17 de agosto de 2026/)).toBeInTheDocument()
   })
 
   it('mentions LGPD compliance', () => {

@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
                 <div className="glass p-8 md:p-12 rounded-2xl border border-border shadow-2xl">
                     <h1 className="text-4xl font-heading font-bold mb-8 gradient-text">Política de Privacidade</h1>
                     <div className="prose max-w-none space-y-6 text-muted-foreground">
-                        <p className="text-sm"><strong>Última atualização:</strong> 26 de março de 2026</p>
+                        <p className="text-sm"><strong>Última atualização:</strong> 17 de agosto de 2026</p>
 
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Controlador dos Dados</h2>
@@ -33,7 +33,11 @@ export default function PrivacyPolicy() {
                             <p>Coletamos informações necessárias para a prestação de nossos serviços:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li><strong>Dados de Cadastro:</strong> Nome completo, e-mail, CPF, telefone e senha (armazenada com criptografia).</li>
-                                <li><strong>Dados de Pagamento:</strong> Processados de forma segura pelo Stripe. Não armazenamos dados de cartão de crédito.</li>
+                                <li><strong>Perfil da loja (opcional):</strong> Data de nascimento, gênero, endereço e foto de perfil. Nenhum desses campos é obrigatório — você pode criar conta e comprar sem preencher qualquer um deles, e apagá-los quando quiser. O campo gênero inclui a opção "prefiro não dizer".</li>
+                                <li><strong>Compras e entrega:</strong> Itens do pedido, endereço de entrega, valor, forma de pagamento e código de rastreio.</li>
+                                <li><strong>Produtos salvos:</strong> A lista de produtos que você marca para comprar depois, visível apenas para você.</li>
+                                <li><strong>Atacado (CNPJ):</strong> Para contas de atacado, CNPJ, razão social, nome fantasia, inscrição estadual, ramo de atividade e contato da empresa.</li>
+                                <li><strong>Dados de Pagamento:</strong> Cartão processado pelo Stripe — não armazenamos dados do cartão. No PIX, geramos o código de cobrança e guardamos apenas o identificador da transação.</li>
                                 <li><strong>Dados de Navegação:</strong> Endereço IP, tipo de navegador, páginas visitadas, data e hora de acesso.</li>
                                 <li><strong>Dados de Contrato:</strong> Assinatura digital, data/hora, IP no momento da assinatura.</li>
                                 <li><strong>Perguntas sobre produtos:</strong> O texto da pergunta e o <strong>primeiro nome</strong> de quem perguntou ficam públicos na página do produto, junto da nossa resposta. Nome completo, e-mail e telefone nunca aparecem.</li>
@@ -61,6 +65,8 @@ export default function PrivacyPolicy() {
                                 <li><strong>Logs de navegação:</strong> Mantidos por 6 meses para fins de segurança.</li>
                                 <li><strong>Perguntas e respostas:</strong> Mantidas enquanto o produto estiver no catálogo. Ao excluir a conta, o texto é anonimizado e sai da vitrine.</li>
                                 <li><strong>Fotos da galeria:</strong> Mantidas enquanto a divulgação fizer sentido, ou até pedido de remoção.</li>
+                                <li><strong>Perfil da loja:</strong> Mantido enquanto a conta existir. Ao excluir a conta, os dados de perfil e os produtos salvos são apagados, não apenas anonimizados.</li>
+                                <li><strong>Pedidos da loja:</strong> Mantidos por 5 anos por obrigação fiscal. Ao excluir a conta, os dados pessoais do pedido são anonimizados e apenas os valores permanecem, para fins contábeis.</li>
                             </ul>
                         </section>
 
@@ -100,9 +106,11 @@ export default function PrivacyPolicy() {
                             <h2 className="text-2xl font-semibold text-foreground">5. Compartilhamento de Dados</h2>
                             <p>Não vendemos seus dados. Compartilhamos apenas com:</p>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li><strong>Stripe:</strong> Processamento de pagamentos (PIX e cartão).</li>
+                                <li><strong>Stripe:</strong> Processamento de pagamentos com cartão.</li>
+                                <li><strong>Melhor Envio e Correios:</strong> Cálculo de frete e envio. Para a cotação enviamos apenas o CEP de destino e as medidas do pacote; ao despachar, os dados de entrega necessários para a etiqueta.</li>
                                 <li><strong>Servidor próprio (VPS):</strong> Hospedagem e banco de dados PostgreSQL.</li>
                                 <li><strong>Resend:</strong> Envio de e-mails transacionais.</li>
+                                <li><strong>Umami:</strong> Estatísticas de acesso, hospedado em servidor próprio. Não usa cookies nem cria perfil individual.</li>
                                 <li><strong>Autoridades:</strong> Quando exigido por lei ou ordem judicial.</li>
                             </ul>
                         </section>

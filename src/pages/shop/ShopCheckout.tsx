@@ -543,6 +543,18 @@ export default function ShopCheckout() {
                     `Continuar · ${formatCurrency(estimatedTotal)}`
                   )}
                 </Button>
+
+                <p className="text-center text-xs text-muted-foreground">
+                  Ao finalizar você concorda com os{' '}
+                  <Link to="/termos" className="underline hover:text-foreground">
+                    Termos de Uso
+                  </Link>{' '}
+                  e a{' '}
+                  <Link to="/privacidade" className="underline hover:text-foreground">
+                    Política de Privacidade
+                  </Link>
+                  . Você tem 7 dias após o recebimento para desistir da compra.
+                </p>
               </form>
             ) : paymentMethod === 'credit_card' && result.clientSecret ? (
               <Card>
