@@ -456,11 +456,11 @@ describe('Members API client', () => {
   // ---- getMemberDiscount ----
 
   describe('getMemberDiscount', () => {
-    it('deve retornar 15 (desconto único do clube)', () => {
+    it('returns 15, the single club discount', () => {
       expect(getMemberDiscount()).toBe(15)
     })
 
-    it('deve retornar sempre o mesmo valor', () => {
+    it('always returns the same value', () => {
       expect(getMemberDiscount()).toBe(getMemberDiscount())
     })
   })

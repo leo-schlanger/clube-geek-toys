@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { PaymentTrustBadges } from './PaymentTrustBadges'
 
 describe('PaymentTrustBadges', () => {
-  it('mostra cada bandeira como selo acessível', () => {
+  it('shows each brand as an accessible badge', () => {
     render(<PaymentTrustBadges />)
     // The marks are SVG, so the accessible name is all a screen reader has.
     for (const brand of ['PIX', 'Visa', 'Mastercard', 'Elo', 'Stripe']) {
@@ -22,7 +22,7 @@ describe('PaymentTrustBadges', () => {
     expect(row?.className).toMatch(/justify-center/)
   })
 
-  it('esconde o título no modo compacto', () => {
+  it('hides the title in compact mode', () => {
     render(<PaymentTrustBadges compact />)
     expect(screen.queryByText('Formas de pagamento')).not.toBeInTheDocument()
   })

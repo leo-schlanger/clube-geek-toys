@@ -43,13 +43,13 @@ const PROFILE: CustomerProfile = {
 beforeEach(() => vi.clearAllMocks())
 
 describe('fetchProfile', () => {
-  it('devolve o perfil', async () => {
+  it('returns the profile', async () => {
     mockedApi.get.mockResolvedValue({ data: PROFILE, status: 200 })
     await expect(fetchProfile()).resolves.toEqual(PROFILE)
     expect(mockedApi.get).toHaveBeenCalledWith('/profile')
   })
 
-  it('joga com a mensagem do servidor quando falha', async () => {
+  it('throws with the server message on failure', async () => {
     mockedApi.get.mockResolvedValue({ error: 'Sessão expirada', status: 401 })
     await expect(fetchProfile()).rejects.toThrow('Sessão expirada')
   })
@@ -58,7 +58,7 @@ describe('fetchProfile', () => {
 describe('updateProfile', () => {
   // Partial semantics are the heart of the screen: it saves per section, so the
   // PATCH must not carry keys the person never touched.
-  it('envia só as chaves informadas', async () => {
+  it('sends only the keys provided', async () => {
     mockedApi.patch.mockResolvedValue({ data: PROFILE, status: 200 })
 
     await updateProfile({ phone: '21999998888' })
@@ -66,7 +66,7 @@ describe('updateProfile', () => {
     expect(mockedApi.patch).toHaveBeenCalledWith('/profile', { phone: '21999998888' })
   })
 
-  it('preserva null, que significa "apagar o campo"', async () => {
+  it('preserves null, which means clearing the field', async () => {
     mockedApi.patch.mockResolvedValue({ data: PROFILE, status: 200 })
 
     await updateProfile({ gender: null, address: null })
@@ -74,14 +74,14 @@ describe('updateProfile', () => {
     expect(mockedApi.patch).toHaveBeenCalledWith('/profile', { gender: null, address: null })
   })
 
-  it('joga quando o servidor recusa', async () => {
+  it('throws when the server refuses', async () => {
     mockedApi.patch.mockResolvedValue({ error: 'Data inválida', status: 400 })
     await expect(updateProfile({ birthDate: '9999-99-99' })).rejects.toThrow('Data inválida')
   })
 })
 
 describe('foto de perfil', () => {
-  it('sobe como multipart no campo "photo"', async () => {
+  it('uploads as multipart under the "photo" field', async () => {
     mockedRequest.mockResolvedValue({ data: PROFILE, status: 201 })
     const file = new File(['x'], 'eu.jpg', { type: 'image/jpeg' })
 
@@ -95,7 +95,7 @@ describe('foto de perfil', () => {
   })
 
   // The photo is optional: failure returns a value instead of breaking the page.
-  it('devolve erro sem lançar quando o upload falha', async () => {
+  it('returns an error rather than throwing when the upload fails', async () => {
     mockedRequest.mockResolvedValue({ error: 'Foto muito grande', status: 400 })
 
     await expect(
@@ -103,7 +103,7 @@ describe('foto de perfil', () => {
     ).resolves.toEqual({ ok: false, error: 'Foto muito grande' })
   })
 
-  it('remove a foto', async () => {
+  it('removes the photo', async () => {
     mockedApi.delete.mockResolvedValue({ data: PROFILE, status: 200 })
     await removeProfilePhoto()
     expect(mockedApi.delete).toHaveBeenCalledWith('/profile/photo')
@@ -111,19 +111,19 @@ describe('foto de perfil', () => {
 })
 
 describe('produtos salvos', () => {
-  it('lista os salvos', async () => {
+  it('lists saved products', async () => {
     mockedApi.get.mockResolvedValue({ data: [], status: 200 })
     await expect(fetchSavedProducts()).resolves.toEqual([])
     expect(mockedApi.get).toHaveBeenCalledWith('/profile/saved')
   })
 
-  it('devolve lista vazia quando a chamada falha, sem quebrar a tela', async () => {
+  it('returns an empty list when the call fails, without breaking the page', async () => {
     mockedApi.get.mockResolvedValue({ error: 'offline', status: 0 })
     await expect(fetchSavedProducts()).resolves.toEqual([])
     await expect(fetchSavedProductIds()).resolves.toEqual([])
   })
 
-  it('salva com PUT e remove com DELETE', async () => {
+  it('saves with PUT and removes with DELETE', async () => {
     mockedRequest.mockResolvedValue({ status: 204 })
 
     await expect(saveProduct('p1')).resolves.toBe(true)
@@ -133,7 +133,7 @@ describe('produtos salvos', () => {
     expect(mockedRequest).toHaveBeenCalledWith('/profile/saved/p1', { method: 'DELETE' })
   })
 
-  it('devolve false quando o servidor recusa, para a UI reverter o otimismo', async () => {
+  it('returns false when the server refuses, so the UI can revert its optimism', async () => {
     mockedRequest.mockResolvedValue({ error: 'nope', status: 500 })
     await expect(saveProduct('p1')).resolves.toBe(false)
     await expect(unsaveProduct('p1')).resolves.toBe(false)

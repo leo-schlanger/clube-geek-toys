@@ -21,7 +21,7 @@ function collectErrors(page: Page) {
   return errors
 }
 
-test.describe('Loja pública GeekPop (produção)', () => {
+test.describe('Public shop (production)', () => {
   test('home: carrega a vitrine da loja, sem erros', async ({ page }, testInfo) => {
     const errors = collectErrors(page)
     const resp = await page.goto(SHOP, { waitUntil: 'domcontentloaded' })
@@ -39,7 +39,7 @@ test.describe('Loja pública GeekPop (produção)', () => {
     expect(errors, `erros no console/rede:\n${errors.join('\n')}`).toEqual([])
   })
 
-  test('home: catálogo da API aparece ou estado vazio amigável', async ({ page }) => {
+  test('home: the API catalogue appears, or a friendly empty state', async ({ page }) => {
     await page.goto(SHOP, { waitUntil: 'networkidle' })
     // Com estoque real: lista produtos; sem estoque: mensagem amigável (API 200 em ambos)
     const empty = page.getByText(/Nenhum produto disponível|Nenhum produto encontrado/i)
@@ -52,7 +52,7 @@ test.describe('Loja pública GeekPop (produção)', () => {
     }
   })
 
-  test('evento: página /evento carrega com data e reserva', async ({ page }) => {
+  test('event: /evento loads with the date and reservation', async ({ page }) => {
     const errors = collectErrors(page)
     await page.goto(`${SHOP}/evento`, { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('heading').first()).toBeVisible()
@@ -72,7 +72,7 @@ test.describe('Loja pública GeekPop (produção)', () => {
     await page.screenshot({ path: 'e2e/.out/shop-cart-drawer.png' })
   })
 
-  test('login: link "Entrar" leva à página de login da loja', async ({ page }) => {
+  test('login: the "Entrar" link reaches the shop login page', async ({ page }) => {
     const errors = collectErrors(page)
     await page.goto(SHOP, { waitUntil: 'domcontentloaded' })
     // Desktop mostra botão-texto "Entrar"; mobile mostra ícone (aria-label="Entrar").
@@ -85,7 +85,7 @@ test.describe('Loja pública GeekPop (produção)', () => {
     expect(errors, errors.join('\n')).toEqual([])
   })
 
-  test('rota de produto inexistente não quebra a aplicação', async ({ page }) => {
+  test('a nonexistent product route does not break the app', async ({ page }) => {
     const errors = collectErrors(page)
     await page.goto(`${SHOP}/produto/produto-que-nao-existe-123`, { waitUntil: 'networkidle' })
     // não deve haver tela branca/erro fatal — o app segue renderizando (header presente ou redireciona)
@@ -95,8 +95,8 @@ test.describe('Loja pública GeekPop (produção)', () => {
   })
 })
 
-test.describe('Assinatura do clube (produção)', () => {
-  test('página /assinar: plano único R$ 149,99 / 15%, sem erros', async ({ page }, testInfo) => {
+test.describe('Club subscription (production)', () => {
+  test('/assinar: single plan R$ 149.99 / 15%, with no errors', async ({ page }, testInfo) => {
     const errors = collectErrors(page)
     const resp = await page.goto(`${CLUB}/assinar`, { waitUntil: 'domcontentloaded' })
     expect(resp?.status()).toBeLessThan(400)

@@ -28,20 +28,20 @@ describe('isPlayableVideoHeader', () => {
     }
   );
 
-  it('aceita MOV do iPhone (major qt)', () => {
+  it('accepts an iPhone MOV (major qt)', () => {
     expect(isPlayableVideoHeader(ftyp('qt  ', ['qt  ']))).toBe(true);
   });
 
-  it('aceita export do CapCut/YouTube (major dash)', () => {
+  it('accepts a CapCut/YouTube export (major dash)', () => {
     expect(isPlayableVideoHeader(ftyp('dash'))).toBe(true);
   });
 
-  it('aceita quando só um compatible_brand é de vídeo', () => {
+  it('accepts when only a compatible_brand is a video brand', () => {
     // Unknown major, but the file declares iso6/mp41 compatibility
     expect(isPlayableVideoHeader(ftyp('xxxx', ['zzzz', 'iso6', 'mp41']))).toBe(true);
   });
 
-  it('rejeita arquivo sem caixa ftyp (AVI/MKV renomeado pra .mp4)', () => {
+  it('rejects a file with no ftyp box (AVI/MKV renamed to .mp4)', () => {
     const avi = Buffer.concat([
       Buffer.from('RIFF', 'ascii'),
       Buffer.alloc(4),
@@ -56,11 +56,11 @@ describe('isPlayableVideoHeader', () => {
     expect(isPlayableVideoHeader(ftyp(brand, [brand]))).toBe(false);
   });
 
-  it('rejeita buffer curto demais pro header', () => {
+  it('rejects a buffer too short for the header', () => {
     expect(isPlayableVideoHeader(Buffer.from('000ftyp', 'ascii'))).toBe(false);
   });
 
-  it('não lê compatible_brands além do fim da caixa ftyp', () => {
+  it('does not read compatible_brands past the end of the ftyp box', () => {
     // boxSize cuts at 16 bytes: the 'mp41' right after belongs to the next box
     // (moov/mdat) and must not be read as a compatible_brand.
     const buf = Buffer.concat([ftyp('heic', ['mp41'], 16)]);

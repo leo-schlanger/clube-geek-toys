@@ -29,11 +29,11 @@ function renderBanner() {
 }
 
 describe('EventAnnouncementBanner da loja — empilhamento', () => {
-  it('o evento precisa estar ativo, senão este arquivo não testa nada', () => {
+  it('the event must be active, or this file tests nothing', () => {
     expect(isEventVisible(ACTIVE_EVENT)).toBe(true)
   })
 
-  it('NÃO é sticky — dois sticky em top-0 brigam e o header perde', () => {
+  it('is NOT sticky: two sticky elements at top-0 fight and the header loses', () => {
     renderBanner()
     const banner = screen.getByRole('region', { name: /anúncio do evento/i })
 
@@ -41,7 +41,7 @@ describe('EventAnnouncementBanner da loja — empilhamento', () => {
     expect(banner.className).not.toMatch(/\bfixed\b/)
   })
 
-  it('não publica mais a var de altura — ela era lida por ninguém', () => {
+  it('no longer publishes the height variable, which nothing read', () => {
     renderBanner()
     // An in-flow element pushes content by itself; the old variable carried two
     // fixed numbers that never tracked the real text.

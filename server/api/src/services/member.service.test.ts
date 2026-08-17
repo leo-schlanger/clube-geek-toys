@@ -96,7 +96,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
     expect(String(userUpdate?.[0])).toContain('email_verified = FALSE');
   });
 
-  it('recusa e-mail já usado por outra conta', async () => {
+  it('refuses an email already used by another account', async () => {
     mockSelects({ emailTaken: true });
 
     await expect(updateMember('m1', { email: 'novo@example.com' }, 'admin')).rejects.toMatchObject({
@@ -106,7 +106,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
     expect(clientQuery).not.toHaveBeenCalled();
   });
 
-  it('recusa CPF já cadastrado em outro membro', async () => {
+  it('refuses a CPF already registered to another member', async () => {
     mockSelects({ cpfTaken: true });
 
     await expect(updateMember('m1', { cpf: '52998224725' }, 'admin')).rejects.toMatchObject({
@@ -116,7 +116,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
     expect(clientQuery).not.toHaveBeenCalled();
   });
 
-  it('ignora e-mail e CPF quando quem edita é o próprio membro', async () => {
+  it('ignores email and CPF when the editor is the member themselves', async () => {
     mockSelects();
 
     // Only phone is a member field; email/cpf are dropped by the allowlist.
@@ -130,7 +130,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
     ).toBe(false);
   });
 
-  it('ignora e-mail e CPF quando quem edita é vendedor do PDV', async () => {
+  it('ignores email and CPF when the editor is a PDV seller', async () => {
     mockSelects();
 
     // Sellers may touch status/plan, but changing the login would be a takeover.
@@ -150,7 +150,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
     ).toBe(false);
   });
 
-  it('não toca em users quando o e-mail enviado é o mesmo de antes', async () => {
+  it('leaves users untouched when the email is unchanged', async () => {
     mockSelects();
 
     await updateMember('m1', { email: 'antigo@example.com', phone: '21977776666' }, 'admin');

@@ -88,14 +88,14 @@ describe('buildAuthorizeUrl', () => {
     expect(url.searchParams.get('scope')).toBe('shipping-calculate');
   });
 
-  it('aponta para o sandbox quando a flag está ligada', () => {
+  it('points at the sandbox when the flag is on', () => {
     envMock.MELHOR_ENVIO_SANDBOX = true;
     expect(new URL(oauth.buildAuthorizeUrl()).origin).toBe(
       'https://sandbox.melhorenvio.com.br'
     );
   });
 
-  it('nunca coloca o client_secret na URL de autorização', () => {
+  it('never puts the client_secret in the authorize URL', () => {
     // The URL reaches the address bar and the browser history.
     expect(oauth.buildAuthorizeUrl()).not.toContain('segredo-do-app');
   });
@@ -106,21 +106,21 @@ describe('buildAuthorizeUrl', () => {
   });
 });
 
-describe('isValidState — proteção do callback', () => {
-  it('aceita o state que ele mesmo emitiu', () => {
+describe('isValidState — callback protection', () => {
+  it('accepts the state it issued itself', () => {
     const state = new URL(oauth.buildAuthorizeUrl()).searchParams.get('state')!;
     expect(oauth.isValidState(state)).toBe(true);
   });
 
   // The callback is public; without this check anyone could drive the token
   // exchange with a `code` of their own.
-  it('recusa state ausente, vazio ou forjado', () => {
+  it('refuses a missing, empty or forged state', () => {
     expect(oauth.isValidState(undefined)).toBe(false);
     expect(oauth.isValidState('')).toBe(false);
     expect(oauth.isValidState('qualquer-coisa')).toBe(false);
   });
 
-  it('recusa state malformado sem estourar exceção', () => {
+  it('refuses a malformed state without throwing', () => {
     // A different-length signature used to make timingSafeEqual throw a 500.
     expect(() => oauth.isValidState('aaa.bbb')).not.toThrow();
     expect(oauth.isValidState('aaa.bbb')).toBe(false);
@@ -128,7 +128,7 @@ describe('isValidState — proteção do callback', () => {
 });
 
 describe('exchangeCodeForToken', () => {
-  it('troca o code e guarda access + refresh', async () => {
+  it('exchanges the code and stores access plus refresh', async () => {
     const fetchMock = mockFetch(200, {
       access_token: 'novo-token',
       refresh_token: 'novo-refresh',
@@ -164,23 +164,23 @@ describe('exchangeCodeForToken', () => {
 });
 
 describe('getAccessToken', () => {
-  it('devolve null quando nunca foi autorizado', async () => {
+  it('returns null when never authorized', async () => {
     await expect(oauth.getAccessToken()).resolves.toBeNull();
   });
 
-  it('usa o token guardado quando está longe de expirar', async () => {
+  it('uses the stored token while it is far from expiry', async () => {
     queryMock.mockResolvedValue(storedRow());
     await expect(oauth.getAccessToken()).resolves.toBe('token-valido');
   });
 
-  it('MELHOR_ENVIO_TOKEN manual tem precedência e nem consulta o banco', async () => {
+  it('a manual MELHOR_ENVIO_TOKEN takes precedence and skips the database', async () => {
     envMock.MELHOR_ENVIO_TOKEN = 'token-colado-na-mao';
     await expect(oauth.getAccessToken()).resolves.toBe('token-colado-na-mao');
     expect(queryMock).not.toHaveBeenCalled();
   });
 
   // Without this the store returns to the fallback in ~30 days, unnoticed.
-  it('renova quando está perto de expirar', async () => {
+  it('refreshes when close to expiry', async () => {
     queryMock.mockResolvedValue(storedRow({ expiresAt: Date.now() + 2 * 60 * 60 * 1000 }));
     const fetchMock = mockFetch(200, {
       access_token: 'token-renovado',
@@ -193,7 +193,7 @@ describe('getAccessToken', () => {
     expect(sentBody(fetchMock as ReturnType<typeof vi.fn>).grant_type).toBe('refresh_token');
   });
 
-  it('segue com o token atual se a renovação falhar mas ele ainda valer', async () => {
+  it('keeps the current token when the refresh fails but it is still valid', async () => {
     queryMock.mockResolvedValue(storedRow({ expiresAt: Date.now() + 2 * 60 * 60 * 1000 }));
     vi.stubGlobal('fetch', mockFetch(500, {}));
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -201,7 +201,7 @@ describe('getAccessToken', () => {
     await expect(oauth.getAccessToken()).resolves.toBe('token-valido');
   });
 
-  it('devolve null quando já expirou e não renovou — token morto só daria 401', async () => {
+  it('returns null when expired and unrenewed: a dead token would only 401', async () => {
     queryMock.mockResolvedValue(storedRow({ expiresAt: Date.now() - DAY }));
     vi.stubGlobal('fetch', mockFetch(500, {}));
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -210,7 +210,7 @@ describe('getAccessToken', () => {
   });
 
   // A sandbox token against production returns 401, which the fallback hides.
-  it('ignora token guardado de outro ambiente', async () => {
+  it('ignores a stored token from the other environment', async () => {
     queryMock.mockResolvedValue(storedRow({ sandbox: true }));
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -237,15 +237,15 @@ describe('getOAuthStatus', () => {
     expect(JSON.stringify(status)).not.toContain('segredo-do-app');
   });
 
-  it('marca não autorizado quando não há token guardado', async () => {
+  it('reports unauthorized when no token is stored', async () => {
     const status = await oauth.getOAuthStatus();
     expect(status.authorized).toBe(false);
     expect(status.expiresAt).toBeNull();
   });
 });
 
-describe('redirectUri — domínio do callback', () => {
-  it('deriva do API_URL quando não há override', () => {
+describe('redirectUri — callback domain', () => {
+  it('derives from API_URL when there is no override', () => {
     expect(oauth.redirectUri()).toBe(
       'https://api.geeketoys.com.br/shipping/melhor-envio/callback'
     );
@@ -253,7 +253,7 @@ describe('redirectUri — domínio do callback', () => {
 
   // The two domains are mirrors; the override picks one without touching
   // API_URL, which is baked into stored upload URLs.
-  it('respeita o override para o domínio espelho', () => {
+  it('honours the override for the mirror domain', () => {
     envMock.MELHOR_ENVIO_REDIRECT_URI =
       'https://api.geekpoptoys.com.br/shipping/melhor-envio/callback';
 
@@ -265,7 +265,7 @@ describe('redirectUri — domínio do callback', () => {
     );
   });
 
-  it('ignora override em branco e volta para o API_URL', () => {
+  it('ignores a blank override and falls back to API_URL', () => {
     envMock.MELHOR_ENVIO_REDIRECT_URI = '   ';
     expect(oauth.redirectUri()).toContain('api.geeketoys.com.br');
   });

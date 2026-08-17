@@ -95,7 +95,7 @@ describe('ProductCard', () => {
 describe('ProductCard — salvar para depois', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('mostra o coração no varejo', () => {
+  it('shows the heart on retail', () => {
     render(
       <MemoryRouter>
         <ProductCard product={product} />
@@ -105,7 +105,7 @@ describe('ProductCard — salvar para depois', () => {
   })
 
   // Wholesale buys through an approved CNPJ; saving makes no sense there.
-  it('esconde o coração no atacado', () => {
+  it('hides the heart on wholesale', () => {
     render(
       <MemoryRouter>
         <ProductCard product={product} isWholesale isWholesaleApproved />
@@ -115,7 +115,7 @@ describe('ProductCard — salvar para depois', () => {
   })
 
   // A button inside an <a> is invalid HTML and the click would navigate.
-  it('não fica aninhado dentro do link do produto', () => {
+  it('is not nested inside the product link', () => {
     const { container } = render(
       <MemoryRouter>
         <ProductCard product={product} />

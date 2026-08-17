@@ -7,7 +7,7 @@ import type { PlanType, MemberStatus, PaymentType, PaymentStatus, PaymentMethod,
 // ============================================
 
 describe('PLANS', () => {
-  it('deve ter exatamente um plano: club', () => {
+  it('has exactly one plan: club', () => {
     const keys = Object.keys(PLANS)
     expect(keys).toHaveLength(1)
     expect(keys).toContain('club')
@@ -19,32 +19,32 @@ describe('PLANS', () => {
 })
 
 describe('CLUB_PLAN', () => {
-  it('deve ter id e nome corretos', () => {
+  it('has the correct id and name', () => {
     expect(CLUB_PLAN.id).toBe('club')
     expect(CLUB_PLAN.name).toBe('Clube GeekPop & Toys')
   })
 
-  it('deve ter preço anual de 149.99', () => {
+  it('has an annual price of 149.99', () => {
     expect(CLUB_PLAN.price).toBe(149.99)
   })
 
-  it('deve ter desconto de 15%', () => {
+  it('has a 15% discount', () => {
     expect(CLUB_PLAN.discount).toBe(15)
   })
 
-  it('deve ter três benefícios', () => {
+  it('has three benefits', () => {
     expect(CLUB_PLAN.benefits).toBeInstanceOf(Array)
     expect(CLUB_PLAN.benefits).toHaveLength(3)
   })
 
-  it('deve ter cor e ícone', () => {
+  it('has a colour and an icon', () => {
     expect(typeof CLUB_PLAN.color).toBe('string')
     expect(CLUB_PLAN.color).toBeTruthy()
     expect(typeof CLUB_PLAN.icon).toBe('string')
     expect(CLUB_PLAN.icon).toBeTruthy()
   })
 
-  it('deve ter todos os campos obrigatórios', () => {
+  it('has every required field', () => {
     expect(CLUB_PLAN.id).toBe('club')
     expect(typeof CLUB_PLAN.name).toBe('string')
     expect(typeof CLUB_PLAN.price).toBe('number')
@@ -60,11 +60,11 @@ describe('CLUB_PLAN', () => {
 // ============================================
 
 describe('MEMBER_SHOP_DISCOUNT', () => {
-  it('deve ser 0.15 (15% como fração)', () => {
+  it('is 0.15, i.e. 15% as a fraction', () => {
     expect(MEMBER_SHOP_DISCOUNT).toBe(0.15)
   })
 
-  it('deve corresponder ao desconto do CLUB_PLAN', () => {
+  it('matches the CLUB_PLAN discount', () => {
     expect(MEMBER_SHOP_DISCOUNT * 100).toBeCloseTo(CLUB_PLAN.discount, 5)
   })
 })
@@ -74,34 +74,34 @@ describe('MEMBER_SHOP_DISCOUNT', () => {
 // ============================================
 
 describe('type compatibility', () => {
-  it('valores de PlanType devem corresponder às chaves de PLANS', () => {
+  it('PlanType values match the PLANS keys', () => {
     const planTypes: PlanType[] = ['club']
     for (const pt of planTypes) {
       expect(PLANS[pt]).toBeDefined()
     }
   })
 
-  it('valores de MemberStatus são strings válidas', () => {
+  it('MemberStatus values are valid strings', () => {
     const statuses: MemberStatus[] = ['active', 'pending', 'inactive', 'expired']
     expect(statuses).toHaveLength(4)
   })
 
-  it('valores de PaymentType são strings válidas', () => {
+  it('PaymentType values are valid strings', () => {
     const types: PaymentType[] = ['annual']
     expect(types).toHaveLength(1)
   })
 
-  it('valores de PaymentStatus são strings válidas', () => {
+  it('PaymentStatus values are valid strings', () => {
     const statuses: PaymentStatus[] = ['pending', 'paid', 'failed', 'refunded']
     expect(statuses).toHaveLength(4)
   })
 
-  it('valores de PaymentMethod são strings válidas', () => {
+  it('PaymentMethod values are valid strings', () => {
     const methods: PaymentMethod[] = ['pix', 'credit_card', 'boleto', 'cash']
     expect(methods).toHaveLength(4)
   })
 
-  it('valores de UserRole são strings válidas', () => {
+  it('UserRole values are valid strings', () => {
     const roles: UserRole[] = ['member', 'seller', 'admin']
     expect(roles).toHaveLength(3)
   })

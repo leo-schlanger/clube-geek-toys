@@ -59,7 +59,7 @@ describe('SaveProductButton — visitante', () => {
     expect(mockToast.info).toHaveBeenCalled()
   })
 
-  it('não consulta os salvos sem conta', () => {
+  it('does not fetch saved ids without an account', () => {
     mockUser = null
     renderButton()
     expect(mockLoadIds).not.toHaveBeenCalled()
@@ -67,7 +67,7 @@ describe('SaveProductButton — visitante', () => {
 })
 
 describe('SaveProductButton — logado', () => {
-  it('salva e marca o coração', async () => {
+  it('saves and fills the heart', async () => {
     renderButton()
 
     await userEvent.click(screen.getByRole('button'))
@@ -79,7 +79,7 @@ describe('SaveProductButton — logado', () => {
     )
   })
 
-  it('reflete o que já estava salvo ao montar', async () => {
+  it('reflects what was already saved, on mount', async () => {
     mockLoadIds.mockResolvedValue(new Set(['p1']))
     renderButton()
 
@@ -88,7 +88,7 @@ describe('SaveProductButton — logado', () => {
     )
   })
 
-  it('remove quando já estava salvo', async () => {
+  it('removes when it was already saved', async () => {
     mockLoadIds.mockResolvedValue(new Set(['p1']))
     renderButton()
     await waitFor(() =>
@@ -102,7 +102,7 @@ describe('SaveProductButton — logado', () => {
   })
 
   // The optimism must revert, or the UI lies about what was saved.
-  it('desfaz o coração quando o servidor recusa', async () => {
+  it('unfills the heart when the server refuses', async () => {
     mockSave.mockResolvedValue(false)
     renderButton()
 
@@ -117,7 +117,7 @@ describe('SaveProductButton — logado', () => {
 })
 
 describe('SaveProductButton — acessibilidade', () => {
-  it('descreve a ação e o produto no rótulo', async () => {
+  it('describes the action and the product in the label', async () => {
     renderButton()
     expect(screen.getByRole('button')).toHaveAccessibleName('Salvar Photocard BTS')
 
@@ -130,7 +130,7 @@ describe('SaveProductButton — acessibilidade', () => {
     )
   })
 
-  it('na variante full mostra texto além do ícone', () => {
+  it('the full variant shows text alongside the icon', () => {
     renderButton({ variant: 'full' })
     expect(screen.getByRole('button')).toHaveTextContent('Salvar')
   })

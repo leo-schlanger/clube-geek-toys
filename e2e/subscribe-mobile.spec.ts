@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
 // o CTA principal ficar preso invisível se a animação por scroll regredir.
 test.use({ viewport: { width: 375, height: 667 }, isMobile: true })
 
-test('assinar: card do plano visível ao rolar (mobile)', async ({ page }) => {
+test('subscribe: the plan card is visible when scrolling (mobile)', async ({ page }) => {
   await page.goto('https://club.geeketoys.com.br/assinar', { waitUntil: 'networkidle' })
 
   // dispensa o banner de cookies se estiver cobrindo

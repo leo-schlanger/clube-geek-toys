@@ -11,7 +11,7 @@ function collectPageErrors(page: Page) {
   return errors
 }
 
-test.describe('Atacado B2B (produção)', () => {
+test.describe('B2B wholesale (production)', () => {
   test('aba /atacado carrega e mostra canal B2B', async ({ page }, testInfo) => {
     // Skip until CI deploy of 530ffc0 is live — still assert soft if 404
     const errors = collectPageErrors(page)

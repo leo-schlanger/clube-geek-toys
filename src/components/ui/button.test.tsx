@@ -156,7 +156,7 @@ describe('Button', () => {
 
   // --- asChild ---
 
-  it('estiliza o próprio filho em vez de embrulhá-lo num <button>', () => {
+  it('styles the child itself instead of wrapping it in a <button>', () => {
     render(
       <Button asChild>
         <a href="/evento">Ver evento</a>
@@ -172,7 +172,7 @@ describe('Button', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('mantém as classes que o filho já tinha', () => {
+  it('keeps the classes the child already had', () => {
     render(
       <Button asChild className="border-primary/40">
         <a href="/x" className="w-full">
@@ -185,7 +185,7 @@ describe('Button', () => {
     expect(link).toHaveClass('border-primary/40')
   })
 
-  it('volta a renderizar <button> quando asChild não recebe elemento', () => {
+  it('falls back to a <button> when asChild gets no element', () => {
     render(<Button asChild>{'texto solto'}</Button>)
     expect(screen.getByRole('button', { name: 'texto solto' })).toBeInTheDocument()
   })

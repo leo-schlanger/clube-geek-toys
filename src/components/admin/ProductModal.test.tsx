@@ -92,7 +92,7 @@ const product: Product = {
   updatedAt: '',
 }
 
-describe('ProductModal — foto por variação', () => {
+describe('ProductModal — per-variant photo', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -202,14 +202,14 @@ describe('ProductModal — foto por variação', () => {
   })
 })
 
-describe('ProductModal — gerar combinações', () => {
+describe('ProductModal — generating combinations', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
 
-  it('usa a opção digitada mesmo sem clicar no "+"', () => {
+  it('uses the typed option even without pressing "+"', () => {
     // The natural path for someone who skipped the hint: type "Rosa" and go
     // straight to generate. That text used to be discarded, generating nothing.
     render(
@@ -230,7 +230,7 @@ describe('ProductModal — gerar combinações', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it('reclama do nome do tipo, não das opções, quando o tipo está vazio', () => {
+  it('complains about the axis name, not the options, when the axis is empty', () => {
     render(
       <ProductModal
         mode="edit"
@@ -273,7 +273,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     )
   }
 
-  it('salva o link de vídeo colado sem clicar em Adicionar', async () => {
+  it('saves a pasted video link without pressing add', async () => {
     renderModal(semVariacao)
 
     fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
@@ -288,7 +288,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     ])
   })
 
-  it('bloqueia o save quando o link de vídeo colado é inválido', async () => {
+  it('blocks the save when the pasted video link is invalid', async () => {
     renderModal(semVariacao)
 
     fireEvent.change(screen.getByPlaceholderText(/Colar link do YouTube/i), {
@@ -300,7 +300,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     expect(mockedUpdate).not.toHaveBeenCalled()
   })
 
-  it('gera os SKUs quando os eixos foram preenchidos sem clicar em Gerar combinações', async () => {
+  it('generates the SKUs when axes were filled without pressing generate', async () => {
     renderModal(semVariacao)
 
     fireEvent.click(screen.getByLabelText(/Ativar variações/i))
@@ -316,7 +316,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     expect(rows.map((r) => r.name)).toEqual(['Rosa', 'Preto'])
   })
 
-  it('acrescenta a opção nova ao produto que já tem variações', async () => {
+  it('adds a new option to a product that already has variants', async () => {
     renderModal(product)
 
     // "Azul" joins the axes without regenerating; the existing rows keep their
@@ -338,7 +338,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     expect(rows.find((r) => r.name === 'Azul')?.id).toBeUndefined()
   })
 
-  it('avisa em vez de salvar mudo quando Ativar está marcado e não há eixo', async () => {
+  it('warns instead of saving silently when variants are enabled with no axis', async () => {
     renderModal(semVariacao)
 
     fireEvent.click(screen.getByLabelText(/Ativar variações/i))
@@ -351,7 +351,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     expect(mockedUpdate).not.toHaveBeenCalled()
   })
 
-  it('salva a URL de foto da variação colada sem clicar em OK', async () => {
+  it('saves a pasted variant photo URL without pressing OK', async () => {
     renderModal(product)
 
     const urlInputs = screen.getAllByPlaceholderText(/cole URL da foto desta variação/i)
@@ -366,7 +366,7 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
   })
 })
 
-describe('ProductModal — várias fotos por variação', () => {
+describe('ProductModal — multiple photos per variant', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -383,7 +383,7 @@ describe('ProductModal — várias fotos por variação', () => {
     )
   }
 
-  it('acumula fotos na variação em vez de substituir a anterior', async () => {
+  it('accumulates variant photos instead of replacing the previous one', async () => {
     mockedUpdate.mockResolvedValue(product)
     mockedReplace.mockResolvedValue(product)
     renderEdit()
@@ -403,7 +403,7 @@ describe('ProductModal — várias fotos por variação', () => {
     ])
   })
 
-  it('não anexa foto de variação na galeria do listing', async () => {
+  it('does not append a variant photo to the listing gallery', async () => {
     mockedUpdate.mockResolvedValue(product)
     mockedReplace.mockResolvedValue(product)
     renderEdit()
@@ -427,7 +427,7 @@ describe('ProductModal — várias fotos por variação', () => {
     ])
   })
 
-  it('recusa a foto acima do teto por variação', () => {
+  it('rejects a photo above the per-variant cap', () => {
     const cheio: Product = {
       ...product,
       variants: [
@@ -456,7 +456,7 @@ describe('ProductModal — várias fotos por variação', () => {
   })
 })
 
-describe('ProductModal — abas do formulário', () => {
+describe('ProductModal — form tabs', () => {
   // The modal was ~1100 lines of fields in one scroll and the video block sat
   // in the final third, where it went unfound. Tabs fix that, but only if they
   // hide no work and break no save.
@@ -489,7 +489,7 @@ describe('ProductModal — abas do formulário', () => {
     return paineis[idx]
   }
 
-  it('abre no Básico e esconde as outras seções', () => {
+  it('opens on the first tab and hides the other sections', () => {
     renderEdit()
 
     expect(screen.getByRole('tab', { name: /Básico/ })).toHaveAttribute('aria-selected', 'true')
@@ -498,7 +498,7 @@ describe('ProductModal — abas do formulário', () => {
     expect(painelDaAba(/Variações/)).toHaveClass('hidden')
   })
 
-  it('o contador da aba mostra que existe conteúdo escondido lá dentro', () => {
+  it('the tab counter reveals content hidden inside', () => {
     // This was the gap: with no counter, hiding behind a tab merely swaps one
     // problema de descoberta por outro.
     renderEdit()
@@ -509,7 +509,7 @@ describe('ProductModal — abas do formulário', () => {
     expect(screen.getByRole('tab', { name: /Variações/ })).toHaveTextContent('2')
   })
 
-  it('troca de aba revela a seção sem desmontar as outras', () => {
+  it('switching tabs reveals a section without unmounting the others', () => {
     renderEdit()
 
     fireEvent.click(screen.getByRole('tab', { name: /Fotos e vídeos/ }))
@@ -521,7 +521,7 @@ describe('ProductModal — abas do formulário', () => {
     expect(screen.getByLabelText(/Nome do Produto/i)).toBeInTheDocument()
   })
 
-  it('rascunho digitado numa aba sobrevive à troca e entra no save', async () => {
+  it('a draft typed in one tab survives the switch and reaches the save', async () => {
     const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
     renderEdit(semVariacao)
 
@@ -538,7 +538,7 @@ describe('ProductModal — abas do formulário', () => {
     expect(payload.videos).toHaveLength(1)
   })
 
-  it('erro de validação leva à aba onde o campo está', async () => {
+  it('a validation error jumps to the tab holding the field', async () => {
     const semVariacao: Product = { ...product, hasVariants: false, variantAxes: [], variants: [] }
     renderEdit(semVariacao)
 
@@ -559,7 +559,7 @@ describe('ProductModal — abas do formulário', () => {
     )
   })
 
-  it('nome vazio volta para o Básico mesmo tendo saído dele', async () => {
+  it('an empty name returns to the first tab even after leaving it', async () => {
     renderEdit()
 
     fireEvent.change(screen.getByLabelText(/Nome do Produto/i), { target: { value: '' } })

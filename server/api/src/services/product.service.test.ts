@@ -50,7 +50,7 @@ describe('addProductImages — teto da galeria do listing', () => {
     query.mockReset();
   });
 
-  it('anexa tudo quando cabe no teto', async () => {
+  it('appends everything when it fits under the cap', async () => {
     const novas = urls(3);
     query
       .mockResolvedValueOnce({ rows: [{ images: ['ja-existia.jpg'] }] })
@@ -63,7 +63,7 @@ describe('addProductImages — teto da galeria do listing', () => {
     expect(result.product.images).toHaveLength(4);
   });
 
-  it('aceita só o que cabe e devolve o excedente para o caller apagar', async () => {
+  it('accepts only what fits and returns the excess for the caller to delete', async () => {
     const existentes = urls(MAX_PRODUCT_IMAGES - 2, 'velha');
     const novas = urls(5);
     query
@@ -79,7 +79,7 @@ describe('addProductImages — teto da galeria do listing', () => {
     expect(JSON.parse(updateArgs[1][1] as string)).toEqual(novas.slice(0, 2));
   });
 
-  it('recusa o upload quando a galeria já está cheia — sem UPDATE', async () => {
+  it('refuses the upload when the gallery is already full, with no UPDATE', async () => {
     query.mockResolvedValueOnce({ rows: [{ images: urls(MAX_PRODUCT_IMAGES, 'velha') }] });
 
     await expect(addProductImages('p1', urls(1))).rejects.toMatchObject({
@@ -89,7 +89,7 @@ describe('addProductImages — teto da galeria do listing', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it('404 quando o produto não existe', async () => {
+  it('404 when the product does not exist', async () => {
     query.mockResolvedValueOnce({ rows: [] });
 
     await expect(addProductImages('sumiu', urls(1))).rejects.toMatchObject({
@@ -98,7 +98,7 @@ describe('addProductImages — teto da galeria do listing', () => {
     });
   });
 
-  it('trata images nulo/legado como galeria vazia', async () => {
+  it('treats null or legacy images as an empty gallery', async () => {
     const novas = urls(2);
     query
       .mockResolvedValueOnce({ rows: [{ images: null }] })
@@ -118,7 +118,7 @@ describe('addProductVideo', () => {
 
   const video = { kind: 'file' as const, url: 'https://api.test/uploads/demo.mp4' };
 
-  it('anexa o vídeo quando há espaço', async () => {
+  it('appends the video when there is room', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ videos: [] }] })
       .mockResolvedValueOnce({ rows: [{ ...productRow([]), videos: [video] }] });
@@ -128,7 +128,7 @@ describe('addProductVideo', () => {
     expect(product.videos).toEqual([video]);
   });
 
-  it('recusa acima do teto — sem UPDATE', async () => {
+  it('refuses above the cap, with no UPDATE', async () => {
     const cheio = Array.from({ length: MAX_PRODUCT_VIDEOS }, (_, i) => ({
       kind: 'youtube' as const,
       url: `https://youtu.be/abcdefghij${i}`,
@@ -142,7 +142,7 @@ describe('addProductVideo', () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it('recusa o mesmo vídeo duas vezes', async () => {
+  it('refuses the same video twice', async () => {
     query.mockResolvedValueOnce({ rows: [{ videos: [video] }] });
 
     await expect(addProductVideo('p1', video)).rejects.toMatchObject({
@@ -151,7 +151,7 @@ describe('addProductVideo', () => {
     });
   });
 
-  it('404 quando o produto não existe', async () => {
+  it('404 when the product does not exist', async () => {
     query.mockResolvedValueOnce({ rows: [] });
 
     await expect(addProductVideo('sumiu', video)).rejects.toMatchObject({

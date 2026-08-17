@@ -198,7 +198,7 @@ beforeEach(() => {
 // ─── Pricing and discounts ───────────────────────────────────────────────────
 
 describe('createOrder — dinheiro', () => {
-  it('usa o preço do banco, ignorando qualquer coisa vinda do cliente', async () => {
+  it('uses the database price, ignoring anything the client sends', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
 
     // The client sends a price on the line; the service takes only productId + quantity.
@@ -209,7 +209,7 @@ describe('createOrder — dinheiro', () => {
     expect(v[COL.total]).toBe(224); // 200 + 24 de frete
   });
 
-  it('aplica os 15% de membro sobre os produtos, nunca sobre o frete', async () => {
+  it('applies the 15% member discount to goods, never to shipping', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
     memberIdMock.mockResolvedValue('m1');
     queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] }); // membership ativa
@@ -224,7 +224,7 @@ describe('createOrder — dinheiro', () => {
     expect(v[COL.shippingCost]).toBe(24);
   });
 
-  it('não dá desconto de membro para assinatura vencida', async () => {
+  it('gives no member discount on an expired subscription', async () => {
     setupTx({});
     memberIdMock.mockResolvedValue('m1');
     queryMock.mockResolvedValue({ rows: [] }); // o filtro de expiry_date não devolveu nada
@@ -236,7 +236,7 @@ describe('createOrder — dinheiro', () => {
     expect(v[COL.discountReason]).toBeNull();
   });
 
-  it('atacado usa 25% e NÃO empilha com os 15% de membro', async () => {
+  it('wholesale uses 25% and does NOT stack with the member 15%', async () => {
     setupTx({ products: [product({ price: '100.00', wholesale_enabled: true })] });
     approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11222333000181' });
     memberIdMock.mockResolvedValue('m1'); // é membro também — não pode somar
@@ -253,7 +253,7 @@ describe('createOrder — dinheiro', () => {
     expect(v[COL.total]).toBe(99);
   });
 
-  it('crédito de loja entra depois do desconto do canal e nunca deixa o total negativo', async () => {
+  it('store credit applies after the channel discount and never drives the total negative', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
     // The redeem cap is the post-discount goods value, not the order total.
     redeemMock.mockImplementation(async (_c: unknown, _u: string, cap: number) => cap);
@@ -266,7 +266,7 @@ describe('createOrder — dinheiro', () => {
     expect(res.order.total).toBeGreaterThanOrEqual(0);
   });
 
-  it('não tenta usar crédito de visitante sem login', async () => {
+  it('does not attempt store credit for a signed-out visitor', async () => {
     setupTx({});
     await createOrder(baseInput({ applyStoreCredit: true }));
     expect(redeemMock).not.toHaveBeenCalled();
@@ -276,7 +276,7 @@ describe('createOrder — dinheiro', () => {
 // ─── Stock ───────────────────────────────────────────────────────────────
 
 describe('createOrder — estoque', () => {
-  it('soma linhas repetidas do mesmo SKU antes de checar o estoque', async () => {
+  it('sums repeated lines of the same SKU before checking stock', async () => {
     // Stock of 5, cart sends 3 + 3 on separate lines.
     setupTx({ products: [product({ stock: 5 })] });
 
@@ -292,7 +292,7 @@ describe('createOrder — estoque', () => {
     ).rejects.toMatchObject({ code: 'INSUFFICIENT_STOCK' });
   });
 
-  it('recusa quantidade zero ou negativa', async () => {
+  it('refuses a zero or negative quantity', async () => {
     setupTx({});
     await expect(
       createOrder(baseInput({ items: [{ productId: 'p1', quantity: 0 }] }))
@@ -302,14 +302,14 @@ describe('createOrder — estoque', () => {
     ).rejects.toMatchObject({ code: 'INVALID_QUANTITY' });
   });
 
-  it('recusa produto inativo mesmo que o id exista', async () => {
+  it('refuses an inactive product even when the id exists', async () => {
     setupTx({ products: [product({ active: false })] });
     await expect(createOrder(baseInput())).rejects.toMatchObject({
       code: 'PRODUCT_UNAVAILABLE',
     });
   });
 
-  it('desfaz a transação quando alguma linha falha', async () => {
+  it('rolls the transaction back when a line fails', async () => {
     setupTx({ products: [product({ stock: 0 })] });
     await expect(createOrder(baseInput())).rejects.toThrow(AppError);
     const sqls = clientQueryMock.mock.calls.map((c) => String(c[0]).trim());
@@ -321,7 +321,7 @@ describe('createOrder — estoque', () => {
 
 // ─── Variants ────────────────────────────────────────────────────────────────
 
-describe('createOrder — variações', () => {
+describe('createOrder — variants', () => {
   const parent = product({ has_variants: true, price: '100.00', stock: 0 });
   const variant = {
     id: 'v1',
@@ -333,7 +333,7 @@ describe('createOrder — variações', () => {
     images: ['/uploads/rosa.jpg'],
   };
 
-  it('cobra o preço do SKU, não o do produto pai', async () => {
+  it('charges the SKU price, not that of the parent product', async () => {
     setupTx({ products: [parent], variants: [variant] });
 
     await createOrder(baseInput({ items: [{ productId: 'p1', quantity: 2, variantId: 'v1' }] }));
@@ -342,12 +342,12 @@ describe('createOrder — variações', () => {
     expect(v[COL.subtotal]).toBe(160); // 2 × 80, não 2 × 100
   });
 
-  it('exige o SKU quando o produto tem variação', async () => {
+  it('requires the SKU when the product has variants', async () => {
     setupTx({ products: [parent], variants: [] });
     await expect(createOrder(baseInput())).rejects.toMatchObject({ code: 'VARIANT_REQUIRED' });
   });
 
-  it('recusa SKU que pertence a outro produto', async () => {
+  it('refuses a SKU belonging to another product', async () => {
     setupTx({
       products: [parent],
       variants: [{ ...variant, product_id: 'OUTRO' }],
@@ -357,14 +357,14 @@ describe('createOrder — variações', () => {
     ).rejects.toMatchObject({ code: 'VARIANT_UNAVAILABLE' });
   });
 
-  it('recusa SKU em produto sem variação', async () => {
+  it('refuses a SKU on a product without variants', async () => {
     setupTx({ products: [product()], variants: [variant] });
     await expect(
       createOrder(baseInput({ items: [{ productId: 'p1', quantity: 1, variantId: 'v1' }] }))
     ).rejects.toMatchObject({ code: 'VARIANT_NOT_ALLOWED' });
   });
 
-  it('checa o estoque do SKU, não o do pai', async () => {
+  it('checks the SKU stock, not that of the parent', async () => {
     setupTx({ products: [parent], variants: [{ ...variant, stock: 1 }] });
     await expect(
       createOrder(baseInput({ items: [{ productId: 'p1', quantity: 2, variantId: 'v1' }] }))
@@ -382,7 +382,7 @@ describe('createOrder — atacado', () => {
     ).rejects.toMatchObject({ code: 'WHOLESALE_AUTH_REQUIRED' });
   });
 
-  it('recusa conta não aprovada', async () => {
+  it('refuses an unapproved account', async () => {
     setupTx({});
     approvedAccountMock.mockResolvedValue(null);
     await expect(
@@ -393,7 +393,7 @@ describe('createOrder — atacado', () => {
     ).rejects.toMatchObject({ code: 'WHOLESALE_NOT_APPROVED' });
   });
 
-  it('recusa CNPJ que não bate com o cadastro aprovado', async () => {
+  it('refuses a CNPJ that does not match the approved account', async () => {
     setupTx({});
     approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11444777000161' });
     await expect(
@@ -404,7 +404,7 @@ describe('createOrder — atacado', () => {
     ).rejects.toMatchObject({ code: 'CNPJ_MISMATCH' });
   });
 
-  it('recusa produto que não está liberado para atacado', async () => {
+  it('refuses a product not enabled for wholesale', async () => {
     setupTx({ products: [product({ wholesale_enabled: false })] });
     approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11222333000181' });
     await expect(
@@ -415,7 +415,7 @@ describe('createOrder — atacado', () => {
     ).rejects.toMatchObject({ code: 'PRODUCT_NOT_WHOLESALE' });
   });
 
-  it('exige a quantidade mínima por produto', async () => {
+  it('enforces the per-product minimum quantity', async () => {
     setupTx({ products: [product({ wholesale_enabled: true, wholesale_min_qty: 6 })] });
     approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11222333000181' });
     await expect(
@@ -433,32 +433,32 @@ describe('createOrder — atacado', () => {
 
 // ─── Entrada / frete ─────────────────────────────────────────────────────────
 
-describe('createOrder — validação de entrada', () => {
-  it('recusa carrinho vazio', async () => {
+describe('createOrder — input validation', () => {
+  it('refuses an empty cart', async () => {
     await expect(createOrder(baseInput({ items: [] }))).rejects.toMatchObject({
       code: 'EMPTY_CART',
     });
   });
 
-  it('recusa endereço incompleto', async () => {
+  it('refuses an incomplete address', async () => {
     await expect(
       createOrder(baseInput({ shippingAddress: { ...ADDRESS, city: '' } }))
     ).rejects.toMatchObject({ code: 'INVALID_ADDRESS' });
   });
 
-  it('recusa CEP que não tem 8 dígitos', async () => {
+  it('refuses a CEP that is not 8 digits', async () => {
     await expect(
       createOrder(baseInput({ shippingAddress: { ...ADDRESS, cep: '2204' } }))
     ).rejects.toMatchObject({ code: 'INVALID_CEP' });
   });
 
-  it('exige a opção de frete escolhida', async () => {
+  it('requires a chosen shipping option', async () => {
     await expect(
       createOrder(baseInput({ shipping: { quoteToken: '', serviceId: '' } }))
     ).rejects.toMatchObject({ code: 'SHIPPING_REQUIRED' });
   });
 
-  it('revalida o frete pelo token assinado — preço nunca vem do cliente', async () => {
+  it('revalidates shipping through the signed token: the price never comes from the client', async () => {
     setupTx({});
     pickOptionMock.mockReturnValue({ id: 'pac', name: 'PAC', service: 'PAC', price: 41.9, days: 12 });
 
@@ -485,7 +485,7 @@ describe('createOrder — aviso de PIX pendente', () => {
     )?.[0] as { to: string; variables: Record<string, string> } | undefined;
   }
 
-  it('avisa o admin com pedido, cliente, valor e TX ID', async () => {
+  it('notifies the admin with order, customer, amount and TX ID', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
 
     await createOrder(baseInput());
@@ -513,7 +513,7 @@ describe('createOrder — aviso de PIX pendente', () => {
     );
   });
 
-  it('não avisa quando o pagamento é cartão', async () => {
+  it('does not notify when the payment is by card', async () => {
     setupTx({});
     stripeMock.mockReturnValue({
       paymentIntents: { create: async () => ({ id: 'pi_1', client_secret: 'cs_1' }) },
@@ -526,7 +526,7 @@ describe('createOrder — aviso de PIX pendente', () => {
 
   // The notification is raised inside the checkout try, whose catch cancels the
   // order and restores credit. A failed email must not drop a real purchase.
-  it('conclui o pedido mesmo se o envio do e-mail explodir', async () => {
+  it('completes the order even if sending the email throws', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
     sendEmailMock.mockImplementation(() => {
       throw new Error('Resend fora do ar');
@@ -544,7 +544,7 @@ describe('createOrder — aviso de PIX pendente', () => {
     ).toBe(false);
   });
 
-  it('conclui o pedido mesmo se o e-mail rejeitar a promise', async () => {
+  it('completes the order even if the email rejects its promise', async () => {
     setupTx({});
     sendEmailMock.mockRejectedValue(new Error('429 rate limited'));
 
@@ -580,7 +580,7 @@ describe('cancelMyOrder', () => {
     };
   }
 
-  it('cancela um pedido pendente do próprio usuário', async () => {
+  it('cancels an own pending order', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [orderRow()] })
       .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled' })] });
@@ -596,12 +596,12 @@ describe('cancelMyOrder', () => {
   });
 
   // Ownership lives in the WHERE clause, so a guessed id finds nothing.
-  it('não encontra pedido de outra pessoa', async () => {
+  it('does not find an order belonging to someone else', async () => {
     queryMock.mockResolvedValue({ rows: [] });
     await expect(cancelMyOrder('u1', 'alheio')).rejects.toBeInstanceOf(AppError);
   });
 
-  it('recusa pedido já pago — reembolso é ação de admin', async () => {
+  it('refuses an already paid order: a refund is an admin action', async () => {
     queryMock.mockResolvedValue({ rows: [orderRow({ status: 'paid' })] });
 
     await expect(cancelMyOrder('u1', 'o1')).rejects.toThrow(/não pode ser cancelado/i);
@@ -617,7 +617,7 @@ describe('cancelMyOrder', () => {
     await expect(cancelMyOrder('u1', 'o1')).rejects.toBeInstanceOf(AppError);
   });
 
-  it('é idempotente: cancelar de novo devolve o pedido sem reescrever', async () => {
+  it('is idempotent: cancelling again returns the order without rewriting', async () => {
     queryMock.mockResolvedValue({ rows: [orderRow({ status: 'cancelled' })] });
 
     const order = await cancelMyOrder('u1', 'o1');
@@ -632,7 +632,7 @@ describe('cancelMyOrder', () => {
 
   // The UPDATE is conditioned on status so a double click, or a race with an
   // admin, cannot cancel twice and restore credit twice.
-  it('detecta corrida quando o status muda entre a leitura e o UPDATE', async () => {
+  it('detects a race when the status changes between the read and the UPDATE', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [orderRow()] })
       .mockResolvedValueOnce({ rows: [] });
@@ -640,7 +640,7 @@ describe('cancelMyOrder', () => {
     await expect(cancelMyOrder('u1', 'o1')).rejects.toThrow(/mudou de status/i);
   });
 
-  it('devolve o crédito de loja gasto no pedido', async () => {
+  it('restores the store credit spent on the order', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [orderRow({ store_credit_applied: '30.00' })] })
       .mockResolvedValueOnce({
@@ -652,7 +652,7 @@ describe('cancelMyOrder', () => {
     expect(restoreCreditMock).toHaveBeenCalledWith('o1', expect.any(Object));
   });
 
-  it('avisa o admin sem deixar a falha do e-mail derrubar o cancelamento', async () => {
+  it('notifies the admin without letting an email failure drop the cancellation', async () => {
     queryMock
       .mockResolvedValueOnce({ rows: [orderRow()] })
       .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled' })] });

@@ -124,7 +124,7 @@ describe('getMonthlyReport', () => {
 // =============================================================================
 
 describe('getRevenueByPlan', () => {
-  it('deve retornar distribuição do plano club a partir de /plan-distribution', async () => {
+  it('returns the club plan distribution from /plan-distribution', async () => {
     mockedApi.get.mockResolvedValueOnce({
       data: [{ plan: 'club', count: 12, revenue: 1799.88, percentage: 100 }],
       status: 200,
@@ -142,7 +142,7 @@ describe('getRevenueByPlan', () => {
     })
   })
 
-  it('deve tratar zero membros', async () => {
+  it('handles zero members', async () => {
     mockedApi.get.mockResolvedValueOnce({
       data: [{ plan: 'club', count: 0, revenue: 0, percentage: 0 }],
       status: 200,

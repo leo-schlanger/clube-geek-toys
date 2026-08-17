@@ -40,7 +40,7 @@ describe('ensureSchema — isolamento de falha por etapa', () => {
     expect(state.ranAt).not.toBeNull();
   });
 
-  it('uma etapa quebrada NÃO cancela as demais — era a regressão silenciosa', async () => {
+  it('a broken step does NOT cancel the others, which was the silent regression', async () => {
     // Worst realistic case: an early `ALTER TABLE` dies (permissions, lock,
     // incompatible type) with migrations 013-019 queued behind it.
     let calls = 0;
@@ -62,7 +62,7 @@ describe('ensureSchema — isolamento de falha por etapa', () => {
     expect(calls).toBeGreaterThan(50);
   });
 
-  it('conta cada etapa que falha, não só a primeira', async () => {
+  it('counts every failing step, not just the first', async () => {
     queryMock.mockImplementation(async (sql: string) => {
       if (/CREATE TABLE IF NOT EXISTS/.test(sql)) {
         throw new Error('disk full');
@@ -81,7 +81,7 @@ describe('ensureSchema — isolamento de falha por etapa', () => {
     }
   });
 
-  it('getSchemaState começa em pending e passa a refletir a última execução', async () => {
+  it('getSchemaState starts pending and then reflects the last run', async () => {
     queryMock.mockResolvedValue({ rows: [] });
     const { ensureSchema, getSchemaState } = await loadFresh();
 
@@ -95,7 +95,7 @@ describe('ensureSchema — isolamento de falha por etapa', () => {
     expect(getSchemaState().ranAt).not.toBeNull();
   });
 
-  it('nunca lança — a API tem que subir mesmo com o banco recusando DDL', async () => {
+  it('never throws: the API must boot even when the database refuses DDL', async () => {
     queryMock.mockRejectedValue(new Error('connection terminated'));
     const { ensureSchema } = await loadFresh();
 

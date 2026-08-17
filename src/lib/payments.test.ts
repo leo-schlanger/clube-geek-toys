@@ -82,7 +82,7 @@ describe('Payments API client', () => {
   // ---- calculatePlanPrice ----
 
   describe('calculatePlanPrice', () => {
-    it('deve retornar o preço anual do clube (149.99)', () => {
+    it('returns the annual club price (149.99)', () => {
       expect(calculatePlanPrice('club', 'annual')).toBe(149.99)
     })
   })
@@ -317,7 +317,7 @@ describe('Payments API client', () => {
   // ---- createSubscriptionPayment ----
 
   describe('createSubscriptionPayment', () => {
-    it('deve fazer POST /subscription/create com frequency_type years e preço do clube', async () => {
+    it('POSTs /subscription/create with frequency_type years and the club price', async () => {
       mockedApi.post.mockResolvedValue({
         data: {
           id: 'sub_123',
@@ -347,7 +347,7 @@ describe('Payments API client', () => {
       })
     })
 
-    it('deve lançar erro quando a API retorna erro', async () => {
+    it('throws when the API returns an error', async () => {
       mockedApi.post.mockResolvedValue({ error: 'Subscription failed', status: 400 })
 
       await expect(
@@ -355,7 +355,7 @@ describe('Payments API client', () => {
       ).rejects.toThrow('Subscription failed')
     })
 
-    it('deve lançar erro quando a API não retorna dados', async () => {
+    it('throws when the API returns no data', async () => {
       mockedApi.post.mockResolvedValue({ data: undefined, status: 200 })
 
       await expect(
@@ -363,7 +363,7 @@ describe('Payments API client', () => {
       ).rejects.toThrow('Resposta inválida do servidor ao criar assinatura')
     })
 
-    it('deve propagar erros de rede', async () => {
+    it('propagates network errors', async () => {
       mockedApi.post.mockRejectedValue(new Error('Timeout'))
 
       await expect(

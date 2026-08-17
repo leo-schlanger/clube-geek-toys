@@ -42,7 +42,7 @@ function parseTlv(payload: string): Array<[string, string]> {
 }
 
 describe('generatePixEMV', () => {
-  it('monta o BR Code com os campos obrigatórios na ordem da spec', () => {
+  it('builds the BR Code with the required fields in spec order', () => {
     const { emvCode } = generatePixEMV(BASE);
     const ids = parseTlv(emvCode).map(([id]) => id);
 
@@ -68,14 +68,14 @@ describe('generatePixEMV', () => {
     expect(fields['58']).toBe('BR');
   });
 
-  it('fecha com um CRC16 válido sobre o payload + "6304"', () => {
+  it('closes with a valid CRC16 over the payload plus "6304"', () => {
     const { emvCode } = generatePixEMV(BASE);
     expect(crc16(emvCode.slice(0, -4))).toBe(emvCode.slice(-4));
   });
 
   // Regression: `tlv()` counted UTF-16 characters, so an accented merchant name
   // declared fewer bytes than it occupied and the bank app rejected the code.
-  it('mantém length em bytes com nome acentuado', () => {
+  it('keeps the length in bytes with an accented merchant name', () => {
     const { emvCode } = generatePixEMV({
       ...BASE,
       merchantName: 'GEEKPOP & TOYS AÇÃO',
@@ -122,7 +122,7 @@ describe('generatePixEMV', () => {
     expect(crc16(emvCode.slice(0, -4))).toBe(emvCode.slice(-4));
   });
 
-  it('devolve txId e expiração coerentes', () => {
+  it('returns a coherent txId and expiry', () => {
     const before = Date.now();
     const result = generatePixEMV({ ...BASE, expirationMinutes: 30 });
     const expires = new Date(result.expiresAt).getTime();
@@ -134,14 +134,14 @@ describe('generatePixEMV', () => {
 });
 
 describe('generatePixTxId', () => {
-  it('gera id alfanumérico dentro do limite de 25 chars', () => {
+  it('generates an alphanumeric id within the 25-char limit', () => {
     for (let i = 0; i < 50; i++) {
       const txId = generatePixTxId();
       expect(txId).toMatch(/^[A-Z0-9]{1,25}$/);
     }
   });
 
-  it('não repete em chamadas seguidas', () => {
+  it('does not repeat across successive calls', () => {
     const ids = new Set(Array.from({ length: 200 }, generatePixTxId));
     expect(ids.size).toBeGreaterThan(190);
   });

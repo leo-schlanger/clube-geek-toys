@@ -89,7 +89,7 @@ beforeEach(() => {
 // =============================================================================
 
 describe('calculateSubscriptionPrice', () => {
-  it('deve retornar o preço anual do clube (149.99)', () => {
+  it('returns the annual club price (149.99)', () => {
     expect(calculateSubscriptionPrice('club', 'years')).toBe(149.99)
   })
 })

@@ -63,8 +63,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('quoteShipping — origem da cotação', () => {
-  it('usa a cotação real quando o Melhor Envio responde', async () => {
+describe('quoteShipping — quote source', () => {
+  it('uses the real quote when Melhor Envio responds', async () => {
     vi.stubGlobal('fetch', mockFetch(200, LIVE_OPTION));
 
     const result = await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
@@ -75,7 +75,7 @@ describe('quoteShipping — origem da cotação', () => {
   });
 
   // The rejected-credential case.
-  it('cai na tabela interna quando a credencial é recusada', async () => {
+  it('falls back to the internal table when the credential is refused', async () => {
     vi.stubGlobal('fetch', mockFetch(401, { message: 'Unauthenticated.' }));
 
     const result = await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
@@ -85,7 +85,7 @@ describe('quoteShipping — origem da cotação', () => {
     expect(result.options.length).toBeGreaterThan(0);
   });
 
-  it('trata 200 com lista vazia como fallback, não como sucesso', async () => {
+  it('treats a 200 with an empty list as fallback, not success', async () => {
     // lastSuccessAt is process state by design (a health signal, not a
     // per-request value), so the assertion is relative: it must not advance.
     const before = getMelhorEnvioHealth().lastSuccessAt;
@@ -99,7 +99,7 @@ describe('quoteShipping — origem da cotação', () => {
 });
 
 describe('getMelhorEnvioHealth — o sinal que faltava', () => {
-  it('marca credentialRejected em 401', async () => {
+  it('flags credentialRejected on 401', async () => {
     vi.stubGlobal('fetch', mockFetch(401, { message: 'Unauthenticated.' }));
     await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
 
@@ -108,7 +108,7 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
     expect(health.lastFailure?.status).toBe(401);
   });
 
-  it('marca credentialRejected em 403', async () => {
+  it('flags credentialRejected on 403', async () => {
     vi.stubGlobal('fetch', mockFetch(403, 'Forbidden'));
     await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
 
@@ -117,7 +117,7 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
 
   // Upstream flakiness and a wrong credential need different responses: one
   // resolves by waiting, the other does not.
-  it('separa instabilidade (500) de credencial recusada', async () => {
+  it('separates upstream flakiness (500) from a refused credential', async () => {
     vi.stubGlobal('fetch', mockFetch(500, 'Internal Server Error'));
     await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
 
@@ -126,7 +126,7 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
     expect(health.lastFailure?.status).toBe(500);
   });
 
-  it('grita no log quando a credencial é recusada', async () => {
+  it('logs loudly when the credential is refused', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubGlobal('fetch', mockFetch(401, { message: 'Unauthenticated.' }));
 
@@ -140,7 +140,7 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
     error.mockRestore();
   });
 
-  it('limpa a falha depois que uma cotação real volta a funcionar', async () => {
+  it('clears the failure once a real quote succeeds again', async () => {
     vi.stubGlobal('fetch', mockFetch(401, { message: 'Unauthenticated.' }));
     await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
     expect(getMelhorEnvioHealth().lastFailure).not.toBeNull();

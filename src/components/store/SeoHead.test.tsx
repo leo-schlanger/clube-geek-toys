@@ -40,29 +40,29 @@ afterEach(() => {
   document.title = originalTitle
 })
 
-describe('SeoHead — título e canonical', () => {
-  it('completa o título com o nome do site quando falta a marca', () => {
+describe('SeoHead — title and canonical', () => {
+  it('appends the site name when the title lacks the brand', () => {
     render(<SeoHead title="Carrinho" path="/carrinho" />)
     expect(document.title).toBe('Carrinho | Loja GeekPop & Toys')
   })
 
-  it('respeita o título que já traz a marca', () => {
+  it('respects a title that already carries the brand', () => {
     render(<SeoHead title="Loja GeekPop & Toys | K-pop" />)
     expect(document.title).toBe('Loja GeekPop & Toys | K-pop')
   })
 
-  it('usa o nome do clube quando o modo é club', () => {
+  it('uses the club site name in club mode', () => {
     mockMode.value = 'club'
     render(<SeoHead title="Assinar" />)
     expect(meta('property', 'og:site_name')).toBe('Clube GeekPop & Toys')
   })
 
-  it('aponta o canonical para a própria origem e caminho', () => {
+  it('points the canonical at the origin and path', () => {
     render(<SeoHead title="Produto" path="/produto/x" />)
     expect(canonical()).toBe('https://shop.geekpoptoys.com.br/produto/x')
   })
 
-  it('aceita caminho sem barra inicial', () => {
+  it('accepts a path without a leading slash', () => {
     render(<SeoHead title="X" path="carrinho" />)
     expect(canonical()).toBe('https://shop.geekpoptoys.com.br/carrinho')
   })
@@ -76,43 +76,43 @@ describe('SeoHead — imagem', () => {
     expect(meta('property', 'og:image')).toBe('https://shop.geekpoptoys.com.br/uploads/a.jpg')
   })
 
-  it('preserva URL já absoluta', () => {
+  it('preserves an already absolute URL', () => {
     render(<SeoHead title="Produto" image="https://api.geeketoys.com.br/uploads/a.jpg" />)
     expect(meta('property', 'og:image')).toBe('https://api.geeketoys.com.br/uploads/a.jpg')
   })
 
-  it('cai no og-image padrão quando não há foto', () => {
+  it('falls back to the default og-image when there is no photo', () => {
     render(<SeoHead title="Carrinho" />)
     expect(meta('property', 'og:image')).toBe('https://shop.geekpoptoys.com.br/og-image.png')
   })
 
-  it('mantém twitter:image e og:image iguais', () => {
+  it('keeps twitter:image and og:image identical', () => {
     render(<SeoHead title="P" image="/uploads/a.jpg" />)
     expect(meta('name', 'twitter:image')).toBe(meta('property', 'og:image'))
   })
 })
 
-describe('SeoHead — indexação', () => {
-  it('libera indexação por padrão', () => {
+describe('SeoHead — indexing', () => {
+  it('allows indexing by default', () => {
     render(<SeoHead title="Vitrine" />)
     expect(meta('name', 'robots')).toBe('index, follow, max-image-preview:large')
   })
 
-  it('bloqueia quando noIndex', () => {
+  it('blocks indexing when noIndex is set', () => {
     render(<SeoHead title="Checkout" noIndex />)
     expect(meta('name', 'robots')).toBe('noindex, nofollow')
   })
 
-  it('marca og:type product na página de produto', () => {
+  it('sets og:type product on a product page', () => {
     render(<SeoHead title="P" type="product" />)
     expect(meta('property', 'og:type')).toBe('product')
   })
 })
 
-describe('SeoHead — meta obsoleta entre navegações', () => {
+describe('SeoHead — stale meta across navigations', () => {
   // The bug: an empty value returned early and the previous tag stayed in the
   // head. Going from a product to the cart kept the product's description.
-  it('apaga a description quando a nova página não tem uma', () => {
+  it('removes the description when the new page has none', () => {
     const { unmount } = render(<SeoHead title="Produto" description="Photocard raro" />)
     expect(meta('name', 'description')).toBe('Photocard raro')
     unmount()
@@ -122,7 +122,7 @@ describe('SeoHead — meta obsoleta entre navegações', () => {
     expect(meta('property', 'og:description')).toBeNull()
   })
 
-  it('substitui a description ao trocar de página', () => {
+  it('replaces the description on page change', () => {
     const { unmount } = render(<SeoHead title="A" description="primeira" />)
     unmount()
     render(<SeoHead title="B" description="segunda" />)
@@ -131,7 +131,7 @@ describe('SeoHead — meta obsoleta entre navegações', () => {
     expect(document.head.querySelectorAll('meta[name="description"]')).toHaveLength(1)
   })
 
-  it('não duplica tags ao re-renderizar', () => {
+  it('does not duplicate tags on re-render', () => {
     const { rerender } = render(<SeoHead title="A" description="x" />)
     rerender(<SeoHead title="A" description="y" />)
 
@@ -140,25 +140,25 @@ describe('SeoHead — meta obsoleta entre navegações', () => {
   })
 })
 
-describe('SeoHead — domínio canônico', () => {
+describe('SeoHead — canonical domain', () => {
   // Regression: the canonical came from window.location.origin, so each mirror
   // declared itself canonical. Google reads that as duplicate content and
   // splits the ranking authority instead of adding it up.
-  it('usa o canônico da loja, não o domínio acessado', () => {
+  it('uses the shop canonical, not the host in use', () => {
     render(<SeoHead title="Vitrine" path="/" />)
 
     expect(canonical()).toBe('https://shop.geekpoptoys.com.br/')
     expect(meta('property', 'og:url')).toBe('https://shop.geekpoptoys.com.br/')
   })
 
-  it('usa o canônico do clube no modo club', () => {
+  it('uses the club canonical in club mode', () => {
     mockMode.value = 'club'
     render(<SeoHead title="Assinar" path="/assinar" />)
 
     expect(canonical()).toBe('https://club.geeketoys.com.br/assinar')
   })
 
-  it('não deixa o canonical variar com o host da janela', () => {
+  it('never lets the canonical vary with the window host', () => {
     // jsdom serves on localhost; a canonical reflecting it would show up here.
     render(<SeoHead title="X" path="/" />)
     expect(canonical()).not.toContain(window.location.hostname)

@@ -26,7 +26,7 @@ export default function TermsOfUse() {
                             <p>E-mail: <a href="mailto:contato@geeketoys.com.br" className="text-primary hover:underline">contato@geeketoys.com.br</a></p>
                         </section>
 
-                        <p>Ao utilizar os sites da <strong>GeekPop & Toys</strong> e o <strong>Clube de Vantagens</strong>, você concorda com os seguintes termos, elaborados em conformidade com o Código de Defesa do Consumidor (Lei nº 8.078/90) e demais legislações aplicáveis:</p>
+                        <p>Ao utilizar os sites da <strong>GeekPop & Toys</strong> e o <strong>Clube de Vantagens</strong>, você concorda com os seguintes termos, elaborados em conformidade com o Código de Defesa do Consumidor (Lei nº 8.078/90), o Decreto nº 7.962/2013 (regulamenta o CDC para o comércio eletrônico), o Marco Civil da Internet (Lei nº 12.965/2014) e a LGPD (Lei nº 13.709/2018):</p>
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">1. O Clube de Vantagens</h2>
@@ -70,7 +70,10 @@ export default function TermsOfUse() {
                                 <li><strong>Preço e disponibilidade:</strong> O preço cobrado é o exibido no momento da finalização do pedido. Em caso de erro evidente de preço ou de indisponibilidade do item, entramos em contato e você escolhe entre a devolução integral do valor ou a substituição do produto.</li>
                                 <li><strong>Pagamento:</strong> PIX ou cartão. O pedido só é preparado após a confirmação do pagamento; no PIX, a confirmação é feita mediante conferência do recebimento.</li>
                                 <li><strong>Cancelamento antes do pagamento:</strong> Enquanto o pedido estiver aguardando pagamento, você pode cancelá-lo sozinho em "Minhas compras", sem custo e sem precisar falar com a gente.</li>
-                                <li><strong>Direito de arrependimento (Art. 49, CDC):</strong> Em compras feitas fora do estabelecimento físico, você pode desistir em até <strong>7 (sete) dias corridos contados do recebimento do produto</strong>, sem precisar justificar. Basta avisar pelos canais de contato. Devolvemos o valor pago, incluindo o frete, e os custos de devolução são por nossa conta.</li>
+                                <li><strong>Direito de arrependimento (Art. 49, CDC):</strong> Em compras feitas fora do estabelecimento físico, você pode desistir em até <strong>7 (sete) dias corridos contados do recebimento do produto</strong>, sem precisar justificar nem pagar nada por isso. Devolvemos o valor integral, <strong>incluindo o frete pago</strong>, e os custos de devolução são por nossa conta.</li>
+                                <li><strong>Como exercer o arrependimento:</strong> Pela mesma ferramenta usada na compra — em <strong>"Minhas compras"</strong>, abrindo o pedido e escolhendo a opção de desistência, ou respondendo ao e-mail de confirmação do pedido. Também aceitamos pelo WhatsApp e pelo e-mail de contato. Confirmamos o recebimento do seu pedido de desistência imediatamente, por e-mail, e o comprovante fica registrado na sua conta.</li>
+                                <li><strong>Devolução do valor:</strong> Se o pagamento foi em cartão, comunicamos a operadora para que o lançamento não seja feito ou, se já tiver sido, seja estornado. Em PIX, devolvemos para a mesma chave ou conta de origem. O prazo de processamento depende da instituição financeira; a nossa comunicação é feita em até 2 dias úteis do seu pedido.</li>
+                                <li><strong>Contratos acessórios:</strong> O arrependimento encerra automaticamente qualquer contrato acessório vinculado à compra, sem custo para você.</li>
                                 <li><strong>Condição do produto devolvido:</strong> O item deve ser devolvido com todos os acessórios e, quando houver, a embalagem original. Colecionáveis e photocards não podem ter sido retirados de embalagem lacrada quando o lacre for parte do valor do produto — nesse caso, informe antes de abrir.</li>
                                 <li><strong>Produto com defeito ou avaria no transporte:</strong> Avise em até 7 dias do recebimento, com fotos. Trocamos o produto ou devolvemos o valor, à sua escolha, conforme o Art. 18 do CDC.</li>
                                 <li><strong>Prazos de entrega:</strong> Os prazos exibidos no checkout são estimativas informadas pela transportadora e contam a partir da postagem, não da compra. Greves, ocorrências dos Correios e endereço incorreto podem atrasar a entrega.</li>
@@ -79,7 +82,18 @@ export default function TermsOfUse() {
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">6. Uso do Site</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">6. Atendimento ao Consumidor</h2>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li><strong>Canais:</strong> E-mail <a href="mailto:contato@geeketoys.com.br" className="text-primary hover:underline">contato@geeketoys.com.br</a>, WhatsApp <a href="https://wa.me/5511914662881" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">(11) 91466-2881</a> e a loja física na Rua Barata Ribeiro, 181, Loja J — Copacabana, Rio de Janeiro/RJ.</li>
+                                <li><strong>Confirmação:</strong> Confirmamos o recebimento da sua mensagem imediatamente, por e-mail.</li>
+                                <li><strong>Prazo de resposta:</strong> Respondemos demandas de consumidor em <strong>até 5 (cinco) dias</strong>, conforme o Decreto nº 7.962/2013. Solicitações relativas a dados pessoais (LGPD) seguem o prazo de 15 dias descrito na Política de Privacidade.</li>
+                                <li><strong>Registro do pedido:</strong> Cada pedido fica disponível na sua conta, em "Minhas compras", com itens, valores, endereço e status — em formato que você pode consultar, salvar e imprimir a qualquer momento.</li>
+                                <li><strong>Correção de erros:</strong> Antes de finalizar, o resumo do pedido mostra itens, quantidades, frete e total, e permite alterar ou remover qualquer item.</li>
+                            </ul>
+                        </section>
+
+                        <section className="space-y-3">
+                            <h2 className="text-2xl font-semibold text-foreground">7. Uso do Site</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>É proibido o uso do site para fins ilegais ou para tentar comprometer a segurança da plataforma.</li>
                                 <li>Reservamo-nos o direito de suspender ou cancelar contas que violem estes termos.</li>
@@ -88,7 +102,7 @@ export default function TermsOfUse() {
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">7. Limitação de Responsabilidade</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">8. Limitação de Responsabilidade</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Os descontos são válidos apenas durante a vigência da assinatura e conforme disponibilidade.</li>
                                 <li>Os benefícios do plano incluem 15% de desconto em qualquer produto (loja física e online), brinde especial e entrada gratuita em eventos participantes.</li>
@@ -98,17 +112,17 @@ export default function TermsOfUse() {
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">8. Propriedade Intelectual</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">9. Propriedade Intelectual</h2>
                             <p>Todo o conteúdo (logos, textos, imagens, software) é propriedade da GeekPop & Toys ou de seus licenciadores, protegido pela Lei de Direitos Autorais (Lei nº 9.610/98). É proibida a reprodução sem autorização expressa.</p>
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">9. Alterações nos Termos</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">10. Alterações nos Termos</h2>
                             <p>Estes termos podem ser alterados a qualquer momento. Alterações significativas serão comunicadas por e-mail com antecedência mínima de 15 dias. O uso continuado após a notificação implica aceitação das novas condições.</p>
                         </section>
 
                         <section className="space-y-3">
-                            <h2 className="text-2xl font-semibold text-foreground">10. Foro e Legislação Aplicável</h2>
+                            <h2 className="text-2xl font-semibold text-foreground">11. Foro e Legislação Aplicável</h2>
                             <p>Este contrato é regido pelas leis brasileiras. Fica eleito o foro da Comarca do Rio de Janeiro - RJ para dirimir controvérsias, sem prejuízo do direito do consumidor de optar pelo foro de seu domicílio (Art. 101, I, CDC).</p>
                         </section>
                     </div>

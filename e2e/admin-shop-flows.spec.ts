@@ -39,7 +39,7 @@ async function preConsent(target: { addInitScript: (fn: () => void) => Promise<v
   })
 }
 
-test.describe('Fluxos admin + loja (produção)', () => {
+test.describe('Admin and shop flows (production)', () => {
   // Rodar sempre com --project=desktop (evita criar o produto em dobro no mobile).
   test.beforeEach(async ({ page }) => {
     test.skip(!EMAIL || !PASSWORD, 'defina E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD')
@@ -124,7 +124,7 @@ test.describe('Fluxos admin + loja (produção)', () => {
     process.env.__CART_STORAGE = JSON.stringify(storage)
   })
 
-  test('3) checkout até a etapa de pagamento (sem cobrar)', async ({ browser }) => {
+  test('3) checkout up to the payment step, without charging', async ({ browser }) => {
     // reusa o carrinho do teste anterior
     const state = process.env.__CART_STORAGE ? JSON.parse(process.env.__CART_STORAGE) : undefined
     const ctx = await browser.newContext({ storageState: state })
@@ -165,7 +165,7 @@ test.describe('Fluxos admin + loja (produção)', () => {
    * Clicar nos botões antes de salvar faria o teste passar mesmo com o bug de
    * volta — por isso os cliques em "Gerar combinações"/"Adicionar" ficam de fora.
    */
-  test('3b) admin cadastra variações e vídeo sem clicar em Gerar/Adicionar', async ({ page }) => {
+  test('3b) admin saves variants and a video without pressing generate or add', async ({ page }) => {
     await adminLogin(page)
     await page.getByRole('button', { name: 'Produtos' }).first().click()
     await expect(page.getByRole('button', { name: /Novo Produto/i })).toBeVisible({ timeout: 15_000 })

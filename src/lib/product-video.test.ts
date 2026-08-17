@@ -2,20 +2,20 @@ import { describe, it, expect } from 'vitest'
 import { parseVideoUrl, youtubeId, embedUrl, videoThumbnail, videoKindLabel } from './product-video'
 
 describe('youtubeId', () => {
-  it('lê as formas que o YouTube usa', () => {
+  it('reads every URL shape YouTube uses', () => {
     expect(youtubeId('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
     expect(youtubeId('https://youtu.be/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
     expect(youtubeId('https://www.youtube.com/shorts/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
     expect(youtubeId('https://www.youtube.com/embed/dQw4w9WgXcQ')).toBe('dQw4w9WgXcQ')
   })
 
-  it('sobrevive a parâmetros extras na URL', () => {
+  it('survives extra query parameters', () => {
     expect(youtubeId('https://www.youtube.com/watch?list=PL123&v=dQw4w9WgXcQ&t=30s')).toBe(
       'dQw4w9WgXcQ'
     )
   })
 
-  it('devolve null quando não é YouTube', () => {
+  it('returns null when the URL is not YouTube', () => {
     expect(youtubeId('https://example.com/video.mp4')).toBeNull()
   })
 })
@@ -32,54 +32,54 @@ describe('parseVideoUrl', () => {
     expect(mp4.ok && mp4.video.kind).toBe('file')
   })
 
-  it('recusa link vazio ou sem protocolo', () => {
+  it('rejects an empty link, or one without a protocol', () => {
     expect(parseVideoUrl('')).toMatchObject({ ok: false })
     expect(parseVideoUrl('youtube.com/watch?v=dQw4w9WgXcQ')).toMatchObject({ ok: false })
   })
 
-  it('recusa link de YouTube sem id reconhecível', () => {
+  it('rejects a YouTube link with no recognisable id', () => {
     const result = parseVideoUrl('https://www.youtube.com/feed/subscriptions')
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toMatch(/YouTube/i)
   })
 
-  it('recusa link genérico que a loja não sabe exibir', () => {
+  it('rejects a generic link the storefront cannot display', () => {
     const result = parseVideoUrl('https://vimeo.com/12345')
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.error).toMatch(/YouTube|Instagram|mp4/i)
   })
 
-  it('anexa o título quando informado', () => {
+  it('attaches the title when given', () => {
     const result = parseVideoUrl('https://youtu.be/dQw4w9WgXcQ', 'Unboxing')
     expect(result.ok && result.video.title).toBe('Unboxing')
   })
 })
 
 describe('embedUrl', () => {
-  it('usa o domínio nocookie do YouTube', () => {
+  it('uses the YouTube nocookie domain', () => {
     const url = embedUrl({ kind: 'youtube', url: 'https://youtu.be/dQw4w9WgXcQ' })
     expect(url).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ')
   })
 
-  it('normaliza reel do Instagram para permalink /p/ + embed', () => {
+  it('normalises an Instagram reel to a /p/ permalink and embed', () => {
     const url = embedUrl({ kind: 'instagram', url: 'https://www.instagram.com/reel/CxYzAbCdEfG/' })
     expect(url).toBe('https://www.instagram.com/p/CxYzAbCdEfG/embed')
   })
 
-  it('devolve null para MP4 — toca no <video> nativo', () => {
+  it('returns null for MP4, which plays in a native <video>', () => {
     expect(embedUrl({ kind: 'file', url: 'https://cdn.example.com/demo.mp4' })).toBeNull()
   })
 })
 
 describe('videoThumbnail / videoKindLabel', () => {
-  it('gera miniatura só para YouTube', () => {
+  it('produces a thumbnail only for YouTube', () => {
     expect(videoThumbnail({ kind: 'youtube', url: 'https://youtu.be/dQw4w9WgXcQ' })).toBe(
       'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
     )
     expect(videoThumbnail({ kind: 'file', url: 'https://cdn.example.com/a.mp4' })).toBeNull()
   })
 
-  it('rotula cada origem', () => {
+  it('labels each source', () => {
     expect(videoKindLabel('youtube')).toBe('YouTube')
     expect(videoKindLabel('instagram')).toBe('Instagram')
     expect(videoKindLabel('file')).toBe('MP4')

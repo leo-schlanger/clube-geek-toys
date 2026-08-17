@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 describe('getProfile', () => {
-  it('devolve perfil vazio quando a conta nunca preencheu nada', async () => {
+  it('returns an empty profile when nothing was ever filled in', async () => {
     queryMock.mockResolvedValue({
       rows: [
         profileRow({
@@ -85,25 +85,25 @@ describe('getProfile', () => {
     expect(profile.marketingConsent).toBe(false);
   });
 
-  it('normaliza a data de nascimento para YYYY-MM-DD', async () => {
+  it('normalises the birth date to YYYY-MM-DD', async () => {
     const profile = await getProfile('u1');
     // The driver returns a Date; a timezone must not shift the birthday.
     expect(profile.birthDate).toBe('1998-03-14');
   });
 
-  it('marca isMember quando a conta também assina o clube', async () => {
+  it('flags isMember when the account also holds a membership', async () => {
     queryMock.mockResolvedValue({ rows: [profileRow({ is_member: true })] });
     expect((await getProfile('u1')).isMember).toBe(true);
   });
 
-  it('404 quando a conta não existe', async () => {
+  it('404 when the account does not exist', async () => {
     queryMock.mockResolvedValue({ rows: [] });
     await expect(getProfile('nope')).rejects.toBeInstanceOf(AppError);
   });
 });
 
-describe('upsertProfile — atualização parcial', () => {
-  it('grava só os campos enviados, sem tocar nos demais', async () => {
+describe('upsertProfile — partial update', () => {
+  it('writes only the fields sent, leaving the rest untouched', async () => {
     await upsertProfile('u1', { phone: '21988887777' });
 
     const [sql, params] = upsertCall();
@@ -113,7 +113,7 @@ describe('upsertProfile — atualização parcial', () => {
     expect(params).toEqual(['u1', '21988887777']);
   });
 
-  it('trata null como "apagar o campo"', async () => {
+  it('treats null as clearing the field', async () => {
     await upsertProfile('u1', { gender: null });
 
     const [sql, params] = upsertCall();
@@ -121,7 +121,7 @@ describe('upsertProfile — atualização parcial', () => {
     expect(params).toEqual(['u1', null]);
   });
 
-  it('não emite escrita quando o payload vem vazio', async () => {
+  it('emits no write when the payload is empty', async () => {
     await upsertProfile('u1', {});
 
     expect(
@@ -131,7 +131,7 @@ describe('upsertProfile — atualização parcial', () => {
     ).toBe(false);
   });
 
-  it('serializa o endereço como JSON para a coluna JSONB', async () => {
+  it('serialises the address as JSON for the JSONB column', async () => {
     const address = {
       cep: '22041-001',
       street: 'Av. Atlântica',
@@ -147,7 +147,7 @@ describe('upsertProfile — atualização parcial', () => {
     expect(params[1]).toBe(JSON.stringify(address));
   });
 
-  it('apaga o endereço com null sem passar pelo JSON.stringify', async () => {
+  it('clears the address with null, bypassing JSON.stringify', async () => {
     await upsertProfile('u1', { address: null });
     expect(upsertCall()[1]).toEqual(['u1', null]);
   });
@@ -190,7 +190,7 @@ describe('foto de perfil', () => {
     expect(auditMock).toHaveBeenCalledWith('profile.photo_set', 'u1', {});
   });
 
-  it('remove a foto com null e registra a remoção', async () => {
+  it('removes the photo with null and audits the removal', async () => {
     await setProfilePhoto('u1', null);
     expect(upsertCall()[1][1]).toBeNull();
     expect(auditMock).toHaveBeenCalledWith('profile.photo_removed', 'u1', {});
@@ -198,7 +198,7 @@ describe('foto de perfil', () => {
 });
 
 describe('produtos salvos', () => {
-  it('lista com preço e estoque atuais, não os de quando salvou', async () => {
+  it('lists current price and stock, not those at save time', async () => {
     queryMock.mockResolvedValue({
       rows: [
         {
@@ -248,7 +248,7 @@ describe('produtos salvos', () => {
     expect((await listSavedProducts('u1'))[0].imageUrl).toBeNull();
   });
 
-  it('salvar é idempotente — ON CONFLICT DO NOTHING', async () => {
+  it('saving is idempotent via ON CONFLICT DO NOTHING', async () => {
     queryMock.mockResolvedValue({ rows: [{ id: 'p1' }] });
 
     await saveProduct('u1', 'p1');
@@ -259,12 +259,12 @@ describe('produtos salvos', () => {
     expect(insert![0]).toContain('ON CONFLICT (user_id, product_id) DO NOTHING');
   });
 
-  it('recusa salvar produto inexistente', async () => {
+  it('refuses to save a product that does not exist', async () => {
     queryMock.mockResolvedValue({ rows: [] });
     await expect(saveProduct('u1', 'fantasma')).rejects.toBeInstanceOf(AppError);
   });
 
-  it('remover é idempotente e escopado ao dono', async () => {
+  it('removing is idempotent and scoped to the owner', async () => {
     await unsaveProduct('u1', 'p1');
 
     const del = queryMock.mock.calls.find(

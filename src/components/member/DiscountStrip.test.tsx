@@ -3,27 +3,27 @@ import { render, screen } from '@testing-library/react'
 import { DiscountStrip } from './DiscountStrip'
 
 describe('DiscountStrip', () => {
-  it('renderiza o desconto único de 15%', () => {
+  it('renders the single 15% discount', () => {
     render(<DiscountStrip />)
     expect(screen.getByText('15%')).toBeInTheDocument()
   })
 
-  it('mostra o texto "em qualquer produto"', () => {
+  it('shows the "em qualquer produto" copy', () => {
     render(<DiscountStrip />)
     expect(screen.getByText('em qualquer produto')).toBeInTheDocument()
   })
 
-  it('renderiza o rótulo "Seu desconto de membro"', () => {
+  it('renders the "Seu desconto de membro" label', () => {
     render(<DiscountStrip />)
     expect(screen.getByText('Seu desconto de membro')).toBeInTheDocument()
   })
 
-  it('informa validade na loja física e online', () => {
+  it('states it is valid in the physical store and online', () => {
     render(<DiscountStrip />)
     expect(screen.getByText('Válido na loja física e na loja online')).toBeInTheDocument()
   })
 
-  it('não menciona pontos, serviços nem planos', () => {
+  it('mentions no points, services or plans', () => {
     render(<DiscountStrip />)
     expect(screen.queryByText(/pontos/i)).not.toBeInTheDocument()
     expect(screen.queryByText('em serviços')).not.toBeInTheDocument()

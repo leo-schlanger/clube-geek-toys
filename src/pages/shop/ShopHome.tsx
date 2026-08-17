@@ -289,6 +289,16 @@ export default function ShopHome() {
         <p className="text-xs">
           R. Barata Ribeiro, 181 - loja J · Copacabana, RJ · Envio Correios para todo o Brasil
         </p>
+        {/* Razao social e CNPJ em local de destaque: Decreto 7.962/2013, Art. 2, I e II.
+            Antes so existiam dentro da politica de privacidade, que nao cumpre
+            "local de destaque e de facil visualizacao". */}
+        <p className="text-xs">
+          N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA · CNPJ 52.846.344/0001-10
+          <br />
+          <a href="mailto:contato@geeketoys.com.br" className="hover:underline">
+            contato@geeketoys.com.br
+          </a>
+        </p>
         <p className="text-xs">
           <Link to="/termos" className="hover:underline">Termos de Uso</Link>
           {' · '}

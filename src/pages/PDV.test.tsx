@@ -247,7 +247,7 @@ describe('PDV', () => {
 
   // ─── Reset ────────────────────────────────────────────────
 
-  it('resets verification with Nova Verificação button', async () => {
+  it('resets verification with the "Nova Verificação" button', async () => {
     render(<PDV />)
 
     await userEvent.type(screen.getByPlaceholderText('Digite o CPF...'), '12345678901')
