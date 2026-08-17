@@ -19,6 +19,7 @@ import { EventPromoCard } from '../../components/store/EventPromoCard'
 import { useShopMember } from '../../components/store/useShopMember'
 import { SeoHead, SHOP_DEFAULT_SEO } from '../../components/store/SeoHead'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
+import { CreatorCredit } from '../../components/CreatorCredit'
 import { Button } from '../../components/ui/button'
 import { isEventVisible } from '../../data/event'
 
@@ -288,6 +289,7 @@ export default function ShopHome() {
         <p className="text-xs">
           R. Barata Ribeiro, 181 - loja J · Copacabana, RJ · Envio Correios para todo o Brasil
         </p>
+        <CreatorCredit />
       </footer>
     </div>
   )

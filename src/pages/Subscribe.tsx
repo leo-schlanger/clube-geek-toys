@@ -7,6 +7,7 @@ import { getShopUrl } from '../lib/subdomain'
 import { Check, X, Sparkles, ArrowRight, Shield, Zap, Gift, CreditCard, ShoppingBag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import RadioMiniPlayer from '../components/RadioMiniPlayer'
+import { CreatorCredit } from '../components/CreatorCredit'
 
 export default function Subscribe() {
   const shopUrl = getShopUrl()
@@ -230,6 +231,7 @@ export default function Subscribe() {
         </div>
         <p className="text-xs text-muted-foreground mb-1">club.geeketoys.com.br</p>
         <p className="text-muted-foreground text-xs">&copy; 2026 GeekPop & Toys. Todos os direitos reservados.</p>
+        <CreatorCredit className="mt-2" />
         <p className="mt-3 text-xs flex flex-wrap justify-center gap-3">
           <a href={shopUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             Visite a loja

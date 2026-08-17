@@ -17,6 +17,7 @@ import {
   formatEventDateRange,
   isEventVisible,
 } from '../../data/event'
+import { CreatorCredit } from '../../components/CreatorCredit'
 
 /**
  * Página do evento na loja: infos + reserva.
@@ -146,8 +147,9 @@ export default function EventPage() {
         <EventTicketForm event={event} />
       </main>
 
-      <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+      <footer className="space-y-2 border-t py-6 text-center text-sm text-muted-foreground">
         <p>Clube GeekPop &amp; Toys — Loja oficial</p>
+        <CreatorCredit />
       </footer>
     </div>
   )
