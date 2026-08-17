@@ -1,15 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Perfil de cliente — o cadastro de quem compra na loja **sem** assinar o clube.
+ * Customer profile — the record for people who buy **without** subscribing.
  *
- * O que estes testes protegem:
- *
- *  1. PATCH parcial: `undefined` não mexe no campo, `null` apaga. Mandar o
- *     objeto inteiro a cada salvamento apagaria o que a pessoa nem abriu.
- *  2. Conta sem perfil devolve perfil vazio, não 404 — o perfil é opcional.
- *  3. O audit registra **quais** campos mudaram, nunca os valores: nascimento,
- *     gênero e endereço são dado pessoal e o log é lido por admin.
+ *  1. Partial PATCH: `undefined` leaves a field alone, `null` clears it.
+ *     Sending the whole object each save would wipe untouched fields.
+ *  2. An account with no profile returns an empty one, not a 404.
+ *  3. The audit logs **which** fields changed, never their values: birth date,
+ *     gender and address are personal data and the log is read by admins.
  */
 
 const { queryMock, auditMock } = vi.hoisted(() => ({
@@ -31,7 +29,7 @@ const {
 } = await import('./profile.service.js');
 const { AppError } = await import('../middleware/error-handler.js');
 
-/** Linha do JOIN users+customer_profiles; `over` sobrescreve o que interessa. */
+/** A users+customer_profiles JOIN row; `over` overrides what matters. */
 function profileRow(over: Record<string, unknown> = {}) {
   return {
     user_id: 'u1',
@@ -50,7 +48,7 @@ function profileRow(over: Record<string, unknown> = {}) {
   };
 }
 
-/** Captura o INSERT ... ON CONFLICT emitido pelo upsert. */
+/** Captures the INSERT ... ON CONFLICT emitted by the upsert. */
 function upsertCall(): [string, unknown[]] {
   const call = queryMock.mock.calls.find(
     (c) => typeof c[0] === 'string' && c[0].includes('INSERT INTO customer_profiles')
@@ -89,7 +87,7 @@ describe('getProfile', () => {
 
   it('normaliza a data de nascimento para YYYY-MM-DD', async () => {
     const profile = await getProfile('u1');
-    // O driver devolve Date; fuso não pode empurrar o aniversário um dia.
+    // The driver returns a Date; a timezone must not shift the birthday.
     expect(profile.birthDate).toBe('1998-03-14');
   });
 
@@ -176,7 +174,7 @@ describe('upsertProfile — privacidade do audit', () => {
       { fields: ['phone', 'birthDate', 'gender'] }
     );
 
-    // Nenhum valor pessoal pode ter vazado para o log.
+    // No personal value may have leaked into the log.
     const logged = JSON.stringify(auditMock.mock.calls);
     expect(logged).not.toContain('1998-03-14');
     expect(logged).not.toContain('21999998888');
@@ -272,7 +270,7 @@ describe('produtos salvos', () => {
     const del = queryMock.mock.calls.find(
       (c) => typeof c[0] === 'string' && c[0].includes('DELETE FROM saved_products')
     );
-    // O user_id no WHERE é o que impede apagar o salvo de outra pessoa.
+    // The user_id in the WHERE is what prevents deleting someone else's save.
     expect(del![0]).toContain('user_id = $1');
     expect(del![1]).toEqual(['u1', 'p1']);
   });

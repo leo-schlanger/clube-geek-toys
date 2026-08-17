@@ -4,24 +4,21 @@ import { AppError } from '../middleware/error-handler.js';
 import { createHmacToken, verifyHmacToken } from '../utils/hmac.js';
 
 /**
- * OAuth2 do Melhor Envio.
+ * Melhor Envio OAuth2.
  *
- * O painel deles entrega **Client ID + Secret**, não um token de API — foi essa
- * confusão que gerou 401 em produção e em sandbox em 16/08/2026, com o frete
- * caindo silenciosamente na tabela interna. Com as duas credenciais dá para
- * obter um token, e é isso que este módulo faz.
- *
- * O refresh não é luxo: o token do Melhor Envio expira (na ordem de 30 dias).
- * Sem renovar, a loja voltaria a cotar pela tabela interna um mês depois, do
- * mesmo jeito invisível — por isso o refresh_token é guardado junto.
+ * Their panel hands out a Client ID + Secret, not an API token; pasting the
+ * secret as a token returns 401, and that 401 disappears into the shipping
+ * fallback. Refresh is mandatory rather than nice-to-have: tokens expire in
+ * about 30 days, so without it the store silently returns to the fallback
+ * table a month after every authorization.
  */
 
 const CONFIG_KEY = 'melhor_envio_oauth';
 
-/** Renova antes de expirar de fato: evita corrida com a cotação em andamento. */
+/** Renew ahead of real expiry so an in-flight quote never races the refresh. */
 const REFRESH_MARGIN_MS = 24 * 60 * 60 * 1000;
 
-/** O `state` só precisa sobreviver ao tempo da pessoa autorizando na tela deles. */
+/** Only has to outlive the person authorizing on their screen. */
 const STATE_TTL_MS = 15 * 60 * 1000;
 
 export function melhorEnvioBaseUrl(): string {
@@ -31,13 +28,11 @@ export function melhorEnvioBaseUrl(): string {
 }
 
 /**
- * Precisa bater **exatamente** com o cadastrado no painel do Melhor Envio.
+ * Must match the panel registration **exactly**.
  *
- * Configurável à parte do `API_URL` de propósito: `API_URL` é gravado dentro
- * das URLs de foto de produto, perfil e contrato, então mexer nele para trocar
- * o domínio do OAuth deixaria o banco com hosts misturados para sempre. Os
- * domínios geeketoys e geekpoptoys são espelhos e os dois funcionam aqui;
- * o que importa é ser idêntico ao registrado lá.
+ * Configurable apart from `API_URL` on purpose: that one is baked into stored
+ * product, profile and contract upload URLs, so repointing it just to change
+ * the OAuth domain would leave the database with mixed hosts forever.
  */
 export function redirectUri(): string {
   const base = (env.MELHOR_ENVIO_REDIRECT_URI || '').trim();
@@ -88,11 +83,9 @@ function requireCredentials(): { clientId: string; clientSecret: string } {
 }
 
 /**
- * Monta a URL de autorização com um `state` assinado.
- *
- * O `state` é HMAC com validade curta em vez de um valor guardado em sessão: o
- * callback chega numa requisição sem cookie nossa, e assinar é o que impede
- * alguém de disparar o callback com um `code` próprio.
+ * The `state` is a short-lived HMAC rather than a session value: the callback
+ * arrives on a request carrying none of our cookies, so the signature is what
+ * stops anyone from driving it with a `code` of their own.
  */
 export function buildAuthorizeUrl(): string {
   const { clientId } = requireCredentials();
@@ -137,8 +130,8 @@ async function postToken(body: Record<string, string>): Promise<StoredToken> {
   const data = (await res.json().catch(() => ({}))) as TokenResponse;
 
   if (!res.ok || !data.access_token) {
-    // Nunca ecoar `data` inteiro: a resposta de erro pode devolver o que foi
-    // enviado, e aí o client_secret entraria no log.
+    // Never echo `data` wholesale: the error body can mirror the request,
+    // which would put the client_secret in the logs.
     const reason = data.error || data.message || `HTTP ${res.status}`;
     throw new AppError(
       502,
@@ -147,7 +140,7 @@ async function postToken(body: Record<string, string>): Promise<StoredToken> {
     );
   }
 
-  // Sem expires_in, assume 30 dias e deixa o refresh cuidar do resto.
+  // Without expires_in, assume 30 days and let the refresh sort it out.
   const expiresInMs = (data.expires_in ?? 30 * 24 * 3600) * 1000;
   return {
     accessToken: data.access_token,
@@ -158,7 +151,6 @@ async function postToken(body: Record<string, string>): Promise<StoredToken> {
   };
 }
 
-/** Troca o `code` do callback por um token e guarda. */
 export async function exchangeCodeForToken(code: string): Promise<void> {
   const { clientId, clientSecret } = requireCredentials();
   const token = await postToken({
@@ -198,10 +190,8 @@ async function refresh(stored: StoredToken): Promise<StoredToken | null> {
 }
 
 /**
- * Token válido para as chamadas da API, ou null.
- *
- * `MELHOR_ENVIO_TOKEN` continua tendo precedência: serve de escape manual se o
- * OAuth estiver indisponível e alguém colar um token na mão.
+ * `MELHOR_ENVIO_TOKEN` keeps precedence as a manual escape hatch for when the
+ * OAuth flow is unavailable.
  */
 export async function getAccessToken(): Promise<string | null> {
   if (env.MELHOR_ENVIO_TOKEN) return env.MELHOR_ENVIO_TOKEN;
@@ -209,8 +199,8 @@ export async function getAccessToken(): Promise<string | null> {
   const stored = await loadToken();
   if (!stored) return null;
 
-  // Token obtido no outro ambiente não vale aqui — e usá-lo daria 401, que o
-  // fallback esconderia. Melhor tratar como ausente.
+  // A token from the other environment only yields 401s, which the fallback
+  // would hide, so treat it as absent.
   if (stored.sandbox !== Boolean(env.MELHOR_ENVIO_SANDBOX)) {
     console.error(
       `[shipping] Melhor Envio: token guardado é de ${stored.sandbox ? 'sandbox' : 'produção'} ` +
@@ -223,7 +213,7 @@ export async function getAccessToken(): Promise<string | null> {
     return stored.accessToken;
   }
   const renewed = await refresh(stored);
-  // Expirado de fato e sem renovar: devolver o velho só produziria 401.
+  // Genuinely expired and unrenewed: returning it would only produce 401s.
   if (!renewed) return stored.expiresAt > Date.now() ? stored.accessToken : null;
   return renewed.accessToken;
 }
@@ -239,7 +229,7 @@ export interface OAuthStatus {
   manualTokenOverride: boolean;
 }
 
-/** Estado para o painel admin. Nunca inclui o token em si. */
+/** Admin-panel status. Never includes the token itself. */
 export async function getOAuthStatus(): Promise<OAuthStatus> {
   const stored = await loadToken();
   return {

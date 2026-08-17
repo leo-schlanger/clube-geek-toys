@@ -6,12 +6,12 @@ import * as stockService from '../services/stock.service.js';
 
 export const stockRouter = Router();
 
-// Estoque é dado operacional: admin apenas, em todas as rotas.
+// Stock is operational data: admin only, on every route.
 stockRouter.use(authenticate, requireRole('admin'));
 
 const FILTERS = new Set(['all', 'low', 'out']);
 
-// GET /stock — uma linha por SKU vendável (produto simples ou variação)
+// GET /stock — one row per sellable SKU (plain product or variant)
 stockRouter.get('/', async (req, res, next) => {
   try {
     const filter = FILTERS.has(String(req.query.filter))
@@ -38,7 +38,7 @@ const adjustSchema = z.object({
   note: z.string().max(500).optional().nullable(),
 });
 
-// PATCH /stock — define o estoque de um SKU (grava o ajuste no histórico)
+// PATCH /stock — sets a SKU's stock and records the adjustment
 stockRouter.patch('/', validate(adjustSchema), async (req, res, next) => {
   try {
     res.json(await stockService.adjustStock(req.body, req.user!.userId));
@@ -69,7 +69,7 @@ stockRouter.patch(
   }
 );
 
-// GET /stock/:productId/movements — histórico do produto (inclui variações)
+// GET /stock/:productId/movements — product history, variants included
 stockRouter.get('/:productId/movements', async (req, res, next) => {
   try {
     const movements = await stockService.listMovements(req.params.productId as string, {

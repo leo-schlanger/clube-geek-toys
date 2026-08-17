@@ -4,11 +4,11 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog } from '../utils/audit.js';
 
 /**
- * Controle de estoque do painel.
+ * Admin stock control.
  *
- * O número em si vive em `products.stock` / `product_variants.stock`; esta
- * camada existe para registrar **por que** ele mudou: toda alteração grava uma
- * linha em `stock_movements` — venda, cancelamento ou ajuste manual.
+ * The number itself lives in `products.stock` / `product_variants.stock`; this
+ * layer exists to record **why** it moved — every change writes a
+ * `stock_movements` row for a sale, a cancellation or a manual adjustment.
  */
 
 export type StockMovementKind = 'sale' | 'restock' | 'adjustment' | 'manual_in' | 'manual_out';
@@ -19,7 +19,7 @@ export interface StockMovement {
   variantId: string | null;
   orderId: string | null;
   kind: StockMovementKind;
-  /** Assinado: negativo = saída. */
+  /** Signed: negative means stock leaving. */
   quantity: number;
   stockAfter: number | null;
   note: string | null;
@@ -30,7 +30,6 @@ export interface StockMovement {
   orderNumber?: number | null;
 }
 
-/** Linha da tela de estoque: um produto simples ou uma variação. */
 export interface StockRow {
   productId: string;
   productName: string;
@@ -89,8 +88,8 @@ function mapStockRow(row: pg.QueryResultRow): StockRow {
 }
 
 /**
- * Grava o movimento. Recebe o client quando roda dentro da transação do pedido,
- * para o histórico nascer junto com a baixa (ou sumir junto no rollback).
+ * Takes the client when running inside the order transaction, so the history
+ * is written with the decrement and rolled back with it.
  */
 export async function recordMovement(
   client: pg.PoolClient | null,
@@ -127,9 +126,8 @@ export async function recordMovement(
 }
 
 /**
- * Registra os movimentos de um pedido a partir dos itens dele. Chamado pelo
- * order.service logo depois do UPDATE de estoque, dentro da mesma transação.
- * `direction` -1 = venda, +1 = devolução ao estoque.
+ * Called by order.service right after the stock UPDATE, inside the same
+ * transaction. `direction` -1 is a sale, +1 returns stock.
  */
 export async function recordOrderMovements(
   client: pg.PoolClient,
@@ -163,7 +161,7 @@ export async function recordOrderMovements(
 
 export interface ListStockOptions {
   search?: string;
-  /** 'all' (padrão), 'low' (acabando ou esgotado) ou 'out' (só esgotado). */
+  /** 'all' (default), 'low' (running out or empty) or 'out' (empty only). */
   filter?: 'all' | 'low' | 'out';
   includeInactive?: boolean;
   page?: number;
@@ -171,8 +169,8 @@ export interface ListStockOptions {
 }
 
 /**
- * Uma linha por SKU vendável: produtos sem variação entram direto, produtos com
- * variação entram pelas variações (é nelas que a baixa acontece).
+ * One row per sellable SKU. Products with variants are listed through their
+ * variants, since that is where the decrement happens.
  */
 export async function listStock(opts: ListStockOptions = {}): Promise<{
   rows: StockRow[];
@@ -260,15 +258,15 @@ export async function listStock(opts: ListStockOptions = {}): Promise<{
 export interface AdjustStockInput {
   productId: string;
   variantId?: string | null;
-  /** Novo valor absoluto do estoque. */
+  /** New absolute stock value. */
   stock: number;
   note?: string | null;
 }
 
 /**
- * Define o estoque de um SKU e registra a diferença como ajuste manual.
- * Quando o produto tem variações, o total do pai é recalculado como a soma
- * das ativas — a vitrine lê esse total.
+ * Records the delta as a manual adjustment. When the product has variants the
+ * parent total is recomputed as the sum of the active ones, which is what the
+ * storefront reads.
  */
 export async function adjustStock(
   input: AdjustStockInput,
@@ -297,7 +295,7 @@ export async function adjustStock(
         input.variantId,
         next,
       ]);
-      // Pai passa a refletir a soma das variações ativas.
+      // Parent now mirrors the sum of active variants.
       await client.query(
         `UPDATE products p SET stock = COALESCE((
            SELECT SUM(v.stock)::int FROM product_variants v
@@ -347,7 +345,7 @@ export async function adjustStock(
   return getStockRow(input.productId, input.variantId ?? null);
 }
 
-/** Limiar de "acabando" por produto (vale também para as variações dele). */
+/** Per-product "running low" threshold, inherited by its variants. */
 export async function setLowStockThreshold(
   productId: string,
   threshold: number,
@@ -389,7 +387,7 @@ async function getStockRow(productId: string, variantId: string | null): Promise
   return mapStockRow(result.rows[0]);
 }
 
-/** Histórico de um produto (inclui os movimentos das variações dele). */
+/** Product history, including movements of its variants. */
 export async function listMovements(
   productId: string,
   opts: { limit?: number } = {}

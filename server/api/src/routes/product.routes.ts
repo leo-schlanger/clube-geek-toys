@@ -56,8 +56,8 @@ productRouter.get('/', async (req, res, next) => {
   }
 });
 
-// GET /products/:slug/share — HTML com as meta do produto para preview de link.
-// Definido antes de '/:slug' para não ser capturado como slug.
+// GET /products/:slug/share — product meta as HTML, for link previews.
+// Declared before '/:slug' so it is not swallowed as a slug.
 productRouter.get('/:slug/share', async (req, res, next) => {
   try {
     const html = await productService.buildProductShareHtml(
@@ -68,8 +68,8 @@ productRouter.get('/:slug/share', async (req, res, next) => {
       res.status(404).type('html').send('<!DOCTYPE html><title>Produto não encontrado</title>');
       return;
     }
-    // Cache curto: a foto e o preço mudam com o catálogo, mas o crawler do
-    // WhatsApp reconsulta o mesmo link várias vezes em sequência.
+    // Short cache: photo and price track the catalogue, but the WhatsApp
+    // crawler refetches the same link several times in a row.
     res.set('Cache-Control', 'public, max-age=300');
     res.type('html').send(html);
   } catch (err) {
@@ -136,7 +136,6 @@ productRouter.delete('/categories/:id', authenticate, requireRole('admin'), asyn
 
 // ─── Admin: product CRUD ─────────────────────────────────────────────────────
 
-/** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — sem teto artificial baixo. */
 const MAX_PRODUCT_PRICE = 999_999.99;
 const moneySchema = z.number().nonnegative().max(MAX_PRODUCT_PRICE);
 
@@ -155,7 +154,7 @@ const productSchema = z.object({
   price: moneySchema,
   compareAtPrice: moneySchema.optional().nullable(),
   categoryId: z.string().uuid().optional().nullable(),
-  /** Múltiplas categorias; a primeira vira a principal. Prevalece sobre categoryId. */
+  /** First entry becomes primary. Takes precedence over categoryId. */
   categoryIds: z.array(z.string().uuid()).max(MAX_PRODUCT_CATEGORIES).optional(),
   images: z.array(z.string().url()).max(MAX_PRODUCT_IMAGES).optional(),
   videos: z
@@ -228,10 +227,10 @@ productRouter.patch('/:id', authenticate, requireRole('admin'), validate(product
   }
 });
 
-// GET /products/:id/edit — produto completo para o painel.
-// O detalhe público (`/:slug`) esconde produto inativo e variação inativa; o
-// admin precisa dos dois, senão o modal abre sem as variações e o save seguinte
-// apaga o que não veio.
+// GET /products/:id/edit — full product for the admin panel.
+// The public detail route hides inactive products and variants; the admin needs
+// both, otherwise the modal opens without variants and the next save wipes what
+// was never loaded.
 productRouter.get('/:id/edit', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
     const product = await productService.getProductById(req.params.id as string);
@@ -245,7 +244,7 @@ productRouter.get('/:id/edit', authenticate, requireRole('admin'), async (req, r
   }
 });
 
-// POST /products/:id/duplicate — clone inativo para cadastro em série
+// POST /products/:id/duplicate — inactive clone for bulk entry
 productRouter.post('/:id/duplicate', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
     res.status(201).json(await productService.duplicateProduct(req.params.id as string));
@@ -403,13 +402,13 @@ function discardUpload(filePath: string): void {
   try {
     fs.unlinkSync(filePath);
   } catch {
-    /* já removido ou nunca gravado */
+    /* already removed, or never written */
   }
 }
 
 /**
- * Valida os bytes recebidos e devolve as URLs públicas. Mantém o caminho em
- * disco de cada URL para que o caller possa apagar o que não for gravado.
+ * Validates the received bytes and returns public URLs, keeping each URL's disk
+ * path so the caller can delete whatever does not get persisted.
  */
 function collectUploadedImages(
   files: Express.Multer.File[],
@@ -476,7 +475,7 @@ productRouter.post(
         for (const url of urls) discardUpload(pathByUrl.get(url) as string);
         throw err;
       }
-      // O que não coube no teto não fica ocupando disco.
+      // Whatever did not fit under the cap must not linger on disk.
       for (const url of result.rejected) discardUpload(pathByUrl.get(url) as string);
 
       console.log(
@@ -491,7 +490,7 @@ productRouter.post(
   }
 );
 
-// ─── Admin: upload de vídeo (MP4) ────────────────────────────────────────────
+// ─── Admin: video upload (MP4) ───────────────────────────────────────────────
 
 const videoStorage = multer.diskStorage({
   destination: (req, _file, cb) => {
@@ -520,7 +519,7 @@ const videoUpload = multer({
   },
 });
 
-/** Só MP4/MOV: o navegador precisa conseguir tocar sem transcodificação. */
+/** MP4/MOV only: the browser must play it without transcoding. */
 function isPlayableVideo(filePath: string): boolean {
   let fd: number | undefined;
   try {
@@ -535,13 +534,13 @@ function isPlayableVideo(filePath: string): boolean {
       try {
         fs.closeSync(fd);
       } catch {
-        /* já fechado */
+        /* already closed */
       }
     }
   }
 }
 
-// POST /products/:id/video — sobe um MP4 e anexa em products.videos
+// POST /products/:id/video — uploads an MP4 and appends it to products.videos
 productRouter.post(
   '/:id/video',
   authenticate,
@@ -600,10 +599,10 @@ productRouter.post(
   }
 );
 
-// POST /products/:id/media — sobe arquivos e devolve só as URLs.
-// Usado pelas fotos de variação: elas pertencem ao SKU (product_variants.images,
-// gravado no PUT /variants), não à galeria do listing. Antes o painel reaproveitava
-// /images para isso e cada variação inflava products.images até estourar o teto.
+// POST /products/:id/media — uploads files and returns only the URLs.
+// Used by variant photos: those belong to the SKU (product_variants.images,
+// written by PUT /variants), not to the listing gallery. The panel used to reuse
+// /images for this, and every variant inflated products.images past its cap.
 productRouter.post(
   '/:id/media',
   authenticate,

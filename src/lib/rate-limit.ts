@@ -1,21 +1,12 @@
 /**
- * Rate Limiting para proteção contra brute force
+ * Client-side brute-force throttling.
  *
- * IMPORTANTE: Esta é uma implementação CLIENT-SIDE apenas.
- *
- * Limitações conhecidas:
- * - Pode ser bypassada limpando localStorage
- * - Protege apenas o navegador do usuário atual
- * - Atacantes podem usar múltiplos dispositivos/navegadores
- * - NÃO substitui rate limiting server-side
- *
- * Para rate limiting real, o backend Express possui middleware próprio.
+ * This is **not** a security control: it can be bypassed by clearing
+ * localStorage, only covers the current browser, and does nothing against an
+ * attacker with several devices. The real limit lives in the Express
+ * middleware; this only saves an honest user from hammering a wrong password.
  * Esta camada client-side melhora UX mostrando feedback imediato.
  *
- * Comportamento:
- * - Rastreia tentativas falhas por email
- * - Bloqueia temporariamente após MAX_ATTEMPTS tentativas
- * - Usa localStorage para persistência entre reloads
  */
 
 import { STORAGE_KEYS, TIMEOUTS, LIMITS } from './constants'
@@ -57,7 +48,7 @@ function cleanOldAttempts(store: AttemptsStore): AttemptsStore {
   const cleaned: AttemptsStore = {}
 
   for (const [email, record] of Object.entries(store)) {
-    // Manter se ainda está bloqueado ou se as tentativas são recentes
+    // Keep while still locked out, or while the attempts are recent.
     if (
       (record.lockedUntil && record.lockedUntil > now) ||
       (now - record.firstAttempt < ATTEMPT_WINDOW)
@@ -69,9 +60,7 @@ function cleanOldAttempts(store: AttemptsStore): AttemptsStore {
   return cleaned
 }
 
-/**
- * Verifica se o email está bloqueado
- */
+
 export function isBlocked(email: string): { blocked: boolean; remainingTime: number } {
   const store = getStore()
   const record = store[email.toLowerCase()]
@@ -99,9 +88,7 @@ export function isBlocked(email: string): { blocked: boolean; remainingTime: num
   return { blocked: false, remainingTime: 0 }
 }
 
-/**
- * Registra uma tentativa falha
- */
+
 export function recordFailedAttempt(email: string): {
   blocked: boolean
   attemptsRemaining: number
@@ -148,18 +135,14 @@ export function recordFailedAttempt(email: string): {
   }
 }
 
-/**
- * Limpa tentativas após login bem-sucedido
- */
+
 export function clearAttempts(email: string): void {
   const store = getStore()
   delete store[email.toLowerCase()]
   saveStore(store)
 }
 
-/**
- * Retorna informações sobre tentativas restantes
- */
+
 export function getAttemptsInfo(email: string): {
   attempts: number
   remaining: number

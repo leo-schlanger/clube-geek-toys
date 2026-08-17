@@ -39,17 +39,14 @@ const envSchema = z.object({
   // CORS — comma-separated list of additional allowed origins (optional)
   ALLOWED_ORIGINS: z.string().optional(),
 
-  // Shipping (Melhor Envio + origin). Sem credencial, a cotação usa a tabela
-  // de fallback — visível em GET /health (shipping.quotes).
-  //
-  // O painel do Melhor Envio entrega CLIENT_ID + CLIENT_SECRET, e o token da
-  // API sai do fluxo OAuth (melhor-envio-oauth.service.ts). MELHOR_ENVIO_TOKEN
-  // segue existindo só como escape manual e tem precedência quando presente.
+  // Without a credential, quotes come from the fallback table — visible in
+  // GET /health (shipping.quotes). Their panel hands out CLIENT_ID +
+  // CLIENT_SECRET; the API token comes from the OAuth flow. MELHOR_ENVIO_TOKEN
+  // remains a manual escape hatch and takes precedence when set.
   MELHOR_ENVIO_CLIENT_ID: z.string().min(1).optional(),
   MELHOR_ENVIO_CLIENT_SECRET: z.string().min(1).optional(),
   MELHOR_ENVIO_SCOPES: z.string().default('shipping-calculate'),
-  // Callback do OAuth. Separado de API_URL porque aquele é gravado nas URLs de
-  // upload; trocar API_URL só pelo domínio do OAuth misturaria hosts no banco.
+  // Separate from API_URL because that one is baked into stored upload URLs.
   MELHOR_ENVIO_REDIRECT_URI: z.string().url().optional(),
   MELHOR_ENVIO_TOKEN: z.string().min(1).optional(),
   MELHOR_ENVIO_SANDBOX: z
@@ -88,11 +85,11 @@ function loadEnv(): Env {
 export const env = loadEnv();
 
 /**
- * Origem canônica da loja, usada em sitemap, preview de link e notificações.
+ * Canonical shop origin, used by the sitemap, link previews and notifications.
  *
- * geeketoys.com.br e geekpoptoys.com.br são espelhos completos. Para o Google
- * isso é conteúdo duplicado a menos que um seja canônico — então tudo que gera
- * URL pública da loja precisa sair daqui, e não de string espalhada pelo
- * código. Espelha CANONICAL_ORIGINS.shop no front (src/lib/subdomain.ts).
+ * The two domains are full mirrors, which Google reads as duplicate content
+ * unless one is canonical. Everything emitting a public shop URL reads from
+ * here rather than from scattered literals. Mirrors CANONICAL_ORIGINS.shop in
+ * src/lib/subdomain.ts.
  */
 export const SHOP_CANONICAL_URL = 'https://shop.geekpoptoys.com.br';

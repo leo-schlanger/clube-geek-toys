@@ -63,7 +63,7 @@ export async function exportUserData(userId: string) {
     [userId]
   );
 
-  // Perguntas e notificações (migration 017) — tabelas podem não existir em DB antigo
+  // Questions and notifications (017) — tables may be absent on an older DB
   let questions: Record<string, unknown>[] = [];
   let notifications: Record<string, unknown>[] = [];
   try {
@@ -332,12 +332,13 @@ export async function deleteUserAccount(userId: string, password: string) {
       [userId]
     );
 
-    // Redact questions (texto some da vitrine; a resposta pública some junto,
-    // porque ela cita a pergunta) e apaga as notificações — não têm valor de auditoria.
+    // Redact questions: the text leaves the storefront and the public answer
+    // goes with it, since the answer quotes the question. Notifications are
+    // deleted outright, having no audit value.
     //
-    // to_regclass em vez de try/catch: um statement que falha aborta a transação
-    // inteira no Postgres, então o catch salvaria o erro mas quebraria o resto
-    // da exclusão. Aqui a tabela ausente (migration 017 não aplicada) só pula.
+    // to_regclass rather than try/catch: in Postgres a failed statement aborts
+    // the whole transaction, so catching would swallow the error and break the
+    // rest of the erasure. A missing table simply skips.
     const has017 = await client.query(
       `SELECT to_regclass('public.product_questions') IS NOT NULL AS questions,
               to_regclass('public.notifications') IS NOT NULL AS notifications`

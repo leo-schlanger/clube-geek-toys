@@ -7,9 +7,9 @@ import * as questionService from '../services/question.service.js';
 
 export const questionRouter = Router();
 
-// ─── Público ─────────────────────────────────────────────────────────────────
+// ─── Public ──────────────────────────────────────────────────────────────────
 
-// GET /questions/product/:slugOrId — perguntas publicadas do produto
+// GET /questions/product/:slugOrId — published questions for a product
 questionRouter.get('/product/:slugOrId', publicLookupLimiter, async (req, res, next) => {
   try {
     res.json(
@@ -30,7 +30,7 @@ const askSchema = z.object({
   body: z.string().min(5).max(1000),
 });
 
-// POST /questions — perguntar (exige login: é o que dá rosto à pergunta)
+// POST /questions — login required, which is what puts a name on the question
 questionRouter.post('/', authenticate, validate(askSchema), async (req, res, next) => {
   try {
     res
@@ -41,7 +41,7 @@ questionRouter.post('/', authenticate, validate(askSchema), async (req, res, nex
   }
 });
 
-// GET /questions/me — perguntas do próprio usuário
+// GET /questions/me
 questionRouter.get('/me', authenticate, async (req, res, next) => {
   try {
     res.json({ questions: await questionService.listUserQuestions(req.user!.userId) });
@@ -52,7 +52,7 @@ questionRouter.get('/me', authenticate, async (req, res, next) => {
 
 // ─── Admin ───────────────────────────────────────────────────────────────────
 
-// GET /questions/admin — fila de moderação (não respondidas primeiro)
+// GET /questions/admin — moderation queue, unanswered first
 questionRouter.get('/admin', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
     const answered =
@@ -100,7 +100,7 @@ const statusSchema = z.object({
   status: z.enum(['published', 'hidden']),
 });
 
-// PATCH /questions/:id/status — esconder spam (a pergunta é pública ao ser feita)
+// PATCH /questions/:id/status — hide spam; questions are public once asked
 questionRouter.patch(
   '/:id/status',
   authenticate,

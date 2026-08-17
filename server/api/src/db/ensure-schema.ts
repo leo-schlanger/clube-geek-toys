@@ -14,10 +14,10 @@ import { query } from '../config/database.js';
  *  - Order matters: dependencies (FKs) come last.
  *  - Failures here MUST NOT crash the API. Log loudly and continue — operator can fix manually.
  *
- * Por que em etapas: até 15/08/2026 isto era um `try` único em volta de todo o DDL.
- * Uma etapa que falhasse abortava **todas as seguintes** — em silêncio, com a API
- * servindo tráfego normalmente e o `/health` respondendo `ok`. Agora cada etapa
- * falha sozinha, as demais continuam, e o resultado fica legível em
+ * Why steps: this was once a single `try` around all the DDL, so one failing
+ * step aborted **every later one** silently, while the API served traffic and
+ * `/health` answered `ok`. Now each step fails alone, the rest continue, and
+ * the outcome is readable in
  * `GET /health` (`schema.status`). Ver `getSchemaState()`.
  */
 
@@ -26,7 +26,7 @@ type SchemaStep = { name: string; run: () => Promise<void> };
 export type SchemaStepFailure = { step: string; error: string };
 
 export type SchemaState = {
-  /** Nunca rodou ainda (boot em andamento) → `pending`. */
+  /** Has not run yet (boot in progress). */
   status: 'pending' | 'ok' | 'degraded';
   ranAt: string | null;
   durationMs: number;
@@ -51,7 +51,7 @@ const STEPS: SchemaStep[] = [
     `);
     },
   },
-  // Wave 2.5 — a tabela `settings` (config) já vem do schema.sql; não há etapa aqui.
+  // Wave 2.5 — the `config` table already ships in schema.sql, so no step here.
   {
     name: "Stripe migration — stripe_customer_id on members",
     run: async () => {
@@ -609,7 +609,7 @@ let state: SchemaState = {
   failed: [],
 };
 
-/** Estado da última execução — exposto em `GET /health`. */
+/** State of the last run, surfaced in `GET /health`. */
 export function getSchemaState(): SchemaState {
   return state;
 }
@@ -622,8 +622,8 @@ export async function ensureSchema(): Promise<SchemaState> {
     try {
       await step.run();
     } catch (err) {
-      // Uma etapa quebrada não cancela as outras: elas são independentes na
-      // prática, e abortar tudo foi exatamente o modo de falha silenciosa antigo.
+      // A broken step does not cancel the others: they are independent in
+      // practice, and aborting everything was the old silent-failure mode.
       const message = err instanceof Error ? err.message : String(err);
       failed.push({ step: step.name, error: message });
       console.error(`[SCHEMA] ✗ etapa falhou: ${step.name} — ${message}`);

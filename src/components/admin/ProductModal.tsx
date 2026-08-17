@@ -64,21 +64,12 @@ import {
   Video,
 } from "lucide-react";
 
-/** Preço em BRL: 0 … 999999.99 (XXXXXX.XX) — admin pode precificar livremente. */
 const MAX_PRODUCT_PRICE = 999_999.99;
 
 /**
- * Abas do formulário.
- *
- * Por que existem: o modal tinha ~1100 linhas de campo numa rolagem só, e o
- * bloco de vídeo caía lá pelo terço final. Em 15/08/2026 a Laura não achou o
- * campo — não era bug, era o formulário. As seções seguem exatamente as mesmas
- * de antes; só ganharam um índice em cima.
- *
- * Todos os painéis ficam **montados** (escondidos com `hidden`, não
- * desmontados). O `handleSubmit` lê estado, não DOM, e nenhum campo usa
- * `required` nativo — então trocar de aba não muda nada do que é salvo, e um
- * rascunho digitado numa aba continua valendo quando o Salvar acontece de outra.
+ * Every panel stays **mounted** (hidden via `hidden`, never unmounted), because
+ * `handleSubmit` reads state rather than the DOM and no field uses native
+ * `required`. Switching tabs therefore cannot drop a draft typed in another one.
  */
 const TABS = [
   { id: "basico", label: "Básico" },
@@ -106,7 +97,7 @@ interface FormState {
   description: string;
   price: string;
   compareAtPrice: string;
-  /** Categorias do produto, principal primeiro (até MAX_PRODUCT_CATEGORIES). */
+  /** Primary category first; the rest are secondary. */
   categoryIds: string[];
   stock: string;
   sku: string;
@@ -120,7 +111,6 @@ interface FormState {
   wholesaleMinQty: string;
 }
 
-/** Draft de um eixo de variação no formulário admin. */
 interface AxisDraft {
   name: string;
   optionsText: string;
@@ -171,7 +161,6 @@ export function ProductModal({
     "prepare",
   );
 
-  // Variações: eixos + opções ilimitados (1 tipo "Cor" com N opções = N SKUs)
   function axesToDrafts(axes?: VariantAxis[] | null): AxisDraft[] {
     if (!axes?.length) return [{ name: "Cor", optionsText: "" }];
     return axes.map((a) => ({
@@ -207,7 +196,7 @@ export function ProductModal({
     Record<number, string>
   >({});
 
-  /** Parse opções: vírgula, ponto-e-vírgula ou quebra de linha. */
+  /** Splits on comma, semicolon or newline, dropping case-insensitive dupes. */
   function parseOptionsText(text: string): string[] {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -223,9 +212,8 @@ export function ProductModal({
   }
 
   /**
-   * Anexa a opção que está digitada e ainda não virou chip.
-   * Quem preenche o campo e clica direto em "Gerar combinações" não pode perder
-   * o que escreveu só por não ter clicado no "+".
+   * Folds in the option still sitting in the input. Without this, typing an
+   * option and going straight to "generate" silently discards it.
    */
   function draftsWithPendingOptions(): AxisDraft[] {
     return axisDrafts.map((draft, idx) => {
@@ -286,7 +274,7 @@ export function ProductModal({
     });
   }
 
-  /** Produto cartesiano dos eixos: uma combinação por SKU. */
+  /** Cartesian product of the axes: one combination per SKU. */
   function axisCombinations(axes: VariantAxis[]): Record<string, string>[] {
     let combos: Record<string, string>[] = [{}];
     for (const axis of axes) {
@@ -322,9 +310,9 @@ export function ProductModal({
   }
 
   /**
-   * Acrescenta às linhas atuais os SKUs que os eixos pedem e ainda não existem.
-   * Nunca descarta uma linha já preenchida: se o nome não bate mais com os eixos
-   * (dado legado, opção renomeada), ela continua ali para o admin decidir.
+   * Adds missing SKUs without ever dropping a filled row: a row whose name no
+   * longer matches the axes (legacy data, renamed option) stays for the admin
+   * to decide on.
    */
   function mergeVariantMatrix(
     axes: VariantAxis[],
@@ -347,9 +335,8 @@ export function ProductModal({
     return { ok: true, rows: merged.map((r, i) => ({ ...r, sortOrder: i })) };
   }
 
-  /** Gera matriz de combinações a partir dos eixos. */
   function generateVariantMatrix() {
-    // Confirma o que está digitado antes de gerar, e reflete isso nos chips.
+    // Commit whatever is still typed before generating.
     const drafts = draftsWithPendingOptions();
     setAxisDrafts(drafts);
     setNewOptionByAxis({});
@@ -371,8 +358,8 @@ export function ProductModal({
       );
       return;
     }
-    // Botão explícito: a matriz passa a ser exatamente o que os eixos dizem,
-    // preservando preço/estoque/foto das linhas de mesmo nome.
+    // Explicit action: the matrix becomes exactly what the axes describe,
+    // carrying over price/stock/photo from rows with the same name.
     const existingByName = new Map(variantRows.map((r) => [r.name, r]));
     const rows: VariantInput[] = combos.map((options, idx) => {
       const name = comboName(axes, options);
@@ -395,8 +382,8 @@ export function ProductModal({
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [imageUrl, setImageUrl] = useState("");
 
-  // Vídeos: links entram na hora (salvam no PATCH); MP4 precisa de productId,
-  // então no modo criação o arquivo sobe depois do save.
+  // Links apply immediately (saved by the PATCH); an MP4 needs a productId,
+  // so on create the file is uploaded after the save.
   const [videos, setVideos] = useState<ProductVideo[]>(product?.videos ?? []);
   const [videoUrl, setVideoUrl] = useState("");
   const [pendingVideoFile, setPendingVideoFile] = useState<File | null>(null);
@@ -407,8 +394,8 @@ export function ProductModal({
     | null
   >(null);
 
-  // Fotos por variação (estilo Shopee): arquivos pendentes por índice da linha.
-  // Em modo criação ainda não há productId, então sobem no save.
+  // Per-variant photos, keyed by row index. No productId exists on create,
+  // so these upload during the save.
   const [pendingVariantFiles, setPendingVariantFiles] = useState<
     Record<number, File[]>
   >({});
@@ -449,7 +436,6 @@ export function ProductModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  /** Marca/desmarca uma categoria. A primeira da lista é a principal. */
   function toggleCategory(id: string) {
     setForm((prev) => {
       if (prev.categoryIds.includes(id)) {
@@ -468,7 +454,7 @@ export function ProductModal({
     });
   }
 
-  /** Promove a categoria a principal (position 0) — é a usada no sitemap e nos relacionados. */
+  /** Position 0 is the category used by the sitemap and by related products. */
   function makePrimaryCategory(id: string) {
     setForm((prev) => ({
       ...prev,
@@ -510,7 +496,7 @@ export function ProductModal({
       for (const msg of errors) toast.error(msg);
       if (files.length === 0) return;
 
-      // Edição: envia na hora (botão "Enviar imagens" = upload imediato).
+      // Edit mode uploads immediately.
       if (isEditMode && product?.id) {
         setUploadPhase("upload");
         const result = await uploadProductImages(product.id, files);
@@ -533,7 +519,7 @@ export function ProductModal({
         return;
       }
 
-      // Criação: guarda e sobe no save (precisa de productId).
+      // Create mode defers the upload to the save, which yields a productId.
       setPendingFiles((prev) => [...prev, ...files]);
       if (compressedCount > 0) {
         toast.message(
@@ -572,7 +558,6 @@ export function ProductModal({
     );
   }
 
-  /** Quantas fotos a variação já tem somando salvas + pendentes de upload. */
   function variantImageCount(idx: number): number {
     return (
       (variantRows[idx]?.images?.length ?? 0) +
@@ -664,8 +649,8 @@ export function ProductModal({
     for (const msg of prepared.errors) toast.error(msg);
     if (prepared.files.length === 0) return;
 
-    // Produto já existe: sobe agora via /media (sem tocar na galeria do listing)
-    // e guarda as URLs na linha; o PUT /variants persiste no save.
+    // Goes through /media rather than /images: these belong to the SKU, not to
+    // the listing gallery, which has its own cap.
     const productId = product?.id;
     if (productId) {
       try {
@@ -685,7 +670,7 @@ export function ProductModal({
       return;
     }
 
-    // Criação: guarda arquivos e mostra preview; sobem no save (precisa de productId).
+    // Create mode previews locally and uploads during the save.
     setPendingVariantFiles((prev) => ({
       ...prev,
       [idx]: [...(prev[idx] ?? []), ...prepared.files],
@@ -758,9 +743,8 @@ export function ProductModal({
   }
 
   // ─── Rascunhos pendentes ───────────────────────────────────────────────────
-  // Link digitado no campo e ainda não confirmado no "+" conta como escolhido.
-  // Sem isto o save descartava em silêncio o que o admin acabou de colar, que é
-  // a causa de "cadastrei o vídeo / a foto e não salvou".
+  // A link typed but not yet confirmed with "+" still counts as chosen.
+  // Without this the save silently dropped what the admin had just pasted.
 
   type Resolved<T> = { value: T; error?: string };
 
@@ -834,7 +818,7 @@ export function ProductModal({
       return;
     }
 
-    // Criação: guarda e sobe no save (o upload precisa do productId).
+    // Create mode uploads during the save, once a productId exists.
     if (!product?.id) {
       setPendingVideoFile(file);
       toast.message("Vídeo será enviado ao salvar o produto");
@@ -918,11 +902,10 @@ export function ProductModal({
   }
 
   /**
-   * Recusa o save levando à aba onde o campo mora.
+   * Rejects the save and switches to the tab holding the offending field.
    *
-   * Com o formulário em abas, um toast sozinho vira beco sem saída: "Preço
-   * inválido na variação X" não ajuda ninguém que está olhando para a aba
-   * Básico. Trocar de aba junto com o aviso é o que mantém a mensagem acionável.
+   * With a tabbed form a bare toast is a dead end: "invalid price on variant X"
+   * helps nobody who is looking at the Basics tab.
    */
   function fail(where: TabId, message: string): void {
     setTab(where);
@@ -979,8 +962,8 @@ export function ProductModal({
       return fail("basico", "Qtd. mínima atacado inválida");
     }
 
-    // Rascunhos ainda no campo entram no save (ver resolvePending*): digitar e
-    // clicar em Salvar tem que valer tanto quanto digitar e clicar no "+".
+    // Drafts still in the input are part of the save: typing then hitting Save
+    // must behave like typing then hitting "+".
     const resolvedImages = resolvePendingImages();
     if (resolvedImages.error) {
       return fail("midia", resolvedImages.error);
@@ -990,8 +973,8 @@ export function ProductModal({
       return fail("midia", resolvedVideos.error);
     }
 
-    // Eixos preenchidos sem clicar em "Gerar combinações" também precisam virar
-    // SKUs — antes o produto salvava sem variação nenhuma e sem avisar.
+    // Axes filled without pressing "generate" must still become SKUs; the
+    // product used to save with no variants at all and no warning.
     const drafts = draftsWithPendingOptions();
     const axes = hasVariants ? buildAxes(drafts) : [];
     let rows = variantRows;
@@ -1006,9 +989,8 @@ export function ProductModal({
       if (!merged.ok) {
         return fail("variacoes", merged.error);
       }
-      // Opção retirada dos eixos não apaga o SKU no save — ele pode ter estoque
-      // e foto. Quem quer mesmo remover usa "Gerar combinações", que refaz a
-      // matriz a partir dos eixos.
+      // Removing an option from the axes does not delete the SKU here: it may
+      // hold stock and photos. "Generate" is the explicit way to rebuild.
       const nomesDosEixos = new Set(
         axisCombinations(axes).map((o) => comboName(axes, o)),
       );
@@ -1022,7 +1004,7 @@ export function ProductModal({
         );
       }
       rows = merged.rows;
-      // Reflete na tela o que vai ser gravado, inclusive se o save falhar depois.
+      // Mirror on screen exactly what will be written, even if the save fails.
       setAxisDrafts(drafts);
       setNewOptionByAxis({});
       setVariantRows(rows);
@@ -1086,7 +1068,7 @@ export function ProductModal({
         return;
       }
 
-      // Upload de imagens do listing + fotos de variação pendentes (precisa de productId).
+      // Needs a productId, so it runs after the product row exists.
       if (pendingFiles.length > 0) {
         const withImages = await uploadProductImages(saved.id, pendingFiles);
         if (!withImages.ok) {
@@ -1098,7 +1080,7 @@ export function ProductModal({
         }
       }
 
-      // MP4 escolhido antes do produto existir sobe agora.
+      // An MP4 picked before the product existed uploads now.
       if (pendingVideoFile) {
         const uploaded = await uploadProductVideo(saved.id, pendingVideoFile);
         if (!uploaded.ok) {
@@ -1110,8 +1092,7 @@ export function ProductModal({
         }
       }
 
-      // Resolve fotos de variação que ainda são File (modo criar). Vão pelo /media:
-      // pertencem ao SKU, não à galeria do listing.
+      // Variant photos still held as File objects (create mode).
       const rowsWithImages = rows.map((r, i) => ({
         ...r,
         price: Number(r.price),
@@ -1136,8 +1117,7 @@ export function ProductModal({
         );
       }
 
-      // Variações: salva eixos + SKUs com fotos (ou limpa).
-      // Eixos e preços já foram validados antes do primeiro write.
+      // Axes and prices were validated before the first write.
       if (hasVariants && rowsWithImages.length > 0) {
         const withVariants = await replaceProductVariants(
           saved.id,
@@ -1167,9 +1147,8 @@ export function ProductModal({
   }
 
   /**
-   * Quanto conteúdo cada aba já tem. Conta o que está **confirmado** e também o
-   * rascunho ainda no campo — o rascunho entra no save (ver `resolvePending*`),
-   * então esconder isso do contador seria mentir para quem está preenchendo.
+   * Counts confirmed content **and** drafts still in the inputs, because
+   * drafts are part of the save; hiding them would misreport the form.
    */
   const tabCounts: Record<TabId, number> = {
     basico: 0,

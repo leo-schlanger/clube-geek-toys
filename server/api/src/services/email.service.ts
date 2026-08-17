@@ -20,7 +20,7 @@ const AVAILABLE_TEMPLATES = [
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'question-answered',
-  'admin-pix-order-pending',
+  'admin-pix-order-pending', 'admin-order-cancelled',
 ];
 
 export function getAvailableTemplates() {
@@ -362,7 +362,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Atualizar Cartão', url: `${frontendUrl}/membro` },
     },
 
-    // ─── RENOVAÇÃO ──────────────────────────────────────
+    // ─── RENEWAL ────────────────────────────────────────
     'renewal-reminder': {
       subject: 'Sua assinatura expira em breve — Clube GeekPop & Toys',
       preheader: `${name}, renove para continuar aproveitando os benefícios!`,
@@ -430,9 +430,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     // ─── ADMIN: PIX PENDENTE (LOJA) ────────────────────
-    // Irmão do 'admin-pix-pending', mas para pedidos da loja: o QR é gerado
-    // localmente e nada confirma sozinho, então sem este aviso um pedido pago
-    // fica 'pending' até alguém abrir o painel por acaso.
+    // Sibling of 'admin-pix-pending' for shop orders: the QR is generated
+    // locally and nothing confirms it, so without this a paid order sits
+    // 'pending' until someone opens the panel by chance.
     'admin-pix-order-pending': {
       subject: '🔔 Pedido PIX aguardando confirmação — Loja GeekPop & Toys',
       preheader: `Pedido #${v.order_number || ''} de R$ ${v.total || '0,00'} gerou um PIX.`,
@@ -448,6 +448,23 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Confira no extrato se o PIX com o TX ID acima caiu<br>2. Abra o pedido no painel admin e confirme o pagamento<br>3. O estoque só é baixado depois da confirmação')}`,
       cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || `${frontendUrl}/admin` },
+    },
+
+    // ─── ADMIN: PEDIDO CANCELADO PELO CLIENTE ──────────
+    'admin-order-cancelled': {
+      subject: '❌ Pedido cancelado pelo cliente — Loja GeekPop & Toys',
+      preheader: `Pedido #${v.order_number || ''} de R$ ${v.total || '0,00'} foi cancelado.`,
+      body: `
+        <h2 style="color:#f87171;margin:0 0 12px">Pedido cancelado ❌</h2>
+        <p>O cliente cancelou um pedido que ainda não havia sido pago.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Cliente', escapeHtml(v.customer_name || '—')],
+          ['Email', v.customer_email || '—'],
+          ['Valor', `R$ ${v.total || '0,00'}`],
+        ])}
+        ${infoBox('Nenhum valor foi cobrado e o estoque não havia sido baixado — não há nada a estornar. Se houver PIX pago por engano, confira o extrato antes de fechar.')}`,
+      cta: { text: 'Abrir Pedidos no Painel', url: v.admin_url || `${frontendUrl}/admin` },
     },
 
     // ─── ADMIN: NOVO MEMBRO CADASTRADO ─────────────────

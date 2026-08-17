@@ -14,10 +14,9 @@ import { GENDERS } from '../services/profile.service.js';
 export const profileRouter = Router();
 
 /**
- * Perfil da conta — disponível para qualquer usuário logado, assine o clube ou
- * não. Todas as rotas exigem `authenticate` e agem sobre o **próprio** usuário
- * (`req.user.userId`); não há parâmetro de id, então não há como ler o perfil
- * de outra pessoa.
+ * Every route requires `authenticate` and acts on the caller's own account via
+ * `req.user.userId`. There is no id parameter, so no way to read someone
+ * else's profile.
  */
 
 const PHOTO_MAX_BYTES = 8 * 1024 * 1024;
@@ -39,7 +38,7 @@ const updateSchema = z.object({
     .regex(/^\+?[\d\s()-]{10,20}$/, 'Telefone inválido')
     .nullable()
     .optional(),
-  // Nascimento é só data, sem hora: evita fuso mudar o dia de aniversário.
+  // Date only, no time: a timezone must not shift someone's birthday.
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida')
@@ -56,7 +55,6 @@ const updateSchema = z.object({
   marketingConsent: z.boolean().optional(),
 });
 
-// GET /profile — perfil da própria conta
 profileRouter.get('/', authenticate, async (req, res, next) => {
   try {
     res.json(await profileService.getProfile(req.user!.userId));
@@ -65,7 +63,7 @@ profileRouter.get('/', authenticate, async (req, res, next) => {
   }
 });
 
-// PATCH /profile — grava só os campos enviados
+// PATCH /profile — writes only the fields present in the body
 profileRouter.patch('/', authenticate, validate(updateSchema), async (req, res, next) => {
   try {
     res.json(await profileService.upsertProfile(req.user!.userId, req.body));
@@ -86,8 +84,8 @@ const photoStorage = multer.diskStorage({
       cb(err as Error, dir);
     }
   },
-  // Nome aleatório: o id do usuário no caminho vazaria quem é o dono da foto
-  // para qualquer um que visse a URL.
+  // Random name: putting the user id in the path would leak the photo's owner
+  // to anyone who saw the URL.
   filename: (_req, _file, cb) => cb(null, `${crypto.randomUUID()}.bin`),
 });
 
@@ -97,7 +95,7 @@ const photoUpload = multer({
   fileFilter: (_req, file, cb) => {
     const mime = (file.mimetype || '').toLowerCase();
     const name = (file.originalname || '').toLowerCase();
-    // MIME de celular mente; os bytes são conferidos depois do upload.
+    // Phone MIME types lie; the bytes are checked after the upload.
     if (!mime || mime === 'application/octet-stream' || mime.startsWith('image/')) {
       cb(null, true);
     } else if (/\.(jpe?g|png|webp|hei[cf])$/.test(name)) {
@@ -171,7 +169,7 @@ profileRouter.post(
         return;
       }
 
-      // Renomeia com a extensão real só depois de confirmar os bytes.
+      // Rename with the real extension only after the bytes confirm it.
       const finalPath = file.path.replace(/\.bin$/, extensionFor(kind));
       await fs.promises.rename(file.path, finalPath);
 
@@ -185,7 +183,7 @@ profileRouter.post(
   }
 );
 
-// DELETE /profile/photo — remove a foto (o campo é opcional)
+// DELETE /profile/photo
 profileRouter.delete('/photo', authenticate, async (req, res, next) => {
   try {
     res.json(await profileService.setProfilePhoto(req.user!.userId, null));
@@ -196,7 +194,7 @@ profileRouter.delete('/photo', authenticate, async (req, res, next) => {
 
 // ─── Produtos salvos ─────────────────────────────────────────────────────────
 
-// GET /profile/saved — lista completa, com preço e estoque atuais
+// GET /profile/saved
 profileRouter.get('/saved', authenticate, async (req, res, next) => {
   try {
     res.json(await profileService.listSavedProducts(req.user!.userId));
@@ -205,7 +203,7 @@ profileRouter.get('/saved', authenticate, async (req, res, next) => {
   }
 });
 
-// GET /profile/saved/ids — só os ids, para o catálogo pintar o coração
+// GET /profile/saved/ids — ids only, so the catalogue can fill in hearts
 profileRouter.get('/saved/ids', authenticate, async (req, res, next) => {
   try {
     res.json(await profileService.listSavedProductIds(req.user!.userId));

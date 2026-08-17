@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mesmo motivo do product.service.test.ts: env.ts encerra o processo fora de um
-// container configurado e database.ts abre um pool no import.
+// Same reason as product.service.test.ts: env.ts exits the process outside a
+// configured container, and database.ts opens a pool at import time.
 vi.mock('../config/env.js', () => ({
   env: { API_URL: 'https://api.test', NODE_ENV: 'test' },
 }));
 
-// O binário nativo do bcrypt em server/api/node_modules foi compilado para
-// outra plataforma; o service só o usa em createMemberWithUser.
+// The native bcrypt binary under server/api/node_modules was built for another
+// platform; the service only uses it in createMemberWithUser.
 vi.mock('bcrypt', () => ({
   default: { hash: vi.fn(async () => 'hash'), compare: vi.fn(async () => true) },
 }));
@@ -52,7 +52,7 @@ const BEFORE = {
   updated_at: '2026-01-01',
 };
 
-/** Rows do `SELECT * FROM members WHERE id` e das checagens de unicidade. */
+/** Rows for `SELECT * FROM members WHERE id` and the uniqueness checks. */
 function mockSelects(opts: { emailTaken?: boolean; cpfTaken?: boolean } = {}) {
   query.mockImplementation(async (sql: string) => {
     if (sql.includes('SELECT * FROM members WHERE id')) {
@@ -90,9 +90,9 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
       String(c[0]).includes('UPDATE users SET email')
     );
     expect(userUpdate).toBeDefined();
-    // Normalizado: minúsculas e sem espaço, senão members e users divergem.
+    // Lowercased and trimmed, otherwise members and users drift apart.
     expect(userUpdate?.[1]).toEqual(['novo@example.com', 'u1']);
-    // Endereço novo volta a precisar de verificação.
+    // A new address needs verifying again.
     expect(String(userUpdate?.[0])).toContain('email_verified = FALSE');
   });
 
@@ -119,7 +119,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
   it('ignora e-mail e CPF quando quem edita é o próprio membro', async () => {
     mockSelects();
 
-    // Só phone é campo de membro; email/cpf saem do payload pelo allowlist.
+    // Only phone is a member field; email/cpf are dropped by the allowlist.
     await updateMember('m1', { email: 'novo@example.com', phone: '21988887777' }, 'member');
 
     const update = clientQuery.mock.calls.find((c) => String(c[0]).startsWith('UPDATE members'));
@@ -133,7 +133,7 @@ describe('updateMember — e-mail e CPF pelo admin', () => {
   it('ignora e-mail e CPF quando quem edita é vendedor do PDV', async () => {
     mockSelects();
 
-    // Vendedor mexe em status/plano, mas trocar o login seria tomada de conta.
+    // Sellers may touch status/plan, but changing the login would be a takeover.
     await updateMember(
       'm1',
       { email: 'novo@example.com', cpf: '52998224725', status: 'active' },

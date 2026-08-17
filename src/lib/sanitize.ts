@@ -1,14 +1,11 @@
 /**
- * Input sanitization utilities
+ * Input normalisation before data leaves the browser.
  *
- * Funções para normalizar e sanitizar inputs de usuário
- * antes de enviar ao servidor ou armazenar no banco.
+ * Defence in depth only: the backend validates and escapes everything again.
  */
 
 /**
- * Sanitiza string removendo caracteres perigosos e normalizando espaços
- * @param input - String a sanitizar
- * @returns String limpa e normalizada
+ * Strips control characters and collapses whitespace.
  * @example
  * sanitizeString('  Hello   World  ') // 'Hello World'
  */
@@ -17,7 +14,7 @@ export function sanitizeString(input: string): string {
 
   return input
     .trim()
-    // Remove múltiplos espaços
+    // Collapse repeated spaces
     .replace(/\s+/g, ' ')
     // Remove caracteres de controle ASCII (0-31 e 127)
     // eslint-disable-next-line no-control-regex
@@ -37,16 +34,15 @@ export function normalizeEmail(email: string): string {
   return email
     .trim()
     .toLowerCase()
-    // Remove espaços que podem ter sido colados acidentalmente
+    // Spaces sometimes come along with a paste.
     .replace(/\s/g, '')
 }
 
 /**
- * Sanitiza nome: trim, capitaliza primeira letra de cada palavra,
+ * Title-cases the name and strips markup.
  * e REMOVE caracteres potencialmente perigosos (XSS-safe).
  *
- * Defense in depth: backend deve escapar/validar de novo, mas o frontend não envia
- * conteúdo claramente malicioso.
+ * The backend escapes again; this only avoids sending obvious junk.
  *
  * @param name - Nome a sanitizar
  * @returns Nome limpo, capitalizado e limitado a 200 caracteres
@@ -78,9 +74,8 @@ export function sanitizeName(name: string): string {
 }
 
 /**
- * Normaliza telefone: remove caracteres não numéricos e formata
- * @param phone - Telefone em qualquer formato
- * @returns Telefone formatado (XX) XXXXX-XXXX ou dígitos se inválido
+ * Formats as (XX) XXXXX-XXXX, falling back to bare digits when the length
+ * does not match a Brazilian number.
  * @example
  * normalizePhone('11999998888') // '(11) 99999-8888'
  * normalizePhone('(11) 9999-8888') // '(11) 9999-8888'
@@ -88,27 +83,25 @@ export function sanitizeName(name: string): string {
 export function normalizePhone(phone: string): string {
   if (!phone) return ''
 
-  // Remove tudo que não é dígito
+  // Digits only
   const digits = phone.replace(/\D/g, '')
 
-  // Formata para (XX) XXXXX-XXXX se tiver 11 dígitos
+  // 11 digits: mobile
   if (digits.length === 11) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`
   }
 
-  // Formata para (XX) XXXX-XXXX se tiver 10 dígitos
+  // 10 digits: landline
   if (digits.length === 10) {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`
   }
 
-  // Retorna os dígitos sem formatação se não tiver 10 ou 11
+  // Unknown length: leave the digits untouched rather than mangle them
   return digits
 }
 
 /**
- * Normaliza CPF: remove caracteres não numéricos
- * @param cpf - CPF em qualquer formato
- * @returns Apenas os 11 dígitos do CPF
+ * Returns the 11 digits, dropping punctuation.
  * @example
  * normalizeCPF('123.456.789-00') // '12345678900'
  */
@@ -118,7 +111,7 @@ export function normalizeCPF(cpf: string): string {
 }
 
 /**
- * Sanitiza dados de formulário de membro
+ * Applies the helpers above across a member form payload.
  */
 export function sanitizeMemberForm(data: {
   fullName?: string

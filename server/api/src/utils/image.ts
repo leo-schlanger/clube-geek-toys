@@ -1,22 +1,21 @@
 /**
- * Identificação de imagem pelos bytes (magic numbers).
+ * Image identification by magic numbers.
  *
- * O MIME que o navegador manda mente com frequência — celular sobe HEIC
- * rotulado como `image/jpeg`, e `application/octet-stream` aparece direto. Só
- * os primeiros bytes dizem a verdade sobre o formato.
+ * Browser MIME types lie often: phones upload HEIC labelled `image/jpeg`, and
+ * `application/octet-stream` shows up regularly. Only the leading bytes tell
+ * the truth about the format.
  *
- * NOTA: `product.routes.ts` e `gallery.routes.ts` têm cópias próprias desta
- * lógica, anteriores a este arquivo. Ficaram como estão de propósito — são o
- * caminho de upload do catálogo, em uso diário; unificar merece um passo
- * separado, com os testes de upload rodando junto.
+ * NOTE: `product.routes.ts` and `gallery.routes.ts` predate this file and keep
+ * their own copies. Unifying them deserves a separate pass with the upload
+ * tests running alongside.
  */
 
 export type ImageKind = 'jpeg' | 'png' | 'webp' | 'heic';
 
-/** Bytes suficientes para todos os magic numbers reconhecidos. */
+/** Enough bytes for every magic number recognised here. */
 export const IMAGE_PROBE_BYTES = 12;
 
-/** Devolve o formato real do buffer, ou null se não for imagem conhecida. */
+/** Returns the buffer's real format, or null if it is not a known image. */
 export function sniffImageKind(buf: Buffer): ImageKind | null {
   if (buf.length < IMAGE_PROBE_BYTES) return null;
 
@@ -25,7 +24,7 @@ export function sniffImageKind(buf: Buffer): ImageKind | null {
   if (buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') {
     return 'webp';
   }
-  // HEIC/HEIF são ISO-BMFF, igual a MP4: caixa `ftyp` com marca de imagem.
+  // HEIC/HEIF are ISO-BMFF like MP4: a `ftyp` box carrying an image brand.
   if (buf.toString('ascii', 4, 8) === 'ftyp') {
     const brand = buf.toString('ascii', 8, 12);
     if (/^(heic|heix|heim|heis|heif|mif1|msf1|avif)/i.test(brand)) return 'heic';
@@ -33,7 +32,7 @@ export function sniffImageKind(buf: Buffer): ImageKind | null {
   return null;
 }
 
-/** Extensão canônica do formato — HEIC vira .heic e é convertido depois. */
+/** Canonical extension for the format. */
 export function extensionFor(kind: ImageKind): string {
   return kind === 'jpeg' ? '.jpg' : `.${kind}`;
 }

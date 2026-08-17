@@ -40,8 +40,8 @@ const createMemberSchema = z.object({
 
 const updateMemberSchema = z.object({
   fullName: z.string().min(3).max(200).optional(),
-  // Admin corrige e-mail e CPF errados no cadastro; o serviço recusa os dois
-  // quando quem edita é o próprio membro (troca de e-mail exige verificação).
+  // Admins fix wrong emails and CPFs; the service refuses both when the editor
+  // is the member themselves, since an email change requires verification.
   email: z.string().email().optional(),
   cpf: z.string().length(11).refine(isValidCPF, { message: 'CPF inválido' }).optional(),
   phone: z.string().optional(),

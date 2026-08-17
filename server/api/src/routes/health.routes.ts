@@ -6,21 +6,17 @@ import { getMelhorEnvioHealth } from '../services/shipping.service.js';
 export const healthRouter = Router();
 
 /**
- * Health check público — consumido pelo docker healthcheck e pelo passo final
- * do `deploy.yml`.
+ * Public health check, consumed by the docker healthcheck and by the final
+ * step of `deploy.yml`.
  *
- * `schema` existe porque o `ensureSchema()` roda no boot sem derrubar a API:
- * antes, uma migration quebrada só aparecia numa linha de log do container que
- * ninguém lia (foi assim que o certbot ficou 3 semanas parado). Agora um schema
- * degradado é visível de fora, e o deploy pode falhar em cima disso.
+ * `schema` is here because `ensureSchema()` runs at boot without taking the
+ * API down: a broken migration used to surface only in a container log line
+ * nobody read. `shipping` is here for the same reason — a rejected credential
+ * drops quotes to the internal table and the customer still sees a plausible,
+ * wrong price.
  *
- * A lista de etapas que falharam **não** é exposta aqui — nome de tabela/coluna
- * é informação de dentro. O detalhe fica no log e em `GET /logs/schema` (admin).
- *
- * `shipping` segue a mesma regra: diz **se** a cotação real está de pé, sem o
- * corpo da resposta do Melhor Envio. Está aqui porque a falha dessa integração
- * é invisível por natureza — credencial recusada faz o frete cair na tabela
- * interna e o cliente vê um preço plausível, errado, sem nenhum sinal.
+ * Neither exposes detail: failed step names and upstream response bodies are
+ * internal, and stay in the logs and in `GET /logs/schema` (admin).
  */
 healthRouter.get('/', async (_req, res) => {
   const schema = getSchemaState();
@@ -38,10 +34,9 @@ healthRouter.get('/', async (_req, res) => {
         totalSteps: schema.total,
       },
       shipping: {
-        // 'live' exige um sucesso observado, não só credencial presente:
-        // anunciar "live" sem nunca ter cotado é o mesmo tipo de sinal
-        // enganoso que este bloco existe para evitar. 'untested' é o estado
-        // honesto entre configurar e a primeira cotação.
+        // 'live' requires an observed success, not merely a credential:
+        // claiming live before any quote is the same misleading signal this
+        // block exists to prevent. 'untested' is the honest middle state.
         quotes: !shipping.configured
           ? 'unconfigured'
           : shipping.lastFailure

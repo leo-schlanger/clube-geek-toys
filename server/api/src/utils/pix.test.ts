@@ -9,7 +9,7 @@ const BASE = {
   txId: 'CGTMFXYZ12AB',
 };
 
-/** CRC16-CCITT (FALSE) — reimplementado aqui pra conferir o do código sob teste. */
+/** CRC16-CCITT (FALSE), reimplemented here to check the code under test. */
 function crc16(data: string): string {
   let crc = 0xffff;
   const bytes = Buffer.from(data, 'utf8');
@@ -22,7 +22,7 @@ function crc16(data: string): string {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-/** Percorre o EMV e devolve [id, valor]; joga se algum length não bater em bytes. */
+/** Walks the EMV returning [id, value]; throws if any length disagrees in bytes. */
 function parseTlv(payload: string): Array<[string, string]> {
   const out: Array<[string, string]> = [];
   let i = 0;
@@ -47,7 +47,7 @@ describe('generatePixEMV', () => {
     const ids = parseTlv(emvCode).map(([id]) => id);
 
     expect(ids).toEqual(['00', '26', '52', '53', '54', '58', '59', '60', '62', '63']);
-    // IDs em ordem ascendente — exigência do EMV
+    // Ascending IDs, as EMV requires
     expect([...ids].sort()).toEqual(ids);
   });
 
@@ -73,8 +73,8 @@ describe('generatePixEMV', () => {
     expect(crc16(emvCode.slice(0, -4))).toBe(emvCode.slice(-4));
   });
 
-  // Regressão: `tlv()` contava caracteres UTF-16. Com acento no nome do recebedor
-  // o length saía menor que os bytes reais e o app do banco recusava o código.
+  // Regression: `tlv()` counted UTF-16 characters, so an accented merchant name
+  // declared fewer bytes than it occupied and the bank app rejected the code.
   it('mantém length em bytes com nome acentuado', () => {
     const { emvCode } = generatePixEMV({
       ...BASE,
@@ -104,10 +104,8 @@ describe('generatePixEMV', () => {
     expect(fields['60']).toHaveLength(15);
   });
 
-  // A chave de recebimento pode ser e-mail, CPF, telefone ou aleatória (UUID).
-  // Produção rodou meses com uma chave aleatória que não era a conta da loja;
-  // o gerador aceita qualquer formato, então o teste fixa que nenhum deles
-  // quebra o length em bytes nem o CRC.
+  // The receiving key may be an email, CPF, phone or random UUID. The generator
+  // accepts any of them, so this pins that none breaks the byte length or CRC.
   it.each([
     ['e-mail', 'ecoeletricrj@gmail.com'],
     ['CPF', '12345678909'],

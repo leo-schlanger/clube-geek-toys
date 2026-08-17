@@ -8,14 +8,14 @@ import { notify } from './notification.service.js';
 import { sendTemplateEmail } from './email.service.js';
 
 /**
- * Perguntas e respostas no produto.
+ * Product questions and answers.
  *
- * A pergunta aparece na loja assim que é feita, marcada como "aguardando
- * resposta". Não há aprovação prévia, então `status='hidden'` é a moderação a
- * posteriori e o limite por usuário abaixo é o que segura spam.
+ * A question appears on the storefront as soon as it is asked. There is no
+ * prior approval, so `status='hidden'` is after-the-fact moderation and the
+ * per-user cap below is what holds back spam.
  */
 
-/** Perguntas não respondidas que um usuário pode ter em aberto ao mesmo tempo. */
+/** Unanswered questions a single user may have open at once. */
 export const MAX_OPEN_QUESTIONS_PER_USER = 10;
 
 export interface ProductQuestion {
@@ -54,7 +54,7 @@ function mapQuestion(row: pg.QueryResultRow): ProductQuestion {
   };
 }
 
-/** Só o primeiro nome vai pra vitrine — pergunta pública não expõe nome completo. */
+/** First name only: a public question must not expose a full name. */
 const AUTHOR_NAME_SQL = `COALESCE(NULLIF(SPLIT_PART(m.full_name, ' ', 1), ''), 'Cliente')`;
 
 async function resolveProductId(productIdOrSlug: string): Promise<string> {
@@ -120,7 +120,7 @@ export async function askQuestion(
 
   const productId = await resolveProductId(productIdOrSlug);
 
-  // Sem aprovação prévia, este teto é o que impede alguém de encher a loja.
+  // With no prior approval, this cap is what stops someone flooding the store.
   const open = await query(
     `SELECT COUNT(*)::int AS total FROM product_questions
      WHERE user_id = $1 AND answered_at IS NULL AND status = 'published'`,
@@ -146,7 +146,6 @@ export async function askQuestion(
   return mapQuestion(result.rows[0]);
 }
 
-/** Perguntas feitas pelo usuário (aba "minhas perguntas"). */
 export async function listUserQuestions(userId: string): Promise<ProductQuestion[]> {
   const result = await query(
     `SELECT q.*, p.name AS product_name, p.slug AS product_slug
@@ -196,7 +195,7 @@ export async function adminListQuestions(
   };
 }
 
-/** Quantas estão esperando resposta (badge da aba do admin). */
+/** Count awaiting an answer, for the admin tab badge. */
 export async function countPendingQuestions(): Promise<number> {
   const result = await query(
     `SELECT COUNT(*)::int AS total FROM product_questions
@@ -206,8 +205,8 @@ export async function countPendingQuestions(): Promise<number> {
 }
 
 /**
- * Publica a resposta e avisa quem perguntou. A notificação nasce na mesma
- * transação: sem resposta gravada não existe aviso, e vice-versa.
+ * The notification is written in the same transaction: no stored answer means
+ * no notification, and vice versa.
  */
 export async function answerQuestion(
   id: string,
@@ -268,8 +267,8 @@ export async function answerQuestion(
     productId: question.productId,
   });
 
-  // E-mail fora da transação e sem bloquear: a notificação no perfil já é o
-  // canal garantido, o e-mail é reforço.
+  // Email is sent outside the transaction and non-blocking: the in-app
+  // notification is the guaranteed channel, email is reinforcement.
   void sendAnswerEmail(question).catch((err) =>
     console.error('[QUESTION] answer email error:', err)
   );

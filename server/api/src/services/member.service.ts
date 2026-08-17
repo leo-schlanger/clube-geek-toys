@@ -241,12 +241,11 @@ export async function updateMember(
     'activatedAt', 'activatedByPayment',
   ];
   /**
-   * E-mail e CPF só pelo **admin**, nem pelo vendedor do PDV.
+   * Email and CPF are admin-only, not even the PDV seller.
    *
-   * O e-mail é o login: trocá-lo e pedir "esqueci a senha" é uma tomada de conta
-   * completa. CPF é a chave de identidade do membro. O membro comum também não
-   * passa por aqui — troca de e-mail vai por /auth/update-profile, que exige a
-   * senha atual e revalida o endereço.
+   * Email is the login: changing it and then asking for a password reset is a
+   * full account takeover. Members change their own email through
+   * /auth/update-profile, which requires the current password and revalidates.
    */
   const adminOnlyIdentityFields = ['email', 'cpf'];
 
@@ -277,8 +276,8 @@ export async function updateMember(
     activatedByPayment: 'activated_by_payment',
   };
 
-  // E-mail é chave de login: normaliza aqui para não criar duas grafias do mesmo
-  // endereço entre members e users.
+  // Normalize here so members and users cannot end up with two spellings of
+  // the same login address.
   if (typeof data.email === 'string') {
     data = { ...data, email: data.email.toLowerCase().trim() };
   }
@@ -331,10 +330,9 @@ export async function updateMember(
     }
   }
 
-  // Correção de e-mail/CPF pelo admin: os dois são únicos e o e-mail é o login,
-  // então checa colisão antes e grava members + users de uma vez só.
-  // Só conta o que o allowlist do papel deixou entrar: para um membro, `email`
-  // já foi descartado do UPDATE e não pode disparar a troca de login aqui.
+  // Both are unique and email is the login, so collisions are checked before
+  // writing members and users together. Only fields the role allowlist let
+  // through count: a member's `email` was already dropped from the UPDATE.
   const newEmail =
     allowedFields.includes('email') && typeof data.email === 'string' ? data.email : null;
   const newCpf =
@@ -378,8 +376,8 @@ export async function updateMember(
     }
     after = result.rows[0];
 
-    // users.email é o que o login usa — deixar só members mudar quebraria o acesso.
-    // O endereço novo volta a precisar de verificação.
+    // users.email is what login reads; updating only members would lock the
+    // account out. The new address needs verifying again.
     if (emailChanged && before.user_id) {
       await client.query(
         `UPDATE users SET email = $1, email_verified = FALSE WHERE id = $2`,

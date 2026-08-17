@@ -103,14 +103,14 @@ export interface AuditLog {
   timestamp: string;
 }
 
-// Preço do plano único anual do clube (BRL).
+// Club annual plan price (BRL).
 // MUST match frontend CLUB_PLAN.price in src/types/index.ts
 export const CLUB_PLAN_PRICE = 149.99;
 
-// Desconto do membro ativo na loja (fração). Aplicado server-side no checkout.
+// Active-member shop discount, applied server-side at checkout.
 export const MEMBER_SHOP_DISCOUNT = 0.15;
 
-// Desconto atacadista aprovado (fração). Canal wholesale apenas; não empilha com member_15.
+// Approved wholesale discount. Wholesale channel only; never stacks with member_15.
 export const WHOLESALE_SHOP_DISCOUNT = 0.25;
 
 export type ShopChannel = 'retail' | 'wholesale';
@@ -125,7 +125,7 @@ export interface Category {
   name: string;
   slug: string;
   description: string | null;
-  /** Chave do ícone (ver src/lib/category-icons.ts). */
+  /** Icon key; see src/lib/category-icons.ts. */
   icon?: string | null;
   active: boolean;
   sortOrder: number;
@@ -143,7 +143,7 @@ export interface Product {
   /** Categoria principal (espelha product_categories position 0). */
   categoryId: string | null;
   categoryName?: string | null;
-  /** Todas as categorias do produto, principal primeiro (máx. MAX_PRODUCT_CATEGORIES). */
+  /** Primary category first, up to MAX_PRODUCT_CATEGORIES. */
   categoryIds?: string[];
   categoryNames?: string[];
   videos?: ProductVideo[];
@@ -158,27 +158,26 @@ export interface Product {
   lengthCm?: number | null;
   ratingAvg?: number;
   ratingCount?: number;
-  /** Disponível no canal atacado (aba /atacado). Default false — pronto antes da importação. */
+  /** Available on the wholesale channel. */
   wholesaleEnabled?: boolean;
-  /** Quantidade mínima por SKU no atacado. */
+  /** Minimum wholesale quantity per SKU. */
   wholesaleMinQty?: number;
-  /** Listing com variações (cor/tamanho/material…). */
   hasVariants?: boolean;
-  /** Eixos de variação, ex. [{ name: "Cor", options: ["Rosa","Preto"] }] */
+  /** e.g. [{ name: "Cor", options: ["Rosa", "Preto"] }] */
   variantAxes?: VariantAxis[];
-  /** Preenchido no detalhe/admin quando hasVariants. */
+  /** Only populated on the detail and admin views when hasVariants. */
   variants?: ProductVariant[];
-  /** Preço mínimo entre variantes ativas (vitrine). */
+  /** Lowest price across active variants, shown on the storefront. */
   priceFrom?: number | null;
-  /** Estoque somado das variantes ativas. */
+  /** Summed stock of active variants. */
   stockTotal?: number | null;
   createdAt: string;
   updatedAt: string;
 }
 
 /**
- * Vídeo do produto. `file` = MP4 no volume /uploads; os demais são links
- * externos que a loja embeda.
+ * `file` is an MP4 on the /uploads volume; the others are external links the
+ * storefront embeds.
  */
 export interface ProductVideo {
   kind: 'youtube' | 'instagram' | 'file';
@@ -186,13 +185,11 @@ export interface ProductVideo {
   title?: string;
 }
 
-/** Eixo de variação (Cor, Tamanho, Material…). Sem limite de quantidade. */
 export interface VariantAxis {
   name: string;
   options: string[];
 }
 
-/** SKU vendável de um listing com variações. */
 export interface ProductVariant {
   id: string;
   productId: string;

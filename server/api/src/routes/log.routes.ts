@@ -18,11 +18,11 @@ const errorLogSchema = z.object({
 });
 
 /**
- * Erro vindo de extensão do navegador do visitante — não é da loja.
+ * Errors thrown by a visitor's browser extension, not by the store.
  *
- * O front já filtra (ver `isExtensionNoise` em src/lib/error-tracking.ts), mas
- * esta rota é pública: quem chama não é confiável. Em 15/08/2026 esse ruído era
- * 299 das 485 linhas de `error_logs` e escondia os erros reais.
+ * The frontend already filters these (see `isExtensionNoise`), but
+ * this route is public, so callers are untrusted. That noise once accounted for
+ * 299 of 485 `error_logs` rows and buried the real errors.
  */
 const EXTENSION_STACK = /(chrome|moz|safari-web|ms-browser)-extension:\/\//i;
 
@@ -32,7 +32,7 @@ logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, 
     const { severity, message, stack, context, url } = req.body as z.infer<typeof errorLogSchema>;
 
     if (stack && EXTENSION_STACK.test(stack)) {
-      // 202: o cliente não precisa saber que foi descartado (nem tentar de novo).
+      // 202: the client need not learn it was dropped, nor retry.
       res.status(202).json({ logged: false, reason: 'browser_extension' });
       return;
     }
@@ -73,10 +73,10 @@ logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, 
 logRouter.use(authenticate, requireRole('admin'));
 
 /**
- * GET /logs/schema — resultado do `ensureSchema()` do boot, etapa por etapa.
+ * GET /logs/schema — the boot `ensureSchema()` result, step by step.
  *
- * O `/health` público diz só quantas falharam; o nome da tabela/coluna que
- * quebrou é informação de dentro e fica aqui.
+ * Public `/health` reports only how many failed; the table or column that broke
+ * is internal detail and stays here.
  */
 logRouter.get('/schema', (_req, res) => {
   res.json(getSchemaState());

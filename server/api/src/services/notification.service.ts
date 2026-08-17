@@ -3,10 +3,10 @@ import { query } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 
 /**
- * Notificações no perfil do cliente.
+ * In-app customer notifications.
  *
- * Deliberadamente simples: uma linha por aviso, lida/não lida, com um link
- * relativo para a SPA. Não é fila nem push — o cliente vê quando abre a loja.
+ * Deliberately simple: one row per notice, read/unread, with a relative link
+ * into the SPA. Not a queue and not push — the customer sees it on next visit.
  */
 
 export type NotificationKind = 'question_answered' | 'order_shipped' | 'generic';
@@ -81,7 +81,7 @@ export async function listForUser(
   };
 }
 
-/** Marca uma notificação como lida. O WHERE user_id garante a posse. */
+/** The user_id in the WHERE is what enforces ownership. */
 export async function markRead(userId: string, id: string): Promise<Notification> {
   const result = await query(
     `UPDATE notifications SET read_at = NOW()
@@ -90,7 +90,7 @@ export async function markRead(userId: string, id: string): Promise<Notification
     [id, userId]
   );
   if (result.rows.length === 0) {
-    // Já lida ou de outro usuário — devolve o estado atual sem vazar existência.
+    // Already read, or someone else's: return current state without leaking existence.
     const existing = await query(`SELECT * FROM notifications WHERE id = $1 AND user_id = $2`, [
       id,
       userId,

@@ -15,9 +15,9 @@ export const galleryRouter = Router();
 const { MAX_PHOTO_UPLOAD_BATCH } = galleryService;
 const PHOTO_MAX_BYTES = 40 * 1024 * 1024;
 
-// ─── Público ─────────────────────────────────────────────────────────────────
+// ─── Public ──────────────────────────────────────────────────────────────────
 
-// GET /gallery — álbuns ativos com capa e contagem
+// GET /gallery — active albums with cover and photo count
 galleryRouter.get('/', publicLookupLimiter, async (_req, res, next) => {
   try {
     res.json({ albums: await galleryService.listAlbums(false) });
@@ -26,7 +26,7 @@ galleryRouter.get('/', publicLookupLimiter, async (_req, res, next) => {
   }
 });
 
-// GET /gallery/:slug — álbum com as fotos
+// GET /gallery/:slug — album with its photos
 galleryRouter.get('/:slug', publicLookupLimiter, async (req, res, next) => {
   try {
     const album = await galleryService.getAlbum(req.params.slug as string, false);
@@ -57,7 +57,7 @@ const albumSchema = z.object({
   name: z.string().min(1).max(160),
   description: z.string().max(2000).optional().nullable(),
   coverUrl: z.string().url().optional().nullable(),
-  /** ISO date (YYYY-MM-DD) ou vazio para "sem data". */
+  /** ISO date (YYYY-MM-DD), or empty for "no date". */
   eventDate: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).optional().nullable(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
@@ -90,22 +90,22 @@ function discardFile(filePath: string): void {
   try {
     fs.unlinkSync(filePath);
   } catch {
-    /* já removido */
+    /* already removed */
   }
 }
 
-/** Apaga do disco o arquivo servido por uma URL de /uploads. */
+/** Deletes the file backing an /uploads URL. */
 function discardUploadedUrl(url: string): void {
   try {
     const marker = '/uploads/';
     const index = url.indexOf(marker);
     if (index === -1) return;
     const relative = url.slice(index + marker.length);
-    // Nunca deixa o caminho escapar do volume.
+    // Never let the path escape the volume.
     if (relative.includes('..')) return;
     fs.unlinkSync(path.join('/app/uploads', relative));
   } catch {
-    /* arquivo já removido ou externo */
+    /* file already removed, or external */
   }
 }
 
@@ -158,7 +158,7 @@ const upload = multer({
   },
 });
 
-/** Confere os bytes: MIME de celular mente com frequência. */
+/** Checks the bytes: phone MIME types lie often. */
 function isRealImage(filePath: string): boolean {
   try {
     const fd = fs.openSync(filePath, 'r');

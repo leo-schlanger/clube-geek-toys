@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
- * Saúde da integração com o Melhor Envio.
+ * Melhor Envio integration health.
  *
- * O motivo destes testes existirem: em 16/08/2026 uma credencial foi entregue
- * como "chave da API" e o Melhor Envio devolveu 401 em produção e em sandbox.
- * Se ela tivesse sido instalada, nada quebraria visivelmente — a cotação cai na
- * tabela interna e o cliente vê um preço plausível, porém errado, até a
- * diferença aparecer no caixa. Aqui se trava o sinal que torna isso visível.
+ * A rejected credential breaks nothing visibly: quotes fall to the internal
+ * table and the customer sees a plausible but wrong price until the difference
+ * shows up at the till. These tests pin the signal that makes it visible.
  */
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
@@ -36,7 +34,7 @@ const PRODUCT_ROW = {
   stock: 10,
 };
 
-/** Resposta com uma opção utilizável — o caminho feliz da cotação real. */
+/** A response with one usable option: the happy path of a real quote. */
 const LIVE_OPTION = [
   {
     id: 1,
@@ -76,20 +74,20 @@ describe('quoteShipping — origem da cotação', () => {
     expect(getMelhorEnvioHealth().lastSuccessAt).toBeTruthy();
   });
 
-  // O caso desta sessão: credencial recusada.
+  // The rejected-credential case.
   it('cai na tabela interna quando a credencial é recusada', async () => {
     vi.stubGlobal('fetch', mockFetch(401, { message: 'Unauthenticated.' }));
 
     const result = await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
 
-    // O cliente ainda recebe preço — é justamente o que torna a falha invisível.
+    // The customer still gets a price, which is exactly what hides the failure.
     expect(result.source).toBe('fallback');
     expect(result.options.length).toBeGreaterThan(0);
   });
 
   it('trata 200 com lista vazia como fallback, não como sucesso', async () => {
-    // lastSuccessAt é estado de processo de propósito (é sinal de saúde, não de
-    // requisição), então a asserção é relativa: não pode avançar.
+    // lastSuccessAt is process state by design (a health signal, not a
+    // per-request value), so the assertion is relative: it must not advance.
     const before = getMelhorEnvioHealth().lastSuccessAt;
     vi.stubGlobal('fetch', mockFetch(200, []));
 
@@ -117,8 +115,8 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
     expect(getMelhorEnvioHealth().lastFailure?.kind).toBe('auth');
   });
 
-  // Instabilidade da API e credencial errada pedem ações diferentes: uma se
-  // resolve esperando, a outra não.
+  // Upstream flakiness and a wrong credential need different responses: one
+  // resolves by waiting, the other does not.
   it('separa instabilidade (500) de credencial recusada', async () => {
     vi.stubGlobal('fetch', mockFetch(500, 'Internal Server Error'));
     await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
@@ -137,7 +135,7 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining('CREDENCIAL DO MELHOR ENVIO RECUSADA')
     );
-    // A mensagem precisa dizer o que está acontecendo com o dinheiro.
+    // The message has to say what is happening to the money.
     expect(error).toHaveBeenCalledWith(expect.stringContaining('TABELA DE FALLBACK'));
     error.mockRestore();
   });

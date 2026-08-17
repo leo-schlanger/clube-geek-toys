@@ -43,11 +43,11 @@ shippingRouter.post('/quote', publicLookupLimiter, validate(quoteSchema), async 
 
 // ─── Melhor Envio: OAuth ─────────────────────────────────────────────────────
 //
-// O painel do Melhor Envio dá Client ID + Secret; o token da API sai deste
-// fluxo. A URL de redirecionamento cadastrada lá tem que ser exatamente a que
-// `GET /melhor-envio/status` reporta em `redirectUri`.
+// Their panel gives a Client ID + Secret; the API token comes from this flow.
+// The redirect URL registered there must match exactly what
+// `GET /melhor-envio/status` reports as `redirectUri`.
 
-// GET /shipping/melhor-envio/status — estado da autorização (admin)
+// GET /shipping/melhor-envio/status — authorization state (admin)
 shippingRouter.get(
   '/melhor-envio/status',
   authenticate,
@@ -61,7 +61,7 @@ shippingRouter.get(
   }
 );
 
-// GET /shipping/melhor-envio/authorize — começa o fluxo (admin)
+// GET /shipping/melhor-envio/authorize — starts the flow (admin)
 shippingRouter.get(
   '/melhor-envio/authorize',
   authenticate,
@@ -69,9 +69,9 @@ shippingRouter.get(
   (req, res, next) => {
     try {
       const url = oauth.buildAuthorizeUrl();
-      // ?redirect=1 manda o navegador direto; sem isso devolve a URL, para o
-      // painel abrir numa aba (a chamada do painel leva Authorization e um
-      // 302 perderia o header).
+      // ?redirect=1 sends the browser straight there; otherwise the URL is
+      // returned so the panel can open a tab, since a 302 would drop the
+      // Authorization header the panel's own call carries.
       if (req.query.redirect === '1') {
         res.redirect(url);
         return;
@@ -83,11 +83,10 @@ shippingRouter.get(
   }
 );
 
-// GET /shipping/melhor-envio/callback — o Melhor Envio devolve aqui.
+// GET /shipping/melhor-envio/callback — where Melhor Envio sends the browser.
 //
-// Pública de propósito: quem chega é o navegador de quem autorizou, sem o
-// nosso token. O que autentica a requisição é o `state` assinado — sem ele,
-// qualquer um poderia disparar o callback com um `code` próprio.
+// Public by design: the caller is the authorizing person's browser, carrying
+// none of our auth. The signed `state` is what authenticates the request.
 shippingRouter.get('/melhor-envio/callback', async (req, res, next) => {
   try {
     const { code, state, error } = req.query as Record<string, string | undefined>;
@@ -138,7 +137,7 @@ function escapeHtml(value: string): string {
   );
 }
 
-/** Página mínima: o callback abre no navegador, não é consumido por código. */
+/** Minimal page: the callback opens in a browser, not in code. */
 function oauthPage(title: string, message: string): string {
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">

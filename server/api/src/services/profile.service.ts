@@ -4,11 +4,11 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog } from '../utils/audit.js';
 
 /**
- * Perfil de cliente — existe para qualquer conta, com ou sem assinatura.
+ * Customer profile, available to any account with or without a subscription.
  *
- * Não confundir com `member.service`: `members` é o registro do clube (exige
- * CPF, tem plano e validade). Aqui é só quem a pessoa é, para quem compra na
- * loja sem assinar nada. Uma conta pode ter os dois, um, ou nenhum.
+ * Not to be confused with `member.service`: `members` is the club record and
+ * requires a CPF, a plan and an expiry. An account may have both, either, or
+ * neither.
  */
 
 export const GENDERS = [
@@ -41,7 +41,7 @@ export interface CustomerProfile {
   photoUrl: string | null;
   address: ProfileAddress | null;
   marketingConsent: boolean;
-  /** True quando a conta também é membro do clube — o painel muda com isso. */
+  /** The panel renders differently for accounts that also hold a membership. */
   isMember: boolean;
   createdAt: string | null;
   updatedAt: string | null;
@@ -53,7 +53,7 @@ function mapProfile(row: pg.QueryResultRow): CustomerProfile {
     email: row.email,
     fullName: row.full_name ?? null,
     phone: row.phone ?? null,
-    // DATE volta como Date do pg; a SPA só quer YYYY-MM-DD.
+    // pg returns DATE as a Date; the SPA only wants YYYY-MM-DD.
     birthDate: row.birth_date ? toIsoDate(row.birth_date) : null,
     gender: (row.gender as Gender) ?? null,
     photoUrl: row.photo_url ?? null,
@@ -71,8 +71,8 @@ function toIsoDate(value: Date | string): string {
 }
 
 /**
- * Lê o perfil da conta. Devolve um perfil vazio (não 404) quando a pessoa ainda
- * não preencheu nada: a conta existe desde o registro, o perfil é opcional.
+ * Returns an empty profile rather than a 404 when nothing has been filled in:
+ * the account exists from registration, the profile is optional.
  */
 export async function getProfile(userId: string): Promise<CustomerProfile> {
   const result = await query(
@@ -100,11 +100,9 @@ export interface UpdateProfileInput {
 }
 
 /**
- * Cria ou atualiza o perfil.
- *
- * Só grava as chaves presentes no payload — `undefined` é "não mexe", `null` é
- * "apaga". A distinção importa porque a tela salva por seção: mandar o objeto
- * inteiro a cada PATCH apagaria campos que a pessoa nem viu.
+ * `undefined` means leave alone, `null` means clear. The distinction matters
+ * because the screen saves per section: sending the whole object every time
+ * would wipe fields the person never opened.
  */
 export async function upsertProfile(
   userId: string,
@@ -130,7 +128,7 @@ export async function upsertProfile(
   const cols = provided.map((key) => columns[key]);
   const values = provided.map((key) => {
     const value = input[key];
-    // address é JSONB; os demais vão como texto/boolean/date direto.
+    // address is JSONB; the rest go through as text/boolean/date.
     return key === 'address' && value != null ? JSON.stringify(value) : value;
   });
 
@@ -144,14 +142,13 @@ export async function upsertProfile(
     [userId, ...values]
   );
 
-  // O audit registra **quais** campos mudaram, nunca os valores: são dados
-  // pessoais e o log de auditoria é lido por admin.
+  // Log which fields changed, never their values: this is personal data and
+  // the audit log is read by admins.
   await auditLog('profile.updated', userId, { fields: provided });
 
   return getProfile(userId);
 }
 
-/** Grava a foto (ou remove, com null). Caminho separado por vir de upload. */
 export async function setProfilePhoto(
   userId: string,
   photoUrl: string | null
@@ -179,7 +176,7 @@ export interface SavedProduct {
   savedAt: string;
 }
 
-/** Lista os salvos com o preço e estoque **atuais**, não os de quando salvou. */
+/** Prices and stock are the **current** ones, not those at save time. */
 export async function listSavedProducts(userId: string): Promise<SavedProduct[]> {
   const result = await query(
     `SELECT s.product_id, s.created_at AS saved_at,
@@ -202,7 +199,7 @@ export async function listSavedProducts(userId: string): Promise<SavedProduct[]>
   }));
 }
 
-/** Salva um produto. Idempotente: salvar de novo não duplica nem falha. */
+/** Idempotent: saving twice neither duplicates nor fails. */
 export async function saveProduct(userId: string, productId: string): Promise<void> {
   const product = await query(`SELECT id FROM products WHERE id = $1`, [productId]);
   if (product.rows.length === 0) {
@@ -216,7 +213,7 @@ export async function saveProduct(userId: string, productId: string): Promise<vo
   );
 }
 
-/** Remove dos salvos. Idempotente: remover o que não está salvo é no-op. */
+/** Idempotent: removing something not saved is a no-op. */
 export async function unsaveProduct(userId: string, productId: string): Promise<void> {
   await query(`DELETE FROM saved_products WHERE user_id = $1 AND product_id = $2`, [
     userId,
@@ -224,7 +221,7 @@ export async function unsaveProduct(userId: string, productId: string): Promise<
   ]);
 }
 
-/** IDs salvos — usado pelo catálogo para pintar o coração sem N consultas. */
+/** Lets the catalogue fill in every heart without one query per card. */
 export async function listSavedProductIds(userId: string): Promise<string[]> {
   const result = await query(`SELECT product_id FROM saved_products WHERE user_id = $1`, [
     userId,

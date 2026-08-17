@@ -21,16 +21,16 @@ export interface SettingDefinition {
  * the admin Settings tab without further code changes.
  */
 export const SETTINGS_CATALOGUE: SettingDefinition[] = [
-  // Plano único anual — deve bater com CLUB_PLAN.price no frontend.
+  // Must match CLUB_PLAN.price on the frontend.
   { key: 'pricing.club_annual', default: 149.99, type: 'number', description: 'Plano do Clube — anual (R$)' },
 
-  // Benefício do membro — desconto único em qualquer produto.
+  // Member benefit: a single discount on any product.
   { key: 'plan.club.discount_products', default: 15, type: 'number', description: 'Desconto do membro em produtos (%)' },
 
   // Payment guards
   { key: 'payment.duplicate_window_days', default: 7, type: 'number', description: 'Janela em dias para bloquear pagamentos duplicados' },
 
-  // Shop: recompensa por avaliar pedido entregue (crédito de loja em R$)
+  // Store credit (BRL) rewarded for reviewing a delivered order.
   { key: 'review_reward_amount', default: 1, type: 'number', description: 'Crédito (R$) ao avaliar um pedido entregue' },
 ];
 

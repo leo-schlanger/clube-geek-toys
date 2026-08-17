@@ -10,11 +10,11 @@
 // ─── EMV TLV helpers ─────────────────────────────────────────────────────────
 
 /**
- * O comprimento no EMV é contado em **bytes**, não em caracteres. `'Ç'.length`
- * é 1 em JS mas ocupa 2 bytes em UTF-8, e o CRC também roda sobre bytes — com
- * acento no nome do recebedor o length declarado sai errado e o app do banco
- * rejeita o código inteiro. Os campos de texto passam por `toAscii()` antes de
- * chegar aqui, mas contar bytes mantém a invariante caso algum escape.
+ * EMV lengths are counted in **bytes**, not characters. `'Ç'.length` is 1 in JS
+ * but occupies 2 bytes in UTF-8, and the CRC runs over bytes too — an accented
+ * merchant name therefore declared the wrong length and the bank app rejected
+ * the whole code. Text fields pass through `toAscii()` first, but counting
+ * bytes keeps the invariant if one ever escapes.
  */
 function tlv(id: string, value: string): string {
   const len = Buffer.byteLength(value, 'utf8').toString().padStart(2, '0');
@@ -22,11 +22,11 @@ function tlv(id: string, value: string): string {
 }
 
 /**
- * Remove acentos e qualquer caractere fora do ASCII imprimível.
+ * Strips accents and anything outside printable ASCII.
  *
- * A spec do BR Code limita nome (25) e cidade (15) em caracteres, e os bancos
- * exibem ASCII sem problema — normalizar aqui evita truncar no meio de um
- * caractere multibyte e mantém o campo dentro do limite anunciado.
+ * The BR Code spec caps name (25) and city (15) in characters and banks render
+ * ASCII fine, so normalising here avoids truncating mid-codepoint and keeps
+ * each field inside its declared limit.
  */
 function toAscii(value: string): string {
   return value

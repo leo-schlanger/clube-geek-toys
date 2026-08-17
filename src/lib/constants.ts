@@ -1,11 +1,4 @@
-/**
- * Constantes centralizadas do projeto
- *
- * Mantém todos os valores "mágicos" em um único lugar para:
- * - Facilitar manutenção
- * - Evitar typos
- * - Documentar valores importantes
- */
+/** Shared constants. Values used in more than one place live here. */
 
 // =============================================================================
 // Database Tables (for reference — queries go through the API)
@@ -31,38 +24,28 @@ export const STORAGE_KEYS = {
 } as const
 
 // =============================================================================
-// Timeouts (em milissegundos)
+// Timeouts (milliseconds)
 // =============================================================================
 
 export const TIMEOUTS = {
-  /** Timeout padrão para requisições */
   DEFAULT_REQUEST: 15000,
-  /** Timeout para validação de CPF */
   CPF_VALIDATION: 5000,
-  /** Debounce para inputs */
   INPUT_DEBOUNCE: 500,
-  /** Tempo de lockout após muitas tentativas de login */
-  LOCKOUT_DURATION: 5 * 60 * 1000, // 5 minutos
-  /** Janela de tempo para contar tentativas de login */
-  ATTEMPT_WINDOW: 15 * 60 * 1000, // 15 minutos
-  /** Intervalo para verificar status de pagamento PIX */
+  LOCKOUT_DURATION: 5 * 60 * 1000, // 5 min
+  ATTEMPT_WINDOW: 15 * 60 * 1000, // 15 min
   PIX_POLL_INTERVAL: 5000,
-  /** Expiração do QR Code PIX */
-  PIX_EXPIRATION: 30 * 60 * 1000, // 30 minutos
+  PIX_EXPIRATION: 30 * 60 * 1000, // 30 min
 } as const
 
 // =============================================================================
-// Limites e configurações
+// Limits
 // =============================================================================
 
 export const LIMITS = {
-  /** Máximo de tentativas de login antes de bloquear */
   MAX_LOGIN_ATTEMPTS: 5,
-  /** Máximo de retries para requisições */
   MAX_RETRIES: 3,
-  /** Delay inicial para retry (exponential backoff) */
+  /** Base for exponential backoff. */
   INITIAL_RETRY_DELAY: 1000,
-  /** Máximo de logs para exibir */
   MAX_LOGS_DISPLAY: 50,
 } as const
 
@@ -71,20 +54,17 @@ export const LIMITS = {
 // =============================================================================
 
 export const URLS = {
-  /** API do Brasil para validação de CPF */
+  /** BrasilAPI, used for CPF lookup. */
   BRASIL_API_CPF: 'https://brasilapi.com.br/api/cpf/v1',
 } as const
 
 // =============================================================================
-// Validação
+// Validation
 // =============================================================================
 
 export const VALIDATION = {
-  /** Tamanho mínimo da senha */
   MIN_PASSWORD_LENGTH: 6,
-  /** Tamanho do CPF (apenas dígitos) */
   CPF_LENGTH: 11,
-  /** Tamanho do telefone com DDD (apenas dígitos) */
   PHONE_LENGTH: 11,
 } as const
 
@@ -93,23 +73,18 @@ export const VALIDATION = {
 // =============================================================================
 
 export const CAMERA = {
-  /** Resolução ideal da câmera (largura) */
   IDEAL_WIDTH: 1280,
-  /** Resolução ideal da câmera (altura) */
   IDEAL_HEIGHT: 720,
 } as const
 
 export const UI = {
-  /** Tempo para copiar feedback (ms) */
   COPY_FEEDBACK_DURATION: 2000,
-  /** Tempo de exibição do banner de reconexão (ms) */
   RECONNECT_BANNER_DURATION: 3000,
-  /** Intervalo de atualização do countdown (ms) */
   COUNTDOWN_INTERVAL: 1000,
 } as const
 
 // =============================================================================
-// Mensagens padrão
+// Default messages
 // =============================================================================
 
 export const MESSAGES = {

@@ -4,11 +4,11 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog } from '../utils/audit.js';
 
 /**
- * Galeria do site institucional, organizada em álbuns ("pastas").
+ * Institutional-site gallery, organised into albums.
  *
- * As fotos vivem no mesmo volume /uploads das fotos de produto, sob
- * uploads/gallery/:albumId. Apagar o álbum apaga as linhas em cascata; os
- * arquivos são removidos pelo caller da rota, que conhece o disco.
+ * Photos share the /uploads volume with product photos, under
+ * uploads/gallery/:albumId. Deleting an album cascades the rows; the files are
+ * removed by the route caller, which knows the disk.
  */
 
 export const MAX_PHOTOS_PER_ALBUM = 300;
@@ -90,7 +90,7 @@ async function uniqueSlug(base: string, excludeId?: string): Promise<string> {
   }
 }
 
-/** Capa vem da coluna ou, na falta, da primeira foto do álbum. */
+/** Cover comes from the column, falling back to the album's first photo. */
 const ALBUM_SELECT = `
   SELECT a.*,
          (SELECT COUNT(*) FROM gallery_photos p WHERE p.album_id = a.id) AS photo_count,
@@ -178,7 +178,7 @@ export async function updateAlbum(
   for (const [key, col] of Object.entries(fieldMap)) {
     if (key in data && data[key] !== undefined) {
       sets.push(`${col} = $${i++}`);
-      // Data vazia é "sem data", não string vazia (a coluna é DATE).
+      // An empty date means "no date", not an empty string (the column is DATE).
       values.push(col === 'event_date' ? (data[key] || null) : data[key]);
     }
   }
@@ -205,7 +205,7 @@ export async function updateAlbum(
 }
 
 /**
- * Remove o álbum e devolve as URLs das fotos, para o caller apagar os arquivos.
+ * Removes the album and returns the photo URLs so the caller can delete files.
  * As linhas de gallery_photos somem por ON DELETE CASCADE.
  */
 export async function deleteAlbum(id: string, actorUserId: string): Promise<string[]> {
@@ -239,7 +239,7 @@ export interface AddPhotosResult {
   rejected: string[];
 }
 
-/** Anexa fotos ao álbum respeitando MAX_PHOTOS_PER_ALBUM. */
+/** Appends photos, honouring MAX_PHOTOS_PER_ALBUM. */
 export async function addPhotos(albumId: string, urls: string[]): Promise<AddPhotosResult> {
   const current = await query(
     `SELECT COUNT(*)::int AS total, COALESCE(MAX(sort_order), -1) AS max_sort
@@ -276,7 +276,7 @@ export async function addPhotos(albumId: string, urls: string[]): Promise<AddPho
   return { photos: inserted, accepted, rejected };
 }
 
-/** Remove uma foto e devolve a URL, para o caller apagar o arquivo. */
+/** Removes a photo and returns its URL so the caller can delete the file. */
 export async function deletePhoto(
   albumId: string,
   photoId: string,
@@ -289,7 +289,7 @@ export async function deletePhoto(
   if (result.rows.length === 0) {
     throw new AppError(404, 'Foto não encontrada.', 'PHOTO_NOT_FOUND');
   }
-  // Se a foto removida era a capa fixada, volta para a capa automática.
+  // If the removed photo was the pinned cover, fall back to the automatic one.
   await query(`UPDATE gallery_albums SET cover_url = NULL WHERE id = $1 AND cover_url = $2`, [
     albumId,
     result.rows[0].url,
@@ -298,7 +298,7 @@ export async function deletePhoto(
   return result.rows[0].url as string;
 }
 
-/** Regrava a ordem das fotos a partir da lista de ids na ordem desejada. */
+/** Rewrites photo ordering from a list of ids in the desired order. */
 export async function reorderPhotos(albumId: string, photoIds: string[]): Promise<GalleryPhoto[]> {
   const client = await getClient();
   try {

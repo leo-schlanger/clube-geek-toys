@@ -1,10 +1,9 @@
 /**
- * Email Validation Utilities
+ * Email validation:
  *
- * Validação robusta de emails incluindo:
- * - Formato RFC 5322
- * - Bloqueio de emails temporários/descartáveis
- * - Verificação de domínio via DNS
+ * - RFC 5322 format
+ * - blocks disposable providers
+ * - checks the domain has MX or A records
  */
 
 import { logger } from './logger'
@@ -20,12 +19,11 @@ export interface EmailValidationResult {
 }
 
 // =============================================================================
-// Disposable Email Domains (emails temporários)
+// Disposable email domains
 // =============================================================================
 
 /**
- * Lista de domínios de email temporários/descartáveis mais comuns
- * Fonte: https://github.com/disposable-email-domains/disposable-email-domains
+ * Source: https://github.com/disposable-email-domains/disposable-email-domains
  */
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
   // Mais populares
@@ -489,14 +487,11 @@ const DISPOSABLE_EMAIL_DOMAINS = new Set([
 // =============================================================================
 
 /**
- * Regex RFC 5322 simplificada mas rigorosa para emails comuns
- * Valida formato local@domain.tld com regras restritivas
+ * Simplified RFC 5322: strict enough for real addresses, not exhaustive.
  */
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
-/**
- * Valida formato do email usando regex RFC 5322
- */
+
 export function isValidEmailFormat(email: string): boolean {
   if (!email || typeof email !== 'string') return false
 
@@ -510,7 +505,7 @@ export function isValidEmailFormat(email: string): boolean {
   if (localPart.length > 64) return false
   if (domain.length > 253) return false
 
-  // Validação com regex
+
   return EMAIL_REGEX.test(normalizedEmail)
 }
 
@@ -518,9 +513,7 @@ export function isValidEmailFormat(email: string): boolean {
 // Disposable Email Check
 // =============================================================================
 
-/**
- * Verifica se o email é de um provedor temporário/descartável
- */
+
 export function isDisposableEmail(email: string): boolean {
   if (!email) return false
 
@@ -530,9 +523,7 @@ export function isDisposableEmail(email: string): boolean {
   return DISPOSABLE_EMAIL_DOMAINS.has(domain)
 }
 
-/**
- * Extrai o domínio do email
- */
+
 export function getEmailDomain(email: string): string | null {
   if (!email) return null
   const parts = email.toLowerCase().split('@')
@@ -544,8 +535,7 @@ export function getEmailDomain(email: string): string | null {
 // =============================================================================
 
 /**
- * Verifica se o domínio do email existe via API de DNS
- * Usa a API dns.google.com (gratuita e confiável)
+ * Resolves the domain over DNS-over-HTTPS (dns.google.com).
  */
 export async function verifyEmailDomain(email: string): Promise<{
   valid: boolean
@@ -559,7 +549,7 @@ export async function verifyEmailDomain(email: string): Promise<{
   }
 
   try {
-    // Verifica MX records usando DNS over HTTPS do Google
+    // MX lookup over DoH
     const response = await fetch(
       `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=MX`,
       {
@@ -571,24 +561,22 @@ export async function verifyEmailDomain(email: string): Promise<{
 
     if (!response.ok) {
       logger.warn('DNS lookup failed:', response.status)
-      // Não falha a validação se a API estiver indisponível
+      // An unreachable DNS API must not block signup
       return { valid: true, hasMX: true, error: 'Não foi possível verificar o domínio' }
     }
 
     const data = await response.json()
 
-    // Status 0 = NOERROR (domínio existe)
-    // Status 3 = NXDOMAIN (domínio não existe)
+    // 0 = NOERROR (domain exists), 3 = NXDOMAIN (it does not)
     if (data.Status === 3) {
       return { valid: false, hasMX: false, error: 'Domínio não existe' }
     }
 
-    // Verifica se tem registros MX
+
     const hasMX = data.Answer && data.Answer.length > 0
 
     if (!hasMX) {
-      // Domínio existe mas não tem MX - pode ainda receber emails via A record
-      // Verifica se tem A record
+      // No MX, but an A record can still accept mail
       const aResponse = await fetch(
         `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`,
         {
@@ -601,7 +589,7 @@ export async function verifyEmailDomain(email: string): Promise<{
       if (aResponse.ok) {
         const aData = await aResponse.json()
         if (aData.Answer && aData.Answer.length > 0) {
-          // Tem A record, pode receber emails
+
           return { valid: true, hasMX: false }
         }
       }
@@ -612,7 +600,7 @@ export async function verifyEmailDomain(email: string): Promise<{
     return { valid: true, hasMX: true }
   } catch (error) {
     logger.warn('Error verifying email domain:', error)
-    // Em caso de erro de rede, não bloqueia o usuário
+    // Network failure must not block the user
     return { valid: true, hasMX: true, error: 'Não foi possível verificar o domínio' }
   }
 }
@@ -622,15 +610,14 @@ export async function verifyEmailDomain(email: string): Promise<{
 // =============================================================================
 
 /**
- * Validação completa de email
+ * Full validation: format, disposable list, then DNS.
  *
  * @param email - Email a validar
- * @param options - Opções de validação
- * @returns Resultado da validação
+
  *
  * @example
  * const result = await validateEmail('user@tempmail.com')
- * // { valid: false, error: 'Email temporário não é permitido' }
+
  *
  * const result = await validateEmail('user@gmail.com')
  * // { valid: true }
@@ -646,17 +633,17 @@ export async function validateEmail(
 
   const warnings: string[] = []
 
-  // 1. Validação de formato
+  // 1. Format
   if (!isValidEmailFormat(email)) {
     return { valid: false, error: 'Formato de email inválido' }
   }
 
-  // 2. Verificar email temporário/descartável
+  // 2. Disposable provider
   if (checkDisposable && isDisposableEmail(email)) {
     return { valid: false, error: 'Emails temporários não são permitidos' }
   }
 
-  // 3. Verificar domínio (async)
+  // 3. Domain (async)
   if (checkDomain) {
     const domainResult = await verifyEmailDomain(email)
 
@@ -680,8 +667,7 @@ export async function validateEmail(
 }
 
 /**
- * Validação síncrona (apenas formato e disposable)
- * Use quando não puder fazer chamadas async
+ * Format and disposable check only, for callers that cannot await.
  */
 export function validateEmailSync(email: string): EmailValidationResult {
   if (!isValidEmailFormat(email)) {

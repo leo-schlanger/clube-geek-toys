@@ -12,21 +12,21 @@ import type {
 // ─── Image caps ──────────────────────────────────────────────────────────────
 
 /**
- * Teto da galeria do listing. Precisa ser folgado porque o PATCH do produto
- * reenvia o array inteiro — um teto baixo trava o save de produtos já povoados,
- * que foi exatamente o bug de "não consigo salvar depois de subir as fotos".
- * Por isso o upload também respeita este teto (ver addProductImages).
+ * Listing gallery cap. Has to be generous because the product PATCH resends the
+ * whole array: a low cap blocks saving products that already exceed it, which
+ * was the "can't save after uploading photos" bug. Uploads honour the same cap
+ * (see addProductImages) so a product can never reach a state it cannot save.
  */
 export const MAX_PRODUCT_IMAGES = 30;
-/** Fotos por variação (cada SKU tem a própria galeria). */
+/** Photos per variant; each SKU has its own gallery. */
 export const MAX_VARIANT_IMAGES = 10;
-/** Imagens por requisição de upload (multer). */
+/** Images per upload request (multer). */
 export const MAX_IMAGE_UPLOAD_BATCH = 20;
-/** Categorias por produto (a primeira é a principal, espelhada em products.category_id). */
+/** The first is primary and is mirrored into products.category_id. */
 export const MAX_PRODUCT_CATEGORIES = 5;
-/** Vídeos por produto (link externo ou MP4 hospedado). */
+/** Videos per product (external link or hosted MP4). */
 export const MAX_PRODUCT_VIDEOS = 5;
-/** MP4 no volume /uploads. Acima disso, é caso de usar link do YouTube. */
+/** Hosted MP4 ceiling; above this, a YouTube link is the right answer. */
 export const PRODUCT_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ function mapVariant(row: pg.QueryResultRow): ProductVariant {
   };
 }
 
-/** Aceita só o formato conhecido — JSONB legado ou lixo vira lista vazia. */
+/** Legacy JSONB or garbage degrades to an empty list. */
 function parseVideos(raw: unknown): ProductVideo[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -101,8 +101,8 @@ function mapProduct(row: pg.QueryResultRow): Product {
     compareAtPrice: row.compare_at_price != null ? parseFloat(row.compare_at_price) : null,
     categoryId: row.category_id,
     categoryName: row.category_name ?? null,
-    // Vindas do LATERAL de product_categories; caem na principal quando ausentes
-    // (ex.: SELECT que não faz o join).
+    // From the product_categories LATERAL; falls back to the primary when the
+    // query does not join it.
     categoryIds: Array.isArray(row.category_ids)
       ? (row.category_ids as string[])
       : row.category_id
@@ -181,10 +181,7 @@ async function uniqueSlug(table: 'products' | 'categories', base: string, exclud
 
 // ─── Categorias por produto ──────────────────────────────────────────────────
 
-/**
- * Agrega as categorias do produto (principal primeiro). Depende do alias `p`
- * na query que o inclui.
- */
+/** Aggregates categories, primary first. Requires the alias `p` in the host query. */
 const CATEGORIES_LATERAL = `
        LEFT JOIN LATERAL (
          SELECT array_agg(pc.category_id ORDER BY pc.position, cc.name) AS category_ids,
@@ -197,9 +194,8 @@ const CATEGORIES_LATERAL = `
 const CATEGORIES_SELECT = `pcat.category_ids, pcat.category_names`;
 
 /**
- * Regrava o vínculo produto↔categorias. A primeira da lista vira a principal
- * (position 0) e é espelhada em products.category_id, que o sitemap, os
- * relacionados e os relatórios continuam usando.
+ * The first entry becomes primary (position 0) and is mirrored into
+ * products.category_id, which the sitemap, related products and reports read.
  */
 async function syncProductCategories(
   client: pg.PoolClient | null,
@@ -299,7 +295,7 @@ export async function listProducts(opts: {
     conditions.push(`p.wholesale_enabled = TRUE`);
   }
   if (opts.category) {
-    // Qualquer uma das categorias do produto, não só a principal.
+    // Matches any of the product's categories, not only the primary one.
     conditions.push(
       `EXISTS (SELECT 1 FROM product_categories pcf
                JOIN categories cf ON cf.id = pcf.category_id
@@ -504,7 +500,7 @@ function resolveCategoryIds(
 }
 
 export async function updateProduct(id: string, data: Record<string, unknown>): Promise<Product> {
-  // categoryIds vive na tabela de junção; quando vem, ela manda em category_id.
+  // categoryIds lives in the join table and wins over category_id when present.
   const hasCategoryIds = Array.isArray(data.categoryIds);
   const categoryIds = hasCategoryIds
     ? resolveCategoryIds(data.categoryIds as string[], null)
@@ -536,7 +532,7 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
   const values: unknown[] = [];
   let i = 1;
   for (const [key, col] of Object.entries(fieldMap)) {
-    // syncProductCategories grava category_id no fim — não deixa o campo antigo sobrescrever.
+    // syncProductCategories writes category_id last, so the legacy field cannot overwrite it.
     if (hasCategoryIds && key === 'categoryId') continue;
     if (key in data && data[key] !== undefined) {
       if (col === 'images' || col === 'variant_axes' || col === 'videos') {
@@ -583,17 +579,16 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     await syncProductCategories(null, id, categoryIds);
   }
 
-  // Relê para trazer as categorias agregadas e as variações.
+  // Re-read to pick up aggregated categories and variants.
   const updated = await getProductById(id);
   if (!updated) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
   return updated;
 }
 
 /**
- * Duplica um produto para cadastro em série (itens que compartilham medida e
- * peso e mudam só nome e foto). O clone entra INATIVO para não vazar pro
- * catálogo antes de ser revisado, e reaproveita as URLs das imagens — não
- * copia arquivo no disco.
+ * Clones a product for bulk entry. The copy starts INACTIVE so it cannot leak
+ * into the catalogue before review, and reuses image URLs rather than copying
+ * files on disk.
  */
 export async function duplicateProduct(id: string): Promise<Product> {
   const source = await getProductById(id);
@@ -621,10 +616,10 @@ export async function duplicateProduct(id: string): Promise<Product> {
         source.compareAtPrice ?? null,
         source.categoryId ?? null,
         JSON.stringify(source.images ?? []),
-        // Estoque do clone nasce zerado: é outro produto físico. Copiar o número
-        // do original faria a loja anunciar peça que não existe na prateleira.
+        // Zero stock: it is a different physical product. Copying the original
+        // count would advertise items that are not on the shelf.
         0,
-        // SKU é único por natureza: quem duplica preenche o novo código.
+        // SKUs are unique by nature; whoever duplicates fills in the new code.
         null,
         source.weightG ?? null,
         source.heightCm ?? null,
@@ -866,7 +861,7 @@ export async function deactivateProduct(id: string): Promise<void> {
   if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
 }
 
-/** Escapa para uso dentro de atributo HTML. */
+/** Escapes for use inside an HTML attribute. */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -876,14 +871,14 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * HTML mínimo com as meta do produto, para quem compartilha o link.
+ * Minimal HTML carrying the product's meta tags, for link previews.
  *
- * WhatsApp, Facebook e Telegram não executam JavaScript: eles leem o HTML
- * estático, que descreve a loja inteira. Sem isto, todo produto compartilhado
- * aparecia com a mesma imagem genérica em vez da foto da peça.
+ * WhatsApp, Facebook and Telegram do not run JavaScript: they read the static
+ * shell, which describes the whole store. Without this every shared product
+ * previewed with the same generic image instead of its own photo.
  *
- * Só crawler chega aqui (o nginx roteia por user-agent); pessoa continua indo
- * para a SPA, e o redirect abaixo cobre quem cair nesta URL por engano.
+ * Only crawlers reach this (nginx routes by user-agent); the redirect below
+ * covers anyone landing here by mistake.
  */
 export async function buildProductShareHtml(
   slug: string,
@@ -902,7 +897,7 @@ export async function buildProductShareHtml(
   const description =
     (product.description?.trim().slice(0, 200) ||
       `${product.name} na GeekPop & Toys, loja de K-pop em Copacabana.`) + ` A partir de ${price}.`;
-  // A primeira foto do produto é o ponto de todo este endpoint.
+  // The product's first photo is the entire point of this endpoint.
   const image = product.images[0] || `${base}/og-image.png`;
 
   return `<!DOCTYPE html>
@@ -1097,16 +1092,15 @@ export async function deactivateCategory(id: string): Promise<void> {
 
 export interface AddImagesResult {
   product: Product;
-  /** URLs que couberam no teto e foram gravadas. */
+  /** URLs that fit under the cap and were persisted. */
   accepted: string[];
   /** URLs recusadas por estourar o teto — o caller apaga os arquivos. */
   rejected: string[];
 }
 
 /**
- * Anexa URLs à galeria do listing, respeitando MAX_PRODUCT_IMAGES.
- * O teto é aplicado aqui (e não só no Zod do PATCH) para que o upload nunca
- * deixe o produto num estado que ele mesmo não consegue mais salvar.
+ * The cap is enforced here, not only in the PATCH schema, so an upload can
+ * never leave the product in a state it can no longer save.
  */
 export async function addProductImages(id: string, urls: string[]): Promise<AddImagesResult> {
   const current = await query(`SELECT images FROM products WHERE id = $1`, [id]);
@@ -1132,7 +1126,7 @@ export async function addProductImages(id: string, urls: string[]): Promise<AddI
   return { product: mapProduct(result.rows[0]), accepted, rejected };
 }
 
-/** Anexa um vídeo (MP4 hospedado ou link externo) respeitando MAX_PRODUCT_VIDEOS. */
+/** Appends a hosted MP4 or external link, honouring MAX_PRODUCT_VIDEOS. */
 export async function addProductVideo(id: string, video: ProductVideo): Promise<Product> {
   const current = await query(`SELECT videos FROM products WHERE id = $1`, [id]);
   if (current.rows.length === 0) {

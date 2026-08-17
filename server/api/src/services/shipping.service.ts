@@ -2,9 +2,9 @@ import crypto from 'crypto';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { query } from '../config/database.js';
-// Fonte única do host e do token: se este arquivo tivesse a própria noção de
-// sandbox, um token obtido num ambiente acabaria sendo usado contra o outro —
-// e o 401 resultante sumiria no fallback.
+// Single source for host and token: a local notion of sandbox here would let
+// a token from one environment be used against the other, and the resulting
+// 401 would vanish into the fallback.
 import { getAccessToken, melhorEnvioBaseUrl } from './melhor-envio-oauth.service.js';
 
 // ─── Defaults (photocard / small K-pop package) ──────────────────────────────
@@ -232,12 +232,11 @@ export function pickOptionFromQuote(
 // ─── Melhor Envio ────────────────────────────────────────────────────────────
 
 /**
- * Saúde da integração de frete, exposta em `GET /health`.
+ * Shipping integration health, surfaced in `GET /health`.
  *
- * Existe porque a falha aqui é silenciosa por natureza: quando o Melhor Envio
- * recusa, a cotação cai na tabela interna e o cliente vê um preço plausível.
- * Ninguém percebe até a diferença aparecer no caixa. Um token inválido, ou de
- * sandbox com a flag de produção, some exatamente assim.
+ * Failure here is silent by nature: when Melhor Envio refuses, quotes fall to
+ * the internal table and the customer sees a plausible price. Nobody notices
+ * until the difference shows up at the till.
  */
 export interface MelhorEnvioHealth {
   configured: boolean;
@@ -252,8 +251,7 @@ let lastSuccessAt: string | null = null;
 
 export function getMelhorEnvioHealth(): MelhorEnvioHealth {
   return {
-    // "Configurado" agora é credencial OAuth **ou** token manual — com só o
-    // client id/secret e sem autorizar, o health precisa dizer unconfigured.
+    // Configured means OAuth credentials **or** a manual token.
     configured: Boolean(
       env.MELHOR_ENVIO_TOKEN ||
         (env.MELHOR_ENVIO_CLIENT_ID && env.MELHOR_ENVIO_CLIENT_SECRET)
@@ -274,8 +272,8 @@ function recordMelhorEnvioFailure(status: number, body: string): void {
   };
 
   if (kind === 'auth') {
-    // Grito deliberado: sem isto a linha se perde entre os warnings e o frete
-    // segue saindo da tabela de fallback por semanas.
+    // Deliberately loud: as a plain warning this line gets lost and quotes
+    // keep coming from the fallback table for weeks.
     console.error(
       `[shipping] CREDENCIAL DO MELHOR ENVIO RECUSADA (HTTP ${status}) — ` +
         `ambiente=${env.MELHOR_ENVIO_SANDBOX ? 'sandbox' : 'producao'}. ` +
@@ -291,8 +289,7 @@ async function quoteMelhorEnvio(
   destCep: string,
   pkg: PackageDims
 ): Promise<ShippingOption[] | null> {
-  // Vem do OAuth (com refresh) ou do MELHOR_ENVIO_TOKEN manual, nessa ordem de
-  // precedência — ver melhor-envio-oauth.service.ts.
+  // From OAuth (with refresh) or the manual MELHOR_ENVIO_TOKEN, in that order.
   const token = await getAccessToken();
   if (!token) return null;
 
@@ -364,9 +361,8 @@ async function quoteMelhorEnvio(
       });
     }
 
-    // Só conta como sucesso se veio opção utilizável: um 200 com lista vazia
-    // ainda manda o cliente para o fallback, e registrar isso como "ok"
-    // esconderia justamente o caso que queremos enxergar.
+    // Only a usable option counts as success: a 200 with an empty list still
+    // sends the customer to the fallback.
     if (options.length > 0) {
       lastSuccessAt = new Date().toISOString();
       lastFailure = null;
