@@ -158,6 +158,12 @@ export interface Product {
   videos?: ProductVideo[]
   images: string[]
   stock: number
+  /** Units held by pending orders. */
+  reserved?: number
+  /** `stock - reserved`: what can be sold now. This is what the storefront uses. */
+  available?: number
+  /** Acquisition cost; null = not filled in (distinct from zero). */
+  costPrice?: number | null
   sku: string | null
   active: boolean
   featured: boolean
@@ -201,7 +207,10 @@ export interface ProductVariant {
   sku: string | null
   price: number
   compareAtPrice: number | null
+  costPrice?: number | null
   stock: number
+  reserved?: number
+  available?: number
   images: string[]
   active: boolean
   sortOrder: number

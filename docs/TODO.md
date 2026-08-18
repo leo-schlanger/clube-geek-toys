@@ -10,6 +10,32 @@ o sistema me diz o que fazer?
 
 ### Entregue em 18/08/2026
 
+- [x] **Reserva de estoque entre `create` e `paid`** — o estoque só baixava na
+      confirmação e, como o PIX é confirmado à mão, a última unidade ficava à
+      venda por horas: dois clientes compravam a mesma peça e os dois pagavam.
+      Agora `products.reserved` / `product_variants.reserved` (migration 021)
+      seguram as unidades na **mesma transação** do pedido, a vitrine vende
+      contra `stock - reserved`, o pagamento converte reserva em baixa, e os
+      quatro caminhos de cancelamento (cliente, admin, falha ao criar cobrança,
+      TTL) devolvem. A flag `orders.stock_reserved` garante liberação única.
+      TTL de 24h (`STOCK_RESERVATION_TTL_HOURS`) varrido pelo cron diário —
+      o pedido continua `pending`, porque soltar a reserva não é decidir que a
+      venda morreu. 8 testes.
+- [x] **Venda a descoberto deixou de ser invisível** — `stock` tem
+      `CHECK (stock >= 0)`, então a baixa é obrigada a truncar em zero; o
+      problema era truncar **em silêncio**. O `decrementStockForOrder` agora
+      mede o rombo antes do UPDATE e grava um `stock_movements` de ajuste
+      ("Venda a descoberto: N unidade(s)") no mesmo histórico que o admin já
+      lê, mais `auditLog('order.oversold')` com as linhas afetadas.
+- [x] **Custo de produto → margem, CMV e valor imobilizado** — o relatório
+      mostrava quanto entrou, nunca quanto sobrou. `cost_price` em produto e
+      variação, e `order_items.unit_cost` como **fotografia** no momento da
+      venda (migration 022), para um reajuste de fornecedor não reescrever a
+      margem de meses passados. Campo no modal do admin com margem por unidade
+      ao vivo; bloco "Resultado" no PDF com lucro bruto, CMV, margem % e valor
+      imobilizado. `cost_price` NULL é "não cadastrado" e **fica de fora** do
+      cálculo — o PDF diz sobre quanto da receita a margem foi calculada e
+      quanto ficou de fora, para o número não se passar por completo.
 - [x] **Painel do dia (`ActionCenter`)** — o dashboard respondia "quanto vendi"
       e nada respondia "o que está me esperando". Agora a primeira coisa da tela
       é a lista de filas com pendência: PIX a confirmar, pedidos a separar, a
@@ -40,14 +66,6 @@ o sistema me diz o que fazer?
 
 ### Em aberto — por impacto no caixa
 
-- [ ] **ALTO — Sem reserva de estoque entre `create` e `paid`.** O estoque só
-      baixa na confirmação (`decrementStockForOrder`, chamado no webhook do
-      Stripe e no confirm-PIX). Como a confirmação de PIX é **manual**, a última
-      unidade fica disponível por horas ou dias depois do primeiro pedido. Pior:
-      o decremento usa `GREATEST(0, stock - qty)`, então o segundo pedido
-      confirma **sem erro** e o estoque para em 0 — a venda a descoberto não
-      aparece em lugar nenhum. Sugestão: `stock_reserved` no pending com TTL, ou
-      no mínimo falhar (em vez de clampar) quando o saldo não cobre.
 - [ ] **ALTO — PIX continua sem confirmação automática.** Não há webhook: cada
       pedido PIX exige alguém comparar o TX ID com o extrato. É a fila mais cara
       do painel (o cliente já pagou e não é atendido). Gateway PIX com webhook
@@ -60,14 +78,11 @@ o sistema me diz o que fazer?
       tabela `coupons` (código, tipo, valor, validade, uso máximo, mínimo de
       compra) e aplicação server-side no `createOrder`, sem empilhar com os
       descontos de perfil.
-- [ ] **MEDIO — Relatório de mercadoria pela metade.** O PDF já traz os **mais
-      vendidos** por período; ainda faltam os **parados** (sem venda em N dias)
-      e o **valor imobilizado em estoque**, que é o que fecha a decisão de
-      reposição e de queima.
-- [ ] **MEDIO — Sem custo de produto, logo sem margem.** `products` não tem
-      `cost_price`. Sem isso não há lucro por pedido, margem por produto nem
-      CMV — só faturamento bruto. É uma coluna + um campo no modal do produto,
-      e destrava todo o resto do relatório de mercadoria.
+- [ ] **MEDIO — Faltam os produtos parados no relatório.** O PDF já traz os
+      **mais vendidos** e, desde 18/08, o **valor imobilizado em estoque**.
+      Falta o outro lado: o que **não** vende há N dias, que é o que fecha a
+      decisão de queima. Precisa de `MAX(paid_at)` por SKU cruzado com o
+      catálogo ativo — dá pra tirar de `order_items` sem coluna nova.
 - [ ] **MEDIO — Carrinho abandonado não é recuperado.** O carrinho vive no
       `CartContext` (client-side) e um pedido `pending` que nunca é pago só
       envelhece. Não há e-mail de recuperação nem visibilidade de quanto se

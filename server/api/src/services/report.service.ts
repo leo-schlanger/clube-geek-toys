@@ -536,6 +536,21 @@ export interface OverviewReport {
     refundedOrders: number;
   };
   club: { revenue: number; payments: number; newMembers: number; activeMembers: number; expiredInPeriod: number };
+  /**
+   * Result, not revenue. Only lines carrying `unit_cost` are counted; the rest
+   * become `revenueWithoutCost`, so the figure never passes itself off as whole.
+   */
+  margin: {
+    cogs: number;
+    grossProfit: number;
+    marginPct: number;
+    revenueWithCost: number;
+    revenueWithoutCost: number;
+    costCoveragePct: number;
+    unitsWithoutCost: number;
+    inventoryValue: number;
+    productsWithoutCost: number;
+  };
   products: {
     unitsSold: number;
     distinctProducts: number;
@@ -587,7 +602,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
     FROM orders
     WHERE COALESCE(paid_at, created_at) >= $1 AND COALESCE(paid_at, created_at) < $2`;
 
-  const [sales, club, top, itemTotals, catalog, previous] = await Promise.all([
+  const [sales, club, top, itemTotals, margin, inventory, catalog, previous] = await Promise.all([
     query(salesSql, [startAt, endAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
     query(
       `SELECT
@@ -627,6 +642,37 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
          AND COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2`,
       [startAt, endAt]
     ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    // COGS and margin for the period. `unit_cost` is the snapshot written at
+    // sale time (migration 022), so a supplier price rise today does not rewrite
+    // March's margin. A line without cost stays out of the sum and is counted
+    // separately — an unknown cost must not become profit by omission.
+    query(
+      `SELECT
+         COALESCE(SUM(oi.unit_cost * oi.quantity) FILTER (WHERE oi.unit_cost IS NOT NULL), 0)::float AS cogs,
+         COALESCE(SUM(oi.line_total) FILTER (WHERE oi.unit_cost IS NOT NULL), 0)::float AS revenue_with_cost,
+         COALESCE(SUM(oi.line_total) FILTER (WHERE oi.unit_cost IS NULL), 0)::float AS revenue_without_cost,
+         COALESCE(SUM(oi.quantity) FILTER (WHERE oi.unit_cost IS NULL), 0)::int AS units_without_cost
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.status IN ${EARNED_ORDER_STATUSES}
+         AND COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2`,
+      [startAt, endAt]
+    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    // Tied-up value: how much money is sitting on the shelf right now. It is
+    // the other half the cost column unlocks — revenue never says this.
+    query(
+      `SELECT
+         COALESCE(SUM(s.stock * s.cost_price) FILTER (WHERE s.cost_price IS NOT NULL), 0)::float AS inventory_value,
+         COUNT(*) FILTER (WHERE s.cost_price IS NULL)::int AS products_without_cost
+       FROM (
+         SELECT p.stock, p.cost_price, p.active, p.name AS product_name
+         FROM products p WHERE p.has_variants = FALSE
+         UNION ALL
+         SELECT v.stock, COALESCE(v.cost_price, p.cost_price) AS cost_price, (p.active AND v.active), p.name
+         FROM product_variants v JOIN products p ON p.id = v.product_id
+       ) s
+       WHERE s.active = TRUE AND s.product_name NOT ILIKE 'checkup%'`
+    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
     // Point-in-time, not period: "what is on the shelf right now".
     query(
       `SELECT COUNT(*)::int AS active_skus,
@@ -661,6 +707,8 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
   const c = club.rows[0] || {};
   const cat = catalog.rows[0] || {};
   const totals = itemTotals.rows[0] || {};
+  const mg = margin.rows[0] || {};
+  const inv = inventory.rows[0] || {};
   const p = previous.rows[0] || {};
   const n = (value: unknown) => Number(value) || 0;
 
@@ -699,6 +747,26 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
       activeMembers: n(c.active_members),
       expiredInPeriod: n(c.expired_in_period),
     },
+    margin: (() => {
+      const cogs = n(mg.cogs);
+      const revenueWithCost = n(mg.revenue_with_cost);
+      const revenueWithoutCost = n(mg.revenue_without_cost);
+      const grossProfit = revenueWithCost - cogs;
+      const covered = revenueWithCost + revenueWithoutCost;
+      return {
+        cogs,
+        grossProfit,
+        // Percentage over what has a known cost — dividing by total revenue
+        // would dilute the margin with sales that never entered the sum.
+        marginPct: revenueWithCost > 0 ? (grossProfit / revenueWithCost) * 100 : 0,
+        revenueWithCost,
+        revenueWithoutCost,
+        costCoveragePct: covered > 0 ? (revenueWithCost / covered) * 100 : 0,
+        unitsWithoutCost: n(mg.units_without_cost),
+        inventoryValue: n(inv.inventory_value),
+        productsWithoutCost: n(inv.products_without_cost),
+      };
+    })(),
     products: {
       unitsSold: n(totals.units_sold),
       distinctProducts: n(totals.distinct_products),

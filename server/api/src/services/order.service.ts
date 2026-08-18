@@ -6,7 +6,7 @@ import { getStripe } from '../utils/stripe.js';
 import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
-import { recordOrderMovements } from './stock.service.js';
+import { recordMovement, recordOrderMovements } from './stock.service.js';
 import {
   MEMBER_SHOP_DISCOUNT,
   MEMBER_DISCOUNT_REASON,
@@ -30,6 +30,11 @@ import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 const PIX_KEY = env.PIX_KEY || '';
 const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
 const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
+
+// How long a pending order holds its stock. Deliberately generous: PIX is
+// confirmed by hand, and a short TTL would free the piece before the person who
+// ordered it manages to pay.
+const STOCK_RESERVATION_TTL_HOURS = env.STOCK_RESERVATION_TTL_HOURS;
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
 
@@ -262,7 +267,8 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     // Lock products and validate availability (aggregated qty)
     const ids = [...new Set(aggregatedItems.map((it) => it.productId))];
     const productsResult = await client.query(
-      `SELECT id, name, slug, price, stock, active, images, wholesale_enabled, wholesale_min_qty,
+      `SELECT id, name, slug, price, cost_price, stock, reserved, active, images,
+              wholesale_enabled, wholesale_min_qty,
               COALESCE(has_variants, FALSE) AS has_variants
        FROM products WHERE id = ANY($1::uuid[]) FOR UPDATE`,
       [ids]
@@ -290,6 +296,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       image: string | null;
       variantId: string | null;
       variantLabel: string | null;
+      unitCost: number | null;
     }[] = [];
     let subtotal = 0;
     for (const it of aggregatedItems) {
@@ -318,6 +325,9 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       const hasVariants = p.has_variants === true;
       let unitPrice = parseFloat(p.price);
       let stock = Number(p.stock);
+      let reserved = Number(p.reserved) || 0;
+      // Snapshot of the cost at the moment of sale — see migration 022.
+      let unitCost: number | null = p.cost_price != null ? parseFloat(p.cost_price) : null;
       let image: string | null =
         Array.isArray(p.images) && p.images.length ? p.images[0] : null;
       let displayName = p.name as string;
@@ -338,6 +348,10 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         }
         unitPrice = parseFloat(v.price);
         stock = Number(v.stock);
+        reserved = Number(v.reserved) || 0;
+        // A variant without its own cost inherits the parent's, which is the
+        // common case: same piece, different colours, one supplier invoice.
+        if (v.cost_price != null) unitCost = parseFloat(v.cost_price);
         variantLabel = v.name;
         variantId = v.id;
         displayName = `${p.name} — ${v.name}`;
@@ -347,10 +361,16 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       }
 
       const qty = it.quantity;
-      if (stock < qty) {
+      // What is free, not what exists: `reserved` is what other pending orders
+      // already hold. Selling against raw `stock` is what kept the last unit on
+      // offer during the hours it takes to confirm a PIX by hand.
+      const available = stock - reserved;
+      if (available < qty) {
         throw new AppError(
           409,
-          `Estoque insuficiente para "${displayName}".`,
+          available > 0
+            ? `Só restam ${available} de "${displayName}".`
+            : `"${displayName}" está sem estoque.`,
           'INSUFFICIENT_STOCK'
         );
       }
@@ -366,6 +386,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         image,
         variantId,
         variantLabel,
+        unitCost,
       });
     }
     subtotal = round2(subtotal);
@@ -425,8 +446,8 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
     for (const it of itemRows) {
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, product_slug, unit_price, quantity, line_total, image_url, variant_id, variant_label)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        `INSERT INTO order_items (order_id, product_id, product_name, product_slug, unit_price, quantity, line_total, image_url, variant_id, variant_label, unit_cost)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           orderId,
           it.productId,
@@ -438,9 +459,14 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
           it.image,
           it.variantId,
           it.variantLabel,
+          it.unitCost,
         ]
       );
     }
+
+    // Hold the stock now that the lines exist. Same transaction as the INSERT:
+    // the order and its hold are born together, or neither is born.
+    await reserveStockForOrder(client, orderId);
 
     // Store credit after order exists (ledger needs order_id). Caps at goods after channel discount.
     // Available on both channels when authenticated.
@@ -534,6 +560,12 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       `UPDATE orders SET status = 'cancelled' WHERE id = $1 AND status = 'pending'`,
       [orderId]
     ).catch(() => {});
+    // The hold was committed with the order; the charge failed afterwards.
+    // Without this, stock would stay locked until the TTL over a sale that
+    // never existed.
+    await releaseReservationById(orderId).catch((e) =>
+      console.error('[order] release reservation after charge fail', e)
+    );
     await restoreCreditForOrder(orderId, {
       note: 'Crédito devolvido (falha ao criar cobrança)',
     }).catch((e) => console.error('[order] credit restore after charge fail', e));
@@ -687,6 +719,13 @@ export async function cancelMyOrder(userId: string, orderId: string): Promise<Or
 
   const order = mapOrder(result.rows[0]);
 
+  // Give the units back to the storefront. Only pending orders reach this
+  // point, so the hold never became a decrement: there is no stock to restore,
+  // there is a hold to release.
+  await releaseReservationById(orderId).catch((err) =>
+    console.error('[order] release reservation after customer cancel', err)
+  );
+
   if ((order.storeCreditApplied ?? 0) > 0) {
     const restored = await restoreCreditForOrder(orderId, {
       note: 'Crédito devolvido (pedido cancelado pelo cliente)',
@@ -812,6 +851,15 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
     }
   }
 
+  // An unpaid order has no stock to restore, it has a hold to release; a paid
+  // one has no hold (it became a decrement on confirmation). Calling this
+  // unconditionally is safe: the `stock_reserved` flag decides which case it is.
+  if (closing) {
+    await releaseReservationById(id).catch((err) =>
+      console.error('[order] release reservation on status change', err)
+    );
+  }
+
   // Restock when undoing a paid (or later) order.
   if (closing && hadStockDecremented) {
     const client = await getClient();
@@ -919,8 +967,117 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   return mapOrder(result.rows[0]);
 }
 
+/**
+ * Hold the units of a freshly created order.
+ *
+ * Called inside the create transaction, after the items exist and while the
+ * product/variant rows are still locked `FOR UPDATE` — so the availability that
+ * was just validated is the availability being consumed.
+ *
+ * The TTL exists because the hold has to expire on its own: PIX has no webhook,
+ * so an order nobody ever pays would otherwise sit on the last unit forever.
+ */
+export async function reserveStockForOrder(client: pg.PoolClient, orderId: string): Promise<void> {
+  await client.query(
+    `UPDATE products p SET reserved = p.reserved + oi.quantity
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.product_id = p.id AND oi.variant_id IS NULL`,
+    [orderId]
+  );
+  await client.query(
+    `UPDATE product_variants v SET reserved = v.reserved + oi.quantity
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.variant_id = v.id`,
+    [orderId]
+  );
+  await syncParentReservedFromVariants(client, orderId);
+  await client.query(
+    `UPDATE orders
+     SET stock_reserved = TRUE,
+         reservation_expires_at = NOW() + ($2::int * INTERVAL '1 hour')
+     WHERE id = $1`,
+    [orderId, STOCK_RESERVATION_TTL_HOURS]
+  );
+}
+
+/**
+ * Give the held units back.
+ *
+ * Guarded by `orders.stock_reserved`, flipped in the same statement that claims
+ * it: a double cancel, or a cancel racing the TTL sweep, releases once. Without
+ * that guard the second release would subtract from `reserved` units that
+ * belong to somebody else's pending order.
+ *
+ * Returns whether this call was the one that released it.
+ */
+export async function releaseReservation(client: pg.PoolClient, orderId: string): Promise<boolean> {
+  const claimed = await client.query(
+    `UPDATE orders SET stock_reserved = FALSE, reservation_expires_at = NULL
+     WHERE id = $1 AND stock_reserved = TRUE
+     RETURNING id`,
+    [orderId]
+  );
+  if (claimed.rows.length === 0) return false;
+
+  // The clamp here is honest, unlike the one on `stock`: nothing is being
+  // hidden, the flag above already guarantees a single release, and `reserved`
+  // has its own `>= 0` constraint to respect.
+  await client.query(
+    `UPDATE products p SET reserved = GREATEST(0, p.reserved - oi.quantity)
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.product_id = p.id AND oi.variant_id IS NULL`,
+    [orderId]
+  );
+  await client.query(
+    `UPDATE product_variants v SET reserved = GREATEST(0, v.reserved - oi.quantity)
+     FROM order_items oi
+     WHERE oi.order_id = $1 AND oi.variant_id = v.id`,
+    [orderId]
+  );
+  await syncParentReservedFromVariants(client, orderId);
+  return true;
+}
+
+/** Same release, for callers that are not already inside a transaction. */
+export async function releaseReservationById(orderId: string): Promise<boolean> {
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+    const released = await releaseReservation(client, orderId);
+    await client.query('COMMIT');
+    return released;
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 /** Decrement product/variant stock for every item in an order. Shared by webhook + PIX confirm. */
 export async function decrementStockForOrder(client: pg.PoolClient, orderId: string): Promise<void> {
+  // Turn the hold into a real decrement. Releasing first is what keeps the two
+  // counters from double-counting the same units: they stop being reserved at
+  // the same moment they stop being in stock.
+  await releaseReservation(client, orderId);
+
+  // Measured before the UPDATE, because the UPDATE cannot tell us. `stock` has
+  // a `>= 0` constraint, so the decrement has to clamp or the whole webhook
+  // transaction dies — but clamping quietly is exactly what hid every oversale
+  // until now. With reservations in place this should return nothing; when it
+  // does return something, that is a real oversale and it gets a paper trail.
+  const shortfall = await client.query(
+    `SELECT oi.product_id, oi.variant_id, oi.product_name, oi.quantity,
+            COALESCE(v.stock, p.stock) AS on_hand
+     FROM order_items oi
+     LEFT JOIN products p ON p.id = oi.product_id
+     LEFT JOIN product_variants v ON v.id = oi.variant_id
+     WHERE oi.order_id = $1
+       AND oi.product_id IS NOT NULL
+       AND oi.quantity > COALESCE(v.stock, p.stock)`,
+    [orderId]
+  );
+
   // Simple products (no variant)
   await client.query(
     `UPDATE products p SET stock = GREATEST(0, p.stock - oi.quantity)
@@ -938,6 +1095,37 @@ export async function decrementStockForOrder(client: pg.PoolClient, orderId: str
   await syncParentStockFromVariants(client, orderId);
   // Admin history: same transaction, so it rolls back with the decrement.
   await recordOrderMovements(client, orderId, -1);
+
+  for (const row of shortfall.rows) {
+    const missing = Number(row.quantity) - Number(row.on_hand);
+    // Lands in the same stock history the admin already reads, next to the
+    // sale it belongs to — an oversale that only existed in the difference
+    // between two numbers is now a line someone can see.
+    await recordMovement(client, {
+      productId: row.product_id,
+      variantId: row.variant_id ?? null,
+      orderId,
+      kind: 'adjustment',
+      quantity: -missing,
+      stockAfter: 0,
+      note: `Venda a descoberto: ${missing} unidade(s) vendida(s) sem estoque`,
+    });
+    console.error(
+      `[stock] oversold order=${orderId} product="${row.product_name}" missing=${missing}`
+    );
+  }
+  if (shortfall.rows.length > 0) {
+    await auditLog('order.oversold', null, {
+      orderId,
+      lines: shortfall.rows.map((r) => ({
+        productId: r.product_id,
+        variantId: r.variant_id ?? null,
+        productName: r.product_name,
+        ordered: Number(r.quantity),
+        onHand: Number(r.on_hand),
+      })),
+    });
+  }
 }
 
 /** Reverse of decrement — used on cancel/refund after stock was taken. */
@@ -956,6 +1144,19 @@ export async function restoreStockForOrder(client: pg.PoolClient, orderId: strin
   );
   await syncParentStockFromVariants(client, orderId);
   await recordOrderMovements(client, orderId, 1);
+}
+
+/** Parent `reserved` mirrors the sum of its variants, exactly as `stock` does. */
+async function syncParentReservedFromVariants(client: pg.PoolClient, orderId: string): Promise<void> {
+  await client.query(
+    `UPDATE products p SET reserved = COALESCE((
+       SELECT SUM(v.reserved)::int FROM product_variants v
+       WHERE v.product_id = p.id AND v.active = TRUE
+     ), p.reserved)
+     WHERE p.has_variants = TRUE
+       AND p.id IN (SELECT product_id FROM order_items WHERE order_id = $1 AND product_id IS NOT NULL)`,
+    [orderId]
+  );
 }
 
 async function syncParentStockFromVariants(client: pg.PoolClient, orderId: string): Promise<void> {

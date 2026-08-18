@@ -65,6 +65,8 @@ Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdom
 - Checkout com cartão (Stripe) ou PIX local
 - **Desconto de 10% do membro aplicado server-side no checkout** (`discount_reason = 'member_10'`) — nunca confiando no valor enviado pelo cliente
 - Webhook confirma o pagamento e baixa o estoque automaticamente; PIX de loja é confirmado manualmente pelo admin
+- O estoque fica **reservado** desde o checkout até o pagamento (ou até o TTL de 24h), então a mesma última unidade não é vendida duas vezes enquanto um PIX espera confirmação
+- Custo por produto alimenta lucro bruto, margem, CMV e valor imobilizado no relatório de fechamento
 
 ### Canal Atacado (B2B)
 

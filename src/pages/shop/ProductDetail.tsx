@@ -14,7 +14,7 @@ import {
 import { toast } from 'sonner'
 import type { Product } from '../../types'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
-import { getProductBySlug, listRelatedProducts } from '../../lib/products'
+import { availableStock, getProductBySlug, listRelatedProducts } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -121,7 +121,11 @@ export default function ProductDetail() {
 
   const matched = product ? matchVariant(product, variantSel) : null
   const displayPrice = matched?.price ?? product?.price ?? 0
-  const displayStock = matched?.stock ?? product?.stock ?? 0
+  const displayStock = matched
+    ? availableStock(matched)
+    : product
+      ? availableStock(product)
+      : 0
   const displayImages = useMemo(
     () => (product ? resolveVariantImages(product, variantSel, matched) : []),
     [product, variantSel, matched]
@@ -156,8 +160,8 @@ export default function ProductDetail() {
 
   const outOfStock = product
     ? product.hasVariants
-      ? !matched || matched.stock <= 0
-      : product.stock <= 0
+      ? !matched || availableStock(matched) <= 0
+      : availableStock(product) <= 0
     : false
   const compareAt = matched?.compareAtPrice ?? product?.compareAtPrice ?? null
   const onSale = compareAt != null && compareAt > displayPrice

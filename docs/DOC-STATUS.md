@@ -2,8 +2,9 @@
 
 > Auditoria: docs ↔ código.  
 > Inclui frete, minhas compras, reviews, crédito (010–011), **Atacado B2B (012)**
-> e as migrations 013–019 (variações, categorias múltiplas, estoque, vídeos,
-> perguntas, ícone de categoria, galeria).
+> e as migrations 013–022 (variações, categorias múltiplas, estoque, vídeos,
+> perguntas, ícone de categoria, galeria, perfil de cliente, reserva de estoque,
+> custo de produto).
 
 **Checkup mais recente:** [`CHECKUP-2026-08-16.md`](CHECKUP-2026-08-16.md) —
 base de dados, estrutura e layout: `ensureSchema` por etapas, cobertura passando
@@ -17,38 +18,40 @@ variações/vídeos, CRUD do painel, infra, segurança e integrações.
 
 ## Veredito
 
-| Área                            | Docs                                 | Código       | Notas                                        |
-| ------------------------------- | ------------------------------------ | ------------ | -------------------------------------------- |
-| Stack clube + loja + API        | PROJECT / ARCHITECTURE               | ✅           | OK                                           |
-| Plano único / 15%               | PROJECT                              | ✅           | Desconto server-side                         |
-| Loja checkout Stripe/PIX        | PROJECT                              | ✅           | PIX manual admin                             |
-| **Frete CEP + Melhor Envio**    | SHOP-ORDERS + PROJECT                | ✅           | Fallback tabela sem token                    |
-| **Minhas compras (6 abas)**     | SHOP-ORDERS                          | ✅           | Ownership por `user_id` ou `member_id`       |
-| **Rastreio + e-mail shipped**   | SHOP-ORDERS                          | ✅           | Admin cola código                            |
-| **Reviews + crédito loja**      | SHOP-ORDERS + PROJECT                | ✅           | R$1 default; unique 1×/pedido                |
-| **Atacado B2B (CNPJ / 25%)**    | WHOLESALE + PROJECT + SHOP-ORDERS    | ✅           | Schema 012; deploy necessário em prod        |
-| **LGPD shop + wholesale**       | SECURITY / DOC-STATUS                | ✅           | Export/delete cobrem CNPJ e conta B2B        |
-| Eventos / rádio / design        | EVENTS / RADIO / DESIGN              | ✅           | OK                                           |
-| Fotos de produto                | TODO                                 | ⚠️ conteúdo  | Laura (listing + por variação)               |
-| **Variações + fotos por SKU**   | PRODUCT-VARIANTS + CATALOG-2026-08   | ✅           | Até 10 fotos por SKU; via `/media`           |
-| **Tetos de imagem (30/20/10)**  | CATALOG-2026-08 + PRODUCT-VARIANTS   | ✅           | Fix do save travado acima de 8 fotos         |
-| **Duplicar produto**            | CATALOG-2026-08 + PROJECT            | ✅           | Clone inativo, sem SKU                       |
-| **Até 5 categorias**            | CATALOG-2026-08 + PROJECT            | ✅           | Schema 014; principal = `category_id`        |
-| **Controle de estoque**         | CATALOG-2026-08 + PROJECT            | ✅           | Schema 015; movimentos na TX da baixa        |
-| **Vídeos de produto**           | CATALOG-2026-08 + PROJECT            | ✅           | Schema 016; YouTube/Instagram + MP4          |
-| **Perguntas + notificações**    | CATALOG-2026-08 + PROJECT            | ✅           | Schema 017; modelo Mercado Livre             |
-| **Busca loja estilo Shopee**    | PROJECT / README                     | ✅           | Header sempre visível + botão Buscar         |
-| **Ordenação do catálogo**       | PROJECT / ARCHITECTURE / TODO        | ✅           | `?sort=` no SQL + `?page=` LIMIT/OFFSET      |
-| **Recorte de foto no admin**    | PROJECT / ARCHITECTURE / TODO        | ✅           | Proporção + tamanho px no upload             |
-| Token Melhor Envio prod         | TODO / SHOP-ORDERS                   | ⚠️ ops       | Sem token = fallback                         |
-| Site home SEO K-pop             | SHOP-ORDERS                          | ✅           | Vercel www                                   |
-| Design pink/yellow              | DESIGN / TODO                        | ✅           | Residual purple limpo 08/08                  |
-| **Schema no boot (18 etapas)**  | CHECKUP-2026-08-16                   | ✅           | Falha isolada + `schema.status` no `/health` |
-| **Cobertura mede o backend**    | CHECKUP-2026-08-16 + TODO            | ✅           | Era só front; API entrou em 7,15%            |
-| **`build` / `lint` como trava** | CHECKUP-2026-08-16 + TODO            | ✅           | `tsc -b` no CI; lint em 0 erros              |
-| **Modal de produto em abas**    | CHECKUP-2026-08-16 + CATALOG-2026-08 | ✅           | 4 abas com contador; painéis montados        |
-| Cobertura da API                | TODO                                 | ⚠️ ~8%       | Catraca; webhook/payment/stock a fazer       |
-| Tipos front × backend           | CHECKUP-2026-08-16                   | ⚠️ duplicado | Duas fontes de verdade para o contrato       |
+| Área                            | Docs                                 | Código       | Notas                                         |
+| ------------------------------- | ------------------------------------ | ------------ | --------------------------------------------- |
+| Stack clube + loja + API        | PROJECT / ARCHITECTURE               | ✅           | OK                                            |
+| Plano único / 15%               | PROJECT                              | ✅           | Desconto server-side                          |
+| Loja checkout Stripe/PIX        | PROJECT                              | ✅           | PIX manual admin                              |
+| **Frete CEP + Melhor Envio**    | SHOP-ORDERS + PROJECT                | ✅           | Fallback tabela sem token                     |
+| **Minhas compras (6 abas)**     | SHOP-ORDERS                          | ✅           | Ownership por `user_id` ou `member_id`        |
+| **Rastreio + e-mail shipped**   | SHOP-ORDERS                          | ✅           | Admin cola código                             |
+| **Reviews + crédito loja**      | SHOP-ORDERS + PROJECT                | ✅           | R$1 default; unique 1×/pedido                 |
+| **Atacado B2B (CNPJ / 25%)**    | WHOLESALE + PROJECT + SHOP-ORDERS    | ✅           | Schema 012; deploy necessário em prod         |
+| **LGPD shop + wholesale**       | SECURITY / DOC-STATUS                | ✅           | Export/delete cobrem CNPJ e conta B2B         |
+| Eventos / rádio / design        | EVENTS / RADIO / DESIGN              | ✅           | OK                                            |
+| Fotos de produto                | TODO                                 | ⚠️ conteúdo  | Laura (listing + por variação)                |
+| **Variações + fotos por SKU**   | PRODUCT-VARIANTS + CATALOG-2026-08   | ✅           | Até 10 fotos por SKU; via `/media`            |
+| **Tetos de imagem (30/20/10)**  | CATALOG-2026-08 + PRODUCT-VARIANTS   | ✅           | Fix do save travado acima de 8 fotos          |
+| **Duplicar produto**            | CATALOG-2026-08 + PROJECT            | ✅           | Clone inativo, sem SKU                        |
+| **Até 5 categorias**            | CATALOG-2026-08 + PROJECT            | ✅           | Schema 014; principal = `category_id`         |
+| **Controle de estoque**         | CATALOG-2026-08 + PROJECT            | ✅           | Schema 015; movimentos na TX da baixa         |
+| **Reserva de estoque**          | ARCHITECTURE + TODO                  | ✅           | Schema 021; vende `stock - reserved`, TTL 24h |
+| **Custo / margem / CMV**        | ARCHITECTURE + TODO                  | ✅           | Schema 022; `unit_cost` fotografado na venda  |
+| **Vídeos de produto**           | CATALOG-2026-08 + PROJECT            | ✅           | Schema 016; YouTube/Instagram + MP4           |
+| **Perguntas + notificações**    | CATALOG-2026-08 + PROJECT            | ✅           | Schema 017; modelo Mercado Livre              |
+| **Busca loja estilo Shopee**    | PROJECT / README                     | ✅           | Header sempre visível + botão Buscar          |
+| **Ordenação do catálogo**       | PROJECT / ARCHITECTURE / TODO        | ✅           | `?sort=` no SQL + `?page=` LIMIT/OFFSET       |
+| **Recorte de foto no admin**    | PROJECT / ARCHITECTURE / TODO        | ✅           | Proporção + tamanho px no upload              |
+| Token Melhor Envio prod         | TODO / SHOP-ORDERS                   | ⚠️ ops       | Sem token = fallback                          |
+| Site home SEO K-pop             | SHOP-ORDERS                          | ✅           | Vercel www                                    |
+| Design pink/yellow              | DESIGN / TODO                        | ✅           | Residual purple limpo 08/08                   |
+| **Schema no boot (18 etapas)**  | CHECKUP-2026-08-16                   | ✅           | Falha isolada + `schema.status` no `/health`  |
+| **Cobertura mede o backend**    | CHECKUP-2026-08-16 + TODO            | ✅           | Era só front; API entrou em 7,15%             |
+| **`build` / `lint` como trava** | CHECKUP-2026-08-16 + TODO            | ✅           | `tsc -b` no CI; lint em 0 erros               |
+| **Modal de produto em abas**    | CHECKUP-2026-08-16 + CATALOG-2026-08 | ✅           | 4 abas com contador; painéis montados         |
+| Cobertura da API                | TODO                                 | ⚠️ ~8%       | Catraca; webhook/payment/stock a fazer        |
+| Tipos front × backend           | CHECKUP-2026-08-16                   | ⚠️ duplicado | Duas fontes de verdade para o contrato        |
 
 **Conclusão:** docs alinhados ao código do Atacado (012). Fonte operacional B2B: [`WHOLESALE.md`](WHOLESALE.md).
 
@@ -89,7 +92,12 @@ shipping          = cotação HMAC revalidada (nunca do client; nunca recebe des
 total             = subtotal − discount + shipping
 ```
 
-- Estoque: valida no create (qty **agregada**); decrementa só no **paid**.
+- Estoque: valida no create contra **`stock - reserved`** (qty **agregada**) e
+  **reserva** na mesma TX; decrementa só no **paid**, consumindo a reserva.
+  Devolve em cancel/fail/refund e no TTL de 24h (cron). Falta de estoque na
+  baixa vira `stock_movements` de ajuste + `order.oversold`, nunca silêncio.
+- Custo: `cost_price` NULL = não cadastrado (≠ zero) e **fica fora** da margem;
+  `order_items.unit_cost` é fotografia, para reajuste não reescrever o passado.
 - Atacado: só produtos `wholesale_enabled`; respeita `wholesale_min_qty`.
 - Crédito: debita no create; **restaura** em cancel/fail/refund (idempotente).
 - Review reward: 1× por `order_id` (unique index + mesma TX).

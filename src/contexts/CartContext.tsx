@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { useLocation } from 'react-router-dom'
 import type { CartItem, Product, ProductVariant, ShopChannel } from '../types'
+import { availableStock } from '../lib/products'
 
 const STORAGE_KEY_RETAIL = 'clube_geek_shop_cart'
 const STORAGE_KEY_WHOLESALE = 'clube_geek_shop_cart_wholesale'
@@ -86,7 +87,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       setItems((prev) => {
         const vId = variant?.id ?? null
         const key = lineKey(product.id, vId)
-        const maxStock = variant ? variant.stock : product.stock
+        // The cart ceiling is what is available, not what is physically there:
+        // units another pending order holds must not be counted again here.
+        const maxStock = variant ? availableStock(variant) : availableStock(product)
         const price = variant ? variant.price : product.price
         const image =
           (variant?.images?.[0] ?? product.images[0] ?? null) as string | null

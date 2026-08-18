@@ -16,6 +16,9 @@ vi.mock('react-router-dom', async (importOriginal) => {
 vi.mock('../../lib/products', () => ({
   getProductBySlug: vi.fn(),
   listRelatedProducts: vi.fn(),
+  // Real, not a stub: availability is exactly what these tests exercise.
+  availableStock: (item: { stock: number; available?: number }) =>
+    Math.max(0, item.available ?? item.stock),
 }))
 
 vi.mock('../../contexts/CartContext', () => ({

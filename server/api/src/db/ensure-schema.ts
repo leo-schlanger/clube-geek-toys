@@ -599,6 +599,87 @@ const STEPS: SchemaStep[] = [
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
     },
   },
+  {
+    name: "Reserva de estoque entre create e paid (migration 021)",
+    run: async () => {
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS reserved INTEGER NOT NULL DEFAULT 0`);
+    await query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS reserved INTEGER NOT NULL DEFAULT 0`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE products ADD CONSTRAINT chk_products_reserved CHECK (reserved >= 0);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE product_variants ADD CONSTRAINT chk_variants_reserved CHECK (reserved >= 0);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE`);
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS reservation_expires_at TIMESTAMPTZ`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_reservation_expiry
+      ON orders(reservation_expires_at) WHERE stock_reserved = TRUE`);
+    // Backfill: the pending orders that already exist do hold real stock, and
+    // skipping them would leave `reserved` lying from the first minute.
+    // One call, no parameters: Postgres wraps a multi-statement simple query in
+    // an implicit transaction, so `reserved` and the flag on the order advance
+    // together. `stock_reserved = FALSE` makes a second run find nothing.
+    await query(`
+      UPDATE products p
+         SET reserved = p.reserved + x.qty
+        FROM (
+              SELECT oi.product_id, SUM(oi.quantity)::int AS qty
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+               WHERE o.status = 'pending'
+                 AND o.stock_reserved = FALSE
+                 AND oi.variant_id IS NULL
+                 AND oi.product_id IS NOT NULL
+               GROUP BY oi.product_id
+             ) x
+       WHERE x.product_id = p.id;
+
+      UPDATE product_variants v
+         SET reserved = v.reserved + x.qty
+        FROM (
+              SELECT oi.variant_id, SUM(oi.quantity)::int AS qty
+                FROM order_items oi
+                JOIN orders o ON o.id = oi.order_id
+               WHERE o.status = 'pending'
+                 AND o.stock_reserved = FALSE
+                 AND oi.variant_id IS NOT NULL
+               GROUP BY oi.variant_id
+             ) x
+       WHERE x.variant_id = v.id;
+
+      UPDATE orders
+         SET stock_reserved = TRUE,
+             reservation_expires_at = created_at + INTERVAL '24 hours'
+       WHERE status = 'pending' AND stock_reserved = FALSE;
+
+      UPDATE products p
+         SET reserved = COALESCE((
+               SELECT SUM(v.reserved)::int FROM product_variants v
+                WHERE v.product_id = p.id AND v.active = TRUE
+             ), 0)
+       WHERE COALESCE(p.has_variants, FALSE) = TRUE;
+    `);
+    },
+  },
+  {
+    name: "Custo de produto / margem (migration 022)",
+    run: async () => {
+    await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2)`);
+    await query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2)`);
+    await query(`ALTER TABLE order_items ADD COLUMN IF NOT EXISTS unit_cost DECIMAL(10,2)`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE products ADD CONSTRAINT chk_products_cost_price CHECK (cost_price >= 0);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE product_variants ADD CONSTRAINT chk_variants_cost_price CHECK (cost_price >= 0);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE order_items ADD CONSTRAINT chk_order_items_unit_cost CHECK (unit_cost >= 0);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_products_cost_price
+      ON products(cost_price) WHERE cost_price IS NOT NULL`);
+    },
+  },
 ];
 
 let state: SchemaState = {

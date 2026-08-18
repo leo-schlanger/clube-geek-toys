@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { env } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
 import { getActionItems } from './report.service.js';
+import { releaseReservationById } from './order.service.js';
 
 export function initCronJobs() {
   // Daily at 6:00 AM UTC (3:00 AM BRT)
@@ -17,6 +18,11 @@ export function initCronJobs() {
       await expireMembers();
     } catch (err) {
       console.error('[CRON] Expire members error:', err);
+    }
+    try {
+      await releaseExpiredStockReservations();
+    } catch (err) {
+      console.error('[CRON] Expire stock reservations error:', err);
     }
     // Last: it reports on the state the two jobs above just left behind.
     try {
@@ -35,6 +41,44 @@ export function initCronJobs() {
   });
 
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
+}
+
+/**
+ * Hand back the stock held by pending orders nobody ever paid.
+ *
+ * The hold is what stops two people buying the same last unit, but it has to
+ * end: PIX has no webhook, so an abandoned checkout would otherwise keep a piece
+ * off the shelf forever.
+ *
+ * The order stays `pending` on purpose. Releasing the hold is not the same as
+ * deciding the sale is dead — a late PIX can still be confirmed by an admin,
+ * and if the stock is gone by then that confirmation now leaves an oversale
+ * trail instead of silently clamping to zero.
+ */
+async function releaseExpiredStockReservations() {
+  const expired = await query(
+    `SELECT id, order_number FROM orders
+      WHERE stock_reserved = TRUE
+        AND status = 'pending'
+        AND reservation_expires_at IS NOT NULL
+        AND reservation_expires_at < NOW()
+      ORDER BY reservation_expires_at
+      LIMIT 500`
+  );
+  if (expired.rows.length === 0) {
+    console.log('[CRON] No expired stock reservations');
+    return;
+  }
+  let released = 0;
+  for (const row of expired.rows) {
+    try {
+      if (await releaseReservationById(row.id)) released++;
+    } catch (err) {
+      // One bad order must not stop the rest from being released.
+      console.error(`[CRON] Release reservation failed for order ${row.order_number}:`, err);
+    }
+  }
+  console.log(`[CRON] Released ${released} expired stock reservation(s)`);
 }
 
 /**

@@ -54,6 +54,11 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === 'true'),
   SHIPPING_ORIGIN_CEP: z.string().regex(/^\d{8}$/).default('22011001'),
+
+  // How long a pending order holds stock before the cron hands the units back.
+  // It has a default so the correct behaviour ships without touching the VPS
+  // .env — an unset variable must not mean "no hold at all".
+  STOCK_RESERVATION_TTL_HOURS: z.coerce.number().int().positive().max(720).default(24),
 });
 
 const envSchemaRefined = envSchema.refine(

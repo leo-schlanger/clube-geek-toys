@@ -230,6 +230,18 @@ export interface OverviewReport {
     activeMembers: number
     expiredInPeriod: number
   }
+  /** Result: only lines with a known cost are counted. */
+  margin: {
+    cogs: number
+    grossProfit: number
+    marginPct: number
+    revenueWithCost: number
+    revenueWithoutCost: number
+    costCoveragePct: number
+    unitsWithoutCost: number
+    inventoryValue: number
+    productsWithoutCost: number
+  }
   products: {
     unitsSold: number
     distinctProducts: number

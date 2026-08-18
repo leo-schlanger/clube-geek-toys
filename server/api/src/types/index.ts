@@ -150,6 +150,12 @@ export interface Product {
   videos?: ProductVideo[];
   images: string[];
   stock: number;
+  /** Units already held by pending orders (migration 021). */
+  reserved: number;
+  /** `stock - reserved`: what the storefront can actually sell. */
+  available: number;
+  /** Acquisition cost; NULL = not filled in, distinct from zero (migration 022). */
+  costPrice: number | null;
   sku: string | null;
   active: boolean;
   featured: boolean;
@@ -200,6 +206,12 @@ export interface ProductVariant {
   price: number;
   compareAtPrice: number | null;
   stock: number;
+  /** Units already held by pending orders (migration 021). */
+  reserved: number;
+  /** `stock - reserved`: what the storefront can actually sell. */
+  available: number;
+  /** Acquisition cost; NULL = not filled in, distinct from zero (migration 022). */
+  costPrice: number | null;
   images: string[];
   active: boolean;
   sortOrder: number;

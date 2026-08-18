@@ -44,7 +44,10 @@ function mapVariant(row: pg.QueryResultRow): ProductVariant {
     sku: row.sku ?? null,
     price: parseFloat(row.price),
     compareAtPrice: row.compare_at_price != null ? parseFloat(row.compare_at_price) : null,
+    costPrice: row.cost_price != null ? parseFloat(row.cost_price) : null,
     stock: Number(row.stock) || 0,
+    reserved: Number(row.reserved) || 0,
+    available: Math.max(0, (Number(row.stock) || 0) - (Number(row.reserved) || 0)),
     images: Array.isArray(row.images) ? row.images : [],
     active: row.active !== false,
     sortOrder: Number(row.sort_order) || 0,
@@ -92,6 +95,11 @@ function mapProduct(row: pg.QueryResultRow): Product {
     row.price_from != null ? parseFloat(row.price_from) : hasVariants ? price : null;
   const stockTotal =
     row.stock_total != null ? Number(row.stock_total) : hasVariants ? stock : null;
+  const reserved = Number(row.reserved) || 0;
+  const reservedTotal =
+    row.reserved_total != null ? Number(row.reserved_total) : hasVariants ? reserved : null;
+  const effectiveStock = hasVariants && stockTotal != null ? stockTotal : stock;
+  const effectiveReserved = hasVariants && reservedTotal != null ? reservedTotal : reserved;
   return {
     id: row.id,
     name: row.name,
@@ -115,7 +123,12 @@ function mapProduct(row: pg.QueryResultRow): Product {
         : [],
     images: Array.isArray(row.images) ? row.images : [],
     videos: parseVideos(row.videos),
-    stock: hasVariants && stockTotal != null ? stockTotal : stock,
+    stock: effectiveStock,
+    reserved: effectiveReserved,
+    // What the storefront can sell today. `stock` stays the physical count,
+    // which is the inventory figure — the two diverge while an order is pending.
+    available: Math.max(0, effectiveStock - effectiveReserved),
+    costPrice: row.cost_price != null ? parseFloat(row.cost_price) : null,
     sku: row.sku,
     active: row.active,
     featured: row.featured,
@@ -329,7 +342,8 @@ export async function listProducts(opts: {
        LEFT JOIN categories c ON c.id = p.category_id
        LEFT JOIN LATERAL (
          SELECT MIN(v.price)::float AS price_from,
-                COALESCE(SUM(v.stock), 0)::int AS stock_total
+                COALESCE(SUM(v.stock), 0)::int AS stock_total,
+                COALESCE(SUM(v.reserved), 0)::int AS reserved_total
          FROM product_variants v
          WHERE v.product_id = p.id AND v.active = TRUE
        ) vs ON p.has_variants = TRUE
@@ -374,6 +388,7 @@ async function attachVariants(product: Product, includeInactiveVariants = false)
   const active = variants.filter((v) => v.active);
   const priceFrom = active.length ? Math.min(...active.map((v) => v.price)) : product.price;
   const stockTotal = active.reduce((s, v) => s + v.stock, 0);
+  const reservedTotal = active.reduce((s, v) => s + v.reserved, 0);
   return {
     ...product,
     variants,
@@ -381,6 +396,8 @@ async function attachVariants(product: Product, includeInactiveVariants = false)
     stockTotal,
     price: priceFrom,
     stock: stockTotal,
+    reserved: reservedTotal,
+    available: Math.max(0, stockTotal - reservedTotal),
   };
 }
 
@@ -436,6 +453,7 @@ export async function createProduct(data: {
   description?: string | null;
   price: number;
   compareAtPrice?: number | null;
+  costPrice?: number | null;
   categoryId?: string | null;
   categoryIds?: string[];
   images?: string[];
@@ -457,8 +475,8 @@ export async function createProduct(data: {
   const categoryIds = resolveCategoryIds(data.categoryIds, data.categoryId);
   const result = await query(
     `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku, active, featured,
-                           weight_g, height_cm, width_cm, length_cm, wholesale_enabled, wholesale_min_qty, videos)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb)
+                           weight_g, height_cm, width_cm, length_cm, wholesale_enabled, wholesale_min_qty, videos, cost_price)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18::jsonb, $19)
      RETURNING *`,
     [
       data.name,
@@ -479,6 +497,9 @@ export async function createProduct(data: {
       data.wholesaleEnabled ?? false,
       minQty,
       JSON.stringify(parseVideos(data.videos)),
+      // No cost is a legitimate catalogue state (giveaway, consignment): NULL,
+      // never 0 — zero would enter the report as a 100% margin.
+      data.costPrice ?? null,
     ]
   );
   const created = mapProduct(result.rows[0]);
@@ -511,6 +532,7 @@ export async function updateProduct(id: string, data: Record<string, unknown>): 
     description: 'description',
     price: 'price',
     compareAtPrice: 'compare_at_price',
+    costPrice: 'cost_price',
     categoryId: 'category_id',
     images: 'images',
     stock: 'stock',
@@ -605,8 +627,9 @@ export async function duplicateProduct(id: string): Promise<Product> {
     const inserted = await client.query(
       `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku,
                              active, featured, weight_g, height_cm, width_cm, length_cm,
-                             wholesale_enabled, wholesale_min_qty, has_variants, variant_axes, videos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,FALSE,FALSE,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18::jsonb)
+                             wholesale_enabled, wholesale_min_qty, has_variants, variant_axes, videos,
+                             cost_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,FALSE,FALSE,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18::jsonb,$19)
        RETURNING id`,
       [
         name,
@@ -630,6 +653,9 @@ export async function duplicateProduct(id: string): Promise<Product> {
         source.hasVariants ?? false,
         JSON.stringify(source.variantAxes ?? []),
         JSON.stringify(source.videos ?? []),
+        // Unlike stock, cost is copied: it belongs to the product, not to what
+        // happens to be on the shelf.
+        source.costPrice ?? null,
       ]
     );
     cloneId = inserted.rows[0].id as string;
@@ -645,8 +671,9 @@ export async function duplicateProduct(id: string): Promise<Product> {
     for (const variant of source.variants ?? []) {
       await client.query(
         `INSERT INTO product_variants
-           (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order)
-         VALUES ($1,$2,$3::jsonb,NULL,$4,$5,$6,$7::jsonb,$8,$9)`,
+           (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order,
+            cost_price)
+         VALUES ($1,$2,$3::jsonb,NULL,$4,$5,$6,$7::jsonb,$8,$9,$10)`,
         [
           cloneId,
           variant.name,
@@ -657,6 +684,7 @@ export async function duplicateProduct(id: string): Promise<Product> {
           JSON.stringify(variant.images ?? []),
           variant.active,
           variant.sortOrder,
+          variant.costPrice ?? null,
         ]
       );
     }
@@ -681,6 +709,7 @@ export type VariantInput = {
   sku?: string | null;
   price: number;
   compareAtPrice?: number | null;
+  costPrice?: number | null;
   stock?: number;
   images?: string[];
   active?: boolean;
@@ -751,12 +780,15 @@ export async function replaceVariants(
           : null;
       const active = v.active !== false;
       const sku = v.sku?.trim() || null;
+      // Same rule as the parent: absent cost is NULL, not zero.
+      const costPrice =
+        v.costPrice != null && !Number.isNaN(Number(v.costPrice)) ? Number(v.costPrice) : null;
 
       if (v.id) {
         const upd = await client.query(
           `UPDATE product_variants SET
              name = $1, options = $2::jsonb, sku = $3, price = $4, compare_at_price = $5,
-             stock = $6, images = $7::jsonb, active = $8, sort_order = $9
+             stock = $6, images = $7::jsonb, active = $8, sort_order = $9, cost_price = $12
            WHERE id = $10 AND product_id = $11
            RETURNING id`,
           [
@@ -771,6 +803,7 @@ export async function replaceVariants(
             v.sortOrder ?? sort,
             v.id,
             productId,
+            costPrice,
           ]
         );
         if (upd.rows[0]) {
@@ -779,8 +812,9 @@ export async function replaceVariants(
           // id not found — insert
           const ins = await client.query(
             `INSERT INTO product_variants
-               (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order)
-             VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8::jsonb,$9,$10)
+               (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order,
+                cost_price)
+             VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)
              RETURNING id`,
             [
               productId,
@@ -793,6 +827,7 @@ export async function replaceVariants(
               JSON.stringify(images),
               active,
               v.sortOrder ?? sort,
+              costPrice,
             ]
           );
           keepIds.push(ins.rows[0].id);
@@ -800,8 +835,9 @@ export async function replaceVariants(
       } else {
         const ins = await client.query(
           `INSERT INTO product_variants
-             (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order)
-           VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8::jsonb,$9,$10)
+             (product_id, name, options, sku, price, compare_at_price, stock, images, active, sort_order,
+              cost_price)
+           VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8::jsonb,$9,$10,$11)
            RETURNING id`,
           [
             productId,
@@ -814,6 +850,7 @@ export async function replaceVariants(
             JSON.stringify(images),
             active,
             v.sortOrder ?? sort,
+            costPrice,
           ]
         );
         keepIds.push(ins.rows[0].id);

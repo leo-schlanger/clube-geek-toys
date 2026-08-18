@@ -302,7 +302,7 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const layout = new Layout(doc, font, bold)
 
-  const { sales, club, products, previous, period } = report
+  const { sales, club, products, margin, previous, period } = report
   const totalRevenue = sales.revenue + club.revenue
   const previousTotal = previous.salesRevenue + previous.clubRevenue
 
@@ -341,6 +341,37 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ['Estornados', integer(sales.refundedOrders)],
   ])
   layout.note('Receita conta apenas pedidos pagos, em separacao, enviados ou entregues.')
+
+  layout.section('Resultado')
+  layout.highlight('Lucro bruto da loja', money(margin.grossProfit), null)
+  layout.rows([
+    ['Receita com custo conhecido', money(margin.revenueWithCost)],
+    ['CMV (custo dos produtos vendidos)', money(margin.cogs)],
+    ['Margem bruta', `${margin.marginPct.toFixed(1)}%`],
+    ['Valor imobilizado em estoque', money(margin.inventoryValue)],
+  ])
+  if (margin.revenueWithCost <= 0) {
+    layout.note(
+      'Nenhuma venda do periodo tem custo cadastrado, entao nao ha margem a calcular. ' +
+        'Preencha o custo dos produtos para este bloco deixar de ficar vazio.'
+    )
+  } else if (margin.revenueWithoutCost > 0) {
+    // O rodape existe para o numero nao se passar por completo: quem le precisa
+    // saber quanto da receita ficou de fora antes de decidir com base na margem.
+    layout.note(
+      `Calculado sobre ${margin.costCoveragePct.toFixed(0)}% da receita. ` +
+        `${money(margin.revenueWithoutCost)} em vendas (${integer(margin.unitsWithoutCost)} unidades) ` +
+        'ficaram de fora por nao terem custo cadastrado.'
+    )
+  } else {
+    layout.note('Todas as vendas do periodo tem custo cadastrado.')
+  }
+  if (margin.productsWithoutCost > 0) {
+    layout.note(
+      `${integer(margin.productsWithoutCost)} SKU(s) ativos ainda estao sem custo e ficam de fora ` +
+        'do valor imobilizado.'
+    )
+  }
 
   layout.section('Clube')
   layout.rows([

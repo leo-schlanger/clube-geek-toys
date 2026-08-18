@@ -13,9 +13,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *  5. Store credit cannot drive the total negative.
  *  6. A product with variants requires a SKU, and a SKU from another product
  *     is rejected.
+ *  7. Stock already held by other pending orders is not sold twice, and a sale
+ *     that somehow goes uncovered leaves a trail instead of clamping silently.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -28,6 +30,8 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     auditMock: vi.fn(),
     sendEmailMock: vi.fn(),
     restoreCreditMock: vi.fn(),
+    recordOrderMovementsMock: vi.fn(async () => {}),
+    recordMovementMock: vi.fn(async () => {}),
   }));
 
 vi.mock('../config/database.js', () => ({
@@ -43,6 +47,7 @@ vi.mock('../config/env.js', () => ({
     NODE_ENV: 'test',
     ADMIN_EMAIL: 'geeketoys@gmail.com',
     FRONTEND_URL: 'https://club.geeketoys.com.br',
+    STOCK_RESERVATION_TTL_HOURS: 24,
   },
 }));
 
@@ -60,11 +65,14 @@ vi.mock('./store-credit.service.js', () => ({
 vi.mock('./wholesale.service.js', () => ({ getApprovedAccountByUserId: approvedAccountMock }));
 vi.mock('../middleware/ownership.js', () => ({ getMemberIdForUser: memberIdMock }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
-vi.mock('./stock.service.js', () => ({ recordOrderMovements: vi.fn(async () => {}) }));
+vi.mock('./stock.service.js', () => ({
+  recordOrderMovements: recordOrderMovementsMock,
+  recordMovement: recordMovementMock,
+}));
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
 
-import { createOrder, cancelMyOrder } from './order.service.js';
+import { createOrder, cancelMyOrder, decrementStockForOrder } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -316,6 +324,123 @@ describe('createOrder — estoque', () => {
     expect(sqls).toContain('ROLLBACK');
     expect(sqls).not.toContain('COMMIT');
     expect(releaseMock).toHaveBeenCalled();
+  });
+});
+
+// ─── Stock reservation ───────────────────────────────────────────────────────
+
+/**
+ * The window between create and paid.
+ *
+ * PIX is confirmed by hand, so that window lasts hours. Before the hold, stock
+ * only left on confirmation, which kept the last unit on offer the whole time
+ * and let two customers pay for the same piece.
+ */
+describe('createOrder — reserva de estoque', () => {
+  it('não vende o que outro pedido pendente já segura', async () => {
+    // One unit on the shelf, one already held: nothing available.
+    setupTx({ products: [product({ stock: 1, reserved: 1 })] });
+
+    await expect(createOrder(baseInput())).rejects.toMatchObject({
+      code: 'INSUFFICIENT_STOCK',
+    });
+  });
+
+  it('conta só o livre, não o físico, ao dizer quanto resta', async () => {
+    setupTx({ products: [product({ stock: 5, reserved: 3 })] });
+
+    await expect(
+      createOrder(baseInput({ items: [{ productId: 'p1', quantity: 3 }] }))
+    ).rejects.toThrow(/Só restam 2/);
+  });
+
+  it('segura as unidades na mesma transação do pedido', async () => {
+    setupTx({ products: [product({ stock: 10 })] });
+
+    await createOrder(baseInput());
+
+    const sqls = clientQueryMock.mock.calls.map((c) => String(c[0]));
+    // The hold adds to `reserved` and flags the order; without the flag there
+    // is no way to tell later whether it was consumed or already given back.
+    expect(sqls.some((q) => /UPDATE products.*reserved = p\.reserved \+ oi\.quantity/s.test(q))).toBe(true);
+    expect(sqls.some((q) => /UPDATE orders[\s\S]*stock_reserved = TRUE/.test(q))).toBe(true);
+    expect(sqls).toContain('COMMIT');
+  });
+
+  it('não segura nada quando a linha é recusada', async () => {
+    setupTx({ products: [product({ stock: 1, reserved: 1 })] });
+
+    await expect(createOrder(baseInput())).rejects.toThrow(AppError);
+
+    const sqls = clientQueryMock.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((q) => q.includes('reserved = p.reserved + oi.quantity'))).toBe(false);
+    expect(sqls.map((q) => q.trim())).toContain('ROLLBACK');
+  });
+});
+
+// ─── Overselling ─────────────────────────────────────────────────────────────
+
+/**
+ * `stock` has `CHECK (stock >= 0)`, so the decrement is forced to clamp at zero.
+ * The clamp was never the problem — its silence was: the second order confirmed
+ * without an error, stock stopped at 0 and the difference vanished.
+ */
+describe('decrementStockForOrder — descoberto', () => {
+  function txClient(shortfallRows: Record<string, unknown>[]) {
+    const calls: string[] = [];
+    const query = vi.fn(async (sql: string) => {
+      calls.push(sql);
+      if (sql.includes('oi.quantity > COALESCE')) return { rows: shortfallRows };
+      if (sql.includes('stock_reserved = FALSE')) return { rows: [{ id: 'o1' }] };
+      return { rows: [] };
+    });
+    return { client: { query } as never, calls, query };
+  }
+
+  it('não registra nada quando o estoque cobre o pedido', async () => {
+    const { client } = txClient([]);
+
+    await decrementStockForOrder(client, 'o1');
+
+    expect(recordMovementMock).not.toHaveBeenCalled();
+    expect(auditMock).not.toHaveBeenCalledWith('order.oversold', null, expect.anything());
+  });
+
+  it('deixa rastro no histórico quando faltou estoque', async () => {
+    const { client } = txClient([
+      { product_id: 'p1', variant_id: null, product_name: 'Photocard BTS', quantity: 3, on_hand: 1 },
+    ]);
+
+    await decrementStockForOrder(client, 'o1');
+
+    expect(recordMovementMock).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        productId: 'p1',
+        kind: 'adjustment',
+        quantity: -2,
+        note: expect.stringContaining('descoberto'),
+      })
+    );
+    expect(auditMock).toHaveBeenCalledWith(
+      'order.oversold',
+      null,
+      expect.objectContaining({
+        orderId: 'o1',
+        lines: [expect.objectContaining({ ordered: 3, onHand: 1 })],
+      })
+    );
+  });
+
+  it('consome a reserva antes de baixar, para não descontar duas vezes', async () => {
+    const { client, calls } = txClient([]);
+
+    await decrementStockForOrder(client, 'o1');
+
+    const releaseAt = calls.findIndex((q) => q.includes('stock_reserved = FALSE'));
+    const decrementAt = calls.findIndex((q) => q.includes('GREATEST(0, p.stock - oi.quantity)'));
+    expect(releaseAt).toBeGreaterThanOrEqual(0);
+    expect(decrementAt).toBeGreaterThan(releaseAt);
   });
 });
 
@@ -593,6 +718,25 @@ describe('cancelMyOrder', () => {
       'u1',
       expect.objectContaining({ orderId: 'o1' })
     );
+  });
+
+  // A pending order never had a decrement, but it has held units since
+  // checkout. Without giving them back, cancelling would remove the piece from
+  // the storefront for good.
+  it('devolve a reserva ao cancelar', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow()] })
+      .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled' })] });
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('stock_reserved = FALSE')) return { rows: [{ id: 'o1' }] };
+      return { rows: [] };
+    });
+
+    await cancelMyOrder('u1', 'o1');
+
+    const sqls = clientQueryMock.mock.calls.map((c) => String(c[0]));
+    expect(sqls.some((q) => /UPDATE orders SET stock_reserved = FALSE/.test(q))).toBe(true);
+    expect(sqls.some((q) => /reserved = GREATEST\(0, p\.reserved - oi\.quantity\)/.test(q))).toBe(true);
   });
 
   // Ownership lives in the WHERE clause, so a guessed id finds nothing.

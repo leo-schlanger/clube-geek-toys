@@ -35,6 +35,17 @@ function makeReport(overrides: Partial<OverviewReport> = {}): OverviewReport {
       refundedOrders: 0,
     },
     club: { revenue: 1499.9, payments: 10, newMembers: 4, activeMembers: 38, expiredInPeriod: 2 },
+    margin: {
+      cogs: 1800,
+      grossProfit: 1200,
+      marginPct: 40,
+      revenueWithCost: 3000,
+      revenueWithoutCost: 500,
+      costCoveragePct: 85.7,
+      unitsWithoutCost: 9,
+      inventoryValue: 12500,
+      productsWithoutCost: 4,
+    },
     products: {
       unitsSold: 96,
       distinctProducts: 21,

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { Product, ProductVariant } from '../../types'
 import { cn } from '../../lib/utils'
 import { formatCurrency } from '../../lib/utils'
+import { availableStock } from '../../lib/products'
 
 interface VariantPickerProps {
   product: Product
@@ -31,7 +32,7 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
       for (const opt of axis.options) {
         const ok = variants.some((v) => {
           if ((v.options[axis.name] || '') !== opt) return false
-          if (v.stock <= 0) return false
+          if (availableStock(v) <= 0) return false
           for (const [k, val] of Object.entries(selected)) {
             if (k === axis.name) continue
             if (!val) continue
@@ -152,7 +153,9 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
       {matched && (
         <p className="text-xs text-muted-foreground">
           SKU: {matched.sku || matched.name} · {formatCurrency(matched.price)} ·{' '}
-          {matched.stock > 0 ? `${matched.stock} em estoque` : 'Esgotado'}
+          {availableStock(matched) > 0
+            ? `${availableStock(matched)} em estoque`
+            : 'Esgotado'}
         </p>
       )}
       {!matched && axes.every((a) => selected[a.name]) && (

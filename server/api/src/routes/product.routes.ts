@@ -153,6 +153,8 @@ const productSchema = z.object({
   description: z.string().max(5000).optional().nullable(),
   price: moneySchema,
   compareAtPrice: moneySchema.optional().nullable(),
+  /** Acquisition cost. Null means "not filled in" and stays out of the margin. */
+  costPrice: moneySchema.optional().nullable(),
   categoryId: z.string().uuid().optional().nullable(),
   /** First entry becomes primary. Takes precedence over categoryId. */
   categoryIds: z.array(z.string().uuid()).max(MAX_PRODUCT_CATEGORIES).optional(),
@@ -203,6 +205,7 @@ const variantsReplaceSchema = z.object({
       sku: z.string().max(60).optional().nullable(),
       price: moneySchema,
       compareAtPrice: moneySchema.optional().nullable(),
+      costPrice: moneySchema.optional().nullable(),
       stock: z.number().int().nonnegative().optional(),
       images: z.array(z.string()).max(MAX_VARIANT_IMAGES).optional(),
       active: z.boolean().optional(),

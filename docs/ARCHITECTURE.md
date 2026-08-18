@@ -393,9 +393,15 @@ Aba dedicada no mesmo host `shop.*`. Detalhes operacionais: [`WHOLESALE.md`](WHO
 
 ### Estoque
 
-- Produtos sao travados (`SELECT ... FOR UPDATE`) durante a criacao do pedido para validar disponibilidade
-- O estoque so e **baixado apos a confirmacao do pagamento** (webhook `payment_intent.succeeded` ou confirmacao manual de PIX), via `decrementStockForOrder()`
-- Se o pagamento falha, o pedido de loja e cancelado e o estoque nunca e decrementado
+Duas contas, nao uma. `stock` e o fisico (o que esta na prateleira) e `reserved`
+e o que pedidos pendentes ja seguram. A loja vende contra a diferenca.
+
+- Produtos sao travados (`SELECT ... FOR UPDATE`) durante a criacao do pedido; a validacao usa **`stock - reserved`**, nao `stock`
+- A **reserva** e criada na mesma transacao do pedido (`reserveStockForOrder`). Sem ela, a ultima unidade continuaria a venda durante as horas ate a confirmacao manual do PIX, e dois clientes pagariam pela mesma peca
+- O estoque so e **baixado apos a confirmacao do pagamento** (webhook `payment_intent.succeeded` ou confirmacao manual de PIX), via `decrementStockForOrder()`, que **consome a reserva** antes de decrementar — as unidades deixam de ser reservadas no mesmo instante em que deixam de existir
+- A reserva volta em quatro caminhos: cancelamento pelo cliente, cancelamento/estorno pelo admin, falha ao criar a cobranca, e **TTL** (`STOCK_RESERVATION_TTL_HOURS`, padrao 24h) varrido pelo cron diario. A flag `orders.stock_reserved` e virada na mesma instrucao que reclama a liberacao, entao um cancelamento duplo libera uma vez so
+- O TTL **nao cancela o pedido**: soltar a reserva nao e decidir que a venda morreu. Um PIX atrasado ainda pode ser confirmado
+- `stock` tem `CHECK (stock >= 0)`, entao a baixa trunca em zero. O truncamento e medido **antes** do UPDATE: quando falta estoque, sai um `stock_movements` de ajuste ("Venda a descoberto: N unidade(s)") e um `auditLog('order.oversold')`. Antes disso a venda a descoberto sumia na diferenca entre dois numeros
 
 ### Imagens de produto
 
@@ -703,10 +709,17 @@ Tabelas acrescentadas depois, fora do diagrama:
 | `stock_movements`    | 015       | Livro-razão do estoque: venda, devolução e ajuste manual                 |
 | `product_questions`  | 017       | Perguntas na PDP + resposta da loja                                      |
 | `notifications`      | 017       | Avisos no perfil do cliente (ex.: pergunta respondida)                   |
+| `customer_profiles`  | 020       | Dado pessoal de quem compra sem assinar (1:1 com `users`)                |
 
 Migrations 016 e as colunas novas de `products` (`videos`, `low_stock_threshold`,
 `has_variants`, `variant_axes`) não criam tabela. Detalhes em
 [`CATALOG-2026-08.md`](CATALOG-2026-08.md).
+
+As migrations **021** (`reserved` em produto/variação, `stock_reserved` e
+`reservation_expires_at` em `orders`) e **022** (`cost_price` em produto/variação
+e `unit_cost` em `order_items`) também são só colunas. `unit_cost` é fotografia
+do custo no momento da venda: sem ela, um reajuste de fornecedor reescreveria a
+margem de todos os meses anteriores.
 
 ### Como o schema chega em producao
 

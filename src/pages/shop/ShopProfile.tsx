@@ -32,6 +32,7 @@ import { Label } from '../../components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Loading } from '../../components/ui/loading'
 import { LazyImage } from '../../components/ui/lazy-image'
+import { availableStock } from '../../lib/products'
 
 /**
  * Shop profile, for any account with or without a subscription.
@@ -538,7 +539,7 @@ export default function ShopProfile() {
                         {item.name}
                       </Link>
                       <p className="text-sm text-primary">{formatCurrency(item.price)}</p>
-                      {(!item.active || item.stock === 0) && (
+                      {(!item.active || availableStock(item) === 0) && (
                         <p className="text-xs text-muted-foreground">
                           {item.active ? 'Sem estoque no momento' : 'Indisponível'}
                         </p>

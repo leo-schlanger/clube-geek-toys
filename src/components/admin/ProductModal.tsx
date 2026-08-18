@@ -97,6 +97,7 @@ interface FormState {
   description: string;
   price: string;
   compareAtPrice: string;
+  costPrice: string;
   /** Primary category first; the rest are secondary. */
   categoryIds: string[];
   stock: string;
@@ -123,6 +124,7 @@ function toFormState(product?: Product | null): FormState {
     price: product ? String(product.price) : "",
     compareAtPrice:
       product?.compareAtPrice != null ? String(product.compareAtPrice) : "",
+    costPrice: product?.costPrice != null ? String(product.costPrice) : "",
     categoryIds: product?.categoryIds?.length
       ? product.categoryIds
       : product?.categoryId
@@ -942,6 +944,19 @@ export function ProductModal({
       );
     }
 
+    // Empty stays null, not zero: "I don't know the cost" and "the cost is
+    // zero" are different things and the report treats each on its own terms.
+    const costPrice = form.costPrice.trim() ? Number(form.costPrice) : null;
+    if (
+      costPrice != null &&
+      (!Number.isFinite(costPrice) || costPrice < 0 || costPrice > MAX_PRODUCT_PRICE)
+    ) {
+      return fail(
+        "basico",
+        `Custo inválido (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
+      );
+    }
+
     const stock = form.stock.trim() ? Number(form.stock) : 0;
     if (!Number.isInteger(stock) || stock < 0) {
       return fail("basico", "Estoque inválido");
@@ -1035,6 +1050,7 @@ export function ProductModal({
       description: form.description.trim() || null,
       price,
       compareAtPrice,
+      costPrice,
       categoryIds: form.categoryIds,
       images: resolvedImages.value,
       videos: resolvedVideos.value,
@@ -1165,6 +1181,15 @@ export function ProductModal({
 
   const priceNum = Number(form.price);
   const compareNum = Number(form.compareAtPrice);
+  const costNum = Number(form.costPrice);
+  const showMarginHint =
+    form.costPrice.trim() !== "" &&
+    Number.isFinite(costNum) &&
+    Number.isFinite(priceNum) &&
+    priceNum > 0 &&
+    costNum >= 0;
+  const marginValue = priceNum - costNum;
+  const marginPct = priceNum > 0 ? (marginValue / priceNum) * 100 : 0;
   const showDiscountHint =
     Number.isFinite(priceNum) &&
     Number.isFinite(compareNum) &&
@@ -1310,6 +1335,40 @@ export function ProductModal({
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* Cost — what separates revenue from profit in the report */}
+                <div className="space-y-2">
+                  <Label htmlFor="product-cost">Custo (opcional)</Label>
+                  <Input
+                    id="product-cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={MAX_PRODUCT_PRICE}
+                    inputMode="decimal"
+                    placeholder="Quanto você pagou por unidade"
+                    value={form.costPrice}
+                    onChange={(e) => update("costPrice", e.target.value)}
+                  />
+                  {showMarginHint ? (
+                    <p
+                      className={
+                        marginValue >= 0
+                          ? "text-xs text-green-600"
+                          : "text-xs text-destructive"
+                      }
+                    >
+                      {marginValue >= 0 ? "Margem" : "Prejuízo"} de{" "}
+                      {formatCurrency(Math.abs(marginValue))} por unidade ·{" "}
+                      {marginPct.toFixed(1)}%
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Sem custo, o relatório mostra quanto entrou — não quanto
+                      sobrou. Este produto fica de fora do cálculo de margem.
+                    </p>
+                  )}
                 </div>
 
                 {/* Estoque + SKU */}

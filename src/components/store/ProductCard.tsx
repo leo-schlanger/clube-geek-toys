@@ -10,6 +10,7 @@ import { useCart } from '../../contexts/CartContext'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { SaveProductButton } from './SaveProductButton'
+import { availableStock } from '../../lib/products'
 
 interface ProductCardProps {
   product: Product
@@ -34,7 +35,7 @@ export function ProductCard({
   const { addItem } = useCart()
 
   const image = product.images?.[0] ?? null
-  const outOfStock = product.stock <= 0
+  const outOfStock = availableStock(product) <= 0
   const onSale = product.compareAtPrice != null && product.compareAtPrice > product.price
   const memberPrice = product.price * (1 - MEMBER_SHOP_DISCOUNT)
   const wholesalePrice = product.price * (1 - WHOLESALE_SHOP_DISCOUNT)

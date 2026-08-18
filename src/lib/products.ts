@@ -53,6 +53,18 @@ export async function listCategories(): Promise<Category[]> {
   return result.data ?? []
 }
 
+/**
+ * What can actually be sold right now.
+ *
+ * `stock` is the physical count and includes units that pending orders already
+ * hold (`reserved`, migration 021) — selling against it is what let two people
+ * buy the same last piece while a PIX waited to be confirmed. The fallback to
+ * `stock` covers older responses still cached in the browser.
+ */
+export function availableStock(item: { stock: number; available?: number }): number {
+  return Math.max(0, item.available ?? item.stock)
+}
+
 // ─── Admin ─────────────────────────────────────────────────────────────────
 
 export interface ProductInput {
@@ -60,6 +72,7 @@ export interface ProductInput {
   description?: string | null
   price: number
   compareAtPrice?: number | null
+  costPrice?: number | null
   categoryId?: string | null
   /** First entry becomes primary. Takes precedence over categoryId. */
   categoryIds?: string[]
@@ -86,6 +99,7 @@ export interface VariantInput {
   sku?: string | null
   price: number
   compareAtPrice?: number | null
+  costPrice?: number | null
   stock?: number
   images?: string[]
   active?: boolean
