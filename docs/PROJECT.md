@@ -39,7 +39,7 @@ Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renova
 
 ### 3.2 Modulo Admin
 
-Painel administrativo que abre no **Painel do dia** (`ActionCenter`): as filas que precisam de alguem — PIX a confirmar, pedidos a separar/postar, enviados ha +10 dias sem entrega, perguntas sem resposta, avaliacoes a moderar, CNPJ de atacado a aprovar, SKUs esgotados/no minimo, assinaturas vencendo e membros sem pagar. Fila zerada nao aparece, cada card leva pra aba que resolve, e o cron das 6h manda as mesmas filas por e-mail (`admin-daily-digest`) quando ha pendencia. Alem disso: gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, fotos, videos, variacoes, ate 5 categorias, duplicar, flag atacado; aba **Estoque** — ajuste por SKU, limiar de "acabando" e historico de movimentacao; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Perguntas** — responder duvidas do cliente; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
+Painel administrativo que abre no **Painel do dia** (`ActionCenter`): as filas que precisam de alguem — PIX a confirmar, pedidos a separar/postar, enviados ha +10 dias sem entrega, perguntas sem resposta, avaliacoes a moderar, CNPJ de atacado a aprovar, SKUs esgotados/no minimo, assinaturas vencendo e membros sem pagar. Fila zerada nao aparece, cada card leva pra aba que resolve, e o cron das 6h manda as mesmas filas por e-mail (`admin-daily-digest`) quando ha pendencia. Alem disso: gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, fotos, videos, variacoes, ate 5 categorias, duplicar, flag atacado; aba **Estoque** — ajuste por SKU, limiar de "acabando" e historico de movimentacao; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Perguntas** — responder duvidas do cliente; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn) e **fechamento em PDF** por dia/mes/ano (loja + clube, ticket medio, varejo x atacado, mais vendidos e estoque atual, comparado ao periodo anterior), gestao de usuarios e roles, e configuracoes do sistema.
 
 ### 3.3 Modulo PDV (Ponto de Venda)
 
@@ -559,14 +559,15 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Reports (`/reports`)
 
-| Metodo | Endpoint                  | Descricao                             | Auth  |
-| ------ | ------------------------- | ------------------------------------- | ----- |
-| GET    | `/reports/daily`          | Relatorio diario                      | admin |
-| GET    | `/reports/monthly`        | Relatorio mensal (parametro `months`) | admin |
-| GET    | `/reports/churn`          | Churn por mes (expired + cancelled)   | admin |
-| GET    | `/reports/today-revenue`  | Receita do dia                        | admin |
-| GET    | `/reports/realtime-stats` | Metricas em tempo real                | admin |
-| GET    | `/reports/action-items`   | Filas pendentes (Painel do dia)       | admin |
+| Metodo | Endpoint                  | Descricao                                                                            | Auth  |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------ | ----- |
+| GET    | `/reports/daily`          | Relatorio diario                                                                     | admin |
+| GET    | `/reports/monthly`        | Relatorio mensal (parametro `months`)                                                | admin |
+| GET    | `/reports/churn`          | Churn por mes (expired + cancelled)                                                  | admin |
+| GET    | `/reports/today-revenue`  | Receita do dia                                                                       | admin |
+| GET    | `/reports/realtime-stats` | Metricas em tempo real                                                               | admin |
+| GET    | `/reports/action-items`   | Filas pendentes (Painel do dia)                                                      | admin |
+| GET    | `/reports/overview`       | Fechamento consolidado do periodo (`period=day\|month\|year`, `date`) — fonte do PDF | admin |
 
 ### Logs (`/logs`)
 

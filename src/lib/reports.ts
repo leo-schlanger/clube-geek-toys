@@ -196,3 +196,65 @@ export async function getActionItems(): Promise<ActionItemsReport> {
     totalPending: num(result.data.totalPending),
   }
 }
+
+// ============================================
+// CONSOLIDATED PERIOD REPORT (PDF source)
+// ============================================
+
+export type OverviewPeriod = 'day' | 'month' | 'year'
+
+export interface OverviewReport {
+  period: { type: OverviewPeriod; start: string; end: string }
+  sales: {
+    orders: number
+    revenue: number
+    averageTicket: number
+    subtotal: number
+    discount: number
+    shipping: number
+    storeCredit: number
+    retailOrders: number
+    retailRevenue: number
+    wholesaleOrders: number
+    wholesaleRevenue: number
+    pixOrders: number
+    cardOrders: number
+    pendingOrders: number
+    cancelledOrders: number
+    refundedOrders: number
+  }
+  club: {
+    revenue: number
+    payments: number
+    newMembers: number
+    activeMembers: number
+    expiredInPeriod: number
+  }
+  products: {
+    unitsSold: number
+    distinctProducts: number
+    top: { name: string; quantity: number; revenue: number }[]
+    activeSkus: number
+    outOfStock: number
+    lowStock: number
+  }
+  previous: { salesRevenue: number; clubRevenue: number; orders: number; newMembers: number }
+}
+
+/**
+ * Everything about one period — shop, club, products and stock — in one call.
+ *
+ * Throws on failure rather than returning zeros: this feeds a PDF the manager
+ * may file or forward, and a report full of legitimate-looking zeros is worse
+ * than no report.
+ */
+export async function getOverviewReport(period: OverviewPeriod, date?: string): Promise<OverviewReport> {
+  const params = new URLSearchParams({ period })
+  if (date) params.set('date', date)
+
+  const result = await api.get<OverviewReport>(`/reports/overview?${params.toString()}`)
+  if (result.error || !result.data) {
+    throw new Error(result.error || 'Não foi possível carregar o relatório')
+  }
+  return result.data
+}

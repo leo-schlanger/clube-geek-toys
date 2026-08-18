@@ -22,6 +22,17 @@ o sistema me diz o que fazer?
       quem abre o painel. O cron das 6h UTC passou a mandar as mesmas filas pro
       `ADMIN_EMAIL`, e **só quando há pendência**, pra o e-mail não virar ruído.
       Dedup por `email_logs` no mesmo dia (restart de container não duplica).
+- [x] **Fechamento em PDF por dia/mês/ano** — `GET /reports/overview` +
+      `report-pdf.ts` (pdf-lib, já era dependência do contrato). Um arquivo com
+      receita da loja e do clube, ticket médio, varejo × atacado, PIX × cartão,
+      descontos e frete, novos membros e expirados, **top 10 produtos por
+      receita**, unidades vendidas e a foto do estoque — tudo comparado com o
+      mesmo período anterior. Os limites do período são cortados no Postgres
+      (`date_trunc`), pra "hoje" não depender do fuso do container. Nomes de
+      produto com Hangul/emoji são saneados antes de ir pro PDF: as fontes
+      padrão do pdf-lib são WinAnsi e **lançam exceção** no primeiro caractere
+      que não encodam — num catálogo de K-pop isso quebraria o download.
+      17 testes.
 - [x] **`countUnanswered()` deixa de ser código morto** — existia no
       `question.service.ts` com o comentário "for the admin tab badge", sem rota
       e sem uso desde que foi escrito. O contador de perguntas sem resposta
@@ -49,11 +60,10 @@ o sistema me diz o que fazer?
       tabela `coupons` (código, tipo, valor, validade, uso máximo, mínimo de
       compra) e aplicação server-side no `createOrder`, sem empilhar com os
       descontos de perfil.
-- [ ] **MEDIO — Nenhum relatório de mercadoria.** Os relatórios são todos de
-      receita e de membro (`daily`, `monthly`, `churn`, `plan-distribution`).
-      Falta o que o lojista usa pra comprar: **mais vendidos** por período,
-      **parados** (sem venda em N dias), e **valor imobilizado em estoque**.
-      Hoje a decisão de reposição é feita no olho.
+- [ ] **MEDIO — Relatório de mercadoria pela metade.** O PDF já traz os **mais
+      vendidos** por período; ainda faltam os **parados** (sem venda em N dias)
+      e o **valor imobilizado em estoque**, que é o que fecha a decisão de
+      reposição e de queima.
 - [ ] **MEDIO — Sem custo de produto, logo sem margem.** `products` não tem
       `cost_price`. Sem isso não há lucro por pedido, margem por produto nem
       CMV — só faturamento bruto. É uma coluna + um campo no modal do produto,

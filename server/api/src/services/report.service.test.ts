@@ -19,7 +19,7 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 
-const { getActionItems } = await import('./report.service.js');
+const { getActionItems, getOverviewReport } = await import('./report.service.js');
 
 /** Route each queue's response by matching a fragment of its SQL. */
 function respondBy(matchers: Array<[RegExp, { count: number; oldest_days: number | null }]>) {
@@ -154,5 +154,159 @@ describe('getActionItems', () => {
     // MIN(expiry_date) - NOW(): days until the soonest lapse.
     expect(expiring).toContain('MIN(expiry_date)');
     expect(expiring).toContain("INTERVAL '7 days'");
+  });
+});
+
+/**
+ * Consolidated period report — the data behind the admin PDF.
+ *
+ * What these tests protect:
+ *
+ *  1. Period boundaries are cut by Postgres, so "today" does not depend on the
+ *     API container's timezone agreeing with the database's.
+ *  2. `previous` is the same window shifted back once, so growth compares
+ *     February to January and not to a rolling 30 days.
+ *  3. Only order states that represent earned money enter revenue.
+ *  4. Units sold is the period total, not the sum of the top-10 ranking.
+ */
+describe('getOverviewReport', () => {
+  const bounds = {
+    start_at: '2026-08-01T00:00:00.000Z',
+    end_at: '2026-09-01T00:00:00.000Z',
+    prev_start_at: '2026-07-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    queryMock.mockReset();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  /** First call is always the bounds query; the rest are routed by SQL. */
+  function mockQueries(rowsFor: (sql: string) => Record<string, unknown>[]) {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) {
+        return { rows: [bounds], rowCount: 1 };
+      }
+      return { rows: rowsFor(sql), rowCount: 1 };
+    });
+  }
+
+  it('asks the database to cut the period, passing the period name through', async () => {
+    mockQueries(() => [{}]);
+    await getOverviewReport('month', '2026-08-18');
+
+    const [sql, params] = queryMock.mock.calls[0];
+    expect(sql).toContain('date_trunc');
+    expect(params).toEqual(['month', '2026-08-18']);
+  });
+
+  it('falls back to today when the reference date is malformed', async () => {
+    mockQueries(() => [{}]);
+    await getOverviewReport('day', 'ontem');
+
+    const [, params] = queryMock.mock.calls[0];
+    expect(params[0]).toBe('day');
+    expect(params[1]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('reads the previous window as the same period shifted back once', async () => {
+    const windows: unknown[][] = [];
+    queryMock.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
+      windows.push(params);
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    await getOverviewReport('month', '2026-08-18');
+
+    // The comparison block is the only one reading [prev_start, start).
+    expect(windows).toContainEqual([bounds.prev_start_at, bounds.start_at]);
+    expect(windows).toContainEqual([bounds.start_at, bounds.end_at]);
+  });
+
+  it('counts only earned order states as revenue', async () => {
+    const sqls: string[] = [];
+    queryMock.mockImplementation(async (sql: string) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
+      sqls.push(sql);
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    await getOverviewReport('month');
+
+    const salesSql = sqls.find((s) => /AS retail_revenue/.test(s));
+    expect(salesSql).toContain("('paid','processing','shipped','delivered')");
+    // pending/cancelled/refunded are reported as counts, never summed into revenue.
+    expect(salesSql).toContain('AS pending_orders');
+    expect(salesSql).not.toMatch(/SUM\(total\) FILTER \(WHERE status = 'cancelled'/);
+  });
+
+  it('derives the average ticket from the period, and guards against no orders', async () => {
+    mockQueries((sql) => (/AS retail_revenue/.test(sql) ? [{ orders: 4, revenue: 500 }] : [{}]));
+    const withOrders = await getOverviewReport('month');
+    expect(withOrders.sales.averageTicket).toBe(125);
+
+    mockQueries((sql) => (/AS retail_revenue/.test(sql) ? [{ orders: 0, revenue: 0 }] : [{}]));
+    const empty = await getOverviewReport('month');
+    expect(empty.sales.averageTicket).toBe(0);
+  });
+
+  it('takes units sold from the period total, not from the top-10 ranking', async () => {
+    mockQueries((sql) => {
+      if (/AS units_sold/.test(sql)) return [{ units_sold: 320, distinct_products: 47 }];
+      if (/LIMIT 10/.test(sql)) return [{ name: 'Photocard', quantity: 12, revenue: 240 }];
+      return [{}];
+    });
+
+    const report = await getOverviewReport('month');
+
+    expect(report.products.unitsSold).toBe(320);
+    expect(report.products.distinctProducts).toBe(47);
+    expect(report.products.top).toHaveLength(1);
+  });
+
+  it('ranks top products by revenue', async () => {
+    const sqls: string[] = [];
+    queryMock.mockImplementation(async (sql: string) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
+      sqls.push(sql);
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    await getOverviewReport('year');
+
+    const topSql = sqls.find((s) => /LIMIT 10/.test(s));
+    expect(topSql).toContain('ORDER BY revenue DESC');
+  });
+
+  it('keeps the report usable when one block fails', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
+      if (/order_items/.test(sql)) throw new Error('relation "order_items" does not exist');
+      if (/AS retail_revenue/.test(sql)) return { rows: [{ orders: 2, revenue: 100 }], rowCount: 1 };
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    const report = await getOverviewReport('day');
+
+    expect(report.sales.revenue).toBe(100);
+    expect(report.products.top).toEqual([]);
+    expect(report.products.unitsSold).toBe(0);
+  });
+
+  it('reports the catalog as of now, not as of the period', async () => {
+    const sqls: string[] = [];
+    queryMock.mockImplementation(async (sql: string) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
+      sqls.push(sql);
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    await getOverviewReport('year');
+
+    const catalogSql = sqls.find((s) => /AS active_skus/.test(s));
+    expect(catalogSql).toBeDefined();
+    // No period predicate: stock is a snapshot, not an aggregate over time.
+    expect(catalogSql).not.toContain('paid_at');
   });
 });

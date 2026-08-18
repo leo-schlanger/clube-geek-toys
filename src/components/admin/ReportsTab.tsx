@@ -9,6 +9,7 @@ import type {
   PlanDistribution,
   ChurnData,
 } from '../../lib/reports'
+import { ReportExport } from './ReportExport'
 
 interface ReportsTabProps {
   reportPeriod: number
@@ -37,6 +38,9 @@ export function ReportsTab({
         onRefresh={onRefresh}
         refreshing={loadingReports}
       />
+
+      {/* Fechamento por periodo, para arquivar ou mandar pra contabilidade. */}
+      <ReportExport />
 
       {/* Revenue Chart */}
       <RevenueChart data={monthlyReportData} loading={loadingReports} />

@@ -81,3 +81,15 @@ reportRouter.get('/action-items', async (_req, res, next) => {
     next(err);
   }
 });
+
+// GET /reports/overview?period=day|month|year&date=YYYY-MM-DD — consolidated period report (PDF source)
+reportRouter.get('/overview', async (req, res, next) => {
+  try {
+    const period = reportService.isOverviewPeriod(req.query.period) ? req.query.period : 'month';
+    const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+    const result = await reportService.getOverviewReport(period, date);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
