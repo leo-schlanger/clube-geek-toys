@@ -35,6 +35,27 @@ describe('ImageCropDialog', () => {
     expect(onComplete).toHaveBeenCalledWith([file])
   })
 
+  it('rotates in both directions and wraps around', () => {
+    render(<ImageCropDialog files={[jpegFile()]} onComplete={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByText('0°')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Girar à direita/i }))
+    expect(screen.getByText('90°')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Girar à esquerda/i }))
+    expect(screen.getByText('0°')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Girar à esquerda/i }))
+    expect(screen.getByText('270°')).toBeInTheDocument()
+  })
+
+  it('offers to keep the rotation without cropping', () => {
+    render(<ImageCropDialog files={[jpegFile()]} onComplete={vi.fn()} onCancel={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /Usar sem cortar/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Girar à direita/i }))
+    expect(screen.getByRole('button', { name: /Girar sem cortar/i })).toBeInTheDocument()
+  })
+
   it('opens custom width/height fields', () => {
     render(<ImageCropDialog files={[jpegFile()]} onComplete={vi.fn()} onCancel={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /Personalizado/i }))

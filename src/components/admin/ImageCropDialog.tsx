@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Crop, Check } from 'lucide-react'
+import { Crop, Check, RotateCcw, RotateCw } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -9,8 +9,12 @@ import {
   clampCoverPan,
   computeCoverCrop,
   cropProductImage,
+  normalizeRotation,
+  rotateProductImage,
+  rotatedImageSize,
   sizeFromLongestSide,
   type ImageCropRect,
+  type ImageRotation,
 } from '../../lib/product-image'
 
 const ASPECT_PRESETS = [
@@ -55,6 +59,7 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
 
   const [natural, setNatural] = useState({ width: 0, height: 0 })
   const [aspectId, setAspectId] = useState<AspectId>('1:1')
+  const [rotation, setRotation] = useState<ImageRotation>(0)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   // A number, not a string: the UI compares `sizeMode` against the numeric
@@ -75,6 +80,7 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
 
   useEffect(() => {
     setNatural({ width: 0, height: 0 })
+    setRotation(0)
     setZoom(1)
     setPan({ x: 0, y: 0 })
     setAspectId('1:1')
@@ -83,39 +89,67 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
     setCustomH('1200')
   }, [file])
 
+  // Everything downstream measures the *rotated* image: a quarter turn swaps
+  // width and height, so the frame, the pan clamp and the crop rect all follow.
+  const naturalRot = useMemo(
+    () => rotatedImageSize(natural.width, natural.height, rotation),
+    [natural, rotation]
+  )
+
   const preset = ASPECT_PRESETS.find((p) => p.id === aspectId) ?? ASPECT_PRESETS[0]
   const ratio =
     preset.ratio ??
-    (natural.width > 0 && natural.height > 0 ? natural.width / natural.height : 1)
+    (naturalRot.width > 0 && naturalRot.height > 0 ? naturalRot.width / naturalRot.height : 1)
   const frame = frameBox(ratio)
 
   const clampedPan = useMemo(() => {
     // Same shape on both paths: consumers read `panX`/`panY`. Returning a raw
     // `pan` ({x,y}) left `left`/`top` as NaN while the image had no
     // carregado.
-    if (!natural.width) return { panX: pan.x, panY: pan.y }
-    return clampCoverPan(natural.width, natural.height, frame.width, frame.height, zoom, pan.x, pan.y)
-  }, [natural, frame.width, frame.height, zoom, pan])
+    if (!naturalRot.width) return { panX: pan.x, panY: pan.y }
+    return clampCoverPan(
+      naturalRot.width,
+      naturalRot.height,
+      frame.width,
+      frame.height,
+      zoom,
+      pan.x,
+      pan.y
+    )
+  }, [naturalRot, frame.width, frame.height, zoom, pan])
 
   const display = useMemo(() => {
-    if (!natural.width) return { width: frame.width, height: frame.height, left: 0, top: 0 }
-    const cover = Math.max(frame.width / natural.width, frame.height / natural.height)
+    if (!naturalRot.width) {
+      return {
+        width: frame.width,
+        height: frame.height,
+        left: 0,
+        top: 0,
+        imgWidth: frame.width,
+        imgHeight: frame.height,
+      }
+    }
+    const cover = Math.max(frame.width / naturalRot.width, frame.height / naturalRot.height)
     const scale = cover * zoom
-    const width = natural.width * scale
-    const height = natural.height * scale
+    const width = naturalRot.width * scale
+    const height = naturalRot.height * scale
     return {
       width,
       height,
       left: (frame.width - width) / 2 + clampedPan.panX,
       top: (frame.height - height) / 2 + clampedPan.panY,
+      // The <img> keeps its own orientation and is rotated by CSS inside a box
+      // that already has the rotated size, so the two always line up.
+      imgWidth: natural.width * scale,
+      imgHeight: natural.height * scale,
     }
-  }, [natural, frame, zoom, clampedPan])
+  }, [natural, naturalRot, frame, zoom, clampedPan])
 
   function cropRect(): ImageCropRect | null {
-    if (!natural.width) return null
+    if (!naturalRot.width) return null
     return computeCoverCrop({
-      imageWidth: natural.width,
-      imageHeight: natural.height,
+      imageWidth: naturalRot.width,
+      imageHeight: naturalRot.height,
       frameWidth: frame.width,
       frameHeight: frame.height,
       zoom,
@@ -165,15 +199,32 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
     }
     setApplying(true)
     try {
-      const cropped = await cropProductImage(file, crop, outputSpec())
+      const cropped = await cropProductImage(file, crop, outputSpec(), rotation)
       pushNext(cropped ?? file)
     } finally {
       setApplying(false)
     }
   }
 
-  function skipCrop() {
-    if (file) pushNext(file)
+  /** Skips the crop but still bakes in the rotation the staff just picked. */
+  async function skipCrop() {
+    if (!file) return
+    if (rotation === 0) {
+      pushNext(file)
+      return
+    }
+    setApplying(true)
+    try {
+      const rotated = await rotateProductImage(file, rotation)
+      pushNext(rotated ?? file)
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  function rotateBy(delta: number) {
+    setRotation((r) => normalizeRotation(r + delta))
+    setPan({ x: 0, y: 0 })
   }
 
   function onPointerDown(e: React.PointerEvent) {
@@ -233,7 +284,7 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {files.length > 1 ? `Foto ${index + 1} de ${files.length} · ` : ''}
-              arraste para enquadrar · escolha a proporção e o tamanho em pixels
+              arraste para enquadrar · gire, escolha a proporção e o tamanho em pixels
             </p>
           </div>
         </div>
@@ -249,25 +300,34 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
             onWheel={onWheel}
           >
             {previewUrl ? (
-              <img
-                src={previewUrl}
-                alt=""
-                draggable={false}
-                className="absolute max-w-none select-none"
+              <div
+                className="absolute"
                 style={{
                   width: display.width,
                   height: display.height,
                   left: display.left,
                   top: display.top,
                 }}
-                onLoad={(e) => {
-                  const img = e.currentTarget
-                  setNatural({
-                    width: img.naturalWidth || img.width,
-                    height: img.naturalHeight || img.height,
-                  })
-                }}
-              />
+              >
+                <img
+                  src={previewUrl}
+                  alt=""
+                  draggable={false}
+                  className="absolute left-1/2 top-1/2 max-w-none select-none"
+                  style={{
+                    width: display.imgWidth,
+                    height: display.imgHeight,
+                    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                  }}
+                  onLoad={(e) => {
+                    const img = e.currentTarget
+                    setNatural({
+                      width: img.naturalWidth || img.width,
+                      height: img.naturalHeight || img.height,
+                    })
+                  }}
+                />
+              </div>
             ) : (
               <Loading />
             )}
@@ -275,6 +335,33 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
         </div>
 
         <div className="mt-3 space-y-3">
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Rotação</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => rotateBy(-90)}
+                disabled={applying}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Girar à esquerda
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => rotateBy(90)}
+                disabled={applying}
+              >
+                <RotateCw className="h-4 w-4" />
+                Girar à direita
+              </Button>
+              <span className="text-xs text-muted-foreground">{rotation}°</span>
+            </div>
+          </div>
+
           <div>
             <p className="mb-1.5 text-xs font-medium text-muted-foreground">Proporção</p>
             <div className="flex flex-wrap gap-1.5">
@@ -411,10 +498,10 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
           <Button type="button" variant="ghost" onClick={onCancel} disabled={applying}>
             Cancelar
           </Button>
-          <Button type="button" variant="outline" onClick={skipCrop} disabled={applying}>
-            Usar sem cortar
+          <Button type="button" variant="outline" onClick={() => void skipCrop()} disabled={applying}>
+            {rotation === 0 ? 'Usar sem cortar' : 'Girar sem cortar'}
           </Button>
-          <Button type="button" onClick={() => void applyCrop()} disabled={applying || !natural.width}>
+          <Button type="button" onClick={() => void applyCrop()} disabled={applying || !naturalRot.width}>
             {applying ? <Loading size="sm" /> : <Check className="h-4 w-4" />}
             Aplicar recorte
           </Button>

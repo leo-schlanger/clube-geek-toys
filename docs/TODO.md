@@ -500,6 +500,7 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 - [x] **Paginação** - loja/atacado `?page=` (24/página); admin 10/25/50/100; troca de sort/busca volta à página 1
 - [x] **Ordenação no admin** - mesma grade na aba Produtos via API (padrão A–Z para agrupar photocards)
 - [x] **Recorte no post** - diálogo ao enviar imagem (proporção Quadrado/Photocard/Retrato/Paisagem/Livre + tamanho 800/1200/1600/personalizado)
+- [x] **Rotação no post (18/08/2026)** - girar à esquerda/direita no mesmo diálogo; o recorte segue a imagem girada e "Girar sem cortar" grava só a rotação
 - [x] **Testes** - product-sort, ProductSortSelect, ImageCropDialog, crop math, ShopHome/Wholesale/CategoryNav/ShopHeader
 
 ### Catálogo: limites de foto e variações (pedido Laura 14/08/2026)

@@ -5,6 +5,9 @@ import {
   prepareProductImages,
   computeCoverCrop,
   clampCoverPan,
+  normalizeRotation,
+  rotatedImageSize,
+  rotationDrawSteps,
   sizeFromLongestSide,
   resolveCropOutputSize,
   PRODUCT_IMAGE_MAX_BYTES,
@@ -115,4 +118,60 @@ describe('product-image helpers', () => {
     expect(batch.errors.length).toBe(1)
     expect(batch.files.length).toBe(1)
   }, 20_000)
+})
+
+describe('image rotation', () => {
+  it('normalizes any angle to a quarter turn', () => {
+    expect(normalizeRotation(0)).toBe(0)
+    expect(normalizeRotation(90)).toBe(90)
+    expect(normalizeRotation(-90)).toBe(270)
+    expect(normalizeRotation(450)).toBe(90)
+    expect(normalizeRotation(-450)).toBe(270)
+    expect(normalizeRotation(Number.NaN)).toBe(0)
+  })
+
+  it('swaps width and height on quarter turns only', () => {
+    expect(rotatedImageSize(4000, 3000, 0)).toEqual({ width: 4000, height: 3000 })
+    expect(rotatedImageSize(4000, 3000, 90)).toEqual({ width: 3000, height: 4000 })
+    expect(rotatedImageSize(4000, 3000, 180)).toEqual({ width: 4000, height: 3000 })
+    expect(rotatedImageSize(4000, 3000, 270)).toEqual({ width: 3000, height: 4000 })
+  })
+
+  it('maps the source corners onto the rotated image box', () => {
+    const W = 400
+    const H = 300
+    // Same transform the canvas applies: translate then rotate.
+    const map = (rotation: number, x: number, y: number) => {
+      const { translateX, translateY, radians } = rotationDrawSteps(rotation, W, H)
+      const cos = Math.round(Math.cos(radians))
+      const sin = Math.round(Math.sin(radians))
+      return {
+        x: translateX + x * cos - y * sin,
+        y: translateY + x * sin + y * cos,
+      }
+    }
+
+    // Top-left of the source lands on the corner that leads the rotation.
+    expect(map(0, 0, 0)).toEqual({ x: 0, y: 0 })
+    expect(map(90, 0, 0)).toEqual({ x: H, y: 0 })
+    expect(map(180, 0, 0)).toEqual({ x: W, y: H })
+    expect(map(270, 0, 0)).toEqual({ x: 0, y: W })
+
+    // And the whole image stays inside the rotated box (no negative offsets).
+    for (const rotation of [0, 90, 180, 270]) {
+      const box = rotatedImageSize(W, H, rotation)
+      for (const [x, y] of [
+        [0, 0],
+        [W, 0],
+        [0, H],
+        [W, H],
+      ]) {
+        const p = map(rotation, x, y)
+        expect(p.x).toBeGreaterThanOrEqual(0)
+        expect(p.y).toBeGreaterThanOrEqual(0)
+        expect(p.x).toBeLessThanOrEqual(box.width)
+        expect(p.y).toBeLessThanOrEqual(box.height)
+      }
+    }
+  })
 })

@@ -21,6 +21,44 @@ export interface ImageCropRect {
   height: number
 }
 
+/** Quarter turns clockwise applied before the crop. */
+export type ImageRotation = 0 | 90 | 180 | 270
+
+/** Any angle (including negatives from "rotate left") to 0/90/180/270. */
+export function normalizeRotation(degrees: number): ImageRotation {
+  if (!Number.isFinite(degrees)) return 0
+  const turns = ((Math.round(degrees / 90) % 4) + 4) % 4
+  return (turns * 90) as ImageRotation
+}
+
+/** Size the image occupies after rotating — width/height swap on quarter turns. */
+export function rotatedImageSize(
+  width: number,
+  height: number,
+  rotation: number
+): { width: number; height: number } {
+  const rot = normalizeRotation(rotation)
+  return rot === 90 || rot === 270 ? { width: height, height: width } : { width, height }
+}
+
+/**
+ * Canvas transform that makes the rotated image span (0,0)-(rotW,rotH), so the
+ * crop rectangle can stay in rotated-image coordinates.
+ */
+export function rotationDrawSteps(
+  rotation: number,
+  sourceWidth: number,
+  sourceHeight: number
+): { translateX: number; translateY: number; radians: number } {
+  const rot = normalizeRotation(rotation)
+  const rotated = rotatedImageSize(sourceWidth, sourceHeight, rot)
+  if (rot === 90) return { translateX: rotated.width, translateY: 0, radians: Math.PI / 2 }
+  if (rot === 180)
+    return { translateX: rotated.width, translateY: rotated.height, radians: Math.PI }
+  if (rot === 270) return { translateX: 0, translateY: rotated.height, radians: -Math.PI / 2 }
+  return { translateX: 0, translateY: 0, radians: 0 }
+}
+
 export interface CoverCropInput {
   imageWidth: number
   imageHeight: number
@@ -272,13 +310,34 @@ async function compressImageFile(file: File, targetBytes: number): Promise<File 
   })
 }
 
+/** Draws a crop taken in rotated-image coordinates back from the unrotated source. */
+function drawRotatedCrop(
+  ctx: CanvasRenderingContext2D,
+  src: Drawable,
+  crop: ImageCropRect,
+  size: { width: number; height: number },
+  rotation: ImageRotation
+): void {
+  const steps = rotationDrawSteps(rotation, src.width, src.height)
+  ctx.save()
+  ctx.imageSmoothingQuality = 'high'
+  ctx.scale(size.width / Math.max(1, crop.width), size.height / Math.max(1, crop.height))
+  ctx.translate(-crop.x, -crop.y)
+  ctx.translate(steps.translateX, steps.translateY)
+  ctx.rotate(steps.radians)
+  ctx.drawImage(src, 0, 0)
+  ctx.restore()
+}
+
 /**
  * Crops and resizes to the output size, as JPEG.
+ * `rotation` is applied first, so `crop` is read in rotated-image coordinates.
  */
 export async function cropProductImage(
   file: File,
   crop: ImageCropRect,
-  output?: { width?: number; height?: number; longestSide?: number }
+  output?: { width?: number; height?: number; longestSide?: number },
+  rotation: number = 0
 ): Promise<File | null> {
   const src = await decodeDrawable(file)
   if (!src) return null
@@ -293,7 +352,12 @@ export async function cropProductImage(
 
   canvas.width = size.width
   canvas.height = size.height
-  ctx.drawImage(src, crop.x, crop.y, crop.width, crop.height, 0, 0, size.width, size.height)
+  const rot = normalizeRotation(rotation)
+  if (rot === 0) {
+    ctx.drawImage(src, crop.x, crop.y, crop.width, crop.height, 0, 0, size.width, size.height)
+  } else {
+    drawRotatedCrop(ctx, src, crop, size, rot)
+  }
   closeDrawable(src)
 
   const blob = await canvasToBlob(canvas, 'image/jpeg', 0.9)
@@ -302,6 +366,20 @@ export async function cropProductImage(
     type: 'image/jpeg',
     lastModified: Date.now(),
   })
+}
+
+/**
+ * Rotates the whole image without cropping. Used when the staff only wants the
+ * photo standing upright.
+ */
+export async function rotateProductImage(file: File, rotation: number): Promise<File | null> {
+  const rot = normalizeRotation(rotation)
+  if (rot === 0) return file
+  const src = await decodeDrawable(file)
+  if (!src) return null
+  const size = rotatedImageSize(src.width, src.height, rot)
+  closeDrawable(src)
+  return cropProductImage(file, { x: 0, y: 0, width: size.width, height: size.height }, undefined, rot)
 }
 
 /**
