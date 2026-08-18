@@ -383,3 +383,122 @@ export async function getRealtimeStats() {
     timestamp: new Date().toISOString(),
   };
 }
+
+/** How long a shipped order may sit without a delivery confirmation. */
+const SHIPPED_STALE_DAYS = 10;
+/** Window used to warn about memberships about to lapse. */
+const EXPIRING_SOON_DAYS = 7;
+
+export type ActionItemKey =
+  | 'pix_pending'
+  | 'to_separate'
+  | 'to_ship'
+  | 'shipped_stale'
+  | 'questions_unanswered'
+  | 'reviews_pending'
+  | 'wholesale_pending'
+  | 'stock_out'
+  | 'stock_low'
+  | 'members_expiring'
+  | 'members_pending';
+
+export interface ActionItem {
+  key: ActionItemKey;
+  count: number;
+  /** Age in days of the oldest row in the queue; null when the queue is empty. */
+  oldestDays: number | null;
+}
+
+export interface ActionItemsReport {
+  items: ActionItem[];
+  totalPending: number;
+  timestamp: string;
+}
+
+/**
+ * One `count` + `oldestDays` pair for a queue.
+ *
+ * Each queue is its own query with its own catch: a table missing on an older
+ * schema (or an `ensureSchema` step that failed) degrades that single card to
+ * zero instead of blanking the whole panel.
+ */
+async function queueStat(key: ActionItemKey, sql: string, params: unknown[] = []): Promise<ActionItem> {
+  try {
+    const result = await query(sql, params);
+    const row = result.rows[0] || {};
+    const count = Number(row.count) || 0;
+    const oldest = row.oldest_days === null || row.oldest_days === undefined ? null : Number(row.oldest_days);
+    return { key, count, oldestDays: count > 0 && Number.isFinite(oldest as number) ? (oldest as number) : null };
+  } catch (err) {
+    console.error(`[REPORTS] action item "${key}" failed:`, err);
+    return { key, count: 0, oldestDays: null };
+  }
+}
+
+/** `count` + age of the oldest row, for a queue keyed off a timestamp column. */
+function queueSql(table: string, where: string, tsColumn = 'created_at'): string {
+  return `SELECT COUNT(*)::int AS count,
+                 EXTRACT(DAY FROM NOW() - MIN(${tsColumn}))::int AS oldest_days
+          FROM ${table} WHERE ${where}`;
+}
+
+/**
+ * Everything waiting on a human, in one call.
+ *
+ * The dashboard already answered "how much did we make"; nothing answered "what
+ * is waiting on me". Each entry maps to an admin tab that can clear it, so the
+ * panel is a worklist rather than another metric board. Counts mirror the
+ * predicates each tab filters by, so a card and its tab never disagree.
+ */
+export async function getActionItems(): Promise<ActionItemsReport> {
+  // Same shape the stock tab lists by: variants replace their parent product,
+  // and seed/checkup rows stay out of both.
+  const stockBase = `
+    SELECT p.stock, p.low_stock_threshold, p.active, p.name AS product_name
+    FROM products p WHERE p.has_variants = FALSE
+    UNION ALL
+    SELECT v.stock, p.low_stock_threshold, (p.active AND v.active), p.name
+    FROM product_variants v JOIN products p ON p.id = v.product_id
+  `;
+  const stockWhere = `s.active = TRUE AND s.product_name NOT ILIKE 'checkup%'`;
+  // Stock has no queue age — a SKU is not "waiting" since a date.
+  const stockSql = (extra: string) =>
+    `SELECT COUNT(*)::int AS count, NULL::int AS oldest_days
+     FROM (${stockBase}) s WHERE ${stockWhere} AND ${extra}`;
+
+  const items = await Promise.all([
+    // Money that may already be in the account: no PIX webhook exists, so these
+    // sit until someone compares the TX ID against the bank statement.
+    queueStat('pix_pending', queueSql('orders', `status = 'pending' AND payment_method = 'pix'`)),
+    queueStat('to_separate', queueSql('orders', `status = 'paid'`, 'COALESCE(paid_at, created_at)')),
+    queueStat('to_ship', queueSql('orders', `status = 'processing'`, 'updated_at')),
+    // No shipped_at column exists; for a shipped order the last write is the
+    // tracking save, so updated_at is the closest thing to "posted on".
+    queueStat(
+      'shipped_stale',
+      queueSql('orders', `status = 'shipped' AND updated_at < NOW() - INTERVAL '${SHIPPED_STALE_DAYS} days'`, 'updated_at')
+    ),
+    queueStat('questions_unanswered', queueSql('product_questions', `answered_at IS NULL AND status = 'published'`)),
+    queueStat('reviews_pending', queueSql('product_reviews', `status = 'pending'`)),
+    queueStat('wholesale_pending', queueSql('wholesale_accounts', `status = 'pending'`)),
+    queueStat('stock_out', stockSql('s.stock <= 0')),
+    queueStat('stock_low', stockSql('s.stock > 0 AND s.stock <= s.low_stock_threshold')),
+    // Age here is days until expiry, not days waiting — negatives are excluded
+    // by the range itself.
+    queueStat(
+      'members_expiring',
+      `SELECT COUNT(*)::int AS count,
+              EXTRACT(DAY FROM MIN(expiry_date)::timestamptz - NOW())::int AS oldest_days
+       FROM members
+       WHERE status = 'active'
+         AND expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${EXPIRING_SOON_DAYS} days'`
+    ),
+    queueStat('members_pending', queueSql('members', `status = 'pending'`)),
+  ]);
+
+  return {
+    items,
+    totalPending: items.reduce((sum, item) => sum + item.count, 0),
+    timestamp: new Date().toISOString(),
+  };
+}

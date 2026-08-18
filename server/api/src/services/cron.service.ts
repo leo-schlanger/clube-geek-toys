@@ -1,6 +1,8 @@
 import cron from 'node-cron';
 import { query } from '../config/database.js';
+import { env } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
+import { getActionItems } from './report.service.js';
 
 export function initCronJobs() {
   // Daily at 6:00 AM UTC (3:00 AM BRT)
@@ -16,6 +18,12 @@ export function initCronJobs() {
     } catch (err) {
       console.error('[CRON] Expire members error:', err);
     }
+    // Last: it reports on the state the two jobs above just left behind.
+    try {
+      await sendAdminDailyDigest();
+    } catch (err) {
+      console.error('[CRON] Admin daily digest error:', err);
+    }
 
     // Record cron execution for health monitoring
     await query(
@@ -27,6 +35,51 @@ export function initCronJobs() {
   });
 
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
+}
+
+/**
+ * One morning e-mail with every queue that needs a human.
+ *
+ * The panel only shows this to whoever opens it; the shop's most time-sensitive
+ * queue (PIX awaiting manual confirmation — there is no webhook) can otherwise
+ * sit unnoticed for a day. Silent when nothing is pending, so the e-mail keeps
+ * meaning something.
+ */
+async function sendAdminDailyDigest() {
+  if (!env.ADMIN_EMAIL) return;
+
+  const report = await getActionItems();
+  if (report.totalPending === 0) {
+    console.log('[CRON] Daily digest skipped - no pending items');
+    return;
+  }
+
+  // The job runs once a day, but a container restart re-registers the schedule;
+  // this keeps a same-day rerun from sending a second copy.
+  const alreadySent = await query(
+    `SELECT 1 FROM email_logs
+     WHERE template = 'admin-daily-digest' AND status = 'sent' AND sent_at::date = CURRENT_DATE
+     LIMIT 1`
+  );
+  if (alreadySent.rowCount) {
+    console.log('[CRON] Daily digest already sent today');
+    return;
+  }
+
+  const counts: Record<string, string> = {};
+  for (const item of report.items) counts[item.key] = String(item.count);
+
+  await sendTemplateEmail({
+    template: 'admin-daily-digest',
+    to: env.ADMIN_EMAIL,
+    variables: {
+      ...counts,
+      total_pending: String(report.totalPending),
+      admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin`,
+    },
+  });
+
+  console.log(`[CRON] Daily digest sent - ${report.totalPending} pending item(s)`);
 }
 
 async function sendRenewalReminders() {

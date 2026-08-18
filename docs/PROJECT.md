@@ -39,7 +39,7 @@ Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renova
 
 ### 3.2 Modulo Admin
 
-Painel administrativo com gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, fotos, videos, variacoes, ate 5 categorias, duplicar, flag atacado; aba **Estoque** — ajuste por SKU, limiar de "acabando" e historico de movimentacao; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Perguntas** — responder duvidas do cliente; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
+Painel administrativo que abre no **Painel do dia** (`ActionCenter`): as filas que precisam de alguem — PIX a confirmar, pedidos a separar/postar, enviados ha +10 dias sem entrega, perguntas sem resposta, avaliacoes a moderar, CNPJ de atacado a aprovar, SKUs esgotados/no minimo, assinaturas vencendo e membros sem pagar. Fila zerada nao aparece, cada card leva pra aba que resolve, e o cron das 6h manda as mesmas filas por e-mail (`admin-daily-digest`) quando ha pendencia. Alem disso: gestao de membros (filtros, busca, paginacao server-side), gerenciamento de pagamentos (confirmacao manual de PIX, estornos), gestao da loja (aba **Produtos** — catalogo, fotos, videos, variacoes, ate 5 categorias, duplicar, flag atacado; aba **Estoque** — ajuste por SKU, limiar de "acabando" e historico de movimentacao; aba **Pedidos** — listagem, status, confirmacao de PIX de loja; aba **Perguntas** — responder duvidas do cliente; aba **Atacado** — aprovacao de CNPJ B2B), logs de auditoria, logs de email, logs de erro, relatorios com graficos (receita, churn), gestao de usuarios e roles, e configuracoes do sistema.
 
 ### 3.3 Modulo PDV (Ponto de Venda)
 
@@ -566,6 +566,7 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 | GET    | `/reports/churn`          | Churn por mes (expired + cancelled)   | admin |
 | GET    | `/reports/today-revenue`  | Receita do dia                        | admin |
 | GET    | `/reports/realtime-stats` | Metricas em tempo real                | admin |
+| GET    | `/reports/action-items`   | Filas pendentes (Painel do dia)       | admin |
 
 ### Logs (`/logs`)
 
@@ -611,7 +612,7 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 | ------ | --------- | ------------------------------------------------------------------- | ------- |
 | GET    | `/health` | Status da API + banco + `schema.status` (`pending`/`ok`/`degraded`) | Publico |
 
-## 6. Templates de Email (17)
+## 6. Templates de Email (22)
 
 | Template                      | Assunto                            | Trigger                                     | Variaveis principais                                                    | Destinatario |
 | ----------------------------- | ---------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- | ------------ |
@@ -632,6 +633,11 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 | `contract-signed`             | Contrato assinado                  | Frontend (apos assinatura digital)          | name, plan, signed_at, hash                                             | Membro       |
 | `admin-pix-pending`           | PIX pendente de confirmacao        | Backend (auto, apos criacao de PIX)         | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
 | `admin-new-member`            | Novo membro cadastrado             | Backend (auto, apos cadastro)               | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
+| `order-shipped`               | Pedido enviado                     | Admin salva codigo de rastreio              | name, order_number, tracking_code, tracking_url, shipping_service       | Cliente      |
+| `question-answered`           | Sua pergunta foi respondida        | Admin responde pergunta do produto          | name, product_name, question, answer, product_url                       | Cliente      |
+| `admin-pix-order-pending`     | Pedido PIX aguardando confirmacao  | Backend (auto, apos gerar PIX de loja)      | order_number, customer_name, customer_email, total, tx_id, admin_url    | Admin        |
+| `admin-order-cancelled`       | Pedido cancelado pelo cliente      | Cliente cancela pedido nao pago             | order_number, customer_name, customer_email, total, admin_url           | Admin        |
+| `admin-daily-digest`          | Painel do dia                      | Cron diario (6h UTC, so com pendencia)      | total_pending, contagem por fila, admin_url                             | Admin        |
 
 ## 7. Roles e Permissoes
 
@@ -773,7 +779,7 @@ clube-geek-toys/
 │   │       │   ├── order.service.ts     # Pedidos, member_10 / wholesale_25, baixa de estoque
 │   │       │   ├── wholesale.service.ts # Contas B2B, CNPJ, aprovacao
 │   │       │   ├── contract.service.ts
-│   │       │   ├── email.service.ts     # 17 templates HTML
+│   │       │   ├── email.service.ts     # 22 templates HTML
 │   │       │   ├── webhook.service.ts   # Assinatura + pedidos de loja (shop_order)
 │   │       │   ├── report.service.ts
 │   │       │   ├── log.service.ts

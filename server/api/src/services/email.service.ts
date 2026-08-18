@@ -27,7 +27,7 @@ const AVAILABLE_TEMPLATES = [
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'question-answered',
-  'admin-pix-order-pending', 'admin-order-cancelled',
+  'admin-pix-order-pending', 'admin-order-cancelled', 'admin-daily-digest',
 ];
 
 export function getAvailableTemplates() {
@@ -492,6 +492,41 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         <p style="margin-top:12px;font-size:13px;color:#94a3b8">O membro está aguardando pagamento para ativação.</p>`,
       cta: { text: 'Ver no Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
+    },
+
+    // ─── ADMIN: DAILY OPERATIONS DIGEST ────────────────
+    // Counts come in one variable per queue (every variable is HTML-escaped
+    // before it gets here, so the rows have to be assembled template-side).
+    // Queues at zero are dropped: a digest that always lists everything stops
+    // being read.
+    'admin-daily-digest': {
+      subject: `📋 Painel do dia — ${v.total_pending || '0'} pendência(s) na GeekPop & Toys`,
+      preheader: `${v.total_pending || '0'} item(ns) aguardando você no painel.`,
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">O que está esperando por você 📋</h2>
+        <p>Resumo das filas do painel admin nesta manhã.</p>
+        ${dataTable(
+          [
+            ['💰 PIX aguardando confirmação', v.pix_pending, '#f59e0b'],
+            ['📦 Pedidos pagos a separar', v.to_separate, '#4ade80'],
+            ['🚚 Pedidos a postar', v.to_ship, '#4ade80'],
+            [`🕐 Enviados há +10 dias sem entrega`, v.shipped_stale, '#f87171'],
+            ['❓ Perguntas sem resposta', v.questions_unanswered, '#3b82f6'],
+            ['⭐ Avaliações a moderar', v.reviews_pending, '#3b82f6'],
+            ['🏢 Contas atacado a aprovar', v.wholesale_pending, '#f59e0b'],
+            ['🔴 SKUs esgotados', v.stock_out, '#f87171'],
+            ['🟡 SKUs no estoque mínimo', v.stock_low, '#f59e0b'],
+            ['📅 Assinaturas vencendo em 7 dias', v.members_expiring, '#f59e0b'],
+            ['⏳ Membros aguardando pagamento', v.members_pending, '#94a3b8'],
+          ]
+            .filter(([, count]) => Number(count) > 0)
+            .map(([label, count, color]) => [
+              label as string,
+              `<strong style="color:${color}">${count}</strong>`,
+            ])
+        )}
+        ${infoBox('💰 <strong>O PIX é o item urgente:</strong> não existe webhook, então cada pedido PIX fica <em>pending</em> até alguém conferir o extrato e confirmar no painel. Enquanto isso o estoque não é baixado.')}`,
+      cta: { text: 'Abrir Painel do Dia', url: v.admin_url || `${frontendUrl}/admin` },
     },
   };
 

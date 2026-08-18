@@ -51,6 +51,7 @@ const LogsTab = lazy(() => import('../components/admin/LogsTab').then(m => ({ de
 const ReportsTab = lazy(() => import('../components/admin/ReportsTab').then(m => ({ default: m.ReportsTab })))
 const SettingsTab = lazy(() => import('../components/admin/SettingsTab').then(m => ({ default: m.SettingsTab })))
 const RealtimeMetrics = lazy(() => import('../components/admin/RealtimeMetrics').then(m => ({ default: m.RealtimeMetrics })))
+const ActionCenter = lazy(() => import('../components/admin/ActionCenter').then(m => ({ default: m.ActionCenter })))
 
 type ModalMode = 'create' | 'edit' | 'view' | 'role' | null
 
@@ -526,6 +527,12 @@ export default function AdminDashboard() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* What needs a human today — before the metrics, which is the
+                  order a shift actually reads the dashboard in. */}
+              <Suspense fallback={<TabLoadingFallback />}>
+                <ActionCenter onNavigate={setActiveTab} />
+              </Suspense>
 
               {/* Real-time Metrics */}
               <Suspense fallback={<TabLoadingFallback />}>

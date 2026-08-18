@@ -71,3 +71,13 @@ reportRouter.get('/realtime-stats', async (_req, res, next) => {
     next(err);
   }
 });
+
+// GET /reports/action-items — everything waiting on an admin, for the day panel
+reportRouter.get('/action-items', async (_req, res, next) => {
+  try {
+    const result = await reportService.getActionItems();
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});

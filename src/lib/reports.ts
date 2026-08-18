@@ -145,3 +145,54 @@ export function calculateGrowthRate(current: number, previous: number): number {
   if (previous === 0) return current > 0 ? 100 : 0
   return Math.round(((current - previous) / previous) * 100 * 10) / 10
 }
+
+// ============================================
+// ACTION ITEMS (the day panel)
+// ============================================
+
+export type ActionItemKey =
+  | 'pix_pending'
+  | 'to_separate'
+  | 'to_ship'
+  | 'shipped_stale'
+  | 'questions_unanswered'
+  | 'reviews_pending'
+  | 'wholesale_pending'
+  | 'stock_out'
+  | 'stock_low'
+  | 'members_expiring'
+  | 'members_pending'
+
+export interface ActionItem {
+  key: ActionItemKey
+  count: number
+  /** Age in days of the oldest row in the queue; null when the queue is empty. */
+  oldestDays: number | null
+}
+
+export interface ActionItemsReport {
+  items: ActionItem[]
+  totalPending: number
+}
+
+/**
+ * Every admin queue that currently needs a human, with the age of its oldest
+ * entry. An empty report is the healthy state, so failures return zero items
+ * rather than throwing — the dashboard around it must still render.
+ */
+export async function getActionItems(): Promise<ActionItemsReport> {
+  const result = await api.get<{ items?: unknown; totalPending?: unknown }>('/reports/action-items')
+  if (result.error || !result.data) return { items: [], totalPending: 0 }
+
+  const rows = Array.isArray(result.data.items) ? result.data.items : []
+  const items = rows.map((row: Record<string, unknown>) => ({
+    key: row.key as ActionItemKey,
+    count: num(row.count),
+    oldestDays: row.oldestDays === null || row.oldestDays === undefined ? null : num(row.oldestDays),
+  }))
+
+  return {
+    items,
+    totalPending: num(result.data.totalPending),
+  }
+}

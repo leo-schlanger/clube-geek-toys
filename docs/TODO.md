@@ -1,6 +1,76 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 16 de Agosto de 2026
+> **Ultima atualizacao:** 18 de Agosto de 2026
+
+## Revisão de negócio — 18/08/2026
+
+Revisão dos fluxos já implementados na ótica de quem **opera a loja no dia a dia**
+(não de quem mantém o código). A pergunta guia foi: abrindo o painel de manhã,
+o sistema me diz o que fazer?
+
+### Entregue em 18/08/2026
+
+- [x] **Painel do dia (`ActionCenter`)** — o dashboard respondia "quanto vendi"
+      e nada respondia "o que está me esperando". Agora a primeira coisa da tela
+      é a lista de filas com pendência: PIX a confirmar, pedidos a separar, a
+      postar, enviados há +10 dias sem entrega, perguntas sem resposta,
+      avaliações a moderar, CNPJ de atacado a aprovar, SKUs esgotados/no mínimo,
+      assinaturas vencendo em 7 dias e membros que não pagaram. Cada card leva
+      pra aba que resolve, mostra há quantos dias o item mais antigo espera, e
+      fila zerada não aparece. `GET /reports/action-items` + 9 testes.
+- [x] **Digest diário por e-mail (`admin-daily-digest`)** — o painel só avisa
+      quem abre o painel. O cron das 6h UTC passou a mandar as mesmas filas pro
+      `ADMIN_EMAIL`, e **só quando há pendência**, pra o e-mail não virar ruído.
+      Dedup por `email_logs` no mesmo dia (restart de container não duplica).
+- [x] **`countUnanswered()` deixa de ser código morto** — existia no
+      `question.service.ts` com o comentário "for the admin tab badge", sem rota
+      e sem uso desde que foi escrito. O contador de perguntas sem resposta
+      agora sai pelo painel.
+
+### Em aberto — por impacto no caixa
+
+- [ ] **ALTO — Sem reserva de estoque entre `create` e `paid`.** O estoque só
+      baixa na confirmação (`decrementStockForOrder`, chamado no webhook do
+      Stripe e no confirm-PIX). Como a confirmação de PIX é **manual**, a última
+      unidade fica disponível por horas ou dias depois do primeiro pedido. Pior:
+      o decremento usa `GREATEST(0, stock - qty)`, então o segundo pedido
+      confirma **sem erro** e o estoque para em 0 — a venda a descoberto não
+      aparece em lugar nenhum. Sugestão: `stock_reserved` no pending com TTL, ou
+      no mínimo falhar (em vez de clampar) quando o saldo não cobre.
+- [ ] **ALTO — PIX continua sem confirmação automática.** Não há webhook: cada
+      pedido PIX exige alguém comparar o TX ID com o extrato. É a fila mais cara
+      do painel (o cliente já pagou e não é atendido). Gateway PIX com webhook
+      resolveria de vez; enquanto não vier, o painel + digest ao menos tornam a
+      fila visível.
+- [ ] **MEDIO — Não existe cupom / código promocional.** Os únicos descontos são
+      automáticos por perfil (`member_15`, `wholesale_25`). Não dá pra rodar
+      campanha (Black Friday, comeback, cupom de influencer, primeira compra),
+      que é a alavanca de marketing mais básica de uma loja. Precisaria de
+      tabela `coupons` (código, tipo, valor, validade, uso máximo, mínimo de
+      compra) e aplicação server-side no `createOrder`, sem empilhar com os
+      descontos de perfil.
+- [ ] **MEDIO — Nenhum relatório de mercadoria.** Os relatórios são todos de
+      receita e de membro (`daily`, `monthly`, `churn`, `plan-distribution`).
+      Falta o que o lojista usa pra comprar: **mais vendidos** por período,
+      **parados** (sem venda em N dias), e **valor imobilizado em estoque**.
+      Hoje a decisão de reposição é feita no olho.
+- [ ] **MEDIO — Sem custo de produto, logo sem margem.** `products` não tem
+      `cost_price`. Sem isso não há lucro por pedido, margem por produto nem
+      CMV — só faturamento bruto. É uma coluna + um campo no modal do produto,
+      e destrava todo o resto do relatório de mercadoria.
+- [ ] **MEDIO — Carrinho abandonado não é recuperado.** O carrinho vive no
+      `CartContext` (client-side) e um pedido `pending` que nunca é pago só
+      envelhece. Não há e-mail de recuperação nem visibilidade de quanto se
+      perde aí.
+- [ ] **BAIXO — Sem nota fiscal.** Nenhuma emissão de NF-e/NFC-e nem campo pra
+      anexar. Com CNPJ ativo (52.846.344/0001-10) e venda a atacado, em algum
+      momento isso deixa de ser opcional.
+- [ ] **BAIXO — `shipped` → `delivered` é 100% manual e sem data.** Não existe
+      `shipped_at`/`delivered_at`; o card "enviados sem entrega" usa `updated_at`
+      como aproximação da data de postagem. Rastreio automático pelos Correios /
+      Melhor Envio fecharia o ciclo e daria prazo médio de entrega real.
+- [ ] **BAIXO — Etiqueta Melhor Envio + token em produção** — já rastreado na
+      seção da loja; segue bloqueado no `MELHOR_ENVIO_TOKEN` vazio.
 
 ## Aberto pelo checkup de 16/08/2026
 

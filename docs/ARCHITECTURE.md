@@ -97,7 +97,7 @@ Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse prox
 | Servico                 | Uso                                                        |
 | ----------------------- | ---------------------------------------------------------- |
 | Stripe                  | Pagamentos com cartao de credito e assinaturas recorrentes |
-| Resend API              | Envio transacional de emails (17 templates)                |
+| Resend API              | Envio transacional de emails (22 templates)                |
 | Umami (self-hosted)     | Analytics de navegacao e eventos                           |
 | AzuraCast (self-hosted) | Radio online (Liquidsoap + Icecast)                        |
 
@@ -507,7 +507,7 @@ A carteirinha digital e renderizada inteiramente no frontend (`MembershipCard`) 
 
 ---
 
-## 11. Emails (17 templates)
+## 11. Emails (22 templates)
 
 Todos os emails usam a API do **Resend** com templates HTML inline renderizados server-side.
 
@@ -534,10 +534,15 @@ Todos os emails usam a API do **Resend** com templates HTML inline renderizados 
 | 15  | `contract-signed`             | Apos assinatura do contrato digital — PDF anexado                 |
 | 16  | `admin-pix-pending`           | Pagamento PIX gerado — notifica admin para confirmacao manual     |
 | 17  | `admin-new-member`            | Novo membro completou cadastro                                    |
+| 18  | `order-shipped`               | Admin salvou o codigo de rastreio — pedido vai para `shipped`     |
+| 19  | `question-answered`           | Admin respondeu uma pergunta na pagina do produto                 |
+| 20  | `admin-pix-order-pending`     | Pedido de loja gerou PIX — notifica admin para confirmacao manual |
+| 21  | `admin-order-cancelled`       | Cliente cancelou um pedido ainda nao pago                         |
+| 22  | `admin-daily-digest`          | Cron 6h UTC: filas do Painel do dia, so quando ha pendencia       |
 
 ### Deduplicacao
 
-Emails de cron (templates 12-13) usam query `NOT EXISTS` contra `email_logs` para evitar envio duplicado dentro de uma janela de 5-7 dias.
+Emails de cron (templates 12-13) usam query `NOT EXISTS` contra `email_logs` para evitar envio duplicado dentro de uma janela de 5-7 dias. O digest (22) usa a mesma tabela com janela de **um dia**, para que um restart do container nao mande a segunda copia.
 
 ---
 

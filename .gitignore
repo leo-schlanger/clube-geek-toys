@@ -112,3 +112,6 @@ server/scripts/sftp_upload.py
 
 # graphify generated output (graph.html, graph.json, obsidian vault, cache)
 graphify-out/
+
+# claude-flow generated agent state (neural patterns, policy, metrics)
+.claude-flow/

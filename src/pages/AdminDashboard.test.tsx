@@ -104,6 +104,10 @@ vi.mock('../components/admin/SettingsTab', () => ({
   SettingsTab: () => <div data-testid="settings-tab">Settings Tab</div>,
 }))
 
+vi.mock('../components/admin/ActionCenter', () => ({
+  ActionCenter: () => <div data-testid="action-center">Action Center</div>,
+}))
+
 vi.mock('../components/admin/RealtimeMetrics', () => ({
   RealtimeMetrics: () => <div data-testid="realtime-metrics">Realtime Metrics</div>,
 }))
