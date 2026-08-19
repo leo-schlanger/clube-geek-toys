@@ -182,6 +182,7 @@ async function handleShopOrderPaid(
       name: order.customer_name,
       order_number: String(order.order_number),
       total: parseFloat(order.total).toFixed(2).replace('.', ','),
+      order_id: order.id,
     },
   });
 

@@ -16,6 +16,8 @@ export interface ShippingAddressPayload {
 export interface CreateOrderPayload {
   items: { productId: string; quantity: number; variantId?: string }[]
   customer: { name: string; email: string; phone?: string }
+  /** Recado livre do cliente para a loja, até 500 caracteres. */
+  customerNote?: string
   shippingAddress: ShippingAddressPayload
   shipping: { quoteToken: string; serviceId: string }
   paymentMethod: 'pix' | 'credit_card'
@@ -69,6 +71,11 @@ export interface OrderListResult {
   total: number
   page: number
   limit: number
+  /**
+   * Purchases made as a guest with this account's e-mail that are waiting on
+   * e-mail verification to be adopted. Only ever set by `/orders/me`.
+   */
+  unclaimedGuestOrders?: number
 }
 
 export async function adminListOrders(params: { status?: string; page?: number; limit?: number } = {}): Promise<OrderListResult> {

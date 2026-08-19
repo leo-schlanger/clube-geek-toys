@@ -33,6 +33,7 @@ import { ProductGrid } from '../../components/store/ProductGrid'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
 import { ProductVideoGallery } from '../../components/store/ProductVideoGallery'
+import { ProductImageViewer, HoverZoom, ZoomHint } from '../../components/store/ProductImageZoom'
 import { ProductQuestions } from '../../components/store/ProductQuestions'
 import { StarRating } from '../../components/store/StarRating'
 import { SeoHead } from '../../components/store/SeoHead'
@@ -59,6 +60,7 @@ export default function ProductDetail() {
   const [variantSel, setVariantSel] = useState<Record<string, string>>({})
   /** Initial touch X, to tell a drag from a tap. */
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -154,7 +156,12 @@ export default function ProductDetail() {
     const endX = e.changedTouches[0]?.clientX ?? touchStartX
     const delta = endX - touchStartX
     setTouchStartX(null)
-    if (Math.abs(delta) < 40) return
+    // Abaixo do limiar o gesto foi um toque, não um arrastar: no celular é
+    // assim que se abre a foto ampliada, já que passar o mouse não existe.
+    if (Math.abs(delta) < 40) {
+      if (displayImages.length > 0) setViewerOpen(true)
+      return
+    }
     stepImage(delta < 0 ? 1 : -1)
   }
 
@@ -242,16 +249,20 @@ export default function ProductDetail() {
                 onTouchEnd={handleTouchEnd}
               >
                 {displayImages.length > 0 ? (
-                  <img
-                    src={displayImages[Math.min(activeImage, displayImages.length - 1)]}
-                    alt={
-                      matched
-                        ? `${product.name} — ${matched.name}`
-                        : product.name
-                    }
-                    className="h-full w-full object-contain transition-opacity duration-200"
-                    draggable={false}
-                  />
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setViewerOpen(true)}
+                      aria-label="Ampliar foto"
+                      className="block h-full w-full cursor-zoom-in overflow-hidden"
+                    >
+                      <HoverZoom
+                        src={displayImages[Math.min(activeImage, displayImages.length - 1)]}
+                        alt={matched ? `${product.name} — ${matched.name}` : product.name}
+                      />
+                    </button>
+                    <ZoomHint />
+                  </>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     <ImageOff className="h-16 w-16" />
@@ -313,6 +324,16 @@ export default function ProductDetail() {
 
               {product.videos && product.videos.length > 0 && (
                 <ProductVideoGallery videos={product.videos} productName={product.name} />
+              )}
+
+              {viewerOpen && displayImages.length > 0 && (
+                <ProductImageViewer
+                  images={displayImages}
+                  index={Math.min(activeImage, displayImages.length - 1)}
+                  alt={matched ? `${product.name} — ${matched.name}` : product.name}
+                  onIndexChange={setActiveImage}
+                  onClose={() => setViewerOpen(false)}
+                />
               )}
             </div>
 

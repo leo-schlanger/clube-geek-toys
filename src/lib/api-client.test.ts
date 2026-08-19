@@ -389,7 +389,7 @@ describe('Token Refresh on 401', () => {
 // =============================================================================
 
 describe('tryRefreshToken', () => {
-  it('returns true on successful refresh and stores new tokens', async () => {
+  it('reports a refresh and stores new tokens', async () => {
     localStorage.getItem.mockImplementation((key: string) => {
       if (key === 'clube_geek_refresh_token') return 'old-refresh'
       return null
@@ -401,29 +401,42 @@ describe('tryRefreshToken', () => {
 
     const result = await tryRefreshToken()
 
-    expect(result).toBe(true)
+    expect(result).toBe('refreshed')
     expect(localStorage.setItem).toHaveBeenCalledWith('clube_geek_access_token', 'fresh-access')
     expect(localStorage.setItem).toHaveBeenCalledWith('clube_geek_refresh_token', 'fresh-refresh')
   })
 
-  it('returns false and clears tokens on failed refresh', async () => {
+  it('ends the session only when the server rejects the token', async () => {
     localStorage.getItem.mockReturnValue(null)
     fetchMock.mockResolvedValue(mockResponse(401, { error: 'invalid' }))
 
     const result = await tryRefreshToken()
 
-    expect(result).toBe(false)
+    expect(result).toBe('invalid')
     expect(localStorage.removeItem).toHaveBeenCalledWith('clube_geek_access_token')
   })
 
-  it('returns false and clears tokens on network error', async () => {
+  // A network blip is not a logout: the tokens are probably still valid and
+  // wiping them here is what made the app "deslogar sozinho" on a bad
+  // connection or during an API restart.
+  it('keeps the session on a network error', async () => {
     localStorage.getItem.mockReturnValue(null)
     fetchMock.mockRejectedValue(new Error('Network error'))
 
     const result = await tryRefreshToken()
 
-    expect(result).toBe(false)
-    expect(localStorage.removeItem).toHaveBeenCalledWith('clube_geek_access_token')
+    expect(result).toBe('transient')
+    expect(localStorage.removeItem).not.toHaveBeenCalledWith('clube_geek_access_token')
+  })
+
+  it('keeps the session when the API answers 502 during a deploy', async () => {
+    localStorage.getItem.mockReturnValue(null)
+    fetchMock.mockResolvedValue(mockResponse(502, { error: 'bad gateway' }))
+
+    const result = await tryRefreshToken()
+
+    expect(result).toBe('transient')
+    expect(localStorage.removeItem).not.toHaveBeenCalledWith('clube_geek_access_token')
   })
 
   it('deduplicates concurrent refresh calls', async () => {
@@ -435,8 +448,8 @@ describe('tryRefreshToken', () => {
     // Fire two concurrent refreshes
     const [r1, r2] = await Promise.all([tryRefreshToken(), tryRefreshToken()])
 
-    expect(r1).toBe(true)
-    expect(r2).toBe(true)
+    expect(r1).toBe('refreshed')
+    expect(r2).toBe('refreshed')
     // Only one fetch call — the second piggybacked on the first
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })

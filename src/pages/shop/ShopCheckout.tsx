@@ -56,6 +56,7 @@ export default function ShopCheckout() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [customerNote, setCustomerNote] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>('pix')
   const [storeCreditBalance, setStoreCreditBalance] = useState(0)
   const [applyStoreCredit, setApplyStoreCredit] = useState(true)
@@ -225,6 +226,7 @@ export default function ShopCheckout() {
           email: email.trim(),
           phone: phone.trim() || undefined,
         },
+        customerNote: customerNote.trim() || undefined,
         shippingAddress: {
           cep: digits,
           street: street.trim(),
@@ -339,6 +341,25 @@ export default function ShopCheckout() {
                         placeholder="(21) 99999-9999"
                         disabled={submitting}
                       />
+                    </div>
+                    {/* O pedido de colecionável quase sempre vem com um recado
+                        ("se tiver do mesmo cantor, manda junto"). Sem campo, ele
+                        chegava por outro canal e desencontrado do pedido. */}
+                    <div className="space-y-2">
+                      <Label htmlFor="customer-note">Mensagem para a loja (opcional)</Label>
+                      <textarea
+                        id="customer-note"
+                        value={customerNote}
+                        onChange={(e) => setCustomerNote(e.target.value.slice(0, 500))}
+                        placeholder="Ex.: se tiver mais photocards do mesmo cantor, pode mandar junto"
+                        rows={3}
+                        maxLength={500}
+                        disabled={submitting}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                      />
+                      <p className="text-right text-xs text-muted-foreground">
+                        {customerNote.length}/500
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -566,7 +587,10 @@ export default function ShopCheckout() {
                     clientSecret={result.clientSecret}
                     amount={order?.total}
                     submitLabel={order ? `Pagar ${formatCurrency(order.total)}` : undefined}
-                    onSuccess={() => navigate(`/pedido/${order?.id}`)}
+                    // `fromCheckout` is what tells the confirmation page it may
+                    // empty the cart. Reaching the same URL later — from the
+                    // confirmation e-mail, say — must not touch a new cart.
+                    onSuccess={() => navigate(`/pedido/${order?.id}`, { state: { fromCheckout: true } })}
                     onError={(msg) => toast.error(msg)}
                     onCancel={() => setResult(null)}
                   />
@@ -616,7 +640,9 @@ export default function ShopCheckout() {
                   </div>
 
                   <Button asChild size="lg" className="w-full">
-                    <Link to={`/pedido/${order?.id}`}>Acompanhar pedido</Link>
+                    <Link to={`/pedido/${order?.id}`} state={{ fromCheckout: true }}>
+                      Acompanhar pedido
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>

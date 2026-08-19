@@ -41,6 +41,7 @@ wholesaleRouter.post(
       const result = await wholesaleService.registerWholesale({
         ...req.body,
         ip: req.ip,
+        userAgent: req.headers['user-agent'],
       });
       res.status(201).json(result);
     } catch (err) {
@@ -55,6 +56,7 @@ wholesaleRouter.post('/login', authLimiter, validate(loginSchema), async (req, r
     const result = await wholesaleService.loginWholesale({
       ...req.body,
       ip: req.ip,
+      userAgent: req.headers['user-agent'],
     });
     res.json(result);
   } catch (err) {

@@ -219,3 +219,54 @@ Duas coisas novas expõem dado pessoal e entraram na política dos dois sites:
   perguntou; excluir a conta anonimiza o texto
 - **Fotos da galeria** podem conter pessoas identificáveis de eventos abertos e
   da loja física; remoção por e-mail, sem exigir justificativa
+
+## Categoria em massa e zoom nas fotos (19/08)
+
+Duas coisas que a operação da loja pediu depois de sentir a falta no uso real.
+
+**Categoria em massa (admin).** Recategorizar o catálogo era um produto por vez:
+mover a prateleira de "Música" para "K-pop" significou abrir, editar e salvar
+cada item. A tabela de produtos agora tem seleção por linha (e um "marcar
+todos" que pega a página visível) e uma barra de ação com três modos:
+
+| Modo      | O que faz                                                   |
+| --------- | ----------------------------------------------------------- |
+| `replace` | Troca as categorias do produto pela escolhida (é o "mover") |
+| `add`     | Acrescenta a categoria, mantendo as que já existiam         |
+| `remove`  | Tira só a categoria escolhida                               |
+
+`PATCH /products/bulk/categories` (admin) recebe `{ productIds, categoryIds,
+mode }`, no máximo 200 produtos e 5 categorias por chamada. O lote inteiro roda
+em **uma transação**: um catálogo meio movido é o estado mais difícil de
+consertar, porque não dá para saber de fora onde a operação parou. Categoria
+inexistente falha a requisição inteira em vez de ser ignorada em silêncio.
+
+A seleção é descartada quando a lista embaixo muda (busca, ordenação, página) —
+marcação que sobrevive à própria linha edita produto fora da tela.
+
+**Zoom nas fotos (loja).** Comprar photocard ou figure é decisão de detalhe, e a
+miniatura escondia justamente isso. `ProductImageZoom` traz:
+
+- **Desktop**: lupa no hover — a posição do ponteiro vira a origem do zoom
+- **Qualquer aparelho**: clique/toque abre o visor em tela cheia, com pinça,
+  duplo toque, arrastar para deslocar, setas do teclado e Esc
+- Zoom limitado a 4x, e trocar de foto volta para 1x
+
+No celular o toque curto na foto abre o visor; o arrastar horizontal continua
+trocando de imagem (o limiar de 40px separa os dois).
+
+## Mensagem do cliente no pedido (19/08)
+
+Campo livre no checkout ("Mensagem para a loja"), até 500 caracteres, gravado em
+`orders.customer_note` (migration 026). Existe porque em colecionável o recado é
+parte do pedido — "se tiver mais photocards do mesmo cantor, manda junto" — e
+antes ele chegava por Instagram ou WhatsApp, desencontrado do pedido.
+
+Onde aparece:
+
+- **E-mail de PIX pendente para o admin** — é o primeiro aviso que a loja lê
+- **Painel do pedido** (`OrderDetailModal`), destacado: muda o que vai na caixa
+- **"Minhas compras"** do cliente, para ele conferir o que escreveu
+
+Nada no sistema decide nada a partir do texto. É dado pessoal escrito pelo
+cliente: sai no export da LGPD junto com o pedido e vira `NULL` na exclusão.

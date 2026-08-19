@@ -20,25 +20,39 @@ A plataforma adota uma postura de **defesa em profundidade**:
 
 ### Tokens de Acesso e Refresh
 
-| Token   | Tipo                                  | Expiração  | Armazenamento      |
-| ------- | ------------------------------------- | ---------- | ------------------ |
-| Access  | JWT HS256 (`{ userId, email, role }`) | 15 minutos | Memória (frontend) |
-| Refresh | 64 bytes random hex                   | 30 dias    | Cookie httpOnly    |
+| Token   | Tipo                                  | Expiração | Armazenamento      |
+| ------- | ------------------------------------- | --------- | ------------------ |
+| Access  | JWT HS256 (`{ userId, email, role }`) | 1 hora    | Memória (frontend) |
+| Refresh | 64 bytes random hex                   | 30 dias   | Cookie httpOnly    |
 
 **Refresh token — detalhes:**
 
 - Armazenado no banco como **hash SHA-256** (o valor em texto nunca é persistido)
 - Cookie configurado com `sameSite: lax`, `secure: true` em produção, `path: /auth`, `maxAge: 30 dias`
 - **Rotação obrigatória**: a cada refresh, o token antigo é invalidado e um novo é emitido
-- Invalidação no logout (hash removido do banco)
+- **Uma sessão por dispositivo** (migration 024): cada sessão é uma linha em
+  `refresh_sessions`, com `expires_at` no servidor. Antes existia uma única
+  coluna `users.refresh_token_hash`, então entrar no celular derrubava o login
+  do computador no refresh seguinte — era a reclamação "desloga muito rápido".
+- Logout encerra **só a sessão do aparelho** que pediu (identificada pelo token
+  no cookie). Sem token, encerra todas.
+- Troca de senha, reset de senha, conta desativada e exclusão LGPD encerram
+  **todas** as sessões — a credencial mudou, nada aberto com a antiga vale.
+- O cron diário limpa as sessões vencidas.
 
 ### Fluxo de Refresh
 
-1. Access token expira (15 min)
+1. Access token expira (1 h)
 2. Frontend envia cookie com refresh token para `POST /auth/refresh`
-3. API valida refresh token contra hash SHA-256 no banco
-4. Gera novo access token + novo refresh token
-5. Token antigo invalidado imediatamente
+3. API acha a **sessão** pelo hash do token (ou pelo token anterior, dentro da
+   janela de 30 s que evita corrida entre abas) e confere `expires_at`
+4. Gera novo access token + novo refresh token, rotacionando **só aquela linha**
+5. Token antigo invalidado imediatamente; sessões dos outros aparelhos intactas
+
+**Falha de rede não é logout**: o cliente só apaga os tokens quando o servidor
+responde 400/401/403 no refresh. Timeout, offline ou 5xx (a API reiniciando num
+deploy) devolvem `transient` e a sessão continua — antes qualquer falha caía no
+mesmo ramo e deslogava o cliente.
 
 ### Verificação de Email
 
@@ -338,6 +352,22 @@ Logs são **imutáveis** (INSERT only, sem UPDATE/DELETE).
 | Rastreio                           | `tracking_code` / `tracking_url` | Limpo no delete LGPD                              |
 | Avaliação                          | `product_reviews`                | Autor público só como "Cliente" ou nome de membro |
 | Crédito                            | `store_credits` / ledger         | Restaurado se pedido cancela/falha/reembolsa      |
+
+### Compra de convidado adotada pela conta (migration 023)
+
+O checkout aceita compra sem login, e esse pedido nasce com `user_id NULL` — ou
+seja, invisível em "Minhas compras" mesmo para quem depois cria conta com o
+**mesmo e-mail**. A adoção liga os dois, mas só com **e-mail verificado**:
+
+- O pedido carrega endereço e telefone. Casar por e-mail sem prova de posse
+  deixaria qualquer pessoa se cadastrar com o e-mail alheio e ler esses dados —
+  vazamento de dado pessoal, não conveniência.
+- A checagem `users.email_verified = TRUE` está **dentro do SQL** do `UPDATE`,
+  não no chamador, para que nenhum caminho novo consiga pular a prova.
+- Trocar o e-mail da conta zera `email_verified`, então não dá para usar a troca
+  como atalho para adotar pedido de terceiro.
+- Enquanto não verifica, a loja mostra quantas compras estão esperando e o botão
+  de reenviar a confirmação — o cliente sabe que o pedido existe.
 
 ### Analytics (Umami)
 

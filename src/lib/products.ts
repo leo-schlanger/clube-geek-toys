@@ -47,6 +47,26 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   return result.data ?? null
 }
 
+/**
+ * Re-files several products in one request.
+ *
+ * `replace` swaps the categories of every selected product, `add` files them
+ * under one more, `remove` takes them out — the three shapes the panel offers.
+ */
+export async function bulkSetProductCategories(
+  productIds: string[],
+  categoryIds: string[],
+  mode: 'replace' | 'add' | 'remove' = 'replace'
+): Promise<number> {
+  const result = await api.patch<{ updated: number }>('/products/bulk/categories', {
+    productIds,
+    categoryIds,
+    mode,
+  })
+  if (result.error) throw new Error(result.error)
+  return result.data?.updated ?? 0
+}
+
 /** Public: active categories. */
 export async function listCategories(): Promise<Category[]> {
   const result = await api.get<Category[]>('/products/categories', { skipAuth: true })

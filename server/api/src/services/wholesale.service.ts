@@ -4,7 +4,7 @@ import { query } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 import { auditLog } from '../utils/audit.js';
-import { hashSha256 } from '../utils/hmac.js';
+import { openRefreshSession, ACCESS_TOKEN_EXPIRY } from './auth.service.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
@@ -32,7 +32,6 @@ export interface WholesaleAccount {
 }
 
 const BCRYPT_ROUNDS = 12;
-const ACCESS_TOKEN_EXPIRY = '15m';
 
 function mapAccount(row: pg.QueryResultRow): WholesaleAccount {
   return {
@@ -101,6 +100,7 @@ export async function registerWholesale(data: {
   contactName: string;
   businessActivity?: string;
   ip?: string;
+  userAgent?: string;
 }): Promise<{ account: WholesaleAccount; accessToken: string; refreshToken: string }> {
   const email = data.email.toLowerCase().trim();
   const cnpj = normalizeCnpj(data.cnpj);
@@ -181,10 +181,7 @@ export async function registerWholesale(data: {
 
   const account = mapAccount({ ...result.rows[0], email: userEmail });
   const { accessToken, refreshToken } = generateTokens({ id: userId, email: userEmail, role: userRole });
-  await query(`UPDATE users SET refresh_token_hash = $1 WHERE id = $2`, [
-    hashSha256(refreshToken),
-    userId,
-  ]);
+  await openRefreshSession(userId, refreshToken, data.userAgent);
 
   await auditLog('wholesale.register', userId, {
     cnpj,
@@ -203,6 +200,7 @@ export async function loginWholesale(data: {
   password: string;
   cnpj: string;
   ip?: string;
+  userAgent?: string;
 }): Promise<{ account: WholesaleAccount; accessToken: string; refreshToken: string }> {
   const email = data.email.toLowerCase().trim();
   const cnpj = normalizeCnpj(data.cnpj);
@@ -263,10 +261,7 @@ export async function loginWholesale(data: {
     email: user.email,
     role: user.role,
   });
-  await query(`UPDATE users SET refresh_token_hash = $1 WHERE id = $2`, [
-    hashSha256(refreshToken),
-    user.id,
-  ]);
+  await openRefreshSession(user.id, refreshToken, data.userAgent);
 
   await auditLog('wholesale.login', user.id, { cnpj, status: account.status, ip: data.ip || null });
 

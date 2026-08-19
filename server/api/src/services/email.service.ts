@@ -240,7 +240,16 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Total', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
         ])}
         <p style="margin-top:16px">Você receberá o código de rastreio dos Correios assim que o pedido for postado.</p>`,
-      cta: { text: 'Acompanhar pedido', url: 'https://shop.geeketoys.com.br/minhas-compras' },
+      // The order page is public and keyed by the order's UUID, so it opens for a
+      // guest checkout too. `/minhas-compras` requires a login the guest does
+      // not have — it used to bounce the customer to a signup form and then to
+      // an empty list, which read as "my order disappeared".
+      cta: {
+        text: 'Acompanhar pedido',
+        url: v.order_id
+          ? `https://shop.geeketoys.com.br/pedido/${v.order_id}`
+          : 'https://shop.geeketoys.com.br/minhas-compras',
+      },
     },
 
     'order-shipped': {
@@ -453,6 +462,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Email', v.customer_email || '—'],
           ['Valor', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
           ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
+          // O recado muda o que vai na caixa, então precisa estar no aviso que a
+          // loja lê primeiro — não só no painel.
+          ...(v.customer_note ? [['Mensagem do cliente', escapeHtml(v.customer_note)]] : []),
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Confira no extrato se o PIX com o TX ID acima caiu<br>2. Abra o pedido no painel admin e confirme o pagamento<br>3. O estoque só é baixado depois da confirmação')}`,
       cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || `${frontendUrl}/admin` },

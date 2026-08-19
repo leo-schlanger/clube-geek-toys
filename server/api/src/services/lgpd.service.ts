@@ -255,6 +255,9 @@ export async function deleteUserAccount(userId: string, password: string) {
        WHERE id = $3`,
       [`deleted_${userId}@redacted`, randomHash, userId]
     );
+    // Erasure has to reach the open sessions too, otherwise a device that is
+    // still signed in keeps working against the anonymised account.
+    await client.query('DELETE FROM refresh_sessions WHERE user_id = $1', [userId]);
 
     if (memberId) {
       await client.query(
@@ -315,7 +318,10 @@ export async function deleteUserAccount(userId: string, password: string) {
          shipping_address = '{"redacted":true}'::jsonb,
          tracking_code = NULL,
          tracking_url = NULL,
-         customer_cnpj = NULL
+         customer_cnpj = NULL,
+         -- Texto escrito pelo cliente: pode conter qualquer dado pessoal que
+         -- ele tenha decidido contar à loja, então sai junto com o resto.
+         customer_note = NULL
        WHERE user_id = $1
           OR ($2::uuid IS NOT NULL AND member_id = $2)
           OR lower(customer_email) = lower($3)`,

@@ -222,6 +222,31 @@ productRouter.post('/', authenticate, requireRole('admin'), validate(productSche
   }
 });
 
+const bulkCategoriesSchema = z.object({
+  // 200 is the admin page size ceiling — a request that batches more than one
+  // full screen of products is a script, not the panel.
+  productIds: z.array(z.string().uuid()).min(1).max(200),
+  categoryIds: z.array(z.string().uuid()).min(1).max(5),
+  mode: z.enum(['replace', 'add', 'remove']).default('replace'),
+});
+
+// PATCH /products/bulk/categories — re-files a selection in one shot.
+// Declared before '/:id' so "bulk" is never read as a product id.
+productRouter.patch(
+  '/bulk/categories',
+  authenticate,
+  requireRole('admin'),
+  validate(bulkCategoriesSchema),
+  async (req, res, next) => {
+    try {
+      const { productIds, categoryIds, mode } = req.body;
+      res.json(await productService.bulkSetProductCategories(productIds, categoryIds, mode));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 productRouter.patch('/:id', authenticate, requireRole('admin'), validate(productSchema.partial()), async (req, res, next) => {
   try {
     res.json(await productService.updateProduct(req.params.id as string, req.body));

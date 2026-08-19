@@ -47,6 +47,7 @@ function mapOrder(row: pg.QueryResultRow): Order {
     customerName: row.customer_name,
     customerEmail: row.customer_email,
     customerPhone: row.customer_phone,
+    customerNote: row.customer_note ?? null,
     shippingAddress: row.shipping_address,
     subtotal: parseFloat(row.subtotal),
     discount: parseFloat(row.discount),
@@ -114,6 +115,7 @@ function notifyAdminOfPendingPix(order: Order, txId: string): void {
         customer_email: order.customerEmail,
         total: order.total.toFixed(2).replace('.', ','),
         tx_id: txId,
+        customer_note: order.customerNote ?? '',
         admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=orders`,
       },
     }).catch((err) => console.error('[PIX] admin-pix-order-pending failed', err));
@@ -127,6 +129,8 @@ function notifyAdminOfPendingPix(order: Order, txId: string): void {
 export interface CreateOrderInput {
   items: { productId: string; quantity: number; variantId?: string }[];
   customer: { name: string; email: string; phone?: string };
+  /** Free-text note the customer writes for the shop at checkout. */
+  customerNote?: string;
   shippingAddress: ShippingAddressInput;
   shipping: {
     quoteToken: string;
@@ -414,10 +418,10 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
          member_id, user_id, customer_name, customer_email, customer_phone, shipping_address,
          subtotal, discount, discount_reason, shipping_cost, shipping_service, shipping_service_id,
          shipping_days, store_credit_applied, total, status, payment_method,
-         channel, customer_cnpj, wholesale_account_id
+         channel, customer_cnpj, wholesale_account_id, customer_note
        )
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16,
-               $17, $18, $19)
+               $17, $18, $19, $20)
        RETURNING *`,
       [
         memberId,
@@ -439,6 +443,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         channel,
         customerCnpj,
         wholesaleAccountId,
+        input.customerNote?.trim() ? input.customerNote.trim().slice(0, 500) : null,
       ]
     );
     order = mapOrder(orderResult.rows[0]);
@@ -620,11 +625,82 @@ export async function listOrders(opts: { status?: string; page?: number; limit?:
   return { orders: data.rows.map(mapOrder), total: count.rows[0].total as number, page, limit };
 }
 
+/**
+ * Adopts guest orders left by the same person before they had an account.
+ *
+ * Guest checkout is allowed (`optionalAuth` on POST /orders), so those orders
+ * are stored with `user_id = NULL` and the customer's e-mail as the only link
+ * back to a human. `listMyOrders` filters by `user_id`/`member_id`, so without
+ * this step the purchase stays invisible forever — the customer pays, gets the
+ * confirmation e-mail, registers with the same address and finds nothing.
+ *
+ * Matching by e-mail alone is not enough to hand over the data: an order
+ * carries the shipping address and phone number, so claiming it for whoever
+ * happens to type that e-mail into the signup form would leak someone else's
+ * personal data. The account therefore has to have proven it owns the address
+ * — `email_verified` — which is why the ownership test lives inside the SQL
+ * instead of in the caller.
+ *
+ * Idempotent, and safe to call on every login: once an order is adopted it no
+ * longer matches `user_id IS NULL`. It does bump `orders.updated_at` — the
+ * table's BEFORE UPDATE trigger fires on any write and cannot be opted out of
+ * — which is why the admin dashboard ages its queues by `status_changed_at`
+ * (migration 025) instead: adopting an order is not the order moving.
+ *
+ * @returns how many orders were adopted.
+ */
+export async function claimGuestOrders(userId: string): Promise<number> {
+  const result = await query(
+    `UPDATE orders o
+        SET user_id = u.id
+       FROM users u
+      WHERE u.id = $1
+        AND u.email_verified = TRUE
+        AND o.user_id IS NULL
+        AND lower(o.customer_email) = lower(u.email)`,
+    [userId]
+  );
+  const claimed = result.rowCount ?? 0;
+  if (claimed > 0) {
+    console.log(`[ORDERS] ${claimed} pedido(s) de convidado vinculados ao usuário ${userId}`);
+  }
+  return claimed;
+}
+
+/**
+ * Guest orders waiting on e-mail verification to be adopted.
+ *
+ * Feeds the notice on "Minhas compras": the customer can see that the purchase
+ * was found and what unlocks it, instead of an empty list that reads like the
+ * order was lost.
+ */
+export async function countUnclaimedGuestOrders(userId: string): Promise<number> {
+  const result = await query(
+    `SELECT COUNT(*)::int AS total
+       FROM orders o
+       JOIN users u ON u.id = $1
+      WHERE u.email_verified = FALSE
+        AND o.user_id IS NULL
+        AND lower(o.customer_email) = lower(u.email)`,
+    [userId]
+  );
+  return (result.rows[0]?.total as number) ?? 0;
+}
+
 /** Customer order history — by user_id (preferred) or legacy member_id. */
 export async function listMyOrders(
   userId: string,
   opts: { statuses?: string[]; page?: number; limit?: number } = {}
 ) {
+  // Adopt any guest order this account is entitled to before reading the list,
+  // so a purchase made before signing up shows up on the first visit — and so
+  // accounts verified before this shipped are healed without a manual UPDATE.
+  // Never fatal: an order that stays orphaned is a support ticket, but an
+  // exception here would take the whole order history down with it.
+  await claimGuestOrders(userId).catch((err) =>
+    console.error('[ORDERS] claimGuestOrders falhou em listMyOrders:', err)
+  );
+
   const memberId = await getMemberIdForUser(userId);
   const conditions: string[] = ['(user_id = $1 OR ($2::uuid IS NOT NULL AND member_id = $2))'];
   const params: unknown[] = [userId, memberId];
@@ -666,7 +742,9 @@ export async function listMyOrders(
     }
   }
 
-  return { orders, total: count.rows[0].total as number, page, limit };
+  const unclaimedGuestOrders = await countUnclaimedGuestOrders(userId);
+
+  return { orders, total: count.rows[0].total as number, page, limit, unclaimedGuestOrders };
 }
 
 /** Statuses a customer may cancel without an admin or a refund. */
@@ -911,6 +989,7 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
         name: order.customerName,
         order_number: String(order.orderNumber),
         total: order.total.toFixed(2).replace('.', ','),
+        order_id: order.id,
       },
     }).catch((err) => console.error('[email] order-confirmed (pix) failed', err));
     return order;

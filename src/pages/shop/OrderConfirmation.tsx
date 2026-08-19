@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useLocation, Link } from 'react-router-dom'
 import { CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Home } from 'lucide-react'
 import type { OrderStatus } from '../../types'
 import { getOrderStatus } from '../../lib/orders'
@@ -24,7 +24,12 @@ const TERMINAL_STATUSES: OrderStatus[] = [
 
 export default function OrderConfirmation() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const { clear } = useCart()
+  // This page doubles as the public order page linked from the confirmation
+  // e-mail, which a customer may open days later with a new cart in progress.
+  // Only a visit that came straight from checkout is allowed to empty it.
+  const cameFromCheckout = (location.state as { fromCheckout?: boolean } | null)?.fromCheckout === true
   const { isMember } = useShopMember()
 
   const [status, setStatus] = useState<OrderStatus | null>(null)
@@ -61,6 +66,7 @@ export default function OrderConfirmation() {
 
         // Clear the cart once, as soon as the order is confirmed.
         if (
+          cameFromCheckout &&
           !clearedRef.current &&
           info.status !== 'pending' &&
           info.status !== 'cancelled' &&

@@ -35,6 +35,9 @@ const createOrderSchema = z.object({
     email: z.string().email(),
     phone: z.string().max(30).optional(),
   }),
+  // Recado livre para a loja ("manda mais photocards do mesmo cantor"). Nada no
+  // sistema decide por ele — é para a pessoa que separa o pedido ler.
+  customerNote: z.string().max(500).optional(),
   shippingAddress: shippingAddressSchema,
   shipping: z.object({
     quoteToken: z.string().min(10),

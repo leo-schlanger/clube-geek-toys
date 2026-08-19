@@ -124,9 +124,19 @@ async function fetchWithRetry(
 // Token Refresh
 // ============================================
 
-let refreshPromise: Promise<boolean> | null = null
+/**
+ * Why the outcome is three-valued and not a boolean: only the server saying
+ * "this token is not valid" means the session is over. A timeout, an offline
+ * phone or a 502 while the API container restarts on deploy used to land in
+ * the same branch and wipe the tokens — the session was fine, the network was
+ * not, and the customer was thrown back to the login screen. Those now report
+ * `transient` and the caller leaves the session alone.
+ */
+export type RefreshOutcome = 'refreshed' | 'invalid' | 'transient'
 
-export async function tryRefreshToken(): Promise<boolean> {
+let refreshPromise: Promise<RefreshOutcome> | null = null
+
+export async function tryRefreshToken(): Promise<RefreshOutcome> {
   // Prevent concurrent refresh attempts
   if (refreshPromise) return refreshPromise
 
@@ -145,18 +155,24 @@ export async function tryRefreshToken(): Promise<boolean> {
       })
 
       if (!response.ok) {
+        // 5xx (and anything else that is not a rejection of the credential) is
+        // the server having a bad moment, not the session ending.
+        if (response.status !== 401 && response.status !== 403 && response.status !== 400) {
+          return 'transient'
+        }
         clearTokens()
-        return false
+        return 'invalid'
       }
 
       const data = await response.json()
       // Backend continues to return refreshToken in body for the migration period.
       // Once cookies are the only path, we can drop this and access becomes memory-only.
       setTokens(data.accessToken, data.refreshToken)
-      return true
+      return 'refreshed'
     } catch {
-      clearTokens()
-      return false
+      // Network error or timeout: the tokens we hold may still be perfectly
+      // good, so they stay put and the request simply fails.
+      return 'transient'
     } finally {
       refreshPromise = null
     }
@@ -216,7 +232,7 @@ export async function apiRequest<T = unknown>(
     // Handle 401 — try token refresh
     if (response.status === 401 && !skipAuth) {
       const refreshed = await tryRefreshToken()
-      if (refreshed) {
+      if (refreshed === 'refreshed') {
         // Retry with new token
         const newToken = getAccessToken()
         fetchOptions.headers = {
@@ -235,8 +251,13 @@ export async function apiRequest<T = unknown>(
           }
         }
         return { data: retryData, status: retryResponse.status }
+      } else if (refreshed === 'transient') {
+        // Could not reach the refresh endpoint. Keep the session and let the
+        // caller retry — signing the user out here is how a flaky connection
+        // used to turn into "o site me desloga sozinho".
+        return { error: 'Não foi possível falar com o servidor. Tente de novo.', status: 503 }
       } else {
-        // Refresh failed — force logout
+        // The server rejected the refresh token — the session is really over.
         window.dispatchEvent(new CustomEvent('auth:logout'))
         return { error: 'Sessão expirada', status: 401 }
       }

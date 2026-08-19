@@ -8,6 +8,7 @@ import { ProductModal } from './ProductModal'
 import type { Product, Category } from '../../types'
 import {
   adminListProducts,
+  bulkSetProductCategories,
   deleteProduct,
   duplicateProduct,
   listCategories,
@@ -16,7 +17,7 @@ import {
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
-import { Plus, Search, Package, Pencil, Trash2, Star, ImageOff, Copy } from 'lucide-react'
+import { Plus, Search, Package, Pencil, Trash2, Star, ImageOff, Copy, FolderTree } from 'lucide-react'
 import { parseProductSort, ADMIN_CATALOG_PAGE_SIZE, type ProductSort } from '../../lib/product-sort'
 import { ProductSortSelect } from '../store/ProductSortSelect'
 import { Pagination } from '../ui/pagination'
@@ -35,6 +36,11 @@ export function ProductsTab() {
   const [pageSize, setPageSize] = useState(ADMIN_CATALOG_PAGE_SIZE)
   const [missingPhotoCount, setMissingPhotoCount] = useState(0)
   const [modal, setModal] = useState<ModalState>(null)
+  /** Ids ticked for a bulk action, kept as a Set to stay O(1) per row. */
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkCategory, setBulkCategory] = useState('')
+  const [bulkMode, setBulkMode] = useState<'replace' | 'add' | 'remove'>('replace')
+  const [bulkSaving, setBulkSaving] = useState(false)
   const debouncedSearch = useDebounce(search, 300)
 
   const fetchProducts = useCallback(async () => {
@@ -52,6 +58,10 @@ export function ProductsTab() {
       ])
       setProducts(productsResult.products)
       setTotal(productsResult.total)
+      // The ticks belong to the rows that were on screen. Keeping them across a
+      // search, a sort or a page turn would apply the action to products the
+      // person can no longer see.
+      setSelected(new Set())
       if (productsResult.missingPhotoCount != null) {
         setMissingPhotoCount(productsResult.missingPhotoCount)
       }
@@ -111,6 +121,45 @@ export function ProductsTab() {
     }
   }, [])
 
+  function toggleRow(id: string) {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const allSelected = products.length > 0 && products.every((p) => selected.has(p.id))
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(products.map((p) => p.id)))
+  }
+
+  const handleBulkCategory = useCallback(async () => {
+    if (!bulkCategory || selected.size === 0) return
+    const categoryName = categories.find((c) => c.id === bulkCategory)?.name ?? 'a categoria'
+    const verb =
+      bulkMode === 'replace'
+        ? `mover para "${categoryName}"`
+        : bulkMode === 'add'
+          ? `adicionar em "${categoryName}"`
+          : `tirar de "${categoryName}"`
+    if (!window.confirm(`${verb} ${selected.size} produto(s)?`)) return
+
+    setBulkSaving(true)
+    try {
+      const updated = await bulkSetProductCategories([...selected], [bulkCategory], bulkMode)
+      toast.success(`${updated} produto(s) atualizados`)
+      setBulkCategory('')
+      fetchProducts()
+    } catch (error) {
+      logger.error('Error updating categories in bulk:', error)
+      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar categorias')
+    }
+    setBulkSaving(false)
+  }, [bulkCategory, bulkMode, categories, fetchProducts, selected])
+
   const term = search.trim()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -158,6 +207,48 @@ export function ProductsTab() {
             }}
           />
         </div>
+
+        {/* Barra de ação em massa — só aparece com algo marcado, para não
+            competir com a busca no uso normal do painel. */}
+        {selected.size > 0 && (
+          <div className="mt-3 flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 sm:flex-row sm:items-center">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <FolderTree className="h-4 w-4 text-primary" />
+              {selected.size} selecionado(s)
+            </span>
+            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                aria-label="Ação na categoria"
+                value={bulkMode}
+                onChange={(e) => setBulkMode(e.target.value as 'replace' | 'add' | 'remove')}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="replace">Mover para</option>
+                <option value="add">Adicionar em</option>
+                <option value="remove">Tirar de</option>
+              </select>
+              <select
+                aria-label="Categoria"
+                value={bulkCategory}
+                onChange={(e) => setBulkCategory(e.target.value)}
+                className="h-9 flex-1 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="">Escolha a categoria…</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <Button size="sm" onClick={handleBulkCategory} disabled={!bulkCategory || bulkSaving}>
+                {bulkSaving ? 'Aplicando…' : 'Aplicar'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                Limpar
+              </Button>
+            </div>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>
@@ -170,6 +261,15 @@ export function ProductsTab() {
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="w-10 py-3 pl-4">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todos os produtos desta página"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="h-4 w-4 cursor-pointer accent-primary"
+                    />
+                  </th>
                   <th className="text-left py-3 px-4 font-medium text-sm">Produto</th>
                   <th className="text-left py-3 px-4 font-medium text-sm">Categoria</th>
                   <th className="text-left py-3 px-4 font-medium text-sm">Preço</th>
@@ -186,6 +286,15 @@ export function ProductsTab() {
                     key={product.id}
                     className={`border-b hover:bg-muted/50 transition-colors ${!product.active ? 'opacity-50' : ''} ${product.active && !hasPhoto ? 'bg-amber-500/5' : ''}`}
                   >
+                    <td className="py-4 pl-4">
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${product.name}`}
+                        checked={selected.has(product.id)}
+                        onChange={() => toggleRow(product.id)}
+                        className="h-4 w-4 cursor-pointer accent-primary"
+                      />
+                    </td>
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
                         <div

@@ -236,6 +236,79 @@ async function syncProductCategories(
   return primary;
 }
 
+/**
+ * Re-files many products at once.
+ *
+ * Recategorising a catalogue used to be one product, one modal, one save — the
+ * shop moved a whole shelf from "Música" to "K-pop" by hand. Batching it is not
+ * only faster: doing it product by product leaves the catalogue half-moved for
+ * as long as the person is clicking, and the storefront shows that.
+ *
+ * The whole batch is one transaction: a partial move is the state that is
+ * hardest to recover from, because there is no way to tell from the outside
+ * which products were already done.
+ *
+ * @param mode `replace` swaps the categories, `add` files the product under one
+ *   more, `remove` takes it out of the given ones. `add`/`remove` never touch
+ *   the categories a product has beyond the ones named.
+ */
+export async function bulkSetProductCategories(
+  productIds: string[],
+  categoryIds: string[],
+  mode: 'replace' | 'add' | 'remove'
+): Promise<{ updated: number }> {
+  const products = [...new Set(productIds.filter(Boolean))];
+  const categories = [...new Set(categoryIds.filter(Boolean))];
+  if (products.length === 0) return { updated: 0 };
+  if (categories.length === 0) {
+    throw new AppError(400, 'Escolha ao menos uma categoria.', 'NO_CATEGORY');
+  }
+
+  // Reject unknown ids up front: silently skipping them would report success
+  // for a move that did not happen.
+  const known = await query(`SELECT id FROM categories WHERE id = ANY($1::uuid[])`, [categories]);
+  if (known.rows.length !== categories.length) {
+    throw new AppError(400, 'Categoria não encontrada.', 'CATEGORY_NOT_FOUND');
+  }
+
+  const client = await getClient();
+  try {
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT id FROM products WHERE id = ANY($1::uuid[])`,
+      [products]
+    );
+    const ids = existing.rows.map((r) => r.id as string);
+
+    for (const productId of ids) {
+      let next: string[];
+      if (mode === 'replace') {
+        next = categories;
+      } else {
+        const current = await client.query(
+          `SELECT category_id FROM product_categories WHERE product_id = $1 ORDER BY position`,
+          [productId]
+        );
+        const currentIds = current.rows.map((r) => r.category_id as string);
+        next =
+          mode === 'add'
+            ? [...currentIds, ...categories.filter((c) => !currentIds.includes(c))]
+            : currentIds.filter((c) => !categories.includes(c));
+      }
+      await syncProductCategories(client, productId, next);
+    }
+
+    await client.query('COMMIT');
+    return { updated: ids.length };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // ─── Products ────────────────────────────────────────────────────────────────
 
 /** Seed/QA products must not appear on the public storefront. */

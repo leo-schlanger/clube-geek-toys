@@ -120,7 +120,7 @@ export async function storeContract(
   // Refresh and retry once on 401.
   if (response.status === 401) {
     const refreshed = await tryRefreshToken()
-    if (refreshed) {
+    if (refreshed === 'refreshed') {
       response = await doUpload(getAccessToken())
     }
   }

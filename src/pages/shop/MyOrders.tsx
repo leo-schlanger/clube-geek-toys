@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Package, ChevronRight, Truck, Loader2 } from 'lucide-react'
+import { Package, ChevronRight, Truck, Loader2, MailWarning } from 'lucide-react'
 import type { MyOrdersTab, Order } from '../../types'
 import { MY_ORDERS_TAB_STATUSES } from '../../types'
 import { listMyOrders } from '../../lib/orders'
+import { sendVerificationEmail } from '../../lib/email'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
@@ -32,6 +33,11 @@ export default function MyOrders() {
 
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  // Guest purchases waiting on e-mail verification. Without this the customer
+  // sees an empty list and concludes the order vanished — the order is there,
+  // it just cannot be handed over until the address is proven.
+  const [pendingGuestOrders, setPendingGuestOrders] = useState(0)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
 
   useEffect(() => {
     if (authLoading) return
@@ -48,10 +54,17 @@ export default function MyOrders() {
     })
     listMyOrders({ tab: activeTab, limit: 40 })
       .then((res) => {
-        if (active) setOrders(res.orders)
+        if (!active) return
+        setOrders(res.orders)
+        setPendingGuestOrders(res.unclaimedGuestOrders ?? 0)
       })
       .catch(() => {
-        if (active) setOrders([])
+        if (!active) return
+        setOrders([])
+        // The count came from the response that just failed — keeping the old
+        // one would show the notice next to a list that is empty for an
+        // entirely different reason.
+        setPendingGuestOrders(0)
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -60,6 +73,15 @@ export default function MyOrders() {
       active = false
     }
   }, [user, activeTab])
+
+  async function resendVerification() {
+    if (!user || resendState === 'sending') return
+    setResendState('sending')
+    const result = await sendVerificationEmail(user.email, user.id)
+    // A silent failure here reads as a dead button — and the rate limiter makes
+    // the second click cost more than the first.
+    setResendState(result.success ? 'sent' : 'error')
+  }
 
   function setTab(id: MyOrdersTab) {
     if (id === 'all') setSearchParams({})
@@ -78,6 +100,43 @@ export default function MyOrders() {
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="mb-4 text-2xl font-heading font-bold">Minhas compras</h1>
+
+        {pendingGuestOrders > 0 && (
+          <div className="mb-6 flex gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4">
+            <MailWarning className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+            <div className="min-w-0 text-sm">
+              <p className="font-medium">
+                {pendingGuestOrders === 1
+                  ? 'Encontramos 1 compra feita sem login com este e-mail.'
+                  : `Encontramos ${pendingGuestOrders} compras feitas sem login com este e-mail.`}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Confirme seu e-mail para {pendingGuestOrders === 1 ? 'ela aparecer' : 'elas aparecerem'} aqui —
+                é o que garante que só você veja o endereço e o telefone do pedido.
+              </p>
+              {resendState === 'sent' ? (
+                <p className="mt-2 font-medium text-accent">
+                  E-mail de confirmação reenviado. Verifique sua caixa de entrada e o spam.
+                </p>
+              ) : resendState === 'error' ? (
+                <p className="mt-2 font-medium text-destructive">
+                  Não conseguimos reenviar agora. Espere alguns minutos e tente de novo, ou fale
+                  com a loja.
+                </p>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={resendVerification}
+                  disabled={resendState === 'sending'}
+                >
+                  {resendState === 'sending' ? 'Enviando…' : 'Reenviar e-mail de confirmação'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="mb-6 flex gap-1 overflow-x-auto border-b pb-px">
           {TABS.map((t) => (

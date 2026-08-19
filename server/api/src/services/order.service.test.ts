@@ -72,7 +72,13 @@ vi.mock('./stock.service.js', () => ({
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
 
-import { createOrder, cancelMyOrder, decrementStockForOrder } from './order.service.js';
+import {
+  createOrder,
+  cancelMyOrder,
+  decrementStockForOrder,
+  claimGuestOrders,
+  listMyOrders,
+} from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -126,6 +132,7 @@ function insertedOrderValues(): unknown[] {
 const COL = {
   customerName: 2,
   customerEmail: 3,
+  customerNote: 19,
   subtotal: 6,
   discount: 7,
   discountReason: 8,
@@ -807,5 +814,98 @@ describe('cancelMyOrder', () => {
     const order = await cancelMyOrder('u1', 'o1');
 
     expect(order.status).toBe('cancelled');
+  });
+});
+
+/**
+ * Guest checkout leaves `user_id = NULL`, and "Minhas compras" only reads by
+ * `user_id`/`member_id` — so without adoption the purchase is invisible to the
+ * account created afterwards with the same e-mail. The rules being pinned:
+ * the ownership proof (`email_verified`) is enforced in SQL, the match ignores
+ * case, and the reading path heals itself.
+ */
+describe('claimGuestOrders', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    memberIdMock.mockResolvedValue(null);
+  });
+
+  it('adopts orders only for an account that proved it owns the e-mail', async () => {
+    queryMock.mockResolvedValueOnce({ rowCount: 2, rows: [] });
+
+    const claimed = await claimGuestOrders('u1');
+
+    expect(claimed).toBe(2);
+    const [sql, params] = queryMock.mock.calls[0];
+    expect(sql).toMatch(/UPDATE orders/);
+    expect(sql).toMatch(/email_verified\s*=\s*TRUE/);
+    expect(sql).toMatch(/o\.user_id IS NULL/);
+    // Case-insensitive: users.email is normalized on signup, customer_email is
+    // whatever the customer typed at checkout.
+    expect(sql).toMatch(/lower\(o\.customer_email\) = lower\(u\.email\)/);
+    expect(params).toEqual(['u1']);
+  });
+
+  it('reports nothing adopted when no guest order matches', async () => {
+    queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(claimGuestOrders('u1')).resolves.toBe(0);
+  });
+
+  it('heals older accounts by adopting before reading the list', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // claim
+      .mockResolvedValueOnce({ rows: [] })              // page
+      .mockResolvedValueOnce({ rows: [{ total: 0 }] })  // count
+      .mockResolvedValueOnce({ rows: [{ total: 0 }] }); // unclaimed
+
+    await listMyOrders('u1');
+
+    expect(queryMock.mock.calls[0][0]).toMatch(/UPDATE orders/);
+  });
+
+  it('tells a still-unverified account how many purchases are waiting', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+      .mockResolvedValueOnce({ rows: [{ total: 1 }] });
+
+    const result = await listMyOrders('u1');
+
+    expect(result.unclaimedGuestOrders).toBe(1);
+    expect(queryMock.mock.calls[3][0]).toMatch(/email_verified = FALSE/);
+  });
+});
+
+/**
+ * The note the customer writes at checkout ("manda mais photocards do mesmo
+ * cantor"). It decides what goes in the box, so what is pinned is that it
+ * reaches the row intact — trimmed, capped, and never invented.
+ */
+describe('mensagem do cliente no checkout', () => {
+
+  it('stores the note with the order', async () => {
+    setupTx({ products: [product()] });
+
+    await createOrder(baseInput({ customerNote: '  se tiver do Jungkook manda junto  ' }));
+
+    expect(insertedOrderValues()[COL.customerNote]).toBe('se tiver do Jungkook manda junto');
+  });
+
+  it('writes NULL when the customer left it blank', async () => {
+    setupTx({ products: [product()] });
+
+    await createOrder(baseInput({ customerNote: '   ' }));
+
+    expect(insertedOrderValues()[COL.customerNote]).toBeNull();
+  });
+
+  it('caps the note instead of letting it hit the column constraint', async () => {
+    setupTx({ products: [product()] });
+
+    await createOrder(baseInput({ customerNote: 'a'.repeat(900) }));
+
+    expect(String(insertedOrderValues()[COL.customerNote])).toHaveLength(500);
   });
 });

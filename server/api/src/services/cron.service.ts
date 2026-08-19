@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
 import { getActionItems } from './report.service.js';
 import { releaseReservationById } from './order.service.js';
+import { purgeExpiredRefreshSessions } from './auth.service.js';
 
 export function initCronJobs() {
   // Daily at 6:00 AM UTC (3:00 AM BRT)
@@ -23,6 +24,12 @@ export function initCronJobs() {
       await releaseExpiredStockReservations();
     } catch (err) {
       console.error('[CRON] Expire stock reservations error:', err);
+    }
+    try {
+      const purged = await purgeExpiredRefreshSessions();
+      if (purged > 0) console.log(`[CRON] Purged ${purged} expired refresh session(s)`);
+    } catch (err) {
+      console.error('[CRON] Purge refresh sessions error:', err);
     }
     // Last: it reports on the state the two jobs above just left behind.
     try {

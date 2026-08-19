@@ -292,7 +292,7 @@ describe('storeContract', () => {
     mockedGetAccessToken
       .mockReturnValueOnce('old-token')
       .mockReturnValueOnce('new-token')
-    mockedTryRefreshToken.mockResolvedValueOnce(true)
+    mockedTryRefreshToken.mockResolvedValueOnce('refreshed')
 
     // First call returns 401
     mockFetch.mockResolvedValueOnce({
@@ -316,7 +316,7 @@ describe('storeContract', () => {
 
   it('should throw when response is not ok after retry', async () => {
     mockedGetAccessToken.mockReturnValue('token')
-    mockedTryRefreshToken.mockResolvedValueOnce(true)
+    mockedTryRefreshToken.mockResolvedValueOnce('refreshed')
 
     // First: 401
     mockFetch.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({}) })
@@ -332,7 +332,7 @@ describe('storeContract', () => {
 
   it('should throw when 401 and refresh fails', async () => {
     mockedGetAccessToken.mockReturnValue('token')
-    mockedTryRefreshToken.mockResolvedValueOnce(false)
+    mockedTryRefreshToken.mockResolvedValueOnce('invalid')
 
     mockFetch.mockResolvedValueOnce({
       ok: false,

@@ -97,7 +97,7 @@ const sendVerificationSchema = z.object({
 authRouter.post('/register', authLimiter, validate(registerSchema), async (req, res, next) => {
   try {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
-    const result = await authService.register({ ...req.body, ip });
+    const result = await authService.register({ ...req.body, ip, userAgent: req.headers['user-agent'] });
     setRefreshCookie(res, result.refreshToken);
     res.status(201).json(result);
   } catch (err) {
@@ -109,7 +109,7 @@ authRouter.post('/register', authLimiter, validate(registerSchema), async (req, 
 authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, next) => {
   try {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
-    const result = await authService.login({ ...req.body, ip });
+    const result = await authService.login({ ...req.body, ip, userAgent: req.headers['user-agent'] });
     setRefreshCookie(res, result.refreshToken);
     res.json(result);
   } catch (err) {
@@ -120,7 +120,7 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, n
 authRouter.post('/google', authLimiter, validate(googleAuthSchema), async (req, res, next) => {
   try {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
-    const result = await authService.googleAuth(req.body.idToken, ip);
+    const result = await authService.googleAuth(req.body.idToken, ip, req.headers['user-agent']);
     setRefreshCookie(res, result.refreshToken);
     res.json(result);
   } catch (err) {
@@ -138,7 +138,7 @@ authRouter.post('/refresh', authLimiter, async (req, res, next) => {
       res.status(400).json({ error: 'Refresh token obrigatório', code: 'NO_REFRESH_TOKEN' });
       return;
     }
-    const result = await authService.refresh(refreshToken);
+    const result = await authService.refresh(refreshToken, req.headers['user-agent']);
     setRefreshCookie(res, result.refreshToken);
     res.json(result);
   } catch (err) {
@@ -148,7 +148,11 @@ authRouter.post('/refresh', authLimiter, async (req, res, next) => {
 
 authRouter.post('/logout', authenticate, async (req, res, next) => {
   try {
-    await authService.logout(req.user!.userId);
+    // Sign out this device only — the refresh token says which session it is.
+    // Without it (a client that never got the cookie) every session is closed,
+    // which is the safe reading of "log me out".
+    const cookies = parseCookies(req);
+    await authService.logout(req.user!.userId, cookies[REFRESH_COOKIE_NAME] || req.body?.refreshToken);
     clearRefreshCookie(res);
     res.json({ message: 'Logout realizado' });
   } catch (err) {

@@ -7,14 +7,17 @@ vi.mock('../config/env.js', () => ({
 }));
 
 const query = vi.fn();
+const clientQuery = vi.fn();
+const release = vi.fn();
 vi.mock('../config/database.js', () => ({
   query: (...args: unknown[]) => query(...args),
-  getClient: vi.fn(),
+  getClient: async () => ({ query: clientQuery, release }),
 }));
 
 const {
   addProductImages,
   addProductVideo,
+  bulkSetProductCategories,
   MAX_PRODUCT_IMAGES,
   MAX_PRODUCT_VIDEOS,
 } = await import('./product.service.js');
@@ -168,5 +171,87 @@ describe('addProductVideo', () => {
     const product = await addProductVideo('p1', video);
 
     expect(product.videos).toEqual([video]);
+  });
+});
+
+/**
+ * Moving a shelf of products between categories used to be one product at a
+ * time. What these tests hold: the batch is all-or-nothing, `add`/`remove`
+ * respect the categories a product already had, and an id nobody recognises
+ * fails loudly instead of reporting a move that did not happen.
+ */
+describe('bulkSetProductCategories', () => {
+  beforeEach(() => {
+    query.mockReset();
+    clientQuery.mockReset();
+    release.mockReset();
+  });
+
+  it('replaces the categories of every product in one transaction', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 'c-kpop' }] }); // categorias conhecidas
+    clientQuery
+      .mockResolvedValueOnce({ rows: [] })                                  // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: 'p1' }, { id: 'p2' }] })        // produtos
+      .mockResolvedValue({ rows: [] });
+
+    const result = await bulkSetProductCategories(['p1', 'p2'], ['c-kpop'], 'replace');
+
+    expect(result).toEqual({ updated: 2 });
+    const statements = clientQuery.mock.calls.map((c) => String(c[0]));
+    expect(statements[0]).toBe('BEGIN');
+    expect(statements).toContain('COMMIT');
+    // Um DELETE + um INSERT por produto: as categorias antigas saem de fato.
+    expect(statements.filter((sql) => sql.includes('DELETE FROM product_categories'))).toHaveLength(2);
+  });
+
+  it('keeps the categories a product already had when adding one', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 'c-kpop' }] });
+    clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'p1' }] })
+      .mockResolvedValueOnce({ rows: [{ category_id: 'c-musica' }] }) // atuais
+      .mockResolvedValue({ rows: [] });
+
+    await bulkSetProductCategories(['p1'], ['c-kpop'], 'add');
+
+    const insert = clientQuery.mock.calls.find((c) =>
+      String(c[0]).includes('INSERT INTO product_categories')
+    );
+    expect(insert?.[1]).toEqual(['p1', 'c-musica', 0]);
+    const second = clientQuery.mock.calls.filter((c) =>
+      String(c[0]).includes('INSERT INTO product_categories')
+    )[1];
+    expect(second?.[1]).toEqual(['p1', 'c-kpop', 1]);
+  });
+
+  it('rolls the whole batch back when one product fails', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 'c-kpop' }] });
+    clientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'p1' }, { id: 'p2' }] })
+      .mockRejectedValueOnce(new Error('deadlock'))
+      .mockResolvedValue({ rows: [] });
+
+    await expect(bulkSetProductCategories(['p1', 'p2'], ['c-kpop'], 'replace')).rejects.toThrow(
+      'deadlock'
+    );
+    expect(clientQuery.mock.calls.map((c) => String(c[0]))).toContain('ROLLBACK');
+    expect(release).toHaveBeenCalled();
+  });
+
+  it('refuses a category that does not exist instead of silently skipping it', async () => {
+    query.mockResolvedValueOnce({ rows: [] });
+
+    await expect(bulkSetProductCategories(['p1'], ['c-fantasma'], 'replace')).rejects.toThrow(
+      /não encontrada/i
+    );
+    expect(clientQuery).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the selection is empty', async () => {
+    await expect(bulkSetProductCategories([], ['c-kpop'], 'replace')).resolves.toEqual({
+      updated: 0,
+    });
+    expect(query).not.toHaveBeenCalled();
   });
 });

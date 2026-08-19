@@ -25,9 +25,17 @@ import OrderConfirmation from './OrderConfirmation'
 
 const mockedStatus = vi.mocked(getOrderStatus)
 
-function renderPage(id = 'ord-1') {
+/**
+ * `fromCheckout` is the state the checkout attaches when it forwards here. The
+ * same URL is also the public order page linked from the confirmation e-mail,
+ * and that visit must not touch the cart — hence the flag rather than "always
+ * clear on a paid order".
+ */
+function renderPage(id = 'ord-1', fromCheckout = true) {
   return render(
-    <MemoryRouter initialEntries={[`/pedido/${id}`]}>
+    <MemoryRouter
+      initialEntries={[{ pathname: `/pedido/${id}`, state: fromCheckout ? { fromCheckout: true } : null }]}
+    >
       <Routes>
         <Route path="/pedido/:id" element={<OrderConfirmation />} />
       </Routes>
@@ -60,6 +68,21 @@ describe('OrderConfirmation', () => {
     })
     expect(screen.getByText(/#42|#\s*42/i)).toBeTruthy()
     expect(mockClear).toHaveBeenCalled()
+  })
+
+  it('leaves the cart alone when the page is opened from the e-mail link', async () => {
+    mockedStatus.mockResolvedValue({
+      id: 'ord-1',
+      status: 'paid',
+      orderNumber: 42,
+    })
+    renderPage('ord-1', false)
+    await waitFor(() => {
+      expect(screen.getByText(/Pagamento confirmado/i)).toBeInTheDocument()
+    })
+    // Days later, with a new cart in progress: emptying it here would be a
+    // silent loss the customer never asked for.
+    expect(mockClear).not.toHaveBeenCalled()
   })
 
   it('shows pending payment state', async () => {

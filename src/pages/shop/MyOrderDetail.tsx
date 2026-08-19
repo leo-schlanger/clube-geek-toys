@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Loader2,
   MapPin,
+  MessageSquare,
   Package,
   Star,
   Truck,
@@ -250,6 +251,20 @@ export default function MyOrderDetail() {
                 </CardHeader>
                 <CardContent className="text-sm text-muted-foreground">
                   <AddressBlock address={order.shippingAddress} />
+                </CardContent>
+              </Card>
+            )}
+
+            {order.customerNote && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <MessageSquare className="h-4 w-4" />
+                    Sua mensagem para a loja
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="whitespace-pre-wrap text-sm text-muted-foreground">
+                  {order.customerNote}
                 </CardContent>
               </Card>
             )}

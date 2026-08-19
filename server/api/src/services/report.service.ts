@@ -471,12 +471,18 @@ export async function getActionItems(): Promise<ActionItemsReport> {
     // sit until someone compares the TX ID against the bank statement.
     queueStat('pix_pending', queueSql('orders', `status = 'pending' AND payment_method = 'pix'`)),
     queueStat('to_separate', queueSql('orders', `status = 'paid'`, 'COALESCE(paid_at, created_at)')),
-    queueStat('to_ship', queueSql('orders', `status = 'processing'`, 'updated_at')),
-    // No shipped_at column exists; for a shipped order the last write is the
-    // tracking save, so updated_at is the closest thing to "posted on".
+    // Aged by `status_changed_at` (migration 025), not `updated_at`: any write
+    // to the row bumps updated_at — saving a tracking code, adopting a guest
+    // order — and a queue that resets because someone touched the order is a
+    // queue that hides exactly the pedido that has been stuck the longest.
+    queueStat('to_ship', queueSql('orders', `status = 'processing'`, 'COALESCE(status_changed_at, updated_at)')),
     queueStat(
       'shipped_stale',
-      queueSql('orders', `status = 'shipped' AND updated_at < NOW() - INTERVAL '${SHIPPED_STALE_DAYS} days'`, 'updated_at')
+      queueSql(
+        'orders',
+        `status = 'shipped' AND COALESCE(status_changed_at, updated_at) < NOW() - INTERVAL '${SHIPPED_STALE_DAYS} days'`,
+        'COALESCE(status_changed_at, updated_at)'
+      )
     ),
     queueStat('questions_unanswered', queueSql('product_questions', `answered_at IS NULL AND status = 'published'`)),
     queueStat('reviews_pending', queueSql('product_reviews', `status = 'pending'`)),

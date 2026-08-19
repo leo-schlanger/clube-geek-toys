@@ -241,6 +241,8 @@ export interface Order {
   customerName: string;
   customerEmail: string;
   customerPhone: string | null;
+  /** Free-text note the customer left for the shop at checkout. */
+  customerNote?: string | null;
   shippingAddress: Record<string, unknown> | null;
   subtotal: number;
   discount: number;

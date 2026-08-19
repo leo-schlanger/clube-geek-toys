@@ -22,6 +22,7 @@ import {
   ImageOff,
   CheckCircle,
   RotateCcw,
+  MessageSquare,
 } from 'lucide-react'
 
 // Shared status metadata (label + badge variant) used across the orders UI.
@@ -252,6 +253,18 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                   <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
                 )}
               </div>
+
+              {/* Recado do cliente — destacado porque muda o que vai na caixa:
+                  pedido de photocard do mesmo cantor, embalagem de presente,
+                  combinação de entrega. Passar batido é errar o pedido. */}
+              {order.customerNote && (
+                <div className="space-y-1 rounded-lg border border-accent/40 bg-accent/10 p-3">
+                  <h4 className="flex items-center gap-1 text-sm font-semibold">
+                    <MessageSquare className="h-4 w-4 text-accent" /> Mensagem do cliente
+                  </h4>
+                  <p className="whitespace-pre-wrap text-sm">{order.customerNote}</p>
+                </div>
+              )}
 
               {/* Endereço */}
               {address && (

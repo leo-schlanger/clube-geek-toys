@@ -680,6 +680,74 @@ const STEPS: SchemaStep[] = [
       ON products(cost_price) WHERE cost_price IS NOT NULL`);
     },
   },
+  {
+    name: "Adoção de pedido de convidado (migration 023)",
+    run: async () => {
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_guest_email
+      ON orders (lower(customer_email)) WHERE user_id IS NULL`);
+    },
+  },
+  {
+    name: "Sessões de refresh por dispositivo (migration 024)",
+    run: async () => {
+    await query(`CREATE TABLE IF NOT EXISTS refresh_sessions (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      prev_token_hash TEXT,
+      rotated_at TIMESTAMPTZ,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      user_agent TEXT
+    )`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_refresh_sessions_user ON refresh_sessions(user_id)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expires ON refresh_sessions(expires_at)`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_refresh_sessions_prev
+      ON refresh_sessions(prev_token_hash) WHERE prev_token_hash IS NOT NULL`);
+    // Migra as sessões vivas e zera a coluna antiga na mesma etapa: se o
+    // backfill rodar de novo com a coluna ainda preenchida, ele ressuscita um
+    // token já revogado.
+    await query(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at)
+      SELECT id, refresh_token_hash, NOW() + INTERVAL '30 days'
+        FROM users WHERE refresh_token_hash IS NOT NULL
+      ON CONFLICT (token_hash) DO NOTHING`);
+    await query(`UPDATE users SET refresh_token_hash = NULL, prev_refresh_token_hash = NULL
+      WHERE refresh_token_hash IS NOT NULL OR prev_refresh_token_hash IS NOT NULL`);
+    },
+  },
+  {
+    name: "Idade da fila por mudança de status (migration 025)",
+    run: async () => {
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ`);
+    await query(`UPDATE orders SET status_changed_at = updated_at WHERE status_changed_at IS NULL`);
+    await query(`CREATE OR REPLACE FUNCTION set_order_status_changed_at()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.status_changed_at = NOW();
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql`);
+    await query(`DROP TRIGGER IF EXISTS tr_orders_status_changed_at ON orders`);
+    await query(`CREATE TRIGGER tr_orders_status_changed_at
+      BEFORE UPDATE ON orders
+      FOR EACH ROW
+      WHEN (OLD.status IS DISTINCT FROM NEW.status)
+      EXECUTE FUNCTION set_order_status_changed_at()`);
+    await query(`CREATE INDEX IF NOT EXISTS idx_orders_status_changed_at
+      ON orders(status, status_changed_at)`);
+    },
+  },
+  {
+    name: "Recado do cliente no pedido (migration 026)",
+    run: async () => {
+    await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_note TEXT`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE orders ADD CONSTRAINT chk_orders_customer_note_len
+        CHECK (customer_note IS NULL OR length(customer_note) <= 500);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    },
+  },
 ];
 
 let state: SchemaState = {
