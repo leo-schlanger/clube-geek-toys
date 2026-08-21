@@ -224,7 +224,9 @@ describe('checkInTicket', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe('already_used');
-      expect(result.message).toMatch(/já utilizado/i);
+      // 17:32 UTC é 14:32 no Rio. O container roda em UTC, e a portaria lê a
+      // hora do relógio dela — não a do servidor.
+      expect(result.message).toBe('Ingresso já utilizado às 14:32.');
     }
   });
 

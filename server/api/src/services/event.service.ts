@@ -26,6 +26,9 @@ import { sendTemplateEmail } from './email.service.js';
  * um admin confirma.
  */
 
+/** Fuso da loja: o container da API roda em UTC. */
+const EVENT_TIME_ZONE = 'America/Sao_Paulo';
+
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled';
 export type TicketStatus = 'pending' | 'valid' | 'used' | 'cancelled';
 
@@ -648,8 +651,15 @@ export async function checkInTicket(code: string, actorUserId: string): Promise<
     const buyerName = buyer.rows[0]?.buyer_name ?? '';
 
     if (ticket.status === 'used') {
+      // O container roda em UTC. Sem fixar o fuso, a portaria leria "já
+      // utilizado às 19:53" para alguém que entrou às 16:53 — três horas de
+      // discussão na porta por causa de uma string.
       const when = ticket.usedAt
-        ? new Date(ticket.usedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        ? new Date(ticket.usedAt).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: EVENT_TIME_ZONE,
+          })
         : null;
       void auditLog('event.ticket_checkin_failed', actorUserId, {
         code: normalized,
