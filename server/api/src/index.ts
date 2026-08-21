@@ -30,6 +30,7 @@ import { questionRouter } from './routes/question.routes.js';
 import { notificationRouter } from './routes/notification.routes.js';
 import { galleryRouter } from './routes/gallery.routes.js';
 import { profileRouter } from './routes/profile.routes.js';
+import { eventRouter } from './routes/event.routes.js';
 import { initCronJobs } from './services/cron.service.js';
 import { ensureSchema } from './db/ensure-schema.js';
 
@@ -101,6 +102,7 @@ app.use('/questions', questionRouter);
 app.use('/notifications', notificationRouter);
 app.use('/gallery', galleryRouter);
 app.use('/profile', profileRouter);
+app.use('/events', eventRouter);
 app.use('/cron', reportRouter); // cron endpoints share admin auth pattern
 
 // Error handler

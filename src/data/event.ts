@@ -33,7 +33,11 @@ export type EventConfig = {
     enabled: boolean
     priceBRL: number | null
     currencyLabel?: string
-    maxPerReservation: number
+    /**
+     * Teto por reserva. `null` = sem teto (o servidor ainda barra pedidos
+     * absurdos). Ficou 6 até 21/08/2026, quando uma família bateu no limite.
+     */
+    maxPerReservation: number | null
     whatsappNumber: string
     notes?: string
   }
@@ -80,10 +84,10 @@ export const ACTIVE_EVENT: EventConfig = {
     enabled: true,
     priceBRL: 20,
     currencyLabel: 'R$',
-    maxPerReservation: 6,
+    maxPerReservation: null,
     whatsappNumber: '5511914662881',
     notes:
-      'Ingresso R$ 20/pessoa (membros do Clube: R$ 10). Criança de colo e criança com deficiência não pagam — informe na observação. A reserva é enviada pelo WhatsApp da loja para confirmação. Pagamento e retirada conforme orientação da equipe.',
+      'Ingresso R$ 20/pessoa (membros do Clube: R$ 10). Criança de colo e criança com deficiência não pagam. Cada pessoa recebe um ingresso nominal com QR Code próprio, liberado assim que a equipe confirmar o pagamento.',
   },
   photos: [],
   ctaPrimary: { label: 'Reservar ingresso', href: '/evento#ingressos' },
@@ -123,30 +127,47 @@ export function photoPublicUrl(event: EventConfig, file: string): string {
   return `/eventos/${event.slug}/${encodeURIComponent(file)}`
 }
 
+export type TicketKind = 'full' | 'member' | 'free'
+
+export const TICKET_KIND_LABEL: Record<TicketKind, string> = {
+  full: 'Inteira',
+  member: 'Membro do Clube (50%)',
+  free: 'Isento (colo ou PCD)',
+}
+
+/** Preço por tipo, espelhando `server/api/src/config/events.ts`. */
+export function ticketPriceBRL(event: EventConfig, kind: TicketKind): number {
+  const price = event.ticketReservation.priceBRL
+  if (price == null || kind === 'free') return 0
+  if (kind === 'member') return price / 2
+  return price
+}
+
+export function formatBRL(value: number, currencyLabel = 'R$'): string {
+  return `${currencyLabel} ${value.toFixed(2).replace('.', ',')}`
+}
+
+/**
+ * Mensagem de WhatsApp da reserva.
+ *
+ * Continua existindo porque o pagamento é combinado por lá. A diferença é que
+ * agora ela carrega o **código da reserva**: a equipe procura por ele no painel
+ * em vez de reconstruir o pedido a partir da conversa.
+ */
 export function buildReservationWhatsAppUrl(params: {
   event: EventConfig
   name: string
   phone: string
   email: string
-  quantity: number
+  attendees: { name: string; kind: TicketKind }[]
   notes?: string
+  reservationCode?: string | null
+  ticketsUrl?: string | null
 }): string {
-  const { event, name, phone, email, quantity, notes } = params
-  const price =
-    event.ticketReservation.priceBRL == null
-      ? 'a combinar / cortesia'
-      : `${event.ticketReservation.currencyLabel ?? 'R$'} ${event.ticketReservation.priceBRL
-          .toFixed(2)
-          .replace('.', ',')}`
-
-  const total =
-    event.ticketReservation.priceBRL == null
-      ? '—'
-      : `${event.ticketReservation.currencyLabel ?? 'R$'} ${(
-          event.ticketReservation.priceBRL * quantity
-        )
-          .toFixed(2)
-          .replace('.', ',')}`
+  const { event, name, phone, email, attendees, notes, reservationCode, ticketsUrl } = params
+  const currency = event.ticketReservation.currencyLabel ?? 'R$'
+  const price = event.ticketReservation.priceBRL
+  const total = attendees.reduce((sum, a) => sum + ticketPriceBRL(event, a.kind), 0)
 
   const lines = [
     `Olá! Quero *reservar ingresso(s)* para o evento:`,
@@ -155,12 +176,31 @@ export function buildReservationWhatsAppUrl(params: {
     `👤 Nome: ${name}`,
     `📱 Telefone: ${phone}`,
     `✉️ E-mail: ${email}`,
-    `🎫 Quantidade: ${quantity}`,
-    `💵 Valor unitário: ${price}`,
-    `💰 Total estimado: ${total}`,
-    ``,
-    `_Reserva via loja online (shop.geeketoys.com.br)_`,
+    `🎫 Quantidade: ${attendees.length}`,
   ]
+
+  if (attendees.length > 0) {
+    lines.push(``, `*Ingressos (um por pessoa):*`)
+    attendees.forEach((a, i) => {
+      const suffix = a.kind === 'full' ? '' : ` — ${TICKET_KIND_LABEL[a.kind]}`
+      lines.push(`${i + 1}. ${a.name}${suffix}`)
+    })
+  }
+
+  lines.push(
+    ``,
+    `💵 Valor unitário: ${price == null ? 'a combinar / cortesia' : formatBRL(price, currency)}`,
+    `💰 Total estimado: ${price == null ? '—' : formatBRL(total, currency)}`
+  )
+
+  if (reservationCode) {
+    lines.push(``, `🔖 Código da reserva: *${reservationCode}*`)
+  }
+  if (ticketsUrl) {
+    lines.push(`🔗 Meus ingressos: ${ticketsUrl}`)
+  }
+
+  lines.push(``, `_Reserva via loja online (shop.geeketoys.com.br)_`)
   if (notes?.trim()) {
     lines.push(``, `📝 Observações: ${notes.trim()}`)
   }

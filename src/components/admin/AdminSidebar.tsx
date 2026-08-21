@@ -23,6 +23,7 @@ import {
   Boxes,
   HelpCircle,
   Images,
+  Ticket,
   LogOut,
   Menu,
 } from 'lucide-react'
@@ -40,6 +41,7 @@ export type AdminTab =
   | 'wholesale'
   | 'reviews'
   | 'questions'
+  | 'events'
   | 'gallery'
   | 'users'
   | 'logs'
@@ -61,6 +63,7 @@ const menuItems: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'wholesale', label: 'Atacado', icon: Building2 },
   { id: 'reviews', label: 'Avaliações', icon: Star },
   { id: 'questions', label: 'Perguntas', icon: HelpCircle },
+  { id: 'events', label: 'Ingressos', icon: Ticket },
   { id: 'gallery', label: 'Galeria', icon: Images },
   { id: 'users', label: 'Usuários', icon: UserCog },
   { id: 'logs', label: 'Logs', icon: FileText },

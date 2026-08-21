@@ -523,6 +523,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
             ['📦 Pedidos pagos a separar', v.to_separate, '#4ade80'],
             ['🚚 Pedidos a postar', v.to_ship, '#4ade80'],
             [`🕐 Enviados há +10 dias sem entrega`, v.shipped_stale, '#f87171'],
+            ['🎫 Ingressos a confirmar', v.event_tickets_pending, '#f59e0b'],
             ['❓ Perguntas sem resposta', v.questions_unanswered, '#3b82f6'],
             ['⭐ Avaliações a moderar', v.reviews_pending, '#3b82f6'],
             ['🏢 Contas atacado a aprovar', v.wholesale_pending, '#f59e0b'],
@@ -539,6 +540,54 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         )}
         ${infoBox('💰 <strong>O PIX é o item urgente:</strong> não existe webhook, então cada pedido PIX fica <em>pending</em> até alguém conferir o extrato e confirmar no painel. Enquanto isso o estoque não é baixado.')}`,
       cta: { text: 'Abrir Painel do Dia', url: v.admin_url || `${frontendUrl}/admin` },
+    },
+
+    // ─── EVENTOS: INGRESSOS ─────────────────────────────
+    // O link é o ingresso. Ele vale por si (código inadivinhável), então o
+    // e-mail é o que garante que o cliente não perca a compra ao fechar a aba.
+    'event-reservation-received': {
+      subject: `Reserva recebida — ${v.event_title || 'Evento GeekPop & Toys'}`,
+      preheader: `Reserva ${v.reservation_code || ''} registrada. Falta a confirmação do pagamento.`,
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Reserva recebida! 🎫</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Sua reserva para o <strong>${v.event_title || 'evento'}</strong> foi registrada.</p>
+        ${dataTable([
+          ['Código da reserva', `<strong>${v.reservation_code || '—'}</strong>`],
+          ['Ingressos', v.quantity || '1'],
+          ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
+        ])}
+        ${infoBox('⏳ Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o pagamento. Assim que confirmarmos, cada pessoa recebe o QR Code de entrada neste mesmo link.')}`,
+      cta: { text: 'Ver meus ingressos', url: v.tickets_url || '#' },
+    },
+
+    'event-tickets-ready': {
+      subject: `Ingressos liberados — ${v.event_title || 'Evento GeekPop & Toys'} 🎉`,
+      preheader: 'Pagamento confirmado. Seus ingressos já têm QR Code de entrada.',
+      body: `
+        <h2 style="color:#4ade80;margin:0 0 12px">Ingressos liberados! ✅</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Confirmamos o pagamento da reserva <strong>${v.reservation_code || ''}</strong>. Seus <strong>${v.quantity || '1'}</strong> ingresso(s) para o <strong>${v.event_title || 'evento'}</strong> já estão válidos.</p>
+        ${infoBox('🎫 Cada ingresso é <strong>nominal</strong> e tem um QR Code próprio. Na entrada, o código é lido uma única vez — depois disso ele aparece como utilizado. Abra o link no celular ou imprima.')}`,
+      cta: { text: 'Abrir meus ingressos', url: v.tickets_url || '#' },
+    },
+
+    'admin-event-reservation': {
+      subject: `🎫 Nova reserva de ingresso — ${v.buyer_name || ''}`,
+      preheader: `${v.quantity || '1'} ingresso(s) aguardando confirmação de pagamento.`,
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Nova reserva de ingresso</h2>
+        ${dataTable([
+          ['Evento', v.event_title || '—'],
+          ['Cliente', v.buyer_name || '—'],
+          ['Telefone', v.buyer_phone || '—'],
+          ['E-mail', v.buyer_email || '—'],
+          ['Reserva', `<strong>${v.reservation_code || '—'}</strong>`],
+          ['Ingressos', v.quantity || '1'],
+          ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
+        ])}
+        ${infoBox('💰 Os ingressos só ficam válidos depois que alguém confirmar o pagamento no painel — antes disso a portaria recusa a entrada.')}`,
+      cta: { text: 'Abrir no painel', url: v.admin_url || `${frontendUrl}/admin` },
     },
   };
 

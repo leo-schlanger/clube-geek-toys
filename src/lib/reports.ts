@@ -156,6 +156,7 @@ export type ActionItemKey =
   | 'to_ship'
   | 'shipped_stale'
   | 'questions_unanswered'
+  | 'event_tickets_pending'
   | 'reviews_pending'
   | 'wholesale_pending'
   | 'stock_out'

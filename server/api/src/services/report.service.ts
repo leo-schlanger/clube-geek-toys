@@ -395,6 +395,7 @@ export type ActionItemKey =
   | 'to_ship'
   | 'shipped_stale'
   | 'questions_unanswered'
+  | 'event_tickets_pending'
   | 'reviews_pending'
   | 'wholesale_pending'
   | 'stock_out'
@@ -485,6 +486,9 @@ export async function getActionItems(): Promise<ActionItemsReport> {
       )
     ),
     queueStat('questions_unanswered', queueSql('product_questions', `answered_at IS NULL AND status = 'published'`)),
+    // Reserva de ingresso parada é dinheiro esperando **e** uma família que vai
+    // ser barrada na portaria: o ingresso só vale depois da confirmação.
+    queueStat('event_tickets_pending', queueSql('event_reservations', `status = 'pending'`)),
     queueStat('reviews_pending', queueSql('product_reviews', `status = 'pending'`)),
     queueStat('wholesale_pending', queueSql('wholesale_accounts', `status = 'pending'`)),
     queueStat('stock_out', stockSql('s.stock <= 0')),

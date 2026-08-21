@@ -47,6 +47,7 @@ const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
 const ShopRegister = lazy(() => import('./pages/shop/ShopRegister'))
 const ShopProfile = lazy(() => import('./pages/shop/ShopProfile'))
 const EventPage = lazy(() => import('./pages/shop/EventPage'))
+const TicketPage = lazy(() => import('./pages/shop/TicketPage'))
 const MyOrders = lazy(() => import('./pages/shop/MyOrders'))
 const MyOrderDetail = lazy(() => import('./pages/shop/MyOrderDetail'))
 const WholesaleHome = lazy(() => import('./pages/shop/WholesaleHome'))
@@ -293,6 +294,9 @@ function ShopRoutes() {
         <Route path="/cadastro" element={<ShopRegister />} />
         <Route path="/perfil" element={<ShopProfile />} />
         <Route path="/evento" element={<EventPage />} />
+        {/* Ingresso nominal: link público, sem login — quem vai entrar não tem conta. */}
+        <Route path="/ingresso/:code" element={<TicketPage mode="ticket" />} />
+        <Route path="/ingressos/:code" element={<TicketPage mode="reservation" />} />
         {/* Canal Atacado (aba dedicada + CNPJ) */}
         <Route path="/atacado" element={<WholesaleHome />} />
         <Route path="/atacado/entrar" element={<WholesaleLogin />} />

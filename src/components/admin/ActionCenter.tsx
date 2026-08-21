@@ -11,6 +11,7 @@ import {
   PackageX,
   RefreshCw,
   Star,
+  Ticket,
   Truck,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
@@ -75,6 +76,14 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     tab: 'questions',
     icon: <HelpCircle className="h-5 w-5" />,
     severity: 'attention',
+    age: 'waiting',
+  },
+  event_tickets_pending: {
+    label: 'Ingressos a confirmar',
+    hint: 'Confirme o pagamento — sem isso a portaria barra a entrada',
+    tab: 'events',
+    icon: <Ticket className="h-5 w-5" />,
+    severity: 'urgent',
     age: 'waiting',
   },
   reviews_pending: {

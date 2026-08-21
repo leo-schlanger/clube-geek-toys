@@ -45,9 +45,21 @@ describe('getActionItems', () => {
     respondBy([]);
     const report = await getActionItems();
 
-    expect(report.items).toHaveLength(11);
+    expect(report.items).toHaveLength(12);
     expect(report.totalPending).toBe(0);
     expect(report.items.every((i) => i.count === 0 && i.oldestDays === null)).toBe(true);
+  });
+
+  it('conta reservas de ingresso aguardando confirmação', async () => {
+    // Reserva parada = dinheiro esperando e família barrada na portaria.
+    respondBy([[/event_reservations/, { count: 2, oldest_days: 1 }]]);
+    const report = await getActionItems();
+
+    expect(itemFor(report, 'event_tickets_pending')).toEqual({
+      key: 'event_tickets_pending',
+      count: 2,
+      oldestDays: 1,
+    });
   });
 
   it('counts pending PIX orders and how long the oldest has waited', async () => {
@@ -82,7 +94,7 @@ describe('getActionItems', () => {
       oldestDays: null,
     });
     expect(itemFor(report, 'to_separate')?.count).toBe(2);
-    expect(report.items).toHaveLength(11);
+    expect(report.items).toHaveLength(12);
   });
 
   it('excludes inactive and seed rows from the stock counts, like the stock tab', async () => {
@@ -123,7 +135,7 @@ describe('getActionItems', () => {
     queryMock.mockImplementation(async () => ({ rows: [{ count: 2, oldest_days: 1 }], rowCount: 1 }));
     const report = await getActionItems();
 
-    expect(report.totalPending).toBe(22);
+    expect(report.totalPending).toBe(24);
   });
 
   it('measures shipped orders that have gone quiet, not all shipped orders', async () => {
