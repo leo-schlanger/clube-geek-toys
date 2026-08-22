@@ -291,6 +291,8 @@ export interface Order {
   paymentMethod: OrderPaymentMethod | null
   stripePaymentIntentId: string | null
   pixTxid: string | null
+  /** PIX de pedido ainda pendente: é o que devolve o QR a quem fechou a aba. */
+  pixData?: PixQRData
   paidAt: string | null
   createdAt: string
   updatedAt: string

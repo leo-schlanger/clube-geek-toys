@@ -143,15 +143,22 @@ no teto de 6 por reserva. As duas coisas foram resolvidas juntas.
    quantidade; a API recusa acima de 50 (`MAX_TICKETS_PER_RESERVATION`) só para
    não virar porta de abuso.
 2. A reserva é gravada (`event_reservations` + um `event_tickets` por pessoa,
-   todos `pending`), o cliente recebe e-mail com o link `/ingressos/<código>`, o
-   admin recebe aviso, e o WhatsApp abre com o **código da reserva** na mensagem.
-   Se a API estiver fora, o formulário ainda abre o WhatsApp — a venda não morre
-   no formulário, só entra à mão no painel.
-3. **Confirmação** — admin confere o pagamento e clica _Confirmar pagamento_ na
+   todos `pending`), o cliente recebe e-mail com o link `/ingressos/<código>` e o
+   admin recebe aviso. Se a API estiver fora, o formulário ainda abre o WhatsApp
+   — a venda não morre no formulário, só entra à mão no painel.
+3. **Pagamento (PIX na tela)** — a reserva já nasce com QR Code e copia-e-cola
+   (mesmo EMV da loja, `pix_txid` guardado na migration 031). O código aparece na
+   tela de confirmação, na página `/ingressos/<código>` enquanto estiver pendente
+   e **no e-mail** — cliente de e-mail não desenha QR, então lá vai o
+   copia-e-cola. Botão _Reenviar por e-mail_ em
+   `POST /events/reservations/:code/payment-link` para quem fechou a aba.
+   O WhatsApp virou secundário: antes disto, se o popup não abrisse (comum no
+   celular), a reserva ficava sem nenhuma forma de pagar.
+4. **Confirmação** — admin confere o pagamento e clica _Confirmar pagamento_ na
    aba **Ingressos**. Os ingressos viram `valid` e o QR aparece para o cliente.
    Antes disso o QR nem é renderizado: um QR bonito com pagamento pendente é
    exatamente o print que a portaria não deveria aceitar.
-4. **Portaria** — aba **Ingressos** → _Portaria_: leitor de QR (ou código
+5. **Portaria** — aba **Ingressos** → _Portaria_: leitor de QR (ou código
    digitado). A leitura **queima** o código (`valid` → `used`). A segunda leitura
    do mesmo QR mostra _ENTRADA NEGADA_ com a hora da primeira. `seller` também
    tem acesso: quem fica na porta é quem opera o PDV.
@@ -167,20 +174,29 @@ no teto de 6 por reserva. As duas coisas foram resolvidas juntas.
 
 ### Endpoints
 
-| Método | Rota                                     | Quem         |
-| ------ | ---------------------------------------- | ------------ |
-| POST   | `/events/:eventId/reservations`          | público      |
-| GET    | `/events/tickets/:code`                  | público      |
-| GET    | `/events/reservations/:code`             | público      |
-| GET    | `/events/admin/reservations`             | admin        |
-| POST   | `/events/admin/reservations/:id/confirm` | admin        |
-| POST   | `/events/admin/reservations/:id/cancel`  | admin        |
-| POST   | `/events/admin/check-in`                 | admin/seller |
-| GET    | `/events/admin/:eventId/stats`           | admin/seller |
+| Método | Rota                                      | Quem                   |
+| ------ | ----------------------------------------- | ---------------------- |
+| POST   | `/events/:eventId/reservations`           | público (optionalAuth) |
+| GET    | `/events/tickets/:code`                   | público                |
+| GET    | `/events/reservations/:code`              | público                |
+| POST   | `/events/reservations/:code/payment-link` | público (rate limit)   |
+| GET    | `/events/my-reservations`                 | cliente logada         |
+| GET    | `/events/admin/reservations`              | admin                  |
+| POST   | `/events/admin/reservations/:id/confirm`  | admin                  |
+| POST   | `/events/admin/reservations/:id/cancel`   | admin                  |
+| POST   | `/events/admin/check-in`                  | admin/seller           |
+| GET    | `/events/admin/:eventId/stats`            | admin/seller           |
 
 Os códigos públicos são inadivinháveis (alfabeto sem `0/O/1/I/L`, para o dia em
 que a câmera não colaborar e alguém digitar). O link não é o que protege a
 portaria — o que protege é o check-in queimar o código.
+
+### Acompanhar no perfil
+
+A reserva aparece em **Meu perfil → Meus ingressos** (`GET /events/my-reservations`),
+com status e botão _Pagar_ quando pendente. Casa por `user_id` **ou** pelo e-mail
+do cadastro, então quem reservou deslogada e criou conta depois também encontra a
+compra sem falar com a loja.
 
 ### Onde a pendência aparece
 

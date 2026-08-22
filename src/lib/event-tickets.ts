@@ -4,10 +4,18 @@ import type { TicketKind } from '../data/event'
 /**
  * Ingressos de evento.
  *
- * Cada pessoa tem um ingresso nominal com código único; a portaria queima o
- * código na entrada. O pagamento continua sendo combinado fora do sistema, então
- * o ingresso nasce `pending` e só vira `valid` quando o admin confirma.
+ * Ingresso nominal por pessoa; a portaria queima o código na entrada.
+ * Pagamento por PIX na tela, baixa manual (sem webhook): nasce `pending`.
  */
+
+/** PIX da reserva. `emvCode` é o copia-e-cola e também o que vira QR na tela. */
+export interface ReservationPix {
+  emvCode: string
+  pixKey: string
+  merchantName: string
+  amount: number
+  txId: string
+}
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled'
 export type TicketStatus = 'pending' | 'valid' | 'used' | 'cancelled'
@@ -40,6 +48,7 @@ export interface EventReservation {
   cancelledAt: string | null
   createdAt: string
   tickets?: EventTicket[]
+  pix?: ReservationPix | null
 }
 
 export interface PublicTicket {
@@ -66,6 +75,14 @@ export interface PublicReservation {
   totalCents: number
   createdAt: string
   tickets: PublicTicket[]
+  /** Só vem enquanto a reserva está pendente. */
+  pix: ReservationPix | null
+}
+
+export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
+  pending: 'Aguardando pagamento',
+  confirmed: 'Paga — ingressos liberados',
+  cancelled: 'Cancelada',
 }
 
 export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
@@ -97,6 +114,26 @@ export async function createReservation(
   return result.data
     ? { ok: true, reservation: result.data.reservation, ticketsUrl: result.data.ticketsUrl }
     : { ok: false, error: result.error || 'Não foi possível registrar a reserva.' }
+}
+
+/** Destinatário é sempre o e-mail da reserva; a API devolve mascarado. */
+export async function resendPaymentLink(
+  code: string
+): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
+  const result = await api.post<{ sent: boolean; email: string }>(
+    `/events/reservations/${code}/payment-link`,
+    {},
+    { skipAuth: true }
+  )
+  return result.data?.sent
+    ? { ok: true, email: result.data.email }
+    : { ok: false, error: result.error || 'Não foi possível reenviar o e-mail.' }
+}
+
+/** Reservas da cliente logada — por conta ou pelo e-mail do cadastro. */
+export async function getMyReservations(): Promise<PublicReservation[]> {
+  const result = await api.get<{ reservations: PublicReservation[] }>('/events/my-reservations')
+  return result.data?.reservations ?? []
 }
 
 export async function getPublicTicket(code: string): Promise<PublicTicket | null> {

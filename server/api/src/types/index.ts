@@ -236,6 +236,15 @@ export interface OrderItem {
   variantLabel?: string | null;
 }
 
+/** PIX EMV returned by the API — same shape as `utils/pix.ts`. */
+export interface PixQRData {
+  emvCode: string;
+  pixKey: string;
+  amount: number;
+  txId: string;
+  expiresAt: string;
+}
+
 export interface Order {
   id: string;
   orderNumber: number;
@@ -271,4 +280,6 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   items?: OrderItem[];
+  /** Only on a `pending` order; never returned for a paid one. */
+  pixData?: PixQRData;
 }

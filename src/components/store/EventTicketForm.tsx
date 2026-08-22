@@ -14,7 +14,8 @@ import {
   type EventConfig,
   type TicketKind,
 } from '../../data/event'
-import { createReservation } from '../../lib/event-tickets'
+import { createReservation, type ReservationPix } from '../../lib/event-tickets'
+import { ReservationPixPanel } from './ReservationPixPanel'
 
 type Props = {
   event?: EventConfig
@@ -28,10 +29,8 @@ const SELECT_CLASS =
 /**
  * Reserva de ingresso.
  *
- * Um ingresso **por pessoa**, cada um com o nome de quem vai entrar: é o nome
- * que impede o mesmo comprovante de rodar entre estranhos. A reserva é gravada
- * na API (que devolve os códigos) e só então abre o WhatsApp para combinar o
- * pagamento.
+ * Um ingresso **por pessoa**, com o nome de quem vai entrar. A API devolve os
+ * códigos e o PIX, então pagar não depende do popup do WhatsApp abrir.
  */
 export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', notes: '' })
@@ -39,7 +38,12 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   const [submitting, setSubmitting] = useState(false)
   /** Enquanto ninguém mexer no primeiro nome, ele acompanha quem está reservando. */
   const [firstNameTouched, setFirstNameTouched] = useState(false)
-  const [result, setResult] = useState<{ code: string; ticketsPath: string } | null>(null)
+  const [result, setResult] = useState<{
+    code: string
+    ticketsPath: string
+    pix: ReservationPix | null
+    totalCents: number
+  } | null>(null)
 
   const max = event.ticketReservation.maxPerReservation
   const unit = event.ticketReservation.priceBRL
@@ -126,9 +130,18 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         setResult({
           code: created.reservation.code,
           ticketsPath: `/ingressos/${created.reservation.code}`,
+          pix: created.reservation.pix ?? null,
+          totalCents: created.reservation.totalCents,
         })
-        openWhatsApp(created.reservation.code, created.ticketsUrl)
-        toast.success('Reserva registrada! Confirme o pagamento pelo WhatsApp.')
+        // Sem PIX (evento gratuito ou chave ausente), o WhatsApp volta a ser o caminho.
+        if (!created.reservation.pix) {
+          openWhatsApp(created.reservation.code, created.ticketsUrl)
+        }
+        toast.success(
+          created.reservation.pix
+            ? 'Reserva registrada! Pague o PIX para liberar os ingressos.'
+            : 'Reserva registrada! Confirme o pagamento pelo WhatsApp.'
+        )
       } else {
         // A reserva não gravou, mas a venda não pode morrer aqui: o WhatsApp
         // ainda leva o pedido completo para a equipe lançar à mão.
@@ -159,11 +172,20 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm leading-relaxed">
-          Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o
-          pagamento pelo WhatsApp. Depois disso, cada pessoa ganha um QR Code próprio — e ele vale
-          uma única entrada.
-        </div>
+        {result.pix ? (
+          <ReservationPixPanel
+            code={result.code}
+            pix={result.pix}
+            totalCents={result.totalCents}
+            className="mt-1"
+          />
+        ) : (
+          <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm leading-relaxed">
+            Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o
+            pagamento pelo WhatsApp. Depois disso, cada pessoa ganha um QR Code próprio — e ele
+            vale uma única entrada.
+          </div>
+        )}
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
           <Button asChild size="lg" className="gap-2">
@@ -180,7 +202,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
             onClick={() => openWhatsApp(result.code, null)}
           >
             <MessageCircle className="h-5 w-5" />
-            Reabrir WhatsApp
+            {result.pix ? 'Falar no WhatsApp' : 'Reabrir WhatsApp'}
           </Button>
         </div>
       </div>

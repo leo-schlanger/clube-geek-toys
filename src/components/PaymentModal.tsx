@@ -7,6 +7,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { useConfirm } from '../hooks/useConfirm'
+import { usePixExitGuard } from '../hooks/usePixExitGuard'
 // paymentLogger available for debugging
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -64,6 +66,25 @@ export function PaymentModal({
   const [method, setMethod] = useState<PaymentMethod>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
+  const confirm = useConfirm()
+
+  usePixExitGuard(Boolean(pixData))
+
+  /** A generated-and-unpaid PIX must not be dismissed by a click outside. */
+  async function handleClose() {
+    if (pixData) {
+      const leave = await confirm({
+        title: 'Sair sem concluir o pagamento?',
+        description:
+          'O PIX já foi gerado e ainda não foi pago. Se sair agora, o pagamento não é registrado e a assinatura continua pendente — você pode gerar de novo quando quiser.',
+        confirmText: 'Sair sem pagar',
+        cancelText: 'Continuar pagamento',
+        variant: 'destructive',
+      })
+      if (!leave) return
+    }
+    onClose()
+  }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -249,10 +270,10 @@ export function PaymentModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <Card className="w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="relative">
-          <button onClick={onClose} className="absolute right-4 top-4 text-muted-foreground hover:text-foreground" aria-label="Fechar">
+          <button onClick={handleClose} className="absolute right-4 top-4 text-muted-foreground hover:text-foreground" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
           <CardTitle className="flex items-center gap-2">

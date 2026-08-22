@@ -29,6 +29,7 @@ const AVAILABLE_TEMPLATES = [
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-daily-digest',
+  'event-reservation-received', 'event-tickets-ready', 'admin-event-reservation',
 ];
 
 export function getAvailableTemplates() {
@@ -588,6 +589,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Ingressos', v.quantity || '1'],
           ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
         ])}
+        ${v.pix_code ? pixBox(v.pix_code, v.pix_key || '', v.total || '0,00') : ''}
         ${infoBox('⏳ Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o pagamento. Assim que confirmarmos, cada pessoa recebe o QR Code de entrada neste mesmo link.')}`,
       cta: { text: 'Ver meus ingressos', url: v.tickets_url || '#' },
     },
@@ -717,6 +719,17 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 // ============================================
 // Template Helpers
 // ============================================
+
+/** Copy-and-paste, not a QR: email clients block external images. */
+function pixBox(emvCode: string, pixKey: string, total: string): string {
+  return `
+    <div style="margin:16px 0;padding:16px;border:1px solid #F04080;border-radius:10px;background:#fff5f8">
+      <p style="margin:0 0 8px;font-weight:600;color:#F04080">Pague por PIX — R$ ${total}</p>
+      <p style="margin:0 0 8px;font-size:13px;color:#444">Copie o código abaixo e cole em "PIX Copia e Cola" no app do seu banco:</p>
+      <p style="margin:0;padding:10px;background:#fff;border:1px solid #eadfe4;border-radius:6px;font-family:monospace;font-size:11px;line-height:1.5;word-break:break-all;color:#222">${emvCode}</p>
+      ${pixKey ? `<p style="margin:8px 0 0;font-size:12px;color:#666">Ou use a chave PIX <strong>${pixKey}</strong> e informe o código da reserva.</p>` : ''}
+    </div>`;
+}
 
 function infoBox(content: string): string {
   return `<div style="background:#0f2847;border-left:4px solid #3b82f6;border-radius:0 8px 8px 0;padding:14px 16px;margin:16px 0;font-size:13px;line-height:1.6;color:#cbd5e1">${content}</div>`;

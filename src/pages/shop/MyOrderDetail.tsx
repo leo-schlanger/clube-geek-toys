@@ -22,6 +22,7 @@ import { ShopHeader } from '../../components/store/ShopHeader'
 import { useShopMember } from '../../components/store/useShopMember'
 import { SeoHead } from '../../components/store/SeoHead'
 import { OrderReviewForm } from '../../components/store/OrderReviewForm'
+import { PixPaymentPanel } from '../../components/store/PixPaymentPanel'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
@@ -357,6 +358,17 @@ export default function MyOrderDetail() {
               <p className="text-center text-sm text-muted-foreground">
                 Obrigado pela avaliação!
               </p>
+            )}
+
+            {order.status === 'pending' && order.pixData && (
+              <PixPaymentPanel
+                emvCode={order.pixData.emvCode}
+                pixKey={order.pixData.pixKey}
+                amount={order.pixData.amount}
+                reference={`#${order.orderNumber}`}
+                title="Pague por PIX para concluir"
+                description="A confirmação é manual: assim que o pagamento cair e a equipe conferir, seu pedido sai da fila."
+              />
             )}
 
             {/* Only unpaid orders: once paid it is a refund, which an admin runs. */}

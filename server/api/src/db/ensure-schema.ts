@@ -945,6 +945,19 @@ const STEPS: SchemaStep[] = [
     await query(`UPDATE categories SET icon = 'gift' WHERE slug = 'brinquedos' AND icon = 'star'`);
     },
   },
+  {
+    name: "PIX na reserva de ingresso (migration 031)",
+    run: async () => {
+    await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pix_txid VARCHAR(25)`);
+    await query(
+      `ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL`
+    );
+    await query(`CREATE INDEX IF NOT EXISTS idx_event_reservations_user ON event_reservations(user_id)`);
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_event_reservations_email ON event_reservations(LOWER(buyer_email))`
+    );
+    },
+  },
 ];
 
 let state: SchemaState = {

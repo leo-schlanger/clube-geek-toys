@@ -34,6 +34,7 @@ import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
 import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
+import { usePixExitGuard } from '../../hooks/usePixExitGuard'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { SeoHead } from '../../components/store/SeoHead'
 import { getStoreCredit } from '../../lib/reviews'
@@ -89,6 +90,8 @@ export default function ShopCheckout() {
 
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<CreateOrderResult | null>(null)
+
+  usePixExitGuard(Boolean(result?.pixData) && result?.order?.status === 'pending')
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {

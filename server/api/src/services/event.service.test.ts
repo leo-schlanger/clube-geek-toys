@@ -10,6 +10,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     e-mail nem ressuscita reserva cancelada.
  *  4. O preço vem do servidor, por tipo de ingresso, e não do cliente.
  *  5. O código é lido com ou sem hífen, porque a portaria digita à mão.
+ *  6. A reserva nasce com PIX pagável e o txid não muda — sem isso a compra
+ *     depende do WhatsApp abrir, e foi assim que uma reserva ficou sem pagamento.
  */
 
 const { queryMock, clientQueryMock, releaseMock, sendEmailMock, auditMock } = vi.hoisted(() => ({
@@ -26,7 +28,13 @@ vi.mock('../config/database.js', () => ({
 }));
 
 vi.mock('../config/env.js', () => ({
-  env: { ADMIN_EMAIL: 'admin@geeketoys.com.br', FRONTEND_URL: 'https://club.geeketoys.com.br' },
+  env: {
+    ADMIN_EMAIL: 'admin@geeketoys.com.br',
+    FRONTEND_URL: 'https://club.geeketoys.com.br',
+    PIX_KEY: 'geekpopee@gmail.com',
+    PIX_MERCHANT_NAME: 'GEEKPOP E TOYS',
+    PIX_MERCHANT_CITY: 'RIO DE JANEIRO',
+  },
   SHOP_CANONICAL_URL: 'https://shop.geekpoptoys.com.br',
 }));
 
@@ -165,6 +173,93 @@ describe('createReservation', () => {
         attendees: [{ name: 'Ana', kind: 'full' }],
       })
     ).rejects.toThrow(/Evento não encontrado/);
+  });
+});
+
+describe('PIX da reserva', () => {
+  it('nasce com PIX pagável e guarda o txid', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('INSERT INTO event_reservations')) {
+        return { rows: [reservationRow({ quantity: 2, total_cents: 4000, pix_txid: 'CGTABC123' })] };
+      }
+      if (sql.startsWith('INSERT INTO event_tickets')) {
+        return { rows: [ticketRow({ status: 'pending' })] };
+      }
+      return { rows: [] };
+    });
+
+    const reservation = await eventService.createReservation(EVENT_ID, {
+      buyerName: 'Ana Souza',
+      buyerEmail: 'ana@example.com',
+      buyerPhone: '21999999999',
+      attendees: [
+        { name: 'Ana Souza', kind: 'full' },
+        { name: 'Bia Souza', kind: 'full' },
+      ],
+    });
+
+    expect(reservation.pix?.emvCode).toContain('geekpopee@gmail.com');
+    expect(reservation.pix?.amount).toBe(40);
+
+    const insert = clientQueryMock.mock.calls.find(([sql]) =>
+      String(sql).startsWith('INSERT INTO event_reservations')
+    )!;
+    expect(insert[1]).toEqual(expect.arrayContaining([expect.stringMatching(/^CGT[A-Z0-9]+$/)]));
+  });
+
+  it('o e-mail da reserva leva o copia-e-cola', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('INSERT INTO event_reservations')) {
+        return { rows: [reservationRow({ total_cents: 2000, pix_txid: 'CGTABC123' })] };
+      }
+      if (sql.startsWith('INSERT INTO event_tickets')) return { rows: [ticketRow()] };
+      return { rows: [] };
+    });
+
+    await eventService.createReservation(EVENT_ID, {
+      buyerName: 'Ana',
+      buyerEmail: 'ana@example.com',
+      buyerPhone: '21999999999',
+      attendees: [{ name: 'Ana', kind: 'full' }],
+    });
+
+    const call = sendEmailMock.mock.calls.find(
+      ([arg]) => (arg as { template?: string })?.template === 'event-reservation-received'
+    )!;
+    const vars = (call[0] as { variables: Record<string, string> }).variables;
+    expect(vars.pix_code).toContain('geekpopee@gmail.com');
+  });
+
+  // Reserva paga não pode exibir QR: convida a pagar duas vezes.
+  it('não devolve PIX em reserva confirmada', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM event_reservations')) {
+        return { rows: [reservationRow({ status: 'confirmed', total_cents: 2000 })] };
+      }
+      return { rows: [] };
+    });
+    const reservation = await eventService.getPublicReservation('R-ABCD-EFGH');
+    expect(reservation?.pix).toBeNull();
+  });
+
+  it('reenvia o PIX só para o e-mail gravado e só enquanto pendente', async () => {
+    queryMock.mockResolvedValue({
+      rows: [reservationRow({ status: 'pending', total_cents: 2000, pix_txid: 'CGTABC123' })],
+    });
+
+    await eventService.resendReservationPaymentLink('R-ABCD-EFGH');
+
+    const call = sendEmailMock.mock.calls.at(-1)!;
+    const payload = call[0] as { to: string; variables: Record<string, string> };
+    expect(payload.to).toBe('ana@example.com');
+    expect(payload.variables.pix_code).toContain('geekpopee@gmail.com');
+  });
+
+  it('recusa reenvio de reserva já confirmada', async () => {
+    queryMock.mockResolvedValue({ rows: [reservationRow({ status: 'confirmed' })] });
+    await expect(eventService.resendReservationPaymentLink('R-ABCD-EFGH')).rejects.toMatchObject({
+      code: 'RESERVATION_NOT_PENDING',
+    });
   });
 });
 

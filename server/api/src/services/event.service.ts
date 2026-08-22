@@ -12,6 +12,7 @@ import {
 import { getEventById, toDefinition } from './event-config.service.js';
 import { auditLog } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
+import { generatePixEMV, generatePixTxId } from '../utils/pix.js';
 
 /**
  * Ingressos de evento.
@@ -21,13 +22,18 @@ import { sendTemplateEmail } from './email.service.js';
  * Agora cada pessoa tem um ingresso **nominal** com código único, e a entrada
  * **queima** o código — o segundo print do mesmo QR aparece como já utilizado.
  *
- * O pagamento continua fora do sistema (PIX/dinheiro confirmado pela equipe),
- * como nos pedidos: a reserva nasce `pending` e só vira ingresso válido quando
- * um admin confirma.
+ * Payment is PIX on screen (same EMV as the shop), but settlement stays manual
+ * as with orders — there is no PIX webhook: a reservation starts `pending` and
+ * only becomes a valid ticket once an admin confirms the money arrived.
  */
 
 /** Fuso da loja: o container da API roda em UTC. */
 const EVENT_TIME_ZONE = 'America/Sao_Paulo';
+
+// Same account that receives shop orders (order.service uses these too).
+const PIX_KEY = env.PIX_KEY || '';
+const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
+const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled';
 export type TicketStatus = 'pending' | 'valid' | 'used' | 'cancelled';
@@ -45,8 +51,19 @@ export interface EventTicket {
   createdAt: string;
 }
 
+/** `emvCode` is the copy-and-paste payload; the QR is drawn from it client-side. */
+export interface ReservationPix {
+  emvCode: string;
+  pixKey: string;
+  merchantName: string;
+  amount: number;
+  txId: string;
+}
+
 export interface EventReservation {
   id: string;
+  userId: string | null;
+  pixTxid: string | null;
   eventId: string;
   code: string;
   buyerName: string;
@@ -60,6 +77,8 @@ export interface EventReservation {
   cancelledAt: string | null;
   createdAt: string;
   tickets?: EventTicket[];
+  /** Only while `pending` and with PIX configured. */
+  pix?: ReservationPix | null;
 }
 
 /**
@@ -129,6 +148,8 @@ function mapTicket(row: pg.QueryResultRow): EventTicket {
 function mapReservation(row: pg.QueryResultRow): EventReservation {
   return {
     id: row.id,
+    userId: row.user_id ?? null,
+    pixTxid: row.pix_txid ?? null,
     eventId: row.event_id,
     code: row.code,
     buyerName: row.buyer_name,
@@ -148,6 +169,33 @@ function mapReservation(row: pg.QueryResultRow): EventReservation {
 async function loadDefinition(eventId: string): Promise<EventDefinition | null> {
   const event = await getEventById(eventId);
   return event ? toDefinition(event) : null;
+}
+
+/**
+ * `null` for a free event or an unconfigured key.
+ *
+ * The txid comes from the database and is never regenerated — it is what ties a
+ * statement line to the reservation. Reservations older than migration 031 fall
+ * back to the reservation code.
+ */
+export function buildReservationPix(reservation: EventReservation): ReservationPix | null {
+  if (!PIX_KEY) return null;
+  if (reservation.totalCents <= 0) return null;
+  const txId = (reservation.pixTxid || reservation.code.replace(/-/g, '')).substring(0, 25);
+  const pix = generatePixEMV({
+    pixKey: PIX_KEY,
+    amount: reservation.totalCents / 100,
+    merchantName: PIX_MERCHANT_NAME,
+    merchantCity: PIX_MERCHANT_CITY,
+    txId,
+  });
+  return {
+    emvCode: pix.emvCode,
+    pixKey: PIX_KEY,
+    merchantName: PIX_MERCHANT_NAME,
+    amount: pix.amount,
+    txId,
+  };
 }
 
 async function requireOpenEvent(eventId: string): Promise<EventDefinition> {
@@ -170,6 +218,8 @@ export interface CreateReservationInput {
   buyerPhone: string;
   notes?: string | null;
   attendees: AttendeeInput[];
+  /** Logged-in account, when there is one: what makes the reservation show in the profile. */
+  userId?: string | null;
 }
 
 /**
@@ -209,8 +259,9 @@ export async function createReservation(
 
     const reservationResult = await client.query(
       `INSERT INTO event_reservations
-         (event_id, code, buyer_name, buyer_email, buyer_phone, quantity, total_cents, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (event_id, code, buyer_name, buyer_email, buyer_phone, quantity, total_cents, notes,
+          user_id, pix_txid)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         event.id,
@@ -221,6 +272,8 @@ export async function createReservation(
         priced.length,
         totalCents,
         input.notes?.trim() || null,
+        input.userId ?? null,
+        generatePixTxId(),
       ]
     );
     const reservation = mapReservation(reservationResult.rows[0]!);
@@ -239,6 +292,7 @@ export async function createReservation(
 
     await client.query('COMMIT');
     reservation.tickets = tickets;
+    reservation.pix = buildReservationPix(reservation);
 
     // E-mail é conveniência: a reserva já está gravada, então uma falha do
     // Resend não pode derrubar a resposta.
@@ -264,10 +318,12 @@ export async function createReservation(
   }
 }
 
+/** Carries the copy-and-paste code: the on-screen QR dies with the tab. */
 async function sendReservationReceivedEmail(
   reservation: EventReservation,
   event: EventDefinition
 ): Promise<void> {
+  const pix = reservation.pix ?? buildReservationPix(reservation);
   await sendTemplateEmail({
     template: 'event-reservation-received',
     to: reservation.buyerEmail,
@@ -278,8 +334,45 @@ async function sendReservationReceivedEmail(
       quantity: String(reservation.quantity),
       total: formatBRL(reservation.totalCents),
       tickets_url: reservationUrl(reservation.code),
+      pix_code: pix?.emvCode ?? '',
+      pix_key: pix?.pixKey ?? '',
     },
   });
+}
+
+/**
+ * Resends the reservation PIX.
+ *
+ * Public (rate limited at the route): reserving needs no account. The recipient
+ * is always the stored email — nothing from the caller changes it.
+ */
+export async function resendReservationPaymentLink(code: string): Promise<EventReservation> {
+  const normalized = normalizeCode(code);
+  const result = await query(`SELECT * FROM event_reservations WHERE code = $1`, [normalized]);
+  if (result.rows.length === 0) {
+    throw new AppError(404, 'Reserva não encontrada.', 'RESERVATION_NOT_FOUND');
+  }
+  const reservation = mapReservation(result.rows[0]!);
+  if (reservation.status !== 'pending') {
+    throw new AppError(
+      409,
+      reservation.status === 'confirmed'
+        ? 'Esta reserva já está paga e confirmada.'
+        : 'Esta reserva foi cancelada.',
+      'RESERVATION_NOT_PENDING'
+    );
+  }
+  const event = await loadDefinition(reservation.eventId);
+  if (!event) {
+    throw new AppError(404, 'Evento não encontrado.', 'EVENT_NOT_FOUND');
+  }
+  reservation.pix = buildReservationPix(reservation);
+  await sendReservationReceivedEmail(reservation, event);
+  await auditLog('event.payment_link_resent', reservation.userId, {
+    reservationId: reservation.id,
+    code: reservation.code,
+  });
+  return reservation;
 }
 
 async function notifyAdminOfReservation(
@@ -360,6 +453,25 @@ export interface PublicReservation {
   totalCents: number;
   createdAt: string;
   tickets: PublicTicket[];
+  /** Present only while the reservation is pending — it is how she pays. */
+  pix: ReservationPix | null;
+}
+
+function buildPublicReservation(
+  reservation: EventReservation,
+  tickets: PublicTicket[]
+): PublicReservation {
+  return {
+    code: reservation.code,
+    buyerName: reservation.buyerName,
+    status: reservation.status,
+    quantity: reservation.quantity,
+    totalCents: reservation.totalCents,
+    createdAt: reservation.createdAt,
+    tickets,
+    // A QR on a confirmed reservation would invite paying twice.
+    pix: reservation.status === 'pending' ? buildReservationPix(reservation) : null,
+  };
 }
 
 /** Todos os ingressos de uma compra — é o link que vai no e-mail. */
@@ -380,15 +492,43 @@ export async function getPublicReservation(code: string): Promise<PublicReservat
     ? ticketsResult.rows.map((row) => buildPublicTicket(mapTicket(row), event))
     : [];
 
-  return {
-    code: reservation.code,
-    buyerName: reservation.buyerName,
-    status: reservation.status,
-    quantity: reservation.quantity,
-    totalCents: reservation.totalCents,
-    createdAt: reservation.createdAt,
-    tickets,
-  };
+  return buildPublicReservation(reservation, tickets);
+}
+
+/** Matches by account **or** email: reserved as a guest, account created later. */
+export async function listReservationsForUser(
+  userId: string,
+  email: string
+): Promise<PublicReservation[]> {
+  const result = await query(
+    `SELECT * FROM event_reservations
+      WHERE user_id = $1 OR LOWER(buyer_email) = LOWER($2)
+      ORDER BY created_at DESC
+      LIMIT 50`,
+    [userId, email]
+  );
+  if (result.rows.length === 0) return [];
+
+  const reservations = result.rows.map(mapReservation);
+  const ticketsResult = await query(
+    `SELECT * FROM event_tickets WHERE reservation_id = ANY($1::uuid[]) ORDER BY created_at, code`,
+    [reservations.map((r) => r.id)]
+  );
+
+  const definitions = new Map<string, EventDefinition | null>();
+  for (const eventId of new Set(reservations.map((r) => r.eventId))) {
+    definitions.set(eventId, await loadDefinition(eventId));
+  }
+
+  return reservations.map((reservation) => {
+    const event = definitions.get(reservation.eventId) ?? null;
+    const tickets = event
+      ? ticketsResult.rows
+          .filter((row) => row.reservation_id === reservation.id)
+          .map((row) => buildPublicTicket(mapTicket(row), event))
+      : [];
+    return buildPublicReservation(reservation, tickets);
+  });
 }
 
 // ─── Admin ───────────────────────────────────────────────────────────────────

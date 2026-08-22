@@ -171,7 +171,7 @@ export interface CreateOrderResult {
  *
  * Channels:
  * - retail: optional member_10 when active member
- * - wholesale: só com `wholesale.sales_open` ligado; requires auth + approved CNPJ account;
+ * - wholesale: only with `wholesale.sales_open` on; requires auth + approved CNPJ account;
  *   wholesale_25; only wholesale_enabled products
  */
 export async function createOrder(input: CreateOrderInput, user?: JwtPayload): Promise<CreateOrderResult> {
@@ -206,7 +206,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   let wholesaleAccountId: string | null = null;
   let customerCnpj: string | null = null;
   if (isWholesale) {
-    // Cadastro segue aberto mesmo com o canal fechado — o que não pode é virar pedido.
+    // Signup stays open with the channel closed — what it must not do is become an order.
     if (!(await isWholesaleSalesOpen())) {
       throw new AppError(
         403,
@@ -641,6 +641,22 @@ export async function getOrderById(id: string, withItems = true): Promise<Order 
   return order;
 }
 
+/** EMV rebuilt from the stored `pix_txid`: same code as checkout, same statement line. */
+export function buildOrderPix(order: Order): PixQRData | null {
+  if (!PIX_KEY) return null;
+  if (order.status !== 'pending') return null;
+  if (order.paymentMethod && order.paymentMethod !== 'pix') return null;
+  if (!order.pixTxid) return null;
+  if (order.total <= 0) return null;
+  return generatePixEMV({
+    pixKey: PIX_KEY,
+    amount: order.total,
+    merchantName: PIX_MERCHANT_NAME,
+    merchantCity: PIX_MERCHANT_CITY,
+    txId: order.pixTxid,
+  });
+}
+
 /** Lightweight status lookup for order-confirmation polling (public by order id). */
 export async function getOrderStatus(id: string): Promise<{ id: string; status: string; orderNumber: number } | null> {
   const result = await query('SELECT id, status, order_number FROM orders WHERE id = $1', [id]);
@@ -899,6 +915,7 @@ export async function getMyOrderById(userId: string, orderId: string): Promise<O
   const order = mapOrder(result.rows[0]);
   const items = await query(`SELECT * FROM order_items WHERE order_id = $1 ORDER BY id`, [orderId]);
   order.items = items.rows.map(mapItem);
+  order.pixData = buildOrderPix(order) ?? undefined;
   return order;
 }
 

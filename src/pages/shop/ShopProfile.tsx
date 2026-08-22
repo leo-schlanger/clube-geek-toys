@@ -6,6 +6,7 @@ import {
   MapPin,
   Heart,
   Package,
+  Ticket,
   Camera,
   Trash2,
   Save,
@@ -33,6 +34,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Loading } from '../../components/ui/loading'
 import { LazyImage } from '../../components/ui/lazy-image'
 import { availableStock } from '../../lib/products'
+import {
+  getMyReservations,
+  RESERVATION_STATUS_LABEL,
+  type PublicReservation,
+} from '../../lib/event-tickets'
 
 /**
  * Shop profile, for any account with or without a subscription.
@@ -43,6 +49,7 @@ import { availableStock } from '../../lib/products'
 export default function ShopProfile() {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const [reservations, setReservations] = useState<PublicReservation[]>([])
 
   const [profile, setProfile] = useState<CustomerProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -113,6 +120,22 @@ export default function ShopProfile() {
       active = false
     }
   }, [user, hydrate])
+
+  useEffect(() => {
+    if (!user) return
+    let active = true
+    ;(async () => {
+      try {
+        const list = await getMyReservations()
+        if (active) setReservations(list)
+      } catch {
+        if (active) setReservations([])
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [user])
 
   useEffect(() => {
     if (!user) return
@@ -560,6 +583,62 @@ export default function ShopProfile() {
             )}
           </CardContent>
         </Card>
+
+        {/* ─── Ingressos ────────────────────────────────────────────── */}
+        {reservations.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Ticket className="h-5 w-5 text-primary" />
+                Meus ingressos
+              </CardTitle>
+              <CardDescription>
+                Reservas de evento. Pendente = falta o pagamento cair; abra para pagar por PIX.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-3">
+                {reservations.map((reservation) => (
+                  <li
+                    key={reservation.code}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {reservation.tickets[0]?.event.title ?? 'Evento GeekPop & Toys'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {reservation.quantity} ingresso(s) ·{' '}
+                        {formatCurrency(reservation.totalCents / 100)} ·{' '}
+                        <span
+                          className={
+                            reservation.status === 'pending'
+                              ? 'font-medium text-yellow-600'
+                              : reservation.status === 'confirmed'
+                                ? 'font-medium text-green-600'
+                                : 'text-muted-foreground'
+                          }
+                        >
+                          {RESERVATION_STATUS_LABEL[reservation.status]}
+                        </span>
+                      </p>
+                      <p className="font-mono text-xs text-muted-foreground">{reservation.code}</p>
+                    </div>
+                    <Button
+                      variant={reservation.status === 'pending' ? 'default' : 'outline'}
+                      size="sm"
+                      asChild
+                    >
+                      <Link to={`/ingressos/${reservation.code}`}>
+                        {reservation.status === 'pending' ? 'Pagar' : 'Ver ingressos'}
+                      </Link>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {/* ─── Histórico ────────────────────────────────────────────── */}
         <Card>

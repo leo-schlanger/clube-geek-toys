@@ -9,6 +9,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
+import { useConfirm } from '../../hooks/useConfirm'
+import { usePixExitGuard } from '../../hooks/usePixExitGuard'
 import {
   CreditCard,
   QrCode,
@@ -76,6 +78,25 @@ export function StepPayment({
   const [method, setMethod] = useState<PaymentMethodChoice>(null)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
+  const confirm = useConfirm()
+
+  usePixExitGuard(Boolean(pixData))
+
+  /** Going back with a generated-and-unpaid PIX has to be a decision. */
+  async function handleBack() {
+    if (pixData) {
+      const leave = await confirm({
+        title: 'Voltar sem concluir o pagamento?',
+        description:
+          'O PIX já foi gerado e ainda não foi pago. Se voltar agora, o pagamento não é registrado — você pode gerar outro quando quiser.',
+        confirmText: 'Voltar sem pagar',
+        cancelText: 'Continuar pagamento',
+        variant: 'destructive',
+      })
+      if (!leave) return
+    }
+    onBack()
+  }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -479,7 +500,7 @@ export function StepPayment({
       )}
 
       {/* ── Back button (always visible) ────────────────────────────────────── */}
-      <Button variant="ghost" onClick={onBack} className="w-full">
+      <Button variant="ghost" onClick={handleBack} className="w-full">
         <ArrowLeft className="h-4 w-4" />
         Voltar
       </Button>

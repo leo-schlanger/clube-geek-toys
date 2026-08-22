@@ -10,8 +10,10 @@ import { formatEventDateRange } from '../../data/event'
 import {
   getPublicReservation,
   getPublicTicket,
+  type PublicReservation,
   type PublicTicket,
 } from '../../lib/event-tickets'
+import { ReservationPixPanel } from '../../components/store/ReservationPixPanel'
 
 type Props = {
   /** `ticket` mostra um ingresso; `reservation` mostra todos os da compra. */
@@ -29,7 +31,7 @@ export default function TicketPage({ mode }: Props) {
   const { code } = useParams<{ code: string }>()
   const { isMember } = useShopMember()
   const [tickets, setTickets] = useState<PublicTicket[] | null>(null)
-  const [buyerName, setBuyerName] = useState<string | null>(null)
+  const [reservation, setReservation] = useState<PublicReservation | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -48,12 +50,12 @@ export default function TicketPage({ mode }: Props) {
           if (!ticket) setError('Ingresso não encontrado.')
           else setTickets([ticket])
         } else {
-          const reservation = await getPublicReservation(code)
+          const found = await getPublicReservation(code)
           if (cancelled) return
-          if (!reservation) setError('Reserva não encontrada.')
+          if (!found) setError('Reserva não encontrada.')
           else {
-            setTickets(reservation.tickets)
-            setBuyerName(reservation.buyerName)
+            setTickets(found.tickets)
+            setReservation(found)
           }
         }
       } catch {
@@ -101,12 +103,23 @@ export default function TicketPage({ mode }: Props) {
               <h1 className="font-heading text-2xl font-bold sm:text-3xl">
                 {event?.title ?? 'Evento GeekPop & Toys'}
               </h1>
-              {buyerName && (
+              {reservation && (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Reserva de <strong>{buyerName}</strong> · {tickets.length} ingresso(s)
+                  Reserva de <strong>{reservation.buyerName}</strong> · {tickets.length}{' '}
+                  ingresso(s)
                 </p>
               )}
             </div>
+
+            {/* Pendente: o QR do ingresso ainda não vale na portaria. */}
+            {reservation?.pix && reservation.status === 'pending' && (
+              <ReservationPixPanel
+                code={reservation.code}
+                pix={reservation.pix}
+                totalCents={reservation.totalCents}
+                className="print:hidden"
+              />
+            )}
 
             {event && (
               <div className="grid gap-3 sm:grid-cols-2">

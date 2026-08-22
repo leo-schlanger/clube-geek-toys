@@ -4,15 +4,22 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
-import { authenticate, requireRole } from '../middleware/auth.js';
+import { authenticate, optionalAuth, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { publicLookupLimiter } from '../middleware/rate-limit.js';
+import { publicLookupLimiter, emailLimiter } from '../middleware/rate-limit.js';
 import { MAX_TICKETS_PER_RESERVATION } from '../config/events.js';
 import { env } from '../config/env.js';
 import * as eventService from '../services/event.service.js';
 import * as eventConfig from '../services/event-config.service.js';
 
 export const eventRouter = Router();
+
+/** `fer***@gmail.com` — confirms which inbox without exposing the address. */
+function maskEmail(email: string): string {
+  const [user = '', domain = ''] = email.split('@');
+  const visible = user.slice(0, 3);
+  return `${visible}${'*'.repeat(Math.max(1, user.length - visible.length))}@${domain}`;
+}
 
 // ─── Público: o evento em cartaz ─────────────────────────────────────────────
 // Declarado antes de qualquer rota com parâmetro para "active" não virar id.
@@ -52,11 +59,15 @@ const reservationSchema = z.object({
 // POST /events/:eventId/reservations — reserva da loja, um ingresso por pessoa
 eventRouter.post(
   '/:eventId/reservations',
+  optionalAuth,
   publicLookupLimiter,
   validate(reservationSchema),
   async (req, res, next) => {
     try {
-      const reservation = await eventService.createReservation(req.params.eventId as string, req.body);
+      const reservation = await eventService.createReservation(req.params.eventId as string, {
+        ...req.body,
+        userId: req.user?.userId ?? null,
+      });
       res.status(201).json({
         reservation,
         ticketsUrl: eventService.reservationUrl(reservation.code),
@@ -90,6 +101,31 @@ eventRouter.get('/reservations/:code', publicLookupLimiter, async (req, res, nex
       return;
     }
     res.json({ reservation });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /events/reservations/:code/payment-link — resend the PIX to the reservation email
+eventRouter.post('/reservations/:code/payment-link', emailLimiter, async (req, res, next) => {
+  try {
+    const reservation = await eventService.resendReservationPaymentLink(
+      req.params.code as string
+    );
+    res.json({ sent: true, email: maskEmail(reservation.buyerEmail) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /events/my-reservations — the logged-in customer's tickets, for the profile
+eventRouter.get('/my-reservations', authenticate, async (req, res, next) => {
+  try {
+    const reservations = await eventService.listReservationsForUser(
+      req.user!.userId,
+      req.user!.email
+    );
+    res.json({ reservations });
   } catch (err) {
     next(err);
   }
