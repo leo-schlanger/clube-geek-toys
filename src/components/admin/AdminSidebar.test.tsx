@@ -44,6 +44,8 @@ vi.mock('lucide-react', () => {
     HelpCircle: icon,
     Images: icon,
     Ticket: icon,
+    Tags: icon,
+    CalendarDays: icon,
     Star: icon,
     Moon: icon,
     Sun: icon,
