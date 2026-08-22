@@ -83,8 +83,8 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 | ------------------------- | ---------------------------------------------------------------------- |
 | Preços                    | Sempre do DB sob `FOR UPDATE`                                          |
 | Qty duplicada no carrinho | Agregada antes do check de estoque                                     |
-| Desconto retail           | `member_15` se membro ativo                                            |
-| Desconto atacado          | `wholesale_25` se conta approved + CNPJ; **não empilha** com member_15 |
+| Desconto retail           | `member_10` se membro ativo                                            |
+| Desconto atacado          | `wholesale_25` se conta approved + CNPJ; **não empilha** com member_10 |
 | Crédito no pending        | Debitado no create; **devolvido** em cancel/fail/refund                |
 | Falha Stripe após create  | Pedido cancelado + crédito restaurado                                  |
 | Review reward             | Na mesma TX das reviews + unique index                                 |
@@ -94,7 +94,7 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 | `orders.channel`   | Quem compra                      | Desconto         |
 | ------------------ | -------------------------------- | ---------------- |
-| `retail` (default) | Convidado ou membro logado       | 0 ou `member_15` |
+| `retail` (default) | Convidado ou membro logado       | 0 ou `member_10` |
 | `wholesale`        | JWT + conta atacado **approved** | `wholesale_25`   |
 
 ## SEO / marca

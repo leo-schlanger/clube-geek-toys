@@ -21,7 +21,7 @@ variações/vídeos, CRUD do painel, infra, segurança e integrações.
 | Área                            | Docs                                 | Código       | Notas                                         |
 | ------------------------------- | ------------------------------------ | ------------ | --------------------------------------------- |
 | Stack clube + loja + API        | PROJECT / ARCHITECTURE               | ✅           | OK                                            |
-| Plano único / 15%               | PROJECT                              | ✅           | Desconto server-side                          |
+| Plano único / 10%               | PROJECT                              | ✅           | Desconto server-side                          |
 | Loja checkout Stripe/PIX        | PROJECT                              | ✅           | PIX manual admin                              |
 | **Frete CEP + Melhor Envio**    | SHOP-ORDERS + PROJECT                | ✅           | Fallback tabela sem token                     |
 | **Minhas compras (6 abas)**     | SHOP-ORDERS                          | ✅           | Ownership por `user_id` ou `member_id`        |
@@ -76,17 +76,17 @@ subtotal          = Σ (price_db × qty_agregada)
 channel           = retail | wholesale  (do body; wholesale exige auth + conta approved)
 
 retail:
-  member_15       = 15% se member ativo
-  credit          = min(saldo, subtotal − member_15)  se applyStoreCredit
-  discount        = member_15 + credit
-  reason          = member_15 | store_credit | member_15+store_credit
+  member_10       = 10% se member ativo
+  credit          = min(saldo, subtotal − member_10)  se applyStoreCredit
+  discount        = member_10 + credit
+  reason          = member_10 | store_credit | member_10+store_credit
 
 wholesale:
   wholesale_25    = 25% se conta approved + CNPJ confere
   credit          = min(saldo, subtotal − wholesale_25)  se applyStoreCredit
   discount        = wholesale_25 + credit
   reason          = wholesale_25 | wholesale_25+store_credit | store_credit
-  (não empilha com member_15)
+  (não empilha com member_10)
 
 shipping          = cotação HMAC revalidada (nunca do client; nunca recebe desconto)
 total             = subtotal − discount + shipping

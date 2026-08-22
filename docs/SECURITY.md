@@ -179,9 +179,9 @@ cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
 
 ### Desconto de Membro na Loja (server-side)
 
-- O desconto de **15%** só é aplicado quando há um membro `active` autenticado no checkout (`expiry_date >= CURRENT_DATE`)
+- O desconto de **10%** só é aplicado quando há um membro `active` autenticado no checkout (`expiry_date >= CURRENT_DATE`)
 - O backend resolve o `member_id` a partir do token — nunca confia em flag/valor enviado pelo cliente
-- Aplicação registrada em `orders.discount_reason = 'member_15'` (constante `MEMBER_SHOP_DISCOUNT = 0.15`)
+- Aplicação registrada em `orders.discount_reason = 'member_10'` (constante `MEMBER_SHOP_DISCOUNT = 0.10`)
 - Frete **nunca** recebe desconto de membro
 
 ### Desconto Atacado B2B (server-side)
@@ -190,7 +190,7 @@ cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
 - Exige JWT + conta em `wholesale_accounts` com `status = 'approved'`
 - CNPJ do body deve bater com o cadastrado (dígitos + checksum Modulo 11)
 - Desconto de **25%** (`WHOLESALE_SHOP_DISCOUNT = 0.25`, reason `wholesale_25`)
-- **Não empilha** com `member_15` (canais mutuamente exclusivos no cálculo)
+- **Não empilha** com `member_10` (canais mutuamente exclusivos no cálculo)
 - Só produtos com `wholesale_enabled = true`; valida `wholesale_min_qty` e estoque
 - Login atacado (`POST /wholesale/login`) exige CNPJ correto — credenciais sozinhas não bastam
 

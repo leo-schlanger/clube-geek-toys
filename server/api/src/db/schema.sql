@@ -306,7 +306,7 @@ CREATE TABLE orders (
   shipping_address JSONB,
   subtotal DECIMAL(10,2) NOT NULL CHECK (subtotal >= 0),
   discount DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (discount >= 0),
-  discount_reason VARCHAR(40),                                     -- 'member_15' | 'wholesale_25' (+ store_credit)
+  discount_reason VARCHAR(40),                                     -- 'member_10' | 'wholesale_25' (+ store_credit)
   shipping_cost DECIMAL(10,2) NOT NULL DEFAULT 0 CHECK (shipping_cost >= 0),
   shipping_service VARCHAR(40),
   shipping_service_id TEXT,

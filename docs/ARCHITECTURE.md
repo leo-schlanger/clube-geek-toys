@@ -353,7 +353,7 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
      │                            │                              │
      │  POST /orders (checkout)   │                              │
      │───────────────────────────►│  createOrder():              │
-     │  channel=retail|wholesale  │   • retail: member_15 se ativo│
+     │  channel=retail|wholesale  │   • retail: member_10 se ativo│
      │                            │   • wholesale: approved CNPJ  │
      │                            │     → wholesale_25 (25%)      │
      │                            │   • frete HMAC revalidado     │
@@ -373,11 +373,11 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
 
 ### Desconto de membro (server-side)
 
-O desconto de **15%** so e aplicado quando ha um membro **ativo** autenticado no checkout **no canal retail**. O backend nunca confia no valor enviado pelo cliente:
+O desconto de **10%** so e aplicado quando ha um membro **ativo** autenticado no checkout **no canal retail**. O backend nunca confia no valor enviado pelo cliente:
 
 - `order.service` resolve o `member_id` do usuario autenticado e verifica `status = 'active'` e `expiry_date >= CURRENT_DATE`
-- Se valido, calcula `discount = subtotal * 0.15` e grava `discount_reason = 'member_15'`; caso contrario, `discount = 0`
-- Constante `MEMBER_SHOP_DISCOUNT = 0.15` em `server/api/src/types/index.ts`
+- Se valido, calcula `discount = subtotal * 0.10` e grava `discount_reason = 'member_10'`; caso contrario, `discount = 0`
+- Constante `MEMBER_SHOP_DISCOUNT = 0.10` em `server/api/src/types/index.ts`
 
 ### Canal Atacado B2B (`/atacado`)
 
