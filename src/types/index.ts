@@ -20,6 +20,13 @@ export function paymentTypeSuffix(type: PaymentType): '/mês' | '/ano' {
   return type === 'annual' ? '/ano' : '/mês'
 }
 
+/**
+ * Frequency of every new charge — signup, renewal or a pending payment picked
+ * back up. A member row may still say `annual` while the year they paid runs
+ * out; that never means the next charge is annual.
+ */
+export const CURRENT_PAYMENT_TYPE: PaymentType = 'monthly'
+
 // Payment status
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 

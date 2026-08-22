@@ -7,7 +7,7 @@ import { validateEmail } from '../lib/email-validation'
 import { createMember, isCPFRegistered } from '../lib/members'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
-import { CLUB_PLAN, type PlanType, type PaymentType, type ContractData } from '../types'
+import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, type PlanType, type PaymentType, type ContractData } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -52,7 +52,7 @@ export default function Register() {
 
   // Single monthly plan. Legacy query params are ignored.
   const selectedPlan: PlanType = 'club'
-  const paymentType: PaymentType = 'monthly'
+  const paymentType: PaymentType = CURRENT_PAYMENT_TYPE
 
   // Flow flags
   const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)

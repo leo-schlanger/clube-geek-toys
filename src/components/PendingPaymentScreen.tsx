@@ -10,7 +10,7 @@ import { updateMember, clearPendingPayment } from '../lib/members'
 import { checkPixPaymentStatus, isPaymentConfigured } from '../lib/payments'
 import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
-import { PLANS, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
+import { PLANS, CURRENT_PAYMENT_TYPE, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -113,7 +113,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
     // Calculate new expiry date
     const now = new Date()
     const newExpiry = new Date(now)
-    newExpiry.setFullYear(newExpiry.getFullYear() + 1)
+    newExpiry.setMonth(newExpiry.getMonth() + 1)
 
     // Update member status to active
     const success = await updateMember(member.id, {
@@ -427,7 +427,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
       {showPayment && (
         <PaymentModal
           plan={member.plan as PlanType}
-          paymentType={member.paymentType}
+          paymentType={CURRENT_PAYMENT_TYPE}
           memberEmail={member.email}
           memberId={member.id}
           initialPendingPayment={hasPendingPayment ? (member.pendingPayment ?? undefined) : undefined}
@@ -445,7 +445,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
           memberEmail={member.email}
           memberPhone={member.phone}
           plan={member.plan as PlanType}
-          paymentType={member.paymentType}
+          paymentType={CURRENT_PAYMENT_TYPE}
           onClose={() => setShowContract(false)}
           onSigned={handleContractSigned}
         />

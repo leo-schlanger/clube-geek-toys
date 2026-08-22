@@ -312,7 +312,7 @@ PIX nao usa Stripe (indisponivel no Brasil para PIX via Stripe). O QR Code e ger
      │                           │  extend expiry_date          │
      │                           │  email: subscription-payment │
      │                           │                              │
-     │                           │  (recorrencia anual)         │
+     │                           │  (recorrencia mensal)        │
      │                           │  webhook: invoice.paid       │
      │                           │◄─────────────────────────────│
      │                           │  extend expiry_date          │
@@ -432,7 +432,7 @@ Imagens sao enviadas por `POST /products/:id/images` (multipart) e armazenadas n
 
 | Transicao                        | Condicao                                | Comportamento                                                                            |
 | -------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+365d, plano anual)                          |
+| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+1 mes, plano mensal)                        |
 | `active` -> `active` (renovacao) | Pagamento enquanto ainda ativo          | Estende `expiry_date` a partir da data de expiracao atual (nao perde dias restantes)     |
 | `active` -> `expired`            | `expiry_date < hoje` + cron diario      | Marca `status = 'expired'`, envia email `member-expired`                                 |
 | `expired` -> `active`            | Novo pagamento                          | Fresh start: `expiry_date` calculado a partir de hoje                                    |

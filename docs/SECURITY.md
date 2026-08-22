@@ -174,7 +174,7 @@ cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
 
 ### Validação de Valores
 
-- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 12,50) — não é possível criar pagamento com valor arbitrário
+- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 12,50) e intervalo travado em mensal (`CLUB_PLAN_INTERVAL`) — o cliente não escolhe nem o valor nem a periodicidade
 - Loja: subtotal, desconto e total são **recalculados no servidor** a partir dos preços dos produtos travados no banco (`SELECT ... FOR UPDATE`); o valor enviado pelo cliente nunca é usado
 
 ### Desconto de Membro na Loja (server-side)

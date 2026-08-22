@@ -4,6 +4,13 @@
 
 ## Entregue em 22/08/2026
 
+- [x] **Clube passou a ser mensal (R$ 12,50)** — o plano era anual de R$ 149,99.
+      Toda cobrança nova é mensal: cadastro, renovação e pagamento pendente
+      retomado. Membro que já pagou um ano mantém a janela dele e só volta a ser
+      cobrado no vencimento — `payment_type = 'annual'` sobrevive **só** nessas
+      linhas (migration 032). O intervalo do Stripe passou a ser travado no
+      servidor junto com o valor: antes o cliente escolhia `frequency_type` e
+      dava para comprar um ano por R$ 12,50.
 - [x] **Evento deixou de ser deploy** — data, local, textos, preço e **banner**
       viviam hardcoded em três arquivos e dois repos (`src/data/event.ts`,
       `geek-toys-home/src/data/event.ts`, `server/api/src/config/events.ts`), e o
@@ -253,7 +260,7 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 
 ## Concluido
 
-### Plano Unico + Loja E-commerce (branch `feat/single-plan-and-store`)
+### Plano Unico + Loja E-commerce (branch `feat/single-plan-and-store`) — preco/frequencia superseded em 22/08/2026
 
 - [x] **Plano unico anual** - Descontinuados os tiers Silver/Gold/Black e a opcao mensal; agora um unico plano "Clube GeekPop & Toys" (R$ 149,99/ano)
 - [x] **Beneficio simplificado** - 15% de desconto em qualquer produto + brinde especial + entrada gratuita em eventos participantes

@@ -3,14 +3,20 @@ import { AppError } from '../middleware/error-handler.js';
 import { getStripe, getOrCreateCustomer } from '../utils/stripe.js';
 import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
-import { CLUB_PLAN_PRICE } from '../types/index.js';
+import {
+  CLUB_PLAN_PRICE,
+  CLUB_PLAN_PAYMENT_TYPE,
+  CLUB_PLAN_FREQUENCY_TYPE,
+  CLUB_PLAN_INTERVAL,
+} from '../types/index.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface CreateSubscriptionData {
   member_id: string;
   plan: string;
-  frequency_type: string;
+  /** Ignored server-side — the club plan is always monthly. */
+  frequency_type?: string;
   payer_email: string;
   payer_name: string;
   /** Ignored server-side — amount is always CLUB_PLAN_PRICE for the club plan. */
@@ -95,10 +101,12 @@ export async function createSubscription(data: CreateSubscriptionData) {
   });
 
   // 3. Create Stripe Subscription (incomplete — client confirms via PaymentElement)
-  // Server locks amount to the club plan price (never trust client transaction_amount).
+  // Server locks both the amount and the interval to the club plan (never trust
+  // client transaction_amount / frequency_type). Locking only the amount would
+  // let a client ask for `years` and buy a whole year for the monthly price.
   const amount = CLUB_PLAN_PRICE;
-  const paymentType = data.frequency_type === 'years' ? 'annual' : 'monthly';
-  const interval = paymentType === 'annual' ? 'year' : 'month';
+  const paymentType = CLUB_PLAN_PAYMENT_TYPE;
+  const interval = CLUB_PLAN_INTERVAL;
 
   // Create a Stripe Product + Price inline via price_data.
   // Stripe requires either `price` (pre-created) or `price_data` with `product`.
@@ -155,7 +163,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
         stripeSubscription.id,
         status,
         data.plan,
-        data.frequency_type,
+        CLUB_PLAN_FREQUENCY_TYPE,
         amount,
         data.payer_email,
       ],

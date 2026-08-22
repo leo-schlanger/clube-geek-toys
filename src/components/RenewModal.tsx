@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { PaymentModal } from './PaymentModal'
-import { CLUB_PLAN, type Member } from '../types'
+import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, type Member } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -34,7 +34,7 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
     return (
       <PaymentModal
         plan="club"
-        paymentType="annual"
+        paymentType={CURRENT_PAYMENT_TYPE}
         memberId={member.id}
         memberEmail={member.email}
         memberName={member.fullName}

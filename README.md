@@ -12,7 +12,7 @@ A **GeekPop & Toys** é uma loja de K-pop e cultura pop em Copacabana, Rio de Ja
 
 A plataforma inclui:
 
-- **Plano único anual** com desconto exclusivo e benefícios para membros
+- **Plano único mensal** com desconto exclusivo e benefícios para membros
 - **Contrato digital** com validade jurídica (Lei 14.063/2020)
 - **Carteirinha digital premium** com QR Code e design metálico
 - **Loja e-commerce própria** em `shop.geeketoys.com.br` com desconto de membro aplicado no checkout
@@ -49,7 +49,7 @@ Assinatura eletronica com validade jurídica conforme a Lei 14.063/2020. Cada co
 
 ### Assinatura Recorrente
 
-Gerenciada pelo Stripe Subscriptions. Suporte a pausa, retomada e cancelamento da assinatura anual. Webhooks processam eventos de cobranca automaticamente.
+Gerenciada pelo Stripe Subscriptions. Suporte a pausa, retomada e cancelamento da assinatura mensal. Webhooks processam eventos de cobranca automaticamente.
 
 ### Carteirinha Digital
 

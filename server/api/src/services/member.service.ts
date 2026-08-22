@@ -304,7 +304,7 @@ export async function updateMember(
   }
   const before = beforeRow.rows[0];
 
-  // Admin sets status=active without expiry → fill annual window so PDV/shop discount work.
+  // Admin sets status=active without expiry → fill a monthly window so PDV/shop discount work.
   if (
     userRole !== 'member' &&
     data.status === 'active' &&
@@ -313,7 +313,7 @@ export async function updateMember(
   ) {
     const start = new Date();
     const expiry = new Date(start);
-    expiry.setFullYear(expiry.getFullYear() + 1);
+    expiry.setMonth(expiry.getMonth() + 1);
     if (data.startDate == null && !before.start_date) {
       setClauses.push(`start_date = $${paramIndex++}`);
       values.push(start.toISOString().slice(0, 10));

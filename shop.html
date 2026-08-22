@@ -16,12 +16,11 @@
       dividir a autoridade. Ver CANONICAL_ORIGINS em src/lib/subdomain.ts.
 
       Por que um arquivo separado, e não sub_filter no HTML do clube: o nginx
-      fazia troca de string no index.html e isso quebrou de três formas ao mesmo
-      tempo — og:description ficou com o texto do plano do clube, a description
-      virou "Plano do Clube com de R$ 149,99" (frase quebrada), e nenhum dos
-      JSON-LD era tocado, então a loja se declarava ao Google como a assinatura
-      de R$ 149,99, com FAQ do clube. Qualquer edição de copy no index.html
-      voltaria a quebrar isto silenciosamente.
+      trocava strings no index.html e isso quebrava de três formas ao mesmo
+      tempo — og:description ficava com o texto do plano do clube, a description
+      saía com a frase truncada, e nenhum JSON-LD era tocado, então a loja se
+      declarava ao Google como a assinatura do clube, com FAQ do clube. Qualquer
+      edição de copy no index.html voltaria a quebrar isto silenciosamente.
     -->
 
     <script src="/boot.js"></script>

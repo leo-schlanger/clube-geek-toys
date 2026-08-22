@@ -138,12 +138,13 @@ export async function updateMember(
 }
 
 /**
- * Manual activation by an admin. The API fills the annual start/expiry when absent.
+ * Manual activation by an admin. The API fills the same monthly window when
+ * these fields are absent.
  */
 export async function activateMember(id: string): Promise<boolean> {
   const start = new Date()
   const expiry = new Date(start)
-  expiry.setFullYear(expiry.getFullYear() + 1)
+  expiry.setMonth(expiry.getMonth() + 1)
   return updateMember(id, {
     status: 'active',
     startDate: start.toISOString().slice(0, 10),

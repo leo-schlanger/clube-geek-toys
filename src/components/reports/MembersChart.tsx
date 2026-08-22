@@ -124,7 +124,7 @@ export function MembersChart({ data, planDistribution, loading }: MembersChartPr
           <CardHeader>
             <CardTitle className="text-base">Plano do clube</CardTitle>
             <CardDescription>
-              Modelo atual: um único plano anual (10% de desconto na loja)
+              Modelo atual: um único plano mensal (10% de desconto na loja)
             </CardDescription>
           </CardHeader>
           <CardContent>

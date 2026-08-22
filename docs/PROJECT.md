@@ -19,7 +19,7 @@
 
 ## 2. Visao do Produto
 
-Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano anual e recebem 10% de desconto em qualquer produto, 50% nos ingressos dos eventos, brinde na primeira compra da loja e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
+Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano mensal e recebem 10% de desconto em qualquer produto, 50% nos ingressos dos eventos, brinde na primeira compra da loja e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
 
 ### Plano de Assinatura
 
