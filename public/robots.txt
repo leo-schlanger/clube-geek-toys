@@ -10,6 +10,9 @@ Disallow: /checkout
 Disallow: /pedido/
 Disallow: /minhas-compras
 Disallow: /perfil
+Disallow: /carrinho
+Disallow: /atacado/entrar
+Disallow: /atacado/cadastro
 
 # Club
 Sitemap: https://club.geeketoys.com.br/sitemap.xml

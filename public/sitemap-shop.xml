@@ -1,23 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Static shop pages only. `/`, `/evento`, `/categoria/*` and every product come
+  from the dynamic sitemap the API serves at /sitemap-products.xml, so they are
+  not repeated here.
+
+  Hosts must be the canonical shop origin (shop.geekpoptoys.com.br). This file
+  used to list shop.geeketoys.com.br while robots.txt published it under
+  geekpoptoys: a cross-domain sitemap, which Google discards, and it contradicted
+  every canonical tag. See CANONICAL_ORIGINS in src/lib/subdomain.ts.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://shop.geeketoys.com.br/</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://shop.geeketoys.com.br/evento</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://shop.geeketoys.com.br/carrinho</loc>
+    <loc>https://shop.geekpoptoys.com.br/entrar</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
+    <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://shop.geeketoys.com.br/entrar</loc>
+    <loc>https://shop.geekpoptoys.com.br/cadastro</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://shop.geekpoptoys.com.br/atacado</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
   </url>
 </urlset>

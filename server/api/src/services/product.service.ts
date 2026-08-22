@@ -1041,7 +1041,7 @@ export async function buildProductShareHtml(
 `;
 }
 
-/** Absolute product URLs for search engines (shop host). */
+/** Absolute product and category URLs for search engines (shop host). */
 export async function buildProductSitemapXml(shopBaseUrl: string): Promise<string> {
   const base = shopBaseUrl.replace(/\/$/, '');
   const result = await query(
@@ -1051,6 +1051,11 @@ export async function buildProductSitemapXml(shopBaseUrl: string): Promise<strin
        AND slug NOT ILIKE 'checkup%'
      ORDER BY updated_at DESC
      LIMIT 5000`
+  );
+  // Category landing pages were in no sitemap at all, though `/categoria/:slug`
+  // is the page that ranks for "photocard", "album kpop" and the like.
+  const categories = await query(
+    `SELECT slug, updated_at FROM categories WHERE active = TRUE ORDER BY sort_order, name`
   );
   const urls = result.rows
     .map((r) => {
@@ -1062,6 +1067,20 @@ export async function buildProductSitemapXml(shopBaseUrl: string): Promise<strin
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>`;
+    })
+    .join('\n');
+
+  const categoryUrls = categories.rows
+    .map((r) => {
+      const lastmod = r.updated_at
+        ? new Date(r.updated_at as string).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      return `  <url>
+    <loc>${base}/categoria/${r.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>`;
     })
     .join('\n');
@@ -1078,6 +1097,7 @@ export async function buildProductSitemapXml(shopBaseUrl: string): Promise<strin
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+${categoryUrls}
 ${urls}
 </urlset>
 `;

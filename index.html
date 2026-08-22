@@ -13,10 +13,16 @@
     <!-- Favicon. O SVG vem primeiro: navegador moderno usa ele e a marca fica
          nítida em qualquer densidade. Os PNG são o fallback, do menor para o
          maior, porque logo-vip.png sozinho (512px) virava borrão a 16px. -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--
+      Tab icon is the GeekPop & Toys wordmark, not a letterform. The previous
+      favicon.svg drew a generic pink "G" that belonged to no brand asset.
+      The .ico carries 16/32/48/64 so the browser downsamples from the right
+      source instead of squashing a 512px plate.
+    -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon-256.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png" />
     <meta name="theme-color" content="#F04080" />
     <meta name="msapplication-TileColor" content="#F04080" />
 
@@ -98,11 +104,23 @@
       "offers": {
         "@type": "Offer",
         "name": "Plano mensal do Clube",
-        "price": "12.50",
         "priceCurrency": "BRL",
-        "priceValidUntil": "2026-12-31",
+        "price": "12.50",
         "availability": "https://schema.org/InStock",
-        "url": "https://club.geeketoys.com.br/assinar"
+        "url": "https://club.geeketoys.com.br/assinar",
+        "priceSpecification": {
+          "@type": "UnitPriceSpecification",
+          "price": "12.50",
+          "priceCurrency": "BRL",
+          "billingDuration": 1,
+          "billingIncrement": 1,
+          "unitCode": "MON",
+          "referenceQuantity": {
+            "@type": "QuantitativeValue",
+            "value": 1,
+            "unitCode": "MON"
+          }
+        }
       }
     }
     </script>

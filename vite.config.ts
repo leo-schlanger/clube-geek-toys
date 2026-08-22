@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.jpg', 'favicon.svg'],
+      includeAssets: ['logo.jpg', 'favicon.ico', 'favicon-32.png', 'favicon-180.png'],
       manifest: {
         name: 'Clube GeekPop & Toys',
         short_name: 'GeekPop',
@@ -20,22 +20,27 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         categories: ['shopping', 'lifestyle'],
+        // `sizes` used to lie: logo-vip.png and logo.jpg are both 1080x1080,
+        // declared as 512 and 192. Install prompts pick by the declared size,
+        // so the wrong file was chosen at every density.
         icons: [
           {
-            src: 'logo-vip.png',
+            src: 'icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'icon-512.png',
             sizes: '512x512',
             type: 'image/png',
           },
           {
-            src: 'logo-vip.png',
+            // Maskable icons are cropped to a circle over the middle 80%; the
+            // square plate would cut the wordmark, so this one is padded.
+            src: 'icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
-          },
-          {
-            src: 'logo.jpg',
-            sizes: '192x192',
-            type: 'image/jpeg',
           },
         ],
       },
