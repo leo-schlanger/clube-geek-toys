@@ -127,7 +127,7 @@ describe('ProductCard — salvar para depois', () => {
   })
 })
 
-// Atacado fechado: a vitrine continua, o carrinho não — a API recusaria o pedido.
+// Wholesale closed: the shelf stays up, the cart does not — the API would refuse the order.
 describe('ProductCard — canal sem venda liberada', () => {
   beforeEach(() => vi.clearAllMocks())
 

@@ -50,9 +50,9 @@ export async function quoteShipping(
 }
 
 /**
- * Loja física onde o pedido de retirada é entregue. Espelha
- * `STORE_PICKUP_LOCATION` no backend — aqui serve só para exibição; quem grava
- * o endereço no pedido é sempre o servidor.
+ * Physical store where pickup orders are collected. Mirrors
+ * `STORE_PICKUP_LOCATION` on the backend — display only; the server always
+ * writes the address onto the order.
  */
 export const STORE_PICKUP = {
   name: 'GeekPop & Toys',

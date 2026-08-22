@@ -6,8 +6,8 @@
  *   import { logger } from '@/lib/logger'
  *   logger.info('...')
  *   logger.warn('...')
- *   logger.error('Erro', error)
- *   logger.debug('Debug detalhado')
+ *   logger.error('Error', error)
+ *   logger.debug('Verbose debug')
  */
 
 const isDev = import.meta.env.DEV
@@ -16,7 +16,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 interface LoggerOptions {
   prefix?: string
-  forceLog?: boolean // Para casos críticos que precisam logar mesmo em prod
+  forceLog?: boolean // Force output in production; use sparingly
 }
 
 function formatMessage(level: LogLevel, prefix: string, message: string): string {

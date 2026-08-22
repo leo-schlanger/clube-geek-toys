@@ -30,14 +30,14 @@ import {
 } from '../../lib/events'
 
 /**
- * Cadastro de eventos.
+ * Event catalogue.
  *
- * O que isto resolve: até aqui o evento estava hardcoded em três arquivos e
- * dois repos, e cada edição — nova data, novo local, novo flyer, evento
- * seguinte — era um deploy. Agora acaba um evento, duplica, ajusta e publica.
+ * Until this, the event was hardcoded in three files and two repos, and every
+ * change — new date, venue, flyer, next event — was a deploy. Now an event
+ * ends, you duplicate, adjust, and publish.
  *
- * Só o **publicado** aparece na loja e no site; entre vários publicados ganha o
- * que ainda não terminou e começa antes (regra no `event-config.service`).
+ * Only **published** appears in the shop and site; among several published,
+ * the one that has not ended and starts first wins (`event-config.service`).
  */
 
 const STATUS_LABEL: Record<EventStatus, string> = {
@@ -55,7 +55,7 @@ const STATUS_VARIANT: Record<EventStatus, 'default' | 'secondary' | 'outline'> =
 const BANNER_ACCEPT = 'image/jpeg,image/png,image/webp'
 const BANNER_MAX_BYTES = 8 * 1024 * 1024
 
-/** ISO com offset → `YYYY-MM-DDTHH:mm` para o `datetime-local`, no fuso do navegador. */
+/** Offset ISO → `YYYY-MM-DDTHH:mm` for `datetime-local`, in the browser timezone. */
 function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -64,7 +64,7 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-/** `datetime-local` → ISO com offset. O servidor exige offset explícito. */
+/** `datetime-local` → offset ISO. The server requires an explicit offset. */
 function fromLocalInput(value: string): string | null {
   if (!value) return null
   const d = new Date(value)
@@ -75,7 +75,7 @@ function priceToInput(cents: number | null): string {
   return cents == null ? '' : (cents / 100).toFixed(2).replace('.', ',')
 }
 
-/** `20,00` e `20.00` viram 2000. Vazio vira `null` (evento gratuito). */
+/** `20,00` and `20.00` become 2000. Empty becomes `null` (free event). */
 function inputToPriceCents(value: string): number | null {
   const cleaned = value.trim().replace(/\./g, '').replace(',', '.')
   if (!cleaned) return null
@@ -115,8 +115,8 @@ function toForm(event: EventConfig): FormState {
     locationName: event.location.name,
     locationAddress: event.location.address,
     locationMapsUrl: event.location.mapsUrl ?? '',
-    // Um parágrafo por linha, um destaque por linha: é o que a Laura consegue
-    // editar sem aprender uma sintaxe.
+    // One paragraph per line, one highlight per line: what Laura can edit
+    // without learning a syntax.
     description: event.description.join('\n'),
     highlights: event.highlights.join('\n'),
     memberPerk: event.memberPerk ?? '',
@@ -202,7 +202,7 @@ export function EventConfigTab() {
   const [events, setEvents] = useState<EventConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<EventConfig | null>(null)
-  /** `true` = formulário de criação; senão edita `editing`. */
+  /** True while the create form is open. */
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -260,8 +260,8 @@ export function EventConfigTab() {
         setEditing(saved)
         toast.success('Evento salvo')
       } else {
-        // Continua no formulário, agora em modo edição: o banner só pode ser
-        // enviado depois que o evento tem id, e é a próxima coisa que ela quer.
+        // Stay on the form, now in edit mode: the banner can only be uploaded
+        // after the event has an id, and that is the next thing she wants.
         const created = await createEvent(payload)
         setEditing(created)
         setCreating(false)
@@ -355,8 +355,6 @@ export function EventConfigTab() {
       toast.error('Erro ao remover o banner')
     }
   }
-
-  // ─── Formulário ────────────────────────────────────────────────────────────
 
   if (creating || editing) {
     return (
@@ -518,7 +516,7 @@ export function EventConfigTab() {
               </div>
             </div>
 
-            {/* Banner só depois de criado: o upload precisa do id do evento. */}
+            {/* Banner only after create: upload needs the event id. */}
             {editing && (
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
                 <Label>Banner / flyer</Label>

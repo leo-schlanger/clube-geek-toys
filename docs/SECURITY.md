@@ -102,12 +102,12 @@ Todos os endpoints validam entrada com schemas Zod (request body, params e query
 
 ### Validações Específicas
 
-| Campo             | Validação                                                                                                                         |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco                                                      |
-| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX                                                          |
-| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                                                                      |
-| Valores numéricos | Assinatura: validada contra `CLUB_PLAN_PRICE` (R$ 149,99). Loja: totais recalculados server-side a partir dos preços dos produtos |
+| Campo             | Validação                                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco                                                     |
+| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX                                                         |
+| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                                                                     |
+| Valores numéricos | Assinatura: validada contra `CLUB_PLAN_PRICE` (R$ 12,50). Loja: totais recalculados server-side a partir dos preços dos produtos |
 
 ### Sanitização
 
@@ -174,7 +174,7 @@ cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
 
 ### Validação de Valores
 
-- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 149,99) — não é possível criar pagamento com valor arbitrário
+- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 12,50) — não é possível criar pagamento com valor arbitrário
 - Loja: subtotal, desconto e total são **recalculados no servidor** a partir dos preços dos produtos travados no banco (`SELECT ... FOR UPDATE`); o valor enviado pelo cliente nunca é usado
 
 ### Desconto de Membro na Loja (server-side)

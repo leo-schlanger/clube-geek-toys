@@ -265,17 +265,14 @@ export async function confirmPixPayment(opts: {
       const isRenewal = member.status === 'active' && currentExpiry && currentExpiry > now;
       const baseDate = isRenewal ? currentExpiry : now;
 
+      // New charges are monthly even if the member originally paid a year.
       const expiryDate = new Date(baseDate);
-      if (member.payment_type === 'annual') {
-        expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      } else {
-        expiryDate.setMonth(expiryDate.getMonth() + 1);
-      }
+      expiryDate.setMonth(expiryDate.getMonth() + 1);
 
       await query(
         `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
          activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
-         auto_renewal = FALSE, payment_count = payment_count + 1
+         auto_renewal = FALSE, payment_count = payment_count + 1, payment_type = 'monthly'
          WHERE id = $4`,
         [
           now.toISOString().split('T')[0],

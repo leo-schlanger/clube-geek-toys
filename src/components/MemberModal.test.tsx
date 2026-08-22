@@ -138,10 +138,9 @@ describe('MemberModal', () => {
       expect(screen.getByRole('button', { name: /criar membro/i })).toBeInTheDocument()
     })
 
-    it('shows the single fixed club plan (Anual)', () => {
+    it('shows the single fixed club plan (Mensal)', () => {
       render(<MemberModal mode="create" {...defaultProps} />)
-    // Single annual plan, with no Silver/Gold/Black selector
-      expect(screen.getByText(/Clube GeekPop & Toys — Anual/)).toBeInTheDocument()
+      expect(screen.getByText(/Clube GeekPop & Toys — Mensal/)).toBeInTheDocument()
       expect(screen.queryByText('Silver')).not.toBeInTheDocument()
       expect(screen.queryByText('Gold')).not.toBeInTheDocument()
       expect(screen.queryByText('Black')).not.toBeInTheDocument()
@@ -149,13 +148,14 @@ describe('MemberModal', () => {
 
     it('shows the plan price and product discount', () => {
       render(<MemberModal mode="create" {...defaultProps} />)
-      expect(screen.getByText(/R\$\s*149,99/)).toBeInTheDocument()
+      expect(screen.getByText(/R\$\s*12,50/)).toBeInTheDocument()
       expect(screen.getByText(/10% de desconto em qualquer produto/)).toBeInTheDocument()
     })
 
     it('does not show a monthly/annual payment type selector', () => {
       render(<MemberModal mode="create" {...defaultProps} />)
-      expect(screen.queryByText('Mensal')).not.toBeInTheDocument()
+      expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+      expect(screen.queryByText('Anual')).not.toBeInTheDocument()
     })
 
     it('does not show status selector in create mode', () => {

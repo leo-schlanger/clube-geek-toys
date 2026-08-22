@@ -71,7 +71,7 @@ const createMemberSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
   plan: z.enum(['club']).default('club'),
-  paymentType: z.enum(['annual']).default('annual'),
+  paymentType: z.enum(['monthly', 'annual']).default('monthly'),
 });
 
 const updateMemberSchema = z.object({
@@ -84,7 +84,7 @@ const updateMemberSchema = z.object({
   photoUrl: z.string().optional(),
   plan: z.enum(['club']).optional(),
   status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
-  paymentType: z.enum(['annual']).optional(),
+  paymentType: z.enum(['monthly', 'annual']).optional(),
   startDate: z.string().optional(),
   expiryDate: z.string().optional(),
   pendingPayment: z.any().optional(),
@@ -99,7 +99,7 @@ const updateMemberSchema = z.object({
 const listQuerySchema = z.object({
   status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
   plan: z.enum(['club']).optional(),
-  paymentType: z.enum(['annual']).optional(),
+  paymentType: z.enum(['monthly', 'annual']).optional(),
   search: z.string().max(100).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),

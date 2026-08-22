@@ -57,7 +57,7 @@ export default function ShopCheckout() {
   const { member, isMember } = useShopMember()
   const { account: wholesaleAccount, isApproved: isWholesaleApproved } = useWholesaleAccount()
   const { salesOpen: wholesaleSalesOpen } = useWholesaleSalesOpen(isWholesale)
-  // Canal fechado: a API recusaria o pedido (WHOLESALE_CLOSED) — melhor barrar antes do formulário.
+  // Channel closed: the API would reject the order (WHOLESALE_CLOSED) — block before the form.
   const wholesaleClosed = isWholesale && !wholesaleSalesOpen
   const { user } = useAuth()
 
@@ -69,7 +69,7 @@ export default function ShopCheckout() {
   const [storeCreditBalance, setStoreCreditBalance] = useState(0)
   const [applyStoreCredit, setApplyStoreCredit] = useState(true)
 
-  // Entrega: retirada na loja dispensa endereço e frete por completo.
+  // Pickup skips address and freight entirely.
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryChoice>('shipping')
   const isPickup = deliveryMethod === 'pickup'
 
@@ -257,8 +257,8 @@ export default function ShopCheckout() {
         },
         customerNote: customerNote.trim() || undefined,
         deliveryMethod,
-        // Retirada não manda endereço nem cotação: o servidor grava o balcão da
-        // loja e zera o frete por conta própria.
+        // Pickup sends neither address nor quote: the server stamps the store
+        // counter and zeroes freight itself.
         ...(isPickup
           ? {}
           : {
@@ -378,9 +378,9 @@ export default function ShopCheckout() {
                         disabled={submitting}
                       />
                     </div>
-                    {/* O pedido de colecionável quase sempre vem com um recado
-                        ("se tiver do mesmo cantor, manda junto"). Sem campo, ele
-                        chegava por outro canal e desencontrado do pedido. */}
+                    {/* Collectible orders almost always come with a note
+                        ("if you have more of the same singer, send them"). Without
+                        a field, it arrived on another channel and off the order. */}
                     <div className="space-y-2">
                       <Label htmlFor="customer-note">Mensagem para a loja (opcional)</Label>
                       <textarea
@@ -442,8 +442,8 @@ export default function ShopCheckout() {
                       <p className="text-muted-foreground">
                         <strong className="text-foreground">Horário:</strong> {STORE_PICKUP.hours}
                       </p>
-                      {/* O pedido só é separado depois do pagamento — sem esse
-                          aviso a pessoa vai à loja no mesmo dia e volta sem nada. */}
+                      {/* Orders are packed only after payment — without this
+                          warning people come the same day and leave empty-handed. */}
                       <p className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-muted-foreground">
                         Avisamos por e-mail quando o pedido estiver separado. Leve um documento com
                         foto e o número do pedido para retirar.
@@ -461,9 +461,9 @@ export default function ShopCheckout() {
                   </Card>
                 )}
 
-                {/* Endereço e frete só existem no fluxo de entrega. Ficam
-                    desmontados na retirada — escondidos por CSS, os campos
-                    `required` continuariam bloqueando o submit do form. */}
+                {/* Address and freight exist only on the delivery path. Unmount
+                    them on pickup — CSS-hidden `required` fields would still
+                    block form submit. */}
                 {!isPickup && (
                   <>
                   <Card>

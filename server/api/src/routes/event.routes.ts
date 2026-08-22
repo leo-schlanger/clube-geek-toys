@@ -21,16 +21,16 @@ function maskEmail(email: string): string {
   return `${visible}${'*'.repeat(Math.max(1, user.length - visible.length))}@${domain}`;
 }
 
-// ─── Público: o evento em cartaz ─────────────────────────────────────────────
-// Declarado antes de qualquer rota com parâmetro para "active" não virar id.
-// Consumido pela loja E pelo site institucional — é o que substituiu os três
-// arquivos hardcoded.
+// ─── Public: the event currently on ──────────────────────────────────────────
+// Declared before any param route so "active" is not captured as an id.
+// Consumed by the shop AND the institutional site — it replaced the three
+// hardcoded files.
 
 eventRouter.get('/active', async (_req, res, next) => {
   try {
     const event = await eventConfig.getActiveEventOrFallback();
-    // Curto de propósito: a admin publica e quer ver no ar, mas o banner é
-    // pedido em toda página da loja.
+    // Short on purpose: the admin publishes and wants it live, but the banner
+    // is requested on every shop page.
     res.set('Cache-Control', 'public, max-age=60');
     res.json({ event });
   } catch (err) {
@@ -38,7 +38,7 @@ eventRouter.get('/active', async (_req, res, next) => {
   }
 });
 
-// ─── Público ─────────────────────────────────────────────────────────────────
+// ─── Public ──────────────────────────────────────────────────────────────────
 
 const reservationSchema = z.object({
   buyerName: z.string().min(2).max(120),
@@ -56,7 +56,7 @@ const reservationSchema = z.object({
     .max(MAX_TICKETS_PER_RESERVATION),
 });
 
-// POST /events/:eventId/reservations — reserva da loja, um ingresso por pessoa
+// POST /events/:eventId/reservations — shop reservation, one ticket per person
 eventRouter.post(
   '/:eventId/reservations',
   optionalAuth,
@@ -78,7 +78,7 @@ eventRouter.post(
   }
 );
 
-// GET /events/tickets/:code — o ingresso em si (sem login: o QR circula)
+// GET /events/tickets/:code — the ticket itself (no login: the QR circulates)
 eventRouter.get('/tickets/:code', publicLookupLimiter, async (req, res, next) => {
   try {
     const ticket = await eventService.getPublicTicket(req.params.code as string);
@@ -92,7 +92,7 @@ eventRouter.get('/tickets/:code', publicLookupLimiter, async (req, res, next) =>
   }
 });
 
-// GET /events/reservations/:code — todos os ingressos da compra
+// GET /events/reservations/:code — every ticket from the purchase
 eventRouter.get('/reservations/:code', publicLookupLimiter, async (req, res, next) => {
   try {
     const reservation = await eventService.getPublicReservation(req.params.code as string);
@@ -131,9 +131,9 @@ eventRouter.get('/my-reservations', authenticate, async (req, res, next) => {
   }
 });
 
-// ─── Admin: cadastro de eventos ──────────────────────────────────────────────
-// Vem antes de `/admin/:eventId/stats`: ambas têm três segmentos, e deixar a
-// específica primeiro evita depender da ordem de match do Express.
+// ─── Admin: event CRUD ───────────────────────────────────────────────────────
+// Before `/admin/:eventId/stats`: both have three segments, and putting the
+// specific one first avoids depending on Express match order.
 
 const isoDate = z.string().datetime({ offset: true });
 
@@ -153,7 +153,7 @@ const eventSchema = z.object({
   highlights: z.array(z.string().max(200)).max(15).optional(),
   memberPerk: z.string().max(400).optional().nullable(),
   reservationsOpen: z.boolean().optional(),
-  // `null` = evento gratuito / a combinar. Zero também é válido.
+  // `null` = free / TBD. Zero is also valid.
   priceCents: z.number().int().min(0).max(10_000_00).optional().nullable(),
   currencyLabel: z.string().max(8).optional(),
   maxPerReservation: z.number().int().min(1).max(500).optional().nullable(),
@@ -161,7 +161,7 @@ const eventSchema = z.object({
   reservationNotes: z.string().max(1000).optional().nullable(),
 });
 
-// GET /events/admin/events — inclui rascunho e arquivado
+// GET /events/admin/events — includes draft and archived
 eventRouter.get('/admin/events', authenticate, requireRole('admin'), async (_req, res, next) => {
   try {
     res.json({ events: await eventConfig.listEvents(true) });
@@ -213,7 +213,7 @@ eventRouter.patch(
   }
 );
 
-// POST /events/admin/events/:id/duplicate — base para o próximo evento
+// POST /events/admin/events/:id/duplicate — starting point for the next event
 eventRouter.post(
   '/admin/events/:id/duplicate',
   authenticate,
@@ -238,9 +238,9 @@ eventRouter.delete('/admin/events/:id', authenticate, requireRole('admin'), asyn
   }
 });
 
-// ─── Admin: banner do evento ─────────────────────────────────────────────────
-// O flyer é a arte que muda a cada edição — é justamente o que a Laura pediu
-// para poder trocar sozinha.
+// ─── Admin: event banner ─────────────────────────────────────────────────────
+// The flyer is the art that changes every edition — that is what the admin
+// asked to swap without a deploy.
 
 const BANNER_MAX_BYTES = 8 * 1024 * 1024;
 const BANNER_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -252,8 +252,8 @@ const bannerStorage = multer.diskStorage({
     cb(null, dir);
   },
   filename: (_req, file, cb) => {
-    // Nome novo a cada upload: o antigo fica no cache do navegador e do
-    // WhatsApp, e reaproveitar o nome mostraria o flyer velho.
+    // Fresh filename per upload: the old one stays in browser and WhatsApp
+    // cache, so reusing the name would show the previous flyer.
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
     cb(null, `banner-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
   },
@@ -328,7 +328,7 @@ eventRouter.get('/admin/reservations', authenticate, requireRole('admin'), async
   }
 });
 
-// POST /events/admin/reservations/:id/confirm — pagamento conferido: libera os ingressos
+// POST /events/admin/reservations/:id/confirm — payment checked: tickets go valid
 eventRouter.post(
   '/admin/reservations/:id/confirm',
   authenticate,
@@ -370,9 +370,9 @@ eventRouter.post(
 const checkInSchema = z.object({ code: z.string().min(4).max(40) });
 
 /**
- * POST /events/admin/check-in — portaria.
- * `seller` entra aqui junto com `admin`: quem fica na porta é a mesma pessoa
- * que opera o PDV, e ninguém vai passar a senha de admin adiante no dia.
+ * POST /events/admin/check-in — door staff.
+ * `seller` is allowed here with `admin`: the person at the door is the same
+ * who runs the POS, and nobody should hand out the admin password on the day.
  */
 eventRouter.post(
   '/admin/check-in',
@@ -388,7 +388,7 @@ eventRouter.post(
   }
 );
 
-// GET /events/admin/:eventId/stats — quantos entraram, quantos faltam
+// GET /events/admin/:eventId/stats — how many entered, how many still to
 eventRouter.get(
   '/admin/:eventId/stats',
   authenticate,

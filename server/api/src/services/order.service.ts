@@ -236,7 +236,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     customerCnpj = cnpj;
   }
 
-  // Revalidate frete server-side (never trust client price). Pickup is priced
+  // Revalidate shipping server-side (never trust client price). Pickup is priced
   // here, not quoted: a token the client could swap must never be what decides
   // that a counter order costs nothing.
   let shippingCost: number;
@@ -276,7 +276,8 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
   // Resolve active membership (for the 10% discount) — never trust the client.
   // Wholesale channel does NOT stack member discount (uses wholesale_25 only).
-  // Always persist user_id when authenticated so "Minhas compras" works even without active plan.
+  // Always persist user_id when authenticated so the customer's order history
+  // works even without an active plan.
   let memberId: string | null = null;
   const orderUserId = user?.userId ?? null;
   if (user && !isWholesale) {
@@ -305,7 +306,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     });
   }
   const aggregatedItems = [...qtyByKey.values()];
-  // Note: frete quote token was validated against the client cart lines above (input.items).
+  // Note: shipping quote token was validated against the client cart lines above (input.items).
 
   const client = await getClient();
   let orderId: string;
@@ -452,7 +453,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         ? MEMBER_DISCOUNT_REASON
         : null;
     const goodsAfterDiscount = round2(subtotal - baseDiscount);
-    // Provisional total without store credit (frete never discounted).
+    // Provisional total without store credit (shipping never discounted).
     let discount = baseDiscount;
     let discountReason: string | null = baseReason;
     let storeCreditApplied = 0;
@@ -732,7 +733,7 @@ export async function claimGuestOrders(userId: string): Promise<number> {
 /**
  * Guest orders waiting on e-mail verification to be adopted.
  *
- * Feeds the notice on "Minhas compras": the customer can see that the purchase
+ * Feeds the notice on the customer's order list: they can see that the purchase
  * was found and what unlocks it, instead of an empty list that reads like the
  * order was lost.
  */
@@ -930,7 +931,7 @@ export async function setOrderTracking(
   if (!code || code.length > 64) {
     throw new AppError(400, 'Código de rastreio inválido.', 'INVALID_TRACKING');
   }
-  // A pickup order has no postagem to track. Letting a code through here would
+  // A pickup order has no shipment to track. Letting a code through here would
   // e-mail the customer a Correios link for a package sitting on the counter.
   const existing = await getOrderById(id, false);
   if (!existing) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');

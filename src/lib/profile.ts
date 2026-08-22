@@ -59,7 +59,7 @@ export async function removeProfilePhoto(): Promise<CustomerProfile> {
   return result.data
 }
 
-// ─── Produtos salvos ─────────────────────────────────────────────────────────
+// ─── Saved products ──────────────────────────────────────────────────────────
 
 export async function fetchSavedProducts(): Promise<SavedProduct[]> {
   const result = await api.get<SavedProduct[]>('/profile/saved')

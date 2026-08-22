@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// env.ts chama process.exit(1) fora de um container configurado, e database.ts
+// env.ts calls process.exit(1) outside a configured container, and database.ts
 // opens a pool at import time; both must be replaced before the service loads.
 vi.mock('../config/env.js', () => ({
   env: { API_URL: 'https://api.test', NODE_ENV: 'test' },
@@ -188,10 +188,10 @@ describe('bulkSetProductCategories', () => {
   });
 
   it('replaces the categories of every product in one transaction', async () => {
-    query.mockResolvedValueOnce({ rows: [{ id: 'c-kpop' }] }); // categorias conhecidas
+    query.mockResolvedValueOnce({ rows: [{ id: 'c-kpop' }] }); // known categories
     clientQuery
       .mockResolvedValueOnce({ rows: [] })                                  // BEGIN
-      .mockResolvedValueOnce({ rows: [{ id: 'p1' }, { id: 'p2' }] })        // produtos
+      .mockResolvedValueOnce({ rows: [{ id: 'p1' }, { id: 'p2' }] })        // products
       .mockResolvedValue({ rows: [] });
 
     const result = await bulkSetProductCategories(['p1', 'p2'], ['c-kpop'], 'replace');
@@ -200,7 +200,7 @@ describe('bulkSetProductCategories', () => {
     const statements = clientQuery.mock.calls.map((c) => String(c[0]));
     expect(statements[0]).toBe('BEGIN');
     expect(statements).toContain('COMMIT');
-    // Um DELETE + um INSERT por produto: as categorias antigas saem de fato.
+    // One DELETE + one INSERT per product: old categories actually leave.
     expect(statements.filter((sql) => sql.includes('DELETE FROM product_categories'))).toHaveLength(2);
   });
 

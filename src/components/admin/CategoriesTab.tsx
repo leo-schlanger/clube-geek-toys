@@ -20,16 +20,16 @@ import { CATEGORY_ICONS, categoryIcon, guessCategoryIcon } from '../../lib/categ
 import type { AdminCategory } from '../../types'
 
 /**
- * Categorias da loja.
+ * Shop categories.
  *
- * Antes disto o único jeito de mexer numa categoria era abrir um produto: o
- * gerenciador morava dentro do `ProductModal`, e o ícone era um `<select>` de
- * rótulos — dava para escolher "Comidas" sem nunca ver o desenho que ia para a
- * vitrine. Aqui o ícone é escolhido pelo desenho, e renomear, reordenar,
- * esconder e excluir são operações de primeira classe.
+ * Before this the only way to edit a category was to open a product: the
+ * manager lived inside `ProductModal`, and the icon was a `<select>` of
+ * labels — you could pick "Comidas" without ever seeing the artwork that
+ * hits the storefront. Here the icon is chosen by drawing, and rename,
+ * reorder, hide, and delete are first-class operations.
  *
- * Excluir é **desativar** (o backend faz soft delete): categoria some da loja
- * mas os produtos continuam ligados a ela, e reativar traz tudo de volta.
+ * Delete is **deactivate** (backend soft delete): the category leaves the
+ * shop but products stay linked, and reactivating brings them all back.
  */
 
 type Draft = {
@@ -48,7 +48,7 @@ function toDraft(category: AdminCategory): Draft {
   }
 }
 
-/** Grade de ícones. Mostra o desenho, não o nome — é o que vai para a vitrine. */
+/** Icon grid. Shows the drawing, not the name — that is what hits the storefront. */
 function IconPicker({
   value,
   onChange,
@@ -185,7 +185,7 @@ export function CategoriesTab() {
     setSavingId(null)
   }
 
-  /** Atalho do ícone sem entrar em edição — é a correção mais comum. */
+  /** Icon shortcut without entering edit — the most common fix. */
   async function handleQuickIcon(category: AdminCategory, icon: string) {
     setSavingId(category.id)
     try {
@@ -242,7 +242,7 @@ export function CategoriesTab() {
     try {
       const created = await createCategory({
         name,
-        // Sem escolha explícita, chuta pelo nome — melhor que nascer sem ícone.
+        // With no explicit pick, guess from the name — better than being born icon-less.
         icon: newIcon || guessCategoryIcon(name),
       })
       if (!created) throw new Error('Resposta vazia do servidor.')

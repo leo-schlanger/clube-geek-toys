@@ -24,11 +24,11 @@ A plataforma inclui:
 
 ## Plano e Preço
 
-Um único plano anual, sem opção mensal e sem tiers.
+Um único plano mensal, sem opção anual nova e sem tiers.
 
-| Plano                    | Anual     | Benefícios                                                                                                                     |
-| ------------------------ | --------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Clube GeekPop & Toys** | R$ 149,99 | 10% de desconto em qualquer produto (loja física e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
+| Plano                    | Mensal   | Benefícios                                                                                                                     |
+| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Clube GeekPop & Toys** | R$ 12,50 | 10% de desconto em qualquer produto (loja física e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
 
 ---
 
@@ -36,7 +36,7 @@ Um único plano anual, sem opção mensal e sem tiers.
 
 ### Cadastro e Assinatura
 
-Wizard de 3 etapas: criação de conta, assinatura de contrato digital e pagamento. Como há um único plano anual, não há seleção de tier nem de frequência — o membro assina eletronicamente e paga na mesma sessão.
+Wizard de 3 etapas: criação de conta, assinatura de contrato digital e pagamento. Como há um único plano mensal, não há seleção de tier nem de frequência — o membro assina eletronicamente e paga na mesma sessão.
 
 ### Contrato Digital
 

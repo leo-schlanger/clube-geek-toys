@@ -255,13 +255,13 @@ describe('createOrder — dinheiro', () => {
 
     const v = insertedOrderValues();
     expect(v[COL.subtotal]).toBe(200);
-    expect(v[COL.total]).toBe(224); // 200 + 24 de frete
+    expect(v[COL.total]).toBe(224); // 200 + 24 shipping
   });
 
   it('applies the 10% member discount to goods, never to shipping', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
     memberIdMock.mockResolvedValue('m1');
-    queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] }); // membership ativa
+    queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] }); // active membership
 
     await createOrder(baseInput(), { userId: 'u1' } as never);
 
@@ -276,7 +276,7 @@ describe('createOrder — dinheiro', () => {
   it('gives no member discount on an expired subscription', async () => {
     setupTx({});
     memberIdMock.mockResolvedValue('m1');
-    queryMock.mockResolvedValue({ rows: [] }); // o filtro de expiry_date não devolveu nada
+    queryMock.mockResolvedValue({ rows: [] }); // expiry_date filter returned nothing
 
     await createOrder(baseInput(), { userId: 'u1' } as never);
 
@@ -288,7 +288,7 @@ describe('createOrder — dinheiro', () => {
   it('wholesale uses 25% and does NOT stack with the member 10%', async () => {
     setupTx({ products: [product({ price: '100.00', wholesale_enabled: true })] });
     approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11222333000181' });
-    memberIdMock.mockResolvedValue('m1'); // é membro também — não pode somar
+    memberIdMock.mockResolvedValue('m1'); // also a member — must not stack
 
     await createOrder(
       baseInput({ channel: 'wholesale', cnpj: '11.222.333/0001-81' }),
@@ -298,7 +298,7 @@ describe('createOrder — dinheiro', () => {
     const v = insertedOrderValues();
     expect(v[COL.discount]).toBe(25);
     expect(v[COL.discountReason]).toBe('wholesale_25');
-    // 25 + 15 empilhados dariam 60 de desconto e total 64.
+    // 25 + 15 stacked would be 60 off and a total of 64.
     expect(v[COL.total]).toBe(99);
   });
 
@@ -505,7 +505,7 @@ describe('createOrder — variants', () => {
     await createOrder(baseInput({ items: [{ productId: 'p1', quantity: 2, variantId: 'v1' }] }));
 
     const v = insertedOrderValues();
-    expect(v[COL.subtotal]).toBe(160); // 2 × 80, não 2 × 100
+    expect(v[COL.subtotal]).toBe(160); // 2 × 80, not 2 × 100
   });
 
   it('requires the SKU when the product has variants', async () => {
@@ -538,7 +538,7 @@ describe('createOrder — variants', () => {
   });
 });
 
-// ─── Atacado ─────────────────────────────────────────────────────────────────
+// ─── Wholesale ───────────────────────────────────────────────────────────────
 
 describe('createOrder — atacado', () => {
   it('recusa pedido com o canal fechado, mesmo com CNPJ aprovado', async () => {
@@ -616,7 +616,7 @@ describe('createOrder — atacado', () => {
   });
 });
 
-// ─── Entrada / frete ─────────────────────────────────────────────────────────
+// ─── Input / shipping ────────────────────────────────────────────────────────
 
 describe('createOrder — input validation', () => {
   it('refuses an empty cart', async () => {
@@ -656,7 +656,7 @@ describe('createOrder — input validation', () => {
   });
 });
 
-// ─── Aviso de PIX pendente ───────────────────────────────────────────────────
+// ─── Pending PIX notice ──────────────────────────────────────────────────────
 
 /**
  * Shop PIX has no webhook: the order is born `pending` and leaves that state
@@ -721,7 +721,7 @@ describe('createOrder — aviso de PIX pendente', () => {
 
     expect(result.order.status).toBe('pending');
     expect(result.pixData?.emvCode).toContain('br.gov.bcb.pix');
-    // nada de UPDATE ... status = 'cancelled'
+    // no UPDATE ... status = 'cancelled'
     expect(
       queryMock.mock.calls.some(
         (c) => typeof c[0] === 'string' && c[0].includes("status = 'cancelled'")
@@ -963,11 +963,11 @@ describe('mensagem do cliente no checkout', () => {
   });
 });
 
-// ─── Retirada na loja ────────────────────────────────────────────────────────
+// ─── Store pickup ────────────────────────────────────────────────────────────
 
 /**
  * Pickup is the one checkout path where the customer is never asked for an
- * address and never sees a frete. What these guard, in order of what a
+ * address and never sees a shipping quote. What these guard, in order of what a
  * regression costs:
  *
  *  1. A pickup order is free of shipping — priced here, never from a token the
@@ -1047,7 +1047,7 @@ describe('createOrder — retirada na loja', () => {
 
     const v = insertedOrderValues();
     expect(v[COL.discount]).toBe(10);
-    expect(v[COL.total]).toBe(90); // sem frete somado
+    expect(v[COL.total]).toBe(90); // goods only, no shipping
   });
 
   it('keeps requiring address and quote on the shipping path', async () => {
@@ -1063,7 +1063,7 @@ describe('createOrder — retirada na loja', () => {
   });
 });
 
-// ─── Rastreio × retirada ─────────────────────────────────────────────────────
+// ─── Tracking vs pickup ──────────────────────────────────────────────────────
 
 describe('setOrderTracking — retirada não tem postagem', () => {
   function orderRow(over: Record<string, unknown> = {}) {
@@ -1087,8 +1087,8 @@ describe('setOrderTracking — retirada não tem postagem', () => {
   it('refuses a Correios code on a pickup order', async () => {
     queryMock.mockResolvedValue({ rows: [orderRow({ delivery_method: 'pickup' })] });
 
-    // Sem a trava o cliente que vai buscar no balcão recebe um e-mail com link
-    // de rastreio de uma postagem que não existe.
+    // Without the guard, a customer collecting at the counter gets an
+    // email with a tracking link for a shipment that does not exist.
     await expect(setOrderTracking('o1', 'BR123456789BR', 'admin-1')).rejects.toThrow(
       /retirada na loja/i
     );

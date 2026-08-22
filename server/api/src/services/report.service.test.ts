@@ -51,7 +51,7 @@ describe('getActionItems', () => {
   });
 
   it('conta reservas de ingresso aguardando confirmação', async () => {
-    // Reserva parada = dinheiro esperando e família barrada na portaria.
+    // A stuck reservation is money waiting and a family turned away at the door.
     respondBy([[/event_reservations/, { count: 2, oldest_days: 1 }]]);
     const report = await getActionItems();
 

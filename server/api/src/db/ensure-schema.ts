@@ -18,7 +18,7 @@ import { query } from '../config/database.js';
  * step aborted **every later one** silently, while the API served traffic and
  * `/health` answered `ok`. Now each step fails alone, the rest continue, and
  * the outcome is readable in
- * `GET /health` (`schema.status`). Ver `getSchemaState()`.
+ * `GET /health` (`schema.status`). See `getSchemaState()`.
  */
 
 type SchemaStep = { name: string; run: () => Promise<void> };
@@ -73,7 +73,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Payment count — contador de pagamentos (usado em relatórios/webhook)",
+    name: "Payment count — used in reports and webhooks",
     run: async () => {
     await query(`
       ALTER TABLE members ADD COLUMN IF NOT EXISTS payment_count INTEGER NOT NULL DEFAULT 0
@@ -107,17 +107,14 @@ const STEPS: SchemaStep[] = [
       await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_payment_type`);
       await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_points_non_negative`);
       await query(`UPDATE members SET plan = 'club' WHERE plan <> 'club'`);
-      await query(`UPDATE members SET payment_type = 'annual' WHERE payment_type <> 'annual'`);
       await query(`DROP TABLE IF EXISTS point_transactions CASCADE`);
       await query(`ALTER TABLE members DROP COLUMN IF EXISTS points`);
       await query(`ALTER TABLE members ALTER COLUMN plan SET DEFAULT 'club'`);
-      await query(`ALTER TABLE members ALTER COLUMN payment_type SET DEFAULT 'annual'`);
       await query(`DO $$ BEGIN
         ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('club'));
       EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-      await query(`DO $$ BEGIN
-        ALTER TABLE members ADD CONSTRAINT chk_members_payment_type CHECK (payment_type IN ('annual'));
-      EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+      // payment_type default + CHECK live in step 032 (monthly). Do not force
+      // `annual` here: this block runs on every boot.
     } catch (err) {
       console.error('[SCHEMA] single-plan migration block failed (non-fatal):', err);
     }
@@ -421,7 +418,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Múltiplas categorias por produto (migration 014)",
+    name: "Multiple categories per product (migration 014)",
     run: async () => {
     // products.category_id segue sendo a principal (position 0).
     await query(`
@@ -442,7 +439,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Controle de estoque (migration 015)",
+    name: "Stock control (migration 015)",
     run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 3`);
     await query(`
@@ -469,13 +466,13 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Vídeos de produto (migration 016)",
+    name: "Product videos (migration 016)",
     run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS videos JSONB NOT NULL DEFAULT '[]'::jsonb`);
     },
   },
   {
-    name: "Perguntas + notificações (migration 017)",
+    name: "Questions + notifications (migration 017)",
     run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS product_questions (
@@ -520,13 +517,13 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Ícone por categoria (migration 018)",
+    name: "Category icon (migration 018)",
     run: async () => {
     await query(`ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon VARCHAR(40)`);
     },
   },
   {
-    name: "Galeria com álbuns (migration 019)",
+    name: "Gallery albums (migration 019)",
     run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS gallery_albums (
@@ -564,7 +561,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Perfil de cliente sem assinatura + salvos (migration 020)",
+    name: "Customer profile without a club plan + saved products (migration 020)",
     run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS customer_profiles (
@@ -600,7 +597,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Reserva de estoque entre create e paid (migration 021)",
+    name: "Stock reservation between create and paid (migration 021)",
     run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS reserved INTEGER NOT NULL DEFAULT 0`);
     await query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS reserved INTEGER NOT NULL DEFAULT 0`);
@@ -662,7 +659,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Custo de produto / margem (migration 022)",
+    name: "Product cost / margin (migration 022)",
     run: async () => {
     await query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2)`);
     await query(`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS cost_price DECIMAL(10,2)`);
@@ -681,14 +678,14 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Adoção de pedido de convidado (migration 023)",
+    name: "Guest order claim (migration 023)",
     run: async () => {
     await query(`CREATE INDEX IF NOT EXISTS idx_orders_guest_email
       ON orders (lower(customer_email)) WHERE user_id IS NULL`);
     },
   },
   {
-    name: "Sessões de refresh por dispositivo (migration 024)",
+    name: "Per-device refresh sessions (migration 024)",
     run: async () => {
     await query(`CREATE TABLE IF NOT EXISTS refresh_sessions (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -705,9 +702,8 @@ const STEPS: SchemaStep[] = [
     await query(`CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expires ON refresh_sessions(expires_at)`);
     await query(`CREATE INDEX IF NOT EXISTS idx_refresh_sessions_prev
       ON refresh_sessions(prev_token_hash) WHERE prev_token_hash IS NOT NULL`);
-    // Migra as sessões vivas e zera a coluna antiga na mesma etapa: se o
-    // backfill rodar de novo com a coluna ainda preenchida, ele ressuscita um
-    // token já revogado.
+    // Move live sessions and clear the old column in the same step: a later
+    // backfill with the column still populated would revive a revoked token.
     await query(`INSERT INTO refresh_sessions (user_id, token_hash, expires_at)
       SELECT id, refresh_token_hash, NOW() + INTERVAL '30 days'
         FROM users WHERE refresh_token_hash IS NOT NULL
@@ -717,7 +713,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Idade da fila por mudança de status (migration 025)",
+    name: "Queue age via status-changed-at (migration 025)",
     run: async () => {
     await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ`);
     await query(`UPDATE orders SET status_changed_at = updated_at WHERE status_changed_at IS NULL`);
@@ -739,7 +735,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Recado do cliente no pedido (migration 026)",
+    name: "Customer note on the order (migration 026)",
     run: async () => {
     await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_note TEXT`);
     await query(`DO $$ BEGIN
@@ -749,7 +745,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Ingressos nominais de evento (migration 027)",
+    name: "Named event tickets (migration 027)",
     run: async () => {
     await query(`
       CREATE TABLE IF NOT EXISTS event_reservations (
@@ -795,7 +791,7 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Retirada na loja no checkout (migration 028)",
+    name: "Store pickup at checkout (migration 028)",
     run: async () => {
     await query(
       `ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_method VARCHAR(16) NOT NULL DEFAULT 'shipping'`
@@ -814,15 +810,15 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Eventos gerenciáveis pelo admin (migration 029)",
+    name: "Admin-managed events (migration 029)",
     run: async () => {
-    // Até aqui o evento vivia hardcoded em três arquivos e dois repos, e trocar
-    // de evento exigia deploy. A tabela passa a ser a fonte de verdade; os
-    // arquivos viram só fallback de primeira carga.
+    // Until this step the event lived hardcoded in three files and two repos,
+    // so a change needed a deploy. The table is now the source of truth; the
+    // files are first-load fallback only.
     //
-    // `id` é TEXT (não UUID) de propósito: `event_reservations.event_id` e
-    // `event_tickets.event_id` já guardam o id textual do evento antigo, e
-    // trocar por UUID invalidaria os ingressos em circulação.
+    // `id` is TEXT (not UUID) on purpose: `event_reservations.event_id` and
+    // `event_tickets.event_id` already store the old textual id, and a UUID
+    // swap would void tickets already in circulation.
     await query(`
       CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY,
@@ -856,10 +852,10 @@ const STEPS: SchemaStep[] = [
       CREATE TRIGGER tr_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at();
     EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
 
-    // Semente: o evento que estava hardcoded, já com a data e o local novos
-    // (o flyer mudou para 20/09 no Mar Palace). Mantém o id antigo para não
-    // órfãos os ingressos já emitidos. `DO NOTHING` — depois disso quem manda
-    // é o admin, e um redeploy não pode sobrescrever a edição dela.
+    // Seed: the previously hardcoded event, with the new date and venue
+    // (flyer moved to 20/09 at Mar Palace). Keep the old id so issued tickets
+    // stay valid. `DO NOTHING` — after this the admin owns the row; a redeploy
+    // must not overwrite their edit.
     await query(
       `INSERT INTO events (
          id, slug, status, title, short_title, banner_text,
@@ -901,12 +897,11 @@ const STEPS: SchemaStep[] = [
     },
   },
   {
-    name: "Ícone padrão por categoria (migration 030)",
+    name: "Default icon per category (migration 030)",
     run: async () => {
-    // As categorias nasceram sem ícone, e quem consome a lista acabava caindo
-    // num ícone genérico (o site institucional desenhava nota musical em
-    // todas). Preenche uma vez o que dá para inferir do nome; a partir daí a
-    // admin edita pela aba Categorias.
+    // Categories shipped with no icon, so consumers fell back to a generic one
+    // (the institutional site drew a music note on every row). Fill once from
+    // the name; after that the admin edits from the Categories tab.
     const guesses: [string, string][] = [
       ['k-?pop', 'star'],
       ['photocard|foto', 'camera'],
@@ -926,27 +921,27 @@ const STEPS: SchemaStep[] = [
       ['casa|eletro', 'home'],
     ];
     for (const [pattern, icon] of guesses) {
-      // Só preenche o que está vazio: um ícone escolhido à mão não é revertido.
+      // Only fill empties: a hand-picked icon is not reverted.
       await query(
         `UPDATE categories SET icon = $1
          WHERE (icon IS NULL OR icon = '') AND (name ~* $2 OR slug ~* $2)`,
         [icon, pattern]
       );
     }
-    // Sobrou sem palpite? Recebe um genérico, para a vitrine não ficar com
-    // metade dos itens com ícone e metade sem.
+    // Leftover with no guess gets a generic icon so the storefront is not
+    // half-icon, half-empty.
     await query(`UPDATE categories SET icon = 'sparkles' WHERE icon IS NULL OR icon = ''`);
 
-    // Correção pontual: as duas únicas categorias que tinham ícone estavam
-    // **ambas** com 'star', escolhido no `<select>` antigo — que mostrava só o
-    // rótulo ("K-pop / Estrela"), nunca o desenho. Guardado por slug **e** pelo
-    // valor atual, então uma escolha deliberada futura não é desfeita.
+    // One-off: the only two categories that already had an icon were **both**
+    // `'star'`, picked in the old `<select>` that showed the label
+    // ("K-pop / Estrela") never the drawing. Guarded by slug **and** current
+    // value so a later deliberate choice is not undone.
     await query(`UPDATE categories SET icon = 'heart' WHERE slug = 'beleza' AND icon = 'star'`);
     await query(`UPDATE categories SET icon = 'gift' WHERE slug = 'brinquedos' AND icon = 'star'`);
     },
   },
   {
-    name: "PIX na reserva de ingresso (migration 031)",
+    name: "PIX on ticket reservation (migration 031)",
     run: async () => {
     await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pix_txid VARCHAR(25)`);
     await query(
@@ -955,6 +950,22 @@ const STEPS: SchemaStep[] = [
     await query(`CREATE INDEX IF NOT EXISTS idx_event_reservations_user ON event_reservations(user_id)`);
     await query(
       `CREATE INDEX IF NOT EXISTS idx_event_reservations_email ON event_reservations(LOWER(buyer_email))`
+    );
+    },
+  },
+  {
+    name: "Monthly club plan (migration 032)",
+    run: async () => {
+    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS members_payment_type_check`);
+    await query(`ALTER TABLE members DROP CONSTRAINT IF EXISTS chk_members_payment_type`);
+    await query(`ALTER TABLE members ALTER COLUMN payment_type SET DEFAULT 'monthly'`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE members ADD CONSTRAINT chk_members_payment_type
+        CHECK (payment_type IN ('monthly', 'annual'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(
+      `UPDATE config SET value = '12.50'::jsonb
+        WHERE key = 'pricing.club_annual' AND value = '149.99'::jsonb`
     );
     },
   },
@@ -985,7 +996,7 @@ export async function ensureSchema(): Promise<SchemaState> {
       // practice, and aborting everything was the old silent-failure mode.
       const message = err instanceof Error ? err.message : String(err);
       failed.push({ step: step.name, error: message });
-      console.error(`[SCHEMA] ✗ etapa falhou: ${step.name} — ${message}`);
+      console.error(`[SCHEMA] ✗ step failed: ${step.name} — ${message}`);
     }
   }
 
@@ -999,11 +1010,11 @@ export async function ensureSchema(): Promise<SchemaState> {
 
   if (failed.length) {
     console.error(
-      `[SCHEMA] ⚠ ${failed.length} de ${STEPS.length} etapas falharam em ${state.durationMs}ms — ` +
-        `o schema está DEGRADADO. Etapas: ${failed.map((f) => f.step).join(' | ')}`
+      `[SCHEMA] ⚠ ${failed.length} of ${STEPS.length} steps failed in ${state.durationMs}ms — ` +
+        `schema is DEGRADED. Steps: ${failed.map((f) => f.step).join(' | ')}`
     );
   } else {
-    console.log(`[SCHEMA] ✓ ${STEPS.length} etapas em ${state.durationMs}ms`);
+    console.log(`[SCHEMA] ✓ ${STEPS.length} steps in ${state.durationMs}ms`);
   }
 
   return state;

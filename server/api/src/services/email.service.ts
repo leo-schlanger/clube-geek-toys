@@ -213,7 +213,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
     },
 
-    // ─── PAGAMENTOS ─────────────────────────────────────
+    // ─── Payments ─────────────────────────────────────
     'payment-confirmed': {
       subject: 'Pagamento confirmado — Clube GeekPop & Toys',
       preheader: `Seu pagamento de R$ ${v.amount || '0,00'} foi aprovado.`,
@@ -277,8 +277,8 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       },
     },
 
-    // Retirada na loja não tem rastreio: este e-mail é o único aviso de que o
-    // pedido já está separado e pode ser buscado no balcão.
+    // Pickup has no tracking: this email is the only notice that the
+    // order is packed and can be collected at the counter.
     'order-ready-for-pickup': {
       subject: `Pedido #${v.order_number || ''} pronto para retirada`,
       preheader: 'Seu pedido já está separado e esperando por você na loja.',
@@ -330,7 +330,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Tentar Novamente', url: `${frontendUrl}/membro` },
     },
 
-    // ─── ASSINATURA ─────────────────────────────────────
+    // ─── Subscription ─────────────────────────────────────
     'subscription-created': {
       subject: 'Assinatura ativada — Clube GeekPop & Toys',
       preheader: `${name}, sua assinatura do ${planLabel(v.plan)} está ativa!`,
@@ -442,7 +442,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Renovar Agora', url: `${frontendUrl}/membro` },
     },
 
-    // ─── CONTRATO ───────────────────────────────────────
+    // ─── Contract ───────────────────────────────────────
     'contract-signed': {
       subject: 'Contrato assinado — Clube GeekPop & Toys',
       preheader: `${name}, seu contrato do ${planLabel(v.plan)} foi assinado digitalmente.`,
@@ -459,7 +459,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Acessar Minha Conta', url: `${frontendUrl}/membro` },
     },
 
-    // ─── ADMIN: PIX PENDENTE ────────────────────────────
+    // ─── ADMIN: PENDING PIX ─────────────────────────────
     'admin-pix-pending': {
       subject: '🔔 PIX pendente de confirmação — Clube GeekPop & Toys',
       preheader: `Novo pagamento PIX de R$ ${v.amount || '0,00'} aguardando confirmação.`,
@@ -494,8 +494,8 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Email', v.customer_email || '—'],
           ['Valor', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
           ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
-          // O recado muda o que vai na caixa, então precisa estar no aviso que a
-          // loja lê primeiro — não só no painel.
+          // The note changes what goes in the box, so it belongs in the
+          // notice the shop reads first — not only in the panel.
           ...(v.customer_note ? [['Mensagem do cliente', escapeHtml(v.customer_note)]] : []),
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Confira no extrato se o PIX com o TX ID acima caiu<br>2. Abra o pedido no painel admin e confirme o pagamento<br>3. O estoque só é baixado depois da confirmação')}`,
@@ -574,9 +574,10 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Abrir Painel do Dia', url: v.admin_url || `${frontendUrl}/admin` },
     },
 
-    // ─── EVENTOS: INGRESSOS ─────────────────────────────
-    // O link é o ingresso. Ele vale por si (código inadivinhável), então o
-    // e-mail é o que garante que o cliente não perca a compra ao fechar a aba.
+    // ─── Events: tickets ────────────────────────────────
+    // The link is the ticket. It stands on its own (unguessable code), so
+    // the email is what keeps the customer from losing the purchase after
+    // closing the tab.
     'event-reservation-received': {
       subject: `Reserva recebida — ${v.event_title || 'Evento GeekPop & Toys'}`,
       preheader: `Reserva ${v.reservation_code || ''} registrada. Falta a confirmação do pagamento.`,

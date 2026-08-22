@@ -79,7 +79,7 @@ describe('TicketPage', () => {
     renderAt('/ingressos/R-AAAA-BBBB', 'reservation')
 
     expect(await screen.findByText('Bia Souza')).toBeInTheDocument()
-    // O nome da compradora aparece no cabeçalho e no ingresso dela.
+    // Buyer name appears in the header and on her own ticket.
     expect(screen.getAllByText('Ana Souza').length).toBeGreaterThan(1)
   })
 

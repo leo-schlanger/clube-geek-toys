@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { CLUB_PLAN, PLANS, MEMBER_SHOP_DISCOUNT } from './index'
+import { CLUB_PLAN, PLANS, MEMBER_SHOP_DISCOUNT, paymentTypeLabel, paymentTypeSuffix } from './index'
 import type { PlanType, MemberStatus, PaymentType, PaymentStatus, PaymentMethod, UserRole } from './index'
 
 // ============================================
@@ -24,8 +24,8 @@ describe('CLUB_PLAN', () => {
     expect(CLUB_PLAN.name).toBe('Clube GeekPop & Toys')
   })
 
-  it('has an annual price of 149.99', () => {
-    expect(CLUB_PLAN.price).toBe(149.99)
+  it('has a monthly price of 12.50', () => {
+    expect(CLUB_PLAN.price).toBe(12.50)
   })
 
   it('has a 10% discount', () => {
@@ -87,8 +87,15 @@ describe('type compatibility', () => {
   })
 
   it('PaymentType values are valid strings', () => {
-    const types: PaymentType[] = ['annual']
-    expect(types).toHaveLength(1)
+    const types: PaymentType[] = ['monthly', 'annual']
+    expect(types).toHaveLength(2)
+  })
+
+  it('labels monthly as Mensal and annual as Anual', () => {
+    expect(paymentTypeLabel('monthly')).toBe('Mensal')
+    expect(paymentTypeLabel('annual')).toBe('Anual')
+    expect(paymentTypeSuffix('monthly')).toBe('/mês')
+    expect(paymentTypeSuffix('annual')).toBe('/ano')
   })
 
   it('PaymentStatus values are valid strings', () => {

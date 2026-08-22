@@ -246,7 +246,6 @@ export default function VerifyEmail() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Mensagem de feedback */}
           {message && (
             <div className={`p-3 rounded-md text-sm ${
               message.type === 'success'
@@ -257,7 +256,6 @@ export default function VerifyEmail() {
             </div>
           )}
 
-          {/* Instruções */}
           <div className="p-4 bg-muted rounded-lg space-y-2">
             <p className="text-sm text-muted-foreground">
               <strong>1.</strong> Acesse sua caixa de entrada
@@ -270,7 +268,6 @@ export default function VerifyEmail() {
             </p>
           </div>
 
-          {/* Verificar se já clicou no link */}
           <Button
             onClick={handleCheckVerification}
             disabled={checking}
@@ -287,7 +284,6 @@ export default function VerifyEmail() {
             )}
           </Button>
 
-          {/* Reenviar email */}
           <Button
             variant="outline"
             onClick={handleResendEmail}
@@ -306,12 +302,10 @@ export default function VerifyEmail() {
             )}
           </Button>
 
-          {/* Dica sobre spam */}
           <p className="text-xs text-center text-muted-foreground">
             Não recebeu? Verifique a pasta de spam ou lixo eletrônico.
           </p>
 
-          {/* Sair */}
           <div className="pt-4 border-t">
             <Button
               variant="ghost"

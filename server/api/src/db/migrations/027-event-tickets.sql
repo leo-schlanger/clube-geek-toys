@@ -1,9 +1,7 @@
--- 027 — Ingressos nominais de evento
+-- 027 — Named event tickets
 --
--- Até aqui o "ingresso" era a mensagem de WhatsApp da reserva: qualquer print
--- valia na porta e a reserva só existia na conversa. Duas tabelas resolvem as
--- duas metades do problema — a reserva vira registro, e cada pessoa ganha um
--- código único que a portaria queima na entrada.
+-- The reservation becomes a record and each person gets a unique code the door
+-- burns on entry, so a forwarded screenshot no longer works.
 
 CREATE TABLE IF NOT EXISTS event_reservations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -31,7 +29,7 @@ CREATE TABLE IF NOT EXISTS event_tickets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   reservation_id UUID NOT NULL REFERENCES event_reservations(id) ON DELETE CASCADE,
   event_id TEXT NOT NULL,
-  -- O código é o ingresso. UNIQUE aqui é o que impede dois "mesmos" ingressos.
+  -- The code is the ticket; UNIQUE is what prevents two "same" tickets.
   code VARCHAR(24) NOT NULL UNIQUE,
   attendee_name TEXT NOT NULL,
   kind TEXT NOT NULL DEFAULT 'full' CHECK (kind IN ('full', 'member', 'free')),

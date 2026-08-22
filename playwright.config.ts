@@ -1,13 +1,13 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// E2E contra PRODUÇÃO (sem webServer local). Testa a loja pública e o fluxo de
-// assinatura. Fluxos que exigem admin/pagamento real ficam de fora por padrão.
+// Production E2E (no local webServer). Covers the public shop and subscribe
+// funnel. Admin/live-payment flows stay out by default.
 export default defineConfig({
   testDir: './e2e',
   timeout: 45_000,
   expect: { timeout: 10_000 },
-  // E2E contra produção: 2 retries absorvem latência/soluços de rede transitórios
-  // sem mascarar falha real (que persiste após o retry).
+  // Two retries absorb transient production latency without masking a real
+  // failure (that one survives the retry).
   retries: 2,
   fullyParallel: false,
   reporter: [['list']],

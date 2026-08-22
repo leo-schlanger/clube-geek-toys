@@ -31,12 +31,11 @@ function isDismissed(eventId: string): boolean {
  *
  * There is deliberately no height variable: an in-flow element pushes content
  * by itself. The old `--shop-event-banner-h` published 44px/72px
- * fixos e **nenhum arquivo a lia** — foi removida junto.
+ * fixed heights and **nothing read it** — removed with the sticky layout.
  */
 export function EventAnnouncementBanner() {
   const { event, visible: eventVisible } = useActiveEvent()
-  // Guarda por evento, não um booleano só: quem fechou o anúncio do evento
-  // passado precisa ver o próximo.
+  // Keyed by event, not a single boolean: dismissing the last event must not hide the next.
   const [dismissedId, setDismissedId] = useState<string | null>(null)
 
   if (!eventVisible) return null

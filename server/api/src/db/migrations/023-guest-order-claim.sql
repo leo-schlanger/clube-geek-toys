@@ -1,22 +1,17 @@
--- 023 — Adoção de pedido de convidado pela conta criada depois
+-- 023 — Guest order claimed by an account created later
 --
--- O checkout aceita compra sem login (`optionalAuth`), e nesse caminho o pedido
--- nasce com `user_id IS NULL`. "Minhas compras" (`listMyOrders`) filtra por
--- `user_id` / `member_id`, então o pedido de convidado ficava órfão para
--- sempre: a pessoa pagava o PIX, recebia a confirmação, criava a conta com o
--- MESMO e-mail depois — e não achava a compra em lugar nenhum. Era o relato
--- "cadastrei com os mesmos dados e não acho a compra dela".
+-- Guest checkout leaves `user_id IS NULL`, and `listMyOrders` filters by
+-- `user_id` / `member_id`, so the order stayed orphaned even after the buyer
+-- signed up with the same email.
 --
--- A adoção acontece no código (auth.service + order.service) e só para conta
--- com e-mail verificado: casar por e-mail sem prova de posse deixaria qualquer
--- um cadastrar com o e-mail alheio e ler endereço e telefone de um pedido que
--- não é seu — vazamento de dado pessoal sob a LGPD.
+-- Claiming happens in code (auth.service + order.service) and only for a
+-- verified email: matching by email without proof of ownership would expose the
+-- address and phone on someone else's order (LGPD).
 --
--- O índice existe porque essa varredura passa a rodar em todo login verificado
--- e em toda abertura de "Minhas compras". É parcial (só a fatia órfã, que é
--- pequena e encolhe a cada adoção) e usa `lower(customer_email)` porque a
--- comparação é case-insensitive — `users.email` é normalizado no cadastro, mas
--- `orders.customer_email` guarda o que o cliente digitou no checkout.
+-- The index serves that sweep on every verified login and every "Minhas
+-- compras" load. Partial (the shrinking orphan slice) and on
+-- `lower(customer_email)`: `users.email` is normalized, `orders.customer_email`
+-- keeps whatever was typed at checkout.
 
 CREATE INDEX IF NOT EXISTS idx_orders_guest_email
   ON orders (lower(customer_email))

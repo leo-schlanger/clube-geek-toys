@@ -139,9 +139,9 @@ describe('MyOrderDetail', () => {
   })
 
   /**
-   * Retirada reaproveita os mesmos status do envio, mas "a caminho" e "entregue"
-   * não descrevem nada para quem vai buscar no balcão — e o endereço na tela
-   * precisa ser o da loja, não um destino de entrega que nunca existiu.
+   * Pickup reuses the same shipping statuses, but "on the way" / "delivered"
+   * mean nothing to someone collecting at the counter — and the address on
+   * screen must be the store, not a delivery destination that never existed.
    */
   it('reads a pickup order as counter collection, not delivery', async () => {
     mockedGet.mockResolvedValue({
@@ -162,7 +162,7 @@ describe('MyOrderDetail', () => {
     expect(screen.getAllByText(/Retirada na loja/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Rua Barata Ribeiro, 181/i)).toBeInTheDocument()
     expect(screen.getByText(/Grátis/i)).toBeInTheDocument()
-    // Nada de "A caminho" nem rastreio dos Correios.
+    // No "A caminho" copy and no Correios tracking.
     expect(screen.queryByText(/A caminho/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Rastrear nos Correios/i)).not.toBeInTheDocument()
   })

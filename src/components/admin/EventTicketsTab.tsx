@@ -156,7 +156,6 @@ export function EventTicketsTab() {
 
   return (
     <div className="space-y-6">
-      {/* ─── Portaria ─────────────────────────────────────────────────── */}
       <Card className="border-primary/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -243,7 +242,6 @@ export function EventTicketsTab() {
         </CardContent>
       </Card>
 
-      {/* ─── Contadores ───────────────────────────────────────────────── */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Aguardando pagamento', value: summary.pending, tone: 'text-amber-500' },
@@ -262,7 +260,6 @@ export function EventTicketsTab() {
         ))}
       </div>
 
-      {/* ─── Reservas ─────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

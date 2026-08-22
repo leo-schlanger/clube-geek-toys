@@ -1,10 +1,9 @@
 -- ============================================
--- Migration 012 — Atacado (wholesale B2B)
+-- Migration 012 — Wholesale (B2B)
 -- ============================================
--- Aba dedicada na loja, cadastro com CNPJ, aprovação admin,
--- desconto 25% server-side (discount_reason='wholesale_25').
--- Pronto antes da importação: produtos só entram no catálogo
--- atacado quando wholesale_enabled=true.
+-- Dedicated shop tab, CNPJ signup, admin approval, 25% discount applied
+-- server-side (discount_reason='wholesale_25'). Products only reach the
+-- wholesale catalogue with wholesale_enabled=true.
 
 CREATE TABLE IF NOT EXISTS wholesale_accounts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -15,7 +14,7 @@ CREATE TABLE IF NOT EXISTS wholesale_accounts (
   state_registration VARCHAR(40),
   phone VARCHAR(20),
   contact_name VARCHAR(200) NOT NULL,
-  -- Atividade / objeto social (admin confere se bate com o que compram)
+  -- Business activity: the admin checks it matches what they buy
   business_activity TEXT,
   status VARCHAR(20) NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'approved', 'rejected', 'disabled')),

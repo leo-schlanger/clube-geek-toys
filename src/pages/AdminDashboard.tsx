@@ -9,7 +9,7 @@ import { Skeleton, SkeletonStats } from '../components/ui/skeleton'
 import { MemberModal } from '../components/MemberModal'
 import { UserModal } from '../components/UserModal'
 import { AdminSidebar, type AdminTab } from '../components/admin/AdminSidebar'
-import { CLUB_PLAN, PLANS, type Member, type PlanType } from '../types'
+import { CLUB_PLAN, PLANS, paymentTypeLabel, type Member, type PlanType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
 import { getRecentLogs, type AuditLog } from '../lib/logs'
@@ -267,7 +267,7 @@ export default function AdminDashboard() {
       `Membro: ${member.fullName}\n` +
       `CPF: ${member.cpf}\n` +
       `Plano: ${plan.name}\n` +
-      `Tipo: Anual\n` +
+      `Tipo: ${paymentTypeLabel(member.paymentType)}\n` +
       `Valor esperado: ${formatCurrency(expectedAmount)}\n\n` +
       `Clique em OK apenas se você VERIFICOU o pagamento.`
     )
@@ -275,8 +275,8 @@ export default function AdminDashboard() {
     if (!confirmed) return
 
     try {
-      // Find pending PIX payment for this member and confirm it via the proper endpoint.
-      // This sets payment status to 'paid', calculates expiry dates, and sends confirmation email.
+      // Confirm the pending PIX when it exists; otherwise stamp an admin
+      // override so PDV and the shop discount work.
       const payments = await api.get<{ id: string; status: string; method: string }[]>(
         `/payments?member_id=${member.id}&status=pending&limit=1`
       )
@@ -287,11 +287,13 @@ export default function AdminDashboard() {
         if (result.error) throw new Error(result.error)
         toast.success('Pagamento PIX confirmado e membro ativado!')
       } else {
-        // Manual admin override: sets active plus the annual window so the PDV
-      // and the shop discount work.
         const start = new Date()
         const expiry = new Date(start)
-        expiry.setFullYear(expiry.getFullYear() + 1)
+        if (member.paymentType === 'annual') {
+          expiry.setFullYear(expiry.getFullYear() + 1)
+        } else {
+          expiry.setMonth(expiry.getMonth() + 1)
+        }
         const startDate = start.toISOString().slice(0, 10)
         const expiryDate = expiry.toISOString().slice(0, 10)
         await updateMember(member.id, {

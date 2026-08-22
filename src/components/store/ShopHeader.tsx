@@ -18,13 +18,13 @@ import { NotificationBell } from './NotificationBell'
 interface ShopHeaderProps {
   /** Active member: shows the discount badge in the header. */
   isMember?: boolean
-  /** Canal atacado — branding e busca em /atacado. */
+  /** Wholesale channel — branding and search under /atacado. */
   isWholesale?: boolean
 }
 
 /**
- * Shop header: logo, a always-visible search with its button,
- * carrinho (gaveta) e login/avatar. Busca → /?search=... (ou /atacado?search=).
+ * Shop header: logo, always-visible search with its button,
+ * cart drawer, and login/avatar. Search → /?search=... (or /atacado?search=).
  */
 export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeaderProps) {
   const { count } = useCart()
@@ -86,7 +86,6 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
   return (
     <>
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        {/* Linha 1: logo + canais + ações */}
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:h-16 sm:gap-3">
           {/* Logo */}
           <Link to={isWholesale ? '/atacado' : '/'} className="flex shrink-0 items-center gap-2">
@@ -96,7 +95,6 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             </span>
           </Link>
 
-          {/* Aba Loja / Atacado */}
           <div className="hidden items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5 sm:flex">
             <Button
               variant={!isWholesale ? 'default' : 'ghost'}
@@ -129,7 +127,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             </Button>
           )}
 
-          {/* Busca (desktop / tablet) — estilo Shopee: borda brand + botão Buscar */}
+          {/* Desktop/tablet search — Shopee-style brand border + Buscar button */}
           <form
             onSubmit={handleSearch}
             className="relative ml-1 hidden min-w-0 flex-1 items-stretch sm:flex"
@@ -158,9 +156,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             </div>
           </form>
 
-          {/* Ações */}
           <div className="ml-auto flex items-center gap-0.5 sm:ml-0 sm:gap-1">
-            {/* Mobile: atalho Atacado */}
             <Button
               variant="ghost"
               size="sm"
@@ -180,7 +176,6 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
 
             <ThemeToggle variant="icon" />
 
-            {/* Carrinho */}
             <Button
               variant="ghost"
               size="icon"
@@ -201,7 +196,6 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
               )}
             </Button>
 
-            {/* Crédito de loja + Minhas compras */}
             {user && creditBalance > 0 && (
               <span
                 className="hidden items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-accent sm:inline-flex"
@@ -227,7 +221,6 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             )}
             {user && <NotificationBell />}
 
-            {/* Login / conta */}
             {user ? (
               <Button variant="ghost" size="icon" asChild aria-label="Meu perfil">
                 <Link to="/perfil">
@@ -251,7 +244,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
           </div>
         </div>
 
-        {/* Linha 2 mobile: busca sempre visível (padrão Shopee) */}
+        {/* Mobile row 2: search always visible (Shopee pattern) */}
         <form onSubmit={handleSearch} className="border-t px-3 py-2 sm:hidden">
           <div className="flex overflow-hidden rounded-md border-2 border-primary bg-background shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
             <div className="relative min-w-0 flex-1">

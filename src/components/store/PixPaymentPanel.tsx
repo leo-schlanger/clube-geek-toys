@@ -7,23 +7,23 @@ import { formatCurrency } from '../../lib/utils'
 import { usePixExitGuard } from '../../hooks/usePixExitGuard'
 
 interface Props {
-  /** EMV copia-e-cola; é também o conteúdo do QR. */
+  /** EMV copy-paste payload; also the QR content. */
   emvCode: string
   pixKey: string
-  /** Valor em reais. */
+  /** Amount in BRL. */
   amount: number
-  /** Código do pedido/reserva, para a cliente citar se pagar pela chave. */
+  /** Order/reservation code, for the customer to quote if paying by key. */
   reference: string
   referenceLabel?: string
   merchantName?: string
   title?: string
   description?: string
-  /** Quando presente, mostra "Reenviar por e-mail". */
+  /** When set, shows "Reenviar por e-mail". */
   onResend?: () => Promise<void>
   className?: string
 }
 
-/** PIX na tela, para pedido da loja e para reserva de ingresso. Baixa manual. */
+/** On-screen PIX for a shop order or a ticket reservation. Manual settlement. */
 export function PixPaymentPanel({
   emvCode,
   pixKey,

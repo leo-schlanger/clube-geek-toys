@@ -226,7 +226,7 @@ export function StepPayment({
         const res = await api.post<{ clientSecret: string; id: string }>('/subscription/create', {
           member_id: memberId,
           plan,
-          frequency_type: 'years',
+          frequency_type: 'months',
           payer_email: memberEmail,
           payer_name: memberName,
           transaction_amount: amount,
@@ -298,10 +298,10 @@ export function StepPayment({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <p className="font-semibold text-lg">{planData.name}</p>
-                <Badge variant="club">Anual</Badge>
+                <Badge variant="club">Mensal</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Assinatura anual
+                Assinatura mensal
               </p>
             </div>
             <p className="text-2xl font-bold">{formatCurrency(amount)}</p>
@@ -492,7 +492,7 @@ export function StepPayment({
             amount={amount}
             submitLabel={
               mode === 'subscription'
-                ? `Assinar por ${formatCurrency(amount)}/ano`
+                ? `Assinar por ${formatCurrency(amount)}/mês`
                 : undefined
             }
           />

@@ -2,7 +2,7 @@
 
 export type PlanType = 'club';
 export type MemberStatus = 'active' | 'pending' | 'inactive' | 'expired';
-export type PaymentType = 'annual';
+export type PaymentType = 'monthly' | 'annual';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'pix' | 'credit_card' | 'boleto' | 'cash';
 export type UserRole = 'member' | 'seller' | 'admin' | 'disabled';
@@ -103,9 +103,8 @@ export interface AuditLog {
   timestamp: string;
 }
 
-// Club annual plan price (BRL).
-// MUST match frontend CLUB_PLAN.price in src/types/index.ts
-export const CLUB_PLAN_PRICE = 149.99;
+// Club monthly plan price (BRL). Must match frontend CLUB_PLAN.price.
+export const CLUB_PLAN_PRICE = 12.50;
 
 // Active-member shop discount, applied server-side at checkout.
 export const MEMBER_SHOP_DISCOUNT = 0.10;
@@ -144,7 +143,7 @@ export interface Product {
   description: string | null;
   price: number;
   compareAtPrice: number | null;
-  /** Categoria principal (espelha product_categories position 0). */
+  /** Primary category (product_categories position 0). */
   categoryId: string | null;
   categoryName?: string | null;
   /** Primary category first, up to MAX_PRODUCT_CATEGORIES. */

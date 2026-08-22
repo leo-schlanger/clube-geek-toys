@@ -261,7 +261,7 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
     `CPF: ${params.memberCPF}`,
     `E-mail: ${params.memberEmail}`,
     `Telefone: ${params.memberPhone}`,
-    `Plano: ${CLUB_PLAN.name} (Anual) - ${priceFormatted}`,
+    `Plano: ${CLUB_PLAN.name} (${params.paymentType === 'annual' ? 'Anual' : 'Mensal'}) - ${priceFormatted}`,
   ]
 
   let dataY = yPosition - 5
@@ -423,7 +423,7 @@ export async function generateContractPDF(params: ContractParams): Promise<Uint8
 }
 
 /**
- * Regulamento + dados do membro, sem assinatura digital.
+ * Club rules + member data, without a digital signature.
  * Used when the member paid but never went through ContractModal.
  */
 export async function generateAdhesionPDF(member: {
@@ -440,7 +440,7 @@ export async function generateAdhesionPDF(member: {
     memberEmail: member.email,
     memberPhone: member.phone || '',
     plan: 'club',
-    paymentType: 'annual',
+    paymentType: 'monthly',
     signatureImage: '',
     signedAt: new Date().toISOString(),
     ipAddress: '',

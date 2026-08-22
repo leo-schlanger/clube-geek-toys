@@ -16,13 +16,13 @@ export interface ShippingAddressPayload {
 export interface CreateOrderPayload {
   items: { productId: string; quantity: number; variantId?: string }[]
   customer: { name: string; email: string; phone?: string }
-  /** Recado livre do cliente para a loja, até 500 caracteres. */
+  /** Free-form note to the shop, up to 500 characters. */
   customerNote?: string
-  /** 'shipping' (padrão) envia pelos Correios; 'pickup' é retirada na loja. */
+  /** 'shipping' (default) goes via Correios; 'pickup' is store collection. */
   deliveryMethod?: DeliveryMethod
-  /** Obrigatório quando deliveryMethod é 'shipping'. */
+  /** Required when deliveryMethod is 'shipping'. */
   shippingAddress?: ShippingAddressPayload
-  /** Obrigatório quando deliveryMethod é 'shipping'. */
+  /** Required when deliveryMethod is 'shipping'. */
   shipping?: { quoteToken: string; serviceId: string }
   paymentMethod: 'pix' | 'credit_card'
   applyStoreCredit?: boolean

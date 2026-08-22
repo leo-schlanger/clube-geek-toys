@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-// O evento vem da API pelo `useActiveEvent`. `isPlaceholder: false` é o que
-// libera o redirect: com o fallback ainda em tela a página não expulsa ninguém.
+// Event comes from the API via `useActiveEvent`. `isPlaceholder: false` is
+// what unlocks the redirect: with the fallback still on screen the page
+// must not kick anyone out.
 const mockUseActiveEvent = vi.fn()
 
 const EVENT = {

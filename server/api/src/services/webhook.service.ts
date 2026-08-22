@@ -521,16 +521,12 @@ async function activateMember(
   const baseDate = isRenewal ? currentExpiry : now;
 
   const expiryDate = new Date(baseDate);
-  if (member.payment_type === 'annual') {
-    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-  } else {
-    expiryDate.setMonth(expiryDate.getMonth() + 1);
-  }
+  expiryDate.setMonth(expiryDate.getMonth() + 1);
 
   await client.query(
     `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
      activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
-     payment_count = payment_count + 1
+     payment_count = payment_count + 1, payment_type = 'monthly'
      WHERE id = $4`,
     [now.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], paymentRef, member.id]
   );

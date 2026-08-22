@@ -85,9 +85,9 @@ describe('TermsOfUse', () => {
     expect(matches.length).toBeGreaterThan(0)
   })
 
-  it('mentions the single annual club plan', () => {
+  it('mentions the single monthly club plan', () => {
     renderPage()
-    expect(screen.getByText(/plano único de assinatura anual/i)).toBeInTheDocument()
+    expect(screen.getByText(/plano único de assinatura mensal/i)).toBeInTheDocument()
   })
 
   it('mentions right of withdrawal (7 days)', () => {

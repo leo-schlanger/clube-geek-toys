@@ -162,8 +162,8 @@ export async function createSubscription(data: CreateSubscriptionData) {
     );
 
     await client.query(
-      `UPDATE members SET subscription_id = $1, subscription_status = $2, auto_renewal = TRUE WHERE id = $3`,
-      [subscriptionId, status, data.member_id],
+      `UPDATE members SET subscription_id = $1, subscription_status = $2, auto_renewal = TRUE, payment_type = $4 WHERE id = $3`,
+      [subscriptionId, status, data.member_id, paymentType],
     );
 
     await client.query('COMMIT');

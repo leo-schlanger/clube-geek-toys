@@ -319,8 +319,8 @@ export async function deleteUserAccount(userId: string, password: string) {
          tracking_code = NULL,
          tracking_url = NULL,
          customer_cnpj = NULL,
-         -- Texto escrito pelo cliente: pode conter qualquer dado pessoal que
-         -- ele tenha decidido contar à loja, então sai junto com o resto.
+         -- Free-text from the customer: it can hold any personal data they
+         -- chose to tell the shop, so it goes with the rest.
          customer_note = NULL
        WHERE user_id = $1
           OR ($2::uuid IS NOT NULL AND member_id = $2)

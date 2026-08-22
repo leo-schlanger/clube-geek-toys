@@ -1,18 +1,12 @@
--- 026 — Recado do cliente para a loja no checkout
+-- 026 — Customer note to the shop at checkout
 --
--- A loja vende photocard e colecionável, onde o pedido quase sempre vem com uma
--- observação: "se tiver do mesmo cantor manda junto", "não precisa embalar para
--- presente", "sou do prédio ao lado". Sem campo para isso o cliente mandava a
--- mensagem por outro canal — Instagram, WhatsApp — e ela chegava desencontrada
--- do pedido, quando chegava.
+-- Free text and deliberately short: it is a note, not an address or a delivery
+-- instruction, and nothing in the system branches on it. The 500-char limit is
+-- also in the route's Zod schema; this constraint is the backstop for writes
+-- that bypass the API.
 --
--- Texto livre e curto de propósito: é recado, não endereço nem instrução de
--- entrega, e nada no sistema decide coisa alguma a partir dele. O limite de 500
--- caracteres também está no Zod da rota; a constraint aqui é a rede de baixo,
--- para o caso de alguém escrever no banco por fora da API.
---
--- É dado pessoal como qualquer outro conteúdo escrito pelo cliente: entra no
--- export da LGPD junto com o pedido e é redigido na exclusão.
+-- Personal data like any customer-written content: included in the LGPD export
+-- and redacted on deletion.
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_note TEXT;
 

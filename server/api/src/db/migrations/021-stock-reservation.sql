@@ -1,22 +1,10 @@
--- 021 — Reserva de estoque entre `create` e `paid`
+-- 021 — Stock reservation between `create` and `paid`
 --
--- Até aqui o estoque só baixava na confirmação do pagamento. Entre criar o
--- pedido e confirmá-lo, a unidade continuava à venda para todo mundo — e o PIX
--- é confirmado à mão, então essa janela dura horas. Dois clientes compravam a
--- mesma última peça e os dois pagavam.
---
--- Pior: a baixa usava `GREATEST(0, stock - qty)`. O segundo pedido confirmava
--- sem erro nenhum, o estoque parava em 0 e a venda a descoberto não aparecia em
--- lugar nenhum — nem no histórico, nem no painel.
---
--- `reserved` é o contrapeso de `stock`: o que já tem dono mas ainda não saiu.
--- A loja passa a vender contra `stock - reserved`. A reserva nasce com o pedido
--- (mesma transação do INSERT), vira baixa de verdade no pagamento, e é devolvida
--- no cancelamento ou quando o TTL vence (varredura diária do cron) — senão um
--- carrinho abandonado seguraria a peça para sempre.
---
--- `stock >= 0` continua valendo. A reserva é que impede o descoberto; o
--- `GREATEST` vira rede de segurança que registra o rombo em vez de escondê-lo.
+-- Stock only dropped on payment confirmation, and PIX is confirmed by hand, so
+-- the unit stayed on sale for hours after being sold. `reserved` counterweights
+-- `stock`: the shop sells against `stock - reserved`. The reservation is created
+-- with the order, becomes a real decrement on payment, and is returned on cancel
+-- or when the TTL expires (daily cron sweep).
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS reserved INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS reserved INTEGER NOT NULL DEFAULT 0;
@@ -29,25 +17,20 @@ DO $$ BEGIN
   ALTER TABLE product_variants ADD CONSTRAINT chk_variants_reserved CHECK (reserved >= 0);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Marca no pedido, não só no produto: sem ela não dá para saber se a reserva
--- daquele pedido já foi consumida (pago) ou devolvida (cancelado), e liberar
--- duas vezes tiraria do `reserved` de outro pedido.
+-- Flag on the order, not just the product: releasing twice would eat another
+-- order's `reserved`.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_reserved BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS reservation_expires_at TIMESTAMPTZ;
 
--- A varredura do cron busca exatamente por isto; parcial porque a esmagadora
--- maioria dos pedidos já teve a reserva resolvida.
+-- Partial: the cron sweep looks for exactly this, and most orders are settled.
 CREATE INDEX IF NOT EXISTS idx_orders_reservation_expiry
   ON orders(reservation_expires_at)
   WHERE stock_reserved = TRUE;
 
--- Backfill: os pedidos pendentes que já existem seguram estoque de verdade, e
--- ignorá-los deixaria o `reserved` mentindo desde o primeiro minuto.
---
--- As quatro instruções vão numa chamada só, sem parâmetros: o Postgres envolve
--- um simple query múltiplo numa transação implícita, então ou o `reserved` e a
--- marca no pedido avançam juntos, ou nenhum dos dois avança. O filtro
--- `stock_reserved = FALSE` faz a segunda execução não encontrar nada.
+-- Backfill for existing pending orders. All four statements go in a single
+-- parameterless call: Postgres wraps a multi-statement simple query in an
+-- implicit transaction, so `reserved` and the order flag advance together.
+-- `stock_reserved = FALSE` makes a second run a no-op.
 UPDATE products p
    SET reserved = p.reserved + x.qty
   FROM (
@@ -80,8 +63,7 @@ UPDATE orders
        reservation_expires_at = created_at + INTERVAL '24 hours'
  WHERE status = 'pending' AND stock_reserved = FALSE;
 
--- Produto com variação tem o `reserved` do pai como soma dos filhos, igual ao
--- que já vale para `stock` — é o número que a vitrine mostra.
+-- A variant parent's `reserved` is the sum of its children, same as `stock`.
 UPDATE products p
    SET reserved = COALESCE((
          SELECT SUM(v.reserved)::int FROM product_variants v

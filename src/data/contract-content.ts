@@ -13,14 +13,14 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
     title: '1. SOBRE O CLUBE GEEKPOP & TOYS',
     content: [
       'O CLUBE GEEKPOP & TOYS é um programa de fidelidade exclusivo da loja GEEKPOP & TOYS, destinado a oferecer vantagens, descontos e benefícios especiais aos seus membros.',
-      'A participação no Clube é voluntária e requer a adesão ao plano anual do Clube, mediante pagamento da anuidade correspondente.',
+      'A participação no Clube é voluntária e requer a adesão ao plano mensal do Clube, mediante pagamento da mensalidade correspondente.',
       'O Clube reserva-se o direito de modificar, suspender ou encerrar o programa a qualquer momento, mediante comunicação prévia de 30 (trinta) dias aos membros, por e-mail.',
     ],
   },
   {
     title: '2. PLANO E BENEFÍCIOS',
     content: [
-      'O Clube GeekPop & Toys possui um único plano, de vigência anual, no valor vigente no momento da adesão.',
+      'O Clube GeekPop & Toys possui um único plano, de vigência mensal, no valor vigente no momento da adesão.',
       'BENEFÍCIO PRINCIPAL: 10% (dez por cento) de desconto em qualquer produto, válido tanto na loja física quanto na loja online do Clube GeekPop & Toys.',
       'BENEFÍCIOS ADICIONAIS: 50% (cinquenta por cento) de desconto nos ingressos dos eventos promovidos ou apoiados pela loja, e um brinde na primeira compra realizada na loja física ou online.',
       'Os benefícios são válidos apenas durante a vigência da assinatura e não são cumulativos com outras promoções, salvo indicação expressa.',
@@ -29,10 +29,10 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
   {
     title: '3. PAGAMENTO E RENOVAÇÃO',
     content: [
-      'A assinatura é anual, com valor conforme tabela vigente no momento da adesão.',
+      'A assinatura é mensal, com valor conforme tabela vigente no momento da adesão.',
       'O pagamento pode ser realizado via PIX ou cartão de crédito.',
-      'A renovação é anual e automática quando contratada por assinatura recorrente, salvo cancelamento solicitado pelo membro antes da data de vencimento.',
-      'O Clube reserva-se o direito de reajustar o valor da assinatura anualmente, mediante comunicação prévia de 30 (trinta) dias.',
+      'A renovação é mensal e automática quando contratada por assinatura recorrente, salvo cancelamento solicitado pelo membro antes da data de vencimento.',
+      'O Clube reserva-se o direito de reajustar o valor da assinatura, mediante comunicação prévia de 30 (trinta) dias.',
       'Em caso de inadimplência superior a 15 (quinze) dias, os benefícios serão suspensos até a regularização.',
     ],
   },
@@ -41,7 +41,7 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
     content: [
       'O membro pode solicitar o cancelamento a qualquer momento através da área do membro ou por contato direto com a loja.',
       'O cancelamento será efetivado ao final do período já pago, não havendo reembolso proporcional.',
-      'A assinatura anual, uma vez contratada, não é passível de reembolso após o prazo de arrependimento previsto neste regulamento.',
+      'A assinatura mensal, uma vez contratada, não é passível de reembolso após o prazo de arrependimento previsto neste regulamento.',
       'Após o cancelamento, o membro perde imediatamente o acesso aos benefícios do Clube.',
     ],
   },

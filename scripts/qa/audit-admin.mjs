@@ -8,7 +8,7 @@ const TABS = [
 ]
 const WIDTHS = [1440, 900, 390]
 
-/** Mesma sonda usada na loja: mede o DOM renderizado, não o código. */
+/** Same probe as the shop: measures the rendered DOM, not source. */
 const probe = () => {
   const problems = []
   for (const el of document.querySelectorAll('a, button')) {
@@ -45,7 +45,7 @@ const probe = () => {
     })
   }
 
-  // Texto que vaza do próprio container (nome de produto, e-mail longo…)
+  // Text overflowing its own box (long product names, emails…)
   for (const el of document.querySelectorAll('td, th, p, span, h1, h2, h3')) {
     const cs = getComputedStyle(el)
     if (cs.overflow !== 'visible' || cs.textOverflow === 'ellipsis') continue
@@ -60,7 +60,7 @@ const probe = () => {
 const b = await chromium.launch()
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } })
 
-// Login uma vez; o estado de sessão é reaproveitado nas abas.
+// Login once; session state is reused across tabs.
 const login = await ctx.newPage()
 await login.goto(`${BASE}/login`, { waitUntil: 'networkidle' })
 await login.getByRole('button', { name: /Aceitar todos/i }).click().catch(() => {})

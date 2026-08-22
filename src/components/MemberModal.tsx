@@ -11,7 +11,7 @@ import { Label } from './ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { PLANS, type Member, type MemberStatus, type MemberWithSubscription } from '../types'
+import { PLANS, paymentTypeLabel, type Member, type MemberStatus, type MemberWithSubscription } from '../types'
 import { createMember, updateMember, activateMember } from '../lib/members'
 import { api } from '../lib/api-client'
 import { formatCurrency, formatCPF, validateCPF, getStatusLabel } from '../lib/utils'
@@ -48,7 +48,7 @@ const memberSchema = z.object({
   cpf: z.string().refine((val) => validateCPF(val), 'CPF inválido'),
   phone: z.string().min(10, 'Telefone inválido'),
   plan: z.literal('club'),
-  paymentType: z.literal('annual'),
+  paymentType: z.enum(['monthly', 'annual']),
   status: z.enum(['active', 'pending', 'inactive', 'expired']).optional(),
 })
 
@@ -104,7 +104,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
       cpf: member?.cpf ? formatCPF(member.cpf) : '',
       phone: member?.phone || '',
       plan: 'club',
-      paymentType: 'annual',
+      paymentType: member?.paymentType || 'monthly',
       status: member?.status || 'pending',
     },
   })
@@ -503,14 +503,14 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
               </div>
             </div>
 
-            {/* Plan (único e anual) */}
+            {/* Plan (single monthly) */}
             <div className="space-y-3">
               <Label>Plano</Label>
               <div className="p-4 rounded-lg border-2 border-primary bg-primary/5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Star className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">{PLANS.club.name} — Anual</span>
+                    <span className="font-semibold">{PLANS.club.name} — {paymentTypeLabel(watch('paymentType'))}</span>
                   </div>
                   <p className="text-lg font-bold text-primary">
                     {formatCurrency(PLANS.club.price)}

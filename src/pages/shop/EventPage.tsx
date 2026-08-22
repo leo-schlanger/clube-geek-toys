@@ -24,9 +24,9 @@ export default function EventPage() {
   const { isMember } = useShopMember()
   const { event, visible, isPlaceholder } = useActiveEvent()
 
-  // Só redireciona depois que a API respondeu: com o fallback ainda em tela,
-  // um evento despublicado no banco mandaria o visitante embora sem motivo —
-  // e um evento recém-publicado seria escondido.
+  // Redirect only after the API answers: with the fallback still on screen,
+  // an unpublished DB event would kick the visitor out for no reason —
+  // and a newly published one would be hidden.
   if (!visible && !isPlaceholder) {
     return <Navigate to="/" replace />
   }

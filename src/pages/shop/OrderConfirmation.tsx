@@ -10,7 +10,7 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 
 const POLL_INTERVAL_MS = 4000
-const POLL_TIMEOUT_MS = 5 * 60 * 1000 // desiste de esperar após 5 min
+const POLL_TIMEOUT_MS = 5 * 60 * 1000 // Stop polling after 5 min
 
 // Settled states, which stop the polling.
 const TERMINAL_STATUSES: OrderStatus[] = [
@@ -76,7 +76,7 @@ export default function OrderConfirmation() {
           clear()
         }
 
-        if (isPaid) return // resolvido — para o polling
+        if (isPaid) return
 
         if (Date.now() - startRef.current > POLL_TIMEOUT_MS) {
           setTimedOut(true)

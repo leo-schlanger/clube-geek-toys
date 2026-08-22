@@ -4,11 +4,11 @@ import { TICKET_KIND_LABEL } from '../../data/event'
 import { TICKET_STATUS_LABEL, type PublicTicket } from '../../lib/event-tickets'
 
 /**
- * O ingresso.
+ * The ticket.
  *
- * O QR carrega a URL pública deste mesmo ingresso, então a portaria pode ler
- * com qualquer leitor e cair na página com o status atual — e o status é o que
- * importa: `used` significa que este código já entrou, print ou não.
+ * The QR encodes this ticket's public URL, so door staff can scan with any
+ * reader and land on the page with the current status — and status is what
+ * matters: `used` means this code already entered, print or not.
  */
 export function TicketCard({ ticket }: { ticket: PublicTicket }) {
   const url =
@@ -40,8 +40,8 @@ export function TicketCard({ ticket }: { ticket: PublicTicket }) {
 
       <div className="grid gap-5 p-5 sm:grid-cols-[auto_1fr] sm:items-center">
         <div className="mx-auto rounded-xl bg-white p-3">
-          {/* Só ingresso liberado carrega QR: um QR bonito com pagamento pendente
-              é exatamente o print que a portaria não deveria aceitar. */}
+          {/* Only a released ticket loads a QR: a pretty QR with pending
+              payment is exactly the print the door must not accept. */}
           {ticket.status === 'valid' || ticket.status === 'used' ? (
             <QRCodeSVG value={url} size={148} level="M" includeMargin={false} />
           ) : (

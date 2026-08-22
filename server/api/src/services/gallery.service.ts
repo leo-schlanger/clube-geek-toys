@@ -206,7 +206,7 @@ export async function updateAlbum(
 
 /**
  * Removes the album and returns the photo URLs so the caller can delete files.
- * As linhas de gallery_photos somem por ON DELETE CASCADE.
+ * `gallery_photos` rows disappear via ON DELETE CASCADE.
  */
 export async function deleteAlbum(id: string, actorUserId: string): Promise<string[]> {
   const client = await getClient();

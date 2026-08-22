@@ -82,8 +82,8 @@ describe('Payments API client', () => {
   // ---- calculatePlanPrice ----
 
   describe('calculatePlanPrice', () => {
-    it('returns the annual club price (149.99)', () => {
-      expect(calculatePlanPrice('club', 'annual')).toBe(149.99)
+    it('returns the monthly club price (12.50)', () => {
+      expect(calculatePlanPrice('club', 'monthly')).toBe(12.50)
     })
   })
 
@@ -215,7 +215,7 @@ describe('Payments API client', () => {
       const result = await createCardPayment('club', 'annual', 'payer@test.com', 'Payer Name', 'member-1')
 
       expect(mockedApi.post).toHaveBeenCalledWith('/checkout/card/create', {
-        amount: 149.99,
+        amount: 12.50,
         description: 'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
@@ -317,7 +317,7 @@ describe('Payments API client', () => {
   // ---- createSubscriptionPayment ----
 
   describe('createSubscriptionPayment', () => {
-    it('POSTs /subscription/create with frequency_type years and the club price', async () => {
+    it('POSTs /subscription/create with frequency_type months and the club price', async () => {
       mockedApi.post.mockResolvedValue({
         data: {
           id: 'sub_123',
@@ -328,16 +328,16 @@ describe('Payments API client', () => {
       })
 
       const result = await createSubscriptionPayment(
-        'club', 'annual', 'payer@test.com', 'Payer Name', 'member-1'
+        'club', 'monthly', 'payer@test.com', 'Payer Name', 'member-1'
       )
 
       expect(mockedApi.post).toHaveBeenCalledWith('/subscription/create', {
         member_id: 'member-1',
         plan: 'club',
-        frequency_type: 'years',
+        frequency_type: 'months',
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
-        transaction_amount: 149.99,
+        transaction_amount: 12.50,
       })
 
       expect(result).toEqual({
@@ -351,7 +351,7 @@ describe('Payments API client', () => {
       mockedApi.post.mockResolvedValue({ error: 'Subscription failed', status: 400 })
 
       await expect(
-        createSubscriptionPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
+        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1')
       ).rejects.toThrow('Subscription failed')
     })
 
@@ -359,7 +359,7 @@ describe('Payments API client', () => {
       mockedApi.post.mockResolvedValue({ data: undefined, status: 200 })
 
       await expect(
-        createSubscriptionPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
+        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1')
       ).rejects.toThrow('Resposta inválida do servidor ao criar assinatura')
     })
 
@@ -367,7 +367,7 @@ describe('Payments API client', () => {
       mockedApi.post.mockRejectedValue(new Error('Timeout'))
 
       await expect(
-        createSubscriptionPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
+        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1')
       ).rejects.toThrow('Timeout')
     })
   })

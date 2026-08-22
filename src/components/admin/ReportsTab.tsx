@@ -39,7 +39,6 @@ export function ReportsTab({
         refreshing={loadingReports}
       />
 
-      {/* Fechamento por periodo, para arquivar ou mandar pra contabilidade. */}
       <ReportExport />
 
       {/* Revenue Chart */}

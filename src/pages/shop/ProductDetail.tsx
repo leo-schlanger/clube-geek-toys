@@ -52,7 +52,7 @@ export default function ProductDetail() {
   const isWholesale = channel === 'wholesale'
   const { isApproved: isWholesaleApproved } = useWholesaleAccount()
   const { salesOpen: wholesaleSalesOpen } = useWholesaleSalesOpen(isWholesale)
-  // Canal atacado fechado: vitrine sem carrinho — o pedido seria recusado pela API.
+  // Wholesale closed: catalogue without a cart — the API would reject the order.
   const canBuy = !isWholesale || wholesaleSalesOpen
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -154,14 +154,14 @@ export default function ProductDetail() {
     setTouchStartX(e.touches[0]?.clientX ?? null)
   }
 
-  /** 40px separa um arrastar de um toque acidental durante a rolagem vertical. */
+  /** 40px separates a swipe from an accidental tap during vertical scroll. */
   function handleTouchEnd(e: React.TouchEvent) {
     if (touchStartX == null) return
     const endX = e.changedTouches[0]?.clientX ?? touchStartX
     const delta = endX - touchStartX
     setTouchStartX(null)
-    // Abaixo do limiar o gesto foi um toque, não um arrastar: no celular é
-    // assim que se abre a foto ampliada, já que passar o mouse não existe.
+    // Below the threshold this was a tap, not a swipe: on mobile that is how
+    // the enlarged photo opens, since hover does not exist.
     if (Math.abs(delta) < 40) {
       if (displayImages.length > 0) setViewerOpen(true)
       return
@@ -243,10 +243,9 @@ export default function ProductDetail() {
           </div>
         ) : (
           <div className="grid gap-8 lg:grid-cols-2">
-            {/* Galeria */}
             <div className="space-y-3">
-              {/* bg-white: foto em outro formato sobra moldura, e cinza sujava o
-                  produto. Branco some com o fundo do card na loja. */}
+              {/* bg-white: non-square photos leave a frame, and grey stained the
+                  product. White blends into the shop card background. */}
               <div
                 className="relative aspect-square touch-pan-y select-none overflow-hidden rounded-xl border bg-white"
                 onTouchStart={handleTouchStart}
@@ -371,7 +370,6 @@ export default function ProductDetail() {
                 <span className="mt-1 text-xs text-muted-foreground">SKU: {product.sku}</span>
               )}
 
-              {/* Preço */}
               <div className="mt-4">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold">{formatCurrency(displayPrice)}</span>
@@ -394,7 +392,6 @@ export default function ProductDetail() {
                   matched={matched}
                 />
 
-                {/* Preview de desconto */}
                 {isWholesale ? (
                   isWholesaleApproved ? (
                     <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2">
@@ -460,7 +457,6 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {/* Estoque */}
               <div className="mt-4 text-sm">
                 {outOfStock ? (
                   <Badge variant="secondary">Esgotado</Badge>
@@ -475,7 +471,6 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {/* Descrição */}
               {product.description && (
                 <div className="mt-5">
                   <h2 className="mb-1 text-sm font-semibold">Descrição</h2>
@@ -485,7 +480,6 @@ export default function ProductDetail() {
                 </div>
               )}
 
-              {/* Quantidade + adicionar */}
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="flex items-center rounded-md border">
                   <button
@@ -519,7 +513,7 @@ export default function ProductDetail() {
                   {!canBuy ? 'Em breve no atacado' : outOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
                 </Button>
 
-                {/* Esgotado é justamente quando salvar mais importa. */}
+                {/* Out of stock is when saving matters most. */}
                 <SaveProductButton
                   productId={product.id}
                   productName={product.name}

@@ -15,7 +15,7 @@ subscriptionRouter.use(authenticate);
 const createSchema = z.object({
   member_id: z.string().uuid(),
   plan: z.enum(['club']).default('club'),
-  frequency_type: z.enum(['months', 'years']).default('years'),
+  frequency_type: z.enum(['months', 'years']).default('months'),
   payer_email: z.string().email(),
   payer_name: z.string().min(1),
   /** Optional for backwards compat — server always uses CLUB_PLAN_PRICE. */

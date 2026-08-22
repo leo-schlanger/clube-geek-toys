@@ -6,6 +6,10 @@ import type { PendingPaymentInfo } from '../types'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
+vi.mock('../hooks/useConfirm', () => ({
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+}))
+
 vi.mock('qrcode.react', () => ({
   QRCodeSVG: ({ value }: { value: string }) => <div data-testid="qr-code">{value}</div>,
 }))
@@ -69,7 +73,7 @@ vi.mock('lucide-react', () => {
 
 const defaultProps = {
   plan: 'club' as const,
-  paymentType: 'annual' as const,
+  paymentType: 'monthly' as const,
   memberEmail: 'test@example.com',
   memberId: 'member-123',
   memberName: 'Test User',
@@ -99,12 +103,12 @@ describe('PaymentModal', () => {
     renderModal()
     expect(screen.getByText('Pagamento')).toBeInTheDocument()
     expect(screen.getAllByText(/Clube GeekPop & Toys/).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText(/149,99/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/12,50/).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders the annual price (R$ 149,99)', () => {
+  it('renders the monthly price (R$ 12,50)', () => {
     renderModal()
-    expect(screen.getAllByText(/149,99/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/12,50/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders close button that calls onClose', async () => {
@@ -173,7 +177,7 @@ describe('PaymentModal', () => {
       expect(screen.getByTestId('qr-code')).toBeInTheDocument()
     })
     expect(mockGeneratePixPayment).toHaveBeenCalledWith(
-      149.99,
+      12.50,
       'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
       'test@example.com',
       'member-123'
@@ -295,7 +299,7 @@ describe('PaymentModal', () => {
       expect(screen.getByTestId('stripe-form')).toBeInTheDocument()
     })
     expect(mockApiPost).toHaveBeenCalledWith('/checkout/card/create', expect.objectContaining({
-      amount: 149.99,
+      amount: 12.50,
       payer_email: 'test@example.com',
     }))
   })
@@ -446,8 +450,8 @@ describe('PaymentModal', () => {
     expect(screen.getByText(/Recorrente/)).toBeInTheDocument()
   })
 
-  it('always shows the annual frequency label', () => {
+  it('always shows the monthly frequency label', () => {
     renderModal()
-    expect(screen.getByText(/Anual/)).toBeInTheDocument()
+    expect(screen.getByText(/Mensal/)).toBeInTheDocument()
   })
 })

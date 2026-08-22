@@ -62,7 +62,7 @@ describe('contract-content', () => {
 
   // --- Specific content checks ---
 
-  it('should describe the single annual plan and its benefits', () => {
+  it('should describe the single monthly plan and its benefits', () => {
     const planSection = CONTRACT_SECTIONS.find(s => s.title.includes('PLANO E BENEFÍCIOS'))
     expect(planSection).toBeDefined()
     const allContent = planSection!.content.join(' ')

@@ -70,7 +70,7 @@ export function OrdersTab() {
             <CardTitle>Pedidos</CardTitle>
             <CardDescription>Acompanhe e gerencie os pedidos da loja</CardDescription>
           </div>
-          {/* Filtro por status */}
+
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
@@ -109,8 +109,8 @@ export function OrdersTab() {
                   <tr key={order.id} className="border-b hover:bg-muted/50 transition-colors">
                     <td className="py-4 px-4">
                       <span className="font-medium font-mono">#{order.orderNumber}</span>
-                      {/* Retirada e postagem viram filas diferentes na prática:
-                          uma vai pro balcão, a outra pros Correios. */}
+                      {/* Pickup and postage become different queues in practice:
+                          one goes to the counter, the other to Correios. */}
                       {order.deliveryMethod === 'pickup' && (
                         <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
                           <Store className="h-3 w-3" />

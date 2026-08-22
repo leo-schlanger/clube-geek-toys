@@ -252,7 +252,7 @@ export async function createOrderReviews(
   return { reviews: created, creditAwarded, newBalance };
 }
 
-/** Reviews the user already left for this order (to show "já avaliado"). */
+/** Reviews the user already left for this order (to show "already reviewed"). */
 export async function listReviewsForOrder(userId: string, orderId: string): Promise<ProductReview[]> {
   const memberId = await getMemberIdForUser(userId);
   const order = await query(`SELECT member_id, user_id FROM orders WHERE id = $1`, [orderId]);

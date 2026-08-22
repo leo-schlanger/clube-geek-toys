@@ -45,7 +45,7 @@ describe('EventTicketForm', () => {
     await user.clear(qty)
     await user.type(qty, '9')
 
-    // Uma linha de nome por pessoa: é o nome que torna o ingresso nominal.
+    // One name field per person: that name is what makes the ticket nominal.
     expect(screen.getByLabelText('Nome da pessoa 9')).toBeInTheDocument()
   })
 
@@ -97,7 +97,7 @@ describe('EventTicketForm', () => {
     await user.click(screen.getByRole('button', { name: /Adicionar pessoa/i }))
     await user.selectOptions(screen.getByLabelText('Tipo de ingresso da pessoa 2'), 'member')
 
-    // R$ 20 (inteira) + R$ 10 (membro do Clube).
+    // R$ 20 (full) + R$ 10 (club member).
     expect(screen.getByText('R$ 30,00')).toBeInTheDocument()
   })
 })

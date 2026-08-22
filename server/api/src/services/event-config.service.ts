@@ -5,15 +5,17 @@ import { auditLog } from '../utils/audit.js';
 import { FALLBACK_EVENT, type EventDefinition } from '../config/events.js';
 
 /**
- * Cadastro de eventos.
+ * Event CRUD.
  *
- * Antes disto o evento vivia hardcoded em três arquivos (loja, API e site
- * institucional) e trocar de evento era um deploy em dois repos. Agora a
- * tabela `events` manda, a API expõe o evento ativo e as duas vitrines só
- * consomem. Quando o evento acaba, a admin publica outro — sem dev no meio.
+ * The event used to live hardcoded in three files (shop, API, and the
+ * institutional site) and swapping it meant a deploy in two repos. The
+ * `events` table is now source of truth: the API exposes the active event
+ * and both storefronts only consume it. When one event ends, the admin
+ * publishes the next — no developer in the middle.
  *
- * Preço e janela de reserva continuam saindo **daqui**, nunca do cliente:
- * quem manda o POST da reserva mandaria o preço junto se ele viesse do front.
+ * Price and the reservation window still come **from here**, never from the
+ * client: whoever POSTs the reservation would send the price with it if it
+ * came from the front.
  */
 
 export type EventStatus = 'draft' | 'published' | 'archived';
@@ -40,7 +42,7 @@ export interface EventRecord {
     whatsappNumber: string;
     notes: string | null;
   };
-  /** Centavos — o que o servidor usa para cobrar. `priceBRL` é a vitrine. */
+  /** Cents — what the server charges. `priceBRL` is the storefront display. */
   priceCents: number | null;
   createdAt: string;
   updatedAt: string;
@@ -85,7 +87,7 @@ function mapEvent(row: pg.QueryResultRow): EventRecord {
   };
 }
 
-/** Forma que `event.service` consome para precificar e barrar reserva fechada. */
+/** Shape `event.service` consumes to price tickets and refuse a closed reservation. */
 export function toDefinition(event: EventRecord): EventDefinition {
   return {
     id: event.id,
@@ -114,12 +116,12 @@ export async function getEventById(id: string): Promise<EventRecord | null> {
 }
 
 /**
- * O evento que as vitrines mostram.
+ * The event the storefronts show.
  *
- * Regra: entre os publicados, ganha o que ainda não terminou e começa antes;
- * se todos já passaram, o mais recente. Assim o banner some sozinho quando o
- * evento acaba, mas a página do evento passado continua de pé para quem tem
- * o link do ingresso.
+ * Rule: among published ones, the one that has not ended yet and starts
+ * soonest; if they have all passed, the most recent. The banner then
+ * disappears on its own when the event ends, but the past event's page
+ * stays up for anyone holding a ticket link.
  */
 export async function getActiveEvent(): Promise<EventRecord | null> {
   const result = await query(
@@ -134,12 +136,13 @@ export async function getActiveEvent(): Promise<EventRecord | null> {
 }
 
 /**
- * Evento ativo com rede de segurança — e só a rede que faz sentido.
+ * Active event with a safety net — and only the net that makes sense.
  *
- * O fallback vale para **tabela vazia** (deploy novo, migration ainda não
- * semeou) e para **falha de leitura**. Nenhum evento publicado numa tabela que
- * já tem eventos é uma decisão da admin: ela arquivou tudo, e devolver o seed
- * hardcoded aqui ressuscitaria no site o evento que ela acabou de tirar do ar.
+ * Fallback applies to an **empty table** (fresh deploy, migration has not
+ * seeded yet) and to a **read failure**. No published event on a table that
+ * already has events is an admin decision: they archived everything, and
+ * returning the hardcoded seed would put back on the site the event they
+ * just took down.
  */
 export async function getActiveEventOrFallback(): Promise<EventRecord | null> {
   try {
@@ -147,7 +150,7 @@ export async function getActiveEventOrFallback(): Promise<EventRecord | null> {
     if (active) return active;
 
     const any = await query(`SELECT 1 FROM events LIMIT 1`);
-    // Tem evento cadastrado, nenhum publicado: nada em cartaz, e é isso mesmo.
+    // Events exist, none published: nothing on the marquee, and that is correct.
     if (any.rows.length > 0) return null;
   } catch (err) {
     console.error('[EVENTS] falha lendo o evento ativo, usando fallback:', err);
@@ -292,7 +295,7 @@ export async function updateEvent(
   let i = 1;
 
   for (const [key, value] of Object.entries(data)) {
-    // `id` nunca muda: os ingressos já emitidos apontam para ele.
+    // `id` never changes: tickets already issued point at it.
     if (key === 'id') continue;
     const column = FIELD_MAP[key as keyof EventInput];
     if (!column) continue;
@@ -330,10 +333,10 @@ export async function updateEvent(
 }
 
 /**
- * Copia um evento para servir de base ao próximo.
+ * Copies an event as a starting point for the next one.
  *
- * É o caminho que a Laura usa quando o evento acaba: duplica o anterior, muda
- * data e local, publica. Nasce `draft` e sem banner — a arte é sempre outra.
+ * The path used when an event ends: duplicate the previous, change date and
+ * venue, publish. Born `draft` and without a banner — the art is always new.
  */
 export async function duplicateEvent(id: string, actorUserId?: string): Promise<EventRecord> {
   const source = await getEventById(id);
@@ -367,10 +370,10 @@ export async function duplicateEvent(id: string, actorUserId?: string): Promise<
 }
 
 /**
- * Remove um evento — só enquanto ninguém reservou.
+ * Deletes an event — only while nobody has reserved.
  *
- * Com ingresso emitido a exclusão viraria um QR apontando para o nada na
- * portaria; nesse caso o caminho é arquivar.
+ * With a ticket already issued, deletion would leave a QR pointing at nothing
+ * at the door; archive instead.
  */
 export async function deleteEvent(id: string, actorUserId?: string): Promise<void> {
   const used = await query(`SELECT 1 FROM event_reservations WHERE event_id = $1 LIMIT 1`, [id]);

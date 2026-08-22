@@ -1,26 +1,26 @@
 -- ============================================
--- Migration 015 — Controle de estoque no painel admin
+-- Migration 015 — Stock control in the admin panel
 -- ============================================
--- O estoque já existia em products.stock / product_variants.stock, mas sem
--- histórico: ninguém sabia por que um número mudou. Esta migration adiciona
--- o livro-razão (stock_movements) e o limiar de "acabando" por produto.
+-- Stock existed in products.stock / product_variants.stock with no history, so
+-- nobody could tell why a number changed. Adds the ledger (stock_movements) and
+-- a per-product low-stock threshold.
 --
--- Idempotente — espelhado em server/api/src/db/ensure-schema.ts.
+-- Idempotent — mirrored in server/api/src/db/ensure-schema.ts.
 
 BEGIN;
 
--- Abaixo ou igual a isto, o painel marca "acabando".
+-- At or below this, the panel flags "acabando".
 ALTER TABLE products ADD COLUMN IF NOT EXISTS low_stock_threshold INTEGER NOT NULL DEFAULT 3;
 
 CREATE TABLE IF NOT EXISTS stock_movements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-  -- Null quando o produto não tem variações.
+  -- Null when the product has no variants.
   variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL,
   order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
   kind VARCHAR(20) NOT NULL
     CHECK (kind IN ('sale', 'restock', 'adjustment', 'manual_in', 'manual_out')),
-  -- Assinado: negativo = saída, positivo = entrada.
+  -- Signed: negative = out, positive = in.
   quantity INTEGER NOT NULL,
   stock_after INTEGER,
   note TEXT,

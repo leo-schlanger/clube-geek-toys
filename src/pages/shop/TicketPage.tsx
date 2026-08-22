@@ -16,16 +16,16 @@ import {
 import { ReservationPixPanel } from '../../components/store/ReservationPixPanel'
 
 type Props = {
-  /** `ticket` mostra um ingresso; `reservation` mostra todos os da compra. */
+  /** `ticket` shows one ticket; `reservation` shows every ticket in the purchase. */
   mode: 'ticket' | 'reservation'
 }
 
 /**
- * Página pública do ingresso.
+ * Public ticket page.
  *
- * Sem login de propósito: o ingresso é repassado para quem vai entrar, e essa
- * pessoa não tem conta na loja. O código é longo e inadivinhável, e o que
- * protege a portaria não é o sigilo do link — é o check-in queimar o código.
+ * No login on purpose: the ticket is forwarded to whoever is entering, and
+ * that person has no shop account. The code is long and unguessable; what
+ * protects the door is check-in burning the code, not secrecy of the link.
  */
 export default function TicketPage({ mode }: Props) {
   const { code } = useParams<{ code: string }>()
@@ -111,7 +111,7 @@ export default function TicketPage({ mode }: Props) {
               )}
             </div>
 
-            {/* Pendente: o QR do ingresso ainda não vale na portaria. */}
+            {/* Pending PIX: the ticket QR is not valid at the door yet. */}
             {reservation?.pix && reservation.status === 'pending' && (
               <ReservationPixPanel
                 code={reservation.code}

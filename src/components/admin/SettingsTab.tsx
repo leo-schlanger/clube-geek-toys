@@ -114,7 +114,6 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Aparência (local ao navegador) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -134,12 +133,12 @@ export function SettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Configuração do Plano</CardTitle>
-          <CardDescription>Defina o preço anual e o desconto do clube</CardDescription>
+          <CardDescription>Defina o preço mensal e o desconto do clube</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6 max-w-xl">
             <div>
-              <Label className="text-xs">Preço Anual (R$)</Label>
+              <Label className="text-xs">Preço Mensal (R$)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -181,7 +180,6 @@ export function SettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Canal atacado */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

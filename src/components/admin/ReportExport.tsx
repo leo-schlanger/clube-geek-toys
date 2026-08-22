@@ -20,10 +20,10 @@ function today(): string {
 /**
  * Period report as a downloadable PDF.
  *
- * The charts above answer trends; this answers "me dá o fechamento" — one file
+ * The charts above answer trends; this answers the period close — one file
  * with shop, club, best sellers and current stock, for filing or sending to the
  * accountant. The date picks any day inside the period, so choosing 15/07 with
- * "Mês" gives all of July.
+ * the "Mês" option gives all of July.
  */
 export function ReportExport() {
   const [period, setPeriod] = useState<OverviewPeriod>('month')

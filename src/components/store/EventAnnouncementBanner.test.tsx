@@ -4,9 +4,9 @@ import { MemoryRouter } from 'react-router-dom'
 import { EventAnnouncementBanner } from './EventAnnouncementBanner'
 import { FALLBACK_EVENT, isEventVisible } from '../../data/event'
 
-// O evento passou a vir da API pelo `useActiveEvent`; o fallback embutido é
-// exatamente o que o hook entrega no primeiro render. `importActual` porque
-// `vi.mock` sobe acima dos imports — a constante ainda não existe aqui.
+// Event comes from the API via `useActiveEvent`; the bundled fallback is
+// what the hook delivers on first render. `importActual` because `vi.mock`
+// is hoisted above imports — the constant does not exist here yet.
 vi.mock('../../hooks/useActiveEvent', async () => {
   const actual = await vi.importActual<typeof import('../../data/event')>('../../data/event')
   return {

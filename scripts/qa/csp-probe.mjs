@@ -1,15 +1,15 @@
 /**
- * Verifica o Content-Security-Policy das SPAs contra o site no ar.
+ * Check the SPAs' Content-Security-Policy against the live site.
  *
- * Navega pelas telas reais e coleta `securitypolicyviolation`. Como roda contra
- * produção, API, fontes, Stripe, Turnstile, Umami e embeds se comportam
- * exatamente como para um visitante.
+ * Walks real screens and collects `securitypolicyviolation`. Against
+ * production, API, fonts, Stripe, Turnstile, Umami and embeds behave as
+ * they do for a visitor.
  *
- *   node scripts/qa/csp-probe.mjs                 # usa o CSP que o servidor manda
- *   node scripts/qa/csp-probe.mjs "<policy>"      # testa uma policy candidata
+ *   node scripts/qa/csp-probe.mjs                 # uses the server's CSP
+ *   node scripts/qa/csp-probe.mjs "<policy>"      # tests a candidate policy
  *
- * Rode antes de subir qualquer integração externa nova (um CDN, um provedor de
- * pagamento, um embed): host que faltar na policy morre calado no navegador.
+ * Run before adding any new external integration (CDN, payment, embed):
+ * a host missing from the policy dies silently in the browser.
  */
 import { chromium } from '@playwright/test'
 
@@ -33,8 +33,8 @@ const PAGES = [
 const browser = await chromium.launch()
 const ctx = await browser.newContext()
 
-// O Umami só é injetado após o consentimento — sem isso o script-src dele
-// nunca seria exercitado.
+// Umami is injected only after consent — without this, its script-src
+// is never exercised.
 await ctx.addInitScript(() => {
   try {
     localStorage.setItem(
@@ -59,13 +59,14 @@ if (CANDIDATE) {
 }
 
 /**
- * Violação conhecida e inofensiva: o zod sonda `new Function("")` dentro de um
- * try/catch para decidir se pode compilar validador otimizado. Com o CSP ele cai
- * sozinho no caminho interpretado — validação do cadastro conferida no navegador
- * com a policy no ar (15/08/2026). Liberar 'unsafe-eval' por causa disso seria
- * abrir o script-src inteiro para um relatório que não quebra nada.
+ * Known, harmless violation: zod probes `new Function("")` inside a
+ * try/catch to decide whether it can compile an optimized validator.
+ * Under CSP it falls back to the interpreted path — registration
+ * validation checked in-browser with the live policy (15/08/2026).
+ * Allowing 'unsafe-eval' for this would open all of script-src for a
+ * report that breaks nothing.
  *
- * Fica listado, mas não reprova a execução. Qualquer violação NOVA reprova.
+ * Listed, but does not fail the run. Any NEW violation fails.
  */
 const BENIGNAS = [{ directive: 'script-src', blocked: 'eval', source: /schemas-.*\.js$/ }]
 

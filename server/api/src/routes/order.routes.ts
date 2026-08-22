@@ -35,11 +35,11 @@ const createOrderSchema = z.object({
     email: z.string().email(),
     phone: z.string().max(30).optional(),
   }),
-  // Recado livre para a loja ("manda mais photocards do mesmo cantor"). Nada no
-  // sistema decide por ele — é para a pessoa que separa o pedido ler.
+  // Free-text note for the shop ("send more photocards of the same artist").
+  // Nothing in the system acts on it — it is for whoever packs the order.
   customerNote: z.string().max(500).optional(),
-  // Retirada na loja não tem endereço nem cotação — os dois viram opcionais no
-  // schema e quem exige é o service, que sabe qual método foi escolhido.
+  // Pickup has no address and no quote — both become optional in the schema
+  // and the service, which knows the chosen method, is what requires them.
   deliveryMethod: z.enum(['shipping', 'pickup']).optional(),
   shippingAddress: shippingAddressSchema.optional(),
   shipping: z
@@ -65,7 +65,7 @@ orderRouter.post('/', optionalAuth, paymentLimiter, validate(createOrderSchema),
   }
 });
 
-// ─── Member: Minhas compras ──────────────────────────────────────────────────
+// ─── Member: my orders ───────────────────────────────────────────────────────
 // Must be registered before /:id routes.
 
 const TAB_STATUSES: Record<string, string[] | undefined> = {

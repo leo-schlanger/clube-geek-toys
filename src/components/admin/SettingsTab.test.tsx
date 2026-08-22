@@ -43,12 +43,12 @@ vi.mock('lucide-react', () => {
 
 const fakeSettings = {
   values: {
-    'pricing.club_annual': 149.99,
+    'pricing.club_annual': 12.5,
     'plan.club.discount_products': 15,
     'payment.duplicate_window_days': 3,
   },
   catalogue: [
-    { key: 'pricing.club_annual', default: 149.99, type: 'number' as const, description: 'Club annual price' },
+    { key: 'pricing.club_annual', default: 12.5, type: 'number' as const, description: 'Club monthly price' },
   ],
 }
 
@@ -150,7 +150,7 @@ describe('SettingsTab', () => {
     })
 
     // Edit the annual price input
-    const priceInput = screen.getByDisplayValue('149.99')
+    const priceInput = screen.getByDisplayValue('12.5')
 
     await user.clear(priceInput)
     await user.type(priceInput, '199.99')
@@ -172,7 +172,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    const priceInput = screen.getByDisplayValue('149.99')
+    const priceInput = screen.getByDisplayValue('12.5')
     await user.clear(priceInput)
     await user.type(priceInput, '199.99')
 
@@ -217,7 +217,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    const priceInput = screen.getByDisplayValue('149.99')
+    const priceInput = screen.getByDisplayValue('12.5')
     await user.clear(priceInput)
     await user.type(priceInput, '99')
 
@@ -239,7 +239,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    const priceInput = screen.getByDisplayValue('149.99')
+    const priceInput = screen.getByDisplayValue('12.5')
     await user.clear(priceInput)
     await user.type(priceInput, '99')
 
@@ -253,7 +253,7 @@ describe('SettingsTab', () => {
 
   // ── Input types / fields ──
 
-  it('renders annual price and product discount inputs', async () => {
+  it('renders monthly price and product discount inputs', async () => {
     mockGetSettings.mockResolvedValue(fakeSettings)
     render(<SettingsTab />)
 
@@ -261,9 +261,9 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Preço Anual (R$)')).toBeInTheDocument()
+    expect(screen.getByText('Preço Mensal (R$)')).toBeInTheDocument()
     expect(screen.getByText('Desconto em Produtos (%)')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('149.99')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('12.5')).toBeInTheDocument()
     expect(screen.getByDisplayValue('15')).toBeInTheDocument()
   })
 

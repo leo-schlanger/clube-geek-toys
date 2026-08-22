@@ -15,7 +15,7 @@ export const DEFAULT_LENGTH_CM = 16;
 
 const QUOTE_TTL_MS = 25 * 60 * 1000; // 25 min
 
-// ─── Retirada na loja ────────────────────────────────────────────────────────
+// ─── In-store pickup ─────────────────────────────────────────────────────────
 
 /**
  * Service id reserved for pickup. It never comes from a quote token — pickup
@@ -26,7 +26,7 @@ export const PICKUP_SERVICE_ID = 'pickup';
 export const PICKUP_SERVICE_LABEL = 'Retirada na loja';
 
 /**
- * Where the customer goes to collect. Snapshotted onto the order so a pedido
+ * Where the customer goes to collect. Snapshotted onto the order so an order
  * from before a move still shows the counter it was placed for.
  */
 export const STORE_PICKUP_LOCATION = {

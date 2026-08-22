@@ -96,11 +96,11 @@ test.describe('Public shop (production)', () => {
 })
 
 test.describe('Club subscription (production)', () => {
-  test('/assinar: single plan R$ 149.99 / 10%, with no errors', async ({ page }, testInfo) => {
+  test('/assinar: single plan R$ 12.50 / 10%, with no errors', async ({ page }, testInfo) => {
     const errors = collectErrors(page)
     const resp = await page.goto(`${CLUB}/assinar`, { waitUntil: 'domcontentloaded' })
     expect(resp?.status()).toBeLessThan(400)
-    await expect(page.getByText(/149,99/).first()).toBeVisible()
+    await expect(page.getByText(/12,50/).first()).toBeVisible()
     await expect(page.getByText(/10%/).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /ASSINAR/i }).first()).toBeVisible()
     // não deve mais existir Silver/Gold/Black/mensal

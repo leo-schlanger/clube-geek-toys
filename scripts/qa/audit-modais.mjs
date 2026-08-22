@@ -27,15 +27,14 @@ const probe = () => {
   if (document.documentElement.scrollWidth > window.innerWidth + 1) {
     problems.push({ tipo: 'overflow-horizontal', largura: document.documentElement.scrollWidth })
   }
-  // Elemento que estoura horizontalmente o pai (grid apertado no celular)
   for (const el of document.querySelectorAll('.modal-overlay *, [role=dialog] *')) {
     const p = el.parentElement
     if (!p) continue
-    // <option> não participa do layout do pai: a caixa dele sempre "vaza".
+    // <option> is not in the parent's layout: its box always "overflows".
     if (el.tagName === 'OPTION' || p.tagName === 'SELECT') continue
-    // display:contents não gera caixa. Vale para os dois lados: como pai,
-    // acusaria qualquer filho; como elemento, tem rect degenerado e parece
-    // estar vazando do próprio pai.
+    // display:contents generates no box. Both sides: as parent it would
+    // accuse every child; as element it has a degenerate rect and looks
+    // like it is overflowing its own parent.
     if (getComputedStyle(p).display === 'contents') continue
     if (getComputedStyle(el).display === 'contents') continue
     const a = el.getBoundingClientRect()

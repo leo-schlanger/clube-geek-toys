@@ -1,11 +1,11 @@
 -- ============================================
--- Migration 016 — Vídeos no cadastro de produto
+-- Migration 016 — Videos on the product form
 -- ============================================
--- Cada item de `videos` é { kind, url, title? }:
+-- Each `videos` item is { kind, url, title? }:
 --   kind = 'youtube' | 'instagram' | 'file'
---   'file' = MP4 hospedado no próprio volume /uploads (mesmo lugar das fotos).
+--   'file' = MP4 on the /uploads volume (same place as the photos).
 --
--- Idempotente — espelhado em server/api/src/db/ensure-schema.ts.
+-- Idempotent — mirrored in server/api/src/db/ensure-schema.ts.
 
 BEGIN;
 

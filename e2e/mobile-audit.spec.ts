@@ -1,12 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
- * Auditoria mobile-first contra PRODUÇÃO.
- * Para cada página pública: detecta overflow horizontal (o sintoma nº 1 de
- * quebra de layout no mobile), aponta o elemento culpado, verifica alvos de
- * toque pequenos e captura screenshot full-page pra inspeção visual.
+ * Mobile-first audit against production.
+ * Per public page: catch horizontal overflow (the #1 mobile layout break),
+ * name the culprit, check small tap targets, and save a full-page screenshot.
  *
- * Roda só no viewport mobile (iPhone SE — o mais estreito, 375px, pior caso).
+ * Mobile viewport only (iPhone SE — 375px, the narrowest still in use).
  */
 
 const SHOP = 'https://shop.geeketoys.com.br'
@@ -24,17 +23,17 @@ const PAGES: { name: string; url: string }[] = [
   { name: 'club-privacy', url: `${CLUB}/privacidade` },
 ]
 
-// iPhone SE: viewport mais estreito ainda em uso — pior caso de overflow.
+// iPhone SE: narrowest viewport still in use — worst-case overflow.
 test.use({ viewport: { width: 375, height: 667 }, isMobile: true })
 
-/** Retorna os elementos que ultrapassam a largura do viewport (culpados de overflow). */
+/** Elements that exceed the viewport width (overflow culprits). */
 async function findOverflowingElements(page: Page) {
   return page.evaluate(() => {
     const vw = document.documentElement.clientWidth
     const bad: { tag: string; cls: string; w: number; right: number; text: string }[] = []
     for (const el of Array.from(document.querySelectorAll<HTMLElement>('body *'))) {
       const r = el.getBoundingClientRect()
-      // tolerância de 1px pra arredondamento subpixel
+      // 1px tolerance for subpixel rounding
       if (r.width > 0 && r.right > vw + 1) {
         bad.push({
           tag: el.tagName.toLowerCase(),
@@ -45,7 +44,7 @@ async function findOverflowingElements(page: Page) {
         })
       }
     }
-    // dedup por assinatura, mantém os 12 piores
+    // Dedup by tag+class; keep the 12 worst.
     const seen = new Set<string>()
     return bad
       .sort((a, b) => b.right - a.right)
@@ -64,9 +63,9 @@ for (const p of PAGES) {
     const resp = await page.goto(p.url, { waitUntil: 'networkidle' })
     expect(resp?.status(), `HTTP status de ${p.url}`).toBeLessThan(400)
 
-    // dá tempo pra fontes/imagens assentarem
+    // Let fonts/images settle before measuring overflow.
     await page.waitForTimeout(600)
-    // grava fora do outputDir (que o Playwright limpa a cada run) pra persistir
+    // Outside Playwright's outputDir, which is wiped every run.
     await page.screenshot({ path: `e2e/screenshots/mobile-${p.name}.png`, fullPage: true })
 
     const scroll = await page.evaluate(() => ({

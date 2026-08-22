@@ -1,14 +1,14 @@
 import { test, type Page, type Locator } from '@playwright/test'
 
 /**
- * Captura screenshots ANOTADOS (setas + caixas + legendas) do painel admin em
- * produção, para o tutorial de funcionários. Cria 2 produtos "[DEMO]" pra popular
- * a tela de produtos e os remove depois (via SQL, fora daqui).
+ * Annotated screenshots (arrows + boxes + captions) of the live admin
+ * panel, for the staff tutorial. Creates 2 "[DEMO]" products to populate
+ * the products screen; they are removed later via SQL (outside this file).
  *
- * O Playwright resolve os elementos (locators) e passa só as bounding boxes pro
- * desenho no browser — evita seletores incompatíveis com querySelector.
+ * Playwright resolves locators and passes only bounding boxes into the
+ * in-browser draw — querySelector cannot use Playwright selectors.
  *
- * Roda só desktop. Precisa de E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD.
+ * Desktop only. Needs E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD.
  */
 
 const ADMIN = 'https://admin.geeketoys.com.br'
@@ -117,7 +117,7 @@ test.describe('Captura tutorial admin', () => {
     test.setTimeout(200_000)
     await preConsent(page)
 
-    // ── 01 Login ────────────────────────────────────────────────────────────
+    // ── 01 Login ─────────────────────────────────────────────────────────────
     await page.goto(`${ADMIN}/login`, { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(500)
     await page.locator('#email').fill(EMAIL)
@@ -132,14 +132,14 @@ test.describe('Captura tutorial admin', () => {
     await page.waitForURL(/\/admin/, { timeout: 20_000 })
     await page.waitForTimeout(1500)
 
-    // ── 02 Dashboard + navegação ──────────────────────────────────────────────
+    // ── 02 Dashboard + navigation ────────────────────────────────────────────
     await shot(page, '02-dashboard', [
       { loc: page.locator('aside nav'), label: 'Menu lateral: navegue entre as seções' },
       { loc: page.getByRole('button', { name: /Abrir PDV/i }), label: 'Abrir PDV: vendas no balcão' },
       { loc: page.getByRole('button', { name: /^Sair$/i }), label: 'Sair: encerra a sessão' },
     ])
 
-    // ── 05/06 Produtos ────────────────────────────────────────────────────────
+    // ── 05/06 Products ────────────────────────────────────────────────────────
     await gotoTab(page, 'Produtos')
     const demos = [
       { name: '[DEMO] Action Figure Goku', price: '149.90', stock: '12' },
@@ -153,8 +153,8 @@ test.describe('Captura tutorial admin', () => {
       await page.locator('#product-price').fill(d.price)
       await page.locator('#product-stock').fill(d.stock)
 
-      // O formulário está em abas desde 16/08/2026 — a foto mora em "Fotos e
-      // vídeos", e o tutorial precisa mostrar o caminho, não pular por cima dele.
+      // Form is tabbed since 16/08/2026 — the photo lives under "Fotos e
+      // vídeos"; the tutorial must show that path, not skip over it.
       if (i === 0) {
         await shot(page, '06-produto-modal', [
           { loc: page.locator('#product-name'), label: 'Nome do produto (obrigatório)' },
@@ -185,7 +185,7 @@ test.describe('Captura tutorial admin', () => {
       { loc: page.locator('table tbody tr').first().locator('td').nth(4), label: 'Status: Ativo = visível na loja' },
     ])
 
-    // ── 03 Membros (PII borrada) ──────────────────────────────────────────────
+    // ── 03 Members (PII blurred) ──────────────────────────────────────────────
     await gotoTab(page, 'Membros')
     await shot(
       page,
@@ -197,7 +197,7 @@ test.describe('Captura tutorial admin', () => {
       ['table tbody td']
     )
 
-    // ── 04 Pedidos ────────────────────────────────────────────────────────────
+    // ── 04 Orders ─────────────────────────────────────────────────────────────
     await gotoTab(page, 'Pedidos')
     await shot(
       page,
@@ -206,7 +206,7 @@ test.describe('Captura tutorial admin', () => {
       ['table tbody td']
     )
 
-    // ── 07 Usuários ───────────────────────────────────────────────────────────
+    // ── 07 Users ──────────────────────────────────────────────────────────────
     await gotoTab(page, 'Usuários')
     await shot(
       page,
@@ -219,12 +219,12 @@ test.describe('Captura tutorial admin', () => {
     await gotoTab(page, 'Logs')
     await shot(page, '08-logs', [{ loc: page.locator('select, table').first(), label: 'Histórico de ações no sistema' }], ['table tbody td'])
 
-    // ── 09 Relatórios ─────────────────────────────────────────────────────────
+    // ── 09 Reports ────────────────────────────────────────────────────────────
     await gotoTab(page, 'Relatórios')
     await page.waitForTimeout(1500)
     await shot(page, '09-relatorios', [{ loc: page.locator('select').first(), label: 'Escolha o período do relatório' }])
 
-    // ── 10 Configurações ──────────────────────────────────────────────────────
+    // ── 10 Settings ───────────────────────────────────────────────────────────
     await gotoTab(page, 'Configurações')
     await shot(page, '10-configuracoes', [
       { loc: page.getByRole('button', { name: /Salvar/i }).first(), label: 'Salvar alterações' },

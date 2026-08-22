@@ -77,11 +77,10 @@ describe('Subscribe', () => {
     expect(screen.getByText(/vantagens VIP/)).toBeInTheDocument()
   })
 
-  it('renders the single annual price in the hero', () => {
+  it('renders the single monthly price in the hero', () => {
     render(<Subscribe />)
-    // "Apenas R$ 149,99 /ano"
     expect(screen.getByText(/Apenas/)).toBeInTheDocument()
-    const prices = screen.getAllByText(/R\$\s*149,99/)
+    const prices = screen.getAllByText(/R\$\s*12,50/)
     expect(prices.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -103,7 +102,7 @@ describe('Subscribe', () => {
   it('renders the single plan section heading', () => {
     render(<Subscribe />)
     expect(screen.getByText('Plano do Clube')).toBeInTheDocument()
-    expect(screen.getByText('Um único plano, anual, com tudo incluso.')).toBeInTheDocument()
+    expect(screen.getByText('Um único plano, mensal, com tudo incluso.')).toBeInTheDocument()
   })
 
   it('renders the club plan name and discount', () => {
@@ -113,22 +112,20 @@ describe('Subscribe', () => {
     expect(screen.getAllByText('10% em qualquer produto').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders the annual price on the plan card', () => {
+  it('renders the monthly price on the plan card', () => {
     render(<Subscribe />)
-    // Price appears in hero and plan card
-    const prices = screen.getAllByText(/R\$\s*149,99/)
+    const prices = screen.getAllByText(/R\$\s*12,50/)
     expect(prices.length).toBeGreaterThanOrEqual(2)
-    // "/ano" label appears near the price
-    expect(screen.getAllByText('/ano').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('/mês').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders a single ASSINAR button linking to /cadastro?plano=club&tipo=annual', () => {
+  it('renders a single ASSINAR button linking to /cadastro?plano=club&tipo=monthly', () => {
     render(<Subscribe />)
     const assinarLinks = screen.getAllByRole('link').filter(
       (link) => link.getAttribute('href')?.startsWith('/cadastro')
     )
     expect(assinarLinks).toHaveLength(1)
-    expect(assinarLinks[0]).toHaveAttribute('href', '/cadastro?plano=club&tipo=annual')
+    expect(assinarLinks[0]).toHaveAttribute('href', '/cadastro?plano=club&tipo=monthly')
   })
 
   it('does NOT render a monthly/annual toggle', () => {
@@ -167,7 +164,7 @@ describe('Subscribe', () => {
     render(<Subscribe />)
     expect(screen.getByText('Carteirinha digital com QR Code')).toBeInTheDocument()
     expect(screen.getByText('Desconto válido na loja física e online')).toBeInTheDocument()
-    expect(screen.getByText('Renovação anual, sem fidelidade')).toBeInTheDocument()
+    expect(screen.getByText('Renovação mensal, sem fidelidade')).toBeInTheDocument()
   })
 
   // ─── Features section ──────────────────────────────────────

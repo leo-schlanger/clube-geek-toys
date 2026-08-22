@@ -25,7 +25,7 @@ describe('TicketCard', () => {
 
     expect(screen.getByText('Ana Souza')).toBeInTheDocument()
     expect(screen.getByText('T-AAAA-BBBB-CCCC')).toBeInTheDocument()
-    // O QR mede 148px; os ícones do card também são <svg>, daí o seletor.
+    // QR is 148px; card icons are also <svg>, hence the selector.
     expect(container.querySelector('svg[height="148"]')).toBeInTheDocument()
   })
 

@@ -2,13 +2,13 @@ import { api } from './api-client'
 import type { TicketKind } from '../data/event'
 
 /**
- * Ingressos de evento.
+ * Event tickets.
  *
- * Ingresso nominal por pessoa; a portaria queima o código na entrada.
- * Pagamento por PIX na tela, baixa manual (sem webhook): nasce `pending`.
+ * Named ticket per person; door staff burns the code on entry.
+ * On-screen PIX, manual settlement (no webhook): starts as `pending`.
  */
 
-/** PIX da reserva. `emvCode` é o copia-e-cola e também o que vira QR na tela. */
+/** Reservation PIX. `emvCode` is the copy-paste payload and the QR content. */
 export interface ReservationPix {
   emvCode: string
   pixKey: string
@@ -75,7 +75,7 @@ export interface PublicReservation {
   totalCents: number
   createdAt: string
   tickets: PublicTicket[]
-  /** Só vem enquanto a reserva está pendente. */
+  /** Present only while the reservation is still pending. */
   pix: ReservationPix | null
 }
 
@@ -116,7 +116,7 @@ export async function createReservation(
     : { ok: false, error: result.error || 'Não foi possível registrar a reserva.' }
 }
 
-/** Destinatário é sempre o e-mail da reserva; a API devolve mascarado. */
+/** Always sent to the reservation email; the API returns it masked. */
 export async function resendPaymentLink(
   code: string
 ): Promise<{ ok: true; email: string } | { ok: false; error: string }> {
@@ -130,7 +130,7 @@ export async function resendPaymentLink(
     : { ok: false, error: result.error || 'Não foi possível reenviar o e-mail.' }
 }
 
-/** Reservas da cliente logada — por conta ou pelo e-mail do cadastro. */
+/** Logged-in customer's reservations — by account or signup email. */
 export async function getMyReservations(): Promise<PublicReservation[]> {
   const result = await api.get<{ reservations: PublicReservation[] }>('/events/my-reservations')
   return result.data?.reservations ?? []
@@ -219,8 +219,8 @@ export type CheckInResponse =
     }
 
 /**
- * O QR do ingresso carrega a URL pública dele. A portaria também digita o
- * código quando a câmera não ajuda, então os dois formatos entram aqui.
+ * The ticket QR encodes its public URL. Door staff also type the code when
+ * the camera fails, so both formats are accepted here.
  */
 export function extractTicketCode(scanned: string): string {
   const trimmed = scanned.trim()
@@ -228,7 +228,7 @@ export function extractTicketCode(scanned: string): string {
   return (fromUrl?.[1] ?? trimmed).toUpperCase()
 }
 
-/** Uma leitura = uma entrada. A segunda vez que o mesmo código chega aqui, ele já queimou. */
+/** One scan = one entry. A second read of the same code is already burned. */
 export async function checkInTicket(code: string): Promise<CheckInResponse> {
   const result = await api.post<CheckInResponse>('/events/admin/check-in', { code })
   return (

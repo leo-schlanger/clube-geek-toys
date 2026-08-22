@@ -31,7 +31,7 @@ function tlv(id: string, value: string): string {
 function toAscii(value: string): string {
   return value
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // marcas de combinação soltas pelo NFD
+    .replace(/[̀-ͯ]/g, '') // combining marks left by NFD
     .replace(/[^\x20-\x7E]/g, '')
     .trim();
 }

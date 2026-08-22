@@ -242,14 +242,14 @@ describe('ShopCheckout', () => {
   })
 
   /**
-   * Retirada é o caminho em que o cliente nunca digita endereço nem escolhe
-   * frete. O que estes testes seguram, na ordem do que quebrar custa:
+   * Pickup is the path where the customer never types an address or picks
+   * shipping. What these tests pin, in cost-if-broken order:
    *
-   *  1. Escolher retirada some com os campos de endereço — se eles ficassem
-   *     montados e escondidos, os `required` travariam o submit do form.
-   *  2. O pedido sai sem `shippingAddress` e sem `shipping`, com
+   *  1. Choosing pickup unmounts the address fields — if they stayed mounted
+   *     and hidden, `required` would block form submit.
+   *  2. The order leaves without `shippingAddress` or `shipping`, with
    *     `deliveryMethod: 'pickup'`.
-   *  3. O resumo mostra frete grátis, não "Calcular" eterno.
+   *  3. The summary shows free shipping, not an endless "Calcular".
    */
   describe('retirada na loja', () => {
     it('hides address and shipping fields when pickup is chosen', async () => {
@@ -280,7 +280,7 @@ describe('ShopCheckout', () => {
       await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
 
       expect(screen.getAllByText(/Grátis/i).length).toBeGreaterThan(0)
-      // Total estimado = só as mercadorias, sem frete somado.
+      // Estimated total is goods only, no shipping added.
       expect(screen.getByRole('button', { name: /Continuar · R\$\s*100,00/i })).toBeInTheDocument()
     })
 
@@ -315,7 +315,7 @@ describe('ShopCheckout', () => {
       expect(payload.deliveryMethod).toBe('pickup')
       expect(payload.shippingAddress).toBeUndefined()
       expect(payload.shipping).toBeUndefined()
-      // Nenhuma cotação é pedida: retirada não depende de CEP.
+      // No quote is requested: pickup does not depend on a CEP.
       expect(mockedQuote).not.toHaveBeenCalled()
     })
   })

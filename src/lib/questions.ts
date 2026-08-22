@@ -1,7 +1,7 @@
 import { api } from './api-client'
 
 /**
- * Perguntas e respostas no produto.
+ * Product Q&A.
  * A question appears on the storefront as soon as it is asked; moderation is
  * after the fact.
  */

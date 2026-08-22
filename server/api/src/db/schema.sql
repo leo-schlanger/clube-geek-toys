@@ -34,7 +34,7 @@ CREATE TABLE members (
   photo_url TEXT,
   plan VARCHAR(10) NOT NULL DEFAULT 'club' CHECK (plan IN ('club')),
   status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'inactive', 'expired')),
-  payment_type VARCHAR(10) NOT NULL DEFAULT 'annual' CHECK (payment_type IN ('annual')),
+  payment_type VARCHAR(10) NOT NULL DEFAULT 'monthly' CHECK (payment_type IN ('monthly', 'annual')),
   start_date DATE,
   expiry_date DATE,
   pending_payment JSONB,
@@ -276,7 +276,7 @@ CREATE TABLE products (
   slug VARCHAR(220) NOT NULL UNIQUE,
   description TEXT,
   price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
-  compare_at_price DECIMAL(10,2) CHECK (compare_at_price >= 0),   -- preço "de" (riscado)
+  compare_at_price DECIMAL(10,2) CHECK (compare_at_price >= 0),   -- compare-at (strikethrough)
   category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
   images JSONB NOT NULL DEFAULT '[]',                              -- array de URLs
   stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
@@ -297,8 +297,8 @@ CREATE TABLE products (
 
 CREATE TABLE orders (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  order_number SERIAL,                                             -- número curto humano
-  member_id UUID REFERENCES members(id) ON DELETE SET NULL,        -- nullable: compra de convidado
+  order_number SERIAL,                                             -- short human number
+  member_id UUID REFERENCES members(id) ON DELETE SET NULL,        -- nullable: guest checkout
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,            -- set when checkout authenticated
   customer_name VARCHAR(200) NOT NULL,
   customer_email VARCHAR(254) NOT NULL,
@@ -331,7 +331,7 @@ CREATE TABLE orders (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Contas atacadistas (CNPJ + aprovação admin)
+-- Wholesale accounts (CNPJ + admin approval)
 CREATE TABLE IF NOT EXISTS wholesale_accounts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -356,7 +356,7 @@ CREATE TABLE order_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   product_id UUID REFERENCES products(id) ON DELETE SET NULL,
-  -- snapshot imutável do produto no momento da compra
+  -- immutable product snapshot at purchase time
   product_name VARCHAR(200) NOT NULL,
   product_slug VARCHAR(220),
   unit_price DECIMAL(10,2) NOT NULL CHECK (unit_price >= 0),

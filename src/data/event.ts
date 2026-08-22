@@ -1,14 +1,14 @@
 /**
- * Tipos e fallback do evento em cartaz.
+ * Event types and the first-paint fallback.
  *
- * A fonte de verdade é o banco (`GET /events/active`), editado na aba
- * **Eventos** do admin — antes disto o evento vivia hardcoded aqui, na API e
- * no site institucional, e trocar de evento era deploy em dois repos.
+ * Source of truth is the DB (`GET /events/active`), edited in the admin
+ * **Eventos** tab. This used to be hardcoded here, in the API, and on the
+ * institutional site — changing an event meant deploying two repos.
  *
- * `FALLBACK_EVENT` cobre só o primeiro paint (e a API fora do ar): editá-lo
- * **não** muda o que o site mostra. Use `useActiveEvent()` nos componentes.
+ * `FALLBACK_EVENT` covers only the first paint (and API downtime): editing it
+ * does **not** change what the site shows. Use `useActiveEvent()` in components.
  *
- * Fotos: geek-toys-home/public/eventos/<slug>/ — Guia: docs/EVENTS.md
+ * Photos: geek-toys-home/public/eventos/<slug>/ — see docs/EVENTS.md
  */
 
 export type EventStatus = 'draft' | 'published' | 'archived'
@@ -20,7 +20,7 @@ export type EventConfig = {
   title: string
   shortTitle: string
   bannerText: string
-  /** Flyer enviado pelo admin. `null` = só texto, como era antes. */
+  /** Admin-uploaded flyer. `null` = text-only banner. */
   bannerImageUrl: string | null
   startsAt: string
   endsAt: string | null
@@ -36,20 +36,20 @@ export type EventConfig = {
     enabled: boolean
     priceBRL: number | null
     currencyLabel: string
-    /** `null` = sem teto (o servidor ainda barra pedidos absurdos). */
+    /** `null` = no cap (the server still rejects absurd quantities). */
     maxPerReservation: number | null
     whatsappNumber: string
     notes: string | null
   }
-  /** Centavos — o que o servidor cobra. `priceBRL` é a vitrine. */
+  /** Cents charged by the server. `priceBRL` is display-only. */
   priceCents: number | null
   createdAt?: string
   updatedAt?: string
 }
 
 /**
- * Espelha a linha semeada pela migration 029 e o `FALLBACK_EVENT` da API.
- * Só aparece enquanto `/events/active` não responde.
+ * Mirrors the row seeded by migration 029 and the API `FALLBACK_EVENT`.
+ * Used only while `/events/active` has not responded.
  */
 export const FALLBACK_EVENT: EventConfig = {
   id: 'kpop-night-2026-09-06',
@@ -93,7 +93,7 @@ export const FALLBACK_EVENT: EventConfig = {
   priceCents: 2000,
 }
 
-/** Rascunho e arquivado não aparecem na vitrine. */
+/** Draft and archived stay off the storefront. */
 export function isEventVisible(event: EventConfig | null | undefined): boolean {
   return event?.status === 'published'
 }
@@ -124,9 +124,9 @@ export function formatEventDateRange(
 }
 
 /**
- * URL da foto do evento na pasta pública. As fotos oficiais vivem na galeria
- * do site institucional (`geeketoys.com.br#galeria`); isto cobre só a cópia
- * versionada em `public/eventos/<slug>/`.
+ * Public-folder URL for an event photo. Official shots live in the
+ * institutional gallery (`geeketoys.com.br#galeria`); this is only the
+ * versioned copy under `public/eventos/<slug>/`.
  */
 export function photoPublicUrl(event: EventConfig, file: string): string {
   return `/eventos/${event.slug}/${encodeURIComponent(file)}`
@@ -140,7 +140,7 @@ export const TICKET_KIND_LABEL: Record<TicketKind, string> = {
   free: 'Isento (colo ou PCD)',
 }
 
-/** Preço por tipo, espelhando `server/api/src/config/events.ts`. */
+/** Price by ticket kind; mirrors `server/api/src/config/events.ts`. */
 export function ticketPriceBRL(event: EventConfig, kind: TicketKind): number {
   const price = event.ticketReservation.priceBRL
   if (price == null || kind === 'free') return 0
@@ -153,11 +153,11 @@ export function formatBRL(value: number, currencyLabel = 'R$'): string {
 }
 
 /**
- * Mensagem de WhatsApp da reserva.
+ * WhatsApp reservation message.
  *
- * Continua existindo porque o pagamento é combinado por lá. A diferença é que
- * agora ela carrega o **código da reserva**: a equipe procura por ele no painel
- * em vez de reconstruir o pedido a partir da conversa.
+ * Payment is still arranged there as a fallback. The message now carries the
+ * **reservation code** so staff can look it up instead of reconstructing the
+ * order from chat.
  */
 export function buildReservationWhatsAppUrl(params: {
   event: EventConfig

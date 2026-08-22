@@ -2,16 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { getActiveEvent } from '../lib/events'
 import { FALLBACK_EVENT, isEventVisible, type EventConfig } from '../data/event'
 
-/** Chave compartilhada — banner, header, card e página do evento leem o mesmo cache. */
+/** Shared cache key — banner, header, card, and event page share it. */
 export const ACTIVE_EVENT_QUERY_KEY = ['events', 'active'] as const
 
 /**
- * O evento em cartaz, vindo do banco.
+ * The published event, loaded from the database.
  *
- * `placeholderData` é o evento embutido no bundle: o banner aparece no primeiro
- * paint em vez de piscar, e a resposta da API substitui em seguida. Como o
- * fallback pode estar desatualizado, `isPlaceholder` avisa quem precisar
- * distinguir (a página do evento não redireciona antes da resposta chegar).
+ * `placeholderData` is the bundled fallback so the banner paints immediately
+ * instead of flashing; the API response then replaces it. Because the fallback
+ * can be stale, `isPlaceholder` lets callers wait (the event page must not
+ * redirect until the API answers).
  */
 export function useActiveEvent(): {
   event: EventConfig
@@ -26,8 +26,8 @@ export function useActiveEvent(): {
     staleTime: 1000 * 60 * 5,
   })
 
-  // `event` nunca é nulo, para quem renderiza não precisar de guarda; quem diz
-  // se há algo em cartaz é `visible`. `data === null` = a admin arquivou tudo.
+  // `event` is never null so renderers skip a guard; `visible` means something
+  // is on the bill. `data === null` = admin archived everything.
   return {
     event: data ?? FALLBACK_EVENT,
     visible: data != null && isEventVisible(data),

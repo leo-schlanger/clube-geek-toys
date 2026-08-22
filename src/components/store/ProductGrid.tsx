@@ -9,7 +9,7 @@ interface ProductGridProps {
   isMember?: boolean
   isWholesale?: boolean
   isWholesaleApproved?: boolean
-  /** Falso: vitrine sem botão de compra (canal atacado ainda fechado). */
+  /** False: catalogue with no buy button (wholesale channel still closed). */
   canBuy?: boolean
   /** Shown when there are no products. */
   emptyMessage?: string
@@ -31,7 +31,7 @@ function ProductGridSkeleton() {
 }
 
 /**
- * Grade responsiva de produtos. Renderiza skeletons enquanto carrega
+ * Responsive product grid. Renders skeletons while loading
  * plus a friendly empty state.
  */
 export function ProductGrid({

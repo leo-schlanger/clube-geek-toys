@@ -8,8 +8,17 @@ export type PlanType = 'club'
 // Member status
 export type MemberStatus = 'active' | 'pending' | 'inactive' | 'expired'
 
-// Payment frequency — the club bills annually
-export type PaymentType = 'annual'
+// Payment frequency. New signups are monthly; `annual` remains for members
+// who already paid a year and still have time on the clock.
+export type PaymentType = 'monthly' | 'annual'
+
+export function paymentTypeLabel(type: PaymentType): 'Mensal' | 'Anual' {
+  return type === 'annual' ? 'Anual' : 'Mensal'
+}
+
+export function paymentTypeSuffix(type: PaymentType): '/mês' | '/ano' {
+  return type === 'annual' ? '/ano' : '/mês'
+}
 
 // Payment status
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
@@ -82,8 +91,8 @@ export interface Payment {
 export interface Plan {
   id: PlanType
   name: string
-  price: number        // preço anual (BRL)
-  discount: number     // % de desconto em qualquer produto
+  price: number        // monthly price (BRL)
+  discount: number     // % off any product
   benefits: string[]
   color: string
   icon: string
@@ -93,11 +102,11 @@ export interface Plan {
 // PLANS CONFIGURATION
 // ============================================
 
-// Single annual club plan.
+// Single monthly club plan.
 export const CLUB_PLAN: Plan = {
   id: 'club',
   name: 'Clube GeekPop & Toys',
-  price: 149.99,
+  price: 12.50,
   discount: 10,
   benefits: [
     '10% de desconto em qualquer produto',
@@ -128,7 +137,7 @@ export type ShopChannel = 'retail' | 'wholesale'
 
 export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
 
-/** Como o pedido chega ao cliente: Correios ou retirada na loja em Copacabana. */
+/** Correios vs counter pickup in Copacabana. */
 export type DeliveryMethod = 'shipping' | 'pickup'
 export type OrderPaymentMethod = 'pix' | 'credit_card'
 
@@ -145,7 +154,7 @@ export interface Category {
   updatedAt: string
 }
 
-/** Categoria na visão do painel: inativas incluídas, com quantos produtos usa. */
+/** Admin category list includes inactive rows and a product count. */
 export interface AdminCategory extends Category {
   productCount: number
 }
@@ -157,7 +166,7 @@ export interface Product {
   description: string | null
   price: number
   compareAtPrice: number | null
-  /** Categoria principal (espelha product_categories position 0). */
+  /** Primary category (product_categories position 0). */
   categoryId: string | null
   categoryName?: string | null
   /** Primary category first, up to 5. */
@@ -268,9 +277,9 @@ export interface Order {
   customerName: string
   customerEmail: string
   customerPhone: string | null
-  /** Recado que o cliente deixou para a loja no checkout. */
+  /** Free-text note from the buyer to the shop. */
   customerNote?: string | null
-  /** 'shipping' = Correios; 'pickup' = retirada no balcão da loja. */
+  /** `shipping` = Correios; `pickup` = counter in the store. */
   deliveryMethod?: DeliveryMethod
   shippingAddress: Record<string, unknown> | null
   subtotal: number
@@ -291,7 +300,7 @@ export interface Order {
   paymentMethod: OrderPaymentMethod | null
   stripePaymentIntentId: string | null
   pixTxid: string | null
-  /** PIX de pedido ainda pendente: é o que devolve o QR a quem fechou a aba. */
+  /** Pending order PIX, so the QR can be recovered after a closed tab. */
   pixData?: PixQRData
   paidAt: string | null
   createdAt: string
@@ -470,8 +479,8 @@ export interface ContractData {
   ipAddress: string
   userAgent: string
   documentHash: string        // SHA-256 hash
-  pdfUrl?: string             // URL do PDF armazenado no servidor
-  pdfPath?: string            // Caminho do arquivo no servidor
+  pdfUrl?: string             // stored PDF URL
+  pdfPath?: string            // stored PDF path on the server
   createdAt: string
 }
 

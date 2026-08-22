@@ -167,7 +167,7 @@ export default function RadioMiniPlayer() {
 
   return (
     <>
-      {/* Audio element persiste mesmo com card colapsado — não interrompe playback */}
+      {/* Keep the audio node mounted while the card is collapsed so playback does not stop */}
       <audio
         ref={audioRef}
         src={streamUrl}

@@ -1,8 +1,9 @@
--- Migration 009: Loja e-commerce própria (shop.geeketoys.com.br)
+-- Migration 009: own e-commerce shop (shop.geeketoys.com.br)
 --
--- Cria as tabelas de catálogo e pedidos: categories, products, orders, order_items.
--- Membros ativos ganham 15% de desconto (aplicado server-side no checkout, discount_reason='member_15').
--- Idempotente — espelhado em server/api/src/db/ensure-schema.ts.
+-- Catalogue and order tables: categories, products, orders, order_items.
+-- Active members get 15% off, applied server-side at checkout
+-- (discount_reason='member_15').
+-- Idempotent — mirrored in server/api/src/db/ensure-schema.ts.
 --
 -- Run: ssh $VPS_HOST "docker exec -i clube-geek-postgres psql -U \$POSTGRES_USER \$POSTGRES_DB" < server/api/src/db/migrations/009-shop.sql
 

@@ -40,10 +40,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Sem `jpg`: as 35 fotos de `public/eventos/` caíam no precache e o
-        // service worker baixava 11,2 MB na primeira visita de todo mundo,
-        // inclusive no 4G de quem só queria ver um produto. Foto é conteúdo,
-        // não casca do app — vai por runtimeCaching, sob demanda.
+        // Omit `jpg`: the 35 photos in `public/eventos/` used to join the
+        // precache and the SW downloaded 11.2 MB on every first visit,
+        // including 4G users who only wanted a product. Photos are content,
+        // not app shell — runtimeCaching, on demand.
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2MB max per file
         runtimeCaching: [
@@ -59,16 +59,16 @@ export default defineConfig({
             },
           },
           {
-            // Fotos (evento, galeria, produto) — cacheadas na primeira vez que
-            // a tela pede, não antecipadamente. Teto por entrada para o cache
-            // não crescer sem limite no celular do cliente.
+            // Event/gallery/product images — cached when the screen asks,
+            // not up front. Entry cap so the cache cannot grow unbounded
+            // on a customer's phone.
             urlPattern: ({ request }) => request.destination === 'image',
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'image-cache',
               expiration: {
                 maxEntries: 120,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 dias
+                maxAgeSeconds: 60 * 60 * 24 * 30,
               },
             },
           },
@@ -78,9 +78,9 @@ export default defineConfig({
   ],
   build: {
     rollupOptions: {
-      // Duas shells HTML, um único bundle: o clube e a loja compartilham a SPA
-      // (o modo sai do subdomínio), mas precisam de <head> diferentes porque
-      // crawler de link não roda JS — ver o comentário no topo de shop.html.
+      // Two HTML shells, one bundle: club and shop share the SPA (mode
+      // comes from the subdomain) but need different <head> because link
+      // crawlers do not run JS — see the comment at the top of shop.html.
       input: {
         main: resolve(__dirname, 'index.html'),
         shop: resolve(__dirname, 'shop.html'),
@@ -102,19 +102,16 @@ export default defineConfig({
         },
       },
     },
-    // Gerar sourcemaps apenas em dev
     sourcemap: false,
-    // Minificar agressivamente
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true, // Remove console.logs em produção
+        drop_console: true,
         drop_debugger: true,
       },
     },
     chunkSizeWarningLimit: 400,
   },
-  // Otimizações de dependências
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
   },

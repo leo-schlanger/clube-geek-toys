@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { getWholesaleSalesOpen } from '../../lib/wholesale'
 
-// A flag muda uma vez por semestre: uma requisição por carregamento de página basta, e as três
-// telas do canal (home, produto, checkout) compartilham a mesma promessa.
+// The flag changes about once a semester: one request per page load is enough, and the three
+// channel screens (home, product, checkout) share the same promise.
 let cached: Promise<boolean> | null = null
 
 function fetchSalesOpen(): Promise<boolean> {
@@ -12,13 +12,13 @@ function fetchSalesOpen(): Promise<boolean> {
   return cached
 }
 
-/** Limpa o cache do módulo (testes; e após o admin virar a chave). */
+/** Clear the module cache (tests; and after admin flips the switch). */
 export function resetWholesaleSalesOpenCache(): void {
   cached = null
 }
 
 export interface WholesaleSalesState {
-  /** Canal aceitando pedidos. Falso enquanto carrega — nunca mostre "Comprar" no escuro. */
+  /** Channel accepting orders. False while loading — never show "Comprar" in the dark. */
   salesOpen: boolean
   loading: boolean
 }
@@ -27,8 +27,8 @@ export interface WholesaleSalesState {
  * Reads the wholesale channel switch (`wholesale.sales_open`). While it is off the storefront
  * keeps the catalogue and the CNPJ signup visible, but no wholesale cart or checkout.
  *
- * `enabled` desliga a requisição em telas que servem os dois canais (PDP, checkout): no varejo
- * a resposta não muda nada, e o visitante não paga por ela.
+ * `enabled` skips the request on screens that serve both channels (PDP, checkout): on retail
+ * the response changes nothing, and the visitor should not pay for it.
  */
 export function useWholesaleSalesOpen(enabled = true): WholesaleSalesState {
   const [salesOpen, setSalesOpen] = useState(false)

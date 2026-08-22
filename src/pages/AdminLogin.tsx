@@ -23,7 +23,6 @@ export default function AdminLogin() {
   const { user, role, loading, error, signIn } = useAuth()
   const navigate = useNavigate()
 
-  // Countdown do lockout
   useEffect(() => {
     if (lockoutTime <= 0) return
 
@@ -63,10 +62,8 @@ export default function AdminLogin() {
     e.preventDefault()
     setFormError('')
 
-    // Normalizar email
     const normalizedEmail = normalizeEmail(email)
 
-    // Verificar rate limit
     const { blocked, remainingTime } = isBlocked(normalizedEmail)
     if (blocked) {
       setLockoutTime(remainingTime)
@@ -79,7 +76,6 @@ export default function AdminLogin() {
     const result = await signIn(normalizedEmail, password)
 
     if (!result.success) {
-      // Registrar tentativa falha
       const { blocked: nowBlocked, attemptsRemaining, lockoutSeconds } = recordFailedAttempt(normalizedEmail)
 
       if (nowBlocked) {
@@ -131,7 +127,6 @@ export default function AdminLogin() {
 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            {/* Aviso de bloqueio */}
             {isLocked && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
                 <div className="flex items-center gap-2 mb-1">
@@ -144,14 +139,12 @@ export default function AdminLogin() {
               </div>
             )}
 
-            {/* Erro do formulário */}
             {formError && !isLocked && (
               <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
                 {formError}
               </div>
             )}
 
-            {/* Erro de autenticação */}
             {error && !formError && !isLocked && (
               <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-400 text-sm">
                 <p className="font-medium mb-1">Usuário não cadastrado</p>

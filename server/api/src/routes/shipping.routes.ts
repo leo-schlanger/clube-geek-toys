@@ -116,7 +116,7 @@ shippingRouter.get('/melhor-envio/callback', async (req, res, next) => {
   }
 });
 
-// DELETE /shipping/melhor-envio/token — revoga localmente (admin)
+// DELETE /shipping/melhor-envio/token — revoke locally (admin)
 shippingRouter.delete(
   '/melhor-envio/token',
   authenticate,

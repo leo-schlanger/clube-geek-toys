@@ -21,7 +21,6 @@ export function calculateSubscriptionPrice(
   _plan: PlanType,
   _frequencyType: SubscriptionFrequencyType
 ): number {
-  // Single annual plan at a fixed price.
   return CLUB_PLAN.price
 }
 

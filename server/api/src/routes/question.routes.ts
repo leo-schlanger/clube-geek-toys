@@ -75,7 +75,7 @@ const answerSchema = z.object({
   answer: z.string().min(1).max(2000),
 });
 
-// POST /questions/:id/answer — responde e notifica quem perguntou
+// POST /questions/:id/answer — answers and notifies whoever asked
 questionRouter.post(
   '/:id/answer',
   authenticate,

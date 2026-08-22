@@ -2,8 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-// O card lê o evento pelo hook (que vem da API). O fallback embutido é o que
-// o hook entrega no primeiro render, então serve de fixture.
+// The card reads the event from the hook (API). The bundled fallback is
+// what the hook delivers on first render, so it is a valid fixture.
 vi.mock('../../hooks/useActiveEvent', async () => {
   const { FALLBACK_EVENT } = await vi.importActual<typeof import('../../data/event')>(
     '../../data/event'

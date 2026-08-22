@@ -1,11 +1,11 @@
 import { useEffect } from 'react'
 
 /**
- * Avisa antes de sair da página com um PIX gerado e não pago.
+ * Warn before leaving a page with an unpaid generated PIX.
  *
- * O texto do diálogo é do navegador e não pode ser customizado. Para uma
- * pergunta nossa, intercepte o fechamento com `useConfirm`; isto cobre o X da
- * aba e o voltar do celular.
+ * The dialog copy is the browser's and cannot be customised. For an in-app
+ * prompt, intercept close with `useConfirm`; this covers the tab X and
+ * mobile back.
  */
 export function usePixExitGuard(active: boolean): void {
   useEffect(() => {

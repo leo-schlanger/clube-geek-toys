@@ -1,11 +1,11 @@
 -- ============================================
--- Migration 018 — Ícone por categoria
+-- Migration 018 — Icon per category
 -- ============================================
--- Guarda só o nome do ícone (ex.: 'music', 'gamepad'). O mapeamento
--- nome -> componente vive no front (src/lib/category-icons.ts), então trocar
--- a biblioteca de ícones não exige tocar no banco.
+-- Stores only the icon key (e.g. 'music', 'gamepad'). The key -> component map
+-- lives in the frontend (src/lib/category-icons.ts), so swapping icon libraries
+-- never touches the schema.
 --
--- Idempotente — espelhado em server/api/src/db/ensure-schema.ts.
+-- Idempotent — mirrored in server/api/src/db/ensure-schema.ts.
 
 BEGIN;
 

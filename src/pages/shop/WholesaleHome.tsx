@@ -28,8 +28,8 @@ import { formatCurrency } from '../../lib/utils'
  * discount applied server-side for approved accounts. With no SKUs it renders
  * an empty state with a signup call to action.
  *
- * Enquanto `wholesale.sales_open` estiver desligado o canal vira lista de espera: catálogo e
- * cadastro de CNPJ continuam no ar, sem carrinho — as lojas se cadastram e avisamos ao abrir.
+ * While `wholesale.sales_open` is off the channel is a waitlist: catalogue and
+ * CNPJ signup stay up, with no cart — shops register and we notify when it opens.
  */
 export default function WholesaleHome() {
   const [searchParams, setSearchParams] = useSearchParams()

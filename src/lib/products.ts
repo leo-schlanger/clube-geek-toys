@@ -126,7 +126,7 @@ export interface VariantInput {
   sortOrder?: number
 }
 
-/** Admin: salva eixos + matriz de SKUs (estilo Shopee). */
+/** Admin: persist axes + SKU matrix (Shopee-style). */
 export async function replaceProductVariants(
   productId: string,
   axes: VariantAxis[],
@@ -314,7 +314,7 @@ export interface CategoryInput {
   sortOrder?: number
 }
 
-/** Admin: inclui inativas e a contagem de produtos por categoria. */
+/** Admin: includes inactive rows and per-category product counts. */
 export async function listCategoriesForAdmin(): Promise<AdminCategory[]> {
   const result = await api.get<{ categories: AdminCategory[] }>('/products/categories/all')
   return result.data?.categories ?? []

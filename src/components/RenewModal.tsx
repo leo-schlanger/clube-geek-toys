@@ -59,7 +59,7 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
             <CardTitle>Renovar Assinatura</CardTitle>
           </div>
           <CardDescription>
-            Renove seu {CLUB_PLAN.name} por mais 1 ano e continue aproveitando os benefícios
+            Renove seu {CLUB_PLAN.name} por mais 1 mês e continue aproveitando os benefícios
           </CardDescription>
         </CardHeader>
 
@@ -87,7 +87,7 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
               <span className="text-2xl font-bold">{formatCurrency(CLUB_PLAN.price)}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Sua assinatura será renovada por 1 ano
+              Sua assinatura será renovada por 1 mês
             </p>
           </div>
 

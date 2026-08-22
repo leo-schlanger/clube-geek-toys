@@ -16,13 +16,12 @@ export function sanitizeString(input: string): string {
     .trim()
     // Collapse repeated spaces
     .replace(/\s+/g, ' ')
-    // Remove caracteres de controle ASCII (0-31 e 127)
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001F\u007F]/g, '')
 }
 
 /**
- * @param email - Email a normalizar
+ * @param email - Address to normalise
  * @example
  * normalizeEmail(' User@Email.COM ') // 'user@email.com'
  */
@@ -37,13 +36,12 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
- * Title-cases the name and strips markup.
- * e REMOVE caracteres potencialmente perigosos (XSS-safe).
+ * Title-cases the name and strips markup (XSS-safe).
  *
  * The backend escapes again; this only avoids sending obvious junk.
  *
- * @param name - Nome a sanitizar
- * @returns Nome limpo, capitalizado e limitado a 200 caracteres
+ * @param name - Name to sanitise
+ * @returns Cleaned, capitalised, capped at 200 characters
  * @example
  * sanitizeName('joao da silva') // 'Joao Da Silva'
  * sanitizeName('<script>alert(1)</script>Ana') // 'Ana'
@@ -130,9 +128,7 @@ export function sanitizeMemberForm(data: {
   }
 }
 
-/**
- * Sanitiza dados de login
- */
+/** Normalises the email; password is passed through (special chars are intentional). */
 export function sanitizeLoginForm(data: {
   email: string
   password: string
@@ -142,6 +138,6 @@ export function sanitizeLoginForm(data: {
 } {
   return {
     email: normalizeEmail(data.email),
-    password: data.password, // Não sanitizar senha - pode ter caracteres especiais intencionais
+    password: data.password,
   }
 }

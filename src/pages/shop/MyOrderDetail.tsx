@@ -37,9 +37,9 @@ const TIMELINE: { status: Order['status']; label: string }[] = [
 ]
 
 /**
- * Na retirada os dois últimos passos não são "a caminho / entregue" — o pedido
- * fica esperando no balcão. Mesmos status no banco, outra leitura para quem vai
- * buscar.
+ * Pickup reuses the last two statuses, but they are not "in transit / delivered"
+ * — the order waits at the counter. Same DB values, different copy for who
+ * collects.
  */
 const PICKUP_TIMELINE: { status: Order['status']; label: string }[] = [
   { status: 'pending', label: 'Pedido criado' },

@@ -1,37 +1,33 @@
--- 020 — Perfil de cliente sem assinatura + produtos salvos
+-- 020 — Customer profile without a subscription + saved products
 --
--- Até aqui, dado pessoal só existia em `members`, que é o registro da
--- assinatura: exige CPF e nasce atrelado a um plano. Quem só quer comprar na
--- loja não tinha onde guardar telefone, nascimento, gênero ou endereço.
+-- Personal data only existed in `members`, which is the subscription record and
+-- requires a CPF. `customer_profiles` is 1:1 with `users` and independent of
+-- `members`, so a shop-only customer has somewhere to keep phone, birth date,
+-- gender and address; becoming a member later keeps the same profile.
 --
--- `customer_profiles` é 1:1 com `users` e independe de `members` — a pessoa
--- cria conta, preenche o que quiser e nunca assina nada. Quem depois vira
--- membro mantém o mesmo perfil; as duas tabelas convivem.
---
--- LGPD: todos os campos são opcionais e a coleta é declarada na política de
--- privacidade. `marketing_consent` guarda o aceite explícito para contato —
--- separado do cadastro, porque consentimento não pode vir embutido no serviço.
+-- LGPD: every field is optional and the collection is declared in the privacy
+-- policy. `marketing_consent` is stored apart from signup — consent cannot be
+-- bundled into the service.
 
 CREATE TABLE IF NOT EXISTS customer_profiles (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   full_name VARCHAR(200),
   phone VARCHAR(20),
   birth_date DATE,
-  -- Lista fechada com saída explícita: 'prefiro_nao_dizer' precisa ser uma
-  -- opção de verdade, não a ausência do campo.
+  -- Closed list with an explicit opt-out: 'prefiro_nao_dizer' must be a real
+  -- option, not an empty field.
   gender VARCHAR(20) CHECK (gender IN (
     'feminino', 'masculino', 'nao_binario', 'outro', 'prefiro_nao_dizer'
   )),
   photo_url TEXT,
-  -- Mesmo formato de `orders.shipping_address`, para o checkout pré-preencher.
+  -- Same shape as `orders.shipping_address`, so checkout can prefill.
   address JSONB,
   marketing_consent BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- "Compras salvas": produtos que a pessoa guarda para comprar depois.
--- O histórico de pedidos já vive em `orders` e não é duplicado aqui.
+-- Saved for later. Order history lives in `orders` and is not duplicated here.
 CREATE TABLE IF NOT EXISTS saved_products (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,

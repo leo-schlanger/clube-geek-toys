@@ -16,11 +16,11 @@ interface ProductCardProps {
   product: Product
   /** Active member: shows the price with a discount preview. */
   isMember?: boolean
-  /** Canal atacado: link /atacado/produto, preview 25%, min qty. */
+  /** Wholesale channel: /atacado/produto link, 25% preview, min qty. */
   isWholesale?: boolean
   /** Approved wholesale account: shows the price at -25%. */
   isWholesaleApproved?: boolean
-  /** Canal fechado (atacado sem venda liberada): vitrine sem botão de compra. */
+  /** Closed channel (wholesale sales off): catalogue with no buy button. */
   canBuy?: boolean
 }
 
@@ -101,9 +101,9 @@ export function ProductCard({
         )}
       </Link>
 
-      {/* Fora do <Link>: aninhar botão dentro de âncora é HTML inválido e o
-          clique acabaria navegando. Fica sobre a imagem, no canto oposto às
-          badges. Atacado não salva — a compra ali é por CNPJ aprovado. */}
+      {/* Outside the <Link>: nesting a button in an anchor is invalid HTML and
+          the click would navigate. Sits on the image, opposite the badges.
+          Wholesale does not save — purchase there is by approved CNPJ. */}
       {!isWholesale && (
         <SaveProductButton
           productId={product.id}

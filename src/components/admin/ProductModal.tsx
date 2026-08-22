@@ -744,7 +744,7 @@ export function ProductModal({
     setVideos((prev) => prev.filter((v) => v.url !== url));
   }
 
-  // ─── Rascunhos pendentes ───────────────────────────────────────────────────
+  // ─── Pending drafts ────────────────────────────────────────────────────────
   // A link typed but not yet confirmed with "+" still counts as chosen.
   // Without this the save silently dropped what the admin had just pasted.
 
@@ -1225,14 +1225,15 @@ export function ProductModal({
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-6">
               {/*
-                Índice das seções. O contador ao lado do rótulo é o que impede a
-                aba de esconder trabalho: quem abre um produto vê "Fotos e
-                vídeos 4" sem precisar entrar para descobrir que tem conteúdo lá.
+                Section index. The count beside the label is what stops a tab
+                from hiding work: opening a product shows "Fotos e vídeos 4"
+                without having to enter to discover content is there.
               */}
               {/*
-                Fixa no topo: quem rola a aba Variações (a mais longa) não pode
-                precisar voltar ao começo só para trocar de seção. O container
-                que rola é o próprio Card, então `top-0` gruda no topo dele.
+                Sticky at the top: anyone scrolling the Variações tab (the
+                longest) must not have to go back to the start just to switch
+                sections. The scrolling container is the Card itself, so
+                `top-0` sticks to its top.
               */}
               <div
                 role="tablist"
@@ -1271,7 +1272,6 @@ export function ProductModal({
               </div>
 
               <div className={cn("space-y-6", tab !== "basico" && "hidden")}>
-                {/* Nome */}
                 <div className="space-y-2">
                   <Label htmlFor="product-name">Nome do Produto</Label>
                   <Input
@@ -1282,7 +1282,6 @@ export function ProductModal({
                   />
                 </div>
 
-                {/* Descrição */}
                 <div className="space-y-2">
                   <Label htmlFor="product-description">Descrição</Label>
                   <textarea
@@ -1295,7 +1294,6 @@ export function ProductModal({
                   />
                 </div>
 
-                {/* Preços */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="product-price">Preço (R$)</Label>
@@ -1371,7 +1369,6 @@ export function ProductModal({
                   )}
                 </div>
 
-                {/* Estoque + SKU */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="product-stock">Estoque</Label>
@@ -1468,7 +1465,6 @@ export function ProductModal({
               </div>
 
               <div className={cn("space-y-6", tab !== "envio" && "hidden")}>
-                {/* Embalagem / frete Correios */}
                 <div className="space-y-2">
                   <Label>Embalagem (frete Correios)</Label>
                   <p className="text-xs text-muted-foreground">
@@ -1547,7 +1543,7 @@ export function ProductModal({
                   </div>
                 </div>
 
-                {/* Categorias — até MAX_PRODUCT_CATEGORIES, a primeira é a principal */}
+                {/* Up to MAX_PRODUCT_CATEGORIES; first is primary */}
                 <div className="space-y-2">
                   <Label>
                     Categorias{" "}
@@ -1606,7 +1602,6 @@ export function ProductModal({
                     </div>
                   )}
 
-                  {/* Gerenciador de categorias inline */}
                   <div className="rounded-lg border border-border p-3 space-y-3 bg-muted/30">
                     <div className="flex items-center gap-2">
                       <Tag className="h-4 w-4 text-muted-foreground" />
@@ -1689,7 +1684,6 @@ export function ProductModal({
               </div>
 
               <div className={cn("space-y-6", tab !== "midia" && "hidden")}>
-                {/* Imagens */}
                 <div className="space-y-3">
                   <Label>
                     Imagens{" "}
@@ -1752,7 +1746,7 @@ export function ProductModal({
                     </div>
                   )}
 
-                  {/* Upload de arquivos — <label> + overlay input (iOS Safari bloqueia click() em input hidden). */}
+                  {/* File upload — <label> + overlay input (iOS Safari blocks click() on a hidden input). */}
                   <div>
                     <label
                       className={cn(
@@ -1792,7 +1786,6 @@ export function ProductModal({
                     </p>
                   </div>
 
-                  {/* Colar URL externa */}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1821,7 +1814,6 @@ export function ProductModal({
                   </div>
                 </div>
 
-                {/* Vídeos — link do YouTube/Instagram ou MP4 hospedado */}
                 <div className="space-y-3">
                   <Label>
                     Vídeos{" "}
@@ -1961,7 +1953,7 @@ export function ProductModal({
               </div>
 
               <div className={cn("space-y-6", tab !== "variacoes" && "hidden")}>
-                {/* Variações: 1 tipo "Cor" + N opções = N SKUs (ilimitado) */}
+                {/* One axis + N options = N SKUs (uncapped) */}
                 <div className="space-y-3 rounded-lg border p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -2146,14 +2138,13 @@ export function ProductModal({
                                 className="space-y-2 rounded-md border border-border/70 bg-muted/20 p-2"
                               >
                                 {/*
-                                No celular a linha empilha: 12 colunas ali davam
-                                33px por célula e a miniatura de 48px vazava.
-                                `sm:contents` dissolve os agrupadores no desktop,
-                                devolvendo os campos ao grid de 12 colunas.
+                                On mobile the row stacks: 12 columns there gave
+                                33px per cell and the 48px thumbnail overflowed.
+                                `sm:contents` dissolves the wrappers on desktop,
+                                putting the fields back on the 12-column grid.
                               */}
                                 <div className="flex flex-col gap-2 text-sm sm:grid sm:grid-cols-12 sm:items-center">
                                   <div className="flex items-center gap-2 sm:contents">
-                                    {/* Foto da variação */}
                                     <div className="shrink-0 sm:col-span-2">
                                       <label
                                         className="relative flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-primary/40 bg-background hover:border-primary"
@@ -2243,7 +2234,6 @@ export function ProductModal({
                                   </div>
                                 </div>
 
-                                {/* Galeria da variação — várias fotos, como na Shopee */}
                                 {photoCount > 0 && (
                                   <div className="flex flex-wrap gap-1.5 pl-0 sm:pl-14">
                                     {savedImages.map((url) => (
@@ -2301,7 +2291,6 @@ export function ProductModal({
                                   </div>
                                 )}
 
-                                {/* Controles de foto da variação */}
                                 <div className="flex flex-wrap items-center gap-2 pl-0 sm:pl-14">
                                   <label
                                     htmlFor={`variant-photo-${idx}`}
@@ -2363,7 +2352,7 @@ export function ProductModal({
                                   </div>
                                 </div>
 
-                                {/* Atalho: escolher imagem já do produto */}
+                                {/* Reuse an image already on the product */}
                                 {images.length > 0 && (
                                   <div className="flex flex-wrap items-center gap-1.5 pl-0 sm:pl-14">
                                     <span className="text-[10px] text-muted-foreground">

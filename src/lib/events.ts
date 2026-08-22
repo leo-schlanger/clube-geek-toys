@@ -2,10 +2,10 @@ import { api } from './api-client'
 import { FALLBACK_EVENT, type EventConfig } from '../data/event'
 
 /**
- * Cadastro de eventos.
+ * Event catalogue.
  *
- * A vitrine lê `getActiveEvent()`; a aba **Eventos** do admin usa o resto.
- * Trocar de evento deixou de ser deploy: é uma linha no banco.
+ * The storefront reads `getActiveEvent()`; the admin **Eventos** tab uses the rest.
+ * Switching events is a database row, not a deploy.
  */
 
 export interface EventInput {
@@ -32,11 +32,11 @@ export interface EventInput {
 }
 
 /**
- * Público. `null` = nada em cartaz (a admin arquivou tudo) — e isso precisa
- * chegar como `null`, não como fallback, senão o evento encerrado volta ao ar.
+ * Public. `null` = nothing on the bill (admin archived everything) — and that
+ * must arrive as `null`, not the fallback, or a closed event would come back.
  *
- * O fallback embutido cobre só a **falha de rede**: aí a loja mantém a campanha
- * em vez de sumir com o banner por causa de um timeout.
+ * The bundled fallback covers **network failure** only: the shop keeps the
+ * campaign instead of dropping the banner on a timeout.
  */
 export async function getActiveEvent(): Promise<EventConfig | null> {
   try {
@@ -71,7 +71,7 @@ export async function updateEvent(id: string, input: Partial<EventInput>): Promi
   return res.data.event
 }
 
-/** Base para o próximo evento: nasce rascunho, sem banner e com reservas fechadas. */
+/** Seed for the next event: born as draft, no banner, reservations closed. */
 export async function duplicateEvent(id: string): Promise<EventConfig> {
   const res = await api.post<{ event: EventConfig }>(
     `/events/admin/events/${encodeURIComponent(id)}/duplicate`
@@ -85,7 +85,7 @@ export async function deleteEvent(id: string): Promise<void> {
   if (res.error) throw new Error(res.error)
 }
 
-/** Upload do flyer. Multipart, então não passa pelo helper JSON. */
+/** Flyer upload. Multipart, so it skips the JSON helper. */
 export async function uploadEventBanner(id: string, file: File): Promise<EventConfig> {
   const form = new FormData()
   form.append('banner', file)

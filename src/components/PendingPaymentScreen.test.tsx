@@ -105,7 +105,7 @@ function makeMember(overrides?: Partial<Member>): Member {
     phone: '11999998888',
     plan: 'club' as PlanType,
     status: 'pending',
-    paymentType: 'annual',
+    paymentType: 'monthly',
     startDate: '',
     expiryDate: '',
     paymentCount: 0,
@@ -165,11 +165,11 @@ describe('PendingPaymentScreen', () => {
     })
   })
 
-  it('should always show the annual label', async () => {
+  it('should always show the monthly label', async () => {
     render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Anual')).toBeInTheDocument()
+      expect(screen.getByText('Mensal')).toBeInTheDocument()
     })
   })
 

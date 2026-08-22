@@ -116,7 +116,7 @@ const defaultProps = {
   memberEmail: 'joao@test.com',
   memberPhone: '11999998888',
   plan: 'club' as const,
-  paymentType: 'annual' as const,
+  paymentType: 'monthly' as const,
   onSigned: vi.fn(),
   onBack: vi.fn(),
 }
@@ -212,8 +212,8 @@ describe('StepContract', () => {
       render(<StepContract {...defaultProps} />)
 
       expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getByText(/anual/i)).toBeInTheDocument()
-      expect(screen.getByText(/149,99/)).toBeInTheDocument()
+      expect(screen.getByText(/mensal/i)).toBeInTheDocument()
+      expect(screen.getByText(/12,50/)).toBeInTheDocument()
     })
 
     it('renders terms and privacy checkboxes', () => {

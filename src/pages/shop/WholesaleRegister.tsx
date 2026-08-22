@@ -22,11 +22,11 @@ import { SeoHead } from '../../components/store/SeoHead'
 import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
 
 /**
- * Cadastro atacadista: CNPJ + dados da empresa.
+ * Wholesale signup: CNPJ + company details.
  * Starts as pending; an admin approves when the company's activity matches.
  *
- * Com o canal fechado o cadastro continua valendo: vira lista de espera e a loja é avisada
- * quando começarmos a vender no atacado.
+ * Signup still works while the channel is closed: it becomes a waitlist and
+ * the shop is notified when wholesale sales open.
  */
 export default function WholesaleRegister() {
   const navigate = useNavigate()

@@ -23,9 +23,9 @@ productRouter.get('/categories', async (_req, res, next) => {
   }
 });
 
-// GET /products/categories/all — admin: inclui as inativas e quantos produtos
-// cada categoria tem (é o que diz se dá para excluir sem esvaziar a vitrine).
-// Antes de '/:slug' pelo mesmo motivo da rota acima.
+// GET /products/categories/all — admin: includes inactive ones and how many
+// products each category has (that is what says whether a delete would empty
+// the storefront). Before '/:slug' for the same reason as the route above.
 productRouter.get('/categories/all', authenticate, requireRole('admin'), async (_req, res, next) => {
   try {
     res.json({ categories: await productService.listCategoriesForAdmin() });
@@ -292,7 +292,7 @@ productRouter.post('/:id/duplicate', authenticate, requireRole('admin'), async (
   }
 });
 
-// PUT /products/:id/variants — salva eixos + matriz de SKUs (estilo Shopee)
+// PUT /products/:id/variants — persist axes + SKU matrix (Shopee-style)
 productRouter.put(
   '/:id/variants',
   authenticate,

@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 interface UseOnlineStatusReturn {
   isOnline: boolean
-  wasOffline: boolean // True se ficou offline em algum momento da sessão
+  wasOffline: boolean // True if the session went offline at least once
 }
 
 export function useOnlineStatus(): UseOnlineStatusReturn {

@@ -27,12 +27,11 @@ function getKeyCombo(e: KeyboardEvent): string {
   if (e.altKey) parts.push('alt')
   if (e.shiftKey) parts.push('shift')
 
-  // Normaliza a tecla
   let key = e.key.toLowerCase()
   if (key === ' ') key = 'space'
   if (key === 'escape') key = 'esc'
 
-  // Evita duplicar modificadores
+  // Skip modifier keys so they are not doubled as the payload
   if (!['control', 'alt', 'shift', 'meta'].includes(key)) {
     parts.push(key)
   }
@@ -96,7 +95,7 @@ export const ADMIN_SHORTCUTS = {
 } as const
 
 /**
- * @param shortcut - Atalho (ex: 'ctrl+s')
+ * @param shortcut - Combo such as 'ctrl+s'
  */
 export function formatShortcut(shortcut: string): string {
   return shortcut

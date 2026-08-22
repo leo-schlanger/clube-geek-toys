@@ -7,6 +7,7 @@ import { auditLog } from '../utils/audit.js';
  * Pattern: each setting key is a dotted path like `pricing.club_annual` and the value is
  * stored as JSONB. Defaults are returned when a key is missing, so the system keeps working
  * even before any explicit configuration has been saved.
+ * `pricing.club_annual` is the stored key for the club price (now monthly).
  */
 
 export interface SettingDefinition {
@@ -22,7 +23,7 @@ export interface SettingDefinition {
  */
 export const SETTINGS_CATALOGUE: SettingDefinition[] = [
   // Must match CLUB_PLAN.price on the frontend.
-  { key: 'pricing.club_annual', default: 149.99, type: 'number', description: 'Plano do Clube — anual (R$)' },
+  { key: 'pricing.club_annual', default: 12.50, type: 'number', description: 'Plano do Clube — mensal (R$)' },
 
   // Member benefit: a single discount on any product.
   { key: 'plan.club.discount_products', default: 15, type: 'number', description: 'Desconto do membro em produtos (%)' },

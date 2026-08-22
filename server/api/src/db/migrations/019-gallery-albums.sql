@@ -1,11 +1,9 @@
 -- ============================================
--- Migration 019 — Galeria com álbuns (pastas)
+-- Migration 019 — Gallery with albums (folders)
 -- ============================================
--- A galeria do site institucional passa a ser editável pelo admin e organizada
--- em pastas: "Evento 6/9", "Loja presencial Copacabana", etc.
---
--- Só cria tabelas novas — nenhuma tabela existente é alterada ou removida.
--- Idempotente e espelhado em server/api/src/db/ensure-schema.ts.
+-- The institutional site gallery becomes admin-editable and organised in
+-- folders. Only creates new tables — nothing existing is altered or removed.
+-- Idempotent, mirrored in server/api/src/db/ensure-schema.ts.
 
 BEGIN;
 
@@ -14,9 +12,9 @@ CREATE TABLE IF NOT EXISTS gallery_albums (
   name VARCHAR(160) NOT NULL,
   slug VARCHAR(180) NOT NULL UNIQUE,
   description TEXT,
-  -- Capa: normalmente a URL de uma das fotos do próprio álbum.
+  -- Cover: usually the URL of one of the album's own photos.
   cover_url TEXT,
-  -- Data do evento, quando o álbum é de um. Ordena a listagem pública.
+  -- Event date, when the album is of one. Orders the public listing.
   event_date DATE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order INTEGER NOT NULL DEFAULT 0,

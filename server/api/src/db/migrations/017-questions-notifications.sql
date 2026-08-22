@@ -1,14 +1,10 @@
 -- ============================================
--- Migration 017 — Perguntas e respostas + notificações
+-- Migration 017 — Questions and answers + notifications
 -- ============================================
--- Pedido Laura (14/08/2026): o cliente pergunta o preço/detalhe no produto, a
--- gente responde, e a pessoa recebe um aviso no perfil.
+-- Mercado Livre model: the question shows on the shelf as soon as it is asked,
+-- marked "aguardando resposta". `status` is the moderation lever for spam.
 --
--- Modelo Mercado Livre (decidido em 14/08): a pergunta aparece na loja assim
--- que é feita, marcada como "aguardando resposta". Por isso `status` existe —
--- é a alavanca de moderação para esconder spam.
---
--- Idempotente — espelhado em server/api/src/db/ensure-schema.ts.
+-- Idempotent — mirrored in server/api/src/db/ensure-schema.ts.
 
 BEGIN;
 
@@ -30,7 +26,7 @@ CREATE TABLE IF NOT EXISTS product_questions (
 CREATE INDEX IF NOT EXISTS idx_questions_product
   ON product_questions(product_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_questions_user ON product_questions(user_id, created_at DESC);
--- Fila do admin: não respondidas primeiro.
+-- Admin queue: unanswered first.
 CREATE INDEX IF NOT EXISTS idx_questions_pending
   ON product_questions(created_at DESC) WHERE answered_at IS NULL;
 
@@ -40,7 +36,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   kind VARCHAR(40) NOT NULL,
   title VARCHAR(200) NOT NULL,
   body TEXT,
-  -- Caminho relativo dentro da SPA (ex.: /produto/camiseta-bts).
+  -- Relative path inside the SPA (e.g. /produto/camiseta-bts).
   link TEXT,
   read_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

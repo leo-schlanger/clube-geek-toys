@@ -184,7 +184,6 @@ export function ProductsTab() {
           </Button>
         </div>
 
-        {/* Busca + ordenação */}
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -208,8 +207,8 @@ export function ProductsTab() {
           />
         </div>
 
-        {/* Barra de ação em massa — só aparece com algo marcado, para não
-            competir com a busca no uso normal do painel. */}
+        {/* Bulk action bar — only with a selection, so it does not compete
+            with search in normal panel use. */}
         {selected.size > 0 && (
           <div className="mt-3 flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 sm:flex-row sm:items-center">
             <span className="flex items-center gap-2 text-sm font-medium">

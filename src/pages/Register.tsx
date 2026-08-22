@@ -32,7 +32,7 @@ export default function Register() {
   const { signUp, signInWithGoogle, user, emailVerified } = useAuth()
 
   // ─── State ──────────────────────────────────────────────────────────────────
-  // 3 steps: 1=Conta+Dados, 2=Contrato, 3=Pagamento
+  // 3 steps: 1=account+data, 2=contract, 3=payment
   // Email verification happens AFTER payment (in dashboard), not during signup.
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -50,10 +50,9 @@ export default function Register() {
     memberId: '',
   })
 
-  // The club has a single annual plan. Legacy params are still read for
-  // compatibility but normalised to 'club'/'annual'.
+  // Single monthly plan. Legacy query params are ignored.
   const selectedPlan: PlanType = 'club'
-  const paymentType: PaymentType = 'annual'
+  const paymentType: PaymentType = 'monthly'
 
   // Flow flags
   const [accountAlreadyExists, setAccountAlreadyExists] = useState(false)
@@ -407,7 +406,7 @@ export default function Register() {
                 {plan.name}
               </Badge>
               <span className="text-sm text-muted-foreground">
-                Anual
+                Mensal
               </span>
             </div>
             <span className="text-lg font-bold">{formatCurrency(price)}</span>

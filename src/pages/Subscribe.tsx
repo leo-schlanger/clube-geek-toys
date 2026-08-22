@@ -14,7 +14,7 @@ export default function Subscribe() {
   const extraBenefits = [
     'Carteirinha digital com QR Code',
     'Desconto válido na loja física e online',
-    'Renovação anual, sem fidelidade',
+    'Renovação mensal, sem fidelidade',
   ]
 
   return (
@@ -89,7 +89,7 @@ export default function Subscribe() {
             transition={{ duration: 0.5, delay: 0.6 }}
           >
             <span className="text-sm text-muted-foreground">
-              Apenas <strong className="text-primary text-lg">{formatCurrency(CLUB_PLAN.price)}</strong>/ano
+              Apenas <strong className="text-primary text-lg">{formatCurrency(CLUB_PLAN.price)}</strong>/mês
             </span>
             <a href="#plano">
               <Button size="lg" className="btn-glow font-bold text-base px-8 h-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90">
@@ -117,7 +117,7 @@ export default function Subscribe() {
       <section id="plano" className="py-8 sm:py-12 px-4 sm:px-6 scroll-mt-20">
         <div className="text-center mb-8">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2">Plano do Clube</h2>
-          <p className="text-sm text-muted-foreground">Um único plano, anual, com tudo incluso.</p>
+          <p className="text-sm text-muted-foreground">Um único plano, mensal, com tudo incluso.</p>
         </div>
 
         <motion.div
@@ -141,9 +141,9 @@ export default function Subscribe() {
 
               <div className="mb-1">
                 <span className="text-4xl font-extrabold">{formatCurrency(CLUB_PLAN.price)}</span>
-                <span className="text-sm text-muted-foreground ml-1">/ano</span>
+                <span className="text-sm text-muted-foreground ml-1">/mês</span>
               </div>
-              <p className="text-xs text-muted-foreground">Renovação anual · cancele quando quiser</p>
+              <p className="text-xs text-muted-foreground">Renovação mensal · cancele quando quiser</p>
             </div>
 
             <CardContent className="px-6 pb-4 flex-grow">
@@ -158,7 +158,7 @@ export default function Subscribe() {
             </CardContent>
 
             <CardFooter className="p-6 pt-0">
-              <Link to="/cadastro?plano=club&tipo=annual" className="w-full">
+              <Link to="/cadastro?plano=club&tipo=monthly" className="w-full">
                 <Button className="w-full h-11 font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
                   ASSINAR <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

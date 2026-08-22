@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Ingressos de evento. O que estes testes seguram, na ordem do prejuízo:
+ * Event tickets. What these tests pin, in cost order:
  *
- *  1. O check-in **queima** o código: a segunda leitura do mesmo QR é negada,
- *     com a hora da primeira. É isso que impede o print de circular.
- *  2. Ingresso de reserva não confirmada não entra — pagamento vem antes.
- *  3. Confirmar só sai de `pending`, então clicar duas vezes não reenvia
- *     e-mail nem ressuscita reserva cancelada.
- *  4. O preço vem do servidor, por tipo de ingresso, e não do cliente.
- *  5. O código é lido com ou sem hífen, porque a portaria digita à mão.
- *  6. A reserva nasce com PIX pagável e o txid não muda — sem isso a compra
- *     depende do WhatsApp abrir, e foi assim que uma reserva ficou sem pagamento.
+ *  1. Check-in **burns** the code: a second scan of the same QR is denied,
+ *     with the time of the first. That is what stops a print from circulating.
+ *  2. An unconfirmed reservation cannot enter — payment first.
+ *  3. Confirm only leaves `pending`, so a double-click neither resends
+ *     email nor revives a cancelled reservation.
+ *  4. Price comes from the server, by ticket type, never from the client.
+ *  5. The code is read with or without hyphens, because door staff type it.
+ *  6. The reservation is born with payable PIX and the txid does not change
+ *     — without that, purchase depends on WhatsApp opening, which is how
+ *     one reservation was left unpaid.
  */
 
 const { queryMock, clientQueryMock, releaseMock, sendEmailMock, auditMock } = vi.hoisted(() => ({
@@ -41,9 +42,9 @@ vi.mock('../config/env.js', () => ({
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 
-// O evento passou a vir da tabela `events`. Estes testes seguram a lógica de
-// ingresso, não o cadastro: o serviço de cadastro é mockado com o mesmo evento
-// que a migration semeia, para o `queryMock` continuar falando só de reservas.
+// Event now comes from the `events` table. These tests pin ticket logic,
+// not catalogue: the catalogue service is mocked with the same event the
+// migration seeds, so `queryMock` only talks about reservations.
 vi.mock('./event-config.service.js', async () => {
   const actual = await vi.importActual<typeof import('./event-config.service.js')>(
     './event-config.service.js'
@@ -142,7 +143,7 @@ describe('createReservation', () => {
     const insert = clientQueryMock.mock.calls.find(([sql]) =>
       String(sql).startsWith('INSERT INTO event_reservations')
     )!;
-    // R$ 20 (inteira) + R$ 10 (membro) — o cliente não manda preço.
+    // R$ 20 (full) + R$ 10 (member) — the client does not send a price.
     expect(insert[1]).toEqual(
       expect.arrayContaining([2, 3000, expect.stringMatching(/^R-[A-Z0-9]{4}-[A-Z0-9]{4}$/)])
     );
@@ -230,7 +231,7 @@ describe('PIX da reserva', () => {
     expect(vars.pix_code).toContain('geekpopee@gmail.com');
   });
 
-  // Reserva paga não pode exibir QR: convida a pagar duas vezes.
+  // A paid reservation must not show a QR: that invites paying twice.
   it('não devolve PIX em reserva confirmada', async () => {
     queryMock.mockImplementation(async (sql: string) => {
       if (sql.includes('FROM event_reservations')) {
@@ -323,7 +324,7 @@ describe('checkInTicket', () => {
 
   it('nega o mesmo código na segunda leitura e diz a hora da primeira', async () => {
     clientQueryMock.mockImplementation(async (sql: string) => {
-      // O UPDATE não pega nada: a linha já não está mais em `valid`.
+      // UPDATE matches nothing: the row is no longer `valid`.
       if (sql.startsWith('UPDATE event_tickets')) return { rows: [] };
       if (sql.startsWith('SELECT * FROM event_tickets')) {
         return { rows: [ticketRow({ status: 'used', used_at: '2026-09-06T17:32:00.000Z' })] };
@@ -337,8 +338,8 @@ describe('checkInTicket', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.reason).toBe('already_used');
-      // 17:32 UTC é 14:32 no Rio. O container roda em UTC, e a portaria lê a
-      // hora do relógio dela — não a do servidor.
+      // 17:32 UTC is 14:32 in Rio. The container runs UTC; door staff
+      // read their wall clock, not the server's.
       expect(result.message).toBe('Ingresso já utilizado às 14:32.');
     }
   });
@@ -409,7 +410,7 @@ describe('cancelReservation', () => {
     const ticketUpdate = clientQueryMock.mock.calls.find(([sql]) =>
       String(sql).startsWith('UPDATE event_tickets')
     )!;
-    // Quem já entrou continua `used`: apagar isso apagaria a trilha da portaria.
+    // Already admitted stays `used`: clearing that would wipe the door log.
     expect(String(ticketUpdate[0])).toContain("status IN ('pending', 'valid')");
   });
 });

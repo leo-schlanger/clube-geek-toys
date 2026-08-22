@@ -291,8 +291,8 @@ describe('Plans Configuration — Registration Flow', () => {
     }
   })
 
-  it('should have the expected annual price (R$ 149,99)', () => {
-    expect(PLANS.club.price).toBe(149.99)
+  it('should have the expected monthly price (R$ 12,50)', () => {
+    expect(PLANS.club.price).toBe(12.50)
   })
 
   it('should have a positive discount', () => {
@@ -302,7 +302,7 @@ describe('Plans Configuration — Registration Flow', () => {
 
   it('should format prices correctly', () => {
     expect(formatCurrency(PLANS.club.price)).toMatch(/R\$/)
-    expect(formatCurrency(PLANS.club.price)).toContain('149,99')
+    expect(formatCurrency(PLANS.club.price)).toContain('12,50')
   })
 
   it('should have valid plan IDs matching keys', () => {
@@ -594,14 +594,14 @@ describe('End-to-End Registration Flow Simulation', () => {
       email,
       phone,
       plan: 'club' as const,
-      paymentType: 'annual' as const,
+      paymentType: 'monthly' as const,
     }
 
     expect(memberPayload.cpf).toMatch(/^\d{11}$/)
     expect(memberPayload.email).toContain('@')
     expect(memberPayload.plan).toBe('club')
 
-    // Step 3: payment calculation — always annual, single plan
+    // Step 3: payment calculation — always monthly, single plan
     const plan = PLANS[memberPayload.plan]
     const price = plan.price
     expect(price).toBe(PLANS.club.price)
@@ -670,10 +670,9 @@ describe('Edge Cases & Error Scenarios', () => {
     const selectedPlan = (urlPlan as 'club') || 'club'
     expect(selectedPlan).toBe('club')
 
-    // Always billed annually
     const urlType = null as string | null
-    const paymentType = (urlType as 'annual') || 'annual'
-    expect(paymentType).toBe('annual')
+    const paymentType = (urlType as 'monthly') || 'monthly'
+    expect(paymentType).toBe('monthly')
   })
 
   it('should not allow XSS via name field', () => {

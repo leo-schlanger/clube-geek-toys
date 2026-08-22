@@ -59,7 +59,6 @@ export default function ShopProfile() {
   const [cepLoading, setCepLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Dados pessoais
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [birthDate, setBirthDate] = useState('')
@@ -243,7 +242,7 @@ export default function ShopProfile() {
 
   async function handlePhotoPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    e.target.value = '' // permite reenviar o mesmo arquivo
+    e.target.value = '' // Reset so the same file can be re-picked
     if (!file) return
 
     setPhotoBusy(true)
@@ -296,7 +295,6 @@ export default function ShopProfile() {
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <h1 className="font-heading text-2xl font-bold">Meu perfil</h1>
 
-        {/* ─── Foto ─────────────────────────────────────────────────── */}
         <Card>
           <CardContent className="flex items-center gap-4 pt-6">
             {profile.photoUrl ? (
@@ -357,7 +355,6 @@ export default function ShopProfile() {
           </CardContent>
         </Card>
 
-        {/* ─── Dados pessoais ───────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -435,7 +432,6 @@ export default function ShopProfile() {
           </form>
         </Card>
 
-        {/* ─── Endereço ─────────────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -517,7 +513,6 @@ export default function ShopProfile() {
           </form>
         </Card>
 
-        {/* ─── Compras salvas ───────────────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -584,7 +579,6 @@ export default function ShopProfile() {
           </CardContent>
         </Card>
 
-        {/* ─── Ingressos ────────────────────────────────────────────── */}
         {reservations.length > 0 && (
           <Card>
             <CardHeader>
@@ -640,7 +634,6 @@ export default function ShopProfile() {
           </Card>
         )}
 
-        {/* ─── Histórico ────────────────────────────────────────────── */}
         <Card>
           <CardContent className="flex items-center justify-between gap-4 pt-6">
             <div className="flex items-center gap-2">

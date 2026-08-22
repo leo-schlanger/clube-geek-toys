@@ -7,12 +7,12 @@ import { Skeleton } from '../ui/skeleton'
 
 interface CategoryNavProps {
   categories: Category[]
-  /** Slug da categoria atualmente selecionada (undefined = "Todos"). */
+  /** Currently selected category slug (undefined = "Todos"). */
   activeSlug?: string
   loading?: boolean
   /** Base path for links: "" (default) or "/atacado". */
   basePath?: string
-  /** Use ?category=slug instead of /categoria/:slug (atacado home). */
+  /** Use ?category=slug instead of /categoria/:slug (wholesale home). */
   queryParam?: boolean
 }
 

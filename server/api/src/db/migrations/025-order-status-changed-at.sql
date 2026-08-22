@@ -1,19 +1,13 @@
--- 025 — A fila do painel envelhece pelo status, não por qualquer escrita
+-- 025 — Panel queues age by status, not by any write
 --
--- O dashboard mede "há quantos dias este pedido está parado" com
--- `orders.updated_at` (report.service: filas `to_ship` e `shipped_stale`).
--- `updated_at` é escrito por um trigger em QUALQUER update da linha, então
--- salvar o rastreio, confirmar o PIX ou — a partir da migration 023 — adotar
--- um pedido de convidado zerava o relógio da fila. Um envio parado há 10 dias
--- sumia do alerta porque o cliente entrou na conta.
+-- The dashboard measured "days stuck" with `orders.updated_at`, which a trigger
+-- writes on ANY update: saving a tracking code or claiming a guest order reset
+-- the queue clock and a 10-day-old shipment vanished from the alert.
 --
--- `status_changed_at` só se move quando o `status` muda de fato, e isso é
--- garantido por trigger com WHEN: não depende de nenhum call site lembrar de
--- atualizar a coluna, inclusive os que ainda serão escritos.
+-- `status_changed_at` moves only when `status` actually changes, enforced by a
+-- trigger WHEN clause so no call site has to remember it.
 --
--- Backfill em `updated_at` porque é a melhor aproximação que existe para o
--- histórico — a alternativa seria `created_at`, que faria todo pedido antigo
--- aparecer como parado desde a criação.
+-- Backfilled from `updated_at`: the best approximation available for history.
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_changed_at TIMESTAMPTZ;
 

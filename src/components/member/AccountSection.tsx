@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { Button } from '../ui/button'
 import { Loading } from '../ui/loading'
-import { PLANS, type Member, type PlanType } from '../../types'
+import { PLANS, paymentTypeLabel, type Member, type PlanType } from '../../types'
 import type { Contract } from '../../types'
 import { resendContractEmail } from '../../lib/email'
 import { generateAdhesionPDF, downloadPDF } from '../../lib/contract-generator'
@@ -125,7 +125,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
               <CreditCard className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <p className="text-[10px] text-muted-foreground uppercase">Cobrança</p>
-                <p className="text-sm font-medium">Anual</p>
+                <p className="text-sm font-medium">{paymentTypeLabel(member.paymentType)}</p>
               </div>
             </div>
           </div>

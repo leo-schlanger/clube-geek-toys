@@ -1,17 +1,17 @@
 import type { EventRecord } from '../services/event-config.service.js';
 
 /**
- * Eventos: tipos, preço e a semente de primeira carga.
+ * Event types, pricing, and the first-load seed.
  *
- * A fonte de verdade passou a ser a tabela `events` (migration 029) —
- * `services/event-config.service.ts` a lê e o admin a edita. O que sobrou
- * aqui é o que não pertence ao banco: os tipos, a regra de preço por tipo de
- * ingresso e o teto anti-abuso do endpoint público.
+ * Source of truth is the `events` table (migration 029) —
+ * `services/event-config.service.ts` reads it and the admin edits it. What
+ * remains here does not belong in the DB: the kinds, the per-kind ticket
+ * price rule, and the public-endpoint anti-abuse cap.
  *
- * `FALLBACK_EVENT` existe só para o intervalo entre subir a API e a migration
- * gravar a linha: sem ele a loja ficaria sem evento nenhum nesse instante.
- * Depois disso ninguém mais lê daqui — editar este arquivo **não** muda o que
- * aparece no site.
+ * `FALLBACK_EVENT` covers only the gap between API boot and the migration
+ * inserting the row: without it the shop would have no event at that moment.
+ * After that, nobody reads this — editing this file does **not** change the
+ * site.
  */
 
 export type TicketKind = 'full' | 'member' | 'free';
@@ -19,19 +19,19 @@ export type TicketKind = 'full' | 'member' | 'free';
 export interface EventDefinition {
   id: string;
   title: string;
-  /** Ingresso inteiro, em centavos. */
+  /** Full-price ticket, in cents. */
   priceCents: number;
   startsAt: string;
   endsAt?: string;
   locationName: string;
   locationAddress: string;
-  /** Desliga a criação de novas reservas sem esconder os ingressos já emitidos. */
+  /** Stops new reservations without hiding tickets already issued. */
   reservationsOpen: boolean;
 }
 
 /**
- * Espelha a linha semeada pela migration 029. Se você mudar uma, mude a outra —
- * mas prefira mudar pelo painel: a migration só grava quando a linha não existe.
+ * Mirrors the row seeded by migration 029. If you change one, change the other —
+ * but prefer the panel: the migration writes only when the row is missing.
  */
 export const FALLBACK_EVENT: EventRecord = {
   id: 'kpop-night-2026-09-06',
@@ -77,7 +77,7 @@ export const FALLBACK_EVENT: EventRecord = {
   updatedAt: '2026-08-22T00:00:00.000Z',
 };
 
-/** @deprecated Leia o banco via `event-config.service`. Mantido só como fallback. */
+/** @deprecated Read the DB via `event-config.service`. Kept only as fallback. */
 export const EVENTS: Record<string, EventDefinition> = {
   [FALLBACK_EVENT.id]: {
     id: FALLBACK_EVENT.id,
@@ -92,13 +92,13 @@ export const EVENTS: Record<string, EventDefinition> = {
 };
 
 /**
- * Teto por reserva. Não é regra de negócio (a Laura pediu justamente para tirar
- * o limite de 6): é o freio de um endpoint público que cria linha no banco.
- * Uma família cabe folgada; um script não.
+ * Cap per reservation. Not a business rule (the limit of 6 was removed on
+ * purpose): it is a brake on a public endpoint that inserts a row. A family
+ * fits; a script does not.
  */
 export const MAX_TICKETS_PER_RESERVATION = 50;
 
-/** Preço do ingresso por tipo. Membro paga metade; colo e PCD não pagam. */
+/** Ticket price by kind. Members pay half; infants and PCD pay nothing. */
 export function ticketPriceCents(event: EventDefinition, kind: TicketKind): number {
   if (kind === 'free') return 0;
   if (kind === 'member') return Math.round(event.priceCents / 2);

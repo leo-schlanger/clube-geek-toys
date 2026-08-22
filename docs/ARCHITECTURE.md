@@ -190,7 +190,7 @@ O cadastro e dividido em 3 etapas sequenciais. O usuario pode interromper e reto
 1. Criar conta com email + senha **ou** Google OAuth
 2. Verificar email (link HMAC com validade de 24h)
 3. Preencher dados pessoais: nome completo, CPF (validado), telefone
-4. Confirmar a assinatura do plano unico anual (Clube GeekPop & Toys, R$ 149,99/ano) — sem selecao de tier nem de frequencia
+4. Confirmar a assinatura do plano unico mensal (Clube GeekPop & Toys, R$ 12,50/mes) — sem selecao de tier nem de frequencia
 
 ### Etapa 2: Contrato Digital
 

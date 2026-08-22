@@ -7,9 +7,9 @@ export default defineConfig({
   test: {
     globals: true,
     // WSL + /mnt/d is I/O bound — few workers avoid pool timeouts.
-    // Medido em 15/08/2026 (20 cores, 14 arquivos de componente): 2 workers =
-    // 126s, 6 = 85s, 10 = 78s. De 6 para 10 o custo por worker de montar o
-    // ambiente já come o ganho, então 6 é o joelho da curva.
+    // Measured 15/08/2026 (20 cores, 14 component files): 2 workers =
+    // 126s, 6 = 85s, 10 = 78s. From 6 to 10, per-worker setup eats the
+    // gain, so 6 is the knee of the curve.
     pool: 'forks',
     maxWorkers: 6,
     minWorkers: 1,
@@ -18,9 +18,9 @@ export default defineConfig({
     hookTimeout: 20_000,
     exclude: ['node_modules', 'dist', 'api-worker', 'server/api/node_modules'],
     /**
-     * Dois ambientes. Montar o jsdom é o que domina o relógio da suíte
-     * (`environment` foi 1876s de 1382s de parede em 15/08/2026), e o código do
-     * servidor não toca em DOM nenhum — rodar aquilo sob jsdom era só custo.
+     * Two environments. jsdom setup dominates wall time (`environment` was
+     * 1876s of 1382s wall on 15/08/2026); server code never touches the
+     * DOM — running it under jsdom was pure cost.
      */
     projects: [
       {
@@ -46,14 +46,14 @@ export default defineConfig({
       reporter: ['text', 'json-summary'],
       reportsDirectory: './.coverage',
       /**
-       * O backend inteiro entra aqui desde 16/08/2026.
+       * Whole backend is in the include since 16/08/2026.
        *
-       * Antes o `include` era `src/**` + `server/api/src/utils/**`, então os
-       * "74% de cobertura" do TODO mediam essencialmente o front. As 10 mil
-       * linhas que mexem em dinheiro e estoque — `order.service` (840),
-       * `webhook.service` (569), `payment.service` (521), `stock.service` (409)
-       * — ficavam fora da conta, todas em 0%. A métrica existia e não olhava
-       * para o lugar de maior risco.
+       * Previously `include` was `src/**` + `server/api/src/utils/**`, so
+       * the TODO's "74% coverage" was essentially the front. The ~10k
+       * lines that move money and stock — `order.service` (840),
+       * `webhook.service` (569), `payment.service` (521), `stock.service`
+       * (409) — sat at 0% and were not in the number. The metric existed
+       * and did not look at the highest-risk code.
        */
       include: [
         'src/**/*.{ts,tsx}',
@@ -70,33 +70,33 @@ export default defineConfig({
         'server/api/src/**/*.spec.ts',
       ],
       /**
-       * Thresholds por área, e cada piso é o valor **medido em 16/08/2026**.
+       * Per-area thresholds; each floor is the value **measured 16/08/2026**.
        *
-       * São catracas contra regressão, não metas. A meta continua sendo 70% nos
-       * dois lados; o piso sobe a cada leva de teste.
+       * These are regression ratchets, not goals. The goal remains 70% on
+       * both sides; the floor rises with each test wave.
        *
-       * Por que não 70 direto: o `src/**` estava em 67,55% e o backend em
-       * 11,80%. Deixar a trava acima do real a mantém vermelha, e trava que vive
-       * vermelha é trava que alguém desliga — foi exatamente o que aconteceu
-       * aqui. O TODO anunciava 74% desde 10/08; com o catálogo (variações,
-       * estoque, vídeos, perguntas, galeria, atacado) entrando mais rápido que
-       * os testes, o número caiu ~6,5 pontos e o threshold global de 70%
-       * **já falhava** — sem ninguém notar, porque a run completa leva ~26 min
-       * e não está no CI.
+       * Why not 70 outright: `src/**` was 67.55% and the backend 11.80%.
+       * A lock above the real number stays red, and a lock that lives red
+       * is a lock someone turns off — that is what happened here. The
+       * TODO advertised 74% since 10/08; catalogue work (variants, stock,
+       * videos, questions, gallery, wholesale) outran the tests, the
+       * number dropped ~6.5 points, and the global 70% threshold **already
+       * failed** — unnoticed, because a full run takes ~26 min and is not
+       * on CI.
        *
-       * Próximos alvos no backend, por prejuízo se quebrarem:
-       * `webhook.service` (confirma pagamento e baixa estoque),
-       * `payment.service`, `stock.service`.
+       * Next backend targets, by cost if they break: `webhook.service`
+       * (confirms payment and decrements stock), `payment.service`,
+       * `stock.service`.
        */
       /*
-       * Medido em 16/08/2026 (2278 testes):
-       *   src/**          67,55 stmts · 69,31 lines · 64,94 funcs · 64,18 branch
-       *   server/api/src  11,80 stmts · 11,78 lines ·  9,07 funcs · 10,59 branch
+       * Measured 16/08/2026 (2278 tests):
+       *   src/**          67.55 stmts · 69.31 lines · 64.94 funcs · 64.18 branch
+       *   server/api/src  11.80 stmts · 11.78 lines ·  9.07 funcs · 10.59 branch
        *
-       * Os pisos ficam ~1 ponto abaixo do medido, de propósito. Zero de folga
-       * transforma qualquer função nova sem teste em CI vermelho por ruído — e
-       * o que se aprende com alarme falso é a ignorar o alarme. Com 1 ponto,
-       * só uma queda real dispara. Ao subir a cobertura, suba o piso junto.
+       * Floors sit ~1 point below measured, on purpose. Zero slack turns
+       * any new untested function into red CI noise — and a false alarm
+       * teaches people to ignore the alarm. With 1 point, only a real
+       * drop fires. Raise the floor when coverage rises.
        */
       thresholds: {
         'src/**': {

@@ -72,7 +72,7 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
     status: 'authorized',
     plan: 'club',
     frequencyType: 'years',
-    transactionAmount: 149.99,
+    transactionAmount: 12.50,
     failedPayments: 0,
     payerEmail: 'user@email.com',
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -89,8 +89,8 @@ beforeEach(() => {
 // =============================================================================
 
 describe('calculateSubscriptionPrice', () => {
-  it('returns the annual club price (149.99)', () => {
-    expect(calculateSubscriptionPrice('club', 'years')).toBe(149.99)
+  it('returns the monthly club price (12.50)', () => {
+    expect(calculateSubscriptionPrice('club', 'months')).toBe(12.50)
   })
 })
 
@@ -102,7 +102,7 @@ describe('createSubscription', () => {
   const request = {
     memberId: 'member-1',
     plan: 'club' as const,
-    frequencyType: 'years' as const,
+    frequencyType: 'months' as const,
     payerEmail: 'user@email.com',
     payerName: 'Joao',
     encryptedCard: 'enc-card',
@@ -124,10 +124,10 @@ describe('createSubscription', () => {
     expect(mockedApi.post).toHaveBeenCalledWith('/subscription/create', {
       member_id: 'member-1',
       plan: 'club',
-      frequency_type: 'years',
+      frequency_type: 'months',
       payer_email: 'user@email.com',
       payer_name: 'Joao',
-      transaction_amount: 149.99,
+      transaction_amount: 12.50,
     })
   })
 

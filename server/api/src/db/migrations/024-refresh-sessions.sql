@@ -1,25 +1,16 @@
--- 024 — Uma sessão por dispositivo, em vez de uma sessão por pessoa
+-- 024 — One session per device instead of one per person
 --
--- O refresh token morava em `users.refresh_token_hash`: UMA coluna por
--- usuário. Todo login sobrescrevia o valor, então entrar no celular invalidava
--- o token do computador — e o computador caía no logout no primeiro refresh
--- seguinte, no máximo 15 minutos depois. Era a reclamação "desloga muito
--- rápido": não era o prazo da sessão, era a sessão de um aparelho apagando a
--- do outro.
+-- The refresh token lived in a single `users.refresh_token_hash` column, so
+-- logging in on the phone logged out the desktop. Each session is now a row.
+-- `prev_token_hash` + `rotated_at` keep the 30s grace window against tab races,
+-- now per session.
 --
--- Cada sessão vira uma linha. `prev_token_hash` + `rotated_at` preservam a
--- janela de carência de 30s que evita corrida entre abas ao rotacionar; agora
--- ela é por sessão, e não mais global do usuário.
+-- `expires_at` lives in the database so the server, not only the cookie
+-- `maxAge`, decides how long a session is valid; the cron clears what expired.
 --
--- `expires_at` fica no banco de propósito: até aqui o único prazo real era o
--- `maxAge` do cookie, ou seja, o cliente decidia sozinho até quando a sessão
--- valia. Agora o servidor também sabe, e o cron limpa o que venceu.
---
--- O backfill migra as sessões vivas para que o deploy não deslogue ninguém, e
--- em seguida zera as colunas antigas: sem isso, uma segunda execução do
--- ensure-schema reinseriria um hash já revogado e ressuscitaria uma sessão
--- encerrada. A partir daqui as colunas em `users` ficam sem uso — não são
--- removidas porque migration que faz DROP não tem volta.
+-- The backfill migrates live sessions so the deploy logs nobody out, then
+-- clears the old columns — otherwise a second ensure-schema run would revive a
+-- revoked session. The `users` columns stay unused: a DROP has no way back.
 
 CREATE TABLE IF NOT EXISTS refresh_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -35,8 +26,7 @@ CREATE TABLE IF NOT EXISTS refresh_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_refresh_sessions_user ON refresh_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expires ON refresh_sessions(expires_at);
--- A carência de rotação é consultada com o token antigo; sem índice essa
--- leitura varreria a tabela inteira a cada corrida de abas.
+-- The rotation grace window is looked up by the previous token.
 CREATE INDEX IF NOT EXISTS idx_refresh_sessions_prev
   ON refresh_sessions(prev_token_hash)
   WHERE prev_token_hash IS NOT NULL;

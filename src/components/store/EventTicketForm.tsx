@@ -27,16 +27,16 @@ const SELECT_CLASS =
   'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
 /**
- * Reserva de ingresso.
+ * Ticket reservation.
  *
- * Um ingresso **por pessoa**, com o nome de quem vai entrar. A API devolve os
- * códigos e o PIX, então pagar não depende do popup do WhatsApp abrir.
+ * One ticket **per person**, named for who is entering. The API returns the
+ * codes and the PIX, so paying does not depend on the WhatsApp popup opening.
  */
 export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', notes: '' })
   const [attendees, setAttendees] = useState<Attendee[]>([{ name: '', kind: 'full' }])
   const [submitting, setSubmitting] = useState(false)
-  /** Enquanto ninguém mexer no primeiro nome, ele acompanha quem está reservando. */
+  /** Until the first name is edited, it tracks whoever is reserving. */
   const [firstNameTouched, setFirstNameTouched] = useState(false)
   const [result, setResult] = useState<{
     code: string
@@ -133,7 +133,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
           pix: created.reservation.pix ?? null,
           totalCents: created.reservation.totalCents,
         })
-        // Sem PIX (evento gratuito ou chave ausente), o WhatsApp volta a ser o caminho.
+        // No PIX (free event or missing key), WhatsApp becomes the path again.
         if (!created.reservation.pix) {
           openWhatsApp(created.reservation.code, created.ticketsUrl)
         }
@@ -143,8 +143,8 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
             : 'Reserva registrada! Confirme o pagamento pelo WhatsApp.'
         )
       } else {
-        // A reserva não gravou, mas a venda não pode morrer aqui: o WhatsApp
-        // ainda leva o pedido completo para a equipe lançar à mão.
+        // The reservation did not persist, but the sale cannot die here:
+        // WhatsApp still carries the full order for staff to enter by hand.
         openWhatsApp(null, null)
         toast.warning(`${created.error} Enviamos sua reserva pelo WhatsApp.`)
       }
@@ -247,7 +247,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
             onChange={(e) => {
               const name = e.target.value
               setBuyer((b) => ({ ...b, name }))
-              // O primeiro ingresso costuma ser de quem reserva; ainda dá para trocar.
+              // The first ticket is usually the reserver's; it can still be changed.
               if (!firstNameTouched) {
                 setAttendees((current) => current.map((a, i) => (i === 0 ? { ...a, name } : a)))
               }

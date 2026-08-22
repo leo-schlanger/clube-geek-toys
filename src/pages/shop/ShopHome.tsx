@@ -87,7 +87,6 @@ export default function ShopHome() {
     }
   }, [categorySlug, search])
 
-  // Produtos (reagem a categoria e busca).
   useEffect(() => {
     let active = true
 
@@ -175,7 +174,7 @@ export default function ShopHome() {
       <ShopHeader isMember={isMember} />
 
       <main className="mx-auto max-w-6xl px-4 py-6">
-        {/* Hero — apenas na home sem filtros */}
+        {/* Hero — unfiltered home only */}
         {!categorySlug && !search && (
           <section className="mb-8 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-background to-accent/10 p-6 sm:p-10">
             <div className="max-w-xl">
@@ -210,10 +209,8 @@ export default function ShopHome() {
           </section>
         )}
 
-        {/* Destaque do evento ativo */}
         {!categorySlug && !search && <EventPromoCard />}
 
-        {/* Categorias */}
         <div className="mb-6">
           <CategoryNav
             categories={categories}
@@ -222,7 +219,6 @@ export default function ShopHome() {
           />
         </div>
 
-        {/* Destaques */}
         {featured.length > 0 && (
           <section className="mb-10">
             <div className="mb-4 flex items-center gap-2">
@@ -233,7 +229,6 @@ export default function ShopHome() {
           </section>
         )}
 
-        {/* Grade principal */}
         <section>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
@@ -290,9 +285,9 @@ export default function ShopHome() {
         <p className="text-xs">
           R. Barata Ribeiro, 181 - loja J · Copacabana, RJ · Envio Correios para todo o Brasil
         </p>
-        {/* Razao social e CNPJ em local de destaque: Decreto 7.962/2013, Art. 2, I e II.
-            Antes so existiam dentro da politica de privacidade, que nao cumpre
-            "local de destaque e de facil visualizacao". */}
+        {/* Legal name + CNPJ in a prominent place: Decree 7.962/2013, Art. 2, I and II.
+            They used to live only inside the privacy policy, which does not meet
+            "local de destaque e de fácil visualização". */}
         <p className="text-xs">
           N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA · CNPJ 52.846.344/0001-10
           <br />

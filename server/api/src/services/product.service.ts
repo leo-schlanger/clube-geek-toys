@@ -168,7 +168,7 @@ function mapCategory(row: pg.QueryResultRow): Category {
 function slugify(text: string): string {
   return text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // remove acentos (marcas diacríticas combinantes)
+    .replace(/[̀-ͯ]/g, '') // combining marks left by NFD
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -192,7 +192,7 @@ async function uniqueSlug(table: 'products' | 'categories', base: string, exclud
   }
 }
 
-// ─── Categorias por produto ──────────────────────────────────────────────────
+// ─── Product categories ──────────────────────────────────────────────────────
 
 /** Aggregates categories, primary first. Requires the alias `p` in the host query. */
 const CATEGORIES_LATERAL = `
@@ -544,7 +544,7 @@ export async function createProduct(data: {
 }): Promise<Product> {
   const slug = await uniqueSlug('products', data.name);
   const minQty = Math.max(1, data.wholesaleMinQty ?? 1);
-  // categoryIds manda; categoryId sozinho ainda funciona (compat).
+  // categoryIds wins; categoryId alone still works (compat).
   const categoryIds = resolveCategoryIds(data.categoryIds, data.categoryId);
   const result = await query(
     `INSERT INTO products (name, slug, description, price, compare_at_price, category_id, images, stock, sku, active, featured,
@@ -753,7 +753,7 @@ export async function duplicateProduct(id: string): Promise<Product> {
           JSON.stringify(variant.options),
           variant.price,
           variant.compareAtPrice ?? null,
-          0, // mesmo motivo do pai: estoque é físico, não se duplica
+          0, // same as the parent: stock is physical, it does not clone
           JSON.stringify(variant.images ?? []),
           variant.active,
           variant.sortOrder,
@@ -1147,11 +1147,11 @@ export async function listCategories(includeInactive = false): Promise<Category[
 }
 
 /**
- * Lista para o painel: inclui inativas e conta os produtos de cada uma.
+ * Admin list: includes inactive and counts products in each.
  *
- * A contagem sai de `product_categories` (a tabela de múltiplas categorias),
- * não de `products.category_id`: um produto arquivado numa categoria
- * secundária também conta, e é ele que impede a exclusão inocente.
+ * The count comes from `product_categories` (the multi-category table), not
+ * from `products.category_id`: a product filed under a secondary category
+ * still counts, and that is what blocks an innocent delete.
  */
 export async function listCategoriesForAdmin(): Promise<(Category & { productCount: number })[]> {
   const result = await query(
@@ -1225,7 +1225,7 @@ export interface AddImagesResult {
   product: Product;
   /** URLs that fit under the cap and were persisted. */
   accepted: string[];
-  /** URLs recusadas por estourar o teto — o caller apaga os arquivos. */
+  /** URLs rejected for exceeding the cap — the caller deletes the files. */
   rejected: string[];
 }
 

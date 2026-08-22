@@ -226,7 +226,6 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
             <p className="text-center text-muted-foreground py-8">Pedido não encontrado</p>
           ) : (
             <>
-              {/* Status atual */}
               <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
@@ -246,7 +245,6 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               </div>
 
-              {/* Cliente */}
               <div className="space-y-1">
                 <h4 className="font-semibold text-sm">Cliente</h4>
                 <p className="text-sm">{order.customerName}</p>
@@ -256,9 +254,9 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 )}
               </div>
 
-              {/* Recado do cliente — destacado porque muda o que vai na caixa:
-                  pedido de photocard do mesmo cantor, embalagem de presente,
-                  combinação de entrega. Passar batido é errar o pedido. */}
+              {/* Customer note is highlighted because it changes what goes in
+                  the box: more photocards of the same singer, gift wrap,
+                  a delivery arrangement. Skipping it is getting the order wrong. */}
               {order.customerNote && (
                 <div className="space-y-1 rounded-lg border border-accent/40 bg-accent/10 p-3">
                   <h4 className="flex items-center gap-1 text-sm font-semibold">
@@ -268,9 +266,9 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               )}
 
-              {/* Retirada na loja: sem endereço de destino e sem postagem. O
-                  aviso vem antes de tudo porque muda o que a equipe faz com o
-                  pedido — separa e guarda no balcão em vez de embalar e postar. */}
+              {/* Store pickup: no destination address and no postage. The
+                  warning comes first because it changes what staff do with
+                  the order — pick and hold at the counter instead of packing and posting. */}
               {isPickup && (
                 <div className="space-y-1 rounded-lg border border-primary/40 bg-primary/10 p-3">
                   <h4 className="flex items-center gap-1 text-sm font-semibold">
@@ -284,7 +282,6 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               )}
 
-              {/* Endereço */}
               {!isPickup && address && (
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm flex items-center gap-1">
@@ -301,8 +298,8 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               )}
 
-              {/* Rastreio Correios — não existe em pedido de retirada, e a API
-                  recusa o código, então o campo nem aparece. */}
+              {/* Correios tracking — pickup orders have none, and the API
+                  rejects a code, so the field is not shown. */}
               <div className={cn('space-y-2 border-t pt-4', isPickup && 'hidden')}>
                 <h4 className="font-semibold text-sm">Rastreio (Correios)</h4>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -334,7 +331,6 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 )}
               </div>
 
-              {/* Itens */}
               <div className="space-y-2">
                 <h4 className="font-semibold text-sm">Itens</h4>
                 <div className="space-y-2">
@@ -362,7 +358,6 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               </div>
 
-              {/* Totais */}
               <div className="space-y-1.5 border-t pt-4 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
@@ -393,7 +388,6 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               </div>
 
-              {/* Alterar status */}
               <div className="space-y-2 border-t pt-4">
                 <h4 className="font-semibold text-sm flex items-center gap-1">
                   <CreditCard className="h-4 w-4 text-muted-foreground" /> Alterar status

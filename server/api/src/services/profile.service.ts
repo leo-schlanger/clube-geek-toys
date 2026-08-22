@@ -163,7 +163,7 @@ export async function setProfilePhoto(
   return getProfile(userId);
 }
 
-// ─── Produtos salvos ─────────────────────────────────────────────────────────
+// ─── Saved products ──────────────────────────────────────────────────────────
 
 export interface SavedProduct {
   productId: string;

@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
+vi.mock('../../hooks/useConfirm', () => ({
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+}))
+
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({
@@ -100,7 +104,7 @@ import { StepPayment } from './StepPayment'
 
 const defaultProps = {
   plan: 'club' as const,
-  paymentType: 'annual' as const,
+  paymentType: 'monthly' as const,
   memberId: 'member-123',
   memberEmail: 'test@example.com',
   memberName: 'Test User',
@@ -127,8 +131,8 @@ describe('StepPayment', () => {
     render(<StepPayment {...defaultProps} />)
 
     expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/assinatura anual/i)).toBeInTheDocument()
-    expect(screen.getByText(/149,99/)).toBeInTheDocument()
+    expect(screen.getByText(/assinatura mensal/i)).toBeInTheDocument()
+    expect(screen.getByText(/12,50/)).toBeInTheDocument()
     expect(screen.getByText(/pagamento seguro via stripe/i)).toBeInTheDocument()
   })
 

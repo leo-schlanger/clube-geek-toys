@@ -30,7 +30,7 @@ export default function TermsOfUse() {
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">1. O Clube de Vantagens</h2>
-                            <p>O Clube oferece um plano único de assinatura anual com descontos exclusivos em nossa loja física e online, brindes e acessos antecipados. Os benefícios estão detalhados na página de assinatura e no contrato de adesão.</p>
+                            <p>O Clube oferece um plano único de assinatura mensal com descontos exclusivos em nossa loja física e online, brindes e acessos antecipados. Os benefícios estão detalhados na página de assinatura e no contrato de adesão.</p>
                         </section>
 
                         <section className="space-y-3">
@@ -45,11 +45,11 @@ export default function TermsOfUse() {
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">3. Assinaturas e Pagamentos</h2>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li>A assinatura é anual, com renovação automática.</li>
+                                <li>A assinatura é mensal, com renovação automática.</li>
                                 <li><strong>Direito de Arrependimento (Art. 49, CDC):</strong> O consumidor pode desistir da contratação no prazo de 7 (sete) dias a contar da assinatura, com reembolso integral dos valores pagos.</li>
                                 <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas não gera estorno de períodos já pagos.</li>
                                 <li>Os pagamentos são processados de forma segura via Stripe (PIX ou cartão de crédito).</li>
-                                <li>Os valores podem ser reajustados anualmente, com comunicação prévia de 30 dias.</li>
+                                <li>Os valores podem ser reajustados, com comunicação prévia de 30 dias.</li>
                             </ul>
                         </section>
 
@@ -57,8 +57,8 @@ export default function TermsOfUse() {
                             <h2 className="text-2xl font-semibold text-foreground">4. Cancelamento e Rescisão</h2>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>O cancelamento pode ser solicitado a qualquer momento pela área do membro ou por e-mail.</li>
-                                <li>A assinatura anual não possui fidelidade além do período já pago; o direito de arrependimento da <strong>assinatura</strong> é de 7 (sete) dias a contar da contratação. Para compra de produtos, o prazo conta do recebimento — ver a seção 5.</li>
-                                <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas o período anual já pago não é reembolsável.</li>
+                                <li>A assinatura mensal não possui fidelidade além do período já pago; o direito de arrependimento da <strong>assinatura</strong> é de 7 (sete) dias a contar da contratação. Para compra de produtos, o prazo conta do recebimento — ver a seção 5.</li>
+                                <li>Após o período de arrependimento, o cancelamento interrompe a renovação futura, mas o período já pago não é reembolsável.</li>
                                 <li>Reservamo-nos o direito de cancelar assinaturas em caso de fraude, uso indevido ou violação destes termos.</li>
                             </ul>
                         </section>

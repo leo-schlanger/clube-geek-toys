@@ -10,7 +10,7 @@ import { updateMember, clearPendingPayment } from '../lib/members'
 import { checkPixPaymentStatus, isPaymentConfigured } from '../lib/payments'
 import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
-import { PLANS, type Member, type PlanType, type Contract } from '../types'
+import { PLANS, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -222,14 +222,14 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                   <div>
                     <p className="font-bold text-lg">Plano {plan.name}</p>
                     <p className="text-sm opacity-80">
-                      Anual
+                      {paymentTypeLabel(member.paymentType)}
                     </p>
                   </div>
                 </div>
                 <div className="text-2xl font-bold">
                   {formatCurrency(price)}
                   <span className="text-sm font-normal opacity-80">
-                    /ano
+                    {paymentTypeSuffix(member.paymentType)}
                   </span>
                 </div>
               </div>

@@ -242,43 +242,34 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        {/* ═══ 1. Carteirinha Digital ═══ */}
         <MembershipCard member={member} />
 
-        {/* ═══ 2. Faixa de Desconto ═══ */}
         <DiscountStrip />
 
-        {/* ═══ 3. Ações Rápidas ═══ */}
         <QuickActions
           member={member}
           onRenew={() => setModal('renew')}
           onEditProfile={() => setModal('profile')}
         />
 
-        {/* ═══ 4. Celebração de Boas-vindas (primeiro acesso) ═══ */}
         <WelcomeCelebration memberName={member.fullName} memberId={member.id} />
 
-        {/* ═══ 5. Guia de Boas-vindas ═══ */}
         <OnboardingGuide memberStartDate={member.startDate} />
 
-        {/* ═══ 6. Benefícios ═══ */}
         <BenefitsSection />
 
-        {/* ═══ 7. Assinatura ═══ */}
         <SubscriptionCard
           member={member}
           subscription={subscription}
           onSubscriptionChange={fetchMemberData}
         />
 
-        {/* ═══ 8. Dados + Contrato ═══ */}
         <AccountSection
           member={member}
           contract={contract}
           onEditProfile={() => setModal('profile')}
         />
 
-        {/* ═══ 9. Atividades Recentes ═══ */}
         <MemberActivityHistory memberId={member.id} limit={5} />
       </main>
 

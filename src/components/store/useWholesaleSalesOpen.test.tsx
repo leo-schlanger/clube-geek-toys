@@ -23,7 +23,7 @@ describe('useWholesaleSalesOpen', () => {
     expect(result.current.salesOpen).toBe(true)
   })
 
-  // Um erro de rede não pode virar botão de compra que a API vai recusar.
+  // A network error must not become a Buy button the API will refuse.
   it('trata falha como canal fechado', async () => {
     mockedGet.mockRejectedValue(new Error('offline'))
     const { result } = renderHook(() => useWholesaleSalesOpen())

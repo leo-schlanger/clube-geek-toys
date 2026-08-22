@@ -135,7 +135,7 @@ describe('ProductModal — per-variant photo', () => {
       />
     )
 
-    // Primeira miniatura "Da galeria" da linha Rosa
+    // First "From gallery" thumb on the Rosa row
     const galleryThumbs = screen.getAllByTitle('Usar esta imagem na variação')
     expect(galleryThumbs.length).toBeGreaterThan(0)
     fireEvent.click(galleryThumbs[0])
@@ -499,8 +499,8 @@ describe('ProductModal — form tabs', () => {
   })
 
   it('the tab counter reveals content hidden inside', () => {
-    // This was the gap: with no counter, hiding behind a tab merely swaps one
-    // problema de descoberta por outro.
+    // This was the gap: with no counter, hiding behind a tab merely swaps
+    // one discoverability problem for another.
     renderEdit()
 
     // 2 photos in the fixture.

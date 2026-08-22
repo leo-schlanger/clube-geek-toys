@@ -134,9 +134,7 @@ function RoleError() {
   )
 }
 
-/**
- * Acesso Negado
- */
+/** Wrong role for this subdomain. */
 function AccessDenied() {
   const { signOut, role } = useAuth()
 
@@ -185,9 +183,6 @@ function AccessDenied() {
   )
 }
 
-/**
- * Rotas Admin
- */
 function AdminRoutes() {
   return (
     <Routes>
@@ -218,9 +213,6 @@ function AdminRoutes() {
   )
 }
 
-/**
- * Rotas Member
- */
 function MemberRoutes() {
   return (
     <Routes>
@@ -290,14 +282,13 @@ function ShopRoutes() {
         <Route path="/minhas-compras" element={<MyOrders />} />
         <Route path="/minhas-compras/:id" element={<MyOrderDetail />} />
         <Route path="/entrar" element={<ShopLogin />} />
-        {/* Conta da loja: cadastro e perfil não exigem assinatura do clube. */}
+        {/* Shop register/profile skip club membership. */}
         <Route path="/cadastro" element={<ShopRegister />} />
         <Route path="/perfil" element={<ShopProfile />} />
         <Route path="/evento" element={<EventPage />} />
-        {/* Ingresso nominal: link público, sem login — quem vai entrar não tem conta. */}
+        {/* Named ticket URL is public: the attendee often has no shop account. */}
         <Route path="/ingresso/:code" element={<TicketPage mode="ticket" />} />
         <Route path="/ingressos/:code" element={<TicketPage mode="reservation" />} />
-        {/* Canal Atacado (aba dedicada + CNPJ) */}
         <Route path="/atacado" element={<WholesaleHome />} />
         <Route path="/atacado/entrar" element={<WholesaleLogin />} />
         <Route path="/atacado/cadastro" element={<WholesaleRegister />} />

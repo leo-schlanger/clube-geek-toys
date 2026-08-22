@@ -67,7 +67,7 @@ export async function getDailyReport() {
 
 /**
  * Monthly report with a continuous month axis (zeros when empty).
- * Revenue = paid club payments; newMembers = cadastros; churned = expired/inactive that month.
+ * Revenue = paid club payments; newMembers = sign-ups; churned = expired/inactive that month.
  * shopRevenue = paid shop orders that month (when table exists).
  */
 export async function getMonthlyReport(months: number) {
@@ -475,7 +475,7 @@ export async function getActionItems(): Promise<ActionItemsReport> {
     // Aged by `status_changed_at` (migration 025), not `updated_at`: any write
     // to the row bumps updated_at — saving a tracking code, adopting a guest
     // order — and a queue that resets because someone touched the order is a
-    // queue that hides exactly the pedido that has been stuck the longest.
+    // queue that hides exactly the order that has been stuck the longest.
     queueStat('to_ship', queueSql('orders', `status = 'processing'`, 'COALESCE(status_changed_at, updated_at)')),
     queueStat(
       'shipped_stale',
@@ -486,8 +486,8 @@ export async function getActionItems(): Promise<ActionItemsReport> {
       )
     ),
     queueStat('questions_unanswered', queueSql('product_questions', `answered_at IS NULL AND status = 'published'`)),
-    // Reserva de ingresso parada é dinheiro esperando **e** uma família que vai
-    // ser barrada na portaria: o ingresso só vale depois da confirmação.
+    // A pending ticket reservation is money waiting **and** a family that
+    // will be turned away at the door: the ticket is valid only after confirmation.
     queueStat('event_tickets_pending', queueSql('event_reservations', `status = 'pending'`)),
     queueStat('reviews_pending', queueSql('product_reviews', `status = 'pending'`)),
     queueStat('wholesale_pending', queueSql('wholesale_accounts', `status = 'pending'`)),

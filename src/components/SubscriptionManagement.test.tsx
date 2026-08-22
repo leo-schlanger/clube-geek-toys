@@ -94,8 +94,8 @@ function makeSub(overrides?: Partial<Subscription>): Subscription {
     providerId: 'prov-1',
     status: 'authorized',
     plan: 'club',
-    frequencyType: 'years',
-    transactionAmount: 149.99,
+    frequencyType: 'months',
+    transactionAmount: 12.50,
     nextPaymentDate: '2026-06-15',
     failedPayments: 0,
     cardLastFour: '1234',
@@ -164,7 +164,7 @@ describe('SubscriptionManagement', () => {
       expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     })
     expect(screen.getByText('**** 1234')).toBeInTheDocument()
-    expect(screen.getByText('Anual')).toBeInTheDocument()
+    expect(screen.getByText('Mensal')).toBeInTheDocument()
     expect(screen.getByText('15/06/2026')).toBeInTheDocument()
     expect(screen.getByText('Ativa')).toBeInTheDocument()
   })

@@ -15,19 +15,17 @@ import { sendTemplateEmail } from './email.service.js';
 import { generatePixEMV, generatePixTxId } from '../utils/pix.js';
 
 /**
- * Ingressos de evento.
+ * Event tickets.
  *
- * O problema que isto resolve: até aqui o "ingresso" era uma mensagem de
- * WhatsApp. Qualquer print valia na porta, e a reserva só existia na conversa.
- * Agora cada pessoa tem um ingresso **nominal** com código único, e a entrada
- * **queima** o código — o segundo print do mesmo QR aparece como já utilizado.
+ * Each person gets a **named** ticket with a unique code, and entry **burns**
+ * it: a second scan of the same QR reads as already used.
  *
  * Payment is PIX on screen (same EMV as the shop), but settlement stays manual
  * as with orders — there is no PIX webhook: a reservation starts `pending` and
  * only becomes a valid ticket once an admin confirms the money arrived.
  */
 
-/** Fuso da loja: o container da API roda em UTC. */
+/** Shop timezone: the API container runs in UTC. */
 const EVENT_TIME_ZONE = 'America/Sao_Paulo';
 
 // Same account that receives shop orders (order.service uses these too).
@@ -82,8 +80,8 @@ export interface EventReservation {
 }
 
 /**
- * Alfabeto sem 0/O/1/I/L: o código também é digitado à mão quando a câmera da
- * portaria não coopera, e um "0" lido como "O" vira ingresso inexistente.
+ * Alphabet without 0/O/1/I/L: the code is also typed by hand at the door, and a
+ * "0" read as "O" becomes a ticket that does not exist.
  */
 const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -96,19 +94,19 @@ function randomCode(length: number): string {
   return out;
 }
 
-/** `R-XXXX-XXXX` — abre a lista de ingressos da compra; precisa ser inadivinhável. */
+/** `R-XXXX-XXXX` — opens the purchase's ticket list; must be unguessable. */
 function newReservationCode(): string {
   const raw = randomCode(8);
   return `R-${raw.slice(0, 4)}-${raw.slice(4)}`;
 }
 
-/** `T-XXXX-XXXX-XXXX` — 60 bits, é o que o QR carrega e a portaria queima. */
+/** `T-XXXX-XXXX-XXXX` — 60 bits; what the QR carries and the door burns. */
 function newTicketCode(): string {
   const raw = randomCode(12);
   return `T-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8)}`;
 }
 
-/** Aceita o código com ou sem hífen/caixa, porque digitação humana varia. */
+/** Accepts the code with or without hyphens and in any case: humans type it. */
 export function normalizeCode(input: string): string {
   const clean = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (clean.startsWith('T') && clean.length === 13) {
@@ -165,7 +163,7 @@ function mapReservation(row: pg.QueryResultRow): EventReservation {
   };
 }
 
-/** Definição do evento vinda do banco, ou `null` se o id não existe mais. */
+/** Event definition from the database, or `null` if the id is gone. */
 async function loadDefinition(eventId: string): Promise<EventDefinition | null> {
   const event = await getEventById(eventId);
   return event ? toDefinition(event) : null;
@@ -223,11 +221,10 @@ export interface CreateReservationInput {
 }
 
 /**
- * Cria a reserva e um ingresso **por pessoa**, todos `pending`.
+ * Creates the reservation and one ticket **per person**, all `pending`.
  *
- * O ingresso já nasce com código: assim o cliente sai da loja com o link na
- * mão e a equipe tem o que procurar no painel. Válido, só depois da confirmação
- * do pagamento.
+ * Tickets are born with their code so the buyer leaves with a link and the team
+ * has something to search for; valid only after payment is confirmed.
  */
 export async function createReservation(
   eventId: string,
@@ -294,8 +291,8 @@ export async function createReservation(
     reservation.tickets = tickets;
     reservation.pix = buildReservationPix(reservation);
 
-    // E-mail é conveniência: a reserva já está gravada, então uma falha do
-    // Resend não pode derrubar a resposta.
+    // The reservation is already committed: a Resend failure must not fail the
+    // response.
     void sendReservationReceivedEmail(reservation, event).catch((err) =>
       console.error('[EVENT] Falha ao enviar e-mail de reserva:', err)
     );
@@ -400,7 +397,7 @@ export function formatBRL(cents: number): string {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-// ─── Consulta pública ────────────────────────────────────────────────────────
+// ─── Public lookup ───────────────────────────────────────────────────────────
 
 export interface PublicTicket {
   code: string;
@@ -436,7 +433,7 @@ function buildPublicTicket(ticket: EventTicket, event: EventDefinition): PublicT
   };
 }
 
-/** Ingresso avulso. Não expõe o comprador — o QR circula. */
+/** Standalone ticket. Does not expose the buyer — the QR circulates. */
 export async function getPublicTicket(code: string): Promise<PublicTicket | null> {
   const result = await query(`SELECT * FROM event_tickets WHERE code = $1`, [normalizeCode(code)]);
   if (result.rows.length === 0) return null;
@@ -474,7 +471,7 @@ function buildPublicReservation(
   };
 }
 
-/** Todos os ingressos de uma compra — é o link que vai no e-mail. */
+/** Every ticket of a purchase — this is the link the email carries. */
 export async function getPublicReservation(code: string): Promise<PublicReservation | null> {
   const normalized = normalizeCode(code);
   const result = await query(`SELECT * FROM event_reservations WHERE code = $1`, [normalized]);
@@ -485,8 +482,7 @@ export async function getPublicReservation(code: string): Promise<PublicReservat
     `SELECT * FROM event_tickets WHERE reservation_id = $1 ORDER BY created_at, code`,
     [reservation.id]
   );
-  // Todos os ingressos da reserva são do mesmo evento: uma leitura, não uma
-  // por ingresso.
+  // All tickets share the event: one read, not one per ticket.
   const event = await loadDefinition(reservation.eventId);
   const tickets = event
     ? ticketsResult.rows.map((row) => buildPublicTicket(mapTicket(row), event))
@@ -626,9 +622,9 @@ export async function adminListReservations(
 }
 
 /**
- * Confirma o pagamento: os ingressos da reserva viram válidos e o comprador
- * recebe o link. Só sai de `pending`, para que confirmar duas vezes não
- * ressuscite ingresso cancelado nem reenvie e-mail à toa.
+ * Confirms payment: the reservation's tickets become valid and the buyer gets
+ * the link. Only leaves `pending`, so confirming twice neither revives a
+ * cancelled ticket nor resends the email.
  */
 export async function confirmReservation(
   id: string,
@@ -698,7 +694,7 @@ export async function confirmReservation(
   }
 }
 
-/** Cancela a reserva e invalida os ingressos que ainda não entraram. */
+/** Cancels the reservation and voids the tickets that have not entered yet. */
 export async function cancelReservation(
   id: string,
   actorUserId: string,
@@ -718,8 +714,7 @@ export async function cancelReservation(
       await client.query('ROLLBACK');
       throw new AppError(404, 'Reserva não encontrada ou já cancelada.', 'RESERVATION_NOT_FOUND');
     }
-    // `used` fica como está: quem já entrou, entrou — apagar isso apagaria a
-    // trilha da portaria.
+    // `used` stays: erasing it would erase the door's audit trail.
     const tickets = await client.query(
       `UPDATE event_tickets SET status = 'cancelled', updated_at = NOW()
        WHERE reservation_id = $1 AND status IN ('pending', 'valid')
@@ -755,11 +750,11 @@ export type CheckInResult =
     };
 
 /**
- * Entrada na portaria: valida e **queima** o código.
+ * Door entry: validates and **burns** the code.
  *
- * O `UPDATE ... WHERE status = 'valid'` é o ponto do sistema todo: só a
- * primeira leitura muda a linha. O print reenviado para o grupo da família cai
- * em `already_used`, com a hora em que o ingresso entrou.
+ * `UPDATE ... WHERE status = 'valid'` is the whole point: only the first scan
+ * changes the row. A forwarded screenshot lands on `already_used`, with the
+ * time the ticket actually entered.
  */
 export async function checkInTicket(code: string, actorUserId: string): Promise<CheckInResult> {
   const normalized = normalizeCode(code);
@@ -800,9 +795,9 @@ export async function checkInTicket(code: string, actorUserId: string): Promise<
     const buyerName = buyer.rows[0]?.buyer_name ?? '';
 
     if (ticket.status === 'used') {
-      // O container roda em UTC. Sem fixar o fuso, a portaria leria "já
-      // utilizado às 19:53" para alguém que entrou às 16:53 — três horas de
-      // discussão na porta por causa de uma string.
+      // The container runs in UTC. Without pinning the zone, door staff would
+      // read "already used at 19:53" for someone who entered at 16:53 — three
+      // hours of argument at the door over a string.
       const when = ticket.usedAt
         ? new Date(ticket.usedAt).toLocaleTimeString('pt-BR', {
             hour: '2-digit',
@@ -840,7 +835,7 @@ export async function checkInTicket(code: string, actorUserId: string): Promise<
   }
 }
 
-/** Contadores da portaria: quantos entraram, quantos faltam. */
+/** Door counters: how many entered, how many still to. */
 export async function getEventStats(eventId: string): Promise<{
   eventId: string;
   pending: number;

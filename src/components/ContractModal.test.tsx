@@ -107,7 +107,7 @@ const defaultProps = {
   memberEmail: 'joao@example.com',
   memberPhone: '(11) 99999-8888',
   plan: 'club' as const,
-  paymentType: 'annual' as const,
+  paymentType: 'monthly' as const,
   onClose: vi.fn(),
   onSigned: vi.fn(),
 }
@@ -153,7 +153,7 @@ describe('ContractModal', () => {
 
     it('shows the annual payment type', () => {
       render(<ContractModal {...defaultProps} />)
-      expect(screen.getByText(/Anual/)).toBeInTheDocument()
+      expect(screen.getByText(/Mensal/)).toBeInTheDocument()
     })
 
     it('renders contract sections', () => {
@@ -322,9 +322,9 @@ describe('ContractModal', () => {
   // ── Plan / price display ───────────────────────────────────
 
   describe('plan and price display', () => {
-    it('shows the annual club price (R$ 149,99)', () => {
+    it('shows the monthly club price (R$ 12,50)', () => {
       render(<ContractModal {...defaultProps} />)
-      expect(screen.getByText(/R\$\s*149,99/)).toBeInTheDocument()
+      expect(screen.getByText(/R\$\s*12,50/)).toBeInTheDocument()
     })
 
     it('always shows the single club plan (no Silver/Gold/Black)', () => {

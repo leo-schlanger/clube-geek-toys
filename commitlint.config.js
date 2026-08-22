@@ -5,20 +5,20 @@ export default {
       2,
       'always',
       [
-        'feat',     // Nova funcionalidade
-        'fix',      // Correção de bug
-        'docs',     // Documentação
-        'style',    // Formatação (não afeta código)
-        'refactor', // Refatoração
-        'perf',     // Melhoria de performance
-        'test',     // Testes
-        'build',    // Build system
-        'ci',       // CI/CD
-        'chore',    // Tarefas de manutenção
-        'revert',   // Reverter commit
+        'feat',
+        'fix',
+        'docs',
+        'style',
+        'refactor',
+        'perf',
+        'test',
+        'build',
+        'ci',
+        'chore',
+        'revert',
       ],
     ],
-    'subject-case': [0], // Desabilita regra de case para permitir português
-    'body-max-line-length': [0], // Desabilita limite de linha no body
+    'subject-case': [0], // off: subjects are often Portuguese
+    'body-max-line-length': [0],
   },
 }

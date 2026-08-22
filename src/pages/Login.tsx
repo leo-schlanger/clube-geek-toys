@@ -34,7 +34,6 @@ export default function Login() {
   const { user, role, loading, error, signIn, signInWithGoogle } = useAuth()
   const navigate = useNavigate()
 
-  // Countdown do lockout
   useEffect(() => {
     if (lockoutTime <= 0) return
 
@@ -74,10 +73,8 @@ export default function Login() {
     e.preventDefault()
     setFormError('')
 
-    // Normalizar email
     const normalizedEmail = normalizeEmail(email)
 
-    // Verificar rate limit
     const { blocked, remainingTime } = isBlocked(normalizedEmail)
     if (blocked) {
       setLockoutTime(remainingTime)
@@ -90,7 +87,6 @@ export default function Login() {
     const result = await signIn(normalizedEmail, password)
 
     if (!result.success) {
-      // Registrar tentativa falha
       const { blocked: nowBlocked, attemptsRemaining, lockoutSeconds } = recordFailedAttempt(normalizedEmail)
 
       if (nowBlocked) {
@@ -255,7 +251,6 @@ export default function Login() {
                   </motion.div>
                 )}
 
-                {/* Erro do formulario */}
                 {formError && !isLocked && (
                   <motion.div
                     initial={{ opacity: 0, y: -4 }}
@@ -266,7 +261,6 @@ export default function Login() {
                   </motion.div>
                 )}
 
-                {/* Erro de autenticacao */}
                 {error && !formError && !isLocked && (
                   <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/50 text-orange-600 text-sm">
                     <p className="font-medium mb-1">Usuário não cadastrado</p>

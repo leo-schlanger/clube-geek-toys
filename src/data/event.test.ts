@@ -8,9 +8,8 @@ import {
 } from './event'
 
 describe('event data', () => {
-  // O fallback só cobre o primeiro paint, mas precisa espelhar o que a
-  // migration semeia: um fallback desalinhado anuncia a data errada até a
-  // resposta da API chegar.
+  // Fallback only covers first paint, but must mirror the migration seed:
+  // a mismatched fallback announces the wrong date until the API answers.
   it('FALLBACK_EVENT espelha o evento semeado pela migration 029', () => {
     expect(FALLBACK_EVENT.status).toBe('published')
     expect(FALLBACK_EVENT.startsAt).toContain('2026-09-20')

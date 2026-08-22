@@ -13,7 +13,7 @@ export const PRODUCT_IMAGE_ACCEPT = 'image/*'
 export const PRODUCT_IMAGE_ACCEPT_LABEL =
   'Foto da galeria · recorte e tamanho na hora · 4K é redimensionada · até 40 MB'
 
-/** Recorte em pixels da imagem original. */
+/** Crop rect in original-image pixels. */
 export interface ImageCropRect {
   x: number
   y: number

@@ -356,8 +356,8 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
         'Preencha o custo dos produtos para este bloco deixar de ficar vazio.'
     )
   } else if (margin.revenueWithoutCost > 0) {
-    // O rodape existe para o numero nao se passar por completo: quem le precisa
-    // saber quanto da receita ficou de fora antes de decidir com base na margem.
+    // The footnote exists so the figure is not mistaken for a complete total:
+    // readers need to know how much revenue was excluded before trusting the margin.
     layout.note(
       `Calculado sobre ${margin.costCoveragePct.toFixed(0)}% da receita. ` +
         `${money(margin.revenueWithoutCost)} em vendas (${integer(margin.unitsWithoutCost)} unidades) ` +

@@ -1,7 +1,6 @@
 /**
- *
  * Uses the browser's native loading="lazy" and shows
- * um placeholder enquanto a imagem carrega.
+ * a placeholder while the image loads.
  *
  * @example
  * <LazyImage
@@ -15,13 +14,10 @@ import { useState, useCallback } from 'react'
 import { cn } from '../../lib/utils'
 
 interface LazyImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
-  /** URL da imagem */
   src: string
-  /** Texto alternativo */
   alt: string
   /** Fallback image URL on error. */
   fallbackSrc?: string
-  /** Mostrar skeleton enquanto carrega */
   showSkeleton?: boolean
   /** Container classes. */
   containerClassName?: string

@@ -1,20 +1,20 @@
 -- ============================================
--- Migration 013 — Variações de produto (modelo Shopee)
+-- Migration 013 — Product variants (Shopee model)
 -- ============================================
--- Um listing (product) pode ter até 2 eixos (ex.: Cor, Tamanho).
--- Cada combinação vira um SKU em product_variants com preço/estoque/imagem.
--- Na vitrine: 1 card. No detalhe: seletor de variações abaixo do produto.
+-- A listing (product) may have up to 2 axes (e.g. Cor, Tamanho). Each
+-- combination is a SKU in product_variants with its own price/stock/image.
+-- One card on the shelf; a variant picker on the detail page.
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS has_variants BOOLEAN NOT NULL DEFAULT FALSE;
--- Eixos do listing: [{ "name": "Cor", "options": ["Rosa","Preto"] }, ...]  max 2
+-- Listing axes: [{ "name": "Cor", "options": ["Rosa","Preto"] }, ...] max 2
 ALTER TABLE products ADD COLUMN IF NOT EXISTS variant_axes JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE TABLE IF NOT EXISTS product_variants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  -- Rótulo humano: "Rosa / M"
+  -- Human label: "Rosa / M"
   name VARCHAR(200) NOT NULL,
-  -- Mapa eixo→opção: {"Cor":"Rosa","Tamanho":"M"}
+  -- Axis→option map: {"Cor":"Rosa","Tamanho":"M"}
   options JSONB NOT NULL DEFAULT '{}'::jsonb,
   sku VARCHAR(60),
   price DECIMAL(10,2) NOT NULL CHECK (price >= 0),
@@ -39,6 +39,6 @@ DO $$ BEGIN
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Snapshot da variação no item do pedido (histórico imutável)
+-- Variant snapshot on the order item (immutable history)
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_id UUID REFERENCES product_variants(id) ON DELETE SET NULL;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS variant_label VARCHAR(200);

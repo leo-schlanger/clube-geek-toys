@@ -7,7 +7,7 @@ import SignaturePad from 'signature_pad'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { CONTRACT_SECTIONS, CONTRACT_TITLE, CONTRACT_SUBTITLE } from '../data/contract-content'
-import { CLUB_PLAN, type PlanType, type PaymentType, type ContractData } from '../types'
+import { CLUB_PLAN, paymentTypeLabel, type PlanType, type PaymentType, type ContractData } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { generateContractPDF, pdfToBase64, downloadPDF } from '../lib/contract-generator'
 import { storeContract } from '../lib/contract-storage'
@@ -404,7 +404,7 @@ export function ContractModal({
                   <p className="mt-2 pt-2 border-t">
                     <span className="text-muted-foreground">Plano:</span>{' '}
                     <Badge variant="club">{CLUB_PLAN.name}</Badge>{' '}
-                    (Anual) - <strong>{formatCurrency(price)}</strong>
+                    ({paymentTypeLabel(paymentType)}) - <strong>{formatCurrency(price)}</strong>
                   </p>
                 </div>
 

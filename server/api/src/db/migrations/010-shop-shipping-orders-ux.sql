@@ -1,7 +1,7 @@
 -- Migration 010: shipping logistics, tracking, reviews, store credit
--- Shop orders UX (frete Correios via Melhor Envio, minhas compras, avaliações)
+-- Shop orders UX (Correios shipping via Melhor Envio, my orders, reviews)
 
--- ─── Product package dimensions (for frete cotação) ─────────────────────────
+-- ─── Product package dimensions (for shipping quotes) ───────────────────────
 ALTER TABLE products ADD COLUMN IF NOT EXISTS weight_g INTEGER CHECK (weight_g IS NULL OR weight_g > 0);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS height_cm NUMERIC(6,1) CHECK (height_cm IS NULL OR height_cm > 0);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS width_cm NUMERIC(6,1) CHECK (width_cm IS NULL OR width_cm > 0);

@@ -25,7 +25,6 @@ export function isPaymentConfigured(): boolean {
 // ============================================
 
 export function calculatePlanPrice(_plan: PlanType, _paymentType: PaymentType): number {
-  // Single annual plan at a fixed price.
   return CLUB_PLAN.price
 }
 
@@ -218,7 +217,7 @@ export async function createSubscriptionPayment(
     }>('/subscription/create', {
       member_id: memberId,
       plan,
-      frequency_type: 'years',
+      frequency_type: paymentType === 'annual' ? 'years' : 'months',
       payer_email: payerEmail,
       payer_name: payerName,
       transaction_amount: amount,

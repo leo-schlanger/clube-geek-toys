@@ -1,13 +1,13 @@
 import { test, expect, type Page } from '@playwright/test'
 
 /**
- * Fluxos-núcleo em PRODUÇÃO: cadastro de produto (admin) + funil de compra (loja).
+ * Core production flows: admin product create + shop purchase funnel.
  *
- * Credenciais vêm de env (E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD) — nunca no arquivo.
- * O produto é criado com nome-âncora "ZZZ E2E ..." e limpo depois via SQL.
+ * Credentials come from env (E2E_ADMIN_EMAIL / E2E_ADMIN_PASSWORD) — never
+ * in this file. The product is named "ZZZ E2E ..." and cleaned up via SQL.
  *
- * IMPORTANTE: o funil de compra vai até a etapa de pagamento e PARA — não clica
- * em "Continuar para o pagamento", que criaria um pedido/cobrança real (Stripe LIVE).
+ * The funnel stops at the payment step — it must not click "Continuar para
+ * o pagamento", which would create a live Stripe charge.
  */
 
 const SHOP = 'https://shop.geeketoys.com.br'
@@ -16,7 +16,7 @@ const ADMIN = 'https://admin.geeketoys.com.br'
 const EMAIL = process.env.E2E_ADMIN_EMAIL ?? ''
 const PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? ''
 
-// Identidade estável do produto durante a run (um nome, reusado nos passos seriais).
+// One product name reused across serial steps.
 const STAMP = process.env.E2E_STAMP ?? String(Date.now()).slice(-8)
 const PRODUCT_NAME = `ZZZ E2E ${STAMP}`
 const PRODUCT_PRICE = '99.90'
@@ -26,8 +26,8 @@ const VIDEO_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 
 test.describe.configure({ mode: 'serial' })
 
-// Pré-semeia o consentimento de cookies pra o banner (fixed bottom, z-9998) nunca
-// aparecer e interceptar cliques em botões de rodapé (ex.: "Criar Produto").
+// Seed cookie consent so the banner (fixed bottom, z-9998) cannot intercept
+// clicks on footer buttons (e.g. "Criar Produto").
 async function preConsent(target: { addInitScript: (fn: () => void) => Promise<void> }) {
   await target.addInitScript(() => {
     try {
@@ -40,7 +40,7 @@ async function preConsent(target: { addInitScript: (fn: () => void) => Promise<v
 }
 
 test.describe('Admin and shop flows (production)', () => {
-  // Rodar sempre com --project=desktop (evita criar o produto em dobro no mobile).
+  // Always --project=desktop or the product is created twice (mobile).
   test.beforeEach(async ({ page }) => {
     test.skip(!EMAIL || !PASSWORD, 'defina E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD')
     await preConsent(page.context())
@@ -57,15 +57,14 @@ test.describe('Admin and shop flows (production)', () => {
     await page.locator('#email').fill(EMAIL)
     await page.locator('#password').fill(PASSWORD)
     await page.getByRole('button', { name: /Acessar Painel/i }).click()
-    // redireciona para /admin após autenticar
     await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 })
   }
 
   /**
-   * O formulário de produto virou abas em 16/08/2026 (o modal tinha ~1100
-   * linhas de campo numa rolagem só e o bloco de vídeo ficava escondido no
-   * fim). Os painéis inativos ficam com `display:none`, então o Playwright
-   * precisa abrir a aba antes de tocar no campo — igual à Laura.
+   * Product form became tabs on 16/08/2026 (the modal was ~1100 lines of
+   * fields in one scroll and the video block sat hidden at the end).
+   * Inactive panels are `display:none`, so Playwright must open the tab
+   * before touching a field — same as a human operator.
    */
   async function abaDoProduto(page: Page, nome: RegExp) {
     await page.getByRole('tab', { name: nome }).click()
@@ -73,7 +72,7 @@ test.describe('Admin and shop flows (production)', () => {
 
   test('1) admin cadastra um produto ativo com imagem', async ({ page }) => {
     await adminLogin(page)
-    // navega para Produtos pela sidebar (client-side — preserva a sessão)
+    // Sidebar nav is client-side — preserves the session.
     await page.getByRole('button', { name: 'Produtos' }).first().click()
     await expect(page.getByRole('button', { name: /Novo Produto/i })).toBeVisible({ timeout: 15_000 })
 
@@ -85,14 +84,12 @@ test.describe('Admin and shop flows (production)', () => {
     await page.locator('#product-price').fill(PRODUCT_PRICE)
     await page.locator('#product-stock').fill(PRODUCT_STOCK)
 
-    // adiciona imagem por URL externa (aba Fotos e vídeos)
     await abaDoProduto(page, /Fotos e vídeos/)
     await page.getByPlaceholder(/Colar URL de imagem externa/i).fill(IMAGE_URL)
     await page.getByRole('button', { name: /^Adicionar$/i }).click()
 
     await page.getByRole('button', { name: /Criar Produto/i }).click()
 
-    // toast de sucesso + linha na tabela
     await expect(page.getByText(/Produto criado!/i)).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('cell', { name: PRODUCT_NAME }).first()).toBeVisible({ timeout: 15_000 })
     await page.screenshot({ path: 'e2e/screenshots/flow-1-admin-created.png', fullPage: true })
@@ -102,30 +99,26 @@ test.describe('Admin and shop flows (production)', () => {
     await page.goto(`${SHOP}/?search=${encodeURIComponent('ZZZ E2E')}`, { waitUntil: 'networkidle' })
     await dismissCookies(page)
 
-    // card do produto na vitrine
     const card = page.getByText(PRODUCT_NAME).first()
     await expect(card, 'produto ativo deve aparecer na loja').toBeVisible({ timeout: 15_000 })
     await card.click()
 
-    // página de detalhe → adicionar ao carrinho
     await expect(page).toHaveURL(/\/produto\//)
     await expect(page.getByRole('heading', { name: PRODUCT_NAME }).first()).toBeVisible()
     await page.getByRole('button', { name: /Adicionar ao carrinho/i }).click()
     await expect(page.getByText(/adicionado ao carrinho/i)).toBeVisible({ timeout: 10_000 })
 
-    // vai ao carrinho e confirma o item
     await page.goto(`${SHOP}/carrinho`, { waitUntil: 'networkidle' })
     await expect(page.getByText(PRODUCT_NAME).first()).toBeVisible()
     await expect(page.getByText(/R\$\s*99,90/).first()).toBeVisible()
     await page.screenshot({ path: 'e2e/screenshots/flow-2-cart.png', fullPage: true })
 
-    // salva o estado do carrinho pra reusar no próximo teste (localStorage)
+    // Persist cart localStorage for the next serial test.
     const storage = await page.context().storageState()
     process.env.__CART_STORAGE = JSON.stringify(storage)
   })
 
   test('3) checkout up to the payment step, without charging', async ({ browser }) => {
-    // reusa o carrinho do teste anterior
     const state = process.env.__CART_STORAGE ? JSON.parse(process.env.__CART_STORAGE) : undefined
     const ctx = await browser.newContext({ storageState: state })
     await preConsent(ctx)
@@ -135,17 +128,15 @@ test.describe('Admin and shop flows (production)', () => {
       await dismissCookies(page)
       await expect(page.getByRole('heading', { name: /Finalizar compra/i })).toBeVisible()
 
-      // dados do cliente
       await page.locator('#name').fill('Cliente Teste E2E')
       await page.locator('#email').fill('e2e-buyer@example.com')
 
-      // formas de pagamento presentes
       await expect(page.getByText('PIX', { exact: true })).toBeVisible()
       await expect(page.getByText('Cartão de crédito')).toBeVisible()
       await page.getByText('Cartão de crédito').click()
       await page.getByText('PIX', { exact: true }).click()
 
-      // resumo com o total e o CTA — mas NÃO clicamos (evita cobrança real)
+      // Assert the CTA is enabled, but do not click — that would charge live.
       await expect(page.getByText(/Resumo do pedido/i)).toBeVisible()
       await expect(page.getByRole('button', { name: /Continuar para o pagamento/i })).toBeEnabled()
       await page.screenshot({ path: 'e2e/screenshots/flow-3-checkout.png', fullPage: true })
@@ -155,15 +146,15 @@ test.describe('Admin and shop flows (production)', () => {
   })
 
   /**
-   * Regressão de 15/08/2026 — o cadastro de variação e vídeo caía no vazio.
+   * Regression 15/08/2026 — variant and video save dropped on the floor.
    *
-   * O ponto do teste é usar o caminho de quem NÃO leu a dica: preencher os eixos
-   * e ir direto em Salvar, sem clicar em "Gerar combinações", e colar o link do
-   * vídeo sem clicar em "Adicionar". Era exatamente assim que o painel gravava o
-   * produto sem SKU nenhum e sem vídeo, exibindo "Produto atualizado!".
+   * Walk the path of someone who did not read the hint: fill the axes and
+   * save without clicking "Gerar combinações", paste the video URL without
+   * clicking "Adicionar". That is exactly how the panel stored a product
+   * with no SKU and no video while toasting "Produto atualizado!".
    *
-   * Clicar nos botões antes de salvar faria o teste passar mesmo com o bug de
-   * volta — por isso os cliques em "Gerar combinações"/"Adicionar" ficam de fora.
+   * Clicking those buttons first would make the test pass with the bug
+   * back — so they stay out.
    */
   test('3b) admin saves variants and a video without pressing generate or add', async ({ page }) => {
     await adminLogin(page)
@@ -175,14 +166,13 @@ test.describe('Admin and shop flows (production)', () => {
     await row.first().getByRole('button', { name: /Editar produto/i }).click()
     await expect(page.getByText('Editar Produto').first()).toBeVisible()
 
-    // Variações: tipo + opções, e nada de "Gerar combinações".
     await abaDoProduto(page, /Variações/)
     await page.getByLabel(/Ativar variações/i).check()
     await page.getByPlaceholder('Cor', { exact: true }).fill('Cor')
     await page.getByPlaceholder(/Ou cole várias/i).fill('Rosa, Preto')
 
-    // Vídeo: link colado e deixado no campo, em OUTRA aba. Salvar da aba
-    // Variações prova de quebra que o rascunho da aba escondida entra no save.
+    // Paste the video URL on another tab and leave it. Saving from
+    // Variações is the break-test that the hidden tab's draft is in the save.
     await abaDoProduto(page, /Fotos e vídeos/)
     await page.getByPlaceholder(/Colar link do YouTube/i).fill(VIDEO_URL)
     await abaDoProduto(page, /Variações/)
@@ -190,11 +180,11 @@ test.describe('Admin and shop flows (production)', () => {
     await page.getByRole('button', { name: /Salvar Alterações/i }).click()
     await expect(page.getByText(/Produto atualizado!/i)).toBeVisible({ timeout: 20_000 })
 
-    // Reabre: o que importa é o que ficou gravado, não o que a tela mostrava.
+    // Reopen: what was stored, not what the screen showed before close.
     await row.first().getByRole('button', { name: /Editar produto/i }).click()
     await expect(page.getByText('Editar Produto').first()).toBeVisible()
 
-    // O contador da aba é a prova de que a aba não escondeu o trabalho.
+    // Tab badge proves the tab did not hide the work.
     await expect(page.getByRole('tab', { name: /Variações/ })).toContainText('2')
 
     await abaDoProduto(page, /Variações/)
@@ -220,24 +210,21 @@ test.describe('Admin and shop flows (production)', () => {
     await page.getByRole('button', { name: 'Produtos' }).first().click()
     await expect(page.getByRole('button', { name: /Novo Produto/i })).toBeVisible({ timeout: 15_000 })
 
-    // localiza a linha do produto e clica em editar
     const row = page.getByRole('row', { name: new RegExp(PRODUCT_NAME) })
     await expect(row.first()).toBeVisible({ timeout: 15_000 })
     await row.first().getByRole('button', { name: /Editar produto/i }).click()
 
-    // edita o preço
     await expect(page.getByText('Editar Produto').first()).toBeVisible()
     await page.locator('#product-price').fill('79.90')
     await page.getByRole('button', { name: /Salvar Alterações/i }).click()
     await expect(page.getByText(/Produto atualizado!/i)).toBeVisible({ timeout: 15_000 })
 
-    // desativa (soft-delete). window.confirm → aceita
+    // Deactivate fires window.confirm.
     page.once('dialog', (d) => d.accept())
     await row.first().getByRole('button', { name: /Desativar produto/i }).click()
     await expect(page.getByText(/Produto desativado/i)).toBeVisible({ timeout: 15_000 })
     await page.screenshot({ path: 'e2e/screenshots/flow-4-deactivated.png', fullPage: true })
 
-    // agora não deve mais aparecer na loja pública
     const shop = await page.context().newPage()
     await shop.goto(`${SHOP}/?search=${encodeURIComponent('ZZZ E2E')}`, { waitUntil: 'networkidle' })
     await expect(shop.getByText(PRODUCT_NAME)).toHaveCount(0)

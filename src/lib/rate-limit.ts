@@ -5,7 +5,6 @@
  * localStorage, only covers the current browser, and does nothing against an
  * attacker with several devices. The real limit lives in the Express
  * middleware; this only saves an honest user from hammering a wrong password.
- * Esta camada client-side melhora UX mostrando feedback imediato.
  *
  */
 
@@ -71,7 +70,6 @@ export function isBlocked(email: string): { blocked: boolean; remainingTime: num
 
   const now = Date.now()
 
-  // Verificar lockout
   if (record.lockedUntil && record.lockedUntil > now) {
     return {
       blocked: true,
@@ -79,7 +77,6 @@ export function isBlocked(email: string): { blocked: boolean; remainingTime: num
     }
   }
 
-  // Limpar lockout expirado
   if (record.lockedUntil && record.lockedUntil <= now) {
     delete store[email.toLowerCase()]
     saveStore(store)
@@ -101,18 +98,15 @@ export function recordFailedAttempt(email: string): {
   let record = store[normalizedEmail]
 
   if (!record || now - record.firstAttempt >= ATTEMPT_WINDOW) {
-    // Nova janela de tentativas
     record = {
       attempts: 1,
       firstAttempt: now,
       lockedUntil: null,
     }
   } else {
-    // Incrementar tentativas
     record.attempts++
   }
 
-  // Verificar se atingiu o limite
   if (record.attempts >= MAX_ATTEMPTS) {
     record.lockedUntil = now + LOCKOUT_DURATION
     store[normalizedEmail] = record

@@ -1,17 +1,17 @@
 /*
- * Boot da SPA — precisa rodar antes da primeira pintura.
+ * SPA boot — must run before first paint.
  *
- * Vive aqui, e não inline no index.html, porque o CSP das SPAs não tem
- * 'unsafe-inline' em script-src. Hash inline foi descartado: o index.html muda
- * com frequência (16 commits até 15/08/2026) e um hash desatualizado quebraria a
- * página em silêncio. Sendo um arquivo próprio, ele cai no 'self' e ponto.
+ * Lives here, not inline in index.html: SPA CSP has no 'unsafe-inline' in
+ * script-src. An inline hash was dropped — index.html changes often (16
+ * commits by 15/08/2026) and a stale hash would blank the page. As its own
+ * file it matches 'self'.
  *
- * Cache: o nginx tem um `location = /boot.js` com validação curta, senão a regra
- * immutable de 1 ano dos .js congelaria este arquivo (ele não é versionado por
- * hash no nome como os bundles do Vite).
+ * Cache: nginx `location = /boot.js` uses a short revalidation; otherwise
+ * the 1-year immutable .js rule would freeze this file (it is not hashed
+ * like Vite bundles).
  */
 (function () {
-  // Anti-FOUC: light é o padrão; dark só se o usuário escolheu.
+  // Anti-FOUC: light is default; dark only if the user chose it.
   try {
     var k = 'geekpop-theme';
     var t = localStorage.getItem(k) || 'light';
@@ -23,10 +23,9 @@
     if (dark) document.documentElement.classList.add('dark');
     document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   } catch (e) {
-    /* localStorage bloqueado — segue no tema claro */
+    /* localStorage blocked — stay on the light theme */
   }
 
-  // Esconde o loader inicial assim que o DOM está pronto.
   window.addEventListener('DOMContentLoaded', function () {
     var loader = document.getElementById('initial-loader');
     if (loader) {

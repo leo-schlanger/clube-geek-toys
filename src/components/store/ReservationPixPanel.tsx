@@ -5,12 +5,12 @@ import { resendPaymentLink, type ReservationPix } from '../../lib/event-tickets'
 interface Props {
   code: string
   pix: ReservationPix
-  /** Total da reserva em centavos — a fonte do valor mostrado. */
+  /** Reservation total in cents — source of the amount shown. */
   totalCents: number
   className?: string
 }
 
-/** PIX da reserva, com reenvio por e-mail para quem já fechou a aba. */
+/** Reservation PIX, with email resend for whoever already closed the tab. */
 export function ReservationPixPanel({ code, pix, totalCents, className }: Props) {
   async function handleResend() {
     const result = await resendPaymentLink(code)
