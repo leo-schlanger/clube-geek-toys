@@ -140,6 +140,8 @@ export interface Category {
   icon?: string | null;
   active: boolean;
   sortOrder: number;
+  /** Parent category, or null for a top-level one. The tree is one level deep. */
+  parentId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

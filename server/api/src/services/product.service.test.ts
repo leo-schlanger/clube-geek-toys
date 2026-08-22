@@ -18,6 +18,8 @@ const {
   addProductImages,
   addProductVideo,
   bulkSetProductCategories,
+  createCategory,
+  updateCategory,
   MAX_PRODUCT_IMAGES,
   MAX_PRODUCT_VIDEOS,
 } = await import('./product.service.js');
@@ -253,5 +255,72 @@ describe('bulkSetProductCategories', () => {
       updated: 0,
     });
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('category parent (subcategories)', () => {
+  beforeEach(() => {
+    query.mockReset();
+    clientQuery.mockReset();
+  });
+
+  it('refuses a parent that is itself a subcategory — the shop draws one level', async () => {
+    // resolveParent looks the parent up and finds it already has a parent.
+    query.mockResolvedValueOnce({ rows: [{ id: 'c-bts', parent_id: 'c-photocards' }], rowCount: 1 });
+
+    await expect(createCategory({ name: 'BTS Proof', parentId: 'c-bts' })).rejects.toThrow(
+      /um nível/i
+    );
+  });
+
+  it('refuses a parent that does not exist', async () => {
+    query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+    await expect(createCategory({ name: 'Nova', parentId: 'c-fantasma' })).rejects.toThrow(
+      /não encontrada/i
+    );
+  });
+
+  it('refuses a category becoming its own subcategory', async () => {
+    await expect(updateCategory('c-1', { parentId: 'c-1' })).rejects.toThrow(/dela mesma/i);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('refuses demoting a category that still has children', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 'c-top', parent_id: null }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 });
+
+    await expect(updateCategory('c-photocards', { parentId: 'c-top' })).rejects.toThrow(
+      /subcategorias/i
+    );
+  });
+
+  it('accepts a top-level parent and writes parent_id', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [{ id: 'c-photocards', parent_id: null }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'c-bts',
+            name: 'BTS',
+            slug: 'bts',
+            description: null,
+            icon: null,
+            active: true,
+            sort_order: 0,
+            parent_id: 'c-photocards',
+            created_at: '',
+            updated_at: '',
+          },
+        ],
+        rowCount: 1,
+      });
+
+    const saved = await updateCategory('c-bts', { parentId: 'c-photocards' });
+    expect(saved.parentId).toBe('c-photocards');
+    const update = query.mock.calls.map((c) => String(c[0])).find((q) => q.includes('UPDATE categories'));
+    expect(update).toContain('parent_id');
   });
 });

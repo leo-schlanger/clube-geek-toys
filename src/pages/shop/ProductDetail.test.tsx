@@ -16,6 +16,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 vi.mock('../../lib/products', () => ({
   getProductBySlug: vi.fn(),
   listRelatedProducts: vi.fn(),
+  listAlsoBoughtProducts: vi.fn(),
   // Real, not a stub: availability is exactly what these tests exercise.
   availableStock: (item: { stock: number; available?: number }) =>
     Math.max(0, item.available ?? item.stock),
@@ -61,21 +62,34 @@ vi.mock('../../components/store/ProductReviews', () => ({
   ProductReviews: () => null,
 }))
 
+// Renders the names so the recommendation blocks can be asserted; the real
+// card is covered by ProductCard.test.tsx.
 vi.mock('../../components/store/ProductGrid', () => ({
-  ProductGrid: () => null,
+  ProductGrid: ({ products }: { products: { id: string; name: string }[] }) => (
+    <div data-testid="product-grid">
+      {products.map((p) => (
+        <span key={p.id}>{p.name}</span>
+      ))}
+    </div>
+  ),
 }))
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-import { getProductBySlug, listRelatedProducts } from '../../lib/products'
+import {
+  getProductBySlug,
+  listAlsoBoughtProducts,
+  listRelatedProducts,
+} from '../../lib/products'
 import { toast } from 'sonner'
 import ProductDetail from './ProductDetail'
 import type { Product } from '../../types'
 
 const mockedGet = vi.mocked(getProductBySlug)
 const mockedRelated = vi.mocked(listRelatedProducts)
+const mockedAlsoBought = vi.mocked(listAlsoBoughtProducts)
 
 const product: Product = {
   id: 'p1',
@@ -148,6 +162,7 @@ describe('ProductDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockedRelated.mockResolvedValue([])
+    mockedAlsoBought.mockResolvedValue([])
   })
 
   it('shows not found when product missing', async () => {
@@ -222,5 +237,55 @@ describe('ProductDetail', () => {
       1,
       expect.objectContaining({ id: 'v-preto', name: 'Preto' })
     )
+  })
+
+  describe('recommendation blocks', () => {
+    const other = (id: string, name: string): Product => ({
+      ...product,
+      id,
+      name,
+      slug: name.toLowerCase().replace(/\s+/g, '-'),
+    })
+
+    it('hides "também compram" when there is no co-purchase data', async () => {
+      mockedGet.mockResolvedValue(product)
+      mockedRelated.mockResolvedValue([other('p9', 'Chaveiro')])
+      mockedAlsoBought.mockResolvedValue([])
+      renderPdp()
+
+      await waitFor(() => {
+        expect(screen.getByText('Você também pode gostar')).toBeInTheDocument()
+      })
+      expect(screen.queryByText('Os clientes também compram')).not.toBeInTheDocument()
+    })
+
+    it('shows both blocks and never repeats a product between them', async () => {
+      const shared = other('p9', 'Chaveiro')
+      mockedGet.mockResolvedValue(product)
+      mockedRelated.mockResolvedValue([shared, other('p10', 'Poster')])
+      mockedAlsoBought.mockResolvedValue([shared])
+      renderPdp()
+
+      await waitFor(() => {
+        expect(screen.getByText('Os clientes também compram')).toBeInTheDocument()
+      })
+      expect(screen.getByText('Você também pode gostar')).toBeInTheDocument()
+      // "Chaveiro" is in both lists; the related row must drop it.
+      expect(screen.getAllByText('Chaveiro')).toHaveLength(1)
+      expect(screen.getByText('Poster')).toBeInTheDocument()
+    })
+
+    it('drops the related row entirely when co-purchase covers all of it', async () => {
+      const shared = other('p9', 'Chaveiro')
+      mockedGet.mockResolvedValue(product)
+      mockedRelated.mockResolvedValue([shared])
+      mockedAlsoBought.mockResolvedValue([shared])
+      renderPdp()
+
+      await waitFor(() => {
+        expect(screen.getByText('Os clientes também compram')).toBeInTheDocument()
+      })
+      expect(screen.queryByText('Você também pode gostar')).not.toBeInTheDocument()
+    })
   })
 })

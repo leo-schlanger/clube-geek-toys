@@ -19,6 +19,10 @@ interface CategoryNavProps {
 /**
  * Horizontal category navigation. Each item links to /categoria/:slug, and
  * "all" returns to the shop root.
+ *
+ * Two rows when the selected branch has subcategories: parents on top, that
+ * parent's children below. Only one level is drawn — the API refuses deeper
+ * trees for exactly this reason.
  */
 export function CategoryNav({
   categories,
@@ -48,6 +52,14 @@ export function CategoryNav({
 
   if (categories.length === 0) return null
 
+  const parents = categories.filter((c) => !c.parentId)
+  const childrenOf = (parentId: string) => categories.filter((c) => c.parentId === parentId)
+
+  // The active slug may be a child; the parent row must still show it selected.
+  const active = categories.find((c) => c.slug === activeSlug)
+  const activeParentId = active?.parentId ?? active?.id ?? null
+  const subcategories = activeParentId ? childrenOf(activeParentId) : []
+
   const pillClass = (active: boolean) =>
     cn(
       'shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors',
@@ -64,24 +76,48 @@ export function CategoryNav({
       : `${basePath}/categoria/${slug}`
 
   return (
-    <nav aria-label="Categorias" className="flex gap-2 overflow-x-auto pb-2">
-      <Link to={withSort(allHref)} className={pillClass(!activeSlug)}>
-        Todos
-      </Link>
-      {categories.map((category) => {
-        const Icon = categoryIcon(category.icon) ?? categoryIcon(guessCategoryIcon(category.name))
-        return (
-          <Link
-            key={category.id}
-            to={withSort(catHref(category.slug))}
-            className={cn(pillClass(activeSlug === category.slug), 'inline-flex items-center gap-1.5')}
-          >
-            {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden />}
-            {category.name}
-          </Link>
-        )
-      })}
-    </nav>
+    <div className="space-y-2">
+      <nav aria-label="Categorias" className="flex gap-2 overflow-x-auto pb-2">
+        <Link to={withSort(allHref)} className={pillClass(!activeSlug)}>
+          Todos
+        </Link>
+        {parents.map((category) => {
+          const Icon = categoryIcon(category.icon) ?? categoryIcon(guessCategoryIcon(category.name))
+          return (
+            <Link
+              key={category.id}
+              to={withSort(catHref(category.slug))}
+              className={cn(
+                pillClass(activeSlug === category.slug || category.id === activeParentId),
+                'inline-flex items-center gap-1.5'
+              )}
+            >
+              {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden />}
+              {category.name}
+            </Link>
+          )
+        })}
+      </nav>
+
+      {subcategories.length > 0 && (
+        <nav aria-label="Subcategorias" className="flex gap-2 overflow-x-auto pb-2 pl-1">
+          {subcategories.map((sub) => (
+            <Link
+              key={sub.id}
+              to={withSort(catHref(sub.slug))}
+              className={cn(
+                'shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                activeSlug === sub.slug
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-input bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              {sub.name}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </div>
   )
 }
 

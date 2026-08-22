@@ -969,6 +969,33 @@ const STEPS: SchemaStep[] = [
     );
     },
   },
+  {
+    name: "Subcategories + co-purchase index (migration 033)",
+    run: async () => {
+    // One level only: the nav drills parent → child and nothing draws a third
+    // level, so a grandchild would be invisible rather than wrong. The depth
+    // rule lives in the service — a CHECK cannot see the parent's own parent.
+    await query(
+      `ALTER TABLE categories ADD COLUMN IF NOT EXISTS parent_id UUID REFERENCES categories(id) ON DELETE SET NULL`
+    );
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id) WHERE parent_id IS NOT NULL`
+    );
+    await query(`DO $$ BEGIN
+      ALTER TABLE categories ADD CONSTRAINT chk_categories_parent_not_self
+        CHECK (parent_id IS NULL OR parent_id <> id);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+    // "Os clientes também compram" self-joins order_items on order_id; without
+    // these the join scans every line the store ever sold.
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_order_items_order_product ON order_items(order_id, product_id)`
+    );
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id) WHERE product_id IS NOT NULL`
+    );
+    },
+  },
 ];
 
 let state: SchemaState = {

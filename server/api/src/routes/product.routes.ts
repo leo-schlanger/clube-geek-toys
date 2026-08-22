@@ -97,6 +97,17 @@ productRouter.get('/:slug/related', async (req, res, next) => {
   }
 });
 
+// Co-purchase, not similarity — see listAlsoBoughtProducts. Returns an empty
+// list when the sales data says nothing, and the page hides the block.
+productRouter.get('/:slug/also-bought', async (req, res, next) => {
+  try {
+    const products = await productService.listAlsoBoughtProducts(req.params.slug as string, 8);
+    res.json({ products });
+  } catch (err) {
+    next(err);
+  }
+});
+
 productRouter.get('/:slug', async (req, res, next) => {
   try {
     const product = await productService.getProductBySlug(req.params.slug as string, false);
@@ -118,6 +129,8 @@ const categorySchema = z.object({
   icon: z.string().max(40).optional().nullable(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  /** Null makes it top-level. Depth is validated in the service. */
+  parentId: z.string().uuid().nullable().optional(),
 });
 
 productRouter.post('/categories', authenticate, requireRole('admin'), validate(categorySchema), async (req, res, next) => {

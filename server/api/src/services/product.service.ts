@@ -158,6 +158,7 @@ function mapCategory(row: pg.QueryResultRow): Category {
     icon: row.icon ?? null,
     active: row.active,
     sortOrder: row.sort_order,
+    parentId: row.parent_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -381,12 +382,18 @@ export async function listProducts(opts: {
     conditions.push(`p.wholesale_enabled = TRUE`);
   }
   if (opts.category) {
-    // Matches any of the product's categories, not only the primary one.
+    // Matches any of the product's categories, not only the primary one, and a
+    // parent slug also matches everything filed under its subcategories —
+    // otherwise "Photocards" would look empty once its products moved into
+    // "Photocards > BTS".
     conditions.push(
       `EXISTS (SELECT 1 FROM product_categories pcf
                JOIN categories cf ON cf.id = pcf.category_id
-               WHERE pcf.product_id = p.id AND cf.slug = $${i++})`
+               LEFT JOIN categories cfp ON cfp.id = cf.parent_id
+               WHERE pcf.product_id = p.id
+                 AND (cf.slug = $${i} OR cfp.slug = $${i}))`
     );
+    i++;
     params.push(opts.category);
   }
   if (opts.featured) {
@@ -1103,6 +1110,46 @@ ${urls}
 `;
 }
 
+/**
+ * "Os clientes também compram" — co-purchase, not similarity.
+ *
+ * `listRelatedProducts` answers "more of the same kind"; this answers "what
+ * went in the same basket", which is the block that lifts order value. Keeping
+ * them separate matters: two carousels showing the same eight products read as
+ * a bug, so this one returns **only** what the sales data supports and the page
+ * hides it when empty. A new catalogue with no order history shows nothing
+ * rather than a second copy of the related row.
+ *
+ * Only settled orders count (`paid` onward, never `cancelled`/`refunded`), so
+ * an abandoned PIX cannot vote.
+ */
+export async function listAlsoBoughtProducts(slug: string, limit = 8): Promise<Product[]> {
+  const base = await getProductBySlug(slug, false);
+  if (!base) return [];
+
+  const take = Math.max(1, Math.min(limit, 16));
+  const result = await query(
+    `SELECT p.*, c.name AS category_name, COUNT(DISTINCT o.id)::int AS together
+       FROM order_items mine
+       JOIN orders o ON o.id = mine.order_id
+       JOIN order_items theirs
+         ON theirs.order_id = mine.order_id
+        AND theirs.product_id <> mine.product_id
+       JOIN products p ON p.id = theirs.product_id
+       LEFT JOIN categories c ON c.id = p.category_id
+      WHERE mine.product_id = $1
+        AND o.status IN ('paid', 'processing', 'shipped', 'delivered')
+        AND p.active = TRUE
+        AND p.stock > 0
+        AND p.name NOT ILIKE 'checkup%'
+      GROUP BY p.id, c.name
+      ORDER BY together DESC, p.featured DESC, p.created_at DESC
+      LIMIT $2`,
+    [base.id, take]
+  );
+  return result.rows.map(mapProduct);
+}
+
 /** Related products: same category first, then featured. */
 export async function listRelatedProducts(slug: string, limit = 8): Promise<Product[]> {
   const base = await getProductBySlug(slug, false);
@@ -1193,14 +1240,62 @@ export async function createCategory(data: {
   icon?: string | null;
   active?: boolean;
   sortOrder?: number;
+  parentId?: string | null;
 }): Promise<Category> {
+  const parentId = await resolveParent(data.parentId ?? null, null);
   const slug = await uniqueSlug('categories', data.name);
   const result = await query(
-    `INSERT INTO categories (name, slug, description, icon, active, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [data.name, slug, data.description ?? null, data.icon ?? null, data.active ?? true, data.sortOrder ?? 0]
+    `INSERT INTO categories (name, slug, description, icon, active, sort_order, parent_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [
+      data.name,
+      slug,
+      data.description ?? null,
+      data.icon ?? null,
+      data.active ?? true,
+      data.sortOrder ?? 0,
+      parentId,
+    ]
   );
   return mapCategory(result.rows[0]);
+}
+
+/**
+ * Validates a candidate parent and keeps the tree one level deep.
+ *
+ * The storefront nav drills parent → child and draws no third level, so a
+ * grandchild would simply be unreachable. Rejecting it here is the difference
+ * between an error the admin can act on and products that quietly vanish.
+ * `selfId` is set when editing, to refuse a category adopting itself or one of
+ * its own children.
+ */
+async function resolveParent(parentId: string | null, selfId: string | null): Promise<string | null> {
+  if (!parentId) return null;
+  if (selfId && parentId === selfId) {
+    throw new AppError(400, 'Uma categoria não pode ser subcategoria dela mesma.', 'CATEGORY_PARENT_SELF');
+  }
+  const parent = await query('SELECT id, parent_id FROM categories WHERE id = $1', [parentId]);
+  if (parent.rows.length === 0) {
+    throw new AppError(400, 'Categoria pai não encontrada.', 'CATEGORY_PARENT_NOT_FOUND');
+  }
+  if (parent.rows[0].parent_id) {
+    throw new AppError(
+      400,
+      'Subcategoria não pode ter subcategoria — a loja mostra só um nível.',
+      'CATEGORY_DEPTH'
+    );
+  }
+  if (selfId) {
+    const children = await query('SELECT 1 FROM categories WHERE parent_id = $1 LIMIT 1', [selfId]);
+    if ((children.rowCount ?? 0) > 0) {
+      throw new AppError(
+        400,
+        'Esta categoria já tem subcategorias; mova-as antes de torná-la subcategoria.',
+        'CATEGORY_HAS_CHILDREN'
+      );
+    }
+  }
+  return parentId;
 }
 
 export async function updateCategory(id: string, data: Record<string, unknown>): Promise<Category> {
@@ -1219,6 +1314,11 @@ export async function updateCategory(id: string, data: Record<string, unknown>):
       sets.push(`${col} = $${i++}`);
       values.push(data[key]);
     }
+  }
+  if ('parentId' in data && data.parentId !== undefined) {
+    const parentId = await resolveParent((data.parentId as string | null) ?? null, id);
+    sets.push(`parent_id = $${i++}`);
+    values.push(parentId);
   }
   if (typeof data.name === 'string' && data.name.trim()) {
     const slug = await uniqueSlug('categories', data.name, id);

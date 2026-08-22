@@ -154,6 +154,19 @@ export async function listRelatedProducts(slug: string): Promise<Product[]> {
   return result.data?.products ?? []
 }
 
+/**
+ * Public: products bought in the same order as this one.
+ *
+ * Empty is a normal answer — it means the sales data says nothing yet, and the
+ * caller must hide the block rather than pad it with the related list.
+ */
+export async function listAlsoBoughtProducts(slug: string): Promise<Product[]> {
+  const result = await api.get<{ products: Product[] }>(`/products/${slug}/also-bought`, {
+    skipAuth: true,
+  })
+  return result.data?.products ?? []
+}
+
 export async function adminListProducts(params: ProductListParams = {}): Promise<ProductListResult> {
   // Same catalog endpoint; sort/search/page run in SQL (ORDER BY + LIMIT/OFFSET).
   return listProducts({ limit: 25, stats: true, ...params })
@@ -312,6 +325,8 @@ export interface CategoryInput {
   icon?: string | null
   active?: boolean
   sortOrder?: number
+  /** Null makes it top-level. The API refuses a subcategory of a subcategory. */
+  parentId?: string | null
 }
 
 /** Admin: includes inactive rows and per-category product counts. */

@@ -4,6 +4,29 @@
 
 ## Entregue em 22/08/2026
 
+- [x] **Subcategorias e "Os clientes também compram"** (pedido Laura) —
+      `categories.parent_id` (migration 033), **um nível só**: a vitrine desenha
+      pai → filho e nada desenha um terceiro, então um neto ficaria invisível em
+      vez de errado; o serviço recusa a profundidade extra com erro em vez de
+      deixar produto sumir. Filtrar pelo pai traz também o que está nos filhos,
+      senão "Photocards" ficaria vazia assim que os produtos migrassem para
+      "Photocards > BTS". A aba **Categorias** ganhou o seletor de pai, e a
+      vitrine, uma segunda fileira de pílulas.
+      O bloco de recomendação novo é **co-compra** (`order_items` do mesmo
+      pedido, só pedidos liquidados — PIX abandonado não vota), não semelhança:
+      o "Você também pode gostar" que já existia responde outra pergunta. Os
+      dois aparecem juntos, na ordem de intenção, e o de semelhança perde os
+      produtos que o de co-compra já mostrou — as mesmas oito cartas sob dois
+      títulos leem como bug. Sem dado de venda o bloco some, em vez de virar uma
+      segunda cópia da fileira de relacionados.
+- [x] **Favicon virou a marca de verdade** — a aba mostrava um "G" rosa genérico
+      que não é asset nenhum da GeekPop & Toys. Agora é o logotipo, em `.ico`
+      multi-tamanho. De quebra: o manifest PWA declarava `logo-vip.png` como
+      512x512 e `logo.jpg` como 192x192 — os dois são 1080x1080.
+- [x] **Sitemap da loja apontava para o domínio errado** — listava
+      `shop.geeketoys.com.br` enquanto o `robots.txt` publica o arquivo em
+      `shop.geekpoptoys.com.br` (o canônico). Sitemap cross-domain o Google
+      descarta. As páginas de categoria não estavam em sitemap nenhum.
 - [x] **Clube passou a ser mensal (R$ 12,50)** — o plano era anual de R$ 149,99.
       Toda cobrança nova é mensal: cadastro, renovação e pagamento pendente
       retomado. Membro que já pagou um ano mantém a janela dele e só volta a ser

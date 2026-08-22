@@ -14,7 +14,12 @@ import {
 import { toast } from 'sonner'
 import type { Product } from '../../types'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
-import { availableStock, getProductBySlug, listRelatedProducts } from '../../lib/products'
+import {
+  availableStock,
+  getProductBySlug,
+  listAlsoBoughtProducts,
+  listRelatedProducts,
+} from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -57,6 +62,7 @@ export default function ProductDetail() {
 
   const [product, setProduct] = useState<Product | null>(null)
   const [related, setRelated] = useState<Product[]>([])
+  const [alsoBought, setAlsoBought] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeImage, setActiveImage] = useState(0)
@@ -65,6 +71,13 @@ export default function ProductDetail() {
   /** Initial touch X, to tell a drag from a tap. */
   const [touchStartX, setTouchStartX] = useState<number | null>(null)
   const [viewerOpen, setViewerOpen] = useState(false)
+
+  // Same product under two headings reads as a bug; co-purchase wins the slot.
+  const relatedToShow = useMemo(() => {
+    if (alsoBought.length === 0) return related
+    const shown = new Set(alsoBought.map((p) => p.id))
+    return related.filter((p) => !shown.has(p.id))
+  }, [related, alsoBought])
 
   useEffect(() => {
     if (!slug) return
@@ -79,6 +92,7 @@ export default function ProductDetail() {
       setQuantity(1)
       setVariantSel({})
       setRelated([])
+      setAlsoBought([])
       try {
         const p = await getProductBySlug(productSlug)
         if (!active) return
@@ -99,16 +113,22 @@ export default function ProductDetail() {
           if (isWholesale && p.wholesaleMinQty && p.wholesaleMinQty > 1) {
             setQuantity(p.wholesaleMinQty)
           }
+          const forChannel = (list: Product[]) =>
+            isWholesale ? list.filter((x) => x.wholesaleEnabled !== false) : list
+
           listRelatedProducts(productSlug)
             .then((list) => {
-              if (!active) return
-              const filtered = isWholesale
-                ? list.filter((x) => x.wholesaleEnabled !== false)
-                : list
-              setRelated(filtered)
+              if (active) setRelated(forChannel(list))
             })
             .catch(() => {
               if (active) setRelated([])
+            })
+          listAlsoBoughtProducts(productSlug)
+            .then((list) => {
+              if (active) setAlsoBought(forChannel(list))
+            })
+            .catch(() => {
+              if (active) setAlsoBought([])
             })
         }
       } catch {
@@ -547,11 +567,34 @@ export default function ProductDetail() {
 
         {product && <ProductQuestions productSlug={product.slug} productId={product.id} />}
 
-        {product && related.length > 0 && (
+        {/*
+          Two rows, in intent order: what other buyers put in the same basket
+          comes before what merely looks similar. `related` is filtered against
+          `alsoBought` because the same eight cards under two headings reads as
+          a bug, and the guidance is 2-3 recommendation blocks per page at most.
+        */}
+        {product && alsoBought.length > 0 && (
+          <section className="mt-12 border-t pt-10">
+            <h2 className="mb-1 text-xl font-heading font-bold">Os clientes também compram</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Levados junto com este produto em outros pedidos
+            </p>
+            <ProductGrid
+              products={alsoBought}
+              loading={false}
+              isMember={isMember && !isWholesale}
+              isWholesale={isWholesale}
+              isWholesaleApproved={isWholesaleApproved}
+              canBuy={canBuy}
+            />
+          </section>
+        )}
+
+        {product && relatedToShow.length > 0 && (
           <section className="mt-12 border-t pt-10">
             <h2 className="mb-4 text-xl font-heading font-bold">Você também pode gostar</h2>
             <ProductGrid
-              products={related}
+              products={relatedToShow}
               loading={false}
               isMember={isMember && !isWholesale}
               isWholesale={isWholesale}

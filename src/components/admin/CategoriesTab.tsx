@@ -37,6 +37,8 @@ type Draft = {
   description: string
   icon: string
   sortOrder: string
+  /** '' means top-level. */
+  parentId: string
 }
 
 function toDraft(category: AdminCategory): Draft {
@@ -45,6 +47,7 @@ function toDraft(category: AdminCategory): Draft {
     description: category.description ?? '',
     icon: category.icon ?? '',
     sortOrder: String(category.sortOrder ?? 0),
+    parentId: category.parentId ?? '',
   }
 }
 
@@ -114,6 +117,7 @@ export function CategoriesTab() {
 
   const [newName, setNewName] = useState('')
   const [newIcon, setNewIcon] = useState('')
+  const [newParentId, setNewParentId] = useState('')
   const [creating, setCreating] = useState(false)
 
   const fetchCategories = useCallback(async () => {
@@ -140,6 +144,14 @@ export function CategoriesTab() {
 
   const missingIcons = useMemo(
     () => categories.filter((c) => !c.icon).length,
+    [categories]
+  )
+
+  // Only top-level rows can be a parent — the API refuses a third level.
+  const topLevel = useMemo(() => categories.filter((c) => !c.parentId), [categories])
+  const parentName = useCallback(
+    (parentId?: string | null) =>
+      parentId ? (categories.find((c) => c.id === parentId)?.name ?? null) : null,
     [categories]
   )
 
@@ -173,6 +185,7 @@ export function CategoriesTab() {
         description: draft.description.trim() || null,
         icon: draft.icon || null,
         sortOrder: Number(draft.sortOrder) || 0,
+        parentId: draft.parentId || null,
       })
       if (!saved) throw new Error('Resposta vazia do servidor.')
       replaceCategory(saved as AdminCategory)
@@ -244,10 +257,12 @@ export function CategoriesTab() {
         name,
         // With no explicit pick, guess from the name — better than being born icon-less.
         icon: newIcon || guessCategoryIcon(name),
+        parentId: newParentId || null,
       })
       if (!created) throw new Error('Resposta vazia do servidor.')
       setNewName('')
       setNewIcon('')
+      setNewParentId('')
       await fetchCategories()
       toast.success('Categoria criada')
     } catch (error) {
@@ -304,6 +319,19 @@ export function CategoriesTab() {
               placeholder="Ex.: Photocards"
               className="max-w-xs"
             />
+            <select
+              aria-label="Categoria pai"
+              value={newParentId}
+              onChange={(e) => setNewParentId(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Categoria principal</option>
+              {topLevel.map((c) => (
+                <option key={c.id} value={c.id}>
+                  Subcategoria de {c.name}
+                </option>
+              ))}
+            </select>
             <Button
               onClick={handleCreate}
               disabled={creating || !newName.trim()}
@@ -364,7 +392,14 @@ export function CategoriesTab() {
                         aria-label="Nome da categoria"
                       />
                     ) : (
-                      <span className="font-medium">{category.name}</span>
+                      <span className="font-medium">
+                        {parentName(category.parentId) && (
+                          <span className="text-muted-foreground">
+                            {parentName(category.parentId)} ›{' '}
+                          </span>
+                        )}
+                        {category.name}
+                      </span>
                     )}
 
                     <Badge variant="outline" className="gap-1 text-[11px] font-normal">
@@ -430,6 +465,29 @@ export function CategoriesTab() {
                             setDraft((prev) => (prev ? { ...prev, icon } : prev))
                           }
                         />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`cat-parent-${category.id}`}>Categoria pai</Label>
+                        <select
+                          id={`cat-parent-${category.id}`}
+                          value={draft?.parentId ?? ''}
+                          onChange={(e) =>
+                            setDraft((prev) => (prev ? { ...prev, parentId: e.target.value } : prev))
+                          }
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-xs"
+                        >
+                          <option value="">Categoria principal</option>
+                          {topLevel
+                            .filter((c) => c.id !== category.id)
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                Subcategoria de {c.name}
+                              </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground">
+                          A loja mostra um nível só: uma subcategoria não pode ter subcategorias.
+                        </p>
                       </div>
                       <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
                         <div className="space-y-1.5">
