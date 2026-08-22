@@ -1,18 +1,21 @@
 # Atacado (B2B) — GeekPop & Toys
 
 > Pedido operacional (Norberto, 10/08/2026): aba Atacado no site, desconto 25%, login com CNPJ correto, vender só quando houver disponibilidade e CNPJ alinhado ao objeto da compra. Estrutura pronta **antes** da importação de estoque.
+>
+> Decisão (22/08/2026): **não** removemos o canal enquanto não estamos vendendo no atacado — ele vira **lista de espera**. A chave `wholesale.sales_open` (admin → Configurações → Canal Atacado) fica desligada: a loja avisa que ainda não vendemos, as lojas seguem se cadastrando e o cadastro fica guardado pra quando abrirmos.
 
 ## Resumo
 
-| Item      | Valor                                                                    |
-| --------- | ------------------------------------------------------------------------ |
-| Canal     | `shop.geeketoys.com.br/atacado`                                          |
-| Desconto  | **25%** server-side (`discount_reason = wholesale_25`)                   |
-| Constante | `WHOLESALE_SHOP_DISCOUNT = 0.25` (API + front)                           |
-| Login     | e-mail + senha + **CNPJ** (deve bater com o cadastro)                    |
-| Aprovação | Admin confere CNPJ / atividade vs. o que vão comprar                     |
-| Produtos  | Só entram no catálogo se `wholesale_enabled = true`                      |
-| Carrinho  | `localStorage` key `clube_geek_shop_cart_wholesale` (separado do varejo) |
+| Item      | Valor                                                                         |
+| --------- | ----------------------------------------------------------------------------- |
+| Canal     | `shop.geeketoys.com.br/atacado`                                               |
+| Desconto  | **25%** server-side (`discount_reason = wholesale_25`)                        |
+| Constante | `WHOLESALE_SHOP_DISCOUNT = 0.25` (API + front)                                |
+| Login     | e-mail + senha + **CNPJ** (deve bater com o cadastro)                         |
+| Aprovação | Admin confere CNPJ / atividade vs. o que vão comprar                          |
+| Produtos  | Só entram no catálogo se `wholesale_enabled = true`                           |
+| Carrinho  | `localStorage` key `clube_geek_shop_cart_wholesale` (separado do varejo)      |
+| Vendendo? | `wholesale.sales_open` (config, **default `false`**) — desligado: só cadastro |
 
 ## Fluxo
 
@@ -45,15 +48,16 @@ Cliente                Shop /atacado              API                     Admin
 
 ## Regras de negócio
 
-| Regra                 | Detalhe                                                             |
-| --------------------- | ------------------------------------------------------------------- |
-| Não empilha com clube | Canal atacado **não** aplica `member_10`                            |
-| Frete                 | Nunca recebe desconto                                               |
-| Estoque               | Mesmo estoque do varejo; valida no create, baixa no paid            |
-| Produto               | Sem `wholesale_enabled` → fora do catálogo e rejeitado no checkout  |
-| Qtd. mínima           | `wholesale_min_qty` validado no checkout (qty max por linha: 999)   |
-| CNPJ                  | Digitos + Modulo 11; storage só dígitos (14)                        |
-| Objeto da compra      | Campo `business_activity` + revisão humana (sem CNAE automático RF) |
+| Regra                 | Detalhe                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| Não empilha com clube | Canal atacado **não** aplica `member_10`                                    |
+| Frete                 | Nunca recebe desconto                                                       |
+| Estoque               | Mesmo estoque do varejo; valida no create, baixa no paid                    |
+| Produto               | Sem `wholesale_enabled` → fora do catálogo e rejeitado no checkout          |
+| Qtd. mínima           | `wholesale_min_qty` validado no checkout (qty max por linha: 999)           |
+| CNPJ                  | Digitos + Modulo 11; storage só dígitos (14)                                |
+| Objeto da compra      | Campo `business_activity` + revisão humana (sem CNAE automático RF)         |
+| Canal fechado         | `wholesale.sales_open=false` → `POST /orders` recusa com `WHOLESALE_CLOSED` |
 
 ## Schema (migration 012 + ensureSchema)
 
@@ -78,6 +82,7 @@ Aplicado automaticamente via `ensureSchema()` no boot da API (sem SSH manual).
 | ------ | ------------------------------------------- | ------------------------------------------ |
 | POST   | `/wholesale/register`                       | público                                    |
 | POST   | `/wholesale/login`                          | público (CNPJ obrigatório)                 |
+| GET    | `/wholesale/status`                         | público (`{ salesOpen }`)                  |
 | GET    | `/wholesale/me`                             | JWT                                        |
 | GET    | `/wholesale/accounts`                       | admin                                      |
 | PATCH  | `/wholesale/accounts/:id`                   | admin (`approve` \| `reject` \| `disable`) |
@@ -94,6 +99,22 @@ Aplicado automaticamente via `ensureSchema()` no boot da API (sem SSH manual).
 | `/atacado/produto/:slug` | PDP (só se wholesale_enabled) |
 | `/atacado/carrinho`      | Carrinho canal                |
 | `/atacado/checkout`      | Checkout canal                |
+
+## Lista de espera (canal fechado)
+
+Com `wholesale.sales_open = false` — o estado atual — o canal continua no ar, sem vender:
+
+| Continua                                       | Some                                     |
+| ---------------------------------------------- | ---------------------------------------- |
+| Aba **Atacado**, catálogo e páginas de produto | Botão **Adicionar** (vira “Em breve”)    |
+| Cadastro e login de CNPJ, aprovação no admin   | Checkout do atacado (botão desabilitado) |
+| Aviso “Ainda não estamos vendendo no atacado”  | Pedido via API (`403 WHOLESALE_CLOSED`)  |
+
+O front lê a chave em `GET /wholesale/status` (`useWholesaleSalesOpen`), mas quem decide é a API: o
+guard está em `createOrder`, não na tela.
+
+**Pra abrir:** admin → **Configurações** → **Canal Atacado** → marcar _Vendendo no atacado_. Os
+CNPJs cadastrados nesse meio-tempo estão na aba **Atacado**, prontos pra aprovar e avisar.
 
 ## Operação (Laura / Norberto)
 
@@ -112,5 +133,6 @@ Aplicado automaticamente via `ensureSchema()` no boot da API (sem SSH manual).
 - [x] Carrinho separado varejo/atacado
 - [x] LGPD export/delete cobre B2B
 - [x] Admin aprovação + flag produto
+- [x] Chave `wholesale.sales_open` (lista de espera com o canal fechado)
 - [ ] Deploy produção
 - [ ] Operação: liberar SKUs + aprovar primeiros CNPJs

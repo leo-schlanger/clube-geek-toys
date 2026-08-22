@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Building2, Package, ShieldCheck, Clock, AlertCircle } from 'lucide-react'
+import { Building2, Package, ShieldCheck, Clock, AlertCircle, Megaphone } from 'lucide-react'
 import type { Product, Category } from '../../types'
 import { WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import { listProducts, listCategories } from '../../lib/products'
@@ -17,6 +17,7 @@ import { CategoryNav } from '../../components/store/CategoryNav'
 import { ProductSortSelect } from '../../components/store/ProductSortSelect'
 import { CatalogPager } from '../../components/store/CatalogPager'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
+import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
 import { SeoHead } from '../../components/store/SeoHead'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
@@ -26,6 +27,9 @@ import { formatCurrency } from '../../lib/utils'
  * Wholesale catalogue. Lists only wholesale_enabled products, with the 25%
  * discount applied server-side for approved accounts. With no SKUs it renders
  * an empty state with a signup call to action.
+ *
+ * Enquanto `wholesale.sales_open` estiver desligado o canal vira lista de espera: catálogo e
+ * cadastro de CNPJ continuam no ar, sem carrinho — as lojas se cadastram e avisamos ao abrir.
  */
 export default function WholesaleHome() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -35,6 +39,7 @@ export default function WholesaleHome() {
   const page = parseCatalogPage(searchParams.get('page'))
 
   const { account, isApproved, isPending, loading: accLoading } = useWholesaleAccount()
+  const { salesOpen, loading: salesLoading } = useWholesaleSalesOpen()
 
   const [categories, setCategories] = useState<Category[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -115,7 +120,11 @@ export default function WholesaleHome() {
     <div className="min-h-screen bg-background">
       <SeoHead
         title="Atacado | GeekPop & Toys"
-        description={`Compras no atacado com ${discountPct}% de desconto para empresas com CNPJ. Cadastro e aprovação necessários.`}
+        description={
+          salesOpen
+            ? `Compras no atacado com ${discountPct}% de desconto para empresas com CNPJ. Cadastro e aprovação necessários.`
+            : 'Ainda não vendemos no atacado. Cadastre o CNPJ da sua loja e avisamos assim que o canal abrir.'
+        }
         path="/atacado"
       />
       <ShopHeader isWholesale />
@@ -127,12 +136,24 @@ export default function WholesaleHome() {
               <div className="flex items-center gap-2">
                 <Building2 className="h-6 w-6 text-primary" />
                 <h1 className="font-heading text-2xl font-bold sm:text-3xl">Atacado B2B</h1>
-                <Badge className="bg-primary text-primary-foreground">{discountPct}% OFF</Badge>
+                <Badge className="bg-primary text-primary-foreground">
+                  {salesOpen ? `${discountPct}% OFF` : 'Cadastro aberto'}
+                </Badge>
               </div>
               <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
-                Canal exclusivo para empresas com CNPJ. Desconto de {discountPct}% aplicado no
-                checkout após aprovação. Vendemos atacado quando houver disponibilidade e o CNPJ
-                estiver de acordo com o objeto da compra.
+                {salesOpen ? (
+                  <>
+                    Canal exclusivo para empresas com CNPJ. Desconto de {discountPct}% aplicado no
+                    checkout após aprovação. Vendemos atacado quando houver disponibilidade e o CNPJ
+                    estiver de acordo com o objeto da compra.
+                  </>
+                ) : (
+                  <>
+                    Canal exclusivo para empresas com CNPJ. O cadastro já está aberto e, quando
+                    começarmos a vender no atacado, contas aprovadas compram com {discountPct}% de
+                    desconto.
+                  </>
+                )}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -173,7 +194,7 @@ export default function WholesaleHome() {
             </div>
           )}
 
-          {isApproved && (
+          {isApproved && salesOpen && (
             <p className="mt-4 text-sm text-muted-foreground">
               Preço de vitrine com preview de −{discountPct}% · desconto real recalculado no servidor.
               Ex.: item de R$ 100 →{' '}
@@ -184,7 +205,25 @@ export default function WholesaleHome() {
           )}
         </div>
 
-        {!accLoading && !isApproved && account?.status !== 'rejected' && (
+        {!salesLoading && !salesOpen && (
+          <div className="mb-6 flex gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
+            <Megaphone className="h-5 w-5 shrink-0 text-primary" />
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">Ainda não estamos vendendo no atacado</p>
+              <p className="text-muted-foreground">
+                Mas o cadastro já está aberto: registre o CNPJ da sua loja e entramos em contato
+                assim que começarmos a vender no atacado.
+              </p>
+              {isPending && (
+                <p className="text-muted-foreground">
+                  Seu cadastro já está com a gente — não precisa fazer de novo.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {salesOpen && !accLoading && !isApproved && account?.status !== 'rejected' && (
           <div className="mb-6 rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
             {isPending
               ? 'Seu cadastro está em análise. Assim que o CNPJ for aprovado (atividade alinhada ao que você compra), o desconto de atacado será liberado no checkout.'
@@ -215,8 +254,9 @@ export default function WholesaleHome() {
             <div>
               <h2 className="font-heading text-lg font-semibold">Catálogo atacado em preparação</h2>
               <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                A opção de atacado já está ativa. Produtos entram aqui quando forem liberados para
-                venda no atacado (antes ou após a importação de estoque).
+                {salesOpen
+                  ? 'Produtos entram aqui quando forem liberados para venda no atacado (antes ou após a importação de estoque).'
+                  : 'Enquanto isso, deixe o CNPJ da sua loja cadastrado — avisamos assim que o atacado abrir.'}
               </p>
             </div>
             <Button variant="outline" asChild>
@@ -227,7 +267,10 @@ export default function WholesaleHome() {
           <>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-muted-foreground">
-                {total} produto{total === 1 ? '' : 's'} disponível{total === 1 ? '' : 'is'} no atacado
+                {total} produto{total === 1 ? '' : 's'}{' '}
+                {salesOpen
+                  ? `disponíve${total === 1 ? 'l' : 'is'} no atacado`
+                  : `que entra${total === 1 ? '' : 'm'} no atacado quando abrirmos`}
               </p>
               <ProductSortSelect value={sort} onChange={setSort} id="wholesale-product-sort" />
             </div>
@@ -235,6 +278,7 @@ export default function WholesaleHome() {
               products={products}
               isWholesale
               isWholesaleApproved={isApproved}
+              canBuy={salesOpen}
             />
             <CatalogPager
               page={page}

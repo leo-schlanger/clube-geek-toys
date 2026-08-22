@@ -8,6 +8,7 @@ vi.mock('../../contexts/AuthContext', () => ({
 
 vi.mock('../../lib/wholesale', () => ({
   registerWholesale: vi.fn(),
+  getWholesaleSalesOpen: vi.fn(async () => false),
 }))
 
 vi.mock('../../lib/api-client', () => ({
@@ -32,6 +33,17 @@ describe('WholesaleRegister', () => {
     )
     expect(screen.getByLabelText(/Razão social/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/CNPJ/i)).toBeInTheDocument()
+  })
+
+  it('mostra que o cadastro é lista de espera com o canal fechado', async () => {
+    render(
+      <MemoryRouter>
+        <WholesaleRegister />
+      </MemoryRouter>
+    )
+    await waitFor(() => {
+      expect(screen.getByText(/Ainda não estamos vendendo no atacado/i)).toBeInTheDocument()
+    })
   })
 
   it('blocks invalid CNPJ', async () => {

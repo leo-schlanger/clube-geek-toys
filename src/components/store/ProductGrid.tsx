@@ -9,6 +9,8 @@ interface ProductGridProps {
   isMember?: boolean
   isWholesale?: boolean
   isWholesaleApproved?: boolean
+  /** Falso: vitrine sem botão de compra (canal atacado ainda fechado). */
+  canBuy?: boolean
   /** Shown when there are no products. */
   emptyMessage?: string
 }
@@ -38,6 +40,7 @@ export function ProductGrid({
   isMember = false,
   isWholesale = false,
   isWholesaleApproved = false,
+  canBuy = true,
   emptyMessage = 'Nenhum produto encontrado.',
 }: ProductGridProps) {
   if (loading) {
@@ -62,6 +65,7 @@ export function ProductGrid({
           isMember={isMember}
           isWholesale={isWholesale}
           isWholesaleApproved={isWholesaleApproved}
+          canBuy={canBuy}
         />
       ))}
     </div>

@@ -4,7 +4,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { toast } from 'sonner'
-import { Save, RotateCcw, AlertTriangle, Loader2, Database, Palette } from 'lucide-react'
+import { Save, RotateCcw, AlertTriangle, Loader2, Database, Palette, Building2 } from 'lucide-react'
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 import { ThemeToggle } from '../ThemeToggle'
 
@@ -100,6 +100,8 @@ export function SettingsTab() {
     return typeof v === 'number' ? v : 0
   }
 
+  const bool = (key: string): boolean => draft[key] === true
+
   return (
     <div className="space-y-6">
       <Card className="border-blue-500/40 bg-blue-500/5">
@@ -176,6 +178,38 @@ export function SettingsTab() {
           <p className="text-xs text-muted-foreground mt-1">
             Bloqueia novos pagamentos do mesmo membro dentro deste período.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Canal atacado */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-primary" />
+            Canal Atacado
+          </CardTitle>
+          <CardDescription>
+            Desligado, /atacado vira lista de espera: catálogo e cadastro de CNPJ no ar, sem
+            carrinho nem checkout. A API recusa qualquer pedido de atacado enquanto estiver assim.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <label className="flex max-w-xl cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-primary"
+              checked={bool('wholesale.sales_open')}
+              onChange={(e) => setValue('wholesale.sales_open', e.target.checked)}
+            />
+            <span>
+              <span className="text-sm font-medium">Vendendo no atacado</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {bool('wholesale.sales_open')
+                  ? 'Atacadistas aprovados podem comprar com 25% de desconto.'
+                  : 'As lojas continuam se cadastrando; avisamos elas quando você ligar isto.'}
+              </span>
+            </span>
+          </label>
         </CardContent>
       </Card>
 

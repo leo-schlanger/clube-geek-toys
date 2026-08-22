@@ -19,14 +19,19 @@ import {
   CardTitle,
 } from '../../components/ui/card'
 import { SeoHead } from '../../components/store/SeoHead'
+import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
 
 /**
  * Cadastro atacadista: CNPJ + dados da empresa.
  * Starts as pending; an admin approves when the company's activity matches.
+ *
+ * Com o canal fechado o cadastro continua valendo: vira lista de espera e a loja é avisada
+ * quando começarmos a vender no atacado.
  */
 export default function WholesaleRegister() {
   const navigate = useNavigate()
   const { refreshUser } = useAuth()
+  const { salesOpen } = useWholesaleSalesOpen()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -69,7 +74,11 @@ export default function WholesaleRegister() {
       })
       setTokens(result.accessToken, result.refreshToken)
       await refreshUser()
-      toast.success('Cadastro enviado! Aguarde a aprovação do CNPJ.')
+      toast.success(
+        salesOpen
+          ? 'Cadastro enviado! Aguarde a aprovação do CNPJ.'
+          : 'Cadastro enviado! Avisamos assim que começarmos a vender no atacado.'
+      )
       navigate('/atacado', { replace: true })
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Erro ao cadastrar')
@@ -89,8 +98,18 @@ export default function WholesaleRegister() {
           </div>
           <CardTitle className="font-heading text-2xl">Solicitar acesso</CardTitle>
           <CardDescription>
-            Cadastre o CNPJ da empresa. Aprovamos contas cujo objeto social bate com o tipo de
-            compra (revenda de produtos geek/colecionáveis). Desconto de 25% após aprovação.
+            {salesOpen ? (
+              <>
+                Cadastre o CNPJ da empresa. Aprovamos contas cujo objeto social bate com o tipo de
+                compra (revenda de produtos geek/colecionáveis). Desconto de 25% após aprovação.
+              </>
+            ) : (
+              <>
+                Ainda não estamos vendendo no atacado, mas o cadastro já está aberto: deixe o CNPJ
+                da sua loja e entramos em contato assim que abrirmos, com 25% de desconto para
+                contas aprovadas.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>

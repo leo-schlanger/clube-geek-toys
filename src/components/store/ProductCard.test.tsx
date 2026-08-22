@@ -126,3 +126,20 @@ describe('ProductCard — salvar para depois', () => {
     expect(container.querySelector('a button')).toBeNull()
   })
 })
+
+// Atacado fechado: a vitrine continua, o carrinho não — a API recusaria o pedido.
+describe('ProductCard — canal sem venda liberada', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('mostra "Em breve" e não adiciona ao carrinho', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} isWholesale canBuy={false} />
+      </MemoryRouter>
+    )
+    const button = screen.getByRole('button', { name: /Em breve/i })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(addItem).not.toHaveBeenCalled()
+  })
+})

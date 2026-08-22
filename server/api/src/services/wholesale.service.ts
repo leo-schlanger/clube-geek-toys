@@ -8,6 +8,7 @@ import { openRefreshSession, ACCESS_TOKEN_EXPIRY } from './auth.service.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
+import { getSetting } from './settings.service.js';
 
 export type WholesaleStatus = 'pending' | 'approved' | 'rejected' | 'disabled';
 
@@ -359,4 +360,15 @@ export async function reviewAccount(
   });
 
   return account;
+}
+
+/**
+ * Is the wholesale channel actually selling?
+ *
+ * Registration/approval stay open regardless — the CNPJ list is what we want while we are not
+ * selling B2B yet. Only order creation is gated (see `createOrder`), and the storefront reads
+ * this through `GET /wholesale/status` to show the "avisamos quando abrir" notice.
+ */
+export async function isWholesaleSalesOpen(): Promise<boolean> {
+  return (await getSetting<boolean>('wholesale.sales_open')) === true;
 }

@@ -32,6 +32,10 @@ export const SETTINGS_CATALOGUE: SettingDefinition[] = [
 
   // Store credit (BRL) rewarded for reviewing a delivered order.
   { key: 'review_reward_amount', default: 1, type: 'number', description: 'Crédito (R$) ao avaliar um pedido entregue' },
+
+  // Wholesale channel. Registration is always open (the CNPJ list is the point); orders are only
+  // accepted once the store is actually selling B2B. Off = /atacado is a waiting list.
+  { key: 'wholesale.sales_open', default: false, type: 'boolean', description: 'Atacado vendendo (desligado: só cadastro de CNPJ)' },
 ];
 
 const definitionByKey = new Map(SETTINGS_CATALOGUE.map((d) => [d.key, d]));

@@ -24,6 +24,7 @@ import { SaveProductButton } from '../../components/store/SaveProductButton'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
+import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
 import {
   VariantPicker,
   matchVariant,
@@ -50,6 +51,9 @@ export default function ProductDetail() {
   const channel = useShopChannel()
   const isWholesale = channel === 'wholesale'
   const { isApproved: isWholesaleApproved } = useWholesaleAccount()
+  const { salesOpen: wholesaleSalesOpen } = useWholesaleSalesOpen(isWholesale)
+  // Canal atacado fechado: vitrine sem carrinho — o pedido seria recusado pela API.
+  const canBuy = !isWholesale || wholesaleSalesOpen
 
   const [product, setProduct] = useState<Product | null>(null)
   const [related, setRelated] = useState<Product[]>([])
@@ -178,7 +182,7 @@ export default function ProductDetail() {
     isWholesale && product ? Math.max(1, product.wholesaleMinQty ?? 1) : 1
 
   function handleAddToCart() {
-    if (!product || outOfStock) return
+    if (!product || outOfStock || !canBuy) return
     if (product.hasVariants && !matched) {
       toast.error('Selecione a variação (cor/tamanho) antes de adicionar.')
       return
@@ -445,6 +449,15 @@ export default function ProductDetail() {
                     Quantidade mínima no atacado: {minQty} un.
                   </p>
                 )}
+                {!canBuy && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Ainda não vendemos no atacado.{' '}
+                    <Link to="/atacado/cadastro" className="font-medium text-primary hover:underline">
+                      Cadastre o CNPJ
+                    </Link>{' '}
+                    e avisamos quando abrir.
+                  </p>
+                )}
               </div>
 
               {/* Estoque */}
@@ -500,10 +513,10 @@ export default function ProductDetail() {
                   size="lg"
                   className="flex-1"
                   onClick={handleAddToCart}
-                  disabled={outOfStock}
+                  disabled={outOfStock || !canBuy}
                 >
                   <ShoppingCart className="h-5 w-5" />
-                  {outOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
+                  {!canBuy ? 'Em breve no atacado' : outOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
                 </Button>
 
                 {/* Esgotado é justamente quando salvar mais importa. */}
@@ -549,6 +562,7 @@ export default function ProductDetail() {
               isMember={isMember && !isWholesale}
               isWholesale={isWholesale}
               isWholesaleApproved={isWholesaleApproved}
+              canBuy={canBuy}
             />
           </section>
         )}

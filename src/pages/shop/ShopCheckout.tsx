@@ -33,6 +33,7 @@ import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
+import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { SeoHead } from '../../components/store/SeoHead'
 import { getStoreCredit } from '../../lib/reviews'
@@ -54,6 +55,9 @@ export default function ShopCheckout() {
   const isWholesale = channel === 'wholesale'
   const { member, isMember } = useShopMember()
   const { account: wholesaleAccount, isApproved: isWholesaleApproved } = useWholesaleAccount()
+  const { salesOpen: wholesaleSalesOpen } = useWholesaleSalesOpen(isWholesale)
+  // Canal fechado: a API recusaria o pedido (WHOLESALE_CLOSED) — melhor barrar antes do formulário.
+  const wholesaleClosed = isWholesale && !wholesaleSalesOpen
   const { user } = useAuth()
 
   const [name, setName] = useState('')
@@ -228,6 +232,10 @@ export default function ShopCheckout() {
     }
 
     if (isWholesale) {
+      if (wholesaleClosed) {
+        toast.error('Ainda não estamos vendendo no atacado. Cadastre o CNPJ e avisamos ao abrir.')
+        return
+      }
       if (!user || !isWholesaleApproved || !wholesaleAccount) {
         toast.error('Faça login no atacado com CNPJ aprovado para finalizar a compra.')
         navigate('/atacado/entrar')
@@ -646,7 +654,7 @@ export default function ShopCheckout() {
                   type="submit"
                   size="lg"
                   className="w-full"
-                  disabled={submitting || (!isPickup && !selectedServiceId)}
+                  disabled={submitting || wholesaleClosed || (!isPickup && !selectedServiceId)}
                 >
                   {submitting ? (
                     <>
@@ -873,7 +881,19 @@ export default function ShopCheckout() {
                   </div>
                 )}
 
-                {!order && isWholesale && !isWholesaleApproved && (
+                {!order && wholesaleClosed && (
+                  <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+                    <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                    <span>
+                      Ainda não estamos vendendo no atacado.{' '}
+                      <Link to="/atacado/cadastro" className="font-medium text-primary underline">
+                        Cadastre o CNPJ
+                      </Link>{' '}
+                      e entramos em contato quando abrir.
+                    </span>
+                  </div>
+                )}
+                {!order && isWholesale && !wholesaleClosed && !isWholesaleApproved && (
                   <Link
                     to="/atacado/entrar"
                     className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"

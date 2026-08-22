@@ -16,7 +16,7 @@ A plataforma inclui:
 - **Contrato digital** com validade jurídica (Lei 14.063/2020)
 - **Carteirinha digital premium** com QR Code e design metálico
 - **Loja e-commerce própria** em `shop.geeketoys.com.br` com desconto de membro aplicado no checkout
-- **Canal Atacado B2B** em `shop.geeketoys.com.br/atacado` (CNPJ + 25% após aprovação)
+- **Canal Atacado B2B** em `shop.geeketoys.com.br/atacado` (CNPJ + 25% após aprovação; hoje em lista de espera)
 - **PDV integrado** para verificação de membro e aplicação de desconto na loja física
 - **Rádio online** via AzuraCast em `rádio.geeketoys.com.br`
 
@@ -76,6 +76,9 @@ Aba dedicada em `/atacado` (mesmo host da loja):
 - Aprovação manual no admin (atividade / objeto social alinhado a compra)
 - **25% de desconto** server-side (`discount_reason = 'wholesale_25'`) só com conta aprovada
 - Produtos só entram no catálogo atacado com flag `wholesale_enabled` (pronto antes da importação)
+- **Lista de espera enquanto não vendemos**: com `wholesale.sales_open` desligado (padrão) o canal
+  segue no ar avisando que ainda não vendemos no atacado — as lojas se cadastram, a API recusa
+  pedido (`WHOLESALE_CLOSED`) e o admin liga a chave em Configurações quando for abrir
 - Documentação: [`docs/WHOLESALE.md`](docs/WHOLESALE.md)
 
 ### Conta e Perfil de Cliente

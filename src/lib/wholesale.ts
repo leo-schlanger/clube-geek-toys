@@ -47,6 +47,16 @@ export async function loginWholesale(data: {
   return result.data
 }
 
+/**
+ * Is the wholesale channel accepting orders? Registration stays open either way — while this is
+ * false, /atacado is a waiting list: the shop registers the CNPJ and we get in touch when we open.
+ * Public endpoint; falls back to closed so a failed request never shows a buy button we can't honour.
+ */
+export async function getWholesaleSalesOpen(): Promise<boolean> {
+  const result = await api.get<{ salesOpen: boolean }>('/wholesale/status', { skipAuth: true })
+  return result.data?.salesOpen === true
+}
+
 export async function getMyWholesaleAccount(): Promise<WholesaleAccount | null> {
   const result = await api.get<WholesaleAccount>('/wholesale/me')
   return result.data ?? null

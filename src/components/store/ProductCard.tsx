@@ -20,6 +20,8 @@ interface ProductCardProps {
   isWholesale?: boolean
   /** Approved wholesale account: shows the price at -25%. */
   isWholesaleApproved?: boolean
+  /** Canal fechado (atacado sem venda liberada): vitrine sem botão de compra. */
+  canBuy?: boolean
 }
 
 /**
@@ -31,6 +33,7 @@ export function ProductCard({
   isMember = false,
   isWholesale = false,
   isWholesaleApproved = false,
+  canBuy = true,
 }: ProductCardProps) {
   const { addItem } = useCart()
 
@@ -45,7 +48,7 @@ export function ProductCard({
   function handleAdd(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (outOfStock) return
+    if (outOfStock || !canBuy) return
     addItem(product, minQty)
     toast.success(
       minQty > 1
@@ -173,12 +176,12 @@ export function ProductCard({
 
         <Button
           onClick={handleAdd}
-          disabled={outOfStock}
-          className={cn('mt-2 w-full', outOfStock && 'opacity-60')}
+          disabled={outOfStock || !canBuy}
+          className={cn('mt-2 w-full', (outOfStock || !canBuy) && 'opacity-60')}
           size="sm"
         >
           <ShoppingCart className="h-4 w-4" />
-          {outOfStock ? 'Esgotado' : 'Adicionar'}
+          {!canBuy ? 'Em breve' : outOfStock ? 'Esgotado' : 'Adicionar'}
         </Button>
       </CardContent>
     </Card>

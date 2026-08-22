@@ -11,6 +11,10 @@ vi.mock('../../components/store/useWholesaleAccount', () => ({
   useWholesaleAccount: vi.fn(),
 }))
 
+vi.mock('../../components/store/useWholesaleSalesOpen', () => ({
+  useWholesaleSalesOpen: vi.fn(),
+}))
+
 vi.mock('../../components/store/ShopHeader', () => ({
   ShopHeader: () => <header data-testid="shop-header">Header</header>,
 }))
@@ -31,11 +35,13 @@ vi.mock('../../components/store/SeoHead', () => ({
 
 import { listProducts, listCategories } from '../../lib/products'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
+import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
 import WholesaleHome from './WholesaleHome'
 
 const mockedList = vi.mocked(listProducts)
 const mockedCats = vi.mocked(listCategories)
 const mockedWh = vi.mocked(useWholesaleAccount)
+const mockedSales = vi.mocked(useWholesaleSalesOpen)
 
 describe('WholesaleHome', () => {
   beforeEach(() => {
@@ -47,6 +53,7 @@ describe('WholesaleHome', () => {
       isPending: false,
       loading: false,
     })
+    mockedSales.mockReturnValue({ salesOpen: true, loading: false })
   })
 
   it('shows empty catalog preparation message', async () => {
@@ -121,5 +128,36 @@ describe('WholesaleHome', () => {
     await waitFor(() => {
       expect(screen.getByTestId('grid')).toHaveTextContent('Lote Cards')
     })
+  })
+
+  it('com o canal fechado, avisa que não vendemos ainda e chama pro cadastro', async () => {
+    mockedSales.mockReturnValue({ salesOpen: false, loading: false })
+    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
+    render(
+      <MemoryRouter>
+        <WholesaleHome />
+      </MemoryRouter>
+    )
+    await waitFor(() => {
+      expect(screen.getByText(/Ainda não estamos vendendo no atacado/i)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('link', { name: /Cadastrar CNPJ/i })).toHaveAttribute(
+      'href',
+      '/atacado/cadastro'
+    )
+    expect(screen.getByText(/Cadastro aberto/i)).toBeInTheDocument()
+  })
+
+  it('com o canal aberto, não mostra o aviso de lista de espera', async () => {
+    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
+    render(
+      <MemoryRouter>
+        <WholesaleHome />
+      </MemoryRouter>
+    )
+    await waitFor(() => {
+      expect(screen.getByText(/Catálogo atacado em preparação/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Ainda não estamos vendendo no atacado/i)).not.toBeInTheDocument()
   })
 })

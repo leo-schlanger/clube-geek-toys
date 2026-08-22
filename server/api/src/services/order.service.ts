@@ -29,7 +29,7 @@ import {
 } from './shipping.service.js';
 import { redeemForOrder, restoreCreditForOrder } from './store-credit.service.js';
 import { sendTemplateEmail } from './email.service.js';
-import { getApprovedAccountByUserId } from './wholesale.service.js';
+import { getApprovedAccountByUserId, isWholesaleSalesOpen } from './wholesale.service.js';
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 
 const PIX_KEY = env.PIX_KEY || '';
@@ -171,7 +171,8 @@ export interface CreateOrderResult {
  *
  * Channels:
  * - retail: optional member_10 when active member
- * - wholesale: requires auth + approved CNPJ account; wholesale_25; only wholesale_enabled products
+ * - wholesale: só com `wholesale.sales_open` ligado; requires auth + approved CNPJ account;
+ *   wholesale_25; only wholesale_enabled products
  */
 export async function createOrder(input: CreateOrderInput, user?: JwtPayload): Promise<CreateOrderResult> {
   if (!input.items?.length) {
@@ -205,6 +206,14 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   let wholesaleAccountId: string | null = null;
   let customerCnpj: string | null = null;
   if (isWholesale) {
+    // Cadastro segue aberto mesmo com o canal fechado — o que não pode é virar pedido.
+    if (!(await isWholesaleSalesOpen())) {
+      throw new AppError(
+        403,
+        'Ainda não estamos vendendo no atacado. Seu cadastro fica guardado e avisamos assim que abrirmos.',
+        'WHOLESALE_CLOSED'
+      );
+    }
     if (!user?.userId) {
       throw new AppError(401, 'Faça login no atacado com CNPJ para comprar.', 'WHOLESALE_AUTH_REQUIRED');
     }

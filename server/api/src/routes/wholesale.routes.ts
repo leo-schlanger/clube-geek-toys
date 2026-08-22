@@ -64,6 +64,15 @@ wholesaleRouter.post('/login', authLimiter, validate(loginSchema), async (req, r
   }
 });
 
+// GET /wholesale/status — público: a loja precisa saber se o canal aceita pedidos
+wholesaleRouter.get('/status', async (_req, res, next) => {
+  try {
+    res.json({ salesOpen: await wholesaleService.isWholesaleSalesOpen() });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /wholesale/me — current user's wholesale account
 wholesaleRouter.get('/me', authenticate, async (req, res, next) => {
   try {

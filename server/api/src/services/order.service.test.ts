@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     that somehow goes uncovered leaves a trail instead of clamping silently.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -26,6 +26,7 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     redeemMock: vi.fn(),
     memberIdMock: vi.fn(),
     approvedAccountMock: vi.fn(),
+    salesOpenMock: vi.fn(),
     stripeMock: vi.fn(),
     auditMock: vi.fn(),
     sendEmailMock: vi.fn(),
@@ -85,7 +86,10 @@ vi.mock('./store-credit.service.js', () => ({
   restoreCreditForOrder: restoreCreditMock,
 }));
 
-vi.mock('./wholesale.service.js', () => ({ getApprovedAccountByUserId: approvedAccountMock }));
+vi.mock('./wholesale.service.js', () => ({
+  getApprovedAccountByUserId: approvedAccountMock,
+  isWholesaleSalesOpen: salesOpenMock,
+}));
 vi.mock('../middleware/ownership.js', () => ({ getMemberIdForUser: memberIdMock }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 vi.mock('./stock.service.js', () => ({
@@ -227,6 +231,7 @@ beforeEach(() => {
   queryMock.mockResolvedValue({ rows: [] });
   redeemMock.mockResolvedValue(0);
   memberIdMock.mockResolvedValue(null);
+  salesOpenMock.mockResolvedValue(true);
   auditMock.mockResolvedValue(undefined);
   sendEmailMock.mockResolvedValue(undefined);
   restoreCreditMock.mockResolvedValue(0);
@@ -536,6 +541,25 @@ describe('createOrder — variants', () => {
 // ─── Atacado ─────────────────────────────────────────────────────────────────
 
 describe('createOrder — atacado', () => {
+  it('recusa pedido com o canal fechado, mesmo com CNPJ aprovado', async () => {
+    setupTx({ products: [product({ wholesale_enabled: true })] });
+    salesOpenMock.mockResolvedValue(false);
+    approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '11222333000181' });
+    await expect(
+      createOrder(
+        baseInput({ channel: 'wholesale', cnpj: '11222333000181' }),
+        { userId: 'u1' } as never
+      )
+    ).rejects.toMatchObject({ code: 'WHOLESALE_CLOSED' });
+  });
+
+  it('não bloqueia o varejo quando o atacado está fechado', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+    salesOpenMock.mockResolvedValue(false);
+    const order = await createOrder(baseInput());
+    expect(order).toBeTruthy();
+  });
+
   it('exige login', async () => {
     setupTx({});
     await expect(
