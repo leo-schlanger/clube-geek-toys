@@ -23,6 +23,17 @@ productRouter.get('/categories', async (_req, res, next) => {
   }
 });
 
+// GET /products/categories/all — admin: inclui as inativas e quantos produtos
+// cada categoria tem (é o que diz se dá para excluir sem esvaziar a vitrine).
+// Antes de '/:slug' pelo mesmo motivo da rota acima.
+productRouter.get('/categories/all', authenticate, requireRole('admin'), async (_req, res, next) => {
+  try {
+    res.json({ categories: await productService.listCategoriesForAdmin() });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Public: dynamic product sitemap (XML for shop SEO) ──────────────────────
 // Must be before /:slug so "sitemap.xml" is not treated as a slug.
 

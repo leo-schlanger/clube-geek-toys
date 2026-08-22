@@ -11,7 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { CartDrawer } from './CartDrawer'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { ThemeToggle } from '../ThemeToggle'
-import { isEventVisible } from '../../data/event'
+import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { useWholesaleAccount } from './useWholesaleAccount'
 import { NotificationBell } from './NotificationBell'
 
@@ -30,6 +30,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
   const { count } = useCart()
   const { user } = useAuth()
   const { isApproved: isWholesaleApproved } = useWholesaleAccount()
+  const { visible: eventVisible } = useActiveEvent()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
 
@@ -116,7 +117,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             </Button>
           </div>
 
-          {isEventVisible() && !isWholesale && (
+          {eventVisible && !isWholesale && (
             <Button
               variant="ghost"
               size="sm"

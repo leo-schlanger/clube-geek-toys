@@ -45,6 +45,8 @@ const StockTab = lazy(() => import('../components/admin/StockTab').then(m => ({ 
 const QuestionsTab = lazy(() => import('../components/admin/QuestionsTab').then(m => ({ default: m.QuestionsTab })))
 const GalleryTab = lazy(() => import('../components/admin/GalleryTab').then(m => ({ default: m.GalleryTab })))
 const EventTicketsTab = lazy(() => import('../components/admin/EventTicketsTab').then(m => ({ default: m.EventTicketsTab })))
+const EventConfigTab = lazy(() => import('../components/admin/EventConfigTab').then(m => ({ default: m.EventConfigTab })))
+const CategoriesTab = lazy(() => import('../components/admin/CategoriesTab').then(m => ({ default: m.CategoriesTab })))
 const WholesaleTab = lazy(() => import('../components/admin/WholesaleTab').then(m => ({ default: m.WholesaleTab })))
 const ReviewsTab = lazy(() => import('../components/admin/ReviewsTab').then(m => ({ default: m.ReviewsTab })))
 const UsersTab = lazy(() => import('../components/admin/UsersTab').then(m => ({ default: m.UsersTab })))
@@ -72,12 +74,14 @@ const VALID_TABS: AdminTab[] = [
   'dashboard',
   'members',
   'products',
+  'categories',
   'stock',
   'orders',
   'wholesale',
   'reviews',
   'questions',
   'events',
+  'event-config',
   'gallery',
   'users',
   'reports',
@@ -419,11 +423,13 @@ export default function AdminDashboard() {
                 {activeTab === 'dashboard' && 'Dashboard'}
                 {activeTab === 'members' && 'Membros'}
                 {activeTab === 'products' && 'Produtos'}
+                {activeTab === 'categories' && 'Categorias'}
                 {activeTab === 'stock' && 'Estoque'}
                 {activeTab === 'orders' && 'Pedidos'}
                 {activeTab === 'wholesale' && 'Atacado'}
                 {activeTab === 'reviews' && 'Avaliações'}
                 {activeTab === 'questions' && 'Perguntas'}
+                {activeTab === 'event-config' && 'Eventos'}
                 {activeTab === 'events' && 'Ingressos'}
                 {activeTab === 'gallery' && 'Galeria'}
                 {activeTab === 'users' && 'Usuários'}
@@ -435,11 +441,13 @@ export default function AdminDashboard() {
                 {activeTab === 'dashboard' && 'Visão geral do sistema'}
                 {activeTab === 'members' && 'Gerencie os membros do clube'}
                 {activeTab === 'products' && 'Gerencie o catálogo da loja'}
+                {activeTab === 'categories' && 'Nome, ícone e ordem das categorias da loja'}
                 {activeTab === 'stock' && 'Ajuste estoque e acompanhe a movimentação'}
                 {activeTab === 'orders' && 'Acompanhe e gerencie os pedidos'}
                 {activeTab === 'wholesale' && 'Aprove CNPJ e gerencie atacadistas (−25%)'}
                 {activeTab === 'reviews' && 'Modere avaliações da loja'}
                 {activeTab === 'questions' && 'Responda as perguntas dos clientes'}
+                {activeTab === 'event-config' && 'Crie, publique e encerre os eventos da loja e do site'}
                 {activeTab === 'events' && 'Reservas, ingressos nominais e check-in na portaria'}
                 {activeTab === 'gallery' && 'Pastas de fotos do site institucional'}
                 {activeTab === 'users' && 'Gerencie usuários do sistema'}
@@ -583,6 +591,8 @@ export default function AdminDashboard() {
             {activeTab === 'wholesale' && <WholesaleTab />}
             {activeTab === 'reviews' && <ReviewsTab />}
             {activeTab === 'questions' && <QuestionsTab />}
+            {activeTab === 'event-config' && <EventConfigTab />}
+            {activeTab === 'categories' && <CategoriesTab />}
             {activeTab === 'events' && <EventTicketsTab />}
             {activeTab === 'gallery' && <GalleryTab />}
             {activeTab === 'users' && (

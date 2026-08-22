@@ -2,36 +2,46 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-const mockIsEventVisible = vi.fn()
+// O evento vem da API pelo `useActiveEvent`. `isPlaceholder: false` é o que
+// libera o redirect: com o fallback ainda em tela a página não expulsa ninguém.
+const mockUseActiveEvent = vi.fn()
 
-vi.mock('../../data/event', () => ({
-  ACTIVE_EVENT: {
-    id: 'e1',
-    slug: 'kpop-night',
-    enabled: true,
-    title: 'GeekPop Night',
-    shortTitle: 'Night',
-    bannerText: 'Evento',
-    startsAt: '2026-09-06T14:00:00-03:00',
-    endsAt: '2026-09-06T18:00:00-03:00',
-    location: {
-      name: 'GeekPop & Toys',
-      address: 'Copacabana, RJ',
-      mapsUrl: 'https://maps.example',
-    },
-    description: ['Festa K-pop'],
-    highlights: ['Brinde'],
-    memberPerk: 'Entrada grátis',
-    ticketReservation: {
-      enabled: true,
-      priceBRL: 20,
-      maxPerReservation: 4,
-      whatsappNumber: '5511914662881',
-    },
-    photos: [],
+const EVENT = {
+  id: 'e1',
+  slug: 'kpop-night',
+  status: 'published' as const,
+  title: 'GeekPop Night',
+  shortTitle: 'Night',
+  bannerText: 'Evento',
+  bannerImageUrl: null,
+  startsAt: '2026-09-06T14:00:00-03:00',
+  endsAt: '2026-09-06T18:00:00-03:00',
+  location: {
+    name: 'GeekPop & Toys',
+    address: 'Copacabana, RJ',
+    mapsUrl: 'https://maps.example',
   },
-  formatEventDateRange: () => '6 de setembro de 2026',
-  isEventVisible: (...args: unknown[]) => mockIsEventVisible(...args),
+  description: ['Festa K-pop'],
+  highlights: ['Brinde'],
+  memberPerk: 'Entrada grátis',
+  ticketReservation: {
+    enabled: true,
+    priceBRL: 20,
+    currencyLabel: 'R$',
+    maxPerReservation: 4,
+    whatsappNumber: '5511914662881',
+    notes: null,
+  },
+  priceCents: 2000,
+}
+
+vi.mock('../../data/event', async () => {
+  const actual = await vi.importActual<typeof import('../../data/event')>('../../data/event')
+  return { ...actual, formatEventDateRange: () => '6 de setembro de 2026' }
+})
+
+vi.mock('../../hooks/useActiveEvent', () => ({
+  useActiveEvent: () => mockUseActiveEvent(),
 }))
 
 vi.mock('../../components/store/useShopMember', () => ({
@@ -54,7 +64,12 @@ describe('EventPage', () => {
   })
 
   it('redirects home when event not visible', () => {
-    mockIsEventVisible.mockReturnValue(false)
+    mockUseActiveEvent.mockReturnValue({
+      event: { ...EVENT, status: 'archived' },
+      visible: false,
+      loading: false,
+      isPlaceholder: false,
+    })
     render(
       <MemoryRouter initialEntries={['/evento']}>
         <Routes>
@@ -67,7 +82,12 @@ describe('EventPage', () => {
   })
 
   it('renders event info and ticket form when visible', () => {
-    mockIsEventVisible.mockReturnValue(true)
+    mockUseActiveEvent.mockReturnValue({
+      event: EVENT,
+      visible: true,
+      loading: false,
+      isPlaceholder: false,
+    })
     render(
       <MemoryRouter initialEntries={['/evento']}>
         <Routes>

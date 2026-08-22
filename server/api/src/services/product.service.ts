@@ -1146,6 +1146,27 @@ export async function listCategories(includeInactive = false): Promise<Category[
   return result.rows.map(mapCategory);
 }
 
+/**
+ * Lista para o painel: inclui inativas e conta os produtos de cada uma.
+ *
+ * A contagem sai de `product_categories` (a tabela de múltiplas categorias),
+ * não de `products.category_id`: um produto arquivado numa categoria
+ * secundária também conta, e é ele que impede a exclusão inocente.
+ */
+export async function listCategoriesForAdmin(): Promise<(Category & { productCount: number })[]> {
+  const result = await query(
+    `SELECT c.*, COUNT(pc.product_id)::int AS product_count
+       FROM categories c
+       LEFT JOIN product_categories pc ON pc.category_id = c.id
+      GROUP BY c.id
+      ORDER BY c.sort_order ASC, c.name ASC`
+  );
+  return result.rows.map((row) => ({
+    ...mapCategory(row),
+    productCount: row.product_count ?? 0,
+  }));
+}
+
 export async function createCategory(data: {
   name: string;
   description?: string | null;

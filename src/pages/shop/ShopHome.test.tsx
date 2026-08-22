@@ -38,8 +38,8 @@ vi.mock('../../components/store/PaymentTrustBadges', () => ({
   PaymentTrustBadges: () => null,
 }))
 
-vi.mock('../../data/event', () => ({
-  isEventVisible: () => true,
+vi.mock('../../hooks/useActiveEvent', () => ({
+  useActiveEvent: () => ({ visible: true, loading: false, isPlaceholder: false }),
 }))
 
 import { listProducts, listCategories } from '../../lib/products'

@@ -21,7 +21,7 @@ import { SeoHead, SHOP_DEFAULT_SEO } from '../../components/store/SeoHead'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { CreatorCredit } from '../../components/CreatorCredit'
 import { Button } from '../../components/ui/button'
-import { isEventVisible } from '../../data/event'
+import { useActiveEvent } from '../../hooks/useActiveEvent'
 
 /**
  * Main storefront, serving both "/" and "/categoria/:slug", and reading
@@ -35,6 +35,7 @@ export default function ShopHome() {
   const page = parseCatalogPage(searchParams.get('page'))
 
   const { isMember } = useShopMember()
+  const { visible: eventVisible } = useActiveEvent()
 
   const [categories, setCategories] = useState<Category[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
@@ -196,7 +197,7 @@ export default function ShopHome() {
                     Entrar no Clube
                   </a>
                 </Button>
-                {isEventVisible() && (
+                {eventVisible && (
                   <Button asChild className="gap-2" size="sm">
                     <Link to="/evento">
                       <Ticket className="h-4 w-4" />

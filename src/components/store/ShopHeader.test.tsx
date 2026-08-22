@@ -28,8 +28,8 @@ vi.mock('../../lib/reviews', () => ({
   getStoreCredit: vi.fn().mockResolvedValue({ balance: 0 }),
 }))
 
-vi.mock('../../data/event', () => ({
-  isEventVisible: () => false,
+vi.mock('../../hooks/useActiveEvent', () => ({
+  useActiveEvent: () => ({ visible: false, loading: false, isPlaceholder: false }),
 }))
 
 vi.mock('../ThemeToggle', () => ({

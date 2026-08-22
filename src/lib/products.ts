@@ -1,5 +1,5 @@
 import { api, apiRequest } from './api-client'
-import type { Product, Category, ProductVariant, VariantAxis, ProductVideo } from '../types'
+import type { Product, Category, AdminCategory, ProductVariant, VariantAxis, ProductVideo } from '../types'
 import { DEFAULT_PRODUCT_SORT, type ProductSort } from './product-sort'
 
 export interface ProductListResult {
@@ -312,6 +312,12 @@ export interface CategoryInput {
   icon?: string | null
   active?: boolean
   sortOrder?: number
+}
+
+/** Admin: inclui inativas e a contagem de produtos por categoria. */
+export async function listCategoriesForAdmin(): Promise<AdminCategory[]> {
+  const result = await api.get<{ categories: AdminCategory[] }>('/products/categories/all')
+  return result.data?.categories ?? []
 }
 
 export async function createCategory(data: CategoryInput): Promise<Category | null> {

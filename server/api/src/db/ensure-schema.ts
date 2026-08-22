@@ -813,6 +813,138 @@ const STEPS: SchemaStep[] = [
     );
     },
   },
+  {
+    name: "Eventos gerenciáveis pelo admin (migration 029)",
+    run: async () => {
+    // Até aqui o evento vivia hardcoded em três arquivos e dois repos, e trocar
+    // de evento exigia deploy. A tabela passa a ser a fonte de verdade; os
+    // arquivos viram só fallback de primeira carga.
+    //
+    // `id` é TEXT (não UUID) de propósito: `event_reservations.event_id` e
+    // `event_tickets.event_id` já guardam o id textual do evento antigo, e
+    // trocar por UUID invalidaria os ingressos em circulação.
+    await query(`
+      CREATE TABLE IF NOT EXISTS events (
+        id TEXT PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        status TEXT NOT NULL DEFAULT 'draft'
+          CHECK (status IN ('draft', 'published', 'archived')),
+        title TEXT NOT NULL,
+        short_title TEXT NOT NULL DEFAULT '',
+        banner_text TEXT NOT NULL DEFAULT '',
+        banner_image_url TEXT,
+        starts_at TIMESTAMPTZ NOT NULL,
+        ends_at TIMESTAMPTZ,
+        location_name TEXT NOT NULL DEFAULT '',
+        location_address TEXT NOT NULL DEFAULT '',
+        location_maps_url TEXT,
+        description JSONB NOT NULL DEFAULT '[]'::jsonb,
+        highlights JSONB NOT NULL DEFAULT '[]'::jsonb,
+        member_perk TEXT,
+        reservations_open BOOLEAN NOT NULL DEFAULT TRUE,
+        price_cents INT CHECK (price_cents IS NULL OR price_cents >= 0),
+        currency_label TEXT NOT NULL DEFAULT 'R$',
+        max_per_reservation INT CHECK (max_per_reservation IS NULL OR max_per_reservation > 0),
+        whatsapp_number TEXT NOT NULL DEFAULT '',
+        reservation_notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await query(`CREATE INDEX IF NOT EXISTS idx_events_status_start ON events(status, starts_at DESC)`);
+    await query(`DO $$ BEGIN
+      CREATE TRIGGER tr_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+    // Semente: o evento que estava hardcoded, já com a data e o local novos
+    // (o flyer mudou para 20/09 no Mar Palace). Mantém o id antigo para não
+    // órfãos os ingressos já emitidos. `DO NOTHING` — depois disso quem manda
+    // é o admin, e um redeploy não pode sobrescrever a edição dela.
+    await query(
+      `INSERT INTO events (
+         id, slug, status, title, short_title, banner_text,
+         starts_at, ends_at, location_name, location_address, location_maps_url,
+         description, highlights, member_perk,
+         reservations_open, price_cents, currency_label, max_per_reservation,
+         whatsapp_number, reservation_notes
+       ) VALUES (
+         'kpop-night-2026-09-06', 'kpop-night', 'published',
+         'Photocard Trading + Dança Livre de K-pop',
+         'Photocard Trading',
+         '🎉 Photocard Trading + Dança Livre · domingo 20/set, 14h–18h · Entrada R$ 20',
+         '2026-09-20T14:00:00-03:00', '2026-09-20T18:00:00-03:00',
+         'Mar Palace Copacabana Hotel',
+         'Avenida Nossa Senhora de Copacabana, 552 — Copacabana, Rio de Janeiro — RJ',
+         'https://maps.google.com/?q=Mar+Palace+Copacabana+Hotel,+Avenida+Nossa+Senhora+de+Copacabana,+552,+Copacabana,+Rio+de+Janeiro',
+         $1::jsonb, $2::jsonb,
+         'Membros do Clube: 50% de desconto na entrada (R$ 10). Criança de colo e PCD: isentos.',
+         TRUE, 2000, 'R$', NULL,
+         '5511914662881',
+         'Entrada R$ 20/pessoa (membros do Clube: R$ 10). Criança de colo e criança com deficiência não pagam. Cada pessoa recebe um ingresso nominal com QR Code próprio, liberado assim que a equipe confirmar o pagamento.'
+       )
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        JSON.stringify([
+          'Um dia inteiro no Mar Palace Copacabana Hotel para trocar photocards, dançar e celebrar o K-pop. Troque, dance e faça amizades — todos os fãs reunidos em um dia incrível.',
+          'Entrada: R$ 20 por pessoa, com lanches grátis. Criança de colo e criança com deficiência (PCD) não pagam. Membros do Clube GeekPop & Toys têm 50% de desconto (R$ 10) — apresente a carteirinha digital ou o CPF na porta.',
+        ]),
+        JSON.stringify([
+          'Domingo, 20 de setembro · 14h às 18h',
+          'Mar Palace Copacabana Hotel — novo local!',
+          'Photocard trading + dança livre de K-pop',
+          'Lanches grátis',
+          'Entrada R$ 20 por pessoa',
+          'Criança de colo e criança PCD: entrada gratuita',
+        ]),
+      ]
+    );
+    },
+  },
+  {
+    name: "Ícone padrão por categoria (migration 030)",
+    run: async () => {
+    // As categorias nasceram sem ícone, e quem consome a lista acabava caindo
+    // num ícone genérico (o site institucional desenhava nota musical em
+    // todas). Preenche uma vez o que dá para inferir do nome; a partir daí a
+    // admin edita pela aba Categorias.
+    const guesses: [string, string][] = [
+      ['k-?pop', 'star'],
+      ['photocard|foto', 'camera'],
+      ['music|músic|musica', 'music'],
+      ['pok[eé]mon', 'zap'],
+      ['anime|mang', 'cat'],
+      ['beleza|maquia', 'heart'],
+      ['moda|vestu[aá]rio|roupa|camiseta', 'shirt'],
+      ['jogo|game', 'gamepad'],
+      ['comida|food|doce', 'cookie'],
+      ['beb[eê]', 'baby'],
+      ['pet|animal', 'paw'],
+      ['decora', 'palette'],
+      ['papelaria|caderno', 'book'],
+      ['acess[oó]rio', 'sparkles'],
+      ['brinquedo', 'gift'],
+      ['casa|eletro', 'home'],
+    ];
+    for (const [pattern, icon] of guesses) {
+      // Só preenche o que está vazio: um ícone escolhido à mão não é revertido.
+      await query(
+        `UPDATE categories SET icon = $1
+         WHERE (icon IS NULL OR icon = '') AND (name ~* $2 OR slug ~* $2)`,
+        [icon, pattern]
+      );
+    }
+    // Sobrou sem palpite? Recebe um genérico, para a vitrine não ficar com
+    // metade dos itens com ícone e metade sem.
+    await query(`UPDATE categories SET icon = 'sparkles' WHERE icon IS NULL OR icon = ''`);
+
+    // Correção pontual: as duas únicas categorias que tinham ícone estavam
+    // **ambas** com 'star', escolhido no `<select>` antigo — que mostrava só o
+    // rótulo ("K-pop / Estrela"), nunca o desenho. Guardado por slug **e** pelo
+    // valor atual, então uma escolha deliberada futura não é desfeita.
+    await query(`UPDATE categories SET icon = 'heart' WHERE slug = 'beleza' AND icon = 'star'`);
+    await query(`UPDATE categories SET icon = 'gift' WHERE slug = 'brinquedos' AND icon = 'star'`);
+    },
+  },
 ];
 
 let state: SchemaState = {

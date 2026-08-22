@@ -1,85 +1,86 @@
 /**
- * Active event, for the shop and the club docs.
+ * Tipos e fallback do evento em cartaz.
  *
- * Keep in step with geek-toys-home/src/data/event.ts when the event changes.
- * Fotos: public/eventos/<slug>/
- * Guia: docs/EVENTS.md
+ * A fonte de verdade é o banco (`GET /events/active`), editado na aba
+ * **Eventos** do admin — antes disto o evento vivia hardcoded aqui, na API e
+ * no site institucional, e trocar de evento era deploy em dois repos.
+ *
+ * `FALLBACK_EVENT` cobre só o primeiro paint (e a API fora do ar): editá-lo
+ * **não** muda o que o site mostra. Use `useActiveEvent()` nos componentes.
+ *
+ * Fotos: geek-toys-home/public/eventos/<slug>/ — Guia: docs/EVENTS.md
  */
 
-export type EventPhoto = {
-  file: string
-  caption?: string
-  alt?: string
-}
+export type EventStatus = 'draft' | 'published' | 'archived'
 
 export type EventConfig = {
   id: string
   slug: string
-  enabled: boolean
+  status: EventStatus
   title: string
   shortTitle: string
   bannerText: string
+  /** Flyer enviado pelo admin. `null` = só texto, como era antes. */
+  bannerImageUrl: string | null
   startsAt: string
-  endsAt?: string
+  endsAt: string | null
   location: {
     name: string
     address: string
-    mapsUrl?: string
+    mapsUrl: string | null
   }
   description: string[]
   highlights: string[]
-  memberPerk?: string
+  memberPerk: string | null
   ticketReservation: {
     enabled: boolean
     priceBRL: number | null
-    currencyLabel?: string
-    /**
-     * Teto por reserva. `null` = sem teto (o servidor ainda barra pedidos
-     * absurdos). Ficou 6 até 21/08/2026, quando uma família bateu no limite.
-     */
+    currencyLabel: string
+    /** `null` = sem teto (o servidor ainda barra pedidos absurdos). */
     maxPerReservation: number | null
     whatsappNumber: string
-    notes?: string
+    notes: string | null
   }
-  photos: EventPhoto[]
-  ctaPrimary: { label: string; href: string }
-  ctaSecondary?: { label: string; href: string }
+  /** Centavos — o que o servidor cobra. `priceBRL` é a vitrine. */
+  priceCents: number | null
+  createdAt?: string
+  updatedAt?: string
 }
 
-/** Evento ativo — 6 de setembro de 2026 (domingo), 14h–18h. Ingresso R$ 20. */
-export const ACTIVE_EVENT: EventConfig = {
+/**
+ * Espelha a linha semeada pela migration 029 e o `FALLBACK_EVENT` da API.
+ * Só aparece enquanto `/events/active` não responde.
+ */
+export const FALLBACK_EVENT: EventConfig = {
   id: 'kpop-night-2026-09-06',
   slug: 'kpop-night',
-  enabled: true,
-  title: 'GeekPop Night — Encontro K-pop & Collectibles',
-  shortTitle: 'GeekPop Night',
-  /**
-   * Same copy as the institutional site. Two copies of one message: edit here
-   * and there together, or the campaign reads differently per domain.
-   */
-  bannerText: '🎉 GeekPop Night · domingo 6/set, 14h–18h · Ingresso R$ 20',
-  startsAt: '2026-09-06T14:00:00-03:00',
-  endsAt: '2026-09-06T18:00:00-03:00',
+  status: 'published',
+  title: 'Photocard Trading + Dança Livre de K-pop',
+  shortTitle: 'Photocard Trading',
+  bannerText: '🎉 Photocard Trading + Dança Livre · domingo 20/set, 14h–18h · Entrada R$ 20',
+  bannerImageUrl: null,
+  startsAt: '2026-09-20T14:00:00-03:00',
+  endsAt: '2026-09-20T18:00:00-03:00',
   location: {
-    name: 'Copacabana Mar Hotel',
-    address:
-      'Rua Ministro Viveiros de Castro, 115 — Copacabana, Rio de Janeiro — RJ',
+    name: 'Mar Palace Copacabana Hotel',
+    address: 'Avenida Nossa Senhora de Copacabana, 552 — Copacabana, Rio de Janeiro — RJ',
     mapsUrl:
-      'https://maps.google.com/?q=Copacabana+Mar+Hotel,+Rua+Ministro+Viveiros+de+Castro,+115+Copacabana+Rio+de+Janeiro',
+      'https://maps.google.com/?q=Mar+Palace+Copacabana+Hotel,+Avenida+Nossa+Senhora+de+Copacabana,+552,+Copacabana,+Rio+de+Janeiro',
   },
   description: [
-    'Um encontro especial no Copacabana Mar Hotel para fãs de K-pop, colecionáveis e cultura pop. Música ambiente, ambiente temático, lançamentos e muita interação com a equipe GeekPop.',
-    'Ingresso: R$ 20 por pessoa. Criança de colo e criança com deficiência (PCD) não pagam. Membros do Clube GeekPop & Toys têm 50% de desconto no ingresso (R$ 10) — apresente a carteirinha digital ou o CPF na porta.',
+    'Um dia inteiro no Mar Palace Copacabana Hotel para trocar photocards, dançar e celebrar o K-pop. Troque, dance e faça amizades — todos os fãs reunidos em um dia incrível.',
+    'Entrada: R$ 20 por pessoa, com lanches grátis. Criança de colo e criança com deficiência (PCD) não pagam. Membros do Clube GeekPop & Toys têm 50% de desconto (R$ 10) — apresente a carteirinha digital ou o CPF na porta.',
   ],
   highlights: [
-    'Domingo, 6 de setembro · 14h às 18h',
-    'Ingresso R$ 20 por pessoa',
+    'Domingo, 20 de setembro · 14h às 18h',
+    'Mar Palace Copacabana Hotel — novo local!',
+    'Photocard trading + dança livre de K-pop',
+    'Lanches grátis',
+    'Entrada R$ 20 por pessoa',
     'Criança de colo e criança PCD: entrada gratuita',
-    'Ambiente temático, playlist K-pop e espaço para fotos',
-    'Fotos na galeria do site (geeketoys.com.br#galeria)',
   ],
   memberPerk:
-    'Membros do Clube: 50% de desconto no ingresso (R$ 10). Criança de colo e PCD: isentos.',
+    'Membros do Clube: 50% de desconto na entrada (R$ 10). Criança de colo e PCD: isentos.',
   ticketReservation: {
     enabled: true,
     priceBRL: 20,
@@ -87,20 +88,19 @@ export const ACTIVE_EVENT: EventConfig = {
     maxPerReservation: null,
     whatsappNumber: '5511914662881',
     notes:
-      'Ingresso R$ 20/pessoa (membros do Clube: R$ 10). Criança de colo e criança com deficiência não pagam. Cada pessoa recebe um ingresso nominal com QR Code próprio, liberado assim que a equipe confirmar o pagamento.',
+      'Entrada R$ 20/pessoa (membros do Clube: R$ 10). Criança de colo e criança com deficiência não pagam. Cada pessoa recebe um ingresso nominal com QR Code próprio, liberado assim que a equipe confirmar o pagamento.',
   },
-  photos: [],
-  ctaPrimary: { label: 'Reservar ingresso', href: '/evento#ingressos' },
-  ctaSecondary: { label: 'Ver evento', href: '/evento' },
+  priceCents: 2000,
 }
 
-export function isEventVisible(event: EventConfig = ACTIVE_EVENT): boolean {
-  return event.enabled
+/** Rascunho e arquivado não aparecem na vitrine. */
+export function isEventVisible(event: EventConfig | null | undefined): boolean {
+  return event?.status === 'published'
 }
 
 export function formatEventDateRange(
   startsAt: string,
-  endsAt?: string,
+  endsAt?: string | null,
   locale = 'pt-BR'
 ): string {
   const start = new Date(startsAt)
@@ -123,6 +123,11 @@ export function formatEventDateRange(
   return `${datePart} · ${startTime} – ${timeFmt.format(end)}`
 }
 
+/**
+ * URL da foto do evento na pasta pública. As fotos oficiais vivem na galeria
+ * do site institucional (`geeketoys.com.br#galeria`); isto cobre só a cópia
+ * versionada em `public/eventos/<slug>/`.
+ */
 export function photoPublicUrl(event: EventConfig, file: string): string {
   return `/eventos/${event.slug}/${encodeURIComponent(file)}`
 }

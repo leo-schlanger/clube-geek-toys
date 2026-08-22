@@ -6,7 +6,7 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import {
-  ACTIVE_EVENT,
+  FALLBACK_EVENT,
   buildReservationWhatsAppUrl,
   formatBRL,
   ticketPriceBRL,
@@ -33,7 +33,7 @@ const SELECT_CLASS =
  * na API (que devolve os códigos) e só então abre o WhatsApp para combinar o
  * pagamento.
  */
-export function EventTicketForm({ event = ACTIVE_EVENT }: Props) {
+export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', notes: '' })
   const [attendees, setAttendees] = useState<Attendee[]>([{ name: '', kind: 'full' }])
   const [submitting, setSubmitting] = useState(false)

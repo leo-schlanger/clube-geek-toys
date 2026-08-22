@@ -2,7 +2,22 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { EventAnnouncementBanner } from './EventAnnouncementBanner'
-import { ACTIVE_EVENT, isEventVisible } from '../../data/event'
+import { FALLBACK_EVENT, isEventVisible } from '../../data/event'
+
+// O evento passou a vir da API pelo `useActiveEvent`; o fallback embutido é
+// exatamente o que o hook entrega no primeiro render. `importActual` porque
+// `vi.mock` sobe acima dos imports — a constante ainda não existe aqui.
+vi.mock('../../hooks/useActiveEvent', async () => {
+  const actual = await vi.importActual<typeof import('../../data/event')>('../../data/event')
+  return {
+    useActiveEvent: () => ({
+      event: actual.FALLBACK_EVENT,
+      visible: true,
+      loading: false,
+      isPlaceholder: false,
+    }),
+  }
+})
 
 /**
  * The bug this pins: the banner was `sticky top-0 z-50` and `ShopHeader` is
@@ -30,7 +45,7 @@ function renderBanner() {
 
 describe('EventAnnouncementBanner da loja — empilhamento', () => {
   it('the event must be active, or this file tests nothing', () => {
-    expect(isEventVisible(ACTIVE_EVENT)).toBe(true)
+    expect(isEventVisible(FALLBACK_EVENT)).toBe(true)
   })
 
   it('is NOT sticky: two sticky elements at top-0 fight and the header loses', () => {
@@ -54,7 +69,7 @@ describe('EventAnnouncementBanner da loja — empilhamento', () => {
     // `localStorage` is a vi.fn() mock in this repo's setup, so `setItem` stores
     // nothing; the way in is teaching `getItem`.
     vi.mocked(localStorage.getItem).mockImplementation((k: string) =>
-      k === `shop-event-banner-dismissed:${ACTIVE_EVENT.id}` ? '1' : null
+      k === `shop-event-banner-dismissed:${FALLBACK_EVENT.id}` ? '1' : null
     )
     renderBanner()
 

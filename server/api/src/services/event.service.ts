@@ -4,12 +4,12 @@ import { query, getClient } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { SHOP_CANONICAL_URL, env } from '../config/env.js';
 import {
-  getEvent,
   ticketPriceCents,
   MAX_TICKETS_PER_RESERVATION,
   type EventDefinition,
   type TicketKind,
 } from '../config/events.js';
+import { getEventById, toDefinition } from './event-config.service.js';
 import { auditLog } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
 
@@ -144,8 +144,14 @@ function mapReservation(row: pg.QueryResultRow): EventReservation {
   };
 }
 
-function requireOpenEvent(eventId: string): EventDefinition {
-  const event = getEvent(eventId);
+/** Definição do evento vinda do banco, ou `null` se o id não existe mais. */
+async function loadDefinition(eventId: string): Promise<EventDefinition | null> {
+  const event = await getEventById(eventId);
+  return event ? toDefinition(event) : null;
+}
+
+async function requireOpenEvent(eventId: string): Promise<EventDefinition> {
+  const event = await loadDefinition(eventId);
   if (!event) throw new AppError(404, 'Evento não encontrado.', 'EVENT_NOT_FOUND');
   if (!event.reservationsOpen) {
     throw new AppError(409, 'As reservas para este evento estão encerradas.', 'EVENT_CLOSED');
@@ -177,7 +183,7 @@ export async function createReservation(
   eventId: string,
   input: CreateReservationInput
 ): Promise<EventReservation> {
-  const event = requireOpenEvent(eventId);
+  const event = await requireOpenEvent(eventId);
 
   const attendees = input.attendees
     .map((a) => ({ name: a.name.trim(), kind: a.kind }))
@@ -319,9 +325,7 @@ export interface PublicTicket {
   };
 }
 
-function toPublicTicket(ticket: EventTicket): PublicTicket | null {
-  const event = getEvent(ticket.eventId);
-  if (!event) return null;
+function buildPublicTicket(ticket: EventTicket, event: EventDefinition): PublicTicket {
   return {
     code: ticket.code,
     attendeeName: ticket.attendeeName,
@@ -343,7 +347,9 @@ function toPublicTicket(ticket: EventTicket): PublicTicket | null {
 export async function getPublicTicket(code: string): Promise<PublicTicket | null> {
   const result = await query(`SELECT * FROM event_tickets WHERE code = $1`, [normalizeCode(code)]);
   if (result.rows.length === 0) return null;
-  return toPublicTicket(mapTicket(result.rows[0]!));
+  const ticket = mapTicket(result.rows[0]!);
+  const event = await loadDefinition(ticket.eventId);
+  return event ? buildPublicTicket(ticket, event) : null;
 }
 
 export interface PublicReservation {
@@ -367,9 +373,12 @@ export async function getPublicReservation(code: string): Promise<PublicReservat
     `SELECT * FROM event_tickets WHERE reservation_id = $1 ORDER BY created_at, code`,
     [reservation.id]
   );
-  const tickets = ticketsResult.rows
-    .map((row) => toPublicTicket(mapTicket(row)))
-    .filter((t): t is PublicTicket => t !== null);
+  // Todos os ingressos da reserva são do mesmo evento: uma leitura, não uma
+  // por ingresso.
+  const event = await loadDefinition(reservation.eventId);
+  const tickets = event
+    ? ticketsResult.rows.map((row) => buildPublicTicket(mapTicket(row), event))
+    : [];
 
   return {
     code: reservation.code,
@@ -519,7 +528,7 @@ export async function confirmReservation(
 
     reservation.tickets = tickets.rows.map(mapTicket);
 
-    const event = getEvent(reservation.eventId);
+    const event = await loadDefinition(reservation.eventId);
     if (event) {
       void sendTemplateEmail({
         template: 'event-tickets-ready',

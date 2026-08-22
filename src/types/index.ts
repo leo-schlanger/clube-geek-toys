@@ -145,6 +145,11 @@ export interface Category {
   updatedAt: string
 }
 
+/** Categoria na visão do painel: inativas incluídas, com quantos produtos usa. */
+export interface AdminCategory extends Category {
+  productCount: number
+}
+
 export interface Product {
   id: string
   name: string

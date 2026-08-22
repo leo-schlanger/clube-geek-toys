@@ -1,8 +1,9 @@
 # Eventos na loja (shop.geeketoys.com.br)
 
-> **Última atualização:** 21 de Agosto de 2026  
-> **Pedido Laura:** evento **6/set/2026 (domingo) 14h–18h**, ingresso **R$ 20** (criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
-> **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)
+> **Última atualização:** 22 de Agosto de 2026  
+> **Evento em cartaz:** **20/set/2026 (domingo) 14h–18h**, Mar Palace Copacabana Hotel, entrada **R$ 20** (criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
+> **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)  
+> **Quem edita:** a admin, na aba **Eventos** — não é mais deploy. Ver [Trocar de evento](#trocar-de-evento-sem-deploy).
 
 > **Galeria:** fotos oficiais ficam na **galeria geral do site principal** (`geeketoys.com.br#galeria`).  
 > **Não** há seção `#fotos-evento` nem botões de download na loja/home.
@@ -16,15 +17,42 @@
 | **Loja online**    | este (`clube-geek-toys`) | `https://shop.geeketoys.com.br`     | Banner, card, `/evento`, reserva + ingresso nominal     |
 | Site institucional | `geek-toys-home`         | `https://geeketoys.com.br` / `www.` | Banner, `#evento`, `#ingressos`, **galeria** `#galeria` |
 
-Config do evento (data, preço, textos) deve ficar **sincronizada** entre:
+### Trocar de evento (sem deploy)
 
-- `src/data/event.ts` (este repo — vitrine da loja)
-- `geek-toys-home/src/data/event.ts` (site institucional)
-- `server/api/src/config/events.ts` (**API** — preço e janela de venda)
+Config do evento (data, local, preço, textos, banner) vive na tabela **`events`**
+(migration 029) e é editada na aba **Eventos** do admin. A API expõe
+`GET /events/active`, e as duas vitrines consomem:
 
-A cópia da API não é redundância preguiçosa: quem manda o POST da reserva também
-mandaria o preço se ele viesse do cliente. O servidor calcula o total a partir
-**da sua** tabela.
+```
+                    ┌─► loja  (shop.*)  — useActiveEvent()
+banco `events` ──► GET /events/active
+                    └─► home  (geeketoys.com.br) — useActiveEvent()
+```
+
+Só o evento com status **`published`** aparece. Entre vários publicados ganha o
+que ainda não terminou e começa antes; se todos já passaram, o mais recente.
+Isso faz o banner sumir sozinho quando o evento acaba.
+
+Fluxo da Laura quando um evento termina:
+
+1. Aba **Eventos** → **Duplicar** no evento que acabou (nasce rascunho, sem
+   banner, com reservas fechadas)
+2. Ajusta data, local e textos; envia o **flyer novo** (JPG/PNG/WebP, até 8 MB)
+3. **Publicar** — o antigo pode ser **Encerrado** (arquivado)
+
+Nada de deploy, nada de mexer nos dois repos.
+
+> **Os arquivos `event.ts` ainda existem, mas viraram fallback.** Eles cobrem só
+> o primeiro paint (e a API fora do ar). **Editá-los não muda o que o site
+> mostra.** São três, e devem espelhar a linha semeada pela migration:
+>
+> - `src/data/event.ts` (loja) — `FALLBACK_EVENT`
+> - `geek-toys-home/src/data/event.ts` (site) — `FALLBACK_EVENT`
+> - `server/api/src/config/events.ts` (API) — `FALLBACK_EVENT`
+
+O preço nunca vem do cliente: quem manda o POST da reserva mandaria o preço
+junto se ele viesse do front. O servidor calcula o total a partir da **linha do
+banco**, via `event-config.service`.
 
 Arquivos de foto (para a galeria do home):
 
@@ -51,44 +79,52 @@ Arquivos de foto (para a galeria do home):
 
 ## Operação (Laura)
 
-1. Editar `src/data/event.ts` nos **dois** repos + `server/api/src/config/events.ts` (título, data, preço, textos, WhatsApp)
-2. Fotos novas: colocar em `geek-toys-home/public/eventos/<slug>/` e listar no array de `GallerySection` (ou manter padrão `evento-01.jpg` …)
-3. Deploy loja: push `master` (CI)
-4. Deploy home: push `main` (Vercel)
+1. Aba **Eventos** do admin: criar (ou **Duplicar** o anterior), preencher, enviar o banner
+2. **Publicar** — loja e site atualizam em até 1 minuto (cache curto do `/events/active`)
+3. Fotos do evento: aba **Galeria** → aparecem em `geeketoys.com.br#galeria`
+4. Ao encerrar: **Encerrar** (arquiva) e publicar o próximo
 
-`enabled: false` esconde banner/card/link e redireciona `/evento` → home da loja.
+Status `draft`/`archived` esconde banner/card/link e redireciona `/evento` → home
+da loja. Para parar de vender sem esconder o evento, desmarque **Aceitar novas
+reservas** — os ingressos já emitidos continuam válidos na portaria.
 
 ---
 
 ## Evento ativo (referência)
 
-| Campo                 | Valor                                  |
-| --------------------- | -------------------------------------- |
-| Data                  | Domingo, 6 de setembro de 2026         |
-| Horário               | 14h–18h                                |
-| Ingresso              | R$ 20 / pessoa                         |
-| Isentos               | Criança de colo e criança PCD          |
-| WhatsApp reserva      | (11) 91466-2881                        |
-| Ingressos por reserva | sem teto (freio anti-abuso da API: 50) |
+| Campo                 | Valor                                                      |
+| --------------------- | ---------------------------------------------------------- |
+| Título                | Photocard Trading + Dança Livre de K-pop                   |
+| Data                  | Domingo, 20 de setembro de 2026                            |
+| Horário               | 14h–18h                                                    |
+| Local                 | Mar Palace Copacabana Hotel — Av. N. S. de Copacabana, 552 |
+| Entrada               | R$ 20 / pessoa (lanches grátis)                            |
+| Isentos               | Criança de colo e criança PCD                              |
+| WhatsApp reserva      | (11) 91466-2881                                            |
+| Ingressos por reserva | sem teto (freio anti-abuso da API: 50)                     |
 
 ---
 
 ## Arquivos (loja)
 
-| Arquivo                                            | Papel                   |
-| -------------------------------------------------- | ----------------------- |
-| `src/data/event.ts`                                | Config do evento ativo  |
-| `src/components/store/EventAnnouncementBanner.tsx` | Banner                  |
-| `src/components/store/EventPromoCard.tsx`          | Destaque na home        |
-| `src/components/store/EventTicketForm.tsx`         | Reserva + ingressos     |
-| `src/components/store/TicketCard.tsx`              | O ingresso (QR)         |
-| `src/pages/shop/EventPage.tsx`                     | Página `/evento`        |
-| `src/pages/shop/TicketPage.tsx`                    | `/ingresso(s)/:code`    |
-| `src/lib/event-tickets.ts`                         | Cliente da API          |
-| `src/components/admin/EventTicketsTab.tsx`         | Painel + portaria       |
-| `server/api/src/config/events.ts`                  | Preço/janela (servidor) |
-| `server/api/src/services/event.service.ts`         | Reservas e check-in     |
-| `server/api/src/routes/event.routes.ts`            | Endpoints `/events`     |
+| Arquivo                                            | Papel                  |
+| -------------------------------------------------- | ---------------------- |
+| `src/data/event.ts`                                | Tipos + fallback       |
+| `src/hooks/useActiveEvent.ts`                      | Evento vivo (API)      |
+| `src/lib/events.ts`                                | Cliente do cadastro    |
+| `src/components/admin/EventConfigTab.tsx`          | **Aba Eventos** (CRUD) |
+| `src/components/store/EventAnnouncementBanner.tsx` | Banner                 |
+| `src/components/store/EventPromoCard.tsx`          | Destaque na home       |
+| `src/components/store/EventTicketForm.tsx`         | Reserva + ingressos    |
+| `src/components/store/TicketCard.tsx`              | O ingresso (QR)        |
+| `src/pages/shop/EventPage.tsx`                     | Página `/evento`       |
+| `src/pages/shop/TicketPage.tsx`                    | `/ingresso(s)/:code`   |
+| `src/lib/event-tickets.ts`                         | Cliente da API         |
+| `src/components/admin/EventTicketsTab.tsx`         | Painel + portaria      |
+| `server/api/src/config/events.ts`                  | Tipos + fallback (API) |
+| `server/api/src/services/event-config.service.ts`  | Cadastro no banco      |
+| `server/api/src/services/event.service.ts`         | Reservas e check-in    |
+| `server/api/src/routes/event.routes.ts`            | Endpoints `/events`    |
 
 Detalhe e checklist do home: `geek-toys-home/docs/EVENTS.md`.
 

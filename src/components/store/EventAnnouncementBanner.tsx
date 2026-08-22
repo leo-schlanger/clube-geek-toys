@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CalendarHeart, Ticket, X } from 'lucide-react'
-import { ACTIVE_EVENT, isEventVisible } from '../../data/event'
+import { useActiveEvent } from '../../hooks/useActiveEvent'
 
 const STORAGE_PREFIX = 'shop-event-banner-dismissed:'
 
@@ -9,12 +9,11 @@ function storageKey(eventId: string) {
   return `${STORAGE_PREFIX}${eventId}`
 }
 
-function readBannerVisible(eventId: string): boolean {
-  if (!isEventVisible(ACTIVE_EVENT)) return false
+function isDismissed(eventId: string): boolean {
   try {
-    return localStorage.getItem(storageKey(eventId)) !== '1'
+    return localStorage.getItem(storageKey(eventId)) === '1'
   } catch {
-    return true
+    return false
   }
 }
 
@@ -35,10 +34,13 @@ function readBannerVisible(eventId: string): boolean {
  * fixos e **nenhum arquivo a lia** — foi removida junto.
  */
 export function EventAnnouncementBanner() {
-  const event = ACTIVE_EVENT
-  const [visible, setVisible] = useState(() => readBannerVisible(event.id))
+  const { event, visible: eventVisible } = useActiveEvent()
+  // Guarda por evento, não um booleano só: quem fechou o anúncio do evento
+  // passado precisa ver o próximo.
+  const [dismissedId, setDismissedId] = useState<string | null>(null)
 
-  if (!visible || !isEventVisible(event)) return null
+  if (!eventVisible) return null
+  if (dismissedId === event.id || isDismissed(event.id)) return null
 
   const dismiss = () => {
     try {
@@ -46,11 +48,8 @@ export function EventAnnouncementBanner() {
     } catch {
       /* ignore */
     }
-    setVisible(false)
+    setDismissedId(event.id)
   }
-
-  const primaryIsRoute = event.ctaPrimary.href.startsWith('/')
-  const secondaryIsRoute = event.ctaSecondary?.href.startsWith('/')
 
   return (
     <div
@@ -65,39 +64,19 @@ export function EventAnnouncementBanner() {
         </p>
 
         <div className="flex shrink-0 items-center gap-2">
-          {event.ctaSecondary &&
-            (secondaryIsRoute ? (
-              <Link
-                to={event.ctaSecondary.href}
-                className="text-xs font-medium underline-offset-2 hover:underline md:text-sm opacity-95"
-              >
-                {event.ctaSecondary.label}
-              </Link>
-            ) : (
-              <a
-                href={event.ctaSecondary.href}
-                className="text-xs font-medium underline-offset-2 hover:underline md:text-sm opacity-95"
-              >
-                {event.ctaSecondary.label}
-              </a>
-            ))}
-          {primaryIsRoute ? (
-            <Link
-              to={event.ctaPrimary.href}
-              className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground shadow-sm transition-all hover:brightness-105 md:text-sm"
-            >
-              <Ticket className="h-3.5 w-3.5" aria-hidden />
-              {event.ctaPrimary.label}
-            </Link>
-          ) : (
-            <a
-              href={event.ctaPrimary.href}
-              className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground shadow-sm transition-all hover:brightness-105 md:text-sm"
-            >
-              <Ticket className="h-3.5 w-3.5" aria-hidden />
-              {event.ctaPrimary.label}
-            </a>
-          )}
+          <Link
+            to="/evento"
+            className="text-xs font-medium underline-offset-2 hover:underline md:text-sm opacity-95"
+          >
+            Ver evento
+          </Link>
+          <Link
+            to="/evento#ingressos"
+            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground shadow-sm transition-all hover:brightness-105 md:text-sm"
+          >
+            <Ticket className="h-3.5 w-3.5" aria-hidden />
+            {event.ticketReservation.enabled ? 'Reservar ingresso' : 'Saiba mais'}
+          </Link>
         </div>
 
         <button

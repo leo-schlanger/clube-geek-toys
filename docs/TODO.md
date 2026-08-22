@@ -1,6 +1,29 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 18 de Agosto de 2026
+> **Ultima atualizacao:** 22 de Agosto de 2026
+
+## Entregue em 22/08/2026
+
+- [x] **Evento deixou de ser deploy** — data, local, textos, preço e **banner**
+      viviam hardcoded em três arquivos e dois repos (`src/data/event.ts`,
+      `geek-toys-home/src/data/event.ts`, `server/api/src/config/events.ts`), e o
+      `docs/EVENTS.md` mandava a Laura editar os três. Ao acabar um evento não
+      havia caminho para o próximo. Agora a tabela `events` (migration 029) é a
+      fonte de verdade, a aba **Eventos** do admin faz CRUD (criar, duplicar,
+      publicar, encerrar, subir flyer) e `GET /events/active` serve **loja e
+      site institucional**. Os `event.ts` viraram fallback de primeira carga.
+      Conteúdo atualizado junto: 20/09/2026, Mar Palace Copacabana Hotel — o id
+      do evento foi mantido para não invalidar ingresso já emitido.
+- [x] **Toda categoria com nota musical no site institucional** —
+      `geek-toys-home/src/components/ProductsSection.tsx` renderizava
+      `<Music size={32}>` **fixo** para cada categoria vinda da API: a mesma arte
+      catorze vezes, sem relação com o que a categoria vende. O `icon` já existia
+      no schema (migration 018) mas 12 das 14 categorias estavam com `null` e
+      ninguém tinha por onde preencher — o gerenciador morava dentro do
+      `ProductModal`, num `<select>` de rótulos sem preview. Agora: aba
+      **Categorias** no admin (CRUD, seletor visual de ícone, ordem, ocultar,
+      contagem de produtos), migration 030 preenchendo as existentes, e o site
+      institucional lendo o mesmo `icon`.
 
 ## Revisão de negócio — 18/08/2026
 

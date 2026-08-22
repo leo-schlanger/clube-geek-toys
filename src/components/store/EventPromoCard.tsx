@@ -1,18 +1,15 @@
 import { Link } from 'react-router-dom'
 import { Calendar, MapPin, Ticket, ArrowRight, Sparkles } from 'lucide-react'
 import { Button } from '../ui/button'
-import {
-  ACTIVE_EVENT,
-  formatEventDateRange,
-  isEventVisible,
-} from '../../data/event'
+import { formatEventDateRange } from '../../data/event'
+import { useActiveEvent } from '../../hooks/useActiveEvent'
 
 /**
  * Featured event card on the shop home.
  */
 export function EventPromoCard() {
-  const event = ACTIVE_EVENT
-  if (!isEventVisible(event)) return null
+  const { event, visible } = useActiveEvent()
+  if (!visible) return null
 
   const dateLabel = formatEventDateRange(event.startsAt, event.endsAt)
   const price = event.ticketReservation.priceBRL
@@ -36,19 +33,30 @@ export function EventPromoCard() {
               {event.location.name}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {event.description[0]}
-          </p>
+          {event.description[0] && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {event.description[0]}
+            </p>
+          )}
           {price != null && event.ticketReservation.enabled && (
             <p className="text-sm">
               Ingresso no valor de{' '}
               <strong className="text-accent">
-                {event.ticketReservation.currencyLabel ?? 'R$'}{' '}
+                {event.ticketReservation.currencyLabel}{' '}
                 {price.toFixed(2).replace('.', ',')}
               </strong>
             </p>
           )}
         </div>
+
+        {event.bannerImageUrl && (
+          <img
+            src={event.bannerImageUrl}
+            alt={`Divulgação: ${event.title}`}
+            loading="lazy"
+            className="mx-auto w-full max-w-[220px] rounded-xl border border-primary/20 object-contain shadow-sm lg:max-w-[200px]"
+          />
+        )}
 
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
           <Button asChild size="lg" className="gap-2">

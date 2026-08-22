@@ -12,11 +12,8 @@ import { ShopHeader } from '../../components/store/ShopHeader'
 import { EventTicketForm } from '../../components/store/EventTicketForm'
 import { useShopMember } from '../../components/store/useShopMember'
 import { Button } from '../../components/ui/button'
-import {
-  ACTIVE_EVENT,
-  formatEventDateRange,
-  isEventVisible,
-} from '../../data/event'
+import { formatEventDateRange } from '../../data/event'
+import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { CreatorCredit } from '../../components/CreatorCredit'
 
 /**
@@ -25,9 +22,12 @@ import { CreatorCredit } from '../../components/CreatorCredit'
  */
 export default function EventPage() {
   const { isMember } = useShopMember()
-  const event = ACTIVE_EVENT
+  const { event, visible, isPlaceholder } = useActiveEvent()
 
-  if (!isEventVisible(event)) {
+  // Só redireciona depois que a API respondeu: com o fallback ainda em tela,
+  // um evento despublicado no banco mandaria o visitante embora sem motivo —
+  // e um evento recém-publicado seria escondido.
+  if (!visible && !isPlaceholder) {
     return <Navigate to="/" replace />
   }
 
@@ -54,6 +54,14 @@ export default function EventPage() {
             Informações e reserva de ingresso online.
           </p>
         </div>
+
+        {event.bannerImageUrl && (
+          <img
+            src={event.bannerImageUrl}
+            alt={`Divulgação: ${event.title}`}
+            className="mx-auto w-full max-w-lg rounded-2xl border border-border object-contain shadow-sm"
+          />
+        )}
 
         <div className="grid gap-6 lg:grid-cols-5">
           <div className="space-y-6 rounded-2xl border border-border bg-card p-6 lg:col-span-3 md:p-8">

@@ -33,6 +33,24 @@ vi.mock('../config/env.js', () => ({
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 
+// O evento passou a vir da tabela `events`. Estes testes seguram a lógica de
+// ingresso, não o cadastro: o serviço de cadastro é mockado com o mesmo evento
+// que a migration semeia, para o `queryMock` continuar falando só de reservas.
+vi.mock('./event-config.service.js', async () => {
+  const actual = await vi.importActual<typeof import('./event-config.service.js')>(
+    './event-config.service.js'
+  );
+  const { FALLBACK_EVENT } = await vi.importActual<typeof import('../config/events.js')>(
+    '../config/events.js'
+  );
+  return {
+    ...actual,
+    getEventById: vi.fn(async (id: string) => (id === FALLBACK_EVENT.id ? FALLBACK_EVENT : null)),
+    getActiveEvent: vi.fn(async () => FALLBACK_EVENT),
+    getActiveEventOrFallback: vi.fn(async () => FALLBACK_EVENT),
+  };
+});
+
 import * as eventService from './event.service.js';
 import { ticketPriceCents, EVENTS, MAX_TICKETS_PER_RESERVATION } from '../config/events.js';
 

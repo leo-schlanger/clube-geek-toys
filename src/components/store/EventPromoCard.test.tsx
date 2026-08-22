@@ -2,11 +2,19 @@ import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('../../data/event', async () => {
-  const actual = await vi.importActual<typeof import('../../data/event')>('../../data/event')
+// O card lê o evento pelo hook (que vem da API). O fallback embutido é o que
+// o hook entrega no primeiro render, então serve de fixture.
+vi.mock('../../hooks/useActiveEvent', async () => {
+  const { FALLBACK_EVENT } = await vi.importActual<typeof import('../../data/event')>(
+    '../../data/event'
+  )
   return {
-    ...actual,
-    isEventVisible: () => true,
+    useActiveEvent: () => ({
+      event: FALLBACK_EVENT,
+      visible: true,
+      loading: false,
+      isPlaceholder: false,
+    }),
   }
 })
 

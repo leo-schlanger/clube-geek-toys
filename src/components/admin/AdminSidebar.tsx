@@ -24,6 +24,8 @@ import {
   HelpCircle,
   Images,
   Ticket,
+  Tags,
+  CalendarDays,
   LogOut,
   Menu,
 } from 'lucide-react'
@@ -36,12 +38,14 @@ export type AdminTab =
   | 'dashboard'
   | 'members'
   | 'products'
+  | 'categories'
   | 'stock'
   | 'orders'
   | 'wholesale'
   | 'reviews'
   | 'questions'
   | 'events'
+  | 'event-config'
   | 'gallery'
   | 'users'
   | 'logs'
@@ -58,11 +62,13 @@ const menuItems: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'members', label: 'Membros', icon: Users },
   { id: 'products', label: 'Produtos', icon: Package },
+  { id: 'categories', label: 'Categorias', icon: Tags },
   { id: 'stock', label: 'Estoque', icon: Boxes },
   { id: 'orders', label: 'Pedidos', icon: ClipboardList },
   { id: 'wholesale', label: 'Atacado', icon: Building2 },
   { id: 'reviews', label: 'Avaliações', icon: Star },
   { id: 'questions', label: 'Perguntas', icon: HelpCircle },
+  { id: 'event-config', label: 'Eventos', icon: CalendarDays },
   { id: 'events', label: 'Ingressos', icon: Ticket },
   { id: 'gallery', label: 'Galeria', icon: Images },
   { id: 'users', label: 'Usuários', icon: UserCog },
