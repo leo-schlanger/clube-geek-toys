@@ -116,6 +116,9 @@ export const WHOLESALE_SHOP_DISCOUNT = 0.25;
 
 export type ShopChannel = 'retail' | 'wholesale';
 
+/** How the order reaches the customer: Correios or the counter in Copacabana. */
+export type DeliveryMethod = 'shipping' | 'pickup';
+
 // ─── Shop / e-commerce ────────────────────────────────────────────────────────
 
 export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
@@ -243,6 +246,8 @@ export interface Order {
   customerPhone: string | null;
   /** Free-text note the customer left for the shop at checkout. */
   customerNote?: string | null;
+  /** 'shipping' = Correios; 'pickup' = customer collects at the counter. */
+  deliveryMethod: DeliveryMethod;
   shippingAddress: Record<string, unknown> | null;
   subtotal: number;
   discount: number;

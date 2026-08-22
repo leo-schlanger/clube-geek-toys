@@ -38,11 +38,16 @@ const createOrderSchema = z.object({
   // Recado livre para a loja ("manda mais photocards do mesmo cantor"). Nada no
   // sistema decide por ele — é para a pessoa que separa o pedido ler.
   customerNote: z.string().max(500).optional(),
-  shippingAddress: shippingAddressSchema,
-  shipping: z.object({
-    quoteToken: z.string().min(10),
-    serviceId: z.string().min(1).max(80),
-  }),
+  // Retirada na loja não tem endereço nem cotação — os dois viram opcionais no
+  // schema e quem exige é o service, que sabe qual método foi escolhido.
+  deliveryMethod: z.enum(['shipping', 'pickup']).optional(),
+  shippingAddress: shippingAddressSchema.optional(),
+  shipping: z
+    .object({
+      quoteToken: z.string().min(10),
+      serviceId: z.string().min(1).max(80),
+    })
+    .optional(),
   paymentMethod: z.enum(['pix', 'credit_card']),
   applyStoreCredit: z.boolean().optional(),
   channel: z.enum(['retail', 'wholesale']).optional(),

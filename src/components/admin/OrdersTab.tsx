@@ -9,7 +9,7 @@ import { adminListOrders, refundOrder } from '../../lib/orders'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
-import { ClipboardList, Eye, RotateCcw } from 'lucide-react'
+import { ClipboardList, Eye, RotateCcw, Store } from 'lucide-react'
 
 export function OrdersTab() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -109,6 +109,14 @@ export function OrdersTab() {
                   <tr key={order.id} className="border-b hover:bg-muted/50 transition-colors">
                     <td className="py-4 px-4">
                       <span className="font-medium font-mono">#{order.orderNumber}</span>
+                      {/* Retirada e postagem viram filas diferentes na prática:
+                          uma vai pro balcão, a outra pros Correios. */}
+                      {order.deliveryMethod === 'pickup' && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
+                          <Store className="h-3 w-3" />
+                          Retirada
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4">
                       <div className="min-w-0">

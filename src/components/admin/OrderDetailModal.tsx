@@ -11,7 +11,7 @@ import {
   refundOrder,
   setOrderTracking,
 } from '../../lib/orders'
-import { formatCurrency } from '../../lib/utils'
+import { formatCurrency, cn } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
 import {
@@ -23,6 +23,7 @@ import {
   CheckCircle,
   RotateCcw,
   MessageSquare,
+  Store,
 } from 'lucide-react'
 
 // Shared status metadata (label + badge variant) used across the orders UI.
@@ -190,6 +191,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
   }
 
   const address = order ? formatAddress(order.shippingAddress) : null
+  const isPickup = order?.deliveryMethod === 'pickup'
   const canConfirmPix = order?.paymentMethod === 'pix' && order?.status === 'pending'
   const canRefund =
     order?.paymentMethod === 'credit_card' &&
@@ -266,8 +268,24 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               )}
 
+              {/* Retirada na loja: sem endereço de destino e sem postagem. O
+                  aviso vem antes de tudo porque muda o que a equipe faz com o
+                  pedido — separa e guarda no balcão em vez de embalar e postar. */}
+              {isPickup && (
+                <div className="space-y-1 rounded-lg border border-primary/40 bg-primary/10 p-3">
+                  <h4 className="flex items-center gap-1 text-sm font-semibold">
+                    <Store className="h-4 w-4 text-primary" /> Retirada na loja
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    O cliente busca no balcão — não postar. Ao separar, mude o status para{' '}
+                    <strong className="text-foreground">Enviado</strong>: é o que dispara o e-mail
+                    "pronto para retirada".
+                  </p>
+                </div>
+              )}
+
               {/* Endereço */}
-              {address && (
+              {!isPickup && address && (
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm flex items-center gap-1">
                     <MapPin className="h-4 w-4 text-muted-foreground" /> Endereço de entrega
@@ -283,8 +301,9 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               )}
 
-              {/* Rastreio Correios */}
-              <div className="space-y-2 border-t pt-4">
+              {/* Rastreio Correios — não existe em pedido de retirada, e a API
+                  recusa o código, então o campo nem aparece. */}
+              <div className={cn('space-y-2 border-t pt-4', isPickup && 'hidden')}>
                 <h4 className="font-semibold text-sm">Rastreio (Correios)</h4>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <input
@@ -355,11 +374,18 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                     <span>−{formatCurrency(order.discount)}</span>
                   </div>
                 )}
-                {order.shippingCost > 0 && (
+                {isPickup ? (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Frete</span>
-                    <span>{formatCurrency(order.shippingCost)}</span>
+                    <span className="text-muted-foreground">Retirada na loja</span>
+                    <span>Grátis</span>
                   </div>
+                ) : (
+                  order.shippingCost > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Frete</span>
+                      <span>{formatCurrency(order.shippingCost)}</span>
+                    </div>
+                  )
                 )}
                 <div className="flex justify-between font-bold text-base pt-1">
                   <span>Total</span>

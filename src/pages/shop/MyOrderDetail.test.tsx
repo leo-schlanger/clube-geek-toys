@@ -137,4 +137,33 @@ describe('MyOrderDetail', () => {
     expect(screen.getByText(/BR123/)).toBeInTheDocument()
     expect(screen.getByText(/Acompanhamento/i)).toBeInTheDocument()
   })
+
+  /**
+   * Retirada reaproveita os mesmos status do envio, mas "a caminho" e "entregue"
+   * não descrevem nada para quem vai buscar no balcão — e o endereço na tela
+   * precisa ser o da loja, não um destino de entrega que nunca existiu.
+   */
+  it('reads a pickup order as counter collection, not delivery', async () => {
+    mockedGet.mockResolvedValue({
+      ...order,
+      deliveryMethod: 'pickup',
+      shippingCost: 0,
+      shippingService: 'Retirada na loja',
+      trackingCode: null,
+      trackingUrl: null,
+      total: 180,
+    } as never)
+    renderDetail()
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pedido #55/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Pronto para retirada/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Retirada na loja/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Rua Barata Ribeiro, 181/i)).toBeInTheDocument()
+    expect(screen.getByText(/Grátis/i)).toBeInTheDocument()
+    // Nada de "A caminho" nem rastreio dos Correios.
+    expect(screen.queryByText(/A caminho/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Rastrear nos Correios/i)).not.toBeInTheDocument()
+  })
 })

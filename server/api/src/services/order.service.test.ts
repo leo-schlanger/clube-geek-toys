@@ -55,6 +55,29 @@ vi.mock('./shipping.service.js', () => ({
   normalizeCep: (v: string) => String(v).replace(/\D/g, ''),
   pickOptionFromQuote: pickOptionMock,
   trackingUrlForCode: (c: string) => `https://rastreio/${c}`,
+  PICKUP_SERVICE_ID: 'pickup',
+  PICKUP_SERVICE_LABEL: 'Retirada na loja',
+  STORE_PICKUP_LOCATION: {
+    name: 'GeekPop & Toys',
+    street: 'Rua Barata Ribeiro',
+    number: '181',
+    complement: 'Loja J',
+    neighborhood: 'Copacabana',
+    city: 'Rio de Janeiro',
+    state: 'RJ',
+    cep: '22011001',
+    hours: 'Segunda a sábado, 10h às 19h',
+  },
+  buildPickupAddress: (recipientName: string) => ({
+    cep: '22011001',
+    street: 'Rua Barata Ribeiro',
+    number: '181',
+    complement: 'Loja J',
+    neighborhood: 'Copacabana',
+    city: 'Rio de Janeiro',
+    state: 'RJ',
+    recipientName,
+  }),
 }));
 
 vi.mock('./store-credit.service.js', () => ({
@@ -78,6 +101,7 @@ import {
   decrementStockForOrder,
   claimGuestOrders,
   listMyOrders,
+  setOrderTracking,
 } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -132,12 +156,17 @@ function insertedOrderValues(): unknown[] {
 const COL = {
   customerName: 2,
   customerEmail: 3,
+  shippingAddress: 5,
   customerNote: 19,
   subtotal: 6,
   discount: 7,
   discountReason: 8,
   shippingCost: 9,
+  shippingService: 10,
+  shippingServiceId: 11,
+  shippingDays: 12,
   total: 14,
+  deliveryMethod: 20,
 };
 
 /** Wires the transaction client: BEGIN, product and variant SELECTs, order and item INSERTs, COMMIT. */
@@ -907,5 +936,147 @@ describe('mensagem do cliente no checkout', () => {
     await createOrder(baseInput({ customerNote: 'a'.repeat(900) }));
 
     expect(String(insertedOrderValues()[COL.customerNote])).toHaveLength(500);
+  });
+});
+
+// ─── Retirada na loja ────────────────────────────────────────────────────────
+
+/**
+ * Pickup is the one checkout path where the customer is never asked for an
+ * address and never sees a frete. What these guard, in order of what a
+ * regression costs:
+ *
+ *  1. A pickup order is free of shipping — priced here, never from a token the
+ *     client could swap to zero a real delivery.
+ *  2. The quote is not consulted at all, so an expired or missing one cannot
+ *     block a counter sale.
+ *  3. The counter address is snapshotted onto the order, so the picking list
+ *     and the LGPD export still read one field.
+ */
+describe('createOrder — retirada na loja', () => {
+  function pickupInput(over: Record<string, unknown> = {}) {
+    return {
+      items: [{ productId: 'p1', quantity: 1 }],
+      customer: { name: 'Laura', email: 'laura@example.com' },
+      deliveryMethod: 'pickup' as const,
+      paymentMethod: 'pix' as const,
+      ...over,
+    };
+  }
+
+  it('charges no shipping and never touches the quote', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(pickupInput());
+
+    const v = insertedOrderValues();
+    expect(v[COL.deliveryMethod]).toBe('pickup');
+    expect(v[COL.shippingCost]).toBe(0);
+    expect(v[COL.shippingService]).toBe('Retirada na loja');
+    expect(v[COL.shippingServiceId]).toBe('pickup');
+    expect(v[COL.shippingDays]).toBeNull();
+    expect(v[COL.total]).toBe(100);
+    // The whole point: no token is read, so nothing about the quote can fail.
+    expect(pickOptionMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a pickup order with neither address nor quote', async () => {
+    setupTx({ products: [product({ price: '50.00' })] });
+
+    await expect(createOrder(pickupInput())).resolves.toBeTruthy();
+  });
+
+  it('ignores a shipping quote sent alongside pickup', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+    // A stale cart could still carry these; pickup must not be priced from them.
+    await createOrder(
+      pickupInput({ shippingAddress: ADDRESS, shipping: { quoteToken: 'tok', serviceId: 'pac' } })
+    );
+
+    const v = insertedOrderValues();
+    expect(v[COL.shippingCost]).toBe(0);
+    expect(v[COL.total]).toBe(100);
+    expect(pickOptionMock).not.toHaveBeenCalled();
+  });
+
+  it('snapshots the counter address with the buyer as recipient', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(pickupInput());
+
+    const addr = JSON.parse(insertedOrderValues()[COL.shippingAddress] as string);
+    expect(addr).toMatchObject({
+      street: 'Rua Barata Ribeiro',
+      number: '181',
+      city: 'Rio de Janeiro',
+      cep: '22011001',
+      recipientName: 'Laura',
+    });
+  });
+
+  it('still applies the member discount to goods', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+    memberIdMock.mockResolvedValue('m1');
+    queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] });
+
+    await createOrder(pickupInput(), { userId: 'u1' } as never);
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(10);
+    expect(v[COL.total]).toBe(90); // sem frete somado
+  });
+
+  it('keeps requiring address and quote on the shipping path', async () => {
+    setupTx({ products: [product()] });
+
+    await expect(
+      createOrder({
+        items: [{ productId: 'p1', quantity: 1 }],
+        customer: { name: 'Laura', email: 'laura@example.com' },
+        paymentMethod: 'pix',
+      } as never)
+    ).rejects.toThrow(AppError);
+  });
+});
+
+// ─── Rastreio × retirada ─────────────────────────────────────────────────────
+
+describe('setOrderTracking — retirada não tem postagem', () => {
+  function orderRow(over: Record<string, unknown> = {}) {
+    return {
+      id: 'o1',
+      order_number: 1001,
+      customer_name: 'Laura',
+      customer_email: 'laura@example.com',
+      subtotal: '100',
+      discount: '0',
+      shipping_cost: '0',
+      total: '100',
+      status: 'paid',
+      delivery_method: 'shipping',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...over,
+    };
+  }
+
+  it('refuses a Correios code on a pickup order', async () => {
+    queryMock.mockResolvedValue({ rows: [orderRow({ delivery_method: 'pickup' })] });
+
+    // Sem a trava o cliente que vai buscar no balcão recebe um e-mail com link
+    // de rastreio de uma postagem que não existe.
+    await expect(setOrderTracking('o1', 'BR123456789BR', 'admin-1')).rejects.toThrow(
+      /retirada na loja/i
+    );
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('still accepts a code on a shipped order', async () => {
+    queryMock.mockResolvedValue({ rows: [orderRow({ tracking_code: 'BR123456789BR' })] });
+
+    await expect(setOrderTracking('o1', 'BR123456789BR', 'admin-1')).resolves.toBeTruthy();
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'order-shipped' })
+    );
   });
 });

@@ -12,6 +12,7 @@ import {
   Clock,
   Truck,
   MapPin,
+  Store,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { QRCodeSVG } from 'qrcode.react'
@@ -21,6 +22,7 @@ import {
   lookupCep,
   quoteShipping,
   maskCep,
+  STORE_PICKUP,
   type ShippingOption,
   type ShippingQuoteResult,
 } from '../../lib/shipping'
@@ -43,6 +45,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { WHOLESALE_SHOP_DISCOUNT, MEMBER_SHOP_DISCOUNT } from '../../types'
 
 type PaymentChoice = 'credit_card' | 'pix'
+type DeliveryChoice = 'shipping' | 'pickup'
 
 export default function ShopCheckout() {
   const navigate = useNavigate()
@@ -60,6 +63,10 @@ export default function ShopCheckout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>('pix')
   const [storeCreditBalance, setStoreCreditBalance] = useState(0)
   const [applyStoreCredit, setApplyStoreCredit] = useState(true)
+
+  // Entrega: retirada na loja dispensa endereço e frete por completo.
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryChoice>('shipping')
+  const isPickup = deliveryMethod === 'pickup'
 
   // Address
   const [cep, setCep] = useState('')
@@ -116,8 +123,9 @@ export default function ShopCheckout() {
     }
   }, [items.length, result, navigate, isWholesale])
 
-  const selectedOption: ShippingOption | null =
-    quote?.options.find((o) => o.id === selectedServiceId) ?? null
+  const selectedOption: ShippingOption | null = isPickup
+    ? null
+    : (quote?.options.find((o) => o.id === selectedServiceId) ?? null)
 
   const discountFraction = isWholesale
     ? isWholesaleApproved
@@ -184,12 +192,13 @@ export default function ShopCheckout() {
 
   // Auto-quote when CEP is complete and city is filled
   useEffect(() => {
+    if (isPickup) return
     const digits = cep.replace(/\D/g, '')
     if (digits.length === 8 && city && items.length > 0 && !result) {
       void handleQuote()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-quote when CEP/city/items change
-  }, [city, cep, items.length])
+  }, [city, cep, items.length, isPickup])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -200,13 +209,22 @@ export default function ShopCheckout() {
       return
     }
     const digits = cep.replace(/\D/g, '')
-    if (digits.length !== 8 || !street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim()) {
-      toast.error('Preencha o endereço completo de entrega.')
-      return
-    }
-    if (!quote || !selectedServiceId) {
-      toast.error('Calcule e selecione o frete pelos Correios.')
-      return
+    if (!isPickup) {
+      if (
+        digits.length !== 8 ||
+        !street.trim() ||
+        !number.trim() ||
+        !neighborhood.trim() ||
+        !city.trim() ||
+        !state.trim()
+      ) {
+        toast.error('Preencha o endereço completo de entrega.')
+        return
+      }
+      if (!quote || !selectedServiceId) {
+        toast.error('Calcule e selecione o frete pelos Correios.')
+        return
+      }
     }
 
     if (isWholesale) {
@@ -227,20 +245,27 @@ export default function ShopCheckout() {
           phone: phone.trim() || undefined,
         },
         customerNote: customerNote.trim() || undefined,
-        shippingAddress: {
-          cep: digits,
-          street: street.trim(),
-          number: number.trim(),
-          complement: complement.trim() || undefined,
-          neighborhood: neighborhood.trim(),
-          city: city.trim(),
-          state: state.trim().toUpperCase().slice(0, 2),
-          recipientName: name.trim(),
-        },
-        shipping: {
-          quoteToken: quote.quoteToken,
-          serviceId: selectedServiceId,
-        },
+        deliveryMethod,
+        // Retirada não manda endereço nem cotação: o servidor grava o balcão da
+        // loja e zera o frete por conta própria.
+        ...(isPickup
+          ? {}
+          : {
+              shippingAddress: {
+                cep: digits,
+                street: street.trim(),
+                number: number.trim(),
+                complement: complement.trim() || undefined,
+                neighborhood: neighborhood.trim(),
+                city: city.trim(),
+                state: state.trim().toUpperCase().slice(0, 2),
+                recipientName: name.trim(),
+              },
+              shipping: {
+                quoteToken: quote!.quoteToken,
+                serviceId: selectedServiceId!,
+              },
+            }),
         paymentMethod,
         applyStoreCredit: Boolean(user && applyStoreCredit && storeCreditBalance > 0),
         channel: isWholesale ? 'wholesale' : 'retail',
@@ -366,163 +391,231 @@ export default function ShopCheckout() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <MapPin className="h-5 w-5 text-primary" />
-                      Endereço de entrega
-                    </CardTitle>
+                    <CardTitle className="text-lg">Como você quer receber</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
-                      <div className="space-y-2">
-                        <Label htmlFor="cep">CEP</Label>
-                        <Input
-                          id="cep"
-                          value={cep}
-                          onChange={(e) => setCep(maskCep(e.target.value))}
-                          onBlur={() => void handleCepBlur()}
-                          placeholder="00000-000"
-                          inputMode="numeric"
-                          required
-                          disabled={submitting || cepLoading}
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => void handleCepBlur().then(() => handleQuote())}
-                          disabled={cepLoading || quoteLoading || submitting}
-                        >
-                          {(cepLoading || quoteLoading) && (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          )}
-                          Buscar CEP e frete
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="street">Rua / Avenida</Label>
-                      <Input
-                        id="street"
-                        value={street}
-                        onChange={(e) => setStreet(e.target.value)}
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="number">Número</Label>
-                        <Input
-                          id="number"
-                          value={number}
-                          onChange={(e) => setNumber(e.target.value)}
-                          required
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label htmlFor="complement">Complemento</Label>
-                        <Input
-                          id="complement"
-                          value={complement}
-                          onChange={(e) => setComplement(e.target.value)}
-                          placeholder="Apto, bloco…"
-                          disabled={submitting}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="neighborhood">Bairro</Label>
-                      <Input
-                        id="neighborhood"
-                        value={neighborhood}
-                        onChange={(e) => setNeighborhood(e.target.value)}
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="space-y-2 sm:col-span-2">
-                        <Label htmlFor="city">Cidade</Label>
-                        <Input
-                          id="city"
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          required
-                          disabled={submitting}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="state">UF</Label>
-                        <Input
-                          id="state"
-                          value={state}
-                          onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
-                          maxLength={2}
-                          required
-                          disabled={submitting}
-                        />
-                      </div>
-                    </div>
+                  <CardContent className="space-y-3">
+                    <DeliveryOption
+                      selected={!isPickup}
+                      onSelect={() => setDeliveryMethod('shipping')}
+                      icon={<Truck className="h-5 w-5" />}
+                      title="Entrega pelos Correios"
+                      description="PAC ou SEDEX para todo o Brasil, com rastreio."
+                      disabled={submitting}
+                    />
+                    <DeliveryOption
+                      selected={isPickup}
+                      onSelect={() => setDeliveryMethod('pickup')}
+                      icon={<Store className="h-5 w-5" />}
+                      title="Retirar na loja"
+                      description={`Sem frete. ${STORE_PICKUP.address}`}
+                      badge="Frete grátis"
+                      disabled={submitting}
+                    />
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Truck className="h-5 w-5 text-primary" />
-                      Frete (Correios)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {quoteLoading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Calculando frete…
+                {isPickup && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Store className="h-5 w-5 text-primary" />
+                        Retirada na loja
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div>
+                        <p className="font-medium">{STORE_PICKUP.name}</p>
+                        <p className="text-muted-foreground">{STORE_PICKUP.address}</p>
+                        <p className="text-muted-foreground">CEP {STORE_PICKUP.cep}</p>
                       </div>
-                    )}
-                    {!quoteLoading && quote && quote.options.length > 0 && (
-                      <div className="space-y-2">
-                        {quote.options.map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setSelectedServiceId(opt.id)}
-                            disabled={submitting}
-                            className={cn(
-                              'flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors',
-                              selectedServiceId === opt.id
-                                ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                : 'border-border hover:border-primary/40'
-                            )}
-                          >
-                            <div>
-                              <p className="font-medium">
-                                {opt.company} — {opt.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Prazo estimado: {opt.days} dia{opt.days === 1 ? '' : 's'} útil
-                                {opt.days === 1 ? '' : 'eis'}
-                              </p>
-                            </div>
-                            <span className="shrink-0 font-semibold tabular-nums">
-                              {formatCurrency(opt.price)}
-                            </span>
-                          </button>
-                        ))}
-                        <p className="text-xs text-muted-foreground">
-                          Envio pelos Correios a partir da loja em Copacabana, RJ.
-                        </p>
-                      </div>
-                    )}
-                    {!quoteLoading && !quote && (
-                      <p className="text-sm text-muted-foreground">
-                        Informe o CEP para ver as opções PAC e SEDEX.
+                      <p className="text-muted-foreground">
+                        <strong className="text-foreground">Horário:</strong> {STORE_PICKUP.hours}
                       </p>
-                    )}
-                  </CardContent>
-                </Card>
+                      {/* O pedido só é separado depois do pagamento — sem esse
+                          aviso a pessoa vai à loja no mesmo dia e volta sem nada. */}
+                      <p className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-muted-foreground">
+                        Avisamos por e-mail quando o pedido estiver separado. Leve um documento com
+                        foto e o número do pedido para retirar.
+                      </p>
+                      <a
+                        href={STORE_PICKUP.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-primary underline-offset-4 hover:underline"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Ver no mapa
+                      </a>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Endereço e frete só existem no fluxo de entrega. Ficam
+                    desmontados na retirada — escondidos por CSS, os campos
+                    `required` continuariam bloqueando o submit do form. */}
+                {!isPickup && (
+                  <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <MapPin className="h-5 w-5 text-primary" />
+                        Endereço de entrega
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-[10rem_1fr]">
+                        <div className="space-y-2">
+                          <Label htmlFor="cep">CEP</Label>
+                          <Input
+                            id="cep"
+                            value={cep}
+                            onChange={(e) => setCep(maskCep(e.target.value))}
+                            onBlur={() => void handleCepBlur()}
+                            placeholder="00000-000"
+                            inputMode="numeric"
+                            required
+                            disabled={submitting || cepLoading}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void handleCepBlur().then(() => handleQuote())}
+                            disabled={cepLoading || quoteLoading || submitting}
+                          >
+                            {(cepLoading || quoteLoading) && (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            )}
+                            Buscar CEP e frete
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="street">Rua / Avenida</Label>
+                        <Input
+                          id="street"
+                          value={street}
+                          onChange={(e) => setStreet(e.target.value)}
+                          required
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="number">Número</Label>
+                          <Input
+                            id="number"
+                            value={number}
+                            onChange={(e) => setNumber(e.target.value)}
+                            required
+                            disabled={submitting}
+                          />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="complement">Complemento</Label>
+                          <Input
+                            id="complement"
+                            value={complement}
+                            onChange={(e) => setComplement(e.target.value)}
+                            placeholder="Apto, bloco…"
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="neighborhood">Bairro</Label>
+                        <Input
+                          id="neighborhood"
+                          value={neighborhood}
+                          onChange={(e) => setNeighborhood(e.target.value)}
+                          required
+                          disabled={submitting}
+                        />
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="space-y-2 sm:col-span-2">
+                          <Label htmlFor="city">Cidade</Label>
+                          <Input
+                            id="city"
+                            value={city}
+                            onChange={(e) => setCity(e.target.value)}
+                            required
+                            disabled={submitting}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="state">UF</Label>
+                          <Input
+                            id="state"
+                            value={state}
+                            onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
+                            maxLength={2}
+                            required
+                            disabled={submitting}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Truck className="h-5 w-5 text-primary" />
+                        Frete (Correios)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {quoteLoading && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Calculando frete…
+                        </div>
+                      )}
+                      {!quoteLoading && quote && quote.options.length > 0 && (
+                        <div className="space-y-2">
+                          {quote.options.map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setSelectedServiceId(opt.id)}
+                              disabled={submitting}
+                              className={cn(
+                                'flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left transition-colors',
+                                selectedServiceId === opt.id
+                                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                  : 'border-border hover:border-primary/40'
+                              )}
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {opt.company} — {opt.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Prazo estimado: {opt.days} dia{opt.days === 1 ? '' : 's'} útil
+                                  {opt.days === 1 ? '' : 'eis'}
+                                </p>
+                              </div>
+                              <span className="shrink-0 font-semibold tabular-nums">
+                                {formatCurrency(opt.price)}
+                              </span>
+                            </button>
+                          ))}
+                          <p className="text-xs text-muted-foreground">
+                            Envio pelos Correios a partir da loja em Copacabana, RJ.
+                          </p>
+                        </div>
+                      )}
+                      {!quoteLoading && !quote && (
+                        <p className="text-sm text-muted-foreground">
+                          Informe o CEP para ver as opções PAC e SEDEX.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                  </>
+                )}
 
                 <Card>
                   <CardHeader>
@@ -553,7 +646,7 @@ export default function ShopCheckout() {
                   type="submit"
                   size="lg"
                   className="w-full"
-                  disabled={submitting || !selectedServiceId}
+                  disabled={submitting || (!isPickup && !selectedServiceId)}
                 >
                   {submitting ? (
                     <>
@@ -705,9 +798,15 @@ export default function ShopCheckout() {
                     )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        Frete{order.shippingService ? ` (${order.shippingService})` : ''}
+                        {order.deliveryMethod === 'pickup'
+                          ? 'Retirada na loja'
+                          : `Frete${order.shippingService ? ` (${order.shippingService})` : ''}`}
                       </span>
-                      <span className="tabular-nums">{formatCurrency(order.shippingCost)}</span>
+                      <span className="tabular-nums">
+                        {order.deliveryMethod === 'pickup' && order.shippingCost === 0
+                          ? 'Grátis'
+                          : formatCurrency(order.shippingCost)}
+                      </span>
                     </div>
                     <div className="h-px bg-border" />
                     <div className="flex justify-between text-base font-semibold">
@@ -752,11 +851,15 @@ export default function ShopCheckout() {
                       </label>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Frete</span>
+                      <span className="text-muted-foreground">
+                        {isPickup ? 'Retirada na loja' : 'Frete'}
+                      </span>
                       <span className="tabular-nums">
-                        {selectedOption
-                          ? formatCurrency(selectedOption.price)
-                          : 'Calcular'}
+                        {isPickup
+                          ? 'Grátis'
+                          : selectedOption
+                            ? formatCurrency(selectedOption.price)
+                            : 'Calcular'}
                       </span>
                     </div>
                     <div className="h-px bg-border" />
@@ -800,6 +903,53 @@ export default function ShopCheckout() {
         </div>
       </main>
     </div>
+  )
+}
+
+function DeliveryOption({
+  selected,
+  onSelect,
+  icon,
+  title,
+  description,
+  badge,
+  disabled,
+}: {
+  selected: boolean
+  onSelect: () => void
+  icon: React.ReactNode
+  title: string
+  description: string
+  badge?: string
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cn(
+        'flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+        selected
+          ? 'border-primary bg-primary/5 ring-1 ring-primary'
+          : 'border-border hover:border-primary/40',
+        disabled && 'opacity-60'
+      )}
+    >
+      <span className="mt-0.5 text-primary">{icon}</span>
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-2 font-medium">
+          {title}
+          {badge && (
+            <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
   )
 }
 

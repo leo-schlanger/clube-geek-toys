@@ -1,5 +1,5 @@
 import { api } from './api-client'
-import type { Order, OrderStatus, PixQRData } from '../types'
+import type { DeliveryMethod, Order, OrderStatus, PixQRData } from '../types'
 import type { CartItem } from '../types'
 
 export interface ShippingAddressPayload {
@@ -18,8 +18,12 @@ export interface CreateOrderPayload {
   customer: { name: string; email: string; phone?: string }
   /** Recado livre do cliente para a loja, até 500 caracteres. */
   customerNote?: string
-  shippingAddress: ShippingAddressPayload
-  shipping: { quoteToken: string; serviceId: string }
+  /** 'shipping' (padrão) envia pelos Correios; 'pickup' é retirada na loja. */
+  deliveryMethod?: DeliveryMethod
+  /** Obrigatório quando deliveryMethod é 'shipping'. */
+  shippingAddress?: ShippingAddressPayload
+  /** Obrigatório quando deliveryMethod é 'shipping'. */
+  shipping?: { quoteToken: string; serviceId: string }
   paymentMethod: 'pix' | 'credit_card'
   applyStoreCredit?: boolean
   channel?: 'retail' | 'wholesale'

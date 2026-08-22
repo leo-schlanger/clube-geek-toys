@@ -183,6 +183,7 @@ async function handleShopOrderPaid(
       order_number: String(order.order_number),
       total: parseFloat(order.total).toFixed(2).replace('.', ','),
       order_id: order.id,
+      delivery_method: order.delivery_method || 'shipping',
     },
   });
 

@@ -127,6 +127,9 @@ export type ShopChannel = 'retail' | 'wholesale'
 // ============================================
 
 export type OrderStatus = 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
+
+/** Como o pedido chega ao cliente: Correios ou retirada na loja em Copacabana. */
+export type DeliveryMethod = 'shipping' | 'pickup'
 export type OrderPaymentMethod = 'pix' | 'credit_card'
 
 export interface Category {
@@ -262,6 +265,8 @@ export interface Order {
   customerPhone: string | null
   /** Recado que o cliente deixou para a loja no checkout. */
   customerNote?: string | null
+  /** 'shipping' = Correios; 'pickup' = retirada no balcão da loja. */
+  deliveryMethod?: DeliveryMethod
   shippingAddress: Record<string, unknown> | null
   subtotal: number
   discount: number

@@ -15,6 +15,53 @@ export const DEFAULT_LENGTH_CM = 16;
 
 const QUOTE_TTL_MS = 25 * 60 * 1000; // 25 min
 
+// ─── Retirada na loja ────────────────────────────────────────────────────────
+
+/**
+ * Service id reserved for pickup. It never comes from a quote token — pickup
+ * skips the quote entirely — so it must not collide with a Melhor Envio id
+ * (numeric) or a fallback id (`fallback-*`).
+ */
+export const PICKUP_SERVICE_ID = 'pickup';
+export const PICKUP_SERVICE_LABEL = 'Retirada na loja';
+
+/**
+ * Where the customer goes to collect. Snapshotted onto the order so a pedido
+ * from before a move still shows the counter it was placed for.
+ */
+export const STORE_PICKUP_LOCATION = {
+  name: 'GeekPop & Toys',
+  street: 'Rua Barata Ribeiro',
+  number: '181',
+  complement: 'Loja J',
+  neighborhood: 'Copacabana',
+  city: 'Rio de Janeiro',
+  state: 'RJ',
+  cep: '22011001',
+  hours: 'Segunda a sábado, 10h às 19h',
+} as const;
+
+/**
+ * The `shipping_address` written for a pickup order.
+ *
+ * Storing the counter address instead of leaving the column NULL keeps the
+ * order self-contained: the picking list, the admin panel and the LGPD export
+ * all read one field and get a real place, and `recipientName` still records
+ * who is entitled to collect it.
+ */
+export function buildPickupAddress(recipientName: string): ShippingAddressInput {
+  return {
+    cep: STORE_PICKUP_LOCATION.cep,
+    street: STORE_PICKUP_LOCATION.street,
+    number: STORE_PICKUP_LOCATION.number,
+    complement: STORE_PICKUP_LOCATION.complement,
+    neighborhood: STORE_PICKUP_LOCATION.neighborhood,
+    city: STORE_PICKUP_LOCATION.city,
+    state: STORE_PICKUP_LOCATION.state,
+    recipientName,
+  };
+}
+
 export interface ShippingAddressInput {
   cep: string;
   street: string;

@@ -11,15 +11,20 @@ import {
   MEMBER_SHOP_DISCOUNT,
   MEMBER_DISCOUNT_REASON,
   WHOLESALE_SHOP_DISCOUNT,
+  type DeliveryMethod,
   type Order,
   type OrderItem,
   type ShopChannel,
 } from '../types/index.js';
 import type { JwtPayload } from '../middleware/auth.js';
 import {
+  buildPickupAddress,
   normalizeCep,
   pickOptionFromQuote,
   trackingUrlForCode,
+  PICKUP_SERVICE_ID,
+  PICKUP_SERVICE_LABEL,
+  STORE_PICKUP_LOCATION,
   type ShippingAddressInput,
 } from './shipping.service.js';
 import { redeemForOrder, restoreCreditForOrder } from './store-credit.service.js';
@@ -48,6 +53,7 @@ function mapOrder(row: pg.QueryResultRow): Order {
     customerEmail: row.customer_email,
     customerPhone: row.customer_phone,
     customerNote: row.customer_note ?? null,
+    deliveryMethod: (row.delivery_method as DeliveryMethod) || 'shipping',
     shippingAddress: row.shipping_address,
     subtotal: parseFloat(row.subtotal),
     discount: parseFloat(row.discount),
@@ -131,8 +137,15 @@ export interface CreateOrderInput {
   customer: { name: string; email: string; phone?: string };
   /** Free-text note the customer writes for the shop at checkout. */
   customerNote?: string;
-  shippingAddress: ShippingAddressInput;
-  shipping: {
+  /**
+   * 'shipping' (default) posts through Correios; 'pickup' has the customer
+   * collect at the counter — no address, no quote, no shipping cost.
+   */
+  deliveryMethod?: DeliveryMethod;
+  /** Required when deliveryMethod is 'shipping'. */
+  shippingAddress?: ShippingAddressInput;
+  /** Required when deliveryMethod is 'shipping'. */
+  shipping?: {
     quoteToken: string;
     serviceId: string;
   };
@@ -168,16 +181,24 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   const channel: ShopChannel = input.channel === 'wholesale' ? 'wholesale' : 'retail';
   const isWholesale = channel === 'wholesale';
 
+  const deliveryMethod: DeliveryMethod = input.deliveryMethod === 'pickup' ? 'pickup' : 'shipping';
+  const isPickup = deliveryMethod === 'pickup';
+
+  // Pickup carries no destination: validating an address the customer was never
+  // asked for would reject every counter order.
+  let cep = '';
   const addr = input.shippingAddress;
-  if (!addr?.cep || !addr.street || !addr.number || !addr.neighborhood || !addr.city || !addr.state) {
-    throw new AppError(400, 'Endereço de entrega incompleto.', 'INVALID_ADDRESS');
-  }
-  const cep = normalizeCep(addr.cep);
-  if (cep.length !== 8) {
-    throw new AppError(400, 'CEP inválido.', 'INVALID_CEP');
-  }
-  if (!input.shipping?.quoteToken || !input.shipping?.serviceId) {
-    throw new AppError(400, 'Selecione uma opção de frete.', 'SHIPPING_REQUIRED');
+  if (!isPickup) {
+    if (!addr?.cep || !addr.street || !addr.number || !addr.neighborhood || !addr.city || !addr.state) {
+      throw new AppError(400, 'Endereço de entrega incompleto.', 'INVALID_ADDRESS');
+    }
+    cep = normalizeCep(addr.cep);
+    if (cep.length !== 8) {
+      throw new AppError(400, 'CEP inválido.', 'INVALID_CEP');
+    }
+    if (!input.shipping?.quoteToken || !input.shipping?.serviceId) {
+      throw new AppError(400, 'Selecione uma opção de frete.', 'SHIPPING_REQUIRED');
+    }
   }
 
   // Wholesale: must be logged in with approved CNPJ account matching the provided CNPJ.
@@ -206,28 +227,43 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     customerCnpj = cnpj;
   }
 
-  // Revalidate frete server-side (never trust client price).
-  const shipOpt = pickOptionFromQuote(
-    input.shipping.quoteToken,
-    input.shipping.serviceId,
-    input.items,
-    cep
-  );
-  const shippingCost = round2(shipOpt.price);
-  const shippingService = shipOpt.service || shipOpt.name;
-  const shippingServiceId = shipOpt.id;
-  const shippingDays = shipOpt.days;
+  // Revalidate frete server-side (never trust client price). Pickup is priced
+  // here, not quoted: a token the client could swap must never be what decides
+  // that a counter order costs nothing.
+  let shippingCost: number;
+  let shippingService: string;
+  let shippingServiceId: string;
+  let shippingDays: number | null;
+  let shippingAddress: ShippingAddressInput;
 
-  const shippingAddress = {
-    cep,
-    street: addr.street.trim(),
-    number: addr.number.trim(),
-    complement: addr.complement?.trim() || undefined,
-    neighborhood: addr.neighborhood.trim(),
-    city: addr.city.trim(),
-    state: addr.state.trim().toUpperCase().slice(0, 2),
-    recipientName: addr.recipientName?.trim() || input.customer.name,
-  };
+  if (isPickup) {
+    shippingCost = 0;
+    shippingService = PICKUP_SERVICE_LABEL;
+    shippingServiceId = PICKUP_SERVICE_ID;
+    shippingDays = null;
+    shippingAddress = buildPickupAddress(input.customer.name.trim());
+  } else {
+    const shipOpt = pickOptionFromQuote(
+      input.shipping!.quoteToken,
+      input.shipping!.serviceId,
+      input.items,
+      cep
+    );
+    shippingCost = round2(shipOpt.price);
+    shippingService = shipOpt.service || shipOpt.name;
+    shippingServiceId = shipOpt.id;
+    shippingDays = shipOpt.days;
+    shippingAddress = {
+      cep,
+      street: addr!.street.trim(),
+      number: addr!.number.trim(),
+      complement: addr!.complement?.trim() || undefined,
+      neighborhood: addr!.neighborhood.trim(),
+      city: addr!.city.trim(),
+      state: addr!.state.trim().toUpperCase().slice(0, 2),
+      recipientName: addr!.recipientName?.trim() || input.customer.name,
+    };
+  }
 
   // Resolve active membership (for the 10% discount) — never trust the client.
   // Wholesale channel does NOT stack member discount (uses wholesale_25 only).
@@ -418,10 +454,10 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
          member_id, user_id, customer_name, customer_email, customer_phone, shipping_address,
          subtotal, discount, discount_reason, shipping_cost, shipping_service, shipping_service_id,
          shipping_days, store_credit_applied, total, status, payment_method,
-         channel, customer_cnpj, wholesale_account_id, customer_note
+         channel, customer_cnpj, wholesale_account_id, customer_note, delivery_method
        )
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16,
-               $17, $18, $19, $20)
+               $17, $18, $19, $20, $21)
        RETURNING *`,
       [
         memberId,
@@ -444,6 +480,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         customerCnpj,
         wholesaleAccountId,
         input.customerNote?.trim() ? input.customerNote.trim().slice(0, 500) : null,
+        deliveryMethod,
       ]
     );
     order = mapOrder(orderResult.rows[0]);
@@ -867,6 +904,17 @@ export async function setOrderTracking(
   if (!code || code.length > 64) {
     throw new AppError(400, 'Código de rastreio inválido.', 'INVALID_TRACKING');
   }
+  // A pickup order has no postagem to track. Letting a code through here would
+  // e-mail the customer a Correios link for a package sitting on the counter.
+  const existing = await getOrderById(id, false);
+  if (!existing) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+  if (existing.deliveryMethod === 'pickup') {
+    throw new AppError(
+      400,
+      'Pedido de retirada na loja não tem rastreio. Marque como "pronto para retirada".',
+      'PICKUP_HAS_NO_TRACKING'
+    );
+  }
   const url = trackingUrl?.trim() || trackingUrlForCode(code);
   const result = await query(
     `UPDATE orders
@@ -954,12 +1002,39 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
     }
   }
 
+  // For pickup, "shipped" is the panel's way of saying the order is bagged and
+  // waiting at the counter — the customer has no tracking to watch, so this
+  // e-mail is the only thing that tells them they can come get it.
+  if (order.deliveryMethod === 'pickup' && status === 'shipped' && prev.status !== 'shipped') {
+    notifyPickupReady(order);
+  }
+
   await auditLog('order.status_changed', actorUserId, {
     orderId: id,
     from: prev.status,
     status,
   });
   return order;
+}
+
+/** Non-blocking "your order is waiting at the counter" notice. */
+function notifyPickupReady(order: Order): void {
+  sendTemplateEmail({
+    template: 'order-ready-for-pickup',
+    to: order.customerEmail,
+    variables: {
+      name: order.customerName,
+      order_number: String(order.orderNumber),
+      order_id: order.id,
+      store_address: formatPickupAddress(),
+      store_hours: STORE_PICKUP_LOCATION.hours,
+    },
+  }).catch((err) => console.error('[email] order-ready-for-pickup failed', err));
+}
+
+export function formatPickupAddress(): string {
+  const l = STORE_PICKUP_LOCATION;
+  return `${l.street}, ${l.number}, ${l.complement} — ${l.neighborhood}, ${l.city}/${l.state}`;
 }
 
 /** Admin confirms a PIX order manually: mark paid + decrement stock (idempotent). */
@@ -990,6 +1065,7 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
         order_number: String(order.orderNumber),
         total: order.total.toFixed(2).replace('.', ','),
         order_id: order.id,
+        delivery_method: order.deliveryMethod,
       },
     }).catch((err) => console.error('[email] order-confirmed (pix) failed', err));
     return order;

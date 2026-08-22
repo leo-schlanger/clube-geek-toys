@@ -4,17 +4,18 @@ Documentação operacional da evolução da loja (`shop.geeketoys.com.br`) após
 
 ## O que foi entregue
 
-| Feature            | Como funciona                                                                       |
-| ------------------ | ----------------------------------------------------------------------------------- |
-| **Frete por CEP**  | Checkout: ViaCEP preenche endereço; `POST /shipping/quote` cota frete               |
-| **Provedor**       | Melhor Envio se `MELHOR_ENVIO_TOKEN` setado; senão **tabela fallback** PAC/SEDEX    |
-| **Total**          | `subtotal − desconto + shipping` (server-side; frete sem desconto)                  |
-| **Atacado B2B**    | Aba `/atacado`, CNPJ, 25% (`wholesale_25`) — ver [`WHOLESALE.md`](WHOLESALE.md)     |
-| **Cotação segura** | `quoteToken` HMAC (TTL ~25 min); revalidado no create order                         |
-| **Minhas compras** | `/minhas-compras` com abas marketplace (requer login + `member_id`)                 |
-| **Rastreio**       | Admin cola código → `PATCH /orders/:id/tracking` → status `shipped` + link Correios |
-| **Related**        | `GET /products/:slug/related` — mesma categoria, depois featured                    |
-| **Trust**          | Badges PIX / Visa / Master / Elo + “Envio Correios”                                 |
+| Feature              | Como funciona                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| **Frete por CEP**    | Checkout: ViaCEP preenche endereço; `POST /shipping/quote` cota frete               |
+| **Retirada na loja** | Checkout: escolher "Retirar na loja" — sem endereço, sem cotação, frete R$ 0        |
+| **Provedor**         | Melhor Envio se `MELHOR_ENVIO_TOKEN` setado; senão **tabela fallback** PAC/SEDEX    |
+| **Total**            | `subtotal − desconto + shipping` (server-side; frete sem desconto)                  |
+| **Atacado B2B**      | Aba `/atacado`, CNPJ, 25% (`wholesale_25`) — ver [`WHOLESALE.md`](WHOLESALE.md)     |
+| **Cotação segura**   | `quoteToken` HMAC (TTL ~25 min); revalidado no create order                         |
+| **Minhas compras**   | `/minhas-compras` com abas marketplace (requer login + `member_id`)                 |
+| **Rastreio**         | Admin cola código → `PATCH /orders/:id/tracking` → status `shipped` + link Correios |
+| **Related**          | `GET /products/:slug/related` — mesma categoria, depois featured                    |
+| **Trust**            | Badges PIX / Visa / Master / Elo + “Envio Correios”                                 |
 
 ## Env (API)
 
@@ -35,10 +36,41 @@ Origem de frete: loja física CEP **22011-001**.
 4. Cliente vê em **Minhas compras → A caminho** com link dos Correios
 5. Marcar `delivered` quando confirmar entrega (manual)
 
+## Retirada na loja (`delivery_method = 'pickup'`)
+
+O cliente escolhe **Retirar na loja** no checkout: o endereço de entrega e o
+bloco de frete somem da tela e o pedido sai com `shipping_cost = 0`. O preço da
+retirada é decidido **no servidor**, nunca a partir do `quoteToken` — um token
+que o cliente pudesse trocar não pode ser o que zera um frete real.
+
+O endereço do balcão (`STORE_PICKUP_LOCATION` em `shipping.service.ts`) é
+gravado em `shipping_address` no momento do pedido, então um pedido antigo
+continua mostrando o balcão para o qual foi feito.
+
+**Fluxo admin:** os status do banco são os mesmos do envio, com outra leitura:
+
+| Status       | Envio      | Retirada                 |
+| ------------ | ---------- | ------------------------ |
+| `processing` | Preparando | Separando                |
+| `shipped`    | A caminho  | **Pronto para retirada** |
+| `delivered`  | Entregue   | Retirado                 |
+
+1. Separar o pedido e guardar no balcão
+2. Mudar o status para **Enviado** → dispara o e-mail `order-ready-for-pickup`
+3. Cliente retira apresentando documento → marcar `delivered`
+
+O campo de rastreio não aparece em pedido de retirada, e a API recusa o código
+(`PICKUP_HAS_NO_TRACKING`): um link dos Correios para uma encomenda que está no
+balcão só confunde quem comprou.
+
+No painel, a lista de pedidos marca a retirada com um selo **Retirada** sob o
+número — retirada e postagem são filas diferentes na prática.
+
 ## Schema (migrations 009–012)
 
 - `products`: weight_g, height/width/length_cm, rating_avg/count, **wholesale_enabled**, **wholesale_min_qty**
 - `orders`: user*id (ownership), shipping*\_, tracking\_\_, store_credit_applied, **channel**, **customer_cnpj**, **wholesale_account_id**
+- `orders` (028): **delivery_method** `shipping|pickup` (default `shipping`), com CHECK que proíbe frete > 0 em retirada
 - `product_reviews`, `store_credits`, `store_credit_ledger`
 - **`wholesale_accounts`** (012): CNPJ, empresa, status pending/approved/rejected/disabled
 - Unique ledger: 1× `review_reward` e 1× `order_refund_credit` por pedido
@@ -84,11 +116,12 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 ## E-mails de pedido
 
-| Evento                 | Template                                 |
-| ---------------------- | ---------------------------------------- |
-| Cartão pago (webhook)  | `order-confirmed`                        |
-| PIX confirmado (admin) | `order-confirmed`                        |
-| Rastreio salvo (admin) | `order-shipped` (código + link Correios) |
+| Evento                              | Template                                      |
+| ----------------------------------- | --------------------------------------------- |
+| Cartão pago (webhook)               | `order-confirmed`                             |
+| PIX confirmado (admin)              | `order-confirmed`                             |
+| Rastreio salvo (admin)              | `order-shipped` (código + link Correios)      |
+| Retirada pronta (admin → `shipped`) | `order-ready-for-pickup` (endereço + horário) |
 
 ## SEO shop
 

@@ -49,6 +49,22 @@ export async function quoteShipping(
   return result.data
 }
 
+/**
+ * Loja física onde o pedido de retirada é entregue. Espelha
+ * `STORE_PICKUP_LOCATION` no backend — aqui serve só para exibição; quem grava
+ * o endereço no pedido é sempre o servidor.
+ */
+export const STORE_PICKUP = {
+  name: 'GeekPop & Toys',
+  address: 'Rua Barata Ribeiro, 181, Loja J — Copacabana, Rio de Janeiro/RJ',
+  cep: '22011-001',
+  hours: 'Segunda a sábado, 10h às 19h',
+  mapsUrl:
+    'https://maps.google.com/?q=Rua+Barata+Ribeiro,+181,+Loja+J,+Copacabana,+Rio+de+Janeiro',
+} as const
+
+export const PICKUP_SERVICE_LABEL = 'Retirada na loja'
+
 export function maskCep(value: string): string {
   const d = value.replace(/\D/g, '').slice(0, 8)
   if (d.length <= 5) return d

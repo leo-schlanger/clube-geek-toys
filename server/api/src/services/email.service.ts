@@ -26,7 +26,8 @@ const AVAILABLE_TEMPLATES = [
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
-  'admin-new-member', 'order-confirmed', 'order-shipped', 'question-answered',
+  'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
+  'question-answered',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-daily-digest',
 ];
 
@@ -239,7 +240,11 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
           ['Total', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
         ])}
-        <p style="margin-top:16px">Você receberá o código de rastreio dos Correios assim que o pedido for postado.</p>`,
+        <p style="margin-top:16px">${
+          v.delivery_method === 'pickup'
+            ? 'Avisaremos por e-mail assim que o pedido estiver separado para retirada na loja.'
+            : 'Você receberá o código de rastreio dos Correios assim que o pedido for postado.'
+        }</p>`,
       // The order page is public and keyed by the order's UUID, so it opens for a
       // guest checkout too. `/minhas-compras` requires a login the guest does
       // not have — it used to bounce the customer to a signup form and then to
@@ -268,6 +273,32 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: {
         text: 'Rastrear nos Correios',
         url: v.tracking_url || 'https://rastreamento.correios.com.br/app/index.php',
+      },
+    },
+
+    // Retirada na loja não tem rastreio: este e-mail é o único aviso de que o
+    // pedido já está separado e pode ser buscado no balcão.
+    'order-ready-for-pickup': {
+      subject: `Pedido #${v.order_number || ''} pronto para retirada`,
+      preheader: 'Seu pedido já está separado e esperando por você na loja.',
+      body: `
+        <h2 style="color:#4ade80;margin:0 0 12px">Pronto para retirada! 🏪</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Seu pedido já está separado e esperando por você na nossa loja.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Endereço', v.store_address || ''],
+          ...(v.store_hours ? [['Horário', v.store_hours]] : []),
+        ])}
+        ${infoBox(
+          'Leve um documento com foto e o número do pedido. Se outra pessoa for retirar, ' +
+            'avise a gente antes pelo WhatsApp.'
+        )}`,
+      cta: {
+        text: 'Ver pedido',
+        url: v.order_id
+          ? `https://shop.geeketoys.com.br/pedido/${v.order_id}`
+          : 'https://shop.geeketoys.com.br/minhas-compras',
       },
     },
 

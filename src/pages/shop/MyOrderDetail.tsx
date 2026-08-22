@@ -9,10 +9,12 @@ import {
   MessageSquare,
   Package,
   Star,
+  Store,
   Truck,
 } from 'lucide-react'
 import type { Order } from '../../types'
 import { getMyOrder, cancelMyOrder } from '../../lib/orders'
+import { STORE_PICKUP } from '../../lib/shipping'
 import { getStoreCredit, listOrderReviews } from '../../lib/reviews'
 import { formatCurrency } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
@@ -31,6 +33,19 @@ const TIMELINE: { status: Order['status']; label: string }[] = [
   { status: 'processing', label: 'Preparando' },
   { status: 'shipped', label: 'A caminho' },
   { status: 'delivered', label: 'Entregue' },
+]
+
+/**
+ * Na retirada os dois últimos passos não são "a caminho / entregue" — o pedido
+ * fica esperando no balcão. Mesmos status no banco, outra leitura para quem vai
+ * buscar.
+ */
+const PICKUP_TIMELINE: { status: Order['status']; label: string }[] = [
+  { status: 'pending', label: 'Pedido criado' },
+  { status: 'paid', label: 'Pago' },
+  { status: 'processing', label: 'Separando' },
+  { status: 'shipped', label: 'Pronto para retirada' },
+  { status: 'delivered', label: 'Retirado' },
 ]
 
 const STATUS_RANK: Record<string, number> = {
@@ -109,6 +124,7 @@ export default function MyOrderDetail() {
 
   const meta = order ? ORDER_STATUS_META[order.status] : null
   const rank = order ? STATUS_RANK[order.status] ?? 0 : 0
+  const isPickup = order?.deliveryMethod === 'pickup'
   const cancelled = order?.status === 'cancelled' || order?.status === 'refunded'
 
   return (
@@ -149,7 +165,7 @@ export default function MyOrderDetail() {
                 </CardHeader>
                 <CardContent>
                   <ol className="space-y-3">
-                    {TIMELINE.map((step) => {
+                    {(isPickup ? PICKUP_TIMELINE : TIMELINE).map((step) => {
                       const stepRank = STATUS_RANK[step.status] ?? 0
                       const done = rank >= stepRank
                       return (
@@ -229,9 +245,15 @@ export default function MyOrderDetail() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      Frete{order.shippingService ? ` (${order.shippingService})` : ''}
+                      {isPickup
+                        ? 'Retirada na loja'
+                        : `Frete${order.shippingService ? ` (${order.shippingService})` : ''}`}
                     </span>
-                    <span className="tabular-nums">{formatCurrency(order.shippingCost)}</span>
+                    <span className="tabular-nums">
+                      {isPickup && order.shippingCost === 0
+                        ? 'Grátis'
+                        : formatCurrency(order.shippingCost)}
+                    </span>
                   </div>
                   <div className="flex justify-between font-semibold">
                     <span>Total</span>
@@ -241,18 +263,47 @@ export default function MyOrderDetail() {
               </CardContent>
             </Card>
 
-            {order.shippingAddress && (
+            {isPickup ? (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base">
-                    <MapPin className="h-4 w-4" />
-                    Entrega
+                    <Store className="h-4 w-4" />
+                    Retirada na loja
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  <AddressBlock address={order.shippingAddress} />
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">{STORE_PICKUP.name}</p>
+                  <p>{STORE_PICKUP.address}</p>
+                  <p>CEP {STORE_PICKUP.cep}</p>
+                  <p>
+                    <strong className="text-foreground">Horário:</strong> {STORE_PICKUP.hours}
+                  </p>
+                  <p>Leve um documento com foto e o número do pedido.</p>
+                  <a
+                    href={STORE_PICKUP.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    Ver no mapa
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
                 </CardContent>
               </Card>
+            ) : (
+              order.shippingAddress && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <MapPin className="h-4 w-4" />
+                      Entrega
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm text-muted-foreground">
+                    <AddressBlock address={order.shippingAddress} />
+                  </CardContent>
+                </Card>
+              )
             )}
 
             {order.customerNote && (

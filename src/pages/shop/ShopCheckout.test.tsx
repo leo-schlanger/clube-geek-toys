@@ -61,6 +61,14 @@ vi.mock('../../lib/shipping', () => ({
   lookupCep: vi.fn(),
   quoteShipping: vi.fn(),
   maskCep: (v: string) => v.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2'),
+  STORE_PICKUP: {
+    name: 'GeekPop & Toys',
+    address: 'Rua Barata Ribeiro, 181, Loja J — Copacabana, Rio de Janeiro/RJ',
+    cep: '22011-001',
+    hours: 'Segunda a sábado, 10h às 19h',
+    mapsUrl: 'https://maps.google.com/?q=loja',
+  },
+  PICKUP_SERVICE_LABEL: 'Retirada na loja',
 }))
 
 vi.mock('../../lib/orders', () => ({
@@ -232,5 +240,83 @@ describe('ShopCheckout', () => {
       expect(screen.getByTestId('qr')).toBeInTheDocument()
     })
   })
-})
 
+  /**
+   * Retirada é o caminho em que o cliente nunca digita endereço nem escolhe
+   * frete. O que estes testes seguram, na ordem do que quebrar custa:
+   *
+   *  1. Escolher retirada some com os campos de endereço — se eles ficassem
+   *     montados e escondidos, os `required` travariam o submit do form.
+   *  2. O pedido sai sem `shippingAddress` e sem `shipping`, com
+   *     `deliveryMethod: 'pickup'`.
+   *  3. O resumo mostra frete grátis, não "Calcular" eterno.
+   */
+  describe('retirada na loja', () => {
+    it('hides address and shipping fields when pickup is chosen', async () => {
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <ShopCheckout />
+        </MemoryRouter>
+      )
+
+      expect(screen.getByLabelText(/CEP/i)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
+
+      expect(screen.queryByLabelText(/CEP/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/^Número/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Frete \(Correios\)/i)).not.toBeInTheDocument()
+      expect(screen.getAllByText(/Rua Barata Ribeiro, 181/i).length).toBeGreaterThan(0)
+    })
+
+    it('shows shipping as free in the summary', async () => {
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <ShopCheckout />
+        </MemoryRouter>
+      )
+      await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
+
+      expect(screen.getAllByText(/Grátis/i).length).toBeGreaterThan(0)
+      // Total estimado = só as mercadorias, sem frete somado.
+      expect(screen.getByRole('button', { name: /Continuar · R\$\s*100,00/i })).toBeInTheDocument()
+    })
+
+    it('creates the order with deliveryMethod pickup and no address or quote', async () => {
+      const user = userEvent.setup()
+      mockedCreate.mockResolvedValue({
+        order: { id: 'ord-2', orderNumber: 100, status: 'pending', total: 100 },
+        pixData: { emvCode: '00020126PIXCODE', qrCodeBase64: null, txId: 'tx2' },
+        clientSecret: null,
+      } as never)
+
+      render(
+        <MemoryRouter>
+          <ShopCheckout />
+        </MemoryRouter>
+      )
+
+      await user.type(screen.getByLabelText(/Nome completo/i), 'Maria Silva')
+      await user.type(screen.getByLabelText(/^Email/i), 'maria@test.com')
+      await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
+
+      const submit = screen
+        .getAllByRole('button')
+        .find((b) => b.getAttribute('type') === 'submit') as HTMLButtonElement
+      expect(submit.disabled).toBe(false)
+      await user.click(submit)
+
+      await waitFor(() => {
+        expect(mockedCreate).toHaveBeenCalled()
+      })
+      const payload = mockedCreate.mock.calls[0][0]
+      expect(payload.deliveryMethod).toBe('pickup')
+      expect(payload.shippingAddress).toBeUndefined()
+      expect(payload.shipping).toBeUndefined()
+      // Nenhuma cotação é pedida: retirada não depende de CEP.
+      expect(mockedQuote).not.toHaveBeenCalled()
+    })
+  })
+})

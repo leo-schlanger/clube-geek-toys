@@ -794,6 +794,25 @@ const STEPS: SchemaStep[] = [
     await query(`CREATE INDEX IF NOT EXISTS idx_event_tickets_event_status ON event_tickets(event_id, status)`);
     },
   },
+  {
+    name: "Retirada na loja no checkout (migration 028)",
+    run: async () => {
+    await query(
+      `ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_method VARCHAR(16) NOT NULL DEFAULT 'shipping'`
+    );
+    await query(`DO $$ BEGIN
+      ALTER TABLE orders ADD CONSTRAINT chk_orders_delivery_method
+        CHECK (delivery_method IN ('shipping', 'pickup'));
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(`DO $$ BEGIN
+      ALTER TABLE orders ADD CONSTRAINT chk_orders_pickup_no_shipping_cost
+        CHECK (delivery_method <> 'pickup' OR shipping_cost = 0);
+    EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await query(
+      `CREATE INDEX IF NOT EXISTS idx_orders_delivery_method_status ON orders(delivery_method, status)`
+    );
+    },
+  },
 ];
 
 let state: SchemaState = {
