@@ -130,6 +130,36 @@ function notifyAdminOfPendingPix(order: Order, txId: string): void {
   }
 }
 
+/**
+ * Sends the customer their own copy of the PIX code.
+ *
+ * The EMV lived only in the checkout component's state, and there is no public
+ * route that returns it: closing the tab — or just tapping "Acompanhar pedido",
+ * which unmounts the component — left a guest with no way to pay. Same reason
+ * the ticket reservation has always mailed its code.
+ *
+ * Never throws: it runs inside the checkout `try`, whose `catch` cancels the
+ * order and restores credit.
+ */
+function notifyCustomerOfPendingPix(order: Order, pix: PixQRData): void {
+  try {
+    void sendTemplateEmail({
+      template: 'order-pending-pix',
+      to: order.customerEmail,
+      variables: {
+        name: order.customerName,
+        order_number: String(order.orderNumber),
+        order_id: order.id,
+        total: order.total.toFixed(2).replace('.', ','),
+        pix_code: pix.emvCode,
+        pix_key: pix.pixKey,
+      },
+    }).catch((err) => console.error('[PIX] order-pending-pix failed', err));
+  } catch (err) {
+    console.error('[PIX] order-pending-pix skipped', err);
+  }
+}
+
 // ─── Create order (checkout) ─────────────────────────────────────────────────
 
 export interface CreateOrderInput {
@@ -585,6 +615,23 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     if (!PIX_KEY) {
       throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
     }
+    // Store credit caps at the goods, so the total only reaches zero when the
+    // credit covers them and there is no shipping left to charge (pickup).
+    // There is nothing to pay: a QR for R$ 0,00 is unpayable and
+    // `buildOrderPix` refuses to rebuild it, so the order used to sit `pending`
+    // forever with the credit already spent. Settle it instead.
+    if (order.total <= 0) {
+      // Credit requires an account, so there is always an actor here.
+      const paid = await confirmPixOrder(orderId, orderUserId ?? '');
+      await auditLog('order.created', orderUserId, {
+        orderId,
+        orderNumber: paid.orderNumber,
+        total: paid.total,
+        storeCreditApplied: paid.storeCreditApplied,
+        paymentMethod: 'store_credit',
+      });
+      return { order: paid };
+    }
     const txId = generatePixTxId();
     const pixData = generatePixEMV({
       pixKey: PIX_KEY,
@@ -604,6 +651,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     });
 
     notifyAdminOfPendingPix(order, txId);
+    notifyCustomerOfPendingPix(order, pixData);
 
     return { order, pixData };
   } catch (err) {
@@ -656,6 +704,23 @@ export function buildOrderPix(order: Order): PixQRData | null {
     merchantCity: PIX_MERCHANT_CITY,
     txId: order.pixTxid,
   });
+}
+
+/**
+ * The pending PIX for an order, by its id — public, like the status lookup.
+ *
+ * The order id is an unguessable UUID and is already the key to the public
+ * order page; what comes back is only the payment code (no customer data).
+ * Without this the EMV existed nowhere a guest could reach it again.
+ */
+export async function getPublicOrderPix(
+  id: string
+): Promise<{ orderNumber: number; total: number; pix: PixQRData } | null> {
+  const order = await getOrderById(id, false);
+  if (!order) return null;
+  const pix = buildOrderPix(order);
+  if (!pix) return null;
+  return { orderNumber: order.orderNumber, total: order.total, pix };
 }
 
 /** Lightweight status lookup for order-confirmation polling (public by order id). */

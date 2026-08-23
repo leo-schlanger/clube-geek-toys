@@ -20,6 +20,13 @@ interface Props {
   description?: string
   /** When set, shows "Reenviar por e-mail". */
   onResend?: () => Promise<void>
+  /**
+   * Warn before leaving with the code unpaid. Only for the checkout, where the
+   * EMV had nowhere else to live. On the order and ticket pages the code is
+   * recoverable, and the browser dialog just nagged whoever came back to check
+   * a payment they had already made.
+   */
+  guardExit?: boolean
   className?: string
 }
 
@@ -34,12 +41,13 @@ export function PixPaymentPanel({
   title = 'Pague por PIX',
   description,
   onResend,
+  guardExit = false,
   className,
 }: Props) {
   const [copied, setCopied] = useState(false)
   const [sending, setSending] = useState(false)
 
-  usePixExitGuard(true)
+  usePixExitGuard(guardExit)
 
   async function handleCopy() {
     try {

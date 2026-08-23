@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, Link } from 'react-router-dom'
 import { CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Home } from 'lucide-react'
 import type { OrderStatus } from '../../types'
-import { getOrderStatus } from '../../lib/orders'
+import { getOrderStatus, getOrderPix, type OrderPixInfo } from '../../lib/orders'
 import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { useShopMember } from '../../components/store/useShopMember'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
+import { PixPaymentPanel } from '../../components/store/PixPaymentPanel'
 
 const POLL_INTERVAL_MS = 4000
 const POLL_TIMEOUT_MS = 5 * 60 * 1000 // Stop polling after 5 min
@@ -37,6 +38,8 @@ export default function OrderConfirmation() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+
+  const [pix, setPix] = useState<OrderPixInfo | null>(null)
 
   const clearedRef = useRef(false)
   const startRef = useRef(Date.now())
@@ -105,6 +108,22 @@ export default function OrderConfirmation() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
+  /**
+   * The PIX code, fetched from the server rather than carried in navigation
+   * state. Coming from checkout the component that held the EMV is already
+   * unmounted, and a guest opening the e-mail link never had it at all.
+   */
+  useEffect(() => {
+    if (!id || status !== 'pending') return
+    let active = true
+    void getOrderPix(id).then((info) => {
+      if (active) setPix(info)
+    })
+    return () => {
+      active = false
+    }
+  }, [id, status])
+
   const isPaid =
     status === 'paid' ||
     status === 'processing' ||
@@ -117,7 +136,11 @@ export default function OrderConfirmation() {
     <div className="min-h-screen bg-background">
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto flex max-w-lg flex-col items-center px-4 py-12">
+      <main
+        className={`mx-auto flex flex-col items-center px-4 py-12 ${
+          pix ? 'max-w-2xl' : 'max-w-lg'
+        }`}
+      >
         <Card className="w-full">
           <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
             {notFound ? (
@@ -169,9 +192,14 @@ export default function OrderConfirmation() {
                     {timedOut ? 'Aguardando confirmação' : 'Aguardando pagamento'}
                   </h1>
                   <p className="text-muted-foreground">
-                    {isPending
-                      ? 'Assim que o pagamento PIX for identificado, seu pedido será confirmado automaticamente. Você pode fechar esta página — enviaremos um email.'
-                      : 'Estamos verificando o status do seu pagamento.'}
+                    {/* Card settles by Stripe webhook; PIX is checked by a
+                        person. Saying "automatic" for PIX was the promise the
+                        system could not keep. */}
+                    {isPending && pix
+                      ? 'A equipe confere o PIX e confirma o pedido — não é automático, e pode levar algumas horas em horário comercial. Enviamos o código para o seu e-mail: pode fechar esta página sem perder nada.'
+                      : isPending
+                        ? 'Assim que o pagamento for identificado, seu pedido é confirmado e você recebe um e-mail.'
+                        : 'Estamos verificando o status do seu pagamento.'}
                   </p>
                 </div>
                 {timedOut && (
@@ -187,6 +215,18 @@ export default function OrderConfirmation() {
                 <span className="text-sm text-muted-foreground">Número do pedido</span>
                 <p className="text-lg font-semibold tabular-nums">#{orderNumber}</p>
               </div>
+            )}
+
+            {/* The code itself, not just a promise of it: this page is where a
+                guest who closed the checkout tab lands. */}
+            {isPending && pix && (
+              <PixPaymentPanel
+                emvCode={pix.pix.emvCode}
+                pixKey={pix.pix.pixKey}
+                amount={pix.total}
+                reference={`#${pix.orderNumber}`}
+                className="w-full text-left"
+              />
             )}
 
             <div className="flex w-full flex-col gap-2 pt-2 sm:flex-row">

@@ -1,6 +1,6 @@
 # Eventos na loja (shop.geeketoys.com.br)
 
-> **Última atualização:** 22 de Agosto de 2026  
+> **Última atualização:** 23 de Agosto de 2026  
 > **Evento em cartaz:** **20/set/2026 (domingo) 14h–18h**, Mar Palace Copacabana Hotel, entrada **R$ 20** (criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
 > **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)  
 > **Quem edita:** a admin, na aba **Eventos** — não é mais deploy. Ver [Trocar de evento](#trocar-de-evento-sem-deploy).
@@ -207,10 +207,18 @@ uma família barrada na porta no domingo.
 
 ### Pendências conhecidas
 
-- O site institucional (`geek-toys-home`) tem **a sua própria** cópia do
-  formulário, ainda só-WhatsApp. Enquanto ela existir, quem reserva por lá não
-  ganha ingresso nominal. O caminho mais curto é apontar o CTA de lá para
-  `shop.geeketoys.com.br/evento#ingressos`.
+- ~~O site institucional (`geek-toys-home`) tem **a sua própria** cópia do
+  formulário, ainda só-WhatsApp.~~ **Resolvido em 23/08/2026** — o formulário
+  de lá agora faz o mesmo `POST /events/:id/reservations` e manda a pessoa para
+  `/ingressos/<código>` desta loja, onde o PIX é exibido. As duas vitrines caem
+  na mesma tabela.
+
+  > Esta pendência ficou aberta e **cobrou o preço**: em 23/08 uma reserva de 2
+  > ingressos (R$ 40) chegou como mensagem solta de WhatsApp. Não existia no
+  > banco, a cliente nunca viu o PIX e a admin não foi notificada — ninguém
+  > conseguia pagar nem confirmar. Foi lançada à mão (`R-PWW2-ZVLZ`). Antes
+  > dela, o sistema inteiro tinha **uma** reserva registrada.
+
 - A API aceita check-in de `seller`, mas a tela vive no painel admin, que só
   abre para `admin`. Na prática a portaria roda com a conta da Laura; para o
   vendedor operar sozinho, a tela precisa de um atalho no PDV.

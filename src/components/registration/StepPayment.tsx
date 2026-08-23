@@ -126,7 +126,10 @@ export function StepPayment({
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current)
           if (pollRef.current) clearInterval(pollRef.current)
-          toast.error('QR Code expirado. Gere um novo.')
+          // A static PIX BR Code has no validity window — only the automatic
+          // check stops here. Calling it "expired" pushed people to generate a
+          // second code for a QR that was still perfectly payable.
+          toast.info('Paramos de verificar automaticamente. O código PIX continua válido.')
           return 0
         }
         return prev - 1
@@ -416,7 +419,9 @@ export function StepPayment({
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-600">
               <Clock className="h-4 w-4" />
-              Expira em {formatTime(timeLeft)}
+              {timeLeft > 0
+                ? `Verificando o pagamento por ${formatTime(timeLeft)}`
+                : 'Código válido — avisaremos quando o pagamento cair'}
             </div>
             <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
               <div

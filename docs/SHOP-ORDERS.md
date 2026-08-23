@@ -118,10 +118,36 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 | Evento                              | Template                                      |
 | ----------------------------------- | --------------------------------------------- |
+| **Pedido PIX criado (cliente)**     | **`order-pending-pix`** (copia-e-cola do EMV) |
+| Pedido PIX criado (admin)           | `admin-pix-order-pending`                     |
 | Cartão pago (webhook)               | `order-confirmed`                             |
 | PIX confirmado (admin)              | `order-confirmed`                             |
 | Rastreio salvo (admin)              | `order-shipped` (código + link Correios)      |
 | Retirada pronta (admin → `shipped`) | `order-ready-for-pickup` (endereço + horário) |
+
+### Recuperar o PIX de um pedido (23/08/2026)
+
+O EMV do checkout vivia **só no estado do componente React**. Fechar a aba —
+ou apenas tocar em "Acompanhar pedido", que desmonta a tela — apagava o código,
+e não havia rota pública que o devolvesse. Convidada não tinha caminho de volta
+nenhum: só criando conta com o mesmo e-mail e verificando-o, para o
+`claimGuestOrders` adotar o pedido. Nada na tela dizia isso. Os quatro
+primeiros pedidos da loja foram todos cancelados sem pagamento.
+
+Agora há dois caminhos, e nenhum depende da aba continuar aberta:
+
+| Caminho                         | Onde                                         |
+| ------------------------------- | -------------------------------------------- |
+| E-mail `order-pending-pix`      | Sai junto com o pedido, com o copia-e-cola   |
+| `GET /orders/:id/pix` (público) | Chaveado pelo UUID do pedido, como `/status` |
+
+A página `/pedido/:id` consome a rota e renderiza o `PixPaymentPanel`. A rota
+devolve `null` (404) quando não há PIX pendente — pedido pago, cancelado ou de
+cartão.
+
+> **A confirmação do PIX é manual.** A página dizia "será confirmado
+> automaticamente" e "enviaremos um email" — não havia webhook nem e-mail de
+> pedido pendente. O texto agora diz o que o sistema faz de verdade.
 
 ## SEO shop
 

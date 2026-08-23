@@ -30,6 +30,7 @@ import {
   type EventReservation,
   type ReservationStatus,
 } from '../../lib/event-tickets'
+import { getShopUrl } from '../../lib/subdomain'
 
 const PAGE_SIZE = 20
 
@@ -383,7 +384,11 @@ export function EventTicketsTab() {
                       )}
                       <Button size="sm" variant="ghost" asChild>
                         <a
-                          href={`/ingressos/${reservation.code}`}
+                          // Absolute: `/ingressos/:code` is a shop route, and
+                          // the admin host's catch-all sends a relative link
+                          // to /login — which is exactly where the PIX and the
+                          // "resend by e-mail" button live.
+                          href={`${getShopUrl()}/ingressos/${reservation.code}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="gap-1.5"

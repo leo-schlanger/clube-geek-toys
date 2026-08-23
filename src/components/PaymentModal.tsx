@@ -107,7 +107,10 @@ export function PaymentModal({
   useEffect(() => {
     if (initialPendingPayment) {
       const expiresAt = new Date(initialPendingPayment.expiresAt)
-      if (expiresAt > new Date() && initialPendingPayment.qrCode) {
+      // No expiry check on purpose: a static PIX BR Code has no validity
+      // window — `expiresAt` is only how long we keep auto-checking. Refusing
+      // to restore it threw away the member's one copy of a payable code.
+      if (initialPendingPayment.qrCode) {
         setPixData({
           paymentIntentId: initialPendingPayment.paymentId,
           clientSecret: '',
@@ -134,7 +137,10 @@ export function PaymentModal({
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current)
           if (pollRef.current) clearInterval(pollRef.current)
-          toast.error('QR Code expirado. Gere um novo.')
+          // The code stays payable; only the automatic check stops. Saying
+          // "expired" sent members to generate a second code — and a second
+          // line in `payments` — for a QR that still worked.
+          toast.info('Paramos de verificar automaticamente. O código PIX continua válido.')
           return 0
         }
         return prev - 1
@@ -365,7 +371,9 @@ export function PaymentModal({
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-600 mb-4">
                   <Clock className="h-4 w-4" />
-                  Expira em {formatTime(timeLeft)}
+                  {timeLeft > 0
+                    ? `Verificando o pagamento por ${formatTime(timeLeft)}`
+                    : 'Código válido — avisaremos quando o pagamento cair'}
                 </div>
               </div>
 

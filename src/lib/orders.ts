@@ -68,6 +68,24 @@ export async function getOrderStatus(id: string): Promise<OrderStatusInfo | null
   return result.data ?? null
 }
 
+export interface OrderPixInfo {
+  orderNumber: number
+  total: number
+  pix: PixQRData
+}
+
+/**
+ * The pending PIX of an order, by id — no login.
+ *
+ * The checkout screen held the EMV only in component state, and tapping
+ * "Acompanhar pedido" unmounted it. This is how the order page gets the code
+ * back, for a guest too. `null` = nothing left to pay (or already settled).
+ */
+export async function getOrderPix(id: string): Promise<OrderPixInfo | null> {
+  const result = await api.get<OrderPixInfo>(`/orders/${id}/pix`, { skipAuth: true })
+  return result.data ?? null
+}
+
 // ─── Admin ─────────────────────────────────────────────────────────────────
 
 export interface OrderListResult {

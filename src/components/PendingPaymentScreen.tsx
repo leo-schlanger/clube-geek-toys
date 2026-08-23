@@ -71,14 +71,10 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   async function checkPreviousPayment() {
     if (!member.pendingPayment) return
 
-    // Check if payment has expired (also handles invalid dates)
-    const expiresAt = new Date(member.pendingPayment.expiresAt)
-    if (isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
-      // Payment expired or invalid date, clear it
-      await clearPendingPayment(member.id)
-      setHasPendingPayment(false)
-      return
-    }
+    // A past `expiresAt` is NOT a reason to discard it: the stored EMV is a
+    // static PIX code, still payable, and this blob is the only place it is
+    // kept. Deleting it after 30 minutes left the member with nothing to pay
+    // and no way to get the code back. Only a settled payment clears it below.
 
     setCheckingPrevious(true)
     toast.loading('Verificando pagamento anterior...', { id: 'check-prev' })
@@ -349,9 +345,12 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                           <Clock className="h-4 w-4" />
                           PIX pendente encontrado
                         </p>
+                        {/* No time shown: `expiresAt` is 30 min past creation
+                            and the static code does not expire — printing it
+                            only made the member think it was too late. */}
                         <p className="text-blue-300/80 mt-1">
-                          Valor: {formatCurrency(member.pendingPayment.amount)} -
-                          Expira: {new Date(member.pendingPayment.expiresAt).toLocaleTimeString('pt-BR')}
+                          Valor: {formatCurrency(member.pendingPayment.amount)} — o código
+                          continua válido, é só continuar o pagamento.
                         </p>
                       </div>
                     )}

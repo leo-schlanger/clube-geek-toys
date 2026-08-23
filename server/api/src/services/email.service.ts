@@ -28,6 +28,7 @@ const AVAILABLE_TEMPLATES = [
   'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
+  'order-pending-pix',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-daily-digest',
   'event-reservation-received', 'event-tickets-ready', 'admin-event-reservation',
 ];
@@ -252,6 +253,35 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       // an empty list, which read as "my order disappeared".
       cta: {
         text: 'Acompanhar pedido',
+        url: v.order_id
+          ? `https://shop.geeketoys.com.br/pedido/${v.order_id}`
+          : 'https://shop.geeketoys.com.br/minhas-compras',
+      },
+    },
+
+    /**
+     * PIX do pedido, para o cliente.
+     *
+     * Só existia o aviso para o admin: quem fechava a aba do checkout perdia o
+     * código para sempre — não há webhook, e nenhuma rota pública devolvia o
+     * EMV. Convidado então não tinha caminho de volta nenhum. Este e-mail é a
+     * cópia durável do código, como já acontecia na reserva de ingresso.
+     */
+    'order-pending-pix': {
+      subject: `Pague seu pedido #${v.order_number || ''} por PIX — GeekPop & Toys`,
+      preheader: `Pedido #${v.order_number || ''} reservado. Falta o pagamento por PIX.`,
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Falta pagar por PIX 💳</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Seu pedido está separado e reservado. Ele é confirmado assim que o PIX cair.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
+        ])}
+        ${v.pix_code ? pixBox(v.pix_code, v.pix_key || '', v.total || '0,00') : ''}
+        ${infoBox('⏳ A confirmação do PIX é <strong>conferida pela equipe</strong>, não é automática — pode levar algumas horas em horário comercial. Guarde este e-mail: o código acima continua válido até lá.')}`,
+      cta: {
+        text: 'Ver meu pedido',
         url: v.order_id
           ? `https://shop.geeketoys.com.br/pedido/${v.order_id}`
           : 'https://shop.geeketoys.com.br/minhas-compras',

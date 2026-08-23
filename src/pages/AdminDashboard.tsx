@@ -277,10 +277,14 @@ export default function AdminDashboard() {
     try {
       // Confirm the pending PIX when it exists; otherwise stamp an admin
       // override so PDV and the shop discount work.
+      // `limit=1` + newest-first meant an abandoned card attempt could be the
+      // only row returned — the PIX line then stayed `pending` forever, with no
+      // payment-confirmed e-mail and the revenue missing from the reports.
+      // Widen the window and pick the oldest PIX, which is the one being paid.
       const payments = await api.get<{ id: string; status: string; method: string }[]>(
-        `/payments?member_id=${member.id}&status=pending&limit=1`
+        `/payments?member_id=${member.id}&status=pending&limit=20`
       )
-      const pendingPayment = (payments.data || []).find(p => p.method === 'pix')
+      const pendingPayment = (payments.data || []).filter((p) => p.method === 'pix').pop()
 
       if (pendingPayment) {
         const result = await api.post(`/payments/${pendingPayment.id}/confirm`)

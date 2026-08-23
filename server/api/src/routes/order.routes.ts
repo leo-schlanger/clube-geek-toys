@@ -130,6 +130,22 @@ orderRouter.get('/:id/status', async (req, res, next) => {
   }
 });
 
+// GET /orders/:id/pix — public recovery of the PIX code, keyed by the order's
+// UUID (same key as /status). It is what lets a guest who closed the checkout
+// tab pay at all; before this the EMV only lived in React state.
+orderRouter.get('/:id/pix', async (req, res, next) => {
+  try {
+    const result = await orderService.getPublicOrderPix(req.params.id as string);
+    if (!result) {
+      res.status(404).json({ error: 'Não há PIX pendente para este pedido.' });
+      return;
+    }
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Admin ───────────────────────────────────────────────────────────────────
 
 orderRouter.get('/', authenticate, requireRole('admin'), async (req, res, next) => {
