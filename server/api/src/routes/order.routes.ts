@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
-import { paymentLimiter } from '../middleware/rate-limit.js';
+import { paymentLimiter, publicLookupLimiter } from '../middleware/rate-limit.js';
 import { validate } from '../middleware/validate.js';
 import * as orderService from '../services/order.service.js';
 
@@ -117,7 +117,7 @@ orderRouter.post('/me/:id/cancel', authenticate, async (req, res, next) => {
 });
 
 // GET /orders/:id/status — public polling for the order-confirmation page.
-orderRouter.get('/:id/status', async (req, res, next) => {
+orderRouter.get('/:id/status', publicLookupLimiter, async (req, res, next) => {
   try {
     const status = await orderService.getOrderStatus(req.params.id as string);
     if (!status) {
@@ -133,7 +133,7 @@ orderRouter.get('/:id/status', async (req, res, next) => {
 // GET /orders/:id/pix — public recovery of the PIX code, keyed by the order's
 // UUID (same key as /status). It is what lets a guest who closed the checkout
 // tab pay at all; before this the EMV only lived in React state.
-orderRouter.get('/:id/pix', async (req, res, next) => {
+orderRouter.get('/:id/pix', publicLookupLimiter, async (req, res, next) => {
   try {
     const result = await orderService.getPublicOrderPix(req.params.id as string);
     if (!result) {

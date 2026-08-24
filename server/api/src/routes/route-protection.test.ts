@@ -31,6 +31,20 @@ vi.mock('../middleware/auth.js', () => ({
       roles,
     }),
 }));
+// Tagged the same way as the guards, so the contract can also ask "esta porta
+// pública está estrangulada?".
+vi.mock('../middleware/rate-limit.js', () => {
+  const limiter = (name: string) =>
+    Object.assign((_q: unknown, _s: unknown, n: () => void) => n(), { limiter: name });
+  return {
+    defaultLimiter: limiter('default'),
+    authLimiter: limiter('auth'),
+    publicLookupLimiter: limiter('publicLookup'),
+    paymentLimiter: limiter('payment'),
+    emailLimiter: limiter('email'),
+  };
+});
+
 // Binding nativo, e este teste só lê a forma dos routers — nada aqui hasheia.
 vi.mock('bcrypt', () => ({
   default: { compare: vi.fn(async () => true), hash: vi.fn(async () => 'x') },
@@ -66,10 +80,22 @@ import { logRouter } from './log.routes.js';
 import { reportRouter } from './report.routes.js';
 import { wholesaleRouter } from './wholesale.routes.js';
 import { contractRouter } from './contract.routes.js';
+import { authRouter } from './auth.routes.js';
+import { productRouter } from './product.routes.js';
+import { eventRouter } from './event.routes.js';
+import { galleryRouter } from './gallery.routes.js';
+import { reviewRouter } from './review.routes.js';
+import { questionRouter } from './question.routes.js';
+import { profileRouter } from './profile.routes.js';
+import { shippingRouter } from './shipping.routes.js';
+import { notificationRouter } from './notification.routes.js';
+import { webhookRouter } from './webhook.routes.js';
+import { healthRouter } from './health.routes.js';
 
 interface Guard {
   guard?: string;
   roles?: string[];
+  limiter?: string;
 }
 interface Endpoint {
   method: string;
@@ -91,14 +117,14 @@ function endpointsOf(router: Router, mountedAt: string): Endpoint[] {
 
     if (!route) {
       const handle = layer.handle as Guard | undefined;
-      if (handle?.guard) routerWide.push(handle);
+      if (handle?.guard || handle?.limiter) routerWide.push(handle);
       continue;
     }
 
     // `route.stack` holds Express Layers; the tagged function is `layer.handle`.
     const routeGuards = route.stack
       .map((l) => l.handle)
-      .filter((h): h is Guard => Boolean(h?.guard));
+      .filter((h): h is Guard => Boolean(h?.guard || h?.limiter));
 
     for (const method of Object.keys(route.methods)) {
       out.push({
@@ -127,6 +153,17 @@ const ROUTERS: [string, Router][] = [
   ['/reports', reportRouter],
   ['/wholesale', wholesaleRouter],
   ['/contracts', contractRouter],
+  ['/auth', authRouter],
+  ['/products', productRouter],
+  ['/events', eventRouter],
+  ['/gallery', galleryRouter],
+  ['/reviews', reviewRouter],
+  ['/questions', questionRouter],
+  ['/profile', profileRouter],
+  ['/shipping', shippingRouter],
+  ['/notifications', notificationRouter],
+  ['/webhook', webhookRouter],
+  ['/health', healthRouter],
 ];
 
 const ALL: Endpoint[] = ROUTERS.flatMap(([mount, r]) => endpointsOf(r, mount));
@@ -136,24 +173,102 @@ const find = (method: string, path: string) =>
 const hasAuth = (e: Endpoint) => e.guards.some((g) => g.guard === 'authenticate');
 const rolesOf = (e: Endpoint) =>
   e.guards.filter((g) => g.guard === 'requireRole').flatMap((g) => g.roles ?? []);
+const throttled = (e: Endpoint) => e.guards.some((g) => g.limiter);
 
 /**
  * Endpoints públicos **de propósito**. Cada um é chaveado por algo inadivinhável
  * ou é a própria porta de entrada.
  */
 const PUBLIC = new Set([
-  'POST /orders', // checkout de convidado
+  // ── A porta: sem estas, ninguém entra ──
+  'POST /auth/register',
+  'POST /auth/login',
+  'POST /auth/refresh',
+  'POST /auth/google',
+  'POST /auth/send-verification-email',
+  'POST /auth/verify-email',
+  'POST /auth/send-password-reset',
+  'POST /auth/reset-password',
+
+  // ── A vitrine: é uma loja, o catálogo é para ser lido ──
+  'GET /products',
+  'GET /products/:slug',
+  'GET /products/:id/variants',
+  'GET /products/:slug/related',
+  'GET /products/:slug/also-bought',
+  'GET /products/:slug/share',
+  'GET /products/categories',
+  'GET /products/sitemap.xml',
+  'GET /reviews/product/:slugOrId',
+  'GET /questions/product/:slugOrId',
+  'GET /gallery',
+  'GET /gallery/:slug',
+
+  // ── Checkout de convidado ──
+  'POST /orders',
   'GET /orders/:id/status', // UUID do pedido
   'GET /orders/:id/pix', // UUID do pedido — a recuperação do PIX
+  'GET /shipping/cep/:cep',
+  'POST /shipping/quote',
+
+  // ── Evento e ingresso: reservar não exige conta, e o QR circula ──
+  'GET /events/active',
+  'POST /events/:eventId/reservations',
+  'GET /events/reservations/:code',
+  'GET /events/tickets/:code',
+  'POST /events/reservations/:code/payment-link', // reenvia para o e-mail GRAVADO
+
+  // ── Integrações: quem chama não tem como carregar nosso JWT ──
+  // Stripe assina o corpo (`constructEvent`); sem `STRIPE_WEBHOOK_SECRET` em
+  // produção a rota recusa tudo. A verificação é dentro do handler e este
+  // contrato não a enxerga — ver `webhook.service.test.ts`.
+  'POST /webhook/stripe',
+  'POST /webhook/pagbank', // 410 Gone, transicional
+  // O navegador de quem autoriza, sem nossa sessão. Quem autentica é o `state`
+  // assinado (`oauth.isValidState`).
+  'GET /shipping/melhor-envio/callback',
+
+  // ── Operacional ──
+  'GET /health',
   'POST /logs/errors', // erro de front, antes de qualquer login
-  'GET /wholesale/status', // o canal B2B está aberto?
+
+  // ── Atacado ──
+  'GET /wholesale/status',
   'POST /wholesale/register',
   'POST /wholesale/login',
+
+  // ── Clube ──
   'GET /members/verify/:id', // QR da carteirinha, lido pela câmera na porta
   // Devolve só `{exists: boolean}` e passa pelo publicLookupLimiter. É o que
   // permite avisar "CPF já cadastrado" antes de criar a conta; em troca, aceita
   // que dá para sondar se um CPF é membro. Trade-off registrado, não descuido.
   'GET /members/cpf-exists/:cpf',
+]);
+
+/**
+ * Portas públicas que **não** precisam de throttle, e por quê. Tudo o mais que
+ * é público tem de estar estrangulado.
+ */
+const PUBLIC_WITHOUT_THROTTLE = new Set([
+  'GET /health', // é o que o deploy consulta em laço
+  'POST /webhook/stripe', // o Stripe reentrega; limitar aqui perde pagamento
+  'POST /webhook/pagbank', // 410 fixo
+  'GET /shipping/melhor-envio/callback', // protegido pelo state assinado
+
+  // Leitura de catálogo. Uma única página da loja dispara produto + categorias
+  // + relacionados + também-compraram; o `publicLookupLimiter` é 15/min e
+  // quebraria a navegação normal antes de incomodar um scraper. São dados
+  // públicos por definição, e o nginx os serve com cache.
+  'GET /products',
+  'GET /products/:slug',
+  'GET /products/:id/variants',
+  'GET /products/:slug/related',
+  'GET /products/:slug/also-bought',
+  'GET /products/:slug/share',
+  'GET /products/categories',
+  'GET /products/sitemap.xml',
+  'GET /events/active', // Cache-Control de 60s
+  'GET /wholesale/status', // devolve um booleano
 ]);
 
 describe('contrato de proteção das rotas', () => {
@@ -223,6 +338,55 @@ describe('contrato de proteção das rotas', () => {
     const actualPublic = ALL.filter((e) => !hasAuth(e)).map((e) => `${e.method} ${e.path}`);
     for (const p of actualPublic) {
       expect(PUBLIC.has(p), `rota pública não declarada: ${p}`).toBe(true);
+    }
+  });
+
+  /**
+   * Routers que misturam vitrine pública e gestão de conteúdo. A varredura por
+   * prefixo acima não os alcança (a leitura é pública de propósito), então a
+   * regra aqui é outra: **escrever é de admin**. Sem isto, tirar o
+   * `requireRole` de um endpoint de produto passava sem ninguém notar.
+   */
+  it.each([
+    ['/products', new Set<string>()],
+    ['/gallery', new Set<string>()],
+    ['/reviews', new Set(['POST /reviews/me/order/:orderId'])],
+    [
+      '/events',
+      new Set(['POST /events/:eventId/reservations', 'POST /events/reservations/:code/payment-link']),
+    ],
+  ])('escrever sob %s é de admin', (prefix, exceptions) => {
+    const writes = ALL.filter(
+      (e) =>
+        e.path.startsWith(prefix as string) &&
+        ['POST', 'PUT', 'PATCH', 'DELETE'].includes(e.method) &&
+        !(exceptions as Set<string>).has(`${e.method} ${e.path}`)
+    );
+    expect(writes.length, `nenhuma escrita sob ${prefix}`).toBeGreaterThan(0);
+    for (const e of writes) {
+      expect(rolesOf(e), `${e.method} ${e.path}`).toContain('admin');
+    }
+  });
+
+  /**
+   * Uma porta aberta sem limitador é força bruta de graça: senha, enumeração de
+   * e-mail, bomba de e-mail de verificação.
+   */
+  it('toda rota pública está estrangulada, salvo as declaradas', () => {
+    const open = ALL.filter(
+      (e) =>
+        !hasAuth(e) &&
+        !throttled(e) &&
+        !PUBLIC_WITHOUT_THROTTLE.has(`${e.method} ${e.path}`)
+    ).map((e) => `${e.method} ${e.path}`);
+    expect(open).toEqual([]);
+  });
+
+  it('login e recuperação de senha têm limitador', () => {
+    for (const path of ['/auth/login', '/auth/send-password-reset', '/auth/reset-password']) {
+      const e = find('POST', path);
+      expect(e, path).toBeDefined();
+      expect(throttled(e!), path).toBe(true);
     }
   });
 
