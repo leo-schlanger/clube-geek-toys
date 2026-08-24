@@ -62,9 +62,14 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
 
     res.status(200).json({ status: 'ok' });
   } catch (err) {
-    // Log but always 200 to avoid Stripe retry storms — idempotency in service handles dupes.
+    // 500 so Stripe re-delivers. The old comment had it backwards: the claim in
+    // `processed_webhooks` is INSERTed inside the same transaction as the
+    // effects, so a failure rolls it back and the event is NOT recorded as
+    // processed. Idempotency is what makes a retry *safe*, not what makes one
+    // unnecessary — answering 200 just told Stripe to forget a payment that was
+    // captured but never applied, leaving the order `pending` forever.
     console.error('[WEBHOOK] Processing error:', err);
-    res.status(200).json({ status: 'processing_error' });
+    res.status(500).json({ status: 'processing_error' });
   }
 });
 

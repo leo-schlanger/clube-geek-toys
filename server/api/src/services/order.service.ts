@@ -615,22 +615,35 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     if (!PIX_KEY) {
       throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
     }
-    // Store credit caps at the goods, so the total only reaches zero when the
-    // credit covers them and there is no shipping left to charge (pickup).
-    // There is nothing to pay: a QR for R$ 0,00 is unpayable and
-    // `buildOrderPix` refuses to rebuild it, so the order used to sit `pending`
-    // forever with the credit already spent. Settle it instead.
+    // A zero total has two very different causes, and only one is a sale.
+    //
+    // Store credit caps at the goods, so credit + pickup can legitimately leave
+    // nothing to charge. That order is already settled: a QR for R$ 0,00 is
+    // unpayable and `buildOrderPix` refuses to rebuild it, so it used to sit
+    // `pending` forever with the credit already spent.
+    //
+    // Zero with no credit means the goods themselves are priced at R$ 0,00 —
+    // a cataloguing mistake, not a giveaway. Seven such products were live on
+    // 23/08/2026 with 47 units in stock. Settling those would hand them out for
+    // free; refuse instead, and the compensation below restores everything.
     if (order.total <= 0) {
-      // Credit requires an account, so there is always an actor here.
-      const paid = await confirmPixOrder(orderId, orderUserId ?? '');
-      await auditLog('order.created', orderUserId, {
-        orderId,
-        orderNumber: paid.orderNumber,
-        total: paid.total,
-        storeCreditApplied: paid.storeCreditApplied,
-        paymentMethod: 'store_credit',
-      });
-      return { order: paid };
+      if ((order.storeCreditApplied ?? 0) > 0) {
+        // Credit requires an account, so there is always an actor here.
+        const paid = await confirmPixOrder(orderId, orderUserId ?? '');
+        await auditLog('order.created', orderUserId, {
+          orderId,
+          orderNumber: paid.orderNumber,
+          total: paid.total,
+          storeCreditApplied: paid.storeCreditApplied,
+          paymentMethod: 'store_credit',
+        });
+        return { order: paid };
+      }
+      throw new AppError(
+        400,
+        'Este pedido ficou com total R$ 0,00. Um dos itens está sem preço — fale com a loja antes de finalizar.',
+        'ZERO_TOTAL_NO_CREDIT'
+      );
     }
     const txId = generatePixTxId();
     const pixData = generatePixEMV({

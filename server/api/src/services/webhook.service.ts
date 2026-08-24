@@ -317,11 +317,22 @@ async function handleInvoicePaid(
   const member = memberResult.rows[0];
   const interval = member.payment_type === 'annual' ? '1 year' : '1 month';
 
-  // Extend member expiry and increment payment count
+  // Extend member expiry and increment payment count.
+  //
+  // `expiry_date` is nullable and `createMember` never sets it, so a first
+  // subscription invoice used to compute `NULL + interval = NULL` — leaving a
+  // paying member `active` with no expiry, which reads as expired everywhere it
+  // matters: the 10% shop discount (`order.service.ts`) and the digital card
+  // (`member.routes.ts`) both require `expiry_date >= CURRENT_DATE`. A member
+  // returning after a lapse hit the same wall from the other side, extending a
+  // date already months in the past. Anchor on today whenever the stored date
+  // is missing or stale — the one-off payment path already does this.
   await client.query(
-    `UPDATE members SET expiry_date = expiry_date + $2::interval, status = 'active',
-     payment_count = payment_count + 1
-     WHERE id = $1`,
+    `UPDATE members
+        SET expiry_date = GREATEST(COALESCE(expiry_date, CURRENT_DATE), CURRENT_DATE) + $2::interval,
+            status = 'active',
+            payment_count = payment_count + 1
+      WHERE id = $1`,
     [member.id, interval]
   );
 

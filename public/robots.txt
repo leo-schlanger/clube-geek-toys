@@ -8,6 +8,9 @@ Disallow: /recuperar-senha
 Disallow: /resultado-pagamento
 Disallow: /checkout
 Disallow: /pedido/
+# Nominal tickets — these pages carry the attendee's full name.
+Disallow: /ingresso/
+Disallow: /ingressos/
 Disallow: /minhas-compras
 Disallow: /perfil
 Disallow: /carrinho

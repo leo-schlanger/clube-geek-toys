@@ -14,6 +14,7 @@ import {
   type PublicTicket,
 } from '../../lib/event-tickets'
 import { ReservationPixPanel } from '../../components/store/ReservationPixPanel'
+import { SeoHead } from '../../components/store/SeoHead'
 
 type Props = {
   /** `ticket` shows one ticket; `reservation` shows every ticket in the purchase. */
@@ -76,6 +77,15 @@ export default function TicketPage({ mode }: Props) {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* The page prints the attendee's full name and is public by URL. It had
+          no SeoHead at all, so it inherited `index, follow` from the static
+          HTML — one shared ticket link was enough to put a real person's name
+          in Google. */}
+      <SeoHead
+        title={mode === 'reservation' ? 'Meus ingressos' : 'Ingresso'}
+        path={`/${mode === 'reservation' ? 'ingressos' : 'ingresso'}/${code ?? ''}`}
+        noIndex
+      />
       <ShopHeader isMember={isMember} />
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-16">

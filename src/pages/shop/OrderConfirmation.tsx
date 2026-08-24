@@ -9,6 +9,7 @@ import { useShopMember } from '../../components/store/useShopMember'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { PixPaymentPanel } from '../../components/store/PixPaymentPanel'
+import { SeoHead } from '../../components/store/SeoHead'
 
 const POLL_INTERVAL_MS = 4000
 const POLL_TIMEOUT_MS = 5 * 60 * 1000 // Stop polling after 5 min
@@ -134,6 +135,9 @@ export default function OrderConfirmation() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Order number and, while pending, the PIX code itself. Public by UUID
+          and previously served with the default `index, follow`. */}
+      <SeoHead title="Pedido" path={`/pedido/${id ?? ''}`} noIndex />
       <ShopHeader isMember={isMember} />
 
       <main
