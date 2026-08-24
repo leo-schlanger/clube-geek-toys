@@ -39,6 +39,8 @@ vi.mock('../config/env.js', () => ({
     ADMIN_EMAIL: 'geeketoys@gmail.com',
     FRONTEND_URL: 'https://club.geeketoys.com.br',
   },
+  // Fiel ao real; o `email-contract.test.ts` exercita a função sem mock.
+  adminUrl: (path = '/admin') => `https://adm.geeketoys.com.br${path}`,
 }));
 
 import {

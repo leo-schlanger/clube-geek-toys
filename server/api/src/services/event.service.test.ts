@@ -37,6 +37,9 @@ vi.mock('../config/env.js', () => ({
     PIX_MERCHANT_CITY: 'RIO DE JANEIRO',
   },
   SHOP_CANONICAL_URL: 'https://shop.geekpoptoys.com.br',
+  // Fiel ao real (que o `email-contract.test.ts` exercita sem mock); aqui o que
+  // importa é qual caminho o service pede.
+  adminUrl: (path = '/admin') => `https://adm.geeketoys.com.br${path}`,
 }));
 
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
@@ -147,6 +150,36 @@ describe('createReservation', () => {
     expect(insert[1]).toEqual(
       expect.arrayContaining([2, 3000, expect.stringMatching(/^R-[A-Z0-9]{4}-[A-Z0-9]{4}$/)])
     );
+  });
+
+  /**
+   * A diretoria abriu este aviso, clicou no botão e caiu na página de
+   * assinatura do clube: o link era `${FRONTEND_URL}/admin?tab=events`, e no
+   * host do clube `/admin` não existe — o catch-all da SPA de membro manda para
+   * `/assinar`. Ela relatou que "não achava o cliente". Todos os outros avisos
+   * de staff trocavam o subdomínio; este ponto não trocava.
+   */
+  it('o aviso ao admin aponta para o painel admin, não para o clube', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('INSERT INTO event_reservations')) return { rows: [reservationRow()] };
+      if (sql.startsWith('INSERT INTO event_tickets')) return { rows: [ticketRow()] };
+      return { rows: [] };
+    });
+
+    await eventService.createReservation(EVENT_ID, {
+      buyerName: 'Norberto',
+      buyerEmail: 'norberto@example.com',
+      buyerPhone: '21999999999',
+      attendees: [{ name: 'Janaina', kind: 'full' }],
+    });
+
+    const call = sendEmailMock.mock.calls.find(
+      ([arg]) => (arg as { template?: string })?.template === 'admin-event-reservation'
+    )!;
+    expect(call, 'o aviso ao admin não foi enviado').toBeDefined();
+    const vars = (call[0] as { variables: Record<string, string> }).variables;
+    expect(vars.admin_url).toBe('https://adm.geeketoys.com.br/admin?tab=events');
+    expect(vars.admin_url).not.toContain('club.');
   });
 
   it('recusa grupo acima do teto anti-abuso do endpoint público', async () => {

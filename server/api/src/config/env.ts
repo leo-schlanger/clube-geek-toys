@@ -98,3 +98,31 @@ export const env = loadEnv();
  * src/lib/subdomain.ts.
  */
 export const SHOP_CANONICAL_URL = 'https://shop.geekpoptoys.com.br';
+
+/**
+ * Admin panel URL for a given path — for the links inside staff e-mails.
+ *
+ * Every notification used to build this inline as
+ * `FRONTEND_URL.replace('club.', 'admin.')`, which is brittle in two ways, and
+ * both bit us. The reservation notification simply forgot the replace and sent
+ * the director to `club.geeketoys.com.br/admin`, where the member SPA's
+ * catch-all bounces to `/assinar` — he opened the e-mail about a customer and
+ * landed on the subscription page. And the replace silently does nothing if
+ * `FRONTEND_URL` ever stops starting with `club.`, which no test would notice.
+ *
+ * Swapping the first label is robust regardless of the value, and `adm` is the
+ * canonical host (`admin.*` answers, but only through a 301).
+ */
+export function adminUrl(path = '/admin'): string {
+  const suffix = path.startsWith('/') ? path : `/${path}`;
+  try {
+    const url = new URL(env.FRONTEND_URL);
+    const labels = url.hostname.split('.');
+    if (labels.length > 2) labels[0] = 'adm';
+    else labels.unshift('adm');
+    url.hostname = labels.join('.');
+    return `${url.origin}${suffix}`;
+  } catch {
+    return `https://adm.geeketoys.com.br${suffix}`;
+  }
+}

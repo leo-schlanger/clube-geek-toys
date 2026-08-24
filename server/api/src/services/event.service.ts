@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import pg from 'pg';
 import { query, getClient } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
-import { SHOP_CANONICAL_URL, env } from '../config/env.js';
+import { SHOP_CANONICAL_URL, env, adminUrl } from '../config/env.js';
 import {
   ticketPriceCents,
   MAX_TICKETS_PER_RESERVATION,
@@ -388,7 +388,7 @@ async function notifyAdminOfReservation(
       reservation_code: reservation.code,
       quantity: String(reservation.quantity),
       total: formatBRL(reservation.totalCents),
-      admin_url: `${env.FRONTEND_URL}/admin?tab=events`,
+      admin_url: adminUrl('/admin?tab=events'),
     },
   });
 }

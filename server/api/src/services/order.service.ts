@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { query, getClient } from '../config/database.js';
-import { env } from '../config/env.js';
+import { env, adminUrl } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { getStripe } from '../utils/stripe.js';
 import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
@@ -122,7 +122,7 @@ function notifyAdminOfPendingPix(order: Order, txId: string): void {
         total: order.total.toFixed(2).replace('.', ','),
         tx_id: txId,
         customer_note: order.customerNote ?? '',
-        admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=orders`,
+        admin_url: adminUrl('/admin?tab=orders'),
       },
     }).catch((err) => console.error('[PIX] admin-pix-order-pending failed', err));
   } catch (err) {
@@ -975,7 +975,7 @@ function notifyAdminOfCustomerCancellation(order: Order): void {
         customer_name: order.customerName,
         customer_email: order.customerEmail,
         total: order.total.toFixed(2).replace('.', ','),
-        admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=orders`,
+        admin_url: adminUrl('/admin?tab=orders'),
       },
     }).catch((err) => console.error('[order] admin-order-cancelled failed', err));
   } catch (err) {

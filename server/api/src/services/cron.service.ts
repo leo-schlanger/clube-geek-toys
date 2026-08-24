@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { query } from '../config/database.js';
-import { env } from '../config/env.js';
+import { env, adminUrl } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
 import { getActionItems } from './report.service.js';
 import { releaseReservationById } from './order.service.js';
@@ -172,7 +172,7 @@ async function sendAdminDailyDigest() {
     variables: {
       ...counts,
       total_pending: String(report.totalPending),
-      admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin`,
+      admin_url: adminUrl(),
     },
   });
 

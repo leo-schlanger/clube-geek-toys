@@ -1,5 +1,5 @@
 import { query } from '../config/database.js';
-import { env } from '../config/env.js';
+import { env, adminUrl } from '../config/env.js';
 import { getStripe, getOrCreateCustomer, mapStripePaymentStatus } from '../utils/stripe.js';
 import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
 import { sendTemplateEmail } from './email.service.js';
@@ -216,7 +216,7 @@ export async function createPixPayment(data: {
       amount: data.amount.toFixed(2).replace('.', ','),
       tx_id: txId,
       payment_id: paymentId,
-      admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
+      admin_url: adminUrl('/admin?tab=members'),
     },
     member_id: data.memberId,
   }).catch((err) => console.error('[PIX] Failed to notify admin:', err));

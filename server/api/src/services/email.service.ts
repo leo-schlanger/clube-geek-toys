@@ -1,4 +1,4 @@
-import { env } from '../config/env.js';
+import { env, adminUrl } from '../config/env.js';
 import { query } from '../config/database.js';
 
 /** User-facing plan name. Emails used to print the slug "club". */
@@ -526,7 +526,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Payment ID', `<span style="font-family:monospace;font-size:11px">${v.payment_id || '—'}</span>`],
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Verifique no extrato bancário se o PIX com o TX ID acima foi recebido<br>2. Acesse o painel admin e confirme o pagamento<br>3. O membro será ativado automaticamente após a confirmação')}`,
-      cta: { text: 'Abrir Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
+      cta: { text: 'Abrir Painel Admin', url: v.admin_url || adminUrl() },
     },
 
     // ─── ADMIN: SHOP PIX PENDING ───────────────────────
@@ -550,7 +550,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ...(v.customer_note ? [['Mensagem do cliente', escapeHtml(v.customer_note)]] : []),
         ])}
         ${infoBox('📋 <strong>O que fazer:</strong><br>1. Confira no extrato se o PIX com o TX ID acima caiu<br>2. Abra o pedido no painel admin e confirme o pagamento<br>3. O estoque só é baixado depois da confirmação')}`,
-      cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || `${frontendUrl}/admin` },
+      cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || adminUrl() },
     },
 
     // ─── ADMIN: ORDER CANCELLED BY CUSTOMER ────────────
@@ -567,7 +567,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Valor', `R$ ${v.total || '0,00'}`],
         ])}
         ${infoBox('Nenhum valor foi cobrado e o estoque não havia sido baixado — não há nada a estornar. Se houver PIX pago por engano, confira o extrato antes de fechar.')}`,
-      cta: { text: 'Abrir Pedidos no Painel', url: v.admin_url || `${frontendUrl}/admin` },
+      cta: { text: 'Abrir Pedidos no Painel', url: v.admin_url || adminUrl() },
     },
 
     // ─── ADMIN: NEW MEMBER ─────────────────────────────
@@ -586,7 +586,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Pagamento', v.payment_type || '—'],
         ])}
         <p style="margin-top:12px;font-size:13px;color:#94a3b8">O membro está aguardando pagamento para ativação.</p>`,
-      cta: { text: 'Ver no Painel Admin', url: v.admin_url || `${frontendUrl}/admin` },
+      cta: { text: 'Ver no Painel Admin', url: v.admin_url || adminUrl() },
     },
 
     // ─── ADMIN: DAILY OPERATIONS DIGEST ────────────────
@@ -622,7 +622,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
             ])
         )}
         ${infoBox('💰 <strong>O PIX é o item urgente:</strong> não existe webhook, então cada pedido PIX fica <em>pending</em> até alguém conferir o extrato e confirmar no painel. Enquanto isso o estoque não é baixado.')}`,
-      cta: { text: 'Abrir Painel do Dia', url: v.admin_url || `${frontendUrl}/admin` },
+      cta: { text: 'Abrir Painel do Dia', url: v.admin_url || adminUrl() },
     },
 
     // ─── Events: tickets ────────────────────────────────
@@ -672,7 +672,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
         ])}
         ${infoBox('💰 Os ingressos só ficam válidos depois que alguém confirmar o pagamento no painel — antes disso a portaria recusa a entrada.')}`,
-      cta: { text: 'Abrir no painel', url: v.admin_url || `${frontendUrl}/admin` },
+      cta: { text: 'Abrir no painel', url: v.admin_url || adminUrl() },
     },
   };
 

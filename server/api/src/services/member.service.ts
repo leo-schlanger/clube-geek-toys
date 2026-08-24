@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
 import { query, getClient } from '../config/database.js';
-import { env } from '../config/env.js';
+import { env, adminUrl } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { auditLog, diffObjects } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
@@ -135,7 +135,7 @@ function notifyAdminNewMember(data: CreateMemberData): void {
       member_phone: data.phone || '—',
       plan: data.plan,
       payment_type: paymentLabel,
-      admin_url: `${env.FRONTEND_URL.replace('club.', 'admin.')}/admin?tab=members`,
+      admin_url: adminUrl('/admin?tab=members'),
     },
   }).catch((err) => console.error('[MEMBER] Admin notification error:', err));
 }

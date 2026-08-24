@@ -655,11 +655,21 @@ async function handleSubscriptionDeleted(
     [stripeSubId]
   );
 
-  // Update member
+  // Update member.
+  //
+  // `subscription_status <> 'cancelled'` is what stops the duplicate e-mail.
+  // `cancelSubscription` mails the member and then calls
+  // `stripe.subscriptions.cancel()`, which fires this very event — so the
+  // member was getting told twice for one cancellation. Zero rows here means
+  // the app already handled it and already wrote to them; a cancellation made
+  // straight in the Stripe Dashboard still finds the member `authorized` and
+  // is announced normally.
   const memberResult = await client.query(
     `UPDATE members SET subscription_status = 'cancelled', auto_renewal = FALSE
      FROM subscriptions s
-     WHERE members.subscription_id = s.id AND s.provider_id = $1
+     WHERE members.subscription_id = s.id
+       AND s.provider_id = $1
+       AND members.subscription_status <> 'cancelled'
      RETURNING members.id, members.email, members.full_name`,
     [stripeSubId]
   );

@@ -50,6 +50,8 @@ vi.mock('../config/env.js', () => ({
     FRONTEND_URL: 'https://club.geeketoys.com.br',
     STOCK_RESERVATION_TTL_HOURS: 24,
   },
+  // Fiel ao real; o `email-contract.test.ts` exercita a função sem mock.
+  adminUrl: (path = '/admin') => `https://adm.geeketoys.com.br${path}`,
 }));
 
 vi.mock('./shipping.service.js', () => ({
@@ -688,13 +690,15 @@ describe('createOrder — aviso de PIX pendente', () => {
     expect(email!.variables.total).toMatch(/^\d+,\d{2}$/);
   });
 
+  // `adm` é o host canônico. `admin.*` também responde, mas só através de um
+  // 301 — e o link de e-mail é o único caminho que a admin tem para chegar ali.
   it('aponta o CTA para a aba de pedidos do painel admin', async () => {
     setupTx({});
 
     await createOrder(baseInput());
 
     expect(pixEmail()!.variables.admin_url).toBe(
-      'https://admin.geeketoys.com.br/admin?tab=orders'
+      'https://adm.geeketoys.com.br/admin?tab=orders'
     );
   });
 
