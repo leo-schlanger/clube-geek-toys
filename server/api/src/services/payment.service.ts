@@ -243,11 +243,20 @@ export async function confirmPixPayment(opts: {
     throw new AppError(400, 'Apenas pagamentos PIX podem ser confirmados manualmente.', 'NOT_PIX_PAYMENT');
   }
 
-  // Mark payment as paid
-  await query(
-    `UPDATE payments SET status = 'paid', paid_at = NOW(), webhook_processed_at = NOW() WHERE id = $1`,
+  // Claim the payment: the read above is not a guard, it is a hint. Two clicks
+  // in the panel (or two admins) both read `pending`, both passed, and the
+  // member got `payment_count + 1` twice and **two months** of validity for one
+  // payment — the expiry is computed from the row this function already read.
+  // Only the writer that actually flips the row proceeds.
+  const claimed = await query(
+    `UPDATE payments SET status = 'paid', paid_at = NOW(), webhook_processed_at = NOW()
+      WHERE id = $1 AND status <> 'paid'
+      RETURNING id`,
     [opts.paymentId]
   );
+  if (claimed.rows.length === 0) {
+    return { success: true }; // another writer got there first
+  }
 
   // Activate or renew member
   if (payment.memberId) {
@@ -398,6 +407,26 @@ export async function createCardPayment(data: {
  * This is critical because PIX QR codes are generated locally, not via Stripe,
  * so the frontend polling needs a DB-based status check.
  */
+/**
+ * Does this payment belong to this user?
+ *
+ * `getPaymentStatus` takes either a Stripe PaymentIntent id or a local payment
+ * UUID, so both are matched here. Used to gate the status route, which used to
+ * answer for anyone's payment as long as the caller was logged in.
+ */
+export async function userOwnsPayment(userId: string, paymentId: string): Promise<boolean> {
+  const column = paymentId.startsWith('pi_') ? 'p.provider_id' : 'p.id::text';
+  const result = await query(
+    `SELECT 1
+       FROM payments p
+       JOIN members m ON m.id = p.member_id
+      WHERE ${column} = $1 AND m.user_id = $2
+      LIMIT 1`,
+    [paymentId, userId]
+  );
+  return result.rows.length > 0;
+}
+
 export async function getPaymentStatus(paymentId: string): Promise<{
   id: string;
   status: string;

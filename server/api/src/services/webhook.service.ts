@@ -3,8 +3,9 @@ import Stripe from 'stripe';
 import { getClient } from '../config/database.js';
 import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
-import { decrementStockForOrder } from './order.service.js';
+import { decrementStockForOrder, restoreStockForOrder, releaseReservation } from './order.service.js';
 import { restoreCreditForOrder } from './store-credit.service.js';
+import { env } from '../config/env.js';
 
 /**
  * Email job collected during transaction processing — sent AFTER commit.
@@ -59,8 +60,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         await handlePaymentIntentFailed(
           client,
           event.data.object as Stripe.PaymentIntent,
-          pendingEmails,
-          pendingCreditRestores
+          pendingEmails
         );
         break;
 
@@ -76,6 +76,34 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         await handleSubscriptionDeleted(client, event.data.object as Stripe.Subscription, pendingEmails);
         break;
 
+      // Only an explicit cancel ends a shop order. A decline does not — see
+      // `handlePaymentIntentFailed`.
+      case 'payment_intent.canceled':
+        await handlePaymentIntentCanceled(
+          client,
+          event.data.object as Stripe.PaymentIntent,
+          pendingCreditRestores
+        );
+        break;
+
+      // A refund issued from the Stripe Dashboard — which is how a shopkeeper
+      // actually refunds — used to never reach the database at all: the order
+      // stayed `paid`, counted as revenue, stock stayed decremented and the
+      // store credit never came back.
+      case 'charge.refunded':
+        await handleChargeRefunded(
+          client,
+          event.data.object as Stripe.Charge,
+          pendingCreditRestores
+        );
+        break;
+
+      // Money is already gone from the account; a human has to decide what to
+      // do about it, so this only raises the flag.
+      case 'charge.dispute.created':
+        await handleDisputeCreated(client, event.data.object as Stripe.Dispute, pendingEmails);
+        break;
+
       default:
         console.log(`[WEBHOOK] Unhandled Stripe event type: ${event.type}`);
     }
@@ -88,14 +116,16 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
     client.release();
   }
 
-  // Side effects AFTER commit so they reflect persisted state.
+  // Side effects AFTER commit so they reflect persisted state. The queue is fed
+  // by the cancel and refund handlers; a mere decline no longer enqueues
+  // anything, because it no longer ends the order.
   for (const orderId of pendingCreditRestores) {
     try {
       const amount = await restoreCreditForOrder(orderId, {
-        note: 'Crédito devolvido (pagamento cartão falhou)',
+        note: 'Crédito devolvido (pedido cancelado ou reembolsado)',
       });
       if (amount > 0) {
-        await auditLog('order.credit_restored', null, { orderId, amount, reason: 'payment_failed' });
+        await auditLog('order.credit_restored', null, { orderId, amount, reason: 'order_closed' });
       }
     } catch (err) {
       console.error(`[WEBHOOK] Credit restore failed (order=${orderId}):`, err);
@@ -150,6 +180,122 @@ async function handlePaymentIntentSucceeded(
   );
 }
 
+// ─── payment_intent.canceled ─────────────────────────────────────────────────
+
+/** The one event that actually ends a shop order. */
+async function handlePaymentIntentCanceled(
+  client: pg.PoolClient,
+  paymentIntent: Stripe.PaymentIntent,
+  pendingCreditRestores: string[],
+): Promise<void> {
+  if (paymentIntent.metadata?.kind !== 'shop_order') return;
+
+  const cancelled = await client.query(
+    `UPDATE orders SET status = 'cancelled'
+      WHERE stripe_payment_intent_id = $1 AND status = 'pending'
+      RETURNING id, store_credit_applied`,
+    [paymentIntent.id]
+  );
+  const row = cancelled.rows[0];
+  if (!row) return;
+
+  // The hold outlives the order otherwise: the TTL sweep only visits `pending`.
+  await releaseReservation(client, row.id as string);
+  if (parseFloat(row.store_credit_applied || '0') > 0) {
+    pendingCreditRestores.push(row.id as string);
+  }
+  await auditLog('order.payment_cancelled', null, {
+    paymentIntentId: paymentIntent.id,
+    orderId: row.id,
+  });
+}
+
+// ─── charge.refunded ─────────────────────────────────────────────────────────
+
+/**
+ * Refund made outside the app (Stripe Dashboard) or by `refundOrder`.
+ *
+ * Idempotent through the status guard. A partial refund is treated the same as
+ * a full one on purpose: the shop has no concept of a partially refunded order,
+ * and leaving it `paid` would keep counting the whole amount as revenue.
+ */
+async function handleChargeRefunded(
+  client: pg.PoolClient,
+  charge: Stripe.Charge,
+  pendingCreditRestores: string[],
+): Promise<void> {
+  const paymentIntentId =
+    typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id;
+  if (!paymentIntentId) return;
+
+  const updated = await client.query(
+    `UPDATE orders SET status = 'refunded', updated_at = NOW()
+      WHERE stripe_payment_intent_id = $1 AND status <> 'refunded'
+      RETURNING id, order_number, status, store_credit_applied`,
+    [paymentIntentId]
+  );
+  const row = updated.rows[0];
+  if (!row) return;
+
+  await restoreStockForOrder(client, row.id as string);
+  if (parseFloat(row.store_credit_applied || '0') > 0) {
+    pendingCreditRestores.push(row.id as string);
+  }
+  await auditLog('order.refunded_via_stripe', null, {
+    orderId: row.id,
+    orderNumber: row.order_number,
+    paymentIntentId,
+    amountRefunded: charge.amount_refunded / 100,
+    partial: charge.amount_refunded < charge.amount,
+  });
+}
+
+// ─── charge.dispute.created ──────────────────────────────────────────────────
+
+/** A chargeback needs a person, not an automatic status change. */
+async function handleDisputeCreated(
+  client: pg.PoolClient,
+  dispute: Stripe.Dispute,
+  pendingEmails: PendingEmail[],
+): Promise<void> {
+  const paymentIntentId =
+    typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent?.id;
+
+  const found = paymentIntentId
+    ? await client.query(
+        `SELECT id, order_number, customer_name, customer_email
+           FROM orders WHERE stripe_payment_intent_id = $1`,
+        [paymentIntentId]
+      )
+    : { rows: [] as pg.QueryResultRow[] };
+  const order = found.rows[0];
+
+  await auditLog('order.disputed', null, {
+    orderId: order?.id ?? null,
+    orderNumber: order?.order_number ?? null,
+    paymentIntentId: paymentIntentId ?? null,
+    reason: dispute.reason,
+    amount: dispute.amount / 100,
+  });
+
+  if (env.ADMIN_EMAIL) {
+    pendingEmails.push({
+      template: 'admin-order-disputed',
+      to: env.ADMIN_EMAIL,
+      variables: {
+        order_number: order ? String(order.order_number) : '—',
+        customer_name: (order?.customer_name as string) ?? '—',
+        customer_email: (order?.customer_email as string) ?? '—',
+        amount: (dispute.amount / 100).toFixed(2).replace('.', ','),
+        reason: dispute.reason,
+        due_by: dispute.evidence_details?.due_by
+          ? new Date(dispute.evidence_details.due_by * 1000).toLocaleDateString('pt-BR')
+          : '—',
+      },
+    });
+  }
+}
+
 // ─── shop order paid ─────────────────────────────────────────────────────────
 
 async function handleShopOrderPaid(
@@ -157,11 +303,16 @@ async function handleShopOrderPaid(
   paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
 ): Promise<void> {
-  // Idempotent: only the first successful webhook flips 'pending' → 'paid'.
+  // Idempotent: only the first successful webhook flips the order to 'paid'.
+  //
+  // `cancelled` is accepted alongside `pending` on purpose. Captured money must
+  // always land on the order — if anything cancelled it while the charge was in
+  // flight, silently dropping the success is the worst of both worlds. Anything
+  // already `paid` (or beyond) matches nothing and returns below.
   const updated = await client.query(
     `UPDATE orders SET status = 'paid', paid_at = NOW(), payment_method = 'credit_card'
-     WHERE stripe_payment_intent_id = $1 AND status = 'pending'
-     RETURNING id, order_number, customer_name, customer_email, total`,
+     WHERE stripe_payment_intent_id = $1 AND status IN ('pending', 'cancelled')
+     RETURNING id, order_number, customer_name, customer_email, total, status`,
     [paymentIntent.id]
   );
 
@@ -201,25 +352,25 @@ async function handlePaymentIntentFailed(
   client: pg.PoolClient,
   paymentIntent: Stripe.PaymentIntent,
   pendingEmails: PendingEmail[],
-  pendingCreditRestores: string[] = [],
 ): Promise<void> {
-  // Shop order failed — cancel it (stock was never decremented). Credit restored after TX commit.
+  // Shop order: record the decline, but **do not cancel**.
+  //
+  // Stripe fires `payment_failed` on every declined confirmation, not only on a
+  // terminal failure. The PaymentIntent stays usable and the checkout form
+  // reuses the same clientSecret — "card refused, try another one" is the most
+  // ordinary path there is. Cancelling here meant the retry succeeded against a
+  // dead order: `handleShopOrderPaid` looks for `status = 'pending'`, found
+  // nothing, and returned in silence. Money captured, order cancelled, stock
+  // never decremented, no e-mail. It also left `stock_reserved = TRUE` forever,
+  // since the TTL sweep only looks at `pending` orders.
+  //
+  // Leaving it `pending` keeps the hold for the retry, and the cron releases it
+  // if the buyer walks away. Only `payment_intent.canceled` ends the order.
   if (paymentIntent.metadata?.kind === 'shop_order') {
-    const cancelled = await client.query(
-      `UPDATE orders SET status = 'cancelled'
-       WHERE stripe_payment_intent_id = $1 AND status = 'pending'
-       RETURNING id, store_credit_applied`,
-      [paymentIntent.id]
-    );
-    const orderId =
-      (cancelled.rows[0]?.id as string | undefined) ||
-      (paymentIntent.metadata?.orderId as string | undefined);
-    if (orderId && cancelled.rows[0] && parseFloat(cancelled.rows[0].store_credit_applied || '0') > 0) {
-      pendingCreditRestores.push(orderId);
-    }
     await auditLog('order.payment_failed', null, {
       paymentIntentId: paymentIntent.id,
-      orderId,
+      orderId: paymentIntent.metadata?.orderId,
+      lastPaymentError: paymentIntent.last_payment_error?.code ?? null,
     });
     return;
   }
@@ -293,11 +444,38 @@ async function handleInvoicePaid(
     [`sp_${invoice.id}`, amountInReais, invoice.id, subscriptionId]
   );
 
-  // Reset failed_payments counter
+  // Mirror the invoice into `payments`, which is the ONLY table the reports
+  // read. `subscription_payments` is consulted in exactly one place — the
+  // member's own statement — so every recurring charge from the second month on
+  // was invisible to the dashboard, the monthly comparison and realtime-stats.
+  // Club revenue showed as zero and the curve looked like total churn.
+  //
+  // Guarded on `provider_id`, so a re-delivery (or `invoice.payment_succeeded`,
+  // should it ever be handled too) cannot count the same invoice twice.
   await client.query(
-    `UPDATE subscriptions SET failed_payments = 0, last_payment_date = NOW()
-     WHERE provider_id = $1`,
-    [subscriptionId]
+    `INSERT INTO payments (member_id, amount, method, status, provider_id, provider_status, reference, paid_at)
+     SELECT m.id, $1, 'credit_card', 'paid', $2, 'invoice.paid', $2, NOW()
+       FROM members m
+       JOIN subscriptions s ON m.subscription_id = s.id
+      WHERE s.provider_id = $3
+        AND NOT EXISTS (SELECT 1 FROM payments WHERE provider_id = $2)`,
+    [amountInReais, invoice.id, subscriptionId]
+  );
+
+  // Reset failed_payments counter. `next_payment_date` is in the schema and is
+  // exposed by the API, but nothing ever wrote it — the subscriber always saw
+  // "próxima cobrança: —". The invoice carries the period end.
+  const periodEnd = (invoice as unknown as Record<string, unknown>).period_end;
+  await client.query(
+    `UPDATE subscriptions
+        SET failed_payments = 0,
+            last_payment_date = NOW(),
+            next_payment_date = COALESCE($2::timestamptz, next_payment_date)
+      WHERE provider_id = $1`,
+    [
+      subscriptionId,
+      typeof periodEnd === 'number' ? new Date(periodEnd * 1000).toISOString() : null,
+    ]
   );
 
   // Get member + subscription info for expiry extension

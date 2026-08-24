@@ -1062,8 +1062,26 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
   const prev = await getOrderById(id, false);
   if (!prev) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
 
-  const result = await query(`UPDATE orders SET status = $1 WHERE id = $2 RETURNING *`, [status, id]);
-  if (result.rows.length === 0) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+  // Compare-and-swap on the status we just read. Without it, two clicks in the
+  // panel both saw `prev.status = 'paid'`, both computed `closing &&
+  // hadStockDecremented`, and both restocked — `restoreStockForOrder` is the
+  // one stock operation with no idempotency guard of its own (credit has a
+  // unique index, the hold has the `stock_reserved` flag). Losing the race is
+  // not an error: the other writer already did the work.
+  const result = await query(
+    `UPDATE orders SET status = $1 WHERE id = $2 AND status = $3 RETURNING *`,
+    [status, id, prev.status]
+  );
+  if (result.rows.length === 0) {
+    const current = await getOrderById(id, false);
+    if (!current) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+    if (current.status === status) return current;
+    throw new AppError(
+      409,
+      `O pedido mudou para "${current.status}" enquanto você editava. Recarregue e tente de novo.`,
+      'ORDER_STATUS_CONFLICT'
+    );
+  }
   const order = mapOrder(result.rows[0]);
 
   const closing =
@@ -1192,15 +1210,39 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   if (!order.stripePaymentIntentId) {
     throw new AppError(400, 'Pedido sem cobrança no Stripe (ex.: PIX) — reembolse manualmente.', 'NO_STRIPE_CHARGE');
   }
-  const stripe = getStripe();
-  await stripe.refunds.create({ payment_intent: order.stripePaymentIntentId });
   const hadStock = ['paid', 'processing', 'shipped', 'delivered'].includes(order.status);
+
+  // Claim the order BEFORE calling Stripe. The other order lost money quietly:
+  // if the UPDATE failed after `refunds.create` succeeded, the cash was gone and
+  // the order stayed `paid` — still counted as revenue — while a retry hit
+  // `charge_already_refunded` and 500'd forever.
   const result = await query(
     `UPDATE orders SET status = 'refunded' WHERE id = $1 AND status <> 'refunded' RETURNING *`,
     [id]
   );
   if (result.rows.length === 0) {
     throw new AppError(409, 'Pedido já reembolsado.', 'ORDER_ALREADY_REFUNDED');
+  }
+
+  const stripe = getStripe();
+  try {
+    // Same key for the same order: a retry after a network blip reuses the
+    // original refund instead of issuing a second one.
+    await stripe.refunds.create(
+      { payment_intent: order.stripePaymentIntentId },
+      { idempotencyKey: `refund_${id}` }
+    );
+  } catch (err) {
+    // Put the order back the way it was, so the panel still shows the truth.
+    await query(`UPDATE orders SET status = $1 WHERE id = $2 AND status = 'refunded'`, [
+      order.status,
+      id,
+    ]).catch((e) => console.error('[order] failed to revert status after refund error', e));
+    await auditLog('order.refund_failed', actorUserId, {
+      orderId: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
   const restored = await restoreCreditForOrder(id, {
     note: 'Crédito devolvido (reembolso Stripe)',

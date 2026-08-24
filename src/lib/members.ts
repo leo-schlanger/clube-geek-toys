@@ -128,13 +128,22 @@ export async function createMember(
 }
 
 /**
+ * Updates a member. **Throws** when the server refuses.
+ *
+ * It used to swallow the failure and return `false`. Every caller sat inside a
+ * `try/catch` that could therefore never fire, so a 403 or a 500 still produced
+ * "Membro ativado até dd/mm" while the record was untouched — the admin
+ * confirmed a PIX, saw success, and the member stayed `pending` with no card
+ * and no discount. Returns `true` so the callers that branch on it still read
+ * naturally.
  */
 export async function updateMember(
   id: string,
   data: Partial<Member>
 ): Promise<boolean> {
   const result = await api.patch(`/members/${id}`, data)
-  return !result.error
+  if (result.error) throw new Error(result.error)
+  return true
 }
 
 /**

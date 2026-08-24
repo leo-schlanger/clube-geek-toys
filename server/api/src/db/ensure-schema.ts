@@ -615,7 +615,21 @@ const STEPS: SchemaStep[] = [
     // skipping them would leave `reserved` lying from the first minute.
     // One call, no parameters: Postgres wraps a multi-statement simple query in
     // an implicit transaction, so `reserved` and the flag on the order advance
-    // together. `stock_reserved = FALSE` makes a second run find nothing.
+    // together.
+    //
+    // Runs ONCE, guarded by a config key. `stock_reserved = FALSE` was not a
+    // sufficient guard: the TTL cron releases an expired hold and deliberately
+    // leaves the order `pending` (a late PIX can still be confirmed), which is
+    // exactly the shape this backfill matches. Every deploy — and the deploy
+    // does `--force-recreate api` — silently re-took holds the cron had just
+    // released, keeping stock off the shelf until the next 6am sweep.
+    const backfilled = await query(
+      `INSERT INTO config (key, value)
+       VALUES ('migration.021_stock_reservation_backfill', 'true'::jsonb)
+       ON CONFLICT (key) DO NOTHING
+       RETURNING key`
+    );
+    if (backfilled.rows.length === 0) return;
     await query(`
       UPDATE products p
          SET reserved = p.reserved + x.qty
@@ -934,10 +948,21 @@ const STEPS: SchemaStep[] = [
 
     // One-off: the only two categories that already had an icon were **both**
     // `'star'`, picked in the old `<select>` that showed the label
-    // ("K-pop / Estrela") never the drawing. Guarded by slug **and** current
-    // value so a later deliberate choice is not undone.
-    await query(`UPDATE categories SET icon = 'heart' WHERE slug = 'beleza' AND icon = 'star'`);
-    await query(`UPDATE categories SET icon = 'gift' WHERE slug = 'brinquedos' AND icon = 'star'`);
+    // ("K-pop / Estrela") never the drawing.
+    //
+    // Runs once. The `icon = 'star'` guard is not enough on its own: it also
+    // matches an admin who *deliberately* picks the star for those two slugs in
+    // the Categorias tab, and the next deploy would quietly undo her choice.
+    const iconOneOff = await query(
+      `INSERT INTO config (key, value)
+       VALUES ('migration.030_category_icon_oneoff', 'true'::jsonb)
+       ON CONFLICT (key) DO NOTHING
+       RETURNING key`
+    );
+    if (iconOneOff.rows.length > 0) {
+      await query(`UPDATE categories SET icon = 'heart' WHERE slug = 'beleza' AND icon = 'star'`);
+      await query(`UPDATE categories SET icon = 'gift' WHERE slug = 'brinquedos' AND icon = 'star'`);
+    }
     },
   },
   {
@@ -994,6 +1019,53 @@ const STEPS: SchemaStep[] = [
     await query(
       `CREATE INDEX IF NOT EXISTS idx_order_items_product ON order_items(product_id) WHERE product_id IS NOT NULL`
     );
+    },
+  },
+  {
+    name: "Missing indexes from migrations 003/010 + hot report paths (migration 034)",
+    run: async () => {
+      // Three indexes were written in migrations but never ported to
+      // `schema.sql` or to a step, so a fresh volume never got them.
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_subpayments_provider
+           ON subscription_payments(provider_payment_id)`
+      );
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_members_expiry_active
+           ON members(expiry_date, status) WHERE status = 'active'`
+      );
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_reviews_order ON product_reviews(order_id)`
+      );
+
+      // Every report filters on `COALESCE(paid_at, created_at)`, which no
+      // plain column index can serve — the dashboard was doing a sequential
+      // scan of `orders` eight times per load.
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_orders_settled_at
+           ON orders ((COALESCE(paid_at, created_at)))`
+      );
+
+      // "Minhas compras" reads (user_id OR member_id) ORDER BY created_at.
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_orders_user_created
+           ON orders(user_id, created_at DESC) WHERE user_id IS NOT NULL`
+      );
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_orders_member_created
+           ON orders(member_id, created_at DESC) WHERE member_id IS NOT NULL`
+      );
+
+      // The LGPD export matches on the address, and `email_logs` is the table
+      // that grows fastest.
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_email_logs_recipient
+           ON email_logs (lower(recipient))`
+      );
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_audit_user_ts
+           ON audit_logs(user_id, timestamp DESC) WHERE user_id IS NOT NULL`
+      );
     },
   },
 ];

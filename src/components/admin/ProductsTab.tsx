@@ -361,11 +361,20 @@ export function ProductsTab() {
                           variant="ghost"
                           size="sm"
                           onClick={async () => {
+                            // Never fall back to the list row. It is the lean
+                            // projection — no images, variants or videos — and
+                            // saving from that modal wrote the gaps back over
+                            // the real product.
                             try {
-                              const full = (await getProductForEdit(product.id)) ?? product
+                              const full = await getProductForEdit(product.id)
+                              if (!full) {
+                                toast.error('Não foi possível carregar o produto completo.')
+                                return
+                              }
                               setModal({ mode: 'edit', product: full })
-                            } catch {
-                              setModal({ mode: 'edit', product })
+                            } catch (err) {
+                              logger.error('getProductForEdit failed', err)
+                              toast.error('Não foi possível carregar o produto. Tente de novo.')
                             }
                           }}
                           className="h-8 w-8 p-0"

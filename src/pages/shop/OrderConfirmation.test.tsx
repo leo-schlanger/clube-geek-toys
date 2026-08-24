@@ -6,6 +6,9 @@ const mockClear = vi.fn()
 
 vi.mock('../../lib/orders', () => ({
   getOrderStatus: vi.fn(),
+  // The page fetches the PIX itself now — the EMV used to live only in the
+  // checkout component's state, so closing the tab lost it for good.
+  getOrderPix: vi.fn().mockResolvedValue(null),
 }))
 
 vi.mock('../../contexts/CartContext', () => ({

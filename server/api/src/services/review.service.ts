@@ -207,8 +207,16 @@ export async function createOrderReviews(
     }
 
     // Award credit once per order inside the same TX (unique index enforces 1×).
+    //
+    // The SAVEPOINT is what makes catching 23505 legal here. `creditUser` shares
+    // this client, so the duplicate-key error aborts the *whole* transaction;
+    // swallowing it and carrying on to COMMIT turned that COMMIT into a silent
+    // ROLLBACK, and the API answered 200 with reviews that were never stored.
+    // Not a rare race either: reviewing a second product of the same order is
+    // allowed, and hit the per-order index every time.
     const reward = await getReviewRewardAmount();
     if (reward > 0) {
+      await client.query('SAVEPOINT review_reward');
       try {
         newBalance = await creditUser(userId, reward, 'review_reward', {
           orderId,
@@ -217,10 +225,13 @@ export async function createOrderReviews(
           client,
         });
         creditAwarded = reward;
+        await client.query('RELEASE SAVEPOINT review_reward');
       } catch (err: unknown) {
         const e = err as { code?: string };
         if (e.code === '23505') {
-          // Concurrent review already received the reward
+          // Already rewarded for this order — undo just the credit attempt and
+          // keep the reviews.
+          await client.query('ROLLBACK TO SAVEPOINT review_reward');
           creditAwarded = 0;
           newBalance = await getBalance(userId);
         } else {

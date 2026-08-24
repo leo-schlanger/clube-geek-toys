@@ -390,12 +390,13 @@ describe('Members API client', () => {
       expect(result).toBe(true)
     })
 
-    it('should return false when API returns an error', async () => {
+    // It used to return `false`, and every caller sat in a `try/catch` that
+    // therefore never fired: a 403 still produced "salvo com sucesso" over a
+    // record that never changed.
+    it('throws when the API refuses, carrying the server message', async () => {
       mockedApi.patch.mockResolvedValue({ error: 'Not found', status: 404 })
 
-      const result = await updateMember('member-1', { fullName: 'Nope' })
-
-      expect(result).toBe(false)
+      await expect(updateMember('member-1', { fullName: 'Nope' })).rejects.toThrow('Not found')
     })
   })
 
@@ -429,12 +430,12 @@ describe('Members API client', () => {
       expect(result).toBe(true)
     })
 
-    it('should return false if patch fails', async () => {
+    // Activation is the one operation that must never report a success it did
+    // not perform — the admin reads it as "PIX conferido, membro liberado".
+    it('throws if the patch fails', async () => {
       mockedApi.patch.mockResolvedValue({ error: 'Server error', status: 500 })
 
-      const result = await activateMember('member-1')
-
-      expect(result).toBe(false)
+      await expect(activateMember('member-1')).rejects.toThrow('Server error')
     })
   })
 

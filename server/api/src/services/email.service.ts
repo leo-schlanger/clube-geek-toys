@@ -29,7 +29,8 @@ const AVAILABLE_TEMPLATES = [
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
   'order-pending-pix',
-  'admin-pix-order-pending', 'admin-order-cancelled', 'admin-daily-digest',
+  'admin-pix-order-pending', 'admin-order-cancelled', 'admin-order-disputed',
+  'admin-daily-digest',
   'event-reservation-received', 'event-tickets-ready', 'admin-event-reservation',
 ];
 
@@ -286,6 +287,26 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ? `https://shop.geeketoys.com.br/pedido/${v.order_id}`
           : 'https://shop.geeketoys.com.br/minhas-compras',
       },
+    },
+
+    /** Chargeback: the money already left the account, and the window to
+        contest it is short. */
+    'admin-order-disputed': {
+      subject: `🚨 Chargeback aberto — pedido #${v.order_number || '?'}`,
+      preheader: `Contestação de R$ ${v.amount || '0,00'}. Prazo para responder: ${v.due_by || '—'}.`,
+      body: `
+        <h2 style="color:#ef4444;margin:0 0 12px">Chargeback aberto</h2>
+        <p>O cliente contestou a cobrança no banco. O valor <strong>já saiu</strong> da conta e só volta se a disputa for ganha.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Cliente', v.customer_name || '—'],
+          ['E-mail', v.customer_email || '—'],
+          ['Valor', `<strong style="color:#ef4444">R$ ${v.amount || '0,00'}</strong>`],
+          ['Motivo', v.reason || '—'],
+          ['Responder até', `<strong>${v.due_by || '—'}</strong>`],
+        ])}
+        ${infoBox('O pedido <strong>não</strong> foi alterado automaticamente — chargeback precisa de decisão humana. Envie a evidência pelo painel do Stripe antes do prazo.')}`,
+      cta: { text: 'Abrir no Stripe', url: 'https://dashboard.stripe.com/disputes' },
     },
 
     'order-shipped': {

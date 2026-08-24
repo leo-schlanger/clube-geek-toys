@@ -31,6 +31,11 @@ export function initCronJobs() {
     } catch (err) {
       console.error('[CRON] Purge refresh sessions error:', err);
     }
+    try {
+      await purgeOldRows();
+    } catch (err) {
+      console.error('[CRON] Purge old rows error:', err);
+    }
     // Last: it reports on the state the two jobs above just left behind.
     try {
       await sendAdminDailyDigest();
@@ -86,6 +91,47 @@ async function releaseExpiredStockReservations() {
     }
   }
   console.log(`[CRON] Released ${released} expired stock reservation(s)`);
+}
+
+/**
+ * Retention.
+ *
+ * `schema.sql` documents `consumed_verification_tokens` as "cron cleans up rows
+ * older than 48h" and even creates `idx_consumed_tokens_consumed_at` for it —
+ * but that job was never written, so the table grew one row per e-mail
+ * verification, forever. Same story for the other write-only logs.
+ *
+ * `audit_logs` and `stock_movements` are deliberately absent: they carry
+ * accounting and legal value and must not be trimmed on a timer.
+ */
+async function purgeOldRows(): Promise<void> {
+  const targets: { table: string; column: string; keep: string }[] = [
+    // The whole point is one-time use; 48h is far past any live link.
+    { table: 'consumed_verification_tokens', column: 'consumed_at', keep: '48 hours' },
+    // Fed by the browser, so this is the fastest-growing and least controlled.
+    { table: 'error_logs', column: 'created_at', keep: '90 days' },
+    // Read back by the digest and the reminders — a year is well past both.
+    { table: 'email_logs', column: 'sent_at', keep: '1 year' },
+    // Stripe never re-delivers anything this old.
+    { table: 'processed_webhooks', column: 'created_at', keep: '90 days' },
+  ];
+
+  for (const t of targets) {
+    try {
+      // `to_regclass` so a volume without the table is skipped, not an error.
+      const exists = await query(`SELECT to_regclass($1) AS t`, [t.table]);
+      if (!exists.rows[0]?.t) continue;
+      const deleted = await query(
+        `DELETE FROM ${t.table} WHERE ${t.column} < NOW() - INTERVAL '${t.keep}'`
+      );
+      if (deleted.rowCount) {
+        console.log(`[CRON] Purged ${deleted.rowCount} row(s) from ${t.table}`);
+      }
+    } catch (err) {
+      // One table must not stop the rest.
+      console.error(`[CRON] Purge failed for ${t.table}:`, err);
+    }
+  }
 }
 
 /**

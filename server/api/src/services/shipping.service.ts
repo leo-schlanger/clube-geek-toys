@@ -310,7 +310,9 @@ export function getMelhorEnvioHealth(): MelhorEnvioHealth {
 }
 
 function recordMelhorEnvioFailure(status: number, body: string): void {
-  const kind = status === 401 || status === 403 ? 'auth' : 'other';
+  // 0 = never left the process (no credential at all), which is an auth problem
+  // as far as the operator is concerned.
+  const kind = status === 0 || status === 401 || status === 403 ? 'auth' : 'other';
   lastFailure = {
     at: new Date().toISOString(),
     status,
@@ -338,7 +340,14 @@ async function quoteMelhorEnvio(
 ): Promise<ShippingOption[] | null> {
   // From OAuth (with refresh) or the manual MELHOR_ENVIO_TOKEN, in that order.
   const token = await getAccessToken();
-  if (!token) return null;
+  if (!token) {
+    // Record it. `recordMelhorEnvioFailure` only ran for HTTP errors, so a
+    // missing token left `lastFailure` and `lastSuccessAt` both null and
+    // `/health` looked untested rather than broken — while every quote in
+    // production silently came off the fixed fallback table.
+    recordMelhorEnvioFailure(0, 'sem credencial: MELHOR_ENVIO_TOKEN e OAuth ausentes');
+    return null;
+  }
 
   const origin = env.SHIPPING_ORIGIN_CEP;
   const weightKg = Math.max(0.1, pkg.weightG / 1000);

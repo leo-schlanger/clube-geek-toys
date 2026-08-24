@@ -13,6 +13,7 @@ import {
   type ProductQuestion,
 } from '../../lib/questions'
 import { HelpCircle, EyeOff, Eye, Send, ExternalLink } from 'lucide-react'
+import { getShopUrl } from '../../lib/subdomain'
 
 const PAGE_SIZE = 20
 
@@ -174,7 +175,7 @@ export function QuestionsTab() {
                       {q.productName}
                       {q.productSlug && (
                         <a
-                          href={`https://shop.geekpoptoys.com.br/produto/${q.productSlug}`}
+                          href={`${getShopUrl()}/produto/${q.productSlug}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-muted-foreground hover:text-foreground"

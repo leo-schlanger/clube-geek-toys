@@ -139,10 +139,21 @@ paymentRouter.get('/', authenticate, async (req, res, next) => {
   }
 });
 
-// GET /payment/status/:paymentIntentId — query Stripe for current status
+/**
+ * GET /payment/status/:paymentId — the caller's own payment.
+ *
+ * It used to take any id from any logged-in account and answer with the amount,
+ * method and status of somebody else's payment.
+ */
 paymentRouter.get('/status/:paymentId', authenticate, async (req, res, next) => {
   try {
-    const result = await paymentService.getPaymentStatus(req.params.paymentId as string);
+    const paymentId = req.params.paymentId as string;
+    const isStaff = req.user?.role === 'admin' || req.user?.role === 'seller';
+    if (!isStaff && !(await paymentService.userOwnsPayment(req.user!.userId, paymentId))) {
+      res.status(404).json({ error: 'Pagamento não encontrado.' });
+      return;
+    }
+    const result = await paymentService.getPaymentStatus(paymentId);
     res.json(result);
   } catch (err) {
     next(err);

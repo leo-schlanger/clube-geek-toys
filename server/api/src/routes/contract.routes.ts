@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import * as contractService from '../services/contract.service.js';
 import { query } from '../config/database.js';
+import { AppError } from '../middleware/error-handler.js';
 
 const contractBodySchema = z.object({
   memberId: z.string().uuid(),
@@ -22,9 +23,21 @@ const contractBodySchema = z.object({
 export const contractRouter = Router();
 contractRouter.use(authenticate);
 
+/** The directory name is a member UUID and nothing else. */
+const MEMBER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const memberId = req.body.memberId || req.params.memberId || 'unknown';
+    // `destination` runs BEFORE `verifyMemberOwnership` and before the %PDF
+    // magic-byte check, on a value that comes straight from the multipart body.
+    // A `memberId` of `../../../x` therefore wrote a file anywhere the container
+    // could reach, and the rejection path only unlinks the final path — the file
+    // was already on disk. Refuse anything that is not a plain UUID.
+    const memberId = req.body?.memberId || req.params?.memberId;
+    if (typeof memberId !== 'string' || !MEMBER_ID_RE.test(memberId)) {
+      cb(new AppError(400, 'memberId inválido.', 'INVALID_MEMBER_ID'), '');
+      return;
+    }
     const dir = path.join('/app/uploads/contracts', memberId);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);

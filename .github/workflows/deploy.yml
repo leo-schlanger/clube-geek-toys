@@ -28,6 +28,24 @@ jobs:
       - name: Typecheck
         run: npx tsc -b
 
+      # `tsc -b` resolves tsconfig.json → tsconfig.app.json, whose `include` is
+      # `src` only: the entire backend went unchecked here and a type error in
+      # it surfaced mid-deploy, inside `docker compose build --no-cache`, with
+      # the rsync already done. Seconds here, a broken deploy there.
+      - name: Typecheck backend
+        run: npm --prefix server/api run build
+
+      # The deploy ran 2.278 tests' worth of nothing: no test step existed, so
+      # the only automatic barrier between a commit and production was the type
+      # checker. `test:api` is the cheap half (~40s, no jsdom) and covers the
+      # code that moves money. `test:web` stays out — it is the slow one and
+      # belongs in a separate job.
+      - name: API tests
+        run: npm run test:api
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build frontend
         env:
           VITE_API_URL: https://api.geeketoys.com.br

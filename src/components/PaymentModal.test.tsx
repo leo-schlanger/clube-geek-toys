@@ -417,7 +417,13 @@ describe('PaymentModal', () => {
     })
   })
 
-  it('does not resume expired pending payment', () => {
+  /**
+   * A static PIX BR Code has no validity window — `expiresAt` only says how
+   * long we keep polling. Refusing to restore it threw away the member's one
+   * copy of a payable code and sent them to generate another, which also meant
+   * a second row in `payments` and a second "CGT…" on the bank statement.
+   */
+  it('resumes a pending payment even past its expiry — the code is still payable', () => {
     const pending: PendingPaymentInfo = {
       paymentId: 'pi_expired',
       qrCode: 'old-code',
@@ -427,7 +433,7 @@ describe('PaymentModal', () => {
     }
 
     renderModal({ initialPendingPayment: pending })
-    expect(screen.queryByTestId('qr-code')).not.toBeInTheDocument()
+    expect(screen.getByTestId('qr-code')).toBeInTheDocument()
   })
 
   // ── Timer ──

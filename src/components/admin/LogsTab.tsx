@@ -5,6 +5,8 @@ import { Button } from '../ui/button'
 import { FileText, Clock, AlertTriangle, Bug, Monitor, Server, RefreshCw } from 'lucide-react'
 import type { AuditLog, ErrorLog, ErrorStats } from '../../lib/logs'
 import { getErrorLogs, getErrorStats } from '../../lib/logs'
+import { toast } from 'sonner'
+import { logger } from '../../lib/logger'
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   member_activated: { label: 'Membro Ativado', color: 'text-green-500' },
@@ -64,8 +66,11 @@ export function LogsTab({
       ])
       setErrorLogs(logsData)
       setErrorStats(statsData)
-    } catch {
-      // Silently fail
+    } catch (err) {
+      // An empty list used to read as "no errors" when the call itself broke —
+      // the worst possible lie for the tab whose whole job is showing errors.
+      logger.error('Failed to load error logs', err)
+      toast.error('Não foi possível carregar os logs de erro.')
     } finally {
       setLoadingErrors(false)
     }

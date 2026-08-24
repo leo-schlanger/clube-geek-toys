@@ -126,7 +126,7 @@ logRouter.get('/errors', async (req, res, next) => {
 });
 
 // GET /logs/errors/stats
-logRouter.get('/errors/stats', async (req, res, next) => {
+logRouter.get('/errors/stats', async (_req, res, next) => {
   try {
     const result = await logService.getErrorStats();
     res.json(result);

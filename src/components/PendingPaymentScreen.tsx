@@ -6,6 +6,7 @@ import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { PaymentModal } from './PaymentModal'
 import { ContractModal } from './ContractModal'
+import { logger } from '../lib/logger'
 import { updateMember, clearPendingPayment } from '../lib/members'
 import { checkPixPaymentStatus, isPaymentConfigured } from '../lib/payments'
 import { getMemberContract } from '../lib/contract-storage'
@@ -111,19 +112,20 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
     const newExpiry = new Date(now)
     newExpiry.setMonth(newExpiry.getMonth() + 1)
 
-    // Update member status to active
-    const success = await updateMember(member.id, {
-      status: 'active',
-      startDate: now.toISOString().split('T')[0],
-      expiryDate: newExpiry.toISOString().split('T')[0],
-    })
-
-    if (success) {
+    // Update member status to active. `updateMember` throws on refusal — the
+    // money is already in, so a failure here has to be visible, not swallowed.
+    try {
+      await updateMember(member.id, {
+        status: 'active',
+        startDate: now.toISOString().split('T')[0],
+        expiryDate: newExpiry.toISOString().split('T')[0],
+      })
       toast.success('Pagamento confirmado! Bem-vindo ao Clube GeekPop & Toys!')
       setShowPayment(false)
       onPaymentSuccess()
-    } else {
-      toast.error('Erro ao ativar assinatura. Entre em contato com o suporte.')
+    } catch (error) {
+      logger.error('Activation after payment failed:', error)
+      toast.error('Pagamento recebido, mas a ativação falhou. Fale com o suporte.')
     }
   }
 
