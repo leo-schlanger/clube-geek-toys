@@ -32,6 +32,13 @@ jobs:
       # `src` only: the entire backend went unchecked here and a type error in
       # it surfaced mid-deploy, inside `docker compose build --no-cache`, with
       # the rsync already done. Seconds here, a broken deploy there.
+      #
+      # The backend has its own package.json, so the root `npm ci` leaves it
+      # without node_modules — without this install the check fails on
+      # "Cannot find module 'pg'" rather than on anything real.
+      - name: Install backend dependencies
+        run: npm ci --prefix server/api
+
       - name: Typecheck backend
         run: npm --prefix server/api run build
 
