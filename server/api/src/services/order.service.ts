@@ -8,8 +8,6 @@ import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
 import { recordMovement, recordOrderMovements } from './stock.service.js';
 import {
-  MEMBER_SHOP_DISCOUNT,
-  MEMBER_DISCOUNT_REASON,
   WHOLESALE_SHOP_DISCOUNT,
   type DeliveryMethod,
   type Order,
@@ -31,6 +29,16 @@ import { redeemForOrder, restoreCreditForOrder } from './store-credit.service.js
 import { sendTemplateEmail } from './email.service.js';
 import { getApprovedAccountByUserId, isWholesaleSalesOpen } from './wholesale.service.js';
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
+import {
+  checkCoupon,
+  claimCoupon,
+  couponReason,
+  getShopPromo,
+  pickBestDiscount,
+  recordRedemption,
+  releaseCoupon,
+  retailDiscountCandidates,
+} from './promo.service.js';
 
 const PIX_KEY = env.PIX_KEY || '';
 const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
@@ -186,6 +194,8 @@ export interface CreateOrderInput {
   channel?: ShopChannel;
   /** Required on wholesale channel; must match the approved account CNPJ. */
   cnpj?: string;
+  /** Optional coupon code. Competes with the member and online discounts; the largest wins. */
+  couponCode?: string;
 }
 
 export interface CreateOrderResult {
@@ -338,9 +348,18 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   const aggregatedItems = [...qtyByKey.values()];
   // Note: shipping quote token was validated against the client cart lines above (input.items).
 
+  // Read outside the transaction: it is a cached settings lookup, and holding
+  // a transaction open across it would only lengthen the lock on the products.
+  const shopPromo = await getShopPromo();
+
   const client = await getClient();
   let orderId: string;
   let order: Order;
+  /** Set only when a coupon actually paid for this order, so the charge-failure
+   *  path knows whether there is a use to hand back. */
+  let couponClaimedId: string | null = null;
+  let couponDiscountAmount = 0;
+  let appliedCoupon: { id: string; code: string; percent: number } | null = null;
   try {
     await client.query('BEGIN');
 
@@ -471,17 +490,67 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     }
     subtotal = round2(subtotal);
 
-    // Discounts: wholesale_25 XOR member_10 (never both).
-    const wholesaleDiscount = isWholesale ? round2(subtotal * WHOLESALE_SHOP_DISCOUNT) : 0;
-    const memberDiscount = !isWholesale && memberId ? round2(subtotal * MEMBER_SHOP_DISCOUNT) : 0;
-    const baseDiscount = isWholesale ? wholesaleDiscount : memberDiscount;
-    const baseReason: string | null = isWholesale
-      ? wholesaleDiscount > 0
-        ? 'wholesale_25'
-        : null
-      : memberDiscount > 0
-        ? MEMBER_DISCOUNT_REASON
-        : null;
+    // Judged here and not earlier: `min_subtotal` needs the basket to exist.
+    // The read runs on the pool rather than this transaction on purpose — it is
+    // advisory. `claimCoupon` below is the binding check.
+    const rawCoupon = input.couponCode?.trim();
+    if (rawCoupon && !isWholesale) {
+      const check = await checkCoupon(rawCoupon, {
+        subtotal,
+        customerEmail: input.customer.email,
+        userId: user?.userId ?? null,
+      });
+      if (!check.ok) {
+        throw new AppError(400, check.message, check.code);
+      }
+      appliedCoupon = {
+        id: check.coupon.id,
+        code: check.coupon.code,
+        percent: check.coupon.percent,
+      };
+    }
+
+    // Discounts. Exactly one is applied, ever.
+    //
+    // Wholesale replaces the whole set with its own 25%; that channel never
+    // sees a coupon or the online promotion. On retail, the member discount,
+    // the online promotion and the coupon are candidates and the **largest
+    // one wins** — the customer pays the best price on offer and the order
+    // still explains itself with one short `discount_reason`.
+    let baseDiscount: number;
+    let baseReason: string | null;
+
+    if (isWholesale) {
+      baseDiscount = round2(subtotal * WHOLESALE_SHOP_DISCOUNT);
+      baseReason = baseDiscount > 0 ? 'wholesale_25' : null;
+    } else {
+      const best = pickBestDiscount(
+        retailDiscountCandidates({
+          isMember: memberId != null,
+          promo: shopPromo,
+          couponPercent: appliedCoupon?.percent ?? null,
+          couponCode: appliedCoupon?.code ?? null,
+        })
+      );
+      baseDiscount = best ? round2(subtotal * (best.percent / 100)) : 0;
+      baseReason = best && baseDiscount > 0 ? best.reason : null;
+
+      // The coupon only gets taken when it is the one that actually paid.
+      // Burning a use for a code that lost to the member discount would spend
+      // a single-use coupon on nothing.
+      if (appliedCoupon && baseReason === couponReason(appliedCoupon.code)) {
+        const claimed = await claimCoupon(client, appliedCoupon.id);
+        if (!claimed) {
+          throw new AppError(
+            409,
+            'Este cupom acabou de esgotar. Remova o cupom e tente de novo.',
+            'COUPON_EXHAUSTED'
+          );
+        }
+        couponClaimedId = appliedCoupon.id;
+        couponDiscountAmount = baseDiscount;
+      }
+    }
     const goodsAfterDiscount = round2(subtotal - baseDiscount);
     // Provisional total without store credit (shipping never discounted).
     let discount = baseDiscount;
@@ -525,6 +594,18 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     );
     order = mapOrder(orderResult.rows[0]);
     orderId = order.id;
+
+    // The use was already taken above; this is the row that says who took it,
+    // and it is what a per-customer limit counts.
+    if (couponClaimedId) {
+      await recordRedemption(client, {
+        couponId: couponClaimedId,
+        orderId,
+        userId: user?.userId ?? null,
+        customerEmail: input.customer.email,
+        discountAmount: couponDiscountAmount,
+      });
+    }
 
     for (const it of itemRows) {
       await client.query(
@@ -682,6 +763,14 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     await restoreCreditForOrder(orderId, {
       note: 'Crédito devolvido (falha ao criar cobrança)',
     }).catch((e) => console.error('[order] credit restore after charge fail', e));
+    // The use was taken inside the committed transaction, so a charge that
+    // never came into being would otherwise burn a single-use coupon on an
+    // order the customer never got to pay.
+    if (couponClaimedId) {
+      await releaseCoupon(couponClaimedId).catch((e) =>
+        console.error('[order] coupon release after charge fail', e)
+      );
+    }
     await auditLog('order.create_failed', orderUserId, {
       orderId,
       error: err instanceof Error ? err.message : String(err),

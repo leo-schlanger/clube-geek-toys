@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     that somehow goes uncovered leaves a trail instead of clamping silently.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock, shopPromoMock, checkCouponMock, claimCouponMock, recordRedemptionMock, releaseCouponMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -33,6 +33,11 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     restoreCreditMock: vi.fn(),
     recordOrderMovementsMock: vi.fn(async () => {}),
     recordMovementMock: vi.fn(async () => {}),
+    shopPromoMock: vi.fn(),
+    checkCouponMock: vi.fn(),
+    claimCouponMock: vi.fn(),
+    recordRedemptionMock: vi.fn(async () => {}),
+    releaseCouponMock: vi.fn(async () => {}),
   }));
 
 vi.mock('../config/database.js', () => ({
@@ -100,6 +105,23 @@ vi.mock('./stock.service.js', () => ({
 }));
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
+
+/**
+ * Only the database-touching half is faked. `pickBestDiscount` and
+ * `retailDiscountCandidates` stay real — they *are* the rule these tests are
+ * here to protect, and stubbing them would leave the money decision untested.
+ */
+vi.mock('./promo.service.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./promo.service.js')>();
+  return {
+    ...actual,
+    getShopPromo: shopPromoMock,
+    checkCoupon: checkCouponMock,
+    claimCoupon: claimCouponMock,
+    recordRedemption: recordRedemptionMock,
+    releaseCoupon: releaseCouponMock,
+  };
+});
 
 import {
   createOrder,
@@ -244,6 +266,16 @@ beforeEach(() => {
     price: 24,
     days: 8,
   });
+  // Off by default: the tests below this line predate the online promotion and
+  // are about shipping, membership and store credit. The promotion has its own
+  // block at the bottom, where it is switched on deliberately.
+  shopPromoMock.mockResolvedValue({
+    enabled: false,
+    percent: 0,
+    bannerEnabled: false,
+    bannerText: '',
+  });
+  claimCouponMock.mockResolvedValue(true);
 });
 
 // ─── Pricing and discounts ───────────────────────────────────────────────────
@@ -1106,5 +1138,205 @@ describe('setOrderTracking — retirada não tem postagem', () => {
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({ template: 'order-shipped' })
     );
+  });
+});
+
+// ─── Online promotion and coupons ────────────────────────────────────────────
+
+/**
+ * The rule, in one line: **exactly one discount is applied, and it is the
+ * largest on offer.**
+ *
+ * `orders` carries a single `discount` and a single `discount_reason`, and
+ * wholesale already behaved as "25% instead of, never on top of, member 10%".
+ * The online promotion and coupons join that same contest rather than opening
+ * a second discount slot, so the customer always pays the best price and any
+ * order can still explain its price with one short string.
+ */
+describe('createOrder — promoção da loja online', () => {
+  function promoOn(percent = 5) {
+    shopPromoMock.mockResolvedValue({
+      enabled: true,
+      percent,
+      bannerEnabled: true,
+      bannerText: 'No site é mais barato',
+    });
+  }
+
+  /** An active member, which is what earns the 10%. */
+  function asMember() {
+    memberIdMock.mockResolvedValue('m1');
+    queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] });
+    return { userId: 'u1', role: 'member' } as never;
+  }
+
+  it('gives a non-member the online discount', async () => {
+    promoOn(5);
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput());
+
+    const v = insertedOrderValues();
+    expect(v[COL.subtotal]).toBe(100);
+    expect(v[COL.discount]).toBe(5);
+    expect(v[COL.discountReason]).toBe('online');
+    expect(v[COL.total]).toBe(119); // 100 - 5 + 24 de frete
+  });
+
+  // The decision taken with the client: the site discount is a floor for people
+  // who are not members, not a bonus on top of the club.
+  it('does not stack with the member discount — the larger one wins', async () => {
+    promoOn(5);
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput(), asMember());
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(10);
+    expect(v[COL.discountReason]).toBe('member_10');
+  });
+
+  // Same rule seen from the other side: when the promotion is the better offer
+  // it beats the membership, so a member is never worse off than a stranger.
+  it('beats the member discount when the promotion is larger', async () => {
+    promoOn(20);
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput(), asMember());
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(20);
+    expect(v[COL.discountReason]).toBe('online');
+  });
+
+  it('never reaches the wholesale channel', async () => {
+    promoOn(30);
+    approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '19131243000197' });
+    setupTx({ products: [product({ price: '100.00', wholesale_enabled: true })] });
+
+    await createOrder(
+      baseInput({ channel: 'wholesale', cnpj: '19.131.243/0001-97' }),
+      { userId: 'u1', role: 'member' } as never
+    );
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(25);
+    expect(v[COL.discountReason]).toBe('wholesale_25');
+  });
+
+  it('is off when the percentage is zero, instead of writing a discount of nothing', async () => {
+    shopPromoMock.mockResolvedValue({
+      enabled: true,
+      percent: 0,
+      bannerEnabled: false,
+      bannerText: '',
+    });
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput());
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(0);
+    expect(v[COL.discountReason]).toBeNull();
+  });
+});
+
+describe('createOrder — cupons', () => {
+  function couponFound(over: Record<string, unknown> = {}) {
+    checkCouponMock.mockResolvedValue({
+      ok: true,
+      coupon: {
+        id: 'c1',
+        code: 'VERAO20',
+        percent: 20,
+        description: null,
+        active: true,
+        startsAt: null,
+        endsAt: null,
+        maxUses: null,
+        usedCount: 0,
+        maxUsesPerCustomer: null,
+        minSubtotal: null,
+        createdAt: '',
+        updatedAt: '',
+        ...over,
+      },
+    });
+  }
+
+  it('applies the coupon and names it on the order', async () => {
+    couponFound();
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput({ couponCode: 'verao20' }));
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(20);
+    expect(v[COL.discountReason]).toBe('coupon_VERAO20');
+    expect(claimCouponMock).toHaveBeenCalledWith(expect.anything(), 'c1');
+    expect(recordRedemptionMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ couponId: 'c1', orderId: 'o1', discountAmount: 20 })
+    );
+  });
+
+  // A single-use code spent on an order it did not pay for would be gone for
+  // nothing — the customer had a better discount all along.
+  it('does not spend a use when the coupon loses to the member discount', async () => {
+    couponFound({ code: 'MINI3', percent: 3 });
+    memberIdMock.mockResolvedValue('m1');
+    queryMock.mockResolvedValue({ rows: [{ id: 'm1' }] });
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput({ couponCode: 'MINI3' }), { userId: 'u1', role: 'member' } as never);
+
+    const v = insertedOrderValues();
+    expect(v[COL.discount]).toBe(10);
+    expect(v[COL.discountReason]).toBe('member_10');
+    expect(claimCouponMock).not.toHaveBeenCalled();
+    expect(recordRedemptionMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses the order when the coupon does not apply', async () => {
+    checkCouponMock.mockResolvedValue({
+      ok: false,
+      code: 'COUPON_EXPIRED',
+      message: 'Este cupom expirou.',
+    });
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await expect(createOrder(baseInput({ couponCode: 'VELHO' }))).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'COUPON_EXPIRED',
+    });
+  });
+
+  // The advisory check and the binding claim are different moments; two people
+  // spending the last use at once both pass the first and only one passes here.
+  it('refuses when the last use is taken between the check and the claim', async () => {
+    couponFound();
+    claimCouponMock.mockResolvedValue(false);
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await expect(createOrder(baseInput({ couponCode: 'VERAO20' }))).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'COUPON_EXHAUSTED',
+    });
+  });
+
+  it('ignores a coupon sent on the wholesale channel', async () => {
+    couponFound({ percent: 80 });
+    approvedAccountMock.mockResolvedValue({ id: 'w1', cnpj: '19131243000197' });
+    setupTx({ products: [product({ price: '100.00', wholesale_enabled: true })] });
+
+    await createOrder(
+      baseInput({ channel: 'wholesale', cnpj: '19.131.243/0001-97', couponCode: 'VERAO20' }),
+      { userId: 'u1', role: 'member' } as never
+    );
+
+    const v = insertedOrderValues();
+    expect(v[COL.discountReason]).toBe('wholesale_25');
+    expect(checkCouponMock).not.toHaveBeenCalled();
+    expect(claimCouponMock).not.toHaveBeenCalled();
   });
 });

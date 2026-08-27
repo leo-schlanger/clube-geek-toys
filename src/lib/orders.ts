@@ -27,6 +27,8 @@ export interface CreateOrderPayload {
   paymentMethod: 'pix' | 'credit_card'
   applyStoreCredit?: boolean
   channel?: 'retail' | 'wholesale'
+  /** Competes with the member and site discounts; the largest one wins. */
+  couponCode?: string
   cnpj?: string
 }
 

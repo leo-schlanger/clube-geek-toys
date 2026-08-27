@@ -82,6 +82,7 @@ import { wholesaleRouter } from './wholesale.routes.js';
 import { contractRouter } from './contract.routes.js';
 import { authRouter } from './auth.routes.js';
 import { productRouter } from './product.routes.js';
+import { promoRouter } from './promo.routes.js';
 import { eventRouter } from './event.routes.js';
 import { galleryRouter } from './gallery.routes.js';
 import { reviewRouter } from './review.routes.js';
@@ -155,6 +156,7 @@ const ROUTERS: [string, Router][] = [
   ['/contracts', contractRouter],
   ['/auth', authRouter],
   ['/products', productRouter],
+  ['/promo', promoRouter],
   ['/events', eventRouter],
   ['/gallery', galleryRouter],
   ['/reviews', reviewRouter],
@@ -203,6 +205,11 @@ const PUBLIC = new Set([
   'GET /questions/product/:slugOrId',
   'GET /gallery',
   'GET /gallery/:slug',
+
+  // ── A promoção e o cupom: o aviso pinta antes de qualquer login, e o
+  //    checkout de convidado precisa conferir o código antes de fechar ──
+  'GET /promo',
+  'POST /promo/coupon-check',
 
   // ── Checkout de convidado ──
   'POST /orders',
@@ -268,6 +275,7 @@ const PUBLIC_WITHOUT_THROTTLE = new Set([
   'GET /products/categories',
   'GET /products/sitemap.xml',
   'GET /events/active', // Cache-Control de 60s
+  'GET /promo', // idem: o aviso é lido em toda página da loja, com Cache-Control de 60s
   'GET /wholesale/status', // devolve um booleano
 ]);
 
