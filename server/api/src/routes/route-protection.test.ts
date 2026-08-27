@@ -320,6 +320,19 @@ describe('contrato de proteção das rotas', () => {
     }
   );
 
+  /**
+   * O catálogo do painel devolve produtos **inativos** — é para isso que ele
+   * existe, já que a lista pública é fixada em `active = TRUE` e sumia com o
+   * produto salvo desmarcado. Justamente por isso não pode escorregar para
+   * público: seria o rascunho da loja aberto na rua.
+   */
+  it('o catálogo do painel, que mostra inativos, é só de admin', () => {
+    const e = find('GET', '/products/admin/catalog');
+    expect(e, 'rota do catálogo do painel não encontrada').toBeDefined();
+    expect(hasAuth(e!)).toBe(true);
+    expect(rolesOf(e!)).toContain('admin');
+  });
+
   it('a listagem de pedidos do admin não é a mesma coisa que a do cliente', () => {
     expect(rolesOf(find('GET', '/orders')!)).toContain('admin');
     // A lista do cliente deriva o id do JWT, nunca da URL.
