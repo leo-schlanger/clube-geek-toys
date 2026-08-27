@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ImageOff, Sparkles } from 'lucide-react'
-import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
+import { resolveShopDiscount } from '../../lib/shop-discount'
+import { useShopPromo } from '../../hooks/useShopPromo'
 import { formatCurrency } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
@@ -18,15 +19,15 @@ export default function Cart() {
   const base = isWholesale ? '/atacado' : ''
   const productPrefix = isWholesale ? '/atacado/produto' : '/produto'
 
-  const discountFrac = isWholesale
-    ? isWholesaleApproved
-      ? WHOLESALE_SHOP_DISCOUNT
-      : 0
-    : isMember
-      ? MEMBER_SHOP_DISCOUNT
-      : 0
-  const estimatedDiscount = subtotal * discountFrac
-  const estimatedTotal = subtotal - estimatedDiscount
+  // Same shared rule as the drawer and the checkout — see lib/shop-discount.
+  const { promo } = useShopPromo()
+  const discount = resolveShopDiscount({
+    subtotal,
+    isWholesale,
+    isWholesaleApproved,
+    isMember,
+    promo,
+  })
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,25 +151,25 @@ export default function Cart() {
                       <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                     </div>
 
-                    {discountFrac > 0 ? (
+                    {discount.amount > 0 ? (
                       <>
                         <div className="flex items-center justify-between text-green-600">
                           <span className="flex items-center gap-1.5">
-                            {isWholesale ? (
-                              <span className="text-sm font-medium">Desconto atacado (25%)</span>
-                            ) : (
+                            {discount.reason === 'member_10' ? (
                               <MemberDiscountBadge />
+                            ) : (
+                              <span className="text-sm font-medium">{discount.label}</span>
                             )}
                           </span>
                           <span className="tabular-nums">
-                            -{formatCurrency(estimatedDiscount)}
+                            -{formatCurrency(discount.amount)}
                           </span>
                         </div>
                         <div className="h-px bg-border" />
                         <div className="flex justify-between text-base font-semibold">
                           <span>Total estimado</span>
                           <span className="tabular-nums">
-                            {formatCurrency(estimatedTotal)}
+                            {formatCurrency(discount.total)}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">

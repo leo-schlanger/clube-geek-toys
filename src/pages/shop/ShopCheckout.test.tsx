@@ -4,6 +4,16 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 const mockNavigate = vi.fn()
+// The promotion arrives from the API. These tests predate it and are about the
+// basket, the address and the shipping quote, so it is switched off here; the
+// promotion has its own tests in lib/shop-discount.test.ts.
+vi.mock('../../hooks/useShopPromo', () => ({
+  useShopPromo: () => ({
+    promo: { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' },
+    loading: false,
+  }),
+}))
+
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>()
   return {

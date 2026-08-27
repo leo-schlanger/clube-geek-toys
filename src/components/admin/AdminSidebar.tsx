@@ -24,6 +24,7 @@ import {
   HelpCircle,
   Images,
   Ticket,
+  TicketPercent,
   Tags,
   CalendarDays,
   LogOut,
@@ -39,6 +40,7 @@ export type AdminTab =
   | 'members'
   | 'products'
   | 'categories'
+  | 'coupons'
   | 'stock'
   | 'orders'
   | 'wholesale'
@@ -66,6 +68,7 @@ const menuItems: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: 'stock', label: 'Estoque', icon: Boxes },
   { id: 'orders', label: 'Pedidos', icon: ClipboardList },
   { id: 'wholesale', label: 'Atacado', icon: Building2 },
+  { id: 'coupons', label: 'Cupons', icon: TicketPercent },
   { id: 'reviews', label: 'Avaliações', icon: Star },
   { id: 'questions', label: 'Perguntas', icon: HelpCircle },
   { id: 'event-config', label: 'Eventos', icon: CalendarDays },

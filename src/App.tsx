@@ -13,6 +13,7 @@ import { CartProvider } from './contexts/CartContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { getAppMode } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
+import { ShopPromoBanner } from './components/store/ShopPromoBanner'
 import { ScrollToTop } from './components/store/ScrollToTop'
 
 function ThemedToaster() {
@@ -272,6 +273,8 @@ function ShopRoutes() {
     <CartProvider>
       <ScrollToTop />
       <EventAnnouncementBanner />
+      {/* Below the event: a date on the calendar outranks a standing price rule. */}
+      <ShopPromoBanner />
       <Routes>
         <Route path="/" element={<ShopHome />} />
         <Route path="/categoria/:slug" element={<ShopHome />} />

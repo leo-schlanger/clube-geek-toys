@@ -37,6 +37,25 @@ export const SETTINGS_CATALOGUE: SettingDefinition[] = [
   // Wholesale channel. Registration is always open (the CNPJ list is the point); orders are only
   // accepted once the store is actually selling B2B. Off = /atacado is a waiting list.
   { key: 'wholesale.sales_open', default: false, type: 'boolean', description: 'Atacado vendendo (desligado: só cadastro de CNPJ)' },
+
+  // ─── Promoção da loja online ────────────────────────────────────────────────
+  //
+  // O pedido do cliente é "no site é 5% mais barato que na loja". A loja física
+  // não passa por este sistema (o PDV só verifica carteirinha, não registra
+  // venda), então isto não é uma comparação que o código consiga fazer: é um
+  // desconto no canal online mais o aviso que explica o porquê.
+  //
+  // Mora aqui, e não numa constante, porque o pedido era ser configurável: uma
+  // chave no catálogo já aparece editável na aba Configurações, sem deploy.
+  { key: 'shop.online_discount_enabled', default: true, type: 'boolean', description: 'Promoção da loja online ligada' },
+  { key: 'shop.online_discount_percent', default: 5, type: 'number', description: 'Desconto da loja online (%)' },
+  { key: 'shop.online_discount_banner_enabled', default: true, type: 'boolean', description: 'Mostrar o aviso da promoção no topo da loja' },
+  {
+    key: 'shop.online_discount_banner_text',
+    default: 'No site é 5% mais barato que na loja física — desconto aplicado no carrinho.',
+    type: 'string',
+    description: 'Texto do aviso da promoção',
+  },
 ];
 
 const definitionByKey = new Map(SETTINGS_CATALOGUE.map((d) => [d.key, d]));

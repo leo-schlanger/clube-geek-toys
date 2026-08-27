@@ -1068,6 +1068,87 @@ const STEPS: SchemaStep[] = [
       );
     },
   },
+  {
+    name: "Shop promotions — coupon codes and their redemptions",
+    run: async () => {
+      // `code` is capped at 20 chars on purpose. `orders.discount_reason` is
+      // VARCHAR(40) and the longest reason this feature can write is
+      // `coupon_<CODE>+store_credit` — 20 characters of prefix and suffix
+      // around the code. A longer code would be silently truncated by
+      // Postgres and the order would no longer say which coupon paid for it.
+      await query(`
+        CREATE TABLE IF NOT EXISTS coupons (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          code VARCHAR(20) NOT NULL,
+          description VARCHAR(200),
+          percent NUMERIC(5,2) NOT NULL,
+          active BOOLEAN NOT NULL DEFAULT TRUE,
+          starts_at TIMESTAMPTZ,
+          ends_at TIMESTAMPTZ,
+          max_uses INTEGER,
+          used_count INTEGER NOT NULL DEFAULT 0,
+          max_uses_per_customer INTEGER,
+          min_subtotal NUMERIC(10,2),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      // Codes are matched case-insensitively — someone typing "verao10" must
+      // hit the coupon created as "VERAO10".
+      await query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_coupons_code ON coupons (upper(code))`
+      );
+      await query(`
+        ALTER TABLE coupons
+          DROP CONSTRAINT IF EXISTS chk_coupons_percent
+      `);
+      await query(`
+        ALTER TABLE coupons
+          ADD CONSTRAINT chk_coupons_percent CHECK (percent > 0 AND percent <= 90)
+      `);
+      await query(`
+        ALTER TABLE coupons
+          DROP CONSTRAINT IF EXISTS chk_coupons_window
+      `);
+      // An end before the start would be a coupon that can never be used, and
+      // the reason would be invisible in the panel.
+      await query(`
+        ALTER TABLE coupons
+          ADD CONSTRAINT chk_coupons_window
+          CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at > starts_at)
+      `);
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_coupons_active ON coupons(active, ends_at)`
+      );
+
+      await query(`
+        CREATE TABLE IF NOT EXISTS coupon_redemptions (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          coupon_id UUID NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
+          order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          customer_email VARCHAR(255),
+          discount_amount NUMERIC(10,2) NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      // One redemption row per order: the claim is what enforces `max_uses`,
+      // so a retry that reached the INSERT twice must not count twice.
+      await query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_coupon_redemptions_order
+           ON coupon_redemptions(order_id)`
+      );
+      // "How many times has this person used this code?" is the per-customer cap.
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_customer
+           ON coupon_redemptions(coupon_id, lower(customer_email))`
+      );
+      await query(
+        `CREATE INDEX IF NOT EXISTS idx_coupon_redemptions_user
+           ON coupon_redemptions(coupon_id, user_id) WHERE user_id IS NOT NULL`
+      );
+    },
+  },
 ];
 
 let state: SchemaState = {

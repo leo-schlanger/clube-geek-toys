@@ -6,6 +6,16 @@ const mockSetQuantity = vi.fn()
 const mockRemoveItem = vi.fn()
 const mockUseCart = vi.fn()
 
+// The promotion arrives from the API. These tests predate it and are about the
+// basket, the address and the shipping quote, so it is switched off here; the
+// promotion has its own tests in lib/shop-discount.test.ts.
+vi.mock('../../hooks/useShopPromo', () => ({
+  useShopPromo: () => ({
+    promo: { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' },
+    loading: false,
+  }),
+}))
+
 vi.mock('../../contexts/CartContext', () => ({
   useCart: () => mockUseCart(),
 }))
