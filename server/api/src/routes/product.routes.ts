@@ -41,6 +41,10 @@ productRouter.get('/categories/all', authenticate, requireRole('admin'), async (
 // created it, and a duplicate (which is born inactive by design) was lost the
 // moment its modal closed. There was no way back to either without SQL.
 //
+// Inactive, but still not the `checkup%` seed rows: those are excluded from the
+// reports, the stock screen and the sitemap too, and the panel is a catalogue,
+// not a QA log.
+//
 // Declared before '/:slug' so "admin" is not captured as a product slug.
 productRouter.get('/admin/catalog', authenticate, requireRole('admin'), async (req, res, next) => {
   try {
