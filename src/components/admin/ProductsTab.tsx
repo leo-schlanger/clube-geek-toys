@@ -15,7 +15,8 @@ import {
   getProductForEdit,
 } from '../../lib/products'
 import { formatCurrency } from '../../lib/utils'
-import { logger } from '../../lib/logger'
+import { errorMessage } from '../../lib/api-client'
+import { reportAdminError } from '../../lib/admin-errors'
 import { toast } from 'sonner'
 import { Plus, Search, Package, Pencil, Trash2, Star, ImageOff, Copy, FolderTree } from 'lucide-react'
 import { parseProductSort, ADMIN_CATALOG_PAGE_SIZE, type ProductSort } from '../../lib/product-sort'
@@ -67,8 +68,8 @@ export function ProductsTab() {
       }
       setCategories(cats)
     } catch (error) {
-      logger.error('Error fetching products:', error)
-      toast.error('Erro ao carregar produtos')
+      reportAdminError('product.list', error)
+      toast.error(errorMessage(error, 'Erro ao carregar produtos'))
     }
     setLoading(false)
   }, [sort, debouncedSearch, page, pageSize])
@@ -77,7 +78,7 @@ export function ProductsTab() {
     try {
       setCategories(await listCategories())
     } catch (error) {
-      logger.error('Error fetching categories:', error)
+      reportAdminError('category.list', error)
     }
   }, [])
 
@@ -90,16 +91,12 @@ export function ProductsTab() {
     async (product: Product) => {
       if (!window.confirm(`Desativar o produto "${product.name}"?`)) return
       try {
-        const ok = await deleteProduct(product.id)
-        if (ok) {
-          toast.success('Produto desativado')
-          fetchProducts()
-        } else {
-          toast.error('Erro ao desativar produto')
-        }
+        await deleteProduct(product.id)
+        toast.success('Produto desativado')
+        fetchProducts()
       } catch (error) {
-        logger.error('Error deleting product:', error)
-        toast.error('Erro ao desativar produto')
+        reportAdminError('product.deactivate', error)
+        toast.error(errorMessage(error, 'Erro ao desativar produto'))
       }
     },
     [fetchProducts]
@@ -108,16 +105,12 @@ export function ProductsTab() {
   const handleDuplicate = useCallback(async (product: Product) => {
     try {
       const clone = await duplicateProduct(product.id)
-      if (!clone) {
-        toast.error('Erro ao duplicar produto')
-        return
-      }
       // Opens the clone in edit mode: the flow is swap name and photo, then save.
       toast.success('Cópia criada (inativa) — ajuste nome e fotos')
       setModal({ mode: 'edit', product: clone })
     } catch (error) {
-      logger.error('Error duplicating product:', error)
-      toast.error('Erro ao duplicar produto')
+      reportAdminError('product.duplicate', error)
+      toast.error(errorMessage(error, 'Erro ao duplicar produto'))
     }
   }, [])
 
@@ -154,8 +147,8 @@ export function ProductsTab() {
       setBulkCategory('')
       fetchProducts()
     } catch (error) {
-      logger.error('Error updating categories in bulk:', error)
-      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar categorias')
+      reportAdminError('product.bulk_categories', error)
+      toast.error(errorMessage(error, 'Erro ao atualizar categorias'))
     }
     setBulkSaving(false)
   }, [bulkCategory, bulkMode, categories, fetchProducts, selected])
@@ -373,8 +366,10 @@ export function ProductsTab() {
                               }
                               setModal({ mode: 'edit', product: full })
                             } catch (err) {
-                              logger.error('getProductForEdit failed', err)
-                              toast.error('Não foi possível carregar o produto. Tente de novo.')
+                              reportAdminError('product.load_for_edit', err)
+                              toast.error(
+                                errorMessage(err, 'Não foi possível carregar o produto. Tente de novo.')
+                              )
                             }
                           }}
                           className="h-8 w-8 p-0"

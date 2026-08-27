@@ -34,6 +34,37 @@ productRouter.get('/categories/all', authenticate, requireRole('admin'), async (
   }
 });
 
+// GET /products/admin/catalog — the catalogue as the panel must see it.
+//
+// The panel used to read the public list, which forces `active = TRUE`: a
+// product saved with "Ativo" unticked vanished from the panel that had just
+// created it, and a duplicate (which is born inactive by design) was lost the
+// moment its modal closed. There was no way back to either without SQL.
+//
+// Inactive, but still not the `checkup%` seed rows: those are excluded from the
+// reports, the stock screen and the sitemap too, and the panel is a catalogue,
+// not a QA log.
+//
+// Declared before '/:slug' so "admin" is not captured as a product slug.
+productRouter.get('/admin/catalog', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    const result = await productService.listProducts({
+      category: req.query.category as string | undefined,
+      search: req.query.search as string | undefined,
+      featured: req.query.featured === 'true',
+      page: req.query.page ? Number(req.query.page) : undefined,
+      limit: req.query.limit ? Number(req.query.limit) : undefined,
+      includeInactive: true,
+      wholesaleOnly: req.query.wholesale === 'true',
+      sort: productService.parseProductSort(req.query.sort),
+      includeStats: req.query.stats === 'true',
+    });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Public: dynamic product sitemap (XML for shop SEO) ──────────────────────
 // Must be before /:slug so "sitemap.xml" is not treated as a slug.
 

@@ -15,6 +15,7 @@ vi.mock('../config/database.js', () => ({
 }));
 
 const {
+  listProducts,
   addProductImages,
   addProductVideo,
   bulkSetProductCategories,
@@ -322,5 +323,45 @@ describe('category parent (subcategories)', () => {
     expect(saved.parentId).toBe('c-photocards');
     const update = query.mock.calls.map((c) => String(c[0])).find((q) => q.includes('UPDATE categories'));
     expect(update).toContain('parent_id');
+  });
+});
+
+describe('listProducts — o que a vitrine esconde e o que o painel precisa ver', () => {
+  beforeEach(() => {
+    query.mockReset();
+    // [linhas, contagem] — a service dispara as duas em paralelo.
+    query.mockResolvedValue({ rows: [{ total: 0 }], rowCount: 1 });
+  });
+
+  /** SQL da primeira chamada: a que traz as linhas. */
+  async function whereOf(opts: Parameters<typeof listProducts>[0]) {
+    await listProducts(opts);
+    return String(query.mock.calls[0][0]);
+  }
+
+  it('a vitrine só mostra ativo, e nunca as linhas de QA', async () => {
+    const sql = await whereOf({});
+    expect(sql).toContain('p.active = TRUE');
+    expect(sql).toContain("p.name NOT ILIKE 'checkup%'");
+  });
+
+  // O painel precisa do rascunho: um produto salvo com "Ativo" desmarcado sumia
+  // da tela que acabou de criá-lo.
+  it('o painel enxerga inativo', async () => {
+    const sql = await whereOf({ includeInactive: true });
+    expect(sql).not.toContain('p.active = TRUE');
+  });
+
+  // As duas decisões dividiam a mesma flag: pedir inativo arrastava junto todo
+  // produto de checkup, que todo o resto do backend trata como lixo.
+  it('mas continua sem as linhas de QA', async () => {
+    const sql = await whereOf({ includeInactive: true });
+    expect(sql).toContain("p.name NOT ILIKE 'checkup%'");
+    expect(sql).toContain("p.slug NOT ILIKE 'checkup%'");
+  });
+
+  it('só quem pede explicitamente recebe as linhas de QA', async () => {
+    const sql = await whereOf({ includeInactive: true, includeSeed: true });
+    expect(sql).not.toContain("checkup%");
   });
 });

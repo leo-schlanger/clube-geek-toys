@@ -1,18 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('./api-client', () => ({
-  api: {
-    get: vi.fn(),
-    post: vi.fn(),
-    patch: vi.fn(),
-    delete: vi.fn(),
-  },
-  apiRequest: vi.fn(),
-}))
+// Only the transport is faked. `unwrapApi` and `ApiError` stay real: they are
+// what turns a failed call into a message the panel can show, and mocking them
+// away would test the opposite of the thing that broke.
+vi.mock('./api-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./api-client')>()
+  return {
+    ...actual,
+    api: {
+      get: vi.fn(),
+      post: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn(),
+    },
+    apiRequest: vi.fn(),
+  }
+})
 
-import { api, apiRequest } from './api-client'
+import { api, apiRequest, ApiError } from './api-client'
 import {
   listProducts,
+  adminListProducts,
   getProductBySlug,
   listCategories,
   listRelatedProducts,
@@ -108,7 +116,55 @@ describe('products API client', () => {
     mockedApi.delete.mockResolvedValue({ status: 204 })
     expect(await createProduct({ name: 'Card', price: 10 })).toEqual(product)
     expect(await updateProduct('p1', { name: 'Novo' })).toMatchObject({ name: 'Novo' })
-    expect(await deleteProduct('p1')).toBe(true)
+    await expect(deleteProduct('p1')).resolves.toBeUndefined()
+  })
+
+  // The whole point of the change: the panel showed "Erro ao criar produto" for
+  // a 400 that named the offending field, for an expired session and for a 500
+  // alike, so nobody could tell them apart.
+  it('createProduct surfaces the backend message instead of a bare null', async () => {
+    mockedApi.post.mockResolvedValue({
+      error: 'Dados inválidos',
+      code: 'VALIDATION',
+      status: 400,
+    })
+    await expect(createProduct({ name: 'Card', price: 10 })).rejects.toMatchObject({
+      name: 'ApiError',
+      message: 'Dados inválidos',
+      status: 400,
+      code: 'VALIDATION',
+    })
+  })
+
+  it('deleteProduct rejects with the backend message', async () => {
+    mockedApi.delete.mockResolvedValue({ error: 'Sessão expirada', status: 401 })
+    await expect(deleteProduct('p1')).rejects.toBeInstanceOf(ApiError)
+  })
+
+  // A 5xx used to be retried three times with no idempotency key, so an insert
+  // that succeeded but answered 502 left duplicates behind the error toast.
+  it('product writes are sent once, with room to finish', async () => {
+    mockedApi.post.mockResolvedValue({ data: product, status: 201 })
+    await createProduct({ name: 'Card', price: 10 })
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/products',
+      expect.anything(),
+      expect.objectContaining({ noRetry: true, timeoutMs: 60_000 })
+    )
+  })
+
+  // The panel read the public list, which is pinned to active = TRUE: a product
+  // saved inactive disappeared from the screen that had just created it.
+  it('adminListProducts asks the admin route, with auth', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: { products: [product], total: 1, page: 1, limit: 25 },
+      status: 200,
+    })
+    await adminListProducts({ page: 2 })
+    const [path, opts] = mockedApi.get.mock.calls[0]
+    expect(path).toMatch(/^\/products\/admin\/catalog\?/)
+    expect(path).toMatch(/page=2/)
+    expect(opts).toBeUndefined()
   })
 
   it('uploadProductImages uses FormData request', async () => {

@@ -1,4 +1,4 @@
-import { api, apiRequest } from './api-client'
+import { api, apiRequest, unwrapApi, unwrapApiVoid } from './api-client'
 import type { Product, Category, AdminCategory, ProductVariant, VariantAxis, ProductVideo } from '../types'
 import { DEFAULT_PRODUCT_SORT, type ProductSort } from './product-sort'
 
@@ -25,8 +25,7 @@ export interface ProductListParams {
   stats?: boolean
 }
 
-/** Public: list active products with optional filters. */
-export async function listProducts(params: ProductListParams = {}): Promise<ProductListResult> {
+function productListQuery(params: ProductListParams): string {
   const qs = new URLSearchParams()
   if (params.category) qs.set('category', params.category)
   if (params.search) qs.set('search', params.search)
@@ -37,7 +36,14 @@ export async function listProducts(params: ProductListParams = {}): Promise<Prod
   if (params.sort && params.sort !== DEFAULT_PRODUCT_SORT) qs.set('sort', params.sort)
   if (params.stats) qs.set('stats', 'true')
   const query = qs.toString()
-  const result = await api.get<ProductListResult>(`/products${query ? `?${query}` : ''}`, { skipAuth: true })
+  return query ? `?${query}` : ''
+}
+
+/** Public: list active products with optional filters. */
+export async function listProducts(params: ProductListParams = {}): Promise<ProductListResult> {
+  const result = await api.get<ProductListResult>(`/products${productListQuery(params)}`, {
+    skipAuth: true,
+  })
   return result.data ?? { products: [], total: 0, page: 1, limit: 24 }
 }
 
@@ -87,6 +93,17 @@ export function availableStock(item: { stock: number; available?: number }): num
 
 // ─── Admin ─────────────────────────────────────────────────────────────────
 
+/**
+ * Writes are sent once and given room to finish.
+ *
+ * `noRetry` because the shared retry repeats any 5xx up to three times with no
+ * idempotency key: an insert that succeeded but answered 502 came back as
+ * "Erro ao criar produto" while leaving two or three copies in the catalogue.
+ * The longer timeout is for the shop's 4G — the 15 s default cut off saves that
+ * carried variants, and the upload paths already use their own budget.
+ */
+const PRODUCT_WRITE_OPTS = { noRetry: true, timeoutMs: 60_000 } as const
+
 export interface ProductInput {
   name: string
   description?: string | null
@@ -131,12 +148,16 @@ export async function replaceProductVariants(
   productId: string,
   axes: VariantAxis[],
   variants: VariantInput[]
-): Promise<Product | null> {
-  const result = await api.put<Product>(`/products/${productId}/variants`, {
-    axes,
-    variants,
-  } as unknown as Record<string, unknown>)
-  return result.data ?? null
+): Promise<Product> {
+  const result = await api.put<Product>(
+    `/products/${productId}/variants`,
+    {
+      axes,
+      variants,
+    } as unknown as Record<string, unknown>,
+    PRODUCT_WRITE_OPTS
+  )
+  return unwrapApi(result, 'Não foi possível gravar as variações.')
 }
 
 export async function listProductVariants(productId: string): Promise<ProductVariant[]> {
@@ -167,9 +188,18 @@ export async function listAlsoBoughtProducts(slug: string): Promise<Product[]> {
   return result.data?.products ?? []
 }
 
+/**
+ * The panel's catalogue — **includes inactive products**.
+ *
+ * Deliberately not the public list: that one is pinned to `active = TRUE`, so a
+ * product saved with "Ativo" unticked, or a duplicate (born inactive), dropped
+ * out of the very screen that had just created it. Sort/search/page still run in
+ * SQL (ORDER BY + LIMIT/OFFSET).
+ */
 export async function adminListProducts(params: ProductListParams = {}): Promise<ProductListResult> {
-  // Same catalog endpoint; sort/search/page run in SQL (ORDER BY + LIMIT/OFFSET).
-  return listProducts({ limit: 25, stats: true, ...params })
+  const query = productListQuery({ limit: 25, stats: true, ...params })
+  const result = await api.get<ProductListResult>(`/products/admin/catalog${query}`)
+  return result.data ?? { products: [], total: 0, page: 1, limit: 25 }
 }
 
 /**
@@ -182,19 +212,27 @@ export async function getProductForEdit(id: string): Promise<Product | null> {
   return result.data ?? null
 }
 
-export async function createProduct(data: ProductInput): Promise<Product | null> {
-  const result = await api.post<Product>('/products', data as unknown as Record<string, unknown>)
-  return result.data ?? null
+export async function createProduct(data: ProductInput): Promise<Product> {
+  const result = await api.post<Product>(
+    '/products',
+    data as unknown as Record<string, unknown>,
+    PRODUCT_WRITE_OPTS
+  )
+  return unwrapApi(result, 'Não foi possível criar o produto.')
 }
 
-export async function updateProduct(id: string, data: Partial<ProductInput>): Promise<Product | null> {
-  const result = await api.patch<Product>(`/products/${id}`, data as unknown as Record<string, unknown>)
-  return result.data ?? null
+export async function updateProduct(id: string, data: Partial<ProductInput>): Promise<Product> {
+  const result = await api.patch<Product>(
+    `/products/${id}`,
+    data as unknown as Record<string, unknown>,
+    PRODUCT_WRITE_OPTS
+  )
+  return unwrapApi(result, 'Não foi possível salvar o produto.')
 }
 
-export async function deleteProduct(id: string): Promise<boolean> {
-  const result = await api.delete(`/products/${id}`)
-  return !result.error
+export async function deleteProduct(id: string): Promise<void> {
+  const result = await api.delete(`/products/${id}`, PRODUCT_WRITE_OPTS)
+  unwrapApiVoid(result, 'Não foi possível desativar o produto.')
 }
 
 export type UploadProductVideoResult =
@@ -221,9 +259,9 @@ export async function uploadProductVideo(
 }
 
 /** Clones the product, inactive, for bulk entry. */
-export async function duplicateProduct(id: string): Promise<Product | null> {
-  const result = await api.post<Product>(`/products/${id}/duplicate`, {})
-  return result.data ?? null
+export async function duplicateProduct(id: string): Promise<Product> {
+  const result = await api.post<Product>(`/products/${id}/duplicate`, {}, PRODUCT_WRITE_OPTS)
+  return unwrapApi(result, 'Não foi possível duplicar o produto.')
 }
 
 /** Tetos espelhados de server/api/src/services/product.service.ts. */
@@ -335,17 +373,25 @@ export async function listCategoriesForAdmin(): Promise<AdminCategory[]> {
   return result.data?.categories ?? []
 }
 
-export async function createCategory(data: CategoryInput): Promise<Category | null> {
-  const result = await api.post<Category>('/products/categories', data as unknown as Record<string, unknown>)
-  return result.data ?? null
+export async function createCategory(data: CategoryInput): Promise<Category> {
+  const result = await api.post<Category>(
+    '/products/categories',
+    data as unknown as Record<string, unknown>,
+    PRODUCT_WRITE_OPTS
+  )
+  return unwrapApi(result, 'Não foi possível criar a categoria.')
 }
 
-export async function updateCategory(id: string, data: Partial<CategoryInput>): Promise<Category | null> {
-  const result = await api.patch<Category>(`/products/categories/${id}`, data as unknown as Record<string, unknown>)
-  return result.data ?? null
+export async function updateCategory(id: string, data: Partial<CategoryInput>): Promise<Category> {
+  const result = await api.patch<Category>(
+    `/products/categories/${id}`,
+    data as unknown as Record<string, unknown>,
+    PRODUCT_WRITE_OPTS
+  )
+  return unwrapApi(result, 'Não foi possível salvar a categoria.')
 }
 
-export async function deleteCategory(id: string): Promise<boolean> {
-  const result = await api.delete(`/products/categories/${id}`)
-  return !result.error
+export async function deleteCategory(id: string): Promise<void> {
+  const result = await api.delete(`/products/categories/${id}`, PRODUCT_WRITE_OPTS)
+  unwrapApiVoid(result, 'Não foi possível remover a categoria.')
 }

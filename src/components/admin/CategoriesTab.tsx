@@ -8,7 +8,8 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Loading } from '../ui/loading'
 import { cn } from '../../lib/utils'
-import { logger } from '../../lib/logger'
+import { errorMessage } from '../../lib/api-client'
+import { reportAdminError } from '../../lib/admin-errors'
 import { useConfirm } from '../../hooks/useConfirm'
 import {
   createCategory,
@@ -125,14 +126,14 @@ export function CategoriesTab() {
     try {
       setCategories(await listCategoriesForAdmin())
     } catch (error) {
-      logger.error('Error loading categories:', error)
+      reportAdminError('category.list', error)
       toast.error('Erro ao carregar as categorias')
     }
     setLoading(false)
   }, [])
 
   useEffect(() => {
-     
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount
     void fetchCategories()
   }, [fetchCategories])
 
@@ -187,13 +188,12 @@ export function CategoriesTab() {
         sortOrder: Number(draft.sortOrder) || 0,
         parentId: draft.parentId || null,
       })
-      if (!saved) throw new Error('Resposta vazia do servidor.')
       replaceCategory(saved as AdminCategory)
       cancelEdit()
       toast.success('Categoria salva')
     } catch (error) {
-      logger.error('Error saving category:', error)
-      toast.error(error instanceof Error ? error.message : 'Erro ao salvar a categoria')
+      reportAdminError('category.update', error)
+      toast.error(errorMessage(error, 'Erro ao salvar a categoria'))
     }
     setSavingId(null)
   }
@@ -203,10 +203,10 @@ export function CategoriesTab() {
     setSavingId(category.id)
     try {
       const saved = await updateCategory(category.id, { icon: icon || null })
-      if (saved) replaceCategory(saved as AdminCategory)
+      replaceCategory(saved as AdminCategory)
     } catch (error) {
-      logger.error('Error setting category icon:', error)
-      toast.error('Erro ao trocar o ícone')
+      reportAdminError('category.set_icon', error)
+      toast.error(errorMessage(error, 'Erro ao trocar o ícone'))
     }
     setSavingId(null)
   }
@@ -215,11 +215,11 @@ export function CategoriesTab() {
     setSavingId(category.id)
     try {
       const saved = await updateCategory(category.id, { active: !category.active })
-      if (saved) replaceCategory(saved as AdminCategory)
+      replaceCategory(saved as AdminCategory)
       toast.success(category.active ? 'Categoria escondida da loja' : 'Categoria de volta à loja')
     } catch (error) {
-      logger.error('Error toggling category:', error)
-      toast.error('Erro ao mudar a visibilidade')
+      reportAdminError('category.toggle_active', error)
+      toast.error(errorMessage(error, 'Erro ao mudar a visibilidade'))
     }
     setSavingId(null)
   }
@@ -237,13 +237,12 @@ export function CategoriesTab() {
     if (!ok) return
 
     try {
-      const done = await deleteCategory(category.id)
-      if (!done) throw new Error('Falha ao excluir.')
+      await deleteCategory(category.id)
       setCategories((prev) => prev.map((c) => (c.id === category.id ? { ...c, active: false } : c)))
       toast.success('Categoria excluída')
     } catch (error) {
-      logger.error('Error deleting category:', error)
-      toast.error('Erro ao excluir a categoria')
+      reportAdminError('category.delete', error)
+      toast.error(errorMessage(error, 'Erro ao excluir a categoria'))
     }
   }
 
@@ -253,21 +252,20 @@ export function CategoriesTab() {
 
     setCreating(true)
     try {
-      const created = await createCategory({
+      await createCategory({
         name,
         // With no explicit pick, guess from the name — better than being born icon-less.
         icon: newIcon || guessCategoryIcon(name),
         parentId: newParentId || null,
       })
-      if (!created) throw new Error('Resposta vazia do servidor.')
       setNewName('')
       setNewIcon('')
       setNewParentId('')
       await fetchCategories()
       toast.success('Categoria criada')
     } catch (error) {
-      logger.error('Error creating category:', error)
-      toast.error(error instanceof Error ? error.message : 'Erro ao criar a categoria')
+      reportAdminError('category.create', error)
+      toast.error(errorMessage(error, 'Erro ao criar a categoria'))
     }
     setCreating(false)
   }

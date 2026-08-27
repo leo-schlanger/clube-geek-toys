@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { logger } from "../../lib/logger";
+import { errorMessage } from "../../lib/api-client";
+import { reportAdminError } from "../../lib/admin-errors";
 import { Button, buttonVariants } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -408,6 +409,39 @@ export function ProductModal({
     Record<number, string>
   >({});
 
+  /**
+   * Anything typed, picked or ticked since the modal opened.
+   *
+   * The form has four tabs and is mostly filled on a phone, where the card is
+   * nearly full-width and the backdrop is a thin strip against the content: one
+   * stray tap discarded the lot without a word. The backdrop no longer closes at
+   * all, and X / "Cancelar" ask first.
+   */
+  const isDirty =
+    JSON.stringify(form) !== JSON.stringify(toFormState(product)) ||
+    pendingFiles.length > 0 ||
+    pendingVideoFile != null ||
+    imageUrl.trim() !== "" ||
+    videoUrl.trim() !== "" ||
+    Object.values(pendingVariantFiles).some((files) => files.length > 0) ||
+    JSON.stringify(images) !== JSON.stringify(product?.images ?? []) ||
+    JSON.stringify(videos) !== JSON.stringify(product?.videos ?? []) ||
+    hasVariants !== (product?.hasVariants ?? false) ||
+    JSON.stringify(variantRows) !==
+      JSON.stringify(variantsToRows(product?.variants));
+
+  function requestClose(): void {
+    if (
+      isDirty &&
+      !window.confirm(
+        "Descartar as alterações deste produto? O que foi preenchido será perdido.",
+      )
+    ) {
+      return;
+    }
+    onClose();
+  }
+
   // Inline category creation
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -531,8 +565,10 @@ export function ProductModal({
         );
       }
     } catch (error) {
-      logger.error("Error preparing product images:", error);
-      toast.error("Erro ao processar as imagens selecionadas");
+      reportAdminError("product.images.prepare", error);
+      toast.error(
+        errorMessage(error, "Erro ao processar as imagens selecionadas"),
+      );
     } finally {
       setUploadingImages(false);
     }
@@ -666,8 +702,8 @@ export function ProductModal({
           `${result.urls.length} foto(s) da variação "${variantRows[idx]?.name ?? ""}" — salve para confirmar`,
         );
       } catch (error) {
-        logger.error("Error uploading variant images:", error);
-        toast.error("Erro ao enviar fotos da variação");
+        reportAdminError("product.variant_images.upload", error);
+        toast.error(errorMessage(error, "Erro ao enviar fotos da variação"));
       }
       return;
     }
@@ -837,8 +873,8 @@ export function ProductModal({
       setVideos(result.product.videos ?? []);
       toast.success("Vídeo enviado");
     } catch (error) {
-      logger.error("Error uploading video:", error);
-      toast.error("Erro ao enviar o vídeo");
+      reportAdminError("product.video.upload", error);
+      toast.error(errorMessage(error, "Erro ao enviar o vídeo"));
     }
     setUploadingVideo(false);
   }
@@ -849,32 +885,24 @@ export function ProductModal({
     setCreatingCategory(true);
     try {
       const created = await createCategory({ name, active: true });
-      if (created) {
-        toast.success("Categoria criada");
-        setNewCategoryName("");
-        toggleCategory(created.id);
-        onCategoriesChange?.();
-      } else {
-        toast.error("Erro ao criar categoria");
-      }
+      toast.success("Categoria criada");
+      setNewCategoryName("");
+      toggleCategory(created.id);
+      onCategoriesChange?.();
     } catch (error) {
-      logger.error("Error creating category:", error);
-      toast.error("Erro ao criar categoria");
+      reportAdminError("category.create", error);
+      toast.error(errorMessage(error, "Erro ao criar categoria"));
     }
     setCreatingCategory(false);
   }
 
   async function handleSetCategoryIcon(id: string, icon: string) {
     try {
-      const updated = await updateCategory(id, { icon: icon || null });
-      if (!updated) {
-        toast.error("Erro ao salvar o ícone");
-        return;
-      }
+      await updateCategory(id, { icon: icon || null });
       onCategoriesChange?.();
     } catch (error) {
-      logger.error("Error setting category icon:", error);
-      toast.error("Erro ao salvar o ícone");
+      reportAdminError("category.set_icon", error);
+      toast.error(errorMessage(error, "Erro ao salvar o ícone"));
     }
   }
 
@@ -886,20 +914,16 @@ export function ProductModal({
     )
       return;
     try {
-      const ok = await deleteCategory(id);
-      if (ok) {
-        toast.success("Categoria removida");
-        update(
-          "categoryIds",
-          form.categoryIds.filter((c) => c !== id),
-        );
-        onCategoriesChange?.();
-      } else {
-        toast.error("Erro ao remover categoria");
-      }
+      await deleteCategory(id);
+      toast.success("Categoria removida");
+      update(
+        "categoryIds",
+        form.categoryIds.filter((c) => c !== id),
+      );
+      onCategoriesChange?.();
     } catch (error) {
-      logger.error("Error deleting category:", error);
-      toast.error("Erro ao remover categoria");
+      reportAdminError("category.delete", error);
+      toast.error(errorMessage(error, "Erro ao remover categoria"));
     }
   }
 
@@ -1068,21 +1092,13 @@ export function ProductModal({
 
     setLoading(true);
     try {
-      let saved: Product | null;
-
-      if (isEditMode && product) {
-        saved = await updateProduct(product.id, payload);
-      } else {
-        saved = await createProduct(payload);
-      }
-
-      if (!saved) {
-        toast.error(
-          isEditMode ? "Erro ao atualizar produto" : "Erro ao criar produto",
-        );
-        setLoading(false);
-        return;
-      }
+      // Throws `ApiError` carrying what the server said. The old shape returned
+      // null on failure, so a 400 naming the invalid field, an expired session
+      // and a 500 all reached this screen as the same "Erro ao criar produto".
+      let saved: Product =
+        isEditMode && product
+          ? await updateProduct(product.id, payload)
+          : await createProduct(payload);
 
       // Needs a productId, so it runs after the product row exists.
       if (pendingFiles.length > 0) {
@@ -1133,22 +1149,21 @@ export function ProductModal({
         );
       }
 
-      // Axes and prices were validated before the first write.
+      // Axes and prices were validated before the first write. The product row
+      // is already committed here, so a variant failure must not read as "the
+      // save failed" — it reports the reason and still closes on success.
       if (hasVariants && rowsWithImages.length > 0) {
-        const withVariants = await replaceProductVariants(
-          saved.id,
-          axes,
-          rowsWithImages,
-        );
-        if (!withVariants) {
+        try {
+          saved = await replaceProductVariants(saved.id, axes, rowsWithImages);
+        } catch (error) {
+          reportAdminError("product.variants.replace", error);
           toast.error(
-            "Produto salvo, mas falhou ao gravar as variações. Tente de novo.",
+            `Produto salvo, mas falhou ao gravar as variações: ${errorMessage(error, "tente de novo")}`,
           );
           setLoading(false);
           onSuccess();
           return;
         }
-        saved = withVariants;
       } else if (isEditMode && product?.hasVariants && !hasVariants) {
         await replaceProductVariants(saved.id, [], []);
       }
@@ -1156,8 +1171,13 @@ export function ProductModal({
       toast.success(isEditMode ? "Produto atualizado!" : "Produto criado!");
       onSuccess();
     } catch (error) {
-      logger.error("Error saving product:", error);
-      toast.error("Erro ao salvar produto");
+      reportAdminError(isEditMode ? "product.update" : "product.create", error);
+      toast.error(
+        errorMessage(
+          error,
+          isEditMode ? "Erro ao atualizar produto" : "Erro ao criar produto",
+        ),
+      );
     }
     setLoading(false);
   }
@@ -1198,15 +1218,21 @@ export function ProductModal({
 
   return (
     <>
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay">
+        {/*
+          `dvh` follows the phone's visible area as the address bar and the
+          keyboard come and go; `vh` does not, which is how the footer with
+          "Criar Produto" ended up below the fold on a phone. The class is the
+          fallback for engines that do not know `dvh` and drop the inline rule.
+        */}
         <Card
-          className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+          style={{ maxHeight: "90dvh" }}
         >
-          <CardHeader className="relative">
+          <CardHeader className="relative shrink-0">
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
             >
               <X className="h-5 w-5" />
@@ -1222,8 +1248,11 @@ export function ProductModal({
             </CardDescription>
           </CardHeader>
 
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-6">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col min-h-0 flex-1"
+          >
+            <CardContent className="space-y-6 flex-1 min-h-0 overflow-y-auto">
               {/*
                 Section index. The count beside the label is what stops a tab
                 from hiding work: opening a product shows "Fotos e vídeos 4"
@@ -2393,11 +2422,11 @@ export function ProductModal({
 
             </CardContent>
 
-            <CardFooter className="gap-2">
+            <CardFooter className="gap-2 shrink-0 border-t bg-card">
               <Button
                 type="button"
                 variant="outline"
-                onClick={onClose}
+                onClick={requestClose}
                 className="flex-1"
               >
                 Cancelar

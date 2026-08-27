@@ -361,6 +361,12 @@ export async function listProducts(opts: {
   page?: number;
   limit?: number;
   includeInactive?: boolean; // admin only
+  /**
+   * Include seed/QA rows (`checkup%`). Off everywhere by default: the reports,
+   * the stock screen and the sitemap all exclude them, so the admin catalogue —
+   * which does want inactive drafts — must not pick them up as a side effect.
+   */
+  includeSeed?: boolean;
   /** When true, only products marked for wholesale channel. */
   wholesaleOnly?: boolean;
   /** Catalog sort. Default: featured then newest. */
@@ -374,7 +380,10 @@ export async function listProducts(opts: {
 
   if (!opts.includeInactive) {
     conditions.push(`p.active = TRUE`);
-    // Hide QA/seed products from public catalog (still visible in admin via includeInactive)
+  }
+  // Two separate decisions. They used to share one flag, so asking for inactive
+  // products (what the panel needs to show a draft) also dragged in every QA row.
+  if (!opts.includeSeed) {
     conditions.push(`p.name NOT ILIKE 'checkup%'`);
     conditions.push(`p.slug NOT ILIKE 'checkup%'`);
   }
