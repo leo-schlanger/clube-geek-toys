@@ -195,6 +195,58 @@ export interface ApiResponse<T = unknown> {
   status: number
 }
 
+/**
+ * A failed call, carrying what the backend actually said.
+ *
+ * `ApiResponse` reports the reason in `error`, but a caller that only reads
+ * `result.data` throws it away — which is how a 400 listing the invalid field,
+ * an expired session and a 500 all reached the admin panel as the same
+ * "Erro ao criar produto". Anything that writes should `unwrapApi` and let this
+ * reach the toast.
+ */
+export class ApiError extends Error {
+  readonly status: number
+  readonly code?: string
+  readonly details?: Record<string, unknown>
+
+  constructor(message: string, status: number, code?: string, details?: Record<string, unknown>) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.details = details
+  }
+}
+
+/**
+ * Returns the payload of a successful call, or throws `ApiError` with the
+ * server's own message. `fallback` covers the case where the request succeeded
+ * at the HTTP level but came back with no body to work with.
+ */
+export function unwrapApi<T>(result: ApiResponse<T>, fallback: string): T {
+  if (result.error !== undefined || result.data === undefined || result.data === null) {
+    throw new ApiError(result.error || fallback, result.status, result.code, result.details)
+  }
+  return result.data
+}
+
+/** Same, for endpoints that answer 204 with no body. */
+export function unwrapApiVoid(result: ApiResponse<unknown>, fallback: string): void {
+  if (result.error !== undefined) {
+    throw new ApiError(result.error || fallback, result.status, result.code, result.details)
+  }
+}
+
+/**
+ * Message to show a person for any thrown error, without leaking a stack or a
+ * bare "[object Object]" into a toast.
+ */
+export function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.message
+  if (error instanceof Error && error.message) return error.message
+  return fallback
+}
+
 export async function apiRequest<T = unknown>(
   path: string,
   options: RequestInit & { skipAuth?: boolean; noRetry?: boolean; timeoutMs?: number } = {}

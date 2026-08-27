@@ -28,6 +28,7 @@ vi.mock('sonner', () => ({
 import { ProductModal } from './ProductModal'
 import { updateProduct, replaceProductVariants } from '../../lib/products'
 import { toast } from 'sonner'
+import { ApiError } from '../../lib/api-client'
 
 const mockedUpdate = vi.mocked(updateProduct)
 const mockedReplace = vi.mocked(replaceProductVariants)
@@ -570,5 +571,109 @@ describe('ProductModal — form tabs', () => {
       expect(toast.error).toHaveBeenCalledWith('Informe o nome do produto')
     )
     expect(screen.getByRole('tab', { name: /Básico/ })).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+describe('ProductModal — falhas e fechamento', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // The reason for the whole change: a 400 naming the invalid field, an expired
+  // session and a 500 all reached this screen as "Erro ao atualizar produto".
+  it('shows what the server actually said, not a generic failure', async () => {
+    mockedUpdate.mockRejectedValue(
+      new ApiError('Dados inválidos: preço acima do limite', 400, 'VALIDATION')
+    )
+    const onSuccess = vi.fn()
+
+    render(
+      <ProductModal
+        mode="edit"
+        product={product}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={onSuccess}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Dados inválidos: preço acima do limite')
+    })
+    expect(onSuccess).not.toHaveBeenCalled()
+  })
+
+  // Four tabs, mostly filled on a phone where the card is nearly full-width:
+  // a stray tap on the backdrop used to discard the lot without a word.
+  it('does not close when the backdrop is tapped', () => {
+    const onClose = vi.fn()
+
+    const { container } = render(
+      <ProductModal
+        mode="create"
+        product={null}
+        categories={categories}
+        onClose={onClose}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    const overlay = container.querySelector('.modal-overlay')
+    expect(overlay).not.toBeNull()
+    fireEvent.click(overlay as Element)
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('asks before throwing away a form that has been filled in', () => {
+    const onClose = vi.fn()
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    render(
+      <ProductModal
+        mode="create"
+        product={null}
+        categories={categories}
+        onClose={onClose}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText(/Nome do Produto/i), {
+      target: { value: 'Chaveiro novo' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }))
+
+    expect(confirmSpy).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+
+    confirmSpy.mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }))
+    expect(onClose).toHaveBeenCalled()
+
+    confirmSpy.mockRestore()
+  })
+
+  it('closes straight away when nothing was typed', () => {
+    const onClose = vi.fn()
+    const confirmSpy = vi.spyOn(window, 'confirm')
+
+    render(
+      <ProductModal
+        mode="create"
+        product={null}
+        categories={categories}
+        onClose={onClose}
+        onSuccess={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }))
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+    confirmSpy.mockRestore()
   })
 })
