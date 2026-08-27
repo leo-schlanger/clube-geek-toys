@@ -11,7 +11,8 @@ import {
 import { Button } from '../ui/button'
 import { formatCurrency } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
-import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
+import { resolveShopDiscount } from '../../lib/shop-discount'
+import { useShopPromo } from '../../hooks/useShopPromo'
 
 interface CartDrawerProps {
   open: boolean
@@ -36,15 +37,17 @@ export function CartDrawer({
   const isWholesale = channel === 'wholesale'
   const base = isWholesale ? '/atacado' : ''
 
-  const discountFrac = isWholesale
-    ? isWholesaleApproved
-      ? WHOLESALE_SHOP_DISCOUNT
-      : 0
-    : isMember
-      ? MEMBER_SHOP_DISCOUNT
-      : 0
-  const estimatedDiscount = subtotal * discountFrac
-  const estimatedTotal = subtotal - estimatedDiscount
+  // One shared rule, mirroring the server: exactly one discount applies and it
+  // is the largest on offer. The drawer used to spell it out itself, which is
+  // how a new discount reaches two of the three baskets and not the third.
+  const { promo } = useShopPromo()
+  const discount = resolveShopDiscount({
+    subtotal,
+    isWholesale,
+    isWholesaleApproved,
+    isMember,
+    promo,
+  })
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -156,17 +159,15 @@ export function CartDrawer({
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                 </div>
-                {discountFrac > 0 && (
+                {discount.amount > 0 && (
                   <>
                     <div className="flex justify-between text-green-600">
-                      <span>
-                        {isWholesale ? 'Desconto atacado (25%)' : `Desconto membro (${Math.round(MEMBER_SHOP_DISCOUNT * 100)}%)`}
-                      </span>
-                      <span className="tabular-nums">-{formatCurrency(estimatedDiscount)}</span>
+                      <span>{discount.label}</span>
+                      <span className="tabular-nums">-{formatCurrency(discount.amount)}</span>
                     </div>
                     <div className="flex justify-between font-semibold">
                       <span>Total estimado</span>
-                      <span className="tabular-nums">{formatCurrency(estimatedTotal)}</span>
+                      <span className="tabular-nums">{formatCurrency(discount.total)}</span>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Valor final calculado no checkout.

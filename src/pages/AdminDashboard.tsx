@@ -47,6 +47,7 @@ const GalleryTab = lazy(() => import('../components/admin/GalleryTab').then(m =>
 const EventTicketsTab = lazy(() => import('../components/admin/EventTicketsTab').then(m => ({ default: m.EventTicketsTab })))
 const EventConfigTab = lazy(() => import('../components/admin/EventConfigTab').then(m => ({ default: m.EventConfigTab })))
 const CategoriesTab = lazy(() => import('../components/admin/CategoriesTab').then(m => ({ default: m.CategoriesTab })))
+const CouponsTab = lazy(() => import('../components/admin/CouponsTab').then(m => ({ default: m.CouponsTab })))
 const WholesaleTab = lazy(() => import('../components/admin/WholesaleTab').then(m => ({ default: m.WholesaleTab })))
 const ReviewsTab = lazy(() => import('../components/admin/ReviewsTab').then(m => ({ default: m.ReviewsTab })))
 const UsersTab = lazy(() => import('../components/admin/UsersTab').then(m => ({ default: m.UsersTab })))
@@ -599,6 +600,7 @@ export default function AdminDashboard() {
             {activeTab === 'questions' && <QuestionsTab />}
             {activeTab === 'event-config' && <EventConfigTab />}
             {activeTab === 'categories' && <CategoriesTab />}
+            {activeTab === 'coupons' && <CouponsTab />}
             {activeTab === 'events' && <EventTicketsTab />}
             {activeTab === 'gallery' && <GalleryTab />}
             {activeTab === 'users' && (

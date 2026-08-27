@@ -44,7 +44,13 @@ import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card'
-import { WHOLESALE_SHOP_DISCOUNT, MEMBER_SHOP_DISCOUNT } from '../../types'
+import {
+  resolveShopDiscount,
+  describeDiscountReason,
+  type AppliedCouponLike,
+} from '../../lib/shop-discount'
+import { useShopPromo } from '../../hooks/useShopPromo'
+import { CouponField } from '../../components/store/CouponField'
 
 type PaymentChoice = 'credit_card' | 'pix'
 type DeliveryChoice = 'shipping' | 'pickup'
@@ -68,6 +74,7 @@ export default function ShopCheckout() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>('pix')
   const [storeCreditBalance, setStoreCreditBalance] = useState(0)
   const [applyStoreCredit, setApplyStoreCredit] = useState(true)
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCouponLike | null>(null)
 
   // Pickup skips address and freight entirely.
   const [deliveryMethod, setDeliveryMethod] = useState<DeliveryChoice>('shipping')
@@ -134,14 +141,18 @@ export default function ShopCheckout() {
     ? null
     : (quote?.options.find((o) => o.id === selectedServiceId) ?? null)
 
-  const discountFraction = isWholesale
-    ? isWholesaleApproved
-      ? WHOLESALE_SHOP_DISCOUNT
-      : 0
-    : isMember
-      ? MEMBER_SHOP_DISCOUNT
-      : 0
-  const goodsAfterDiscount = subtotal * (1 - discountFraction)
+  // Same shared rule as the cart and the drawer, mirroring the server: exactly
+  // one discount applies, and it is the largest on offer.
+  const { promo } = useShopPromo()
+  const discount = resolveShopDiscount({
+    subtotal,
+    isWholesale,
+    isWholesaleApproved,
+    isMember,
+    promo,
+    coupon: appliedCoupon,
+  })
+  const goodsAfterDiscount = discount.total
 
   const estimatedCredit = (() => {
     if (!applyStoreCredit || storeCreditBalance <= 0) return 0
@@ -280,6 +291,7 @@ export default function ShopCheckout() {
         paymentMethod,
         applyStoreCredit: Boolean(user && applyStoreCredit && storeCreditBalance > 0),
         channel: isWholesale ? 'wholesale' : 'retail',
+        couponCode: appliedCoupon?.code,
         cnpj: isWholesale ? wholesaleAccount!.cnpj : undefined,
       })
       setResult(res)
@@ -792,12 +804,10 @@ export default function ShopCheckout() {
                     {order.discount > 0 && (
                       <div className="flex justify-between text-green-600">
                         <span>
-                          {(order.storeCreditApplied ?? 0) > 0 &&
-                          order.discountReason?.includes('member')
-                            ? 'Descontos'
-                            : order.discountReason === 'store_credit'
-                              ? 'Crédito de avaliação'
-                              : `Desconto clube ${Math.round(MEMBER_SHOP_DISCOUNT * 100)}%`}
+                          {describeDiscountReason(
+                            order.discountReason,
+                            order.storeCreditApplied ?? 0
+                          )}
                         </span>
                         <span className="tabular-nums">-{formatCurrency(order.discount)}</span>
                       </div>
@@ -831,18 +841,31 @@ export default function ShopCheckout() {
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                     </div>
-                    {discountFraction > 0 && (
+                    {discount.amount > 0 && (
                       <div className="flex items-center justify-between text-green-600">
-                        {isWholesale ? (
-                          <span className="text-sm font-medium">Desconto atacado (25%)</span>
-                        ) : (
+                        {discount.reason === 'member_10' ? (
                           <MemberDiscountBadge />
+                        ) : (
+                          <span className="text-sm font-medium">{discount.label}</span>
                         )}
                         <span className="tabular-nums">
-                          -{formatCurrency(subtotal * discountFraction)}
+                          -{formatCurrency(discount.amount)}
                         </span>
                       </div>
                     )}
+                    {!isWholesale && <CouponField
+                      subtotal={subtotal}
+                      email={email}
+                      applied={appliedCoupon}
+                      onApply={setAppliedCoupon}
+                      beaten={
+                        appliedCoupon != null &&
+                        discount.reason !== 'coupon' &&
+                        discount.label != null
+                          ? discount.label
+                          : null
+                      }
+                    />}
                     {user && storeCreditBalance > 0 && (
                       <label className="flex items-center justify-between gap-2 text-green-600 cursor-pointer">
                         <span className="flex items-center gap-2 text-sm">

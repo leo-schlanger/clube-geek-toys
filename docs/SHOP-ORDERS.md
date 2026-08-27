@@ -11,6 +11,8 @@ Documentação operacional da evolução da loja (`shop.geeketoys.com.br`) após
 | **Provedor**         | Melhor Envio se `MELHOR_ENVIO_TOKEN` setado; senão **tabela fallback** PAC/SEDEX    |
 | **Total**            | `subtotal − desconto + shipping` (server-side; frete sem desconto)                  |
 | **Atacado B2B**      | Aba `/atacado`, CNPJ, 25% (`wholesale_25`) — ver [`WHOLESALE.md`](WHOLESALE.md)     |
+| **Promoção do site** | Desconto do canal online, configurável em Configurações — ver _Descontos_ abaixo    |
+| **Cupons**           | Códigos com validade, limite de usos e mínimo — aba **Cupons** no admin             |
 | **Cotação segura**   | `quoteToken` HMAC (TTL ~25 min); revalidado no create order                         |
 | **Minhas compras**   | `/minhas-compras` com abas marketplace (requer login + `member_id`)                 |
 | **Rastreio**         | Admin cola código → `PATCH /orders/:id/tracking` → status `shipped` + link Correios |
@@ -92,10 +94,68 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 ### Canais de pedido
 
-| `orders.channel`   | Quem compra                      | Desconto         |
-| ------------------ | -------------------------------- | ---------------- |
-| `retail` (default) | Convidado ou membro logado       | 0 ou `member_10` |
-| `wholesale`        | JWT + conta atacado **approved** | `wholesale_25`   |
+| `orders.channel`   | Quem compra                      | Desconto                                 |
+| ------------------ | -------------------------------- | ---------------------------------------- |
+| `retail` (default) | Convidado ou membro logado       | 0, `member_10`, `online` ou `coupon_XXX` |
+| `wholesale`        | JWT + conta atacado **approved** | `wholesale_25`                           |
+
+## Descontos — só um vale por pedido
+
+`orders` tem **uma** coluna `discount` e **um** `discount_reason`, e o atacado já
+funcionava como "25% no lugar de, nunca em cima de, o `member_10`". A promoção do
+site e os cupons entram nessa mesma disputa em vez de abrirem uma segunda vaga de
+desconto: **o maior vence**.
+
+| Candidato        | `discount_reason` | De onde vem                                |
+| ---------------- | ----------------- | ------------------------------------------ |
+| Atacado          | `wholesale_25`    | Canal `wholesale` — substitui todo o resto |
+| Membro do clube  | `member_10`       | `MEMBER_SHOP_DISCOUNT`                     |
+| Promoção do site | `online`          | `shop.online_discount_*` (Configurações)   |
+| Cupom            | `coupon_<CÓDIGO>` | Tabela `coupons` (aba Cupons)              |
+
+Empate mantém o primeiro da lista acima do cupom: com 10% de cada lado o pedido
+diz `member_10`, porque é o desconto que a pessoa perderia ao cancelar o plano.
+
+**Crédito de loja não é candidato** — é dinheiro que a pessoa já tem, e entra em
+cima de quem venceu (`member_10+store_credit`).
+
+O servidor é a autoridade: `order.service` reprecifica tudo a partir do banco.
+`src/lib/shop-discount.ts` espelha a regra só para a tela mostrar o mesmo número
+antes do pedido existir; se os dois divergirem, o servidor está certo.
+
+### Promoção do site (configurável, sem migration)
+
+Quatro chaves no `SETTINGS_CATALOGUE`, editáveis na aba **Configurações**:
+
+| Chave                                 | Padrão | O que faz                      |
+| ------------------------------------- | ------ | ------------------------------ |
+| `shop.online_discount_enabled`        | `true` | Liga/desliga o desconto        |
+| `shop.online_discount_percent`        | `5`    | Percentual (teto 90)           |
+| `shop.online_discount_banner_enabled` | `true` | Mostra o aviso no topo da loja |
+| `shop.online_discount_banner_text`    | —      | Texto do aviso                 |
+
+`GET /promo` é público (Cache-Control 60s) porque o aviso pinta antes de
+qualquer login. O aviso é dispensável e a dispensa é **por percentual**: quem
+fechou "5% mais barato" ainda vê "20% mais barato" na campanha seguinte.
+
+### Cupons
+
+Tabelas `coupons` e `coupon_redemptions` (criadas no `ensure-schema`).
+
+- **Código até 20 caracteres.** `discount_reason` é `VARCHAR(40)` e a string mais
+  longa que este fluxo escreve é `coupon_<CÓDIGO>+store_credit`. Um código maior
+  seria truncado pelo Postgres e o pedido deixaria de dizer qual cupom o pagou.
+- **`POST /promo/coupon-check`** (público, rate-limited) é só um palpite para o
+  checkout mostrar o valor. Quem manda é `claimCoupon`, dentro da transação do
+  pedido: o `UPDATE ... WHERE used_count < max_uses` é o que impede duas pessoas
+  de gastarem o último uso ao mesmo tempo.
+- **O uso só é gasto se o cupom venceu a disputa.** Um código de uso único que
+  perdeu para o `member_10` não é queimado à toa.
+- **Limite por pessoa** conta usuário logado _ou_ e-mail — a loja aceita pedido
+  de convidado, e contar só quem loga tornaria o limite contornável.
+- Cobrança que falha devolve o uso (`releaseCoupon`).
+- Remover um cupom **desativa**, nunca apaga: os pedidos que ele pagou precisam
+  continuar apontando para ele.
 
 ## SEO / marca
 
