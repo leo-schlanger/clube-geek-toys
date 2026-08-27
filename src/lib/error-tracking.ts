@@ -12,6 +12,11 @@
  */
 
 import { logger } from './logger'
+import {
+  hasAttemptedStaleBundleRecovery,
+  isStaleBundleError,
+  recoverFromStaleBundle,
+} from './stale-bundle'
 
 type Severity = 'debug' | 'info' | 'warning' | 'error' | 'fatal'
 
@@ -206,5 +211,12 @@ if (typeof window !== 'undefined') {
     ErrorTracker.captureException(event.reason || 'Unhandled promise rejection', {
       context: 'unhandledrejection',
     })
+
+    // A chunk that 404s outside a React render (a route preload, a lazy import
+    // fired from a click handler) lands here instead of the ErrorBoundary. Same
+    // cause, same fix: the tab is holding a build the server no longer has.
+    if (isStaleBundleError(event.reason) && !hasAttemptedStaleBundleRecovery()) {
+      void recoverFromStaleBundle()
+    }
   })
 }
