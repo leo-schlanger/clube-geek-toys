@@ -62,4 +62,25 @@ describe('ImageCropDialog', () => {
     expect(screen.getByLabelText(/Largura/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/Altura/i)).toBeInTheDocument()
   })
+
+  it('shrinks the crop frame to fit a phone screen', () => {
+    const width = window.innerWidth
+    try {
+      window.innerWidth = 393
+      const { container } = render(
+        <ImageCropDialog files={[jpegFile()]} onComplete={vi.fn()} onCancel={vi.fn()} />
+      )
+      const frame = container.querySelector('.touch-none') as HTMLElement
+      // 393 menos o padding do overlay, do painel e da caixa preta.
+      expect(frame.style.width).toBe('305px')
+    } finally {
+      window.innerWidth = width
+    }
+  })
+
+  it('keeps the action buttons outside the scrolling area', () => {
+    render(<ImageCropDialog files={[jpegFile()]} onComplete={vi.fn()} onCancel={vi.fn()} />)
+    const apply = screen.getByRole('button', { name: /Aplicar recorte/i })
+    expect(apply.closest('.overflow-y-auto')).toBeNull()
+  })
 })

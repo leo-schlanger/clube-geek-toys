@@ -29,6 +29,11 @@ type AspectId = (typeof ASPECT_PRESETS)[number]['id']
 
 const SIZE_PRESETS = [800, 1200, 1600] as const
 const FRAME_MAX = 320
+const FRAME_MIN = 180
+// Padding do overlay (16 de cada lado) + do painel (16) + da caixa preta em
+// volta do frame (12). Um frame de 320 fixo somava 408 px e estourava a
+// largura de um iPhone (393), empurrando o diálogo para os lados.
+const FRAME_CHROME = 88
 const MIN_OUTPUT = 200
 const MAX_OUTPUT = 2560
 
@@ -38,11 +43,34 @@ interface ImageCropDialogProps {
   onCancel: () => void
 }
 
-function frameBox(ratio: number): { width: number; height: number } {
+function frameMaxFor(viewportWidth: number): number {
+  return Math.max(FRAME_MIN, Math.min(FRAME_MAX, viewportWidth - FRAME_CHROME))
+}
+
+/** Lado maior do frame, limitado pela largura visível do aparelho. */
+function useFrameMax(): number {
+  const [max, setMax] = useState(() =>
+    typeof window === 'undefined' ? FRAME_MAX : frameMaxFor(window.innerWidth)
+  )
+  useEffect(() => {
+    const onResize = () => setMax(frameMaxFor(window.innerWidth))
+    onResize()
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
+    }
+  }, [])
+  return max
+}
+
+function frameBox(ratio: number, max: number): { width: number; height: number } {
+  const min = Math.min(140, max)
   if (ratio >= 1) {
-    return { width: FRAME_MAX, height: Math.max(140, Math.round(FRAME_MAX / ratio)) }
+    return { width: max, height: Math.max(min, Math.round(max / ratio)) }
   }
-  return { width: Math.max(140, Math.round(FRAME_MAX * ratio)), height: FRAME_MAX }
+  return { width: Math.max(min, Math.round(max * ratio)), height: max }
 }
 
 /**
@@ -100,7 +128,8 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
   const ratio =
     preset.ratio ??
     (naturalRot.width > 0 && naturalRot.height > 0 ? naturalRot.width / naturalRot.height : 1)
-  const frame = frameBox(ratio)
+  const frameMax = useFrameMax()
+  const frame = frameBox(ratio, frameMax)
 
   const clampedPan = useMemo(() => {
     // Same shape on both paths: consumers read `panX`/`panY`. Returning a raw
@@ -272,11 +301,19 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
       aria-labelledby="image-crop-title"
       onClick={onCancel}
     >
+      {/*
+        Cabeçalho e botões ficam fixos e só o miolo rola: sem isso o diálogo
+        crescia além da tela do celular e "Aplicar recorte" ficava abaixo da
+        dobra, sem nenhuma forma de alcançar. `dvh` acompanha a área visível
+        conforme a barra de endereço aparece e some; a classe `vh` é o
+        fallback para engines que descartam a regra inline.
+      */}
       <div
-        className="w-full max-w-lg rounded-xl border bg-card p-4 shadow-lg sm:p-5"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border bg-card shadow-lg"
+        style={{ maxHeight: '90dvh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex shrink-0 items-start justify-between gap-3 p-4 pb-3 sm:px-5 sm:pt-5">
           <div>
             <h2 id="image-crop-title" className="flex items-center gap-2 font-heading text-lg font-semibold">
               <Crop className="h-5 w-5 text-primary" />
@@ -289,212 +326,214 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
           </div>
         </div>
 
-        <div className="flex justify-center rounded-lg bg-black/80 p-3">
-          <div
-            className="relative overflow-hidden rounded-md border border-white/20 bg-black touch-none"
-            style={{ width: frame.width, height: frame.height, cursor: 'grab' }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onWheel={onWheel}
-          >
-            {previewUrl ? (
-              <div
-                className="absolute"
-                style={{
-                  width: display.width,
-                  height: display.height,
-                  left: display.left,
-                  top: display.top,
-                }}
-              >
-                <img
-                  src={previewUrl}
-                  alt=""
-                  draggable={false}
-                  className="absolute left-1/2 top-1/2 max-w-none select-none"
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-5">
+          <div className="flex justify-center rounded-lg bg-black/80 p-3">
+            <div
+              className="relative overflow-hidden rounded-md border border-white/20 bg-black touch-none"
+              style={{ width: frame.width, height: frame.height, cursor: 'grab' }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              onWheel={onWheel}
+            >
+              {previewUrl ? (
+                <div
+                  className="absolute"
                   style={{
-                    width: display.imgWidth,
-                    height: display.imgHeight,
-                    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                    width: display.width,
+                    height: display.height,
+                    left: display.left,
+                    top: display.top,
                   }}
-                  onLoad={(e) => {
-                    const img = e.currentTarget
-                    setNatural({
-                      width: img.naturalWidth || img.width,
-                      height: img.naturalHeight || img.height,
-                    })
-                  }}
-                />
-              </div>
-            ) : (
-              <Loading />
-            )}
-          </div>
-        </div>
-
-        <div className="mt-3 space-y-3">
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Rotação</p>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => rotateBy(-90)}
-                disabled={applying}
-              >
-                <RotateCcw className="h-4 w-4" />
-                Girar à esquerda
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => rotateBy(90)}
-                disabled={applying}
-              >
-                <RotateCw className="h-4 w-4" />
-                Girar à direita
-              </Button>
-              <span className="text-xs text-muted-foreground">{rotation}°</span>
-            </div>
-          </div>
-
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Proporção</p>
-            <div className="flex flex-wrap gap-1.5">
-              {ASPECT_PRESETS.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setAspect(opt.id)}
-                  className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-                    aspectId === opt.id
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-input bg-background hover:bg-accent'
-                  )}
                 >
-                  {opt.label} {opt.id !== 'livre' ? opt.id : ''}
-                </button>
-              ))}
+                  <img
+                    src={previewUrl}
+                    alt=""
+                    draggable={false}
+                    className="absolute left-1/2 top-1/2 max-w-none select-none"
+                    style={{
+                      width: display.imgWidth,
+                      height: display.imgHeight,
+                      transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                    }}
+                    onLoad={(e) => {
+                      const img = e.currentTarget
+                      setNatural({
+                        width: img.naturalWidth || img.width,
+                        height: img.naturalHeight || img.height,
+                      })
+                    }}
+                  />
+                </div>
+              ) : (
+                <Loading />
+              )}
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="crop-zoom" className="text-xs text-muted-foreground">
-              Zoom {zoom.toFixed(1)}×
-            </Label>
-            <input
-              id="crop-zoom"
-              type="range"
-              min={1}
-              max={4}
-              step={0.1}
-              value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
-              className="mt-1 w-full accent-primary"
-            />
-          </div>
-
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tamanho de saída</p>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSizeMode('auto')}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium',
-                  sizeMode === 'auto'
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-input bg-background hover:bg-accent'
-                )}
-              >
-                Recorte original
-              </button>
-              {SIZE_PRESETS.map((px) => (
-                <button
-                  key={px}
+          <div className="mt-3 space-y-3">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Rotação</p>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
                   type="button"
-                  onClick={() => setSizeMode(px)}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => rotateBy(-90)}
+                  disabled={applying}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Girar à esquerda
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => rotateBy(90)}
+                  disabled={applying}
+                >
+                  <RotateCw className="h-4 w-4" />
+                  Girar à direita
+                </Button>
+                <span className="text-xs text-muted-foreground">{rotation}°</span>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Proporção</p>
+              <div className="flex flex-wrap gap-1.5">
+                {ASPECT_PRESETS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setAspect(opt.id)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                      aspectId === opt.id
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background hover:bg-accent'
+                    )}
+                  >
+                    {opt.label} {opt.id !== 'livre' ? opt.id : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="crop-zoom" className="text-xs text-muted-foreground">
+                Zoom {zoom.toFixed(1)}×
+              </Label>
+              <input
+                id="crop-zoom"
+                type="range"
+                min={1}
+                max={4}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                className="mt-1 w-full accent-primary"
+              />
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tamanho de saída</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSizeMode('auto')}
                   className={cn(
                     'rounded-full border px-3 py-1 text-xs font-medium',
-                    sizeMode === px
+                    sizeMode === 'auto'
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'border-input bg-background hover:bg-accent'
                   )}
                 >
-                  {px} px
+                  Recorte original
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setSizeMode('custom')}
-                className={cn(
-                  'rounded-full border px-3 py-1 text-xs font-medium',
-                  sizeMode === 'custom'
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-input bg-background hover:bg-accent'
-                )}
-              >
-                Personalizado
-              </button>
-            </div>
-            {sizeMode === 'custom' && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="crop-w" className="text-xs">
-                    Largura (px)
-                  </Label>
-                  <Input
-                    id="crop-w"
-                    type="number"
-                    min={MIN_OUTPUT}
-                    max={MAX_OUTPUT}
-                    value={customW}
-                    onChange={(e) => {
-                      const w = e.target.value
-                      setCustomW(w)
-                      const n = Number(w)
-                      if (Number.isFinite(n) && n > 0) {
-                        setCustomH(String(Math.round(n / ratio)))
-                      }
-                    }}
-                    className="h-9"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="crop-h" className="text-xs">
-                    Altura (px)
-                  </Label>
-                  <Input
-                    id="crop-h"
-                    type="number"
-                    min={MIN_OUTPUT}
-                    max={MAX_OUTPUT}
-                    value={customH}
-                    onChange={(e) => {
-                      const h = e.target.value
-                      setCustomH(h)
-                      const n = Number(h)
-                      if (Number.isFinite(n) && n > 0) {
-                        setCustomW(String(Math.round(n * ratio)))
-                      }
-                    }}
-                    className="h-9"
-                  />
-                </div>
+                {SIZE_PRESETS.map((px) => (
+                  <button
+                    key={px}
+                    type="button"
+                    onClick={() => setSizeMode(px)}
+                    className={cn(
+                      'rounded-full border px-3 py-1 text-xs font-medium',
+                      sizeMode === px
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input bg-background hover:bg-accent'
+                    )}
+                  >
+                    {px} px
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setSizeMode('custom')}
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs font-medium',
+                    sizeMode === 'custom'
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-input bg-background hover:bg-accent'
+                  )}
+                >
+                  Personalizado
+                </button>
               </div>
-            )}
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              Vai salvar em {previewSize.width} × {previewSize.height} px
-            </p>
+              {sizeMode === 'custom' && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="crop-w" className="text-xs">
+                      Largura (px)
+                    </Label>
+                    <Input
+                      id="crop-w"
+                      type="number"
+                      min={MIN_OUTPUT}
+                      max={MAX_OUTPUT}
+                      value={customW}
+                      onChange={(e) => {
+                        const w = e.target.value
+                        setCustomW(w)
+                        const n = Number(w)
+                        if (Number.isFinite(n) && n > 0) {
+                          setCustomH(String(Math.round(n / ratio)))
+                        }
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="crop-h" className="text-xs">
+                      Altura (px)
+                    </Label>
+                    <Input
+                      id="crop-h"
+                      type="number"
+                      min={MIN_OUTPUT}
+                      max={MAX_OUTPUT}
+                      value={customH}
+                      onChange={(e) => {
+                        const h = e.target.value
+                        setCustomH(h)
+                        const n = Number(h)
+                        if (Number.isFinite(n) && n > 0) {
+                          setCustomW(String(Math.round(n * ratio)))
+                        }
+                      }}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+              )}
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Vai salvar em {previewSize.width} × {previewSize.height} px
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t bg-card p-4 sm:px-5">
           <Button type="button" variant="ghost" onClick={onCancel} disabled={applying}>
             Cancelar
           </Button>
