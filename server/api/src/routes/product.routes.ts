@@ -531,6 +531,29 @@ function rejectInvalidUpload(res: import('express').Response, sawHeic: boolean):
   );
 }
 
+// PATCH /products/:id/images — swap one photo for its edited version.
+// Named by URL rather than by index: the panel's array is the *unsaved* one, so
+// an index would silently repoint at whatever the seller had just removed.
+const replaceImageSchema = z.object({
+  from: z.string().url(),
+  to: z.string().url(),
+});
+
+productRouter.patch(
+  '/:id/images',
+  authenticate,
+  requireRole('admin'),
+  validate(replaceImageSchema),
+  async (req, res, next) => {
+    try {
+      const { from, to } = req.body;
+      res.json(await productService.replaceProductImage(req.params.id as string, from, to));
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // POST /products/:id/images — upload a batch of product (listing) images
 productRouter.post(
   '/:id/images',

@@ -230,6 +230,27 @@ export async function updateProduct(id: string, data: Partial<ProductInput>): Pr
   return unwrapApi(result, 'Não foi possível salvar o produto.')
 }
 
+/**
+ * Swaps one photo of the listing gallery for its edited version.
+ *
+ * Takes the old URL, not its position: the modal's `images` array is the
+ * unsaved one, and an index would point at whatever the seller had removed on
+ * screen since the product was loaded. The server rejects a `from` that is no
+ * longer in the gallery instead of appending a duplicate.
+ */
+export async function replaceProductImage(
+  productId: string,
+  from: string,
+  to: string
+): Promise<Product> {
+  const result = await api.patch<Product>(
+    `/products/${productId}/images`,
+    { from, to },
+    PRODUCT_WRITE_OPTS
+  )
+  return unwrapApi(result, 'Não foi possível salvar a foto editada.')
+}
+
 export async function deleteProduct(id: string): Promise<void> {
   const result = await api.delete(`/products/${id}`, PRODUCT_WRITE_OPTS)
   unwrapApiVoid(result, 'Não foi possível desativar o produto.')

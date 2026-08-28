@@ -1386,6 +1386,42 @@ export async function addProductImages(id: string, urls: string[]): Promise<AddI
   return { product: mapProduct(result.rows[0]), accepted, rejected };
 }
 
+/**
+ * Swaps one listing photo for another, in place.
+ *
+ * The panel could have PATCHed the whole `images` array, but that array is also
+ * what the open modal holds unsaved: a photo the seller had removed on screen
+ * but not yet saved would have been written back — or erased — as a side effect
+ * of editing a different photo. Naming the two URLs keeps the edit to the one
+ * photo it is about, and the position is preserved because the first image is
+ * the catalogue thumbnail.
+ *
+ * `from` must still be there. When it is not, the gallery moved on under the
+ * seller (another tab, another admin) and the safe answer is to say so rather
+ * than to append a duplicate.
+ */
+export async function replaceProductImage(id: string, from: string, to: string): Promise<Product> {
+  const current = await query(`SELECT images FROM products WHERE id = $1`, [id]);
+  if (current.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
+
+  const existing = Array.isArray(current.rows[0].images) ? (current.rows[0].images as string[]) : [];
+  const index = existing.indexOf(from);
+  if (index === -1) {
+    throw new AppError(
+      409,
+      'Esta foto não está mais no produto. Feche e abra o produto de novo para ver a galeria atual.',
+      'IMAGE_NOT_FOUND'
+    );
+  }
+
+  const next = existing.map((url, i) => (i === index ? to : url));
+  const result = await query(
+    `UPDATE products SET images = $2::jsonb WHERE id = $1 RETURNING *`,
+    [id, JSON.stringify(next)]
+  );
+  return mapProduct(result.rows[0]);
+}
+
 /** Appends a hosted MP4 or external link, honouring MAX_PRODUCT_VIDEOS. */
 export async function addProductVideo(id: string, video: ProductVideo): Promise<Product> {
   const current = await query(`SELECT videos FROM products WHERE id = $1`, [id]);

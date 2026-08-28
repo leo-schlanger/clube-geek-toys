@@ -251,7 +251,7 @@ export function GalleryTab() {
                     {isCover && (
                       <Badge className="absolute left-1 top-1 text-[10px]">capa</Badge>
                     )}
-                    <div className="absolute inset-x-1 bottom-1 flex justify-between opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="absolute inset-x-1 bottom-1 flex justify-between">
                       <button
                         type="button"
                         onClick={() => handleSetCover(open, photo.url)}

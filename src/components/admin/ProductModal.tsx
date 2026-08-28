@@ -25,6 +25,7 @@ import {
   updateCategory,
   deleteCategory,
   replaceProductVariants,
+  replaceProductImage,
   MAX_PRODUCT_IMAGES,
   MAX_VARIANT_IMAGES,
   MAX_PRODUCT_CATEGORIES,
@@ -33,6 +34,7 @@ import {
 } from "../../lib/products";
 import {
   prepareProductImages,
+  fileFromImageUrl,
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_ACCEPT_LABEL,
 } from "../../lib/product-image";
@@ -58,6 +60,7 @@ import {
   Upload,
   Link as LinkIcon,
   Trash2,
+  Pencil,
   Plus,
   Star,
   Tag,
@@ -394,8 +397,15 @@ export function ProductModal({
   const [cropSession, setCropSession] = useState<
     | { files: File[]; kind: "listing" }
     | { files: File[]; kind: "variant"; variantIndex: number }
+    // Re-editing one photo that is already in the gallery, or one that is still
+    // waiting to be uploaded. `imageUrl` is what the server is asked to swap
+    // out; a pending file has none yet.
+    | { files: File[]; kind: "replace"; imageIndex: number; imageUrl: string }
+    | { files: File[]; kind: "replace-pending"; imageIndex: number }
     | null
   >(null);
+  /** Index of the saved photo being fetched back for editing, if any. */
+  const [openingImageEdit, setOpeningImageEdit] = useState<number | null>(null);
 
   // Per-variant photos, keyed by row index. No productId exists on create,
   // so these upload during the save.
@@ -590,6 +600,87 @@ export function ProductModal({
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  /**
+   * Reopens a photo that is already on the product, to recrop or rotate it.
+   *
+   * The panel offered only "remover" and "adicionar da galeria", so a photo that
+   * needed straightening had to be deleted and re-sent from the original file —
+   * which the seller often no longer has. The bytes come back from the server
+   * because the site is the only place they still exist.
+   */
+  async function startImageEdit(index: number) {
+    const url = images[index];
+    if (!url || openingImageEdit != null) return;
+    setOpeningImageEdit(index);
+    try {
+      const file = await fileFromImageUrl(url);
+      setCropSession({ files: [file], kind: "replace", imageIndex: index, imageUrl: url });
+    } catch (error) {
+      reportAdminError("product.image.edit_open", error);
+      toast.error(
+        "Não foi possível abrir esta foto para edição. Se ela veio de um link de fora do site, envie a foto de novo.",
+      );
+    } finally {
+      setOpeningImageEdit(null);
+    }
+  }
+
+  /** Same, for a photo picked but not yet uploaded — the file is still in hand. */
+  function startPendingImageEdit(index: number) {
+    const file = pendingFiles[index];
+    if (!file) return;
+    setCropSession({ files: [file], kind: "replace-pending", imageIndex: index });
+  }
+
+  /**
+   * Saves the edited photo over the old one, straight away.
+   *
+   * Adding a photo in edit mode already writes to the server on the spot, so an
+   * edit that only lived in local state would be undone by the next upload —
+   * the server would answer with the gallery it still knows, old photo included.
+   * It uploads through /media (which returns a URL without touching the gallery)
+   * and then asks the server to swap that one URL, so an unsaved removal
+   * elsewhere in the modal is not written back as a side effect.
+   */
+  async function commitImageReplacement(file: File, index: number, previousUrl: string) {
+    const productId = product?.id;
+    if (!productId) return;
+
+    setUploadingImages(true);
+    setUploadPhase("prepare");
+    try {
+      const prepared = await prepareProductImages([file]);
+      for (const msg of prepared.errors) toast.error(msg);
+      const ready = prepared.files[0];
+      if (!ready) return;
+
+      setUploadPhase("upload");
+      const uploaded = await uploadProductMedia(productId, [ready]);
+      if (!uploaded.ok) {
+        toast.error(uploaded.error);
+        return;
+      }
+      const nextUrl = uploaded.urls[0];
+      if (!nextUrl) {
+        toast.error("Erro ao enviar a foto editada");
+        return;
+      }
+
+      const saved = await replaceProductImage(productId, previousUrl, nextUrl);
+      setImages((prev) =>
+        prev.map((url, i) => (i === index && url === previousUrl ? nextUrl : url)),
+      );
+      onImagesChange?.(productId, saved.images ?? []);
+      toast.success("Foto atualizada");
+    } catch (error) {
+      reportAdminError("product.image.replace", error);
+      toast.error(errorMessage(error, "Erro ao salvar a foto editada"));
+    } finally {
+      setUploadingImages(false);
+      setUploadPhase("prepare");
+    }
+  }
+
   function setVariantImages(idx: number, nextImages: string[]) {
     setVariantRows((rows) =>
       rows.map((r, i) => (i === idx ? { ...r, images: nextImages } : r)),
@@ -738,6 +829,17 @@ export function ProductModal({
     if (!session || cropped.length === 0) return;
     if (session.kind === "variant") {
       void commitVariantImages(cropped, session.variantIndex);
+      return;
+    }
+    if (session.kind === "replace") {
+      void commitImageReplacement(cropped[0] as File, session.imageIndex, session.imageUrl);
+      return;
+    }
+    if (session.kind === "replace-pending") {
+      const edited = cropped[0] as File;
+      setPendingFiles((prev) =>
+        prev.map((file, i) => (i === session.imageIndex ? edited : file)),
+      );
       return;
     }
     void commitListingImages(cropped);
@@ -1721,6 +1823,12 @@ export function ProductModal({
                     </span>
                   </Label>
 
+                  {images.length + pendingFiles.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Lápis edita a foto (recorte e giro) · lixeira remove
+                    </p>
+                  )}
+
                   {/* Previews */}
                   {images.length > 0 || pendingFiles.length > 0 ? (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -1734,11 +1842,28 @@ export function ProductModal({
                             alt=""
                             className="h-full w-full object-cover"
                           />
+                          {isEditMode && (
+                            <button
+                              type="button"
+                              onClick={() => void startImageEdit(i)}
+                              disabled={openingImageEdit != null || uploadingImages}
+                              className="absolute top-1 left-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-primary disabled:opacity-60"
+                              title="Editar foto (recortar/girar)"
+                              aria-label={`Editar foto ${i + 1}`}
+                            >
+                              {openingImageEdit === i ? (
+                                <Loading size="sm" />
+                              ) : (
+                                <Pencil className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => removeExistingImage(i)}
-                            className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-destructive"
                             title="Remover imagem"
+                            aria-label={`Remover foto ${i + 1}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -1759,9 +1884,19 @@ export function ProductModal({
                           </span>
                           <button
                             type="button"
+                            onClick={() => startPendingImageEdit(i)}
+                            className="absolute top-1 left-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-primary"
+                            title="Editar foto (recortar/girar)"
+                            aria-label={`Editar foto nova ${i + 1}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => removePendingFile(i)}
-                            className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-destructive"
                             title="Remover imagem"
+                            aria-label={`Remover foto nova ${i + 1}`}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -2280,7 +2415,7 @@ export function ProductModal({
                                           onClick={() =>
                                             removeVariantImage(idx, url)
                                           }
-                                          className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                          className="absolute right-0 top-0 rounded-bl bg-black/70 p-0.5 text-white transition-colors hover:bg-destructive"
                                           title="Remover foto"
                                           aria-label={`Remover foto da variação ${row.name}`}
                                         >
@@ -2309,7 +2444,7 @@ export function ProductModal({
                                               fileIndex,
                                             )
                                           }
-                                          className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                          className="absolute right-0 top-0 rounded-bl bg-black/70 p-0.5 text-white transition-colors hover:bg-destructive"
                                           title="Remover foto"
                                           aria-label={`Remover foto pendente da variação ${row.name}`}
                                         >

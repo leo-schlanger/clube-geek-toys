@@ -473,3 +473,36 @@ export async function prepareProductImages(files: File[]): Promise<{
 
   return { files: out, errors, compressedCount }
 }
+
+/**
+ * Reads a photo that is already saved back into a `File`, so it can be reopened
+ * in the crop dialog.
+ *
+ * Laura's photos exist only on the site — "só tem a opção de deletar ou add uma
+ * da galeria" — so editing one means fetching it back rather than asking for
+ * the original file again.
+ *
+ * Two details make it work across origins: the panel is on `adm.*` and the
+ * uploads are on `api.*`, so nginx sends `Access-Control-Allow-Origin` on
+ * `/uploads/`; and the query string is a cache-buster, because the same photo
+ * may already sit in the browser cache from a response stored before that
+ * header existed, which the browser would refuse to reuse for a CORS read.
+ *
+ * Going through `fetch` rather than a `crossOrigin` <img> is deliberate: the
+ * blob becomes a same-origin `File`, so the crop canvas is never tainted.
+ */
+export async function fileFromImageUrl(url: string): Promise<File> {
+  const separator = url.includes('?') ? '&' : '?'
+  const response = await fetch(`${url}${separator}editar=${Date.now()}`, {
+    mode: 'cors',
+    credentials: 'omit',
+    cache: 'reload',
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+
+  const blob = await response.blob()
+  if (!blob.type.startsWith('image/')) throw new Error('Resposta não é uma imagem')
+
+  const name = url.split('?')[0]?.split('/').pop() || 'foto.jpg'
+  return new File([blob], name, { type: blob.type, lastModified: Date.now() })
+}
