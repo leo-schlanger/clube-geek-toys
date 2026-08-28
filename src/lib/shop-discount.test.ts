@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveShopDiscount, formatPercent } from './shop-discount'
+import { resolveShopDiscount, formatPercent, applyShopPromo } from './shop-discount'
 
 const PROMO_5 = { enabled: true, percent: 5 }
 const PROMO_OFF = { enabled: false, percent: 5 }
@@ -119,5 +119,36 @@ describe('formatPercent', () => {
     [7.5, '7,5'],
   ])('%s renders as %s', (input, expected) => {
     expect(formatPercent(input)).toBe(expected)
+  })
+})
+
+describe('applyShopPromo', () => {
+  it('rewrites the list price as the online price', () => {
+    expect(applyShopPromo(100, PROMO_5)).toEqual({ price: 95, listPrice: 100, percent: 5 })
+  })
+
+  it('rounds to the cent the storefront prints', () => {
+    expect(applyShopPromo(125.9, PROMO_5)?.price).toBe(119.61)
+  })
+
+  it('returns null when there is no promotion, so callers keep their markup', () => {
+    expect(applyShopPromo(100, PROMO_OFF)).toBeNull()
+    expect(applyShopPromo(100, null)).toBeNull()
+    expect(applyShopPromo(100, { enabled: true, percent: 0 })).toBeNull()
+  })
+
+  it('refuses a price it cannot discount', () => {
+    expect(applyShopPromo(0, PROMO_5)).toBeNull()
+    expect(applyShopPromo(Number.NaN, PROMO_5)).toBeNull()
+  })
+
+  // Same ceiling as the server: a settings row edited by hand cannot make the
+  // storefront quote a negative price.
+  it('caps a poisoned percentage at 90', () => {
+    expect(applyShopPromo(100, { enabled: true, percent: 500 })).toEqual({
+      price: 10,
+      listPrice: 100,
+      percent: 90,
+    })
   })
 })

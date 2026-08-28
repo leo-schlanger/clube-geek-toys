@@ -138,6 +138,15 @@ Quatro chaves no `SETTINGS_CATALOGUE`, editáveis na aba **Configurações**:
 qualquer login. O aviso é dispensável e a dispensa é **por percentual**: quem
 fechou "5% mais barato" ainda vê "20% mais barato" na campanha seguinte.
 
+**O preço da vitrine já sai com o desconto.** O card (`ProductCard`) e a página
+do produto (`ProductDetail`) passam o preço de tabela por `applyShopPromo` e
+riscam o valor cheio. Na primeira versão a promoção só aparecia no carrinho —
+estava certa e cobrava certo, mas a loja inteira continuava anunciando o preço
+de balcão, e o pedido era justamente que o site _fosse_ mais barato. O desconto
+de membro **não** entra nessa conta: ele sai do preço de tabela, em linha
+própria, porque os dois não somam (10% no lugar de 5%, nunca 14,5%). O canal
+atacado nunca vê a promoção.
+
 ### Cupons
 
 Tabelas `coupons` e `coupon_redemptions` (criadas no `ensure-schema`).

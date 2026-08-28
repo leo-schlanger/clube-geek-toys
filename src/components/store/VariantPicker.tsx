@@ -10,6 +10,13 @@ interface VariantPickerProps {
   onChange: (next: Record<string, string>) => void
   /** Variant resolved from the current selection; null if incomplete or sold out. */
   matched: ProductVariant | null
+  /**
+   * What the SKU line should quote. The page owns the pricing rules — the
+   * online promotion, and the fact that wholesale is exempt from it — so the
+   * SKU line takes the figure rather than recomputing it and contradicting the
+   * price printed right above it.
+   */
+  displayPrice?: number
 }
 
 /**
@@ -17,7 +24,13 @@ interface VariantPickerProps {
  * a photo render as swatches, and price and stock appear once the combination
  * is complete.
  */
-export function VariantPicker({ product, selected, onChange, matched }: VariantPickerProps) {
+export function VariantPicker({
+  product,
+  selected,
+  onChange,
+  matched,
+  displayPrice,
+}: VariantPickerProps) {
   const axes = useMemo(() => product.variantAxes ?? [], [product.variantAxes])
   const variants = useMemo(
     () => (product.variants ?? []).filter((v) => v.active),
@@ -152,7 +165,7 @@ export function VariantPicker({ product, selected, onChange, matched }: VariantP
 
       {matched && (
         <p className="text-xs text-muted-foreground">
-          SKU: {matched.sku || matched.name} · {formatCurrency(matched.price)} ·{' '}
+          SKU: {matched.sku || matched.name} · {formatCurrency(displayPrice ?? matched.price)} ·{' '}
           {availableStock(matched) > 0
             ? `${availableStock(matched)} em estoque`
             : 'Esgotado'}

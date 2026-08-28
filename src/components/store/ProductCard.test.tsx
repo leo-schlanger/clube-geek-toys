@@ -10,6 +10,16 @@ vi.mock('../../contexts/CartContext', () => ({
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }))
 
+// The card prices itself with the online promotion, which is admin-configurable.
+// Mutable so a test can turn it on without a QueryClientProvider.
+const promoState = {
+  promo: { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' },
+  loading: false,
+}
+vi.mock('../../hooks/useShopPromo', () => ({
+  useShopPromo: () => promoState,
+}))
+
 // The card carries the save button, which reads the account and fetches saved
 // ids. The focus here is the storefront, so it renders as a visitor; its own
 // behaviour is covered in SaveProductButton.test.tsx.
@@ -47,6 +57,7 @@ const product = {
 describe('ProductCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    promoState.promo = { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' }
   })
 
   it('renders product and member preview', () => {
@@ -89,6 +100,45 @@ describe('ProductCard', () => {
       </MemoryRouter>
     )
     expect(screen.getAllByText(/Esgotado/i).length).toBeGreaterThan(0)
+  })
+
+  // The promotion was live and priced orders correctly for two days and still
+  // read as "não foi aplicado", because the catalogue went on printing the
+  // counter price. The number on the card is the point of the feature.
+  it('prices the card with the online promotion', () => {
+    promoState.promo = { enabled: true, percent: 5, bannerEnabled: true, bannerText: '' }
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} />
+      </MemoryRouter>
+    )
+    expect(screen.getByText(/95,00/)).toBeInTheDocument()
+    expect(screen.getByText(/−5% no site/)).toBeInTheDocument()
+    // Member preview stays 10% off the list price: the two never stack.
+    expect(screen.getByText(/Membros pagam.*90,00/)).toBeInTheDocument()
+  })
+
+  it('leaves the list price alone when there is no promotion', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} />
+      </MemoryRouter>
+    )
+    expect(screen.getByText(/100,00/)).toBeInTheDocument()
+    expect(screen.queryByText(/no site/)).not.toBeInTheDocument()
+  })
+
+  // Wholesale is priced by its own channel; announcing a retail promotion there
+  // advertises a discount checkout will not give.
+  it('never applies the online promotion on the wholesale channel', () => {
+    promoState.promo = { enabled: true, percent: 5, bannerEnabled: true, bannerText: '' }
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} isWholesale isWholesaleApproved />
+      </MemoryRouter>
+    )
+    expect(screen.queryByText(/no site/)).not.toBeInTheDocument()
+    expect(screen.getByText(/100,00/)).toBeInTheDocument()
   })
 })
 

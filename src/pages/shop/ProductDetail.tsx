@@ -21,6 +21,8 @@ import {
   listRelatedProducts,
 } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
+import { applyShopPromo, formatPercent } from '../../lib/shop-discount'
+import { useShopPromo } from '../../hooks/useShopPromo'
 import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
@@ -53,6 +55,7 @@ export default function ProductDetail() {
   const { addItem } = useCart()
   const { user } = useAuth()
   const { isMember } = useShopMember()
+  const { promo } = useShopPromo()
   const channel = useShopChannel()
   const isWholesale = channel === 'wholesale'
   const { isApproved: isWholesaleApproved } = useWholesaleAccount()
@@ -196,6 +199,9 @@ export default function ProductDetail() {
     : false
   const compareAt = matched?.compareAtPrice ?? product?.compareAtPrice ?? null
   const onSale = compareAt != null && compareAt > displayPrice
+  // What the customer pays online. Wholesale prices itself; the member discount
+  // is worked out from the list price on its own line, because they do not stack.
+  const sitePromo = isWholesale ? null : applyShopPromo(displayPrice, promo)
   const memberPrice = displayPrice * (1 - MEMBER_SHOP_DISCOUNT)
   const wholesalePrice = displayPrice * (1 - WHOLESALE_SHOP_DISCOUNT)
   const minQty =
@@ -391,16 +397,31 @@ export default function ProductDetail() {
               )}
 
               <div className="mt-4">
-                <div className="flex items-baseline gap-3">
-                  <span className="text-3xl font-bold">{formatCurrency(displayPrice)}</span>
-                  {onSale && compareAt != null && (
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="text-3xl font-bold">
+                    {formatCurrency(sitePromo?.price ?? displayPrice)}
+                  </span>
+                  {onSale && compareAt != null ? (
                     <span className="text-lg text-muted-foreground line-through">
                       {formatCurrency(compareAt)}
                     </span>
+                  ) : sitePromo ? (
+                    <span className="text-lg text-muted-foreground line-through">
+                      {formatCurrency(sitePromo.listPrice)}
+                    </span>
+                  ) : null}
+                  {sitePromo && (
+                    <Badge className="bg-accent text-accent-foreground">
+                      −{formatPercent(sitePromo.percent)}% no site
+                    </Badge>
                   )}
                   {product.hasVariants && product.priceFrom != null && !matched && (
                     <span className="text-sm text-muted-foreground">
-                      a partir de {formatCurrency(product.priceFrom)}
+                      a partir de{' '}
+                      {formatCurrency(
+                        applyShopPromo(product.priceFrom, isWholesale ? null : promo)?.price ??
+                          product.priceFrom
+                      )}
                     </span>
                   )}
                 </div>
@@ -410,6 +431,7 @@ export default function ProductDetail() {
                   selected={variantSel}
                   onChange={setVariantSel}
                   matched={matched}
+                  displayPrice={sitePromo?.price ?? displayPrice}
                 />
 
                 {isWholesale ? (

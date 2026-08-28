@@ -8,6 +8,8 @@ import { Badge } from '../ui/badge'
 import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
+import { applyShopPromo, formatPercent } from '../../lib/shop-discount'
+import { useShopPromo } from '../../hooks/useShopPromo'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { SaveProductButton } from './SaveProductButton'
 import { availableStock } from '../../lib/products'
@@ -36,10 +38,26 @@ export function ProductCard({
   canBuy = true,
 }: ProductCardProps) {
   const { addItem } = useCart()
+  const { promo } = useShopPromo()
 
   const image = product.images?.[0] ?? null
   const outOfStock = availableStock(product) <= 0
   const onSale = product.compareAtPrice != null && product.compareAtPrice > product.price
+
+  // The price the customer actually pays online. Wholesale is priced by its own
+  // channel and never sees this. A product with variants is quoted "a partir
+  // de" its cheapest SKU, so the promotion comes off that same figure.
+  const listPrice =
+    product.hasVariants && product.priceFrom != null ? product.priceFrom : product.price
+  const sitePromo = isWholesale ? null : applyShopPromo(listPrice, promo)
+  // One struck price, not two: `compareAtPrice` is the older, higher number
+  // whenever the seller set one, and it is the one worth crossing out.
+  const strikePrice =
+    onSale && !product.hasVariants
+      ? (product.compareAtPrice as number)
+      : (sitePromo?.listPrice ?? null)
+
+  // Off the list price, never off the promotional one — the two do not stack.
   const memberPrice = product.price * (1 - MEMBER_SHOP_DISCOUNT)
   const wholesalePrice = product.price * (1 - WHOLESALE_SHOP_DISCOUNT)
   const minQty = isWholesale ? Math.max(1, product.wholesaleMinQty ?? 1) : 1
@@ -87,6 +105,11 @@ export function ProductCard({
         <div className="absolute left-2 top-2 flex flex-col gap-1">
           {product.featured && <Badge variant="club">Destaque</Badge>}
           {onSale && <Badge variant="destructive">Promo</Badge>}
+          {sitePromo && (
+            <Badge className="bg-accent text-accent-foreground">
+              −{formatPercent(sitePromo.percent)}% no site
+            </Badge>
+          )}
           {isWholesale && (
             <Badge className="bg-primary text-primary-foreground">Atacado</Badge>
           )}
@@ -128,12 +151,12 @@ export function ProductCard({
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-bold text-foreground">
               {product.hasVariants && product.priceFrom != null
-                ? `a partir de ${formatCurrency(product.priceFrom)}`
-                : formatCurrency(product.price)}
+                ? `a partir de ${formatCurrency(sitePromo?.price ?? product.priceFrom)}`
+                : formatCurrency(sitePromo?.price ?? product.price)}
             </span>
-            {onSale && !product.hasVariants && (
+            {strikePrice != null && (
               <span className="text-sm text-muted-foreground line-through">
-                {formatCurrency(product.compareAtPrice as number)}
+                {formatCurrency(strikePrice)}
               </span>
             )}
           </div>

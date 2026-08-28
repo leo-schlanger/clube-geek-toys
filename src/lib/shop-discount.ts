@@ -157,3 +157,34 @@ export function describeDiscountReason(
   if (base.startsWith('coupon_')) return `Cupom ${base.slice('coupon_'.length)}`
   return 'Desconto'
 }
+
+/**
+ * The list price rewritten as the online price.
+ *
+ * The promotion was live and correct for two days and still read as "não foi
+ * aplicado", because it only ever appeared in the basket: the catalogue went on
+ * printing the counter price, so the one place a customer compares prices never
+ * moved. The shop was asked to *be* cheaper online, not to reveal it at
+ * checkout.
+ *
+ * Display only, like every other price on the storefront — `order.service`
+ * prices the order again and is the authority. Returns `null` when there is no
+ * promotion, so the caller keeps its existing markup untouched.
+ *
+ * The member discount is deliberately *not* folded in here. It is worked out
+ * from the list price by the caller and shown on its own line, because the two
+ * do not stack: 10% instead of 5%, never 14.5%.
+ */
+export function applyShopPromo(
+  listPrice: number,
+  promo: ShopPromoLike | null | undefined
+): { price: number; listPrice: number; percent: number } | null {
+  if (!promo?.enabled || !(promo.percent > 0)) return null
+  if (!Number.isFinite(listPrice) || listPrice <= 0) return null
+  const percent = Math.min(90, promo.percent)
+  return {
+    price: round2(listPrice * (1 - percent / 100)),
+    listPrice: round2(listPrice),
+    percent,
+  }
+}

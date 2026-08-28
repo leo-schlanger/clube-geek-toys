@@ -30,6 +30,16 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: null }),
 }))
 
+// The page prices itself with the online promotion. Mutable so a test can turn
+// it on; the hook itself needs a QueryClientProvider this suite does not set up.
+const promoState = {
+  promo: { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' },
+  loading: false,
+}
+vi.mock('../../hooks/useShopPromo', () => ({
+  useShopPromo: () => promoState,
+}))
+
 vi.mock('../../components/store/useShopMember', () => ({
   useShopMember: () => ({ isMember: false }),
 }))
@@ -163,6 +173,20 @@ describe('ProductDetail', () => {
     vi.clearAllMocks()
     mockedRelated.mockResolvedValue([])
     mockedAlsoBought.mockResolvedValue([])
+    promoState.promo = { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' }
+  })
+
+  // Same reason as the card: the promotion only ever showed up in the basket,
+  // so the page a customer actually reads still quoted the counter price.
+  it('quotes the promotional price and strikes the list price', async () => {
+    promoState.promo = { enabled: true, percent: 5, bannerEnabled: true, bannerText: '' }
+    mockedGet.mockResolvedValue(product)
+    renderPdp()
+    await waitFor(() => {
+      expect(screen.getByText(/119,61/)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/125,90/)).toBeInTheDocument()
+    expect(screen.getByText(/−5% no site/)).toBeInTheDocument()
   })
 
   it('shows not found when product missing', async () => {
