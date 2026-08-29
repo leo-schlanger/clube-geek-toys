@@ -6,7 +6,7 @@
 # Required env vars (from server/.env):
 #   RESEND_API_KEY, ADMIN_EMAIL
 #
-# crontab: */5 * * * * cd /opt/clube-geek-toys/server && ./scripts/health-check.sh >> /var/log/clube-health.log 2>&1
+# crontab: */5 * * * * /bin/bash /opt/clube-geek-toys/server/scripts/health-check.sh >> /var/log/clube-health.log 2>&1
 
 set -uo pipefail
 

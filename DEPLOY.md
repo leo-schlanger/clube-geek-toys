@@ -342,19 +342,18 @@ Dois dumps `pg_dump | gzip` no disco da VPS (`/opt/clube-geek-toys/backups/`). C
 | Semanal | `0 4 * * 0` (domingo 01:00 BRT) | `/opt/clube-geek-toys/backups/weekly/` | 12 semanas |
 
 ```bash
-chmod +x /opt/clube-geek-toys/server/scripts/backup-postgres.sh \
-         /opt/clube-geek-toys/server/scripts/cron-backup.sh \
-         /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh
+chmod 755 /opt/clube-geek-toys/server/scripts/*.sh
 
-# crontab root:
-# 0 3 * * * /opt/clube-geek-toys/server/scripts/cron-backup.sh >> /var/log/clube-backup.log 2>&1
-# 0 4 * * 0 /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh >> /var/log/clube-backup-weekly.log 2>&1
+# crontab root — /bin/bash so a future deploy that drops +x cannot break cron:
+# 0 3 * * * /bin/bash /opt/clube-geek-toys/server/scripts/cron-backup.sh >> /var/log/clube-backup.log 2>&1
+# 0 4 * * 0 /bin/bash /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh >> /var/log/clube-backup-weekly.log 2>&1
+# */5 * * * * /bin/bash /opt/clube-geek-toys/server/scripts/health-check.sh >> /var/log/clube-health.log 2>&1
 ```
 
 Dump manual (hoje, sem esperar o domingo):
 
 ```bash
-ssh $VPS_HOST /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh
+ssh $VPS_HOST /bin/bash /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh
 ```
 
 ### Backup manual

@@ -102,6 +102,11 @@ jobs:
             --exclude='.env' \
             -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
             server/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/server/
+          # rsync copies git file mode. Scripts used to be 100644 in git, so
+          # cron (`/path/script.sh`) got "Permission denied" after every deploy.
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'chmod 755 /opt/clube-geek-toys/server/scripts/*.sh'
 
       - name: Deploy frontend
         run: |
