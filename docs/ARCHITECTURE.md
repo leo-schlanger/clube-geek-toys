@@ -41,7 +41,7 @@ Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse prox
                            └──────────────────────────────────────────────┘
                                       │                │
                                 ┌─────┴──────┐  ┌──────┴──────┐
-                                │   Stripe   │  │   Resend    │
+                                │  Pagar.me  │  │   Resend    │
                                 │ (payments) │  │  (emails)   │
                                 └────────────┘  └─────────────┘
 ```
@@ -52,36 +52,36 @@ Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse prox
 
 ### Frontend
 
-| Tecnologia            | Versao | Uso                                         |
-| --------------------- | ------ | ------------------------------------------- |
-| React                 | 19     | SPA com subdomain routing                   |
-| Vite                  | 7      | Build tooling, code splitting, HMR          |
-| Tailwind CSS          | 3      | Estilizacao utility-first                   |
-| TanStack Query        | 5      | Cache de estado do servidor                 |
-| Framer Motion         | 12     | Animacoes (flip da carteirinha, transicoes) |
-| React Hook Form + Zod | 7 / 4  | Formularios com validacao tipada            |
-| qrcode.react          | 4      | QR Code da carteirinha digital              |
-| signature_pad         | 5      | Captura de assinatura digital no canvas     |
-| pdf-lib               | 1.17   | Geracao de PDF do contrato no client-side   |
-| Stripe Elements       | 6 / 9  | Tokenizacao segura de cartao                |
-| React Router          | 7      | Roteamento SPA                              |
-| Recharts              | 2      | Graficos no painel admin                    |
-| Lucide React          | -      | Icones                                      |
+| Tecnologia             | Versao | Uso                                                  |
+| ---------------------- | ------ | ---------------------------------------------------- |
+| React                  | 19     | SPA com subdomain routing                            |
+| Vite                   | 7      | Build tooling, code splitting, HMR                   |
+| Tailwind CSS           | 3      | Estilizacao utility-first                            |
+| TanStack Query         | 5      | Cache de estado do servidor                          |
+| Framer Motion          | 12     | Animacoes (flip da carteirinha, transicoes)          |
+| React Hook Form + Zod  | 7 / 4  | Formularios com validacao tipada                     |
+| qrcode.react           | 4      | QR Code da carteirinha digital                       |
+| signature_pad          | 5      | Captura de assinatura digital no canvas              |
+| pdf-lib                | 1.17   | Geracao de PDF do contrato no client-side            |
+| (sem SDK de pagamento) | —      | O cartao e tokenizado por `fetch` direto na Pagar.me |
+| React Router           | 7      | Roteamento SPA                                       |
+| Recharts               | 2      | Graficos no painel admin                             |
+| Lucide React           | -      | Icones                                               |
 
 ### Backend
 
-| Tecnologia         | Versao              | Uso                                        |
-| ------------------ | ------------------- | ------------------------------------------ |
-| Node.js            | 22 (runtime Docker) | Runtime do servidor                        |
-| Express            | 4                   | Framework HTTP                             |
-| PostgreSQL         | 16 (Alpine)         | Banco principal (pg driver)                |
-| JWT (jsonwebtoken) | 9                   | Autenticacao stateless                     |
-| bcrypt             | 5                   | Hash de senhas (12 rounds)                 |
-| node-cron          | 3                   | Tarefas agendadas                          |
-| Zod                | 3                   | Validacao de entrada em todos os endpoints |
-| Stripe SDK         | 22                  | Pagamentos com cartao e assinaturas        |
-| Helmet             | 8                   | Security headers                           |
-| multer             | 1.4                 | Upload de arquivos (contratos)             |
+| Tecnologia         | Versao              | Uso                                                      |
+| ------------------ | ------------------- | -------------------------------------------------------- |
+| Node.js            | 22 (runtime Docker) | Runtime do servidor                                      |
+| Express            | 4                   | Framework HTTP                                           |
+| PostgreSQL         | 16 (Alpine)         | Banco principal (pg driver)                              |
+| JWT (jsonwebtoken) | 9                   | Autenticacao stateless                                   |
+| bcrypt             | 5                   | Hash de senhas (12 rounds)                               |
+| node-cron          | 3                   | Tarefas agendadas                                        |
+| Zod                | 3                   | Validacao de entrada em todos os endpoints               |
+| Stripe SDK         | 22                  | **Legado**: so estorno de cobranca anterior a 01/09/2026 |
+| Helmet             | 8                   | Security headers                                         |
+| multer             | 1.4                 | Upload de arquivos (contratos)                           |
 
 ### Infraestrutura
 
@@ -94,12 +94,12 @@ Ambas sao orquestradas via Docker Compose. Um unico Nginx atua como reverse prox
 
 ### Servicos Externos
 
-| Servico                 | Uso                                                        |
-| ----------------------- | ---------------------------------------------------------- |
-| Stripe                  | Pagamentos com cartao de credito e assinaturas recorrentes |
-| Resend API              | Envio transacional de emails (22 templates)                |
-| Umami (self-hosted)     | Analytics de navegacao e eventos                           |
-| AzuraCast (self-hosted) | Radio online (Liquidsoap + Icecast)                        |
+| Servico                 | Uso                                            |
+| ----------------------- | ---------------------------------------------- |
+| Pagar.me (API v5)       | Cartao, PIX dinamico e assinaturas recorrentes |
+| Resend API              | Envio transacional de emails (22 templates)    |
+| Umami (self-hosted)     | Analytics de navegacao e eventos               |
+| AzuraCast (self-hosted) | Radio online (Liquidsoap + Icecast)            |
 
 ---
 
@@ -205,7 +205,7 @@ O cadastro e dividido em 3 etapas sequenciais. O usuario pode interromper e reto
 
 ### Etapa 3: Pagamento
 
-1. Escolher metodo: PIX (QR Code) ou Cartao (Stripe Elements)
+1. Escolher metodo: PIX (QR Code da Pagar.me) ou Cartao (formulario proprio, token da Pagar.me)
 2. Processar pagamento (ver secao 6)
 3. Membro ativado apos confirmacao
 
@@ -219,120 +219,146 @@ O cadastro e dividido em 3 etapas sequenciais. O usuario pode interromper e reto
 
 ## 6. Fluxo de Pagamento
 
-### 6.1 Cartao de Credito (Stripe)
+> Migracao Stripe → **Pagar.me** concluida em 01/09/2026. Detalhes de operacao,
+> credenciais e webhook em [`PAGARME.md`](PAGARME.md).
+
+### 6.1 Cartao de Credito (Pagar.me)
+
+O cartao e trocado por um `card_token` **no navegador**, direto com a Pagar.me,
+usando a chave publica. A autorizacao e **sincrona**: nao existe `clientSecret`
+para resgatar, a chamada ja volta com o resultado.
 
 ```
-  Frontend                         API                          Stripe
+  Frontend                         API                        Pagar.me
   ────────                     ────────                       ────────
      │                            │                              │
-     │  POST /checkout/card/create│                              │
-     │───────────────────────────►│                              │
-     │                            │  stripe.paymentIntents.create│
-     │                            │─────────────────────────────►│
-     │                            │◄─────────────────────────────│
-     │    { clientSecret }        │                              │
+     │  POST api.pagar.me/tokens?appId=pk_...                    │
+     │───────────────────────────────────────────────────────────►│
+     │      { id: "token_..." }   │                              │
+     │◄───────────────────────────────────────────────────────────│
+     │  (o cartao NUNCA passa pelo nosso servidor)               │
+     │                            │                              │
+     │  POST /orders              │                              │
+     │───────────────────────────►│  pedido `pending`,           │
+     │      { order, requiresCard }  estoque segurado            │
      │◄───────────────────────────│                              │
      │                            │                              │
-     │  confirmCardPayment()      │                              │
-     │  (Stripe Elements)         │                              │
-     │───────────────────────────────────────────────────────────►│
-     │                            │                              │
-     │                            │  webhook: payment_intent.    │
-     │                            │           succeeded          │
+     │  POST /orders/:id/pay-card │                              │
+     │  { card_token, installments}                              │
+     │───────────────────────────►│  POST /orders (credit_card)  │
+     │                            │─────────────────────────────►│
      │                            │◄─────────────────────────────│
-     │                            │  activateMember()            │
-     │                            │  email: payment-confirmed    │
-     │                            │  email: welcome              │
+     │      { status: 'paid' }    │  autorizado na hora          │
+     │◄───────────────────────────│                              │
+     │                            │  webhook: charge.paid        │
+     │                            │◄─────────────────────────────│
+     │                            │  baixa estoque, e-mails      │
 ```
 
-**Fluxo detalhado:**
+**Por que duas etapas.** Nada precisa ser preparado antes, entao separar
+`POST /orders` de `POST /orders/:id/pay-card` existe por outro motivo: uma
+recusa vira **retentativa no mesmo pedido**, com o mesmo estoque segurado e o
+mesmo cupom. Cancelar o pedido na recusa foi o que uma vez fez a segunda
+tentativa cair num pedido morto — dinheiro capturado, estoque nunca baixado.
 
-1. Frontend chama `POST /checkout/card/create` com valor, email e memberId
-2. API cria um `PaymentIntent` no Stripe (valor em centavos, moeda BRL, metadata com memberId)
-3. API persiste pagamento `pending` no banco e retorna `clientSecret`
-4. Frontend confirma via `Stripe.confirmCardPayment()` — dados do cartao nunca tocam o servidor
-5. Stripe envia webhook `payment_intent.succeeded` para `POST /webhook/stripe`
-6. Webhook `activateMember()`: atualiza status do membro para `active`, calcula `expiry_date`, envia emails
+O clube usa o mesmo token em `POST /checkout/card/create`, em uma unica chamada
+(nao ha estoque a segurar).
 
-### 6.2 PIX (Geracao Local)
+**Recusa** volta como **402** com o motivo do banco ja traduzido, a partir do
+`acquirer_return_code`. A linha e gravada como `failed`, nao deixada `pending`.
 
-PIX nao usa Stripe (indisponivel no Brasil para PIX via Stripe). O QR Code e gerado localmente no padrao EMV.
+### 6.2 PIX (Pagar.me, confirmacao automatica)
 
-```
-  Frontend                        API                         Admin
-  ────────                    ────────                      ──────
-     │                           │                             │
-     │  POST /pix/create         │                             │
-     │──────────────────────────►│                             │
-     │                           │  generatePixEMV()           │
-     │   { pixData, paymentId }  │                             │
-     │◄──────────────────────────│                             │
-     │                           │  email: admin-pix-pending ─►│
-     │  Exibe QR Code            │                             │
-     │                           │                             │
-     │  GET /payment/status/:id  │                             │
-     │──────────────────────────►│  (poll DB-based)            │
-     │   { status: 'pending' }   │                             │
-     │◄──────────────────────────│                             │
-     │                           │                             │
-     │                           │  POST /payments/:id/confirm │
-     │                           │◄────────────────────────────│
-     │                           │  activateMember()           │
-     │                           │  email: payment-confirmed   │
-     │                           │  email: welcome             │
-```
-
-**Fluxo detalhado:**
-
-1. Frontend chama `POST /pix/create` com valor e memberId
-2. API gera codigo EMV com chave PIX da loja, valor, txId unico, nome e cidade do merchant
-3. API salva pagamento `pending` no banco e envia email `admin-pix-pending` para o admin
-4. Frontend exibe QR Code e faz polling em `GET /payment/status/:id` (consulta o banco, nao o Stripe)
-5. Admin recebe notificacao por email, verifica extrato bancario e confirma via `POST /payments/:id/confirm`
-6. Membro ativado + emails de confirmacao e boas-vindas
-
-### 6.3 Assinatura Recorrente (Stripe Subscription)
+O QR e **dinamico**, emitido e conciliado pela Pagar.me. Isto substituiu o BR
+Code estatico que geravamos localmente e que provedor nenhum vigiava: o cliente
+pagava e o pedido ficava `pending` ate alguem conferir o extrato.
 
 ```
-  Frontend                        API                          Stripe
+  Frontend                        API                        Pagar.me
   ────────                    ────────                       ────────
      │                           │                              │
-     │ POST /subscription/create │                              │
-     │──────────────────────────►│ stripe.subscriptions.create  │
-     │                           │  (default_incomplete)        │
-     │                           │─────────────────────────────►│
-     │   { clientSecret }        │◄─────────────────────────────│
+     │  POST /pix/create         │  POST /orders (pix)          │
+     │──────────────────────────►│─────────────────────────────►│
+     │                           │◄─────────────────────────────│
+     │   { pixData, paymentId }  │  guarda qr_code e expires_at │
      │◄──────────────────────────│                              │
+     │  Exibe QR Code            │                              │
      │                           │                              │
-     │  PaymentElement confirm   │                              │
+     │  (cliente paga no app do banco)                          │
+     │                           │                              │
+     │                           │  webhook: charge.paid        │
+     │                           │◄─────────────────────────────│
+     │                           │  RELE a cobranca na API      │
+     │                           │─────────────────────────────►│
+     │                           │  activateMember() / baixa    │
+     │                           │  estoque + e-mails           │
+     │                           │                              │
+     │  GET /payment/status/:id  │  se `pending`, consulta a    │
+     │──────────────────────────►│  cobranca direto na Pagar.me │
+     │   { mapped_status: 'paid' }  (so leitura)                │
+     │◄──────────────────────────│                              │
+```
+
+**Fluxo detalhado:**
+
+1. API cria uma order `pix` na Pagar.me e **guarda** `qr_code`, `qr_code_url` e
+   `expires_at` na linha — o codigo carrega o txid do provedor e nao da para
+   reconstruir depois
+2. Frontend exibe o QR; a equipe recebe um aviso de "aguardando", nao uma tarefa
+3. O cliente paga; a Pagar.me concilia e dispara `charge.paid`
+4. O processador **confere Basic auth e rele a cobranca na API** antes de
+   liquidar — a v5 nao assina o corpo
+5. Pedido vira `paid`, estoque baixa, e-mails saem
+
+O polling continua existindo, mas so para a tela virar no segundo em que o
+dinheiro cai: ele **reporta**, quem aplica efeito e o webhook.
+
+`confirmPixOrder` / `confirmPixPayment` seguem no painel como excecao — para os
+codigos anteriores a migracao e para o webhook que nao chega.
+
+### 6.3 Assinatura Recorrente (Pagar.me)
+
+```
+  Frontend                        API                         Pagar.me
+  ────────                    ────────                        ────────
+     │                           │                              │
+     │  tokeniza o cartao (pk_)  │                              │
      │──────────────────────────────────────────────────────────►│
      │                           │                              │
-     │                           │  webhook: invoice.paid       │
-     │                           │◄─────────────────────────────│
-     │                           │  extend expiry_date          │
-     │                           │  email: subscription-payment │
+     │ POST /subscription/create │  POST /subscriptions         │
+     │  { card_token }           │  billing_type: prepaid       │
+     │──────────────────────────►│─────────────────────────────►│
+     │  { status, cardBrand,     │◄─────────────────────────────│
+     │    cardLastFour }         │                              │
+     │◄──────────────────────────│                              │
      │                           │                              │
-     │                           │  (recorrencia mensal)        │
      │                           │  webhook: invoice.paid       │
      │                           │◄─────────────────────────────│
-     │                           │  extend expiry_date          │
+     │                           │  estende expiry_date         │
+     │                           │  ESPELHA a fatura em         │
+     │                           │  `payments` (relatorios)     │
+     │                           │  email: subscription-payment │
 ```
+
+A Pagar.me guarda o cartao e cobra sozinha. **Nao ha `clientSecret`**: a
+primeira cobranca e autorizada na hora, e a chamada volta com o resultado.
 
 **Ciclo de vida da assinatura:**
 
-| Evento                              | Acao                                                                                                        |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `POST /subscription/create`         | Cria Stripe Subscription com `payment_behavior: default_incomplete`, retorna `clientSecret`                 |
-| Cliente confirma primeiro pagamento | Via `PaymentElement` no frontend                                                                            |
-| `invoice.paid` (webhook)            | Estende `expiry_date` do membro, reseta `failed_payments`, email `subscription-payment`                     |
-| `invoice.payment_failed`            | Incrementa `failed_payments`, email `subscription-payment-failed`                                           |
-| 3 falhas consecutivas               | Cancela assinatura automaticamente no Stripe e no banco, email `subscription-cancelled`                     |
-| `POST /subscription/:id/pause`      | `pause_collection: void` no Stripe, status `paused`, email `subscription-paused`                            |
-| `POST /subscription/:id/resume`     | Remove `pause_collection`, status `authorized`, email `subscription-resumed`                                |
-| `POST /subscription/:id/cancel`     | `stripe.subscriptions.cancel()`, status `cancelled`, `auto_renewal = FALSE`, email `subscription-cancelled` |
-| `customer.subscription.deleted`     | Cancelamento externo (via dashboard Stripe), mesma logica de cancelamento                                   |
+| Evento                                        | Acao                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `POST /subscription/create`                   | Cria a assinatura com `card_token`; valor e intervalo **travados no servidor** (`CLUB_PLAN_*`)           |
+| `invoice.paid` (webhook)                      | Estende `expiry_date`, zera `failed_payments`, grava `next_payment_date`, espelha em `payments`, e-mail  |
+| `invoice.payment_failed`                      | Incrementa `failed_payments`, e-mail `subscription-payment-failed`                                       |
+| 3 falhas consecutivas                         | Cancela na operadora e no banco, e-mail `subscription-cancelled`                                         |
+| `PUT /subscription/:id/pause`                 | **Cancela a recorrencia na Pagar.me** (eles nao tem pause) e mantem a linha `paused`                     |
+| `PUT /subscription/:id/resume`                | `RESUME_REQUIRES_CARD` — pede o cartao de novo, porque a recorrencia foi encerrada la                    |
+| `PUT /subscription/:id/cancel`                | Cancela na operadora, status `cancelled`, `auto_renewal = FALSE`, e-mail                                 |
+| `PUT /subscription/:id/update-payment-method` | Aponta a recorrencia para um novo `card_token` **sem mexer no ciclo** — o membro nao perde os dias pagos |
+| `subscription.canceled` (webhook)             | Cancelamento externo (painel da Pagar.me); a guarda em `subscription_status` evita o e-mail duplicado    |
 
----
+> Assinaturas anteriores a 01/09/2026 continuam no Stripe. Quem decide o ramo e
+> a coluna `subscriptions.provider` — `NULL` significa Stripe.
 
 ## 7. Loja E-commerce (`shop.geeketoys.com.br`)
 
@@ -341,7 +367,7 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
 ### Fluxo de compra
 
 ```
-  Loja (shop.*)                    API                          Stripe / Admin
+  Loja (shop.*)                    API                          Pagar.me
   ─────────────                ────────                       ────────────────
      │                            │                              │
      │  Catalogo publico          │  GET /products?sort=&page=   │
@@ -361,7 +387,7 @@ A loja e servida pelo **mesmo bundle Vite** do SPA. O subdominio e detectado em 
      │   { order, clientSecret }  │     (metadata.kind=shop_order) │
      │◄───────────────────────────│                              │
      │                            │                              │
-     │  Cartao: confirm (Stripe)  │  webhook: payment_intent.    │
+     │  Cartao: POST /pay-card    │  webhook: charge.paid        │
      │  PIX: exibe QR + polling   │           succeeded          │
      │                            │◄─────────────────────────────│
      │                            │  marca pedido paid + baixa    │
@@ -430,14 +456,14 @@ Imagens sao enviadas por `POST /products/:id/images` (multipart) e armazenadas n
                             └────────┘              └────────┘
 ```
 
-| Transicao                        | Condicao                                | Comportamento                                                                            |
-| -------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+1 mes, plano mensal)                        |
-| `active` -> `active` (renovacao) | Pagamento enquanto ainda ativo          | Estende `expiry_date` a partir da data de expiracao atual (nao perde dias restantes)     |
-| `active` -> `expired`            | `expiry_date < hoje` + cron diario      | Marca `status = 'expired'`, envia email `member-expired`                                 |
-| `expired` -> `active`            | Novo pagamento                          | Fresh start: `expiry_date` calculado a partir de hoje                                    |
-| Assinatura ativa                 | `auto_renewal = TRUE`                   | Nao expira pelo cron (Stripe cobra automaticamente e estende via webhook `invoice.paid`) |
-| Assinatura pausada               | `subscription_status = 'paused'`        | Cron pode expirar normalmente (nao ha cobranca enquanto pausada)                         |
+| Transicao                        | Condicao                                | Comportamento                                                                        |
+| -------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+1 mes, plano mensal)                    |
+| `active` -> `active` (renovacao) | Pagamento enquanto ainda ativo          | Estende `expiry_date` a partir da data de expiracao atual (nao perde dias restantes) |
+| `active` -> `expired`            | `expiry_date < hoje` + cron diario      | Marca `status = 'expired'`, envia email `member-expired`                             |
+| `expired` -> `active`            | Novo pagamento                          | Fresh start: `expiry_date` calculado a partir de hoje                                |
+| Assinatura ativa                 | `auto_renewal = TRUE`                   | Nao expira pelo cron (a Pagar.me cobra sozinha e estende via webhook `invoice.paid`) |
+| Assinatura pausada               | `subscription_status = 'paused'`        | Cron pode expirar normalmente (nao ha cobranca enquanto pausada)                     |
 
 ---
 
@@ -527,7 +553,7 @@ Todos os emails usam a API do **Resend** com templates HTML inline renderizados 
 | 2   | `password-reset`              | Solicitacao de redefinicao de senha — link valido por 1h          |
 | 3   | `welcome`                     | Primeira ativacao do membro (pagamento confirmado)                |
 | 4   | `payment-confirmed`           | Qualquer pagamento confirmado (cartao ou PIX)                     |
-| 5   | `payment-failed`              | Falha em `payment_intent` do Stripe                               |
+| 5   | `payment-failed`              | Cobranca recusada (`charge.payment_failed`)                       |
 | 6   | `subscription-created`        | Assinatura recorrente criada                                      |
 | 7   | `subscription-payment`        | Cobranca recorrente processada (`invoice.paid`)                   |
 | 8   | `subscription-paused`         | Membro pausou assinatura                                          |
@@ -853,26 +879,47 @@ Acionado automaticamente no push para `master` via GitHub Actions (`.github/work
 
 ---
 
-## 17. Webhooks Stripe
+## 17. Webhooks
 
-### Eventos processados
+### Pagar.me — `POST /webhook/pagarme`
 
-| Evento Stripe                   | Handler                        | Acao                                                                                                                                                                   |
-| ------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `payment_intent.succeeded`      | `handlePaymentIntentSucceeded` | Assinatura: marca pagamento `paid`, ativa membro, emails. Pedido de loja (`metadata.kind = 'shop_order'`): marca pedido `paid`, baixa estoque, email `order-confirmed` |
-| `payment_intent.payment_failed` | `handlePaymentIntentFailed`    | Assinatura: marca pagamento `failed`, email `payment-failed`. Pedido de loja: cancela o pedido (estoque nunca foi decrementado)                                        |
-| `invoice.paid`                  | `handleInvoicePaid`            | Registra pagamento da assinatura, estende `expiry_date`, reseta `failed_payments`                                                                                      |
-| `invoice.payment_failed`        | `handleInvoicePaymentFailed`   | Incrementa `failed_payments`, cancela apos 3 falhas                                                                                                                    |
-| `customer.subscription.deleted` | `handleSubscriptionDeleted`    | Marca assinatura como cancelada                                                                                                                                        |
+`pagarme-webhook.service.ts`. E o que liquida dinheiro: sem ele, todo PIX fica
+`pending` para sempre.
+
+| Evento                                           | Acao                                                                                                                 |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `charge.paid` / `order.paid`                     | **Rele a cobranca na API**; loja: pedido `paid` + baixa estoque + `order-confirmed`. Clube: ativa o membro + e-mails |
+| `charge.payment_failed` / `order.payment_failed` | Registra a recusa. **Nao cancela o pedido** — o estoque segue segurado para a retentativa                            |
+| `charge.refunded` / `charge.partial_canceled`    | Pedido `refunded`, devolve estoque e credito da loja                                                                 |
+| `order.canceled`                                 | O unico evento que encerra um pedido: `cancelled`, libera a reserva, devolve o credito                               |
+| `charge.chargedback` / `chargeback.received`     | **Nao muda o status** — chargeback precisa de decisao humana. Avisa por e-mail e no sino                             |
+| `invoice.paid`                                   | Estende `expiry_date`, zera falhas, espelha em `payments`                                                            |
+| `invoice.payment_failed`                         | Incrementa falhas; cancela na terceira                                                                               |
+| `subscription.canceled`                          | Cancela a assinatura e espelha no membro                                                                             |
+
+### Autenticidade
+
+A Pagar.me v5 **nao assina o corpo**. Duas camadas:
+
+1. **Basic auth** (`PAGARME_WEBHOOK_USER` / `PAGARME_WEBHOOK_PASSWORD`),
+   comparada em tempo constante. Obrigatoria em producao pelo schema de env.
+2. **Releitura da cobranca na API** antes de acreditar em qualquer evento de
+   dinheiro. Um `charge.paid` forjado nao liquida nada.
+
+Consulta que falha conta como "nao confirmado": o evento fica sem processar e a
+Pagar.me reentrega.
 
 ### Idempotencia
 
-Webhooks Stripe podem ser entregues multiplas vezes. A idempotencia e garantida por:
+1. **Claim atomico:** `INSERT INTO processed_webhooks ... ON CONFLICT DO NOTHING`
+   dentro da **mesma transacao** dos efeitos
+2. **Rollback completo:** falhou, o `ROLLBACK` desfaz o claim junto com os side
+   effects — e por isso o endpoint responde **500**, para a operadora reentregar
+3. **E-mails apos COMMIT:** enfileirados durante a transacao, enviados so depois
 
-1. **Claim atomico:** `INSERT INTO processed_webhooks ... ON CONFLICT DO NOTHING` dentro da mesma transacao
-2. **Rollback completo:** se o processamento falha, o `ROLLBACK` desfaz tanto o claim quanto os side effects
-3. **Emails apos COMMIT:** emails sao enfileirados durante a transacao mas enviados somente apos `COMMIT` bem-sucedido
+### Stripe — `POST /webhook/stripe` (legado)
 
-### Verificacao de assinatura
-
-O webhook recebe o body como `express.raw()` para verificar a assinatura HMAC do Stripe via `stripe.webhooks.constructEvent()`.
+Continua no ar para os eventos que cobrancas anteriores a 01/09/2026 ainda
+emitem (`payment_intent.*`, `invoice.*`, `customer.subscription.deleted`), com a
+mesma estrategia de idempotencia. A assinatura HMAC e verificada por
+`stripe.webhooks.constructEvent()` sobre o body cru (`express.raw()`).

@@ -10,8 +10,8 @@ import { query } from '../config/database.js';
 export const subscriptionRouter = Router();
 subscriptionRouter.use(authenticate);
 
-// Stripe flow: frontend receives clientSecret from create, then uses Stripe.js to confirm.
-// No `encrypted_card` needed — Stripe Elements handles tokenization client-side.
+// Pagar.me flow: the browser tokenizes the card against Pagar.me with the
+// public key and posts only `card_token`. Raw card data never reaches us.
 const createSchema = z.object({
   member_id: z.string().uuid(),
   plan: z.enum(['club']).default('club'),
@@ -21,6 +21,7 @@ const createSchema = z.object({
   payer_name: z.string().min(1),
   /** Optional for backwards compat — server always uses CLUB_PLAN_PRICE. */
   transaction_amount: z.number().positive().optional(),
+  card_token: z.string().min(1).max(200),
 });
 
 // POST /subscription/create
@@ -112,16 +113,27 @@ subscriptionRouter.get('/:id/payments', async (req, res, next) => {
 });
 
 // PUT /subscription/:id/update-payment-method
-// Stripe flow: frontend creates a PaymentMethod via Stripe.js, sends its ID here.
-const updatePMSchema = z.object({
-  paymentMethodId: z.string().min(1),
-});
+// Pagar.me: a `card_token` from the browser. Legacy Stripe subscriptions still
+// accept a PaymentMethod id under the old field name, so a member who has not
+// migrated can still fix their card.
+const updatePMSchema = z
+  .object({
+    cardToken: z.string().min(1).max(200).optional(),
+    paymentMethodId: z.string().min(1).optional(),
+  })
+  .refine((b) => Boolean(b.cardToken || b.paymentMethodId), {
+    message: 'Informe o cartão.',
+    path: ['cardToken'],
+  });
 subscriptionRouter.put('/:id/update-payment-method', paymentLimiter, validate(updatePMSchema), async (req, res, next) => {
   try {
     const sub = await verifySubscriptionOwnership(req, res, req.params.id as string);
     if (!sub) return;
-    const body = req.body as { paymentMethodId: string };
-    const result = await subscriptionService.updatePaymentMethod(req.params.id as string, body.paymentMethodId);
+    const body = req.body as { cardToken?: string; paymentMethodId?: string };
+    const result = await subscriptionService.updatePaymentMethod(
+      req.params.id as string,
+      (body.cardToken ?? body.paymentMethodId) as string,
+    );
     res.json(result);
   } catch (err) {
     next(err);

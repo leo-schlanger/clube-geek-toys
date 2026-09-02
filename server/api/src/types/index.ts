@@ -283,8 +283,19 @@ export interface Order {
   total: number;
   status: OrderStatus;
   paymentMethod: OrderPaymentMethod | null;
+  /** Legacy: set only on orders charged before the Pagar.me migration. */
   stripePaymentIntentId: string | null;
+  pagarmeOrderId?: string | null;
+  pagarmeChargeId?: string | null;
+  /** 'pagarme' | 'stripe' | 'manual' — who holds the charge. */
+  paymentProvider?: string | null;
   pixTxid: string | null;
+  /** The card that paid, for the admin's order view. */
+  cardBrand?: string | null;
+  cardLastFour?: string | null;
+  installments?: number | null;
+  /** CPF/CNPJ of the buyer, required by the acquirer. Digits only. */
+  customerDocument?: string | null;
   paidAt: string | null;
   createdAt: string;
   updatedAt: string;

@@ -1,15 +1,18 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { verifyMemberOwnership, getMemberIdForUser } from '../middleware/ownership.js';
-import { paymentLimiter } from '../middleware/rate-limit.js';
+import { paymentLimiter, publicLookupLimiter } from '../middleware/rate-limit.js';
 import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
 import * as paymentService from '../services/payment.service.js';
+import { env } from '../config/env.js';
+import { maxInstallmentsFor, isPagarmeConfigured } from '../utils/pagarme.js';
 
 export const paymentRouter = Router();
 
-// Stripe flow: frontend receives clientSecret from these endpoints,
-// then uses Stripe.js to complete payment (no encrypted_card on our server).
+// Pagar.me flow: the browser exchanges the card for a `card_token` against
+// Pagar.me directly (public key, no secret on the page), and posts only the
+// token here. Raw card data never touches this server.
 
 const pixCreateSchema = z.object({
   amount: z.number().positive(),
@@ -24,9 +27,49 @@ const cardCreateSchema = z.object({
   payer_email: z.string().email(),
   payer_name: z.string().min(1),
   external_reference: z.string().min(1), // memberId
+  card_token: z.string().min(1),
+  installments: z.number().int().min(1).max(12).optional(),
 });
 
-// POST /pix/create — generate PIX QR code (local, no Stripe — PIX not available on Stripe)
+/**
+ * GET /payment/config — what the checkout needs before it can render.
+ *
+ * The public key is public by definition (it identifies the store in the
+ * tokenization call), so this endpoint is unauthenticated. It exists so the key
+ * and the instalment rules come from the server rather than from a build-time
+ * variable that goes stale on the next deploy.
+ */
+paymentRouter.get('/config', publicLookupLimiter, (_req, res) => {
+  res.json({
+    provider: 'pagarme',
+    publicKey: env.PAGARME_PUBLIC_KEY ?? null,
+    configured: isPagarmeConfigured() && Boolean(env.PAGARME_PUBLIC_KEY),
+    maxInstallments: env.PAGARME_MAX_INSTALLMENTS,
+    minInstallmentAmount: env.PAGARME_MIN_INSTALLMENT_AMOUNT,
+    pixExpiresIn: env.PAGARME_PIX_EXPIRES_IN,
+  });
+});
+
+/** GET /payment/installments?amount=199.90 — the splits offered for a total. */
+paymentRouter.get('/installments', publicLookupLimiter, (req, res) => {
+  const amount = Number(req.query.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    res.status(400).json({ error: 'Valor inválido.', code: 'INVALID_AMOUNT' });
+    return;
+  }
+  const max = maxInstallmentsFor(amount);
+  res.json({
+    maxInstallments: max,
+    // No interest is charged, so each option is a plain division. Sending the
+    // computed value keeps the rounding identical to what will be charged.
+    options: Array.from({ length: max }, (_, i) => {
+      const n = i + 1;
+      return { installments: n, amount: Math.round((amount / n) * 100) / 100, interestFree: true };
+    }),
+  });
+});
+
+// POST /pix/create — PIX QR issued by Pagar.me; the webhook settles it
 paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSchema), async (req, res, next) => {
   try {
     if (!await verifyMemberOwnership(req, res, req.body.external_reference)) return;
@@ -54,7 +97,7 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
   }
 });
 
-// POST /card/create — create Stripe PaymentIntent for card
+// POST /card/create — authorise a card charge from a Pagar.me card_token.
 // NOTE: paymentRouter is mounted on multiple paths (/pix, /checkout, /payment, /payments).
 // To avoid route collision, card uses '/card/create' (→ /payment/card/create or /checkout/card/create).
 paymentRouter.post('/card/create', authenticate, paymentLimiter, validate(cardCreateSchema), async (req, res, next) => {
@@ -77,6 +120,8 @@ paymentRouter.post('/card/create', authenticate, paymentLimiter, validate(cardCr
       payerEmail: req.body.payer_email,
       payerName: req.body.payer_name,
       memberId: req.body.external_reference,
+      cardToken: req.body.card_token,
+      installments: req.body.installments,
     });
     res.status(201).json(result);
   } catch (err) {

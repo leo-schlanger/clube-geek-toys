@@ -22,7 +22,7 @@ variações/vídeos, CRUD do painel, infra, segurança e integrações.
 | ------------------------------- | ------------------------------------ | ------------ | --------------------------------------------- |
 | Stack clube + loja + API        | PROJECT / ARCHITECTURE               | ✅           | OK                                            |
 | Plano único / 10%               | PROJECT                              | ✅           | Desconto server-side                          |
-| Loja checkout Stripe/PIX        | PROJECT                              | ✅           | PIX manual admin                              |
+| **Pagamentos (Pagar.me)**       | PAGARME + ARCHITECTURE + SECURITY    | ✅           | PIX confirma sozinho; Stripe só legado        |
 | **Frete CEP + Melhor Envio**    | SHOP-ORDERS + PROJECT                | ✅           | Fallback tabela sem token                     |
 | **Minhas compras (6 abas)**     | SHOP-ORDERS                          | ✅           | Ownership por `user_id` ou `member_id`        |
 | **Rastreio + e-mail shipped**   | SHOP-ORDERS                          | ✅           | Admin cola código                             |

@@ -25,12 +25,12 @@ const AVAILABLE_TEMPLATES = [
   'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
-  'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
+  'verify-email', 'password-reset', 'contract-signed',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
   'order-pending-pix',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-order-disputed',
-  'admin-daily-digest',
+  'admin-daily-digest', 'admin-payment-event',
   'event-reservation-received', 'event-tickets-ready', 'admin-event-reservation',
 ];
 
@@ -305,8 +305,8 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Motivo', v.reason || '—'],
           ['Responder até', `<strong>${v.due_by || '—'}</strong>`],
         ])}
-        ${infoBox('O pedido <strong>não</strong> foi alterado automaticamente — chargeback precisa de decisão humana. Envie a evidência pelo painel do Stripe antes do prazo.')}`,
-      cta: { text: 'Abrir no Stripe', url: 'https://dashboard.stripe.com/disputes' },
+        ${infoBox('O pedido <strong>não</strong> foi alterado automaticamente — chargeback precisa de decisão humana. Envie a evidência pelo painel da Pagar.me antes do prazo.')}`,
+      cta: { text: 'Abrir na Pagar.me', url: 'https://dash.pagar.me/' },
     },
 
     'order-shipped': {
@@ -511,45 +511,31 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     // ─── ADMIN: PENDING PIX ─────────────────────────────
-    'admin-pix-pending': {
-      subject: '🔔 PIX pendente de confirmação — Clube GeekPop & Toys',
-      preheader: `Novo pagamento PIX de R$ ${v.amount || '0,00'} aguardando confirmação.`,
-      body: `
-        <h2 style="color:#f59e0b;margin:0 0 12px">Pagamento PIX pendente 🔔</h2>
-        <p>Um novo pagamento via PIX foi gerado e aguarda confirmação manual.</p>
-        ${dataTable([
-          ['Membro', escapeHtml(v.member_name || '—')],
-          ['Email', v.member_email || '—'],
-          ['Plano', planLabel(v.plan)],
-          ['Valor', `<strong style="color:#4ade80">R$ ${v.amount || '0,00'}</strong>`],
-          ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
-          ['Payment ID', `<span style="font-family:monospace;font-size:11px">${v.payment_id || '—'}</span>`],
-        ])}
-        ${infoBox('📋 <strong>O que fazer:</strong><br>1. Verifique no extrato bancário se o PIX com o TX ID acima foi recebido<br>2. Acesse o painel admin e confirme o pagamento<br>3. O membro será ativado automaticamente após a confirmação')}`,
-      cta: { text: 'Abrir Painel Admin', url: v.admin_url || adminUrl() },
-    },
 
     // ─── ADMIN: SHOP PIX PENDING ───────────────────────
-    // Sibling of 'admin-pix-pending' for shop orders: the QR is generated
+    // Shop sibling of the club PIX notice: the QR is generated
     // locally and nothing confirms it, so without this a paid order sits
     // 'pending' until someone opens the panel by chance.
+    // Depois da migração para a Pagar.me isto virou um aviso, não uma tarefa:
+    // a operadora concilia o PIX e confirma o pedido sozinha. O texto mudou
+    // junto — mandar conferir o extrato criaria trabalho que não existe mais.
     'admin-pix-order-pending': {
-      subject: '🔔 Pedido PIX aguardando confirmação — Loja GeekPop & Toys',
+      subject: '🔔 Pedido PIX aguardando pagamento — Loja GeekPop & Toys',
       preheader: `Pedido #${v.order_number || ''} de R$ ${v.total || '0,00'} gerou um PIX.`,
       body: `
-        <h2 style="color:#f59e0b;margin:0 0 12px">Pedido PIX pendente 🔔</h2>
-        <p>Um pedido da loja gerou um código PIX e aguarda confirmação manual.</p>
+        <h2 style="color:#f59e0b;margin:0 0 12px">Pedido PIX aguardando 🔔</h2>
+        <p>Um pedido da loja gerou um código PIX. A confirmação é automática — a Pagar.me avisa assim que o dinheiro cair.</p>
         ${dataTable([
           ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
           ['Cliente', escapeHtml(v.customer_name || '—')],
           ['Email', v.customer_email || '—'],
           ['Valor', `<strong style="color:#4ade80">R$ ${v.total || '0,00'}</strong>`],
-          ['TX ID', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
+          ['Cobrança', `<span style="font-family:monospace;font-size:11px">${v.tx_id || '—'}</span>`],
           // The note changes what goes in the box, so it belongs in the
           // notice the shop reads first — not only in the panel.
           ...(v.customer_note ? [['Mensagem do cliente', escapeHtml(v.customer_note)]] : []),
         ])}
-        ${infoBox('📋 <strong>O que fazer:</strong><br>1. Confira no extrato se o PIX com o TX ID acima caiu<br>2. Abra o pedido no painel admin e confirme o pagamento<br>3. O estoque só é baixado depois da confirmação')}`,
+        ${infoBox('📋 <strong>Nada a fazer agora.</strong><br>O pedido vira <strong>pago</strong> sozinho quando o PIX cair, e só então o estoque baixa. Se algo travar, o painel ainda permite confirmar à mão — use a cobrança acima para achar o pagamento no painel da Pagar.me.')}`,
       cta: { text: 'Abrir Pedido no Painel', url: v.admin_url || adminUrl() },
     },
 
@@ -594,6 +580,36 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // before it gets here, so the rows have to be assembled template-side).
     // Queues at zero are dropped: a digest that always lists everything stops
     // being read.
+    /**
+     * One template for every payment event the staff hears about.
+     *
+     * A template per event would have been five near-identical blocks that
+     * drift apart; the event name and the accent colour are variables instead.
+     */
+    'admin-payment-event': {
+      subject: `${v.tone === 'bad' ? '\u26a0\ufe0f ' : ''}${v.event_label || 'Pagamento'} — ${v.subject || ''} (R$ ${v.amount || '0,00'})`,
+      preheader: `${v.event_label || 'Pagamento'} de R$ ${v.amount || '0,00'} via ${v.method || '—'}.`,
+      body: `
+        <h2 style="color:${v.tone === 'good' ? '#4ade80' : v.tone === 'warn' ? '#FCBE04' : '#ef4444'};margin:0 0 12px">${v.event_label || 'Pagamento'}</h2>
+        ${dataTable([
+          ['Referência', `<strong>${v.subject || '—'}</strong>`],
+          ['Valor', `<strong>R$ ${v.amount || '0,00'}</strong>`],
+          ['Forma', v.method || '—'],
+          ['Cliente', v.customer_name || '—'],
+          ['E-mail', v.customer_email || '—'],
+          ...(v.detail ? [['Detalhe', v.detail]] : []),
+          ['Cobrança', `<span style="font-family:monospace;font-size:12px">${v.charge_id || '—'}</span>`],
+        ])}
+        ${
+          v.tone === 'good'
+            ? infoBox('O estoque já foi baixado e o cliente recebeu a confirmação. Nada a fazer além de separar o pedido.')
+            : v.tone === 'warn'
+              ? infoBox('Nada foi baixado ainda. A Pagar.me avisa sozinha quando o pagamento cair — não é preciso confirmar à mão.')
+              : infoBox('Confira no painel da Pagar.me antes de agir. Estorno e chargeback já mexeram no dinheiro.')
+        }`,
+      cta: { text: 'Abrir no painel', url: v.admin_url || adminUrl('/admin?tab=orders') },
+    },
+
     'admin-daily-digest': {
       subject: `📋 Painel do dia — ${v.total_pending || '0'} pendência(s) na GeekPop & Toys`,
       preheader: `${v.total_pending || '0'} item(ns) aguardando você no painel.`,

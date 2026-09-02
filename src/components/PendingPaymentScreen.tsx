@@ -383,7 +383,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
 
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <RefreshCw className="h-4 w-4" />
-                  <span>Pagamento seguro via Stripe</span>
+                  <span>Pagamento seguro via Pagar.me</span>
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted text-sm">

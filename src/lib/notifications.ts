@@ -2,7 +2,17 @@ import { api } from './api-client'
 
 /** In-app customer notifications. */
 
-export type NotificationKind = 'question_answered' | 'order_shipped' | 'generic'
+export type NotificationKind =
+  | 'question_answered'
+  | 'order_shipped'
+  | 'generic'
+  // Staff-only, read by the bell in the admin panel. Same table as the
+  // customer's — an admin is a user like any other; only the audience differs.
+  | 'payment_received'
+  | 'payment_pending'
+  | 'payment_failed'
+  | 'payment_refunded'
+  | 'payment_chargeback'
 
 export interface Notification {
   id: string

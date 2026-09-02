@@ -1149,6 +1149,61 @@ const STEPS: SchemaStep[] = [
       );
     },
   },
+  {
+    name: "Pagar.me provider columns (migration 034)",
+    run: async () => {
+      // Additive only. The Stripe columns stay so charges made before the
+      // migration remain refundable and their webhooks still find their order;
+      // `payment_provider` is what tells the two apart from here on.
+      await query(`ALTER TABLE members ADD COLUMN IF NOT EXISTS pagarme_customer_id VARCHAR(64)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_members_pagarme_customer
+        ON members(pagarme_customer_id) WHERE pagarme_customer_id IS NOT NULL`);
+
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS pagarme_order_id VARCHAR(64)`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS pagarme_charge_id VARCHAR(64)`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(20)`);
+      // The PIX code is issued by Pagar.me now instead of generated locally, so
+      // it has to be stored: it cannot be rebuilt from a txid any more.
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_qr_code TEXT`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_qr_code_url TEXT`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS pix_expires_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_brand VARCHAR(20)`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_last_four VARCHAR(4)`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS installments SMALLINT`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_document VARCHAR(14)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_orders_pagarme_order
+        ON orders(pagarme_order_id) WHERE pagarme_order_id IS NOT NULL`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_orders_pagarme_charge
+        ON orders(pagarme_charge_id) WHERE pagarme_charge_id IS NOT NULL`);
+      await query(`UPDATE orders SET payment_provider = 'stripe'
+        WHERE payment_provider IS NULL AND stripe_payment_intent_id IS NOT NULL`);
+      await query(`UPDATE orders SET payment_provider = 'manual' WHERE payment_provider IS NULL`);
+
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS provider VARCHAR(20)`);
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS pagarme_order_id VARCHAR(64)`);
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS pagarme_charge_id VARCHAR(64)`);
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS installments SMALLINT`);
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS card_brand VARCHAR(20)`);
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS card_last_four VARCHAR(4)`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_payments_pagarme_charge
+        ON payments(pagarme_charge_id) WHERE pagarme_charge_id IS NOT NULL`);
+      await query(`UPDATE payments SET provider = 'stripe'
+        WHERE provider IS NULL AND provider_id LIKE 'pi\\_%'`);
+      await query(`UPDATE payments SET provider = 'manual' WHERE provider IS NULL`);
+
+      // Debit joins the allowed methods: Pagar.me settles it on the same order.
+      // Dropped and re-added rather than guarded, because the constraint already
+      // exists with the old, narrower list.
+      await query(`ALTER TABLE payments DROP CONSTRAINT IF EXISTS chk_payments_method`);
+      await query(`DO $$ BEGIN
+        ALTER TABLE payments ADD CONSTRAINT chk_payments_method
+          CHECK (method IN ('pix','credit_card','debit_card','boleto','cash'));
+      EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+
+      await query(`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS provider VARCHAR(20)`);
+      await query(`UPDATE subscriptions SET provider = 'stripe' WHERE provider IS NULL`);
+    },
+  },
 ];
 
 let state: SchemaState = {

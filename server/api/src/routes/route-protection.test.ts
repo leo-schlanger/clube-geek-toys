@@ -215,6 +215,17 @@ const PUBLIC = new Set([
   'POST /orders',
   'GET /orders/:id/status', // UUID do pedido
   'GET /orders/:id/pix', // UUID do pedido — a recuperação do PIX
+  // Mesma chave e mesmo motivo: o convidado não tem conta, o UUID é a
+  // credencial e nada aqui devolve dado de cliente — cobra um cartão de que
+  // quem chama já tem o token. O serviço só aceita pedido `pending`.
+  'POST /orders/:id/pay-card',
+
+  // ── Configuração do checkout ──
+  // A chave pública é pública por definição (identifica a loja na tokenização)
+  // e o parcelamento é aritmética sobre um valor que o cliente já conhece.
+  // Vêm do servidor, e não de uma variável de build, para não vencerem.
+  'GET /payments/config',
+  'GET /payments/installments',
   'GET /shipping/cep/:cep',
   'POST /shipping/quote',
 
@@ -230,6 +241,11 @@ const PUBLIC = new Set([
   // produção a rota recusa tudo. A verificação é dentro do handler e este
   // contrato não a enxerga — ver `webhook.service.test.ts`.
   'POST /webhook/stripe',
+  // A Pagar.me não assina o corpo: o endpoint é protegido pelas credenciais
+  // Basic configuradas junto com o webhook no painel dela, conferidas dentro do
+  // handler — e, para evento de dinheiro, a cobrança é relida na API antes de
+  // valer. Ver `pagarme-webhook.service.ts`.
+  'POST /webhook/pagarme',
   'POST /webhook/pagbank', // 410 Gone, transicional
   // O navegador de quem autoriza, sem nossa sessão. Quem autentica é o `state`
   // assinado (`oauth.isValidState`).
@@ -259,6 +275,7 @@ const PUBLIC = new Set([
 const PUBLIC_WITHOUT_THROTTLE = new Set([
   'GET /health', // é o que o deploy consulta em laço
   'POST /webhook/stripe', // o Stripe reentrega; limitar aqui perde pagamento
+  'POST /webhook/pagarme', // idem: tem limiter próprio no router, mais folgado
   'POST /webhook/pagbank', // 410 fixo
   'GET /shipping/melhor-envio/callback', // protegido pelo state assinado
 

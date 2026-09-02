@@ -6,7 +6,7 @@ describe('PaymentTrustBadges', () => {
   it('shows each brand as an accessible badge', () => {
     render(<PaymentTrustBadges />)
     // The marks are SVG, so the accessible name is all a screen reader has.
-    for (const brand of ['PIX', 'Visa', 'Mastercard', 'Elo', 'Stripe']) {
+    for (const brand of ['PIX', 'Visa', 'Mastercard', 'Elo', 'Pagar.me']) {
       expect(screen.getByRole('img', { name: brand })).toBeInTheDocument()
     }
   })

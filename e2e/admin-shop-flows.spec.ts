@@ -7,7 +7,7 @@ import { test, expect, type Page } from '@playwright/test'
  * in this file. The product is named "ZZZ E2E ..." and cleaned up via SQL.
  *
  * The funnel stops at the payment step — it must not click "Continuar para
- * o pagamento", which would create a live Stripe charge.
+ * o pagamento", which would create a live Pagar.me charge.
  */
 
 const SHOP = 'https://shop.geeketoys.com.br'

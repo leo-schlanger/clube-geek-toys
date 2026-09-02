@@ -9,7 +9,18 @@ import { AppError } from '../middleware/error-handler.js';
  * into the SPA. Not a queue and not push — the customer sees it on next visit.
  */
 
-export type NotificationKind = 'question_answered' | 'order_shipped' | 'generic';
+export type NotificationKind =
+  | 'question_answered'
+  | 'order_shipped'
+  | 'generic'
+  // Staff-only kinds, written by admin-notification.service and read by the
+  // bell in the admin panel. They live in the same table because an admin is a
+  // user like any other — only the audience differs.
+  | 'payment_received'
+  | 'payment_pending'
+  | 'payment_failed'
+  | 'payment_refunded'
+  | 'payment_chargeback';
 
 export interface Notification {
   id: string;

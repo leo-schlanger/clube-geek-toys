@@ -47,7 +47,7 @@ Verificacao de membros por CPF ou QR Code e visualizacao se o membro esta EM DIA
 
 ### 3.4 Modulo Loja (E-commerce)
 
-Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=` — e **ordenacao** A–Z / postagem / preco via `?sort=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao (Stripe) ou PIX local e confirmacao de pagamento via webhook com baixa automatica de estoque. O desconto de 10% do membro e aplicado server-side no checkout (`discount_reason = 'member_10'`). PIX de loja e confirmado manualmente pelo admin. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`. No admin, o envio de foto abre um **recorte** (rotacao em quartos de volta + proporcao + tamanho em pixels) antes do upload.
+Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdominio e detectado por `getAppMode()`). Catalogo publico (categorias, **busca estilo Shopee** no header — barra sempre visivel + botao Buscar, query `?search=` — e **ordenacao** A–Z / postagem / preco via `?sort=`), paginas de produto com **variacoes** (eixos + SKUs; **foto propria por variacao** quando cadastrada; seletor com miniaturas e galeria que troca ao escolher a opcao — ver [`PRODUCT-VARIANTS.md`](PRODUCT-VARIANTS.md)), carrinho em `localStorage` (`CartContext`), checkout com cartao ou PIX, ambos pela **Pagar.me**, com confirmacao via webhook e baixa automatica de estoque. O desconto de 10% do membro e aplicado server-side no checkout (`discount_reason = 'member_10'`). O PIX da loja **confirma sozinho** desde 01/09/2026 (ver [`PAGARME.md`](PAGARME.md)); a confirmacao manual no painel ficou como excecao. Imagens de produto (listing e por SKU) ficam no volume `/uploads`, servido pelo nginx via `api.geeketoys.com.br`. No admin, o envio de foto abre um **recorte** (rotacao em quartos de volta + proporcao + tamanho em pixels) antes do upload.
 
 ### 3.4.1 Canal Atacado (B2B)
 
@@ -55,7 +55,7 @@ Aba dedicada em `shop.geeketoys.com.br/atacado`. Cadastro com **CNPJ** (validado
 
 ### 3.5 Modulo Pagamento
 
-Pagamento avulso via cartao de credito (Stripe PaymentIntent) e PIX local (QR Code gerado no servidor). Assinaturas recorrentes via Stripe Subscription. Pedidos de loja usam o mesmo motor de pagamento (metadata `kind = 'shop_order'`). Confirmacao manual de PIX pelo admin. Protecao contra pagamentos duplicados.
+Pagamento avulso via cartao (token gerado no navegador, cobrado na Pagar.me) e PIX dinamico emitido pela Pagar.me. Assinaturas recorrentes na Pagar.me. Pedidos de loja usam o mesmo motor (metadata `kind = 'shop_order'`). PIX confirma automaticamente pelo webhook. Protecao contra pagamentos duplicados. Avisos de pagamento para a equipe no sino do admin e por e-mail.
 
 ### 3.6 Modulo Contrato
 
@@ -123,12 +123,12 @@ Modulo de evento ativo na **loja** (`shop.geeketoys.com.br`): banner no topo, ca
 | start_date           | DATE         | Nullable                                                                        |
 | expiry_date          | DATE         | Nullable                                                                        |
 | pending_payment      | JSONB        | Nullable, dados do pagamento pendente                                           |
-| subscription_id      | TEXT         | Nullable, ID da assinatura Stripe                                               |
+| subscription_id      | TEXT         | Nullable, ID interno da assinatura (`sub_<providerId>`)                         |
 | subscription_status  | VARCHAR(20)  | Nullable                                                                        |
 | auto_renewal         | BOOLEAN      | DEFAULT FALSE                                                                   |
 | activated_at         | TIMESTAMPTZ  | Nullable                                                                        |
 | activated_by_payment | TEXT         | Nullable, ID do pagamento que ativou                                            |
-| stripe_customer_id   | TEXT         | Nullable                                                                        |
+| stripe_customer_id   | TEXT         | Nullable (legado); `pagarme_customer_id` e o atual                              |
 | payment_count        | INTEGER      | NOT NULL, DEFAULT 0. Contagem de pagamentos confirmados                         |
 | created_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW()                                                         |
 | updated_at           | TIMESTAMPTZ  | NOT NULL, DEFAULT NOW(), auto-update via trigger                                |
@@ -142,8 +142,8 @@ Modulo de evento ativo na **loja** (`shop.geeketoys.com.br`): banner no topo, ca
 | amount               | DECIMAL(10,2) | NOT NULL                                                                     |
 | method               | VARCHAR(20)   | NOT NULL, CHECK IN ('pix','credit_card','boleto','cash')                     |
 | status               | VARCHAR(20)   | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','paid','failed','refunded') |
-| provider_id          | TEXT          | Nullable, ID no Stripe                                                       |
-| provider_status      | TEXT          | Nullable, status no Stripe                                                   |
+| provider_id          | TEXT          | Nullable, ID da cobranca na operadora (`ch_...`, ou `pi_...` no legado)      |
+| provider_status      | TEXT          | Nullable, status bruto na operadora                                          |
 | reference            | TEXT          | Nullable, referencia interna                                                 |
 | paid_at              | TIMESTAMPTZ   | Nullable                                                                     |
 | webhook_processed_at | TIMESTAMPTZ   | Nullable                                                                     |
@@ -157,7 +157,7 @@ Modulo de evento ativo na **loja** (`shop.geeketoys.com.br`): banner no topo, ca
 | ------------------ | ------------- | ----------------------------------------------------------------------------------- |
 | id                 | TEXT          | PK                                                                                  |
 | member_id          | UUID          | FK → members(id) ON DELETE CASCADE, NOT NULL                                        |
-| provider_id        | TEXT          | NOT NULL, ID no Stripe                                                              |
+| provider_id        | TEXT          | NOT NULL, ID da assinatura na operadora                                             |
 | status             | VARCHAR(20)   | NOT NULL, DEFAULT 'pending', CHECK IN ('pending','authorized','paused','cancelled') |
 | plan               | VARCHAR(10)   | NOT NULL                                                                            |
 | frequency_type     | VARCHAR(10)   | NOT NULL, CHECK IN ('months','years')                                               |
@@ -427,20 +427,20 @@ As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
 
 O mesmo router e montado em quatro prefixos para compatibilidade.
 
-| Metodo | Endpoint                     | Descricao                            | Auth  |
-| ------ | ---------------------------- | ------------------------------------ | ----- |
-| POST   | `/pix/create`                | Gera QR Code PIX local               | JWT   |
-| POST   | `/checkout/card/create`      | Cria PaymentIntent Stripe (cartao)   | JWT   |
-| POST   | `/payments/:id/confirm`      | Admin confirma pagamento PIX manual  | admin |
-| POST   | `/payments/:id/refund`       | Admin realiza estorno                | admin |
-| GET    | `/payments`                  | Lista pagamentos (filtra por membro) | JWT   |
-| GET    | `/payment/status/:paymentId` | Consulta status no Stripe            | JWT   |
+| Metodo | Endpoint                     | Descricao                                                      | Auth  |
+| ------ | ---------------------------- | -------------------------------------------------------------- | ----- |
+| POST   | `/pix/create`                | Gera QR Code PIX local                                         | JWT   |
+| POST   | `/checkout/card/create`      | Cobra o cartao a partir do `card_token`                        | JWT   |
+| POST   | `/payments/:id/confirm`      | Admin confirma pagamento PIX manual                            | admin |
+| POST   | `/payments/:id/refund`       | Admin realiza estorno                                          | admin |
+| GET    | `/payments`                  | Lista pagamentos (filtra por membro)                           | JWT   |
+| GET    | `/payment/status/:paymentId` | Status do pagamento (rele a cobranca na operadora se pendente) | JWT   |
 
 ### Subscriptions (`/subscription`)
 
 | Metodo | Endpoint                                  | Descricao                    | Auth |
 | ------ | ----------------------------------------- | ---------------------------- | ---- |
-| POST   | `/subscription/create`                    | Cria assinatura Stripe       | JWT  |
+| POST   | `/subscription/create`                    | Cria assinatura na Pagar.me  | JWT  |
 | GET    | `/subscription/:id`                       | Detalhes da assinatura       | JWT  |
 | PUT    | `/subscription/:id/pause`                 | Pausa assinatura             | JWT  |
 | PUT    | `/subscription/:id/resume`                | Reativa assinatura           | JWT  |
@@ -552,10 +552,11 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Webhook (`/webhook`)
 
-| Metodo | Endpoint           | Descricao                                                                                                                           | Auth             |
-| ------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| POST   | `/webhook/stripe`  | Processa eventos do Stripe (assinatura e pedidos de loja via `metadata.kind = 'shop_order'`, que confirma o pedido e baixa estoque) | Signature Stripe |
-| POST   | `/webhook/pagbank` | Retorna 410 Gone (deprecado)                                                                                                        | -                |
+| Metodo | Endpoint           | Descricao                                                                                         | Auth             |
+| ------ | ------------------ | ------------------------------------------------------------------------------------------------- | ---------------- |
+| POST   | `/webhook/pagarme` | Liquida PIX e cartao, estorno, chargeback e assinatura. Basic auth + releitura da cobranca na API | Basic auth       |
+| POST   | `/webhook/stripe`  | **Legado**: eventos de cobrancas anteriores a 01/09/2026                                          | Signature Stripe |
+| POST   | `/webhook/pagbank` | Retorna 410 Gone (deprecado)                                                                      | -                |
 
 ### Reports (`/reports`)
 
@@ -615,30 +616,31 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ## 6. Templates de Email (22)
 
-| Template                      | Assunto                            | Trigger                                     | Variaveis principais                                                    | Destinatario |
-| ----------------------------- | ---------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------- | ------------ |
-| `verify-email`                | Verifique seu e-mail               | Backend (auto, apos registro)               | name, verify_url                                                        | Membro       |
-| `password-reset`              | Redefinicao de senha               | Backend (auto, solicitacao do membro)       | name, reset_url                                                         | Membro       |
-| `welcome`                     | Bem-vindo ao Clube GeekPop & Toys! | Frontend (apos ativacao)                    | name, plan                                                              | Membro       |
-| `payment-confirmed`           | Pagamento confirmado               | Webhook Stripe / Admin confirma PIX         | name, amount, plan, expiry_date                                         | Membro       |
-| `payment-failed`              | Pagamento nao aprovado             | Webhook Stripe                              | name                                                                    | Membro       |
-| `subscription-created`        | Assinatura ativada                 | Backend (auto)                              | name, plan, amount, card_last_four                                      | Membro       |
-| `subscription-payment`        | Cobranca recorrente processada     | Webhook Stripe                              | name, amount, plan, next_payment                                        | Membro       |
-| `subscription-paused`         | Assinatura pausada                 | Backend (auto)                              | name                                                                    | Membro       |
-| `subscription-resumed`        | Assinatura reativada               | Backend (auto)                              | name                                                                    | Membro       |
-| `subscription-cancelled`      | Assinatura cancelada               | Backend / Webhook (3 falhas)                | name                                                                    | Membro       |
-| `subscription-payment-failed` | Falha na cobranca recorrente       | Webhook Stripe                              | name, amount, failed_count                                              | Membro       |
-| `renewal-reminder`            | Sua assinatura expira em breve     | Cron diario (6h UTC, dedup via email_logs)  | name, plan, expiry_date                                                 | Membro       |
-| `member-expired`              | Sua assinatura expirou             | Cron diario                                 | name, plan                                                              | Membro       |
-| `order-confirmed`             | Pedido confirmado                  | Webhook Stripe / Admin confirma PIX de loja | name, order_number, total                                               | Cliente      |
-| `contract-signed`             | Contrato assinado                  | Frontend (apos assinatura digital)          | name, plan, signed_at, hash                                             | Membro       |
-| `admin-pix-pending`           | PIX pendente de confirmacao        | Backend (auto, apos criacao de PIX)         | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
-| `admin-new-member`            | Novo membro cadastrado             | Backend (auto, apos cadastro)               | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
-| `order-shipped`               | Pedido enviado                     | Admin salva codigo de rastreio              | name, order_number, tracking_code, tracking_url, shipping_service       | Cliente      |
-| `question-answered`           | Sua pergunta foi respondida        | Admin responde pergunta do produto          | name, product_name, question, answer, product_url                       | Cliente      |
-| `admin-pix-order-pending`     | Pedido PIX aguardando confirmacao  | Backend (auto, apos gerar PIX de loja)      | order_number, customer_name, customer_email, total, tx_id, admin_url    | Admin        |
-| `admin-order-cancelled`       | Pedido cancelado pelo cliente      | Cliente cancela pedido nao pago             | order_number, customer_name, customer_email, total, admin_url           | Admin        |
-| `admin-daily-digest`          | Painel do dia                      | Cron diario (6h UTC, so com pendencia)      | total_pending, contagem por fila, admin_url                             | Admin        |
+| Template                      | Assunto                                          | Trigger                                    | Variaveis principais                                                    | Destinatario |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------- | ------------ |
+| `verify-email`                | Verifique seu e-mail                             | Backend (auto, apos registro)              | name, verify_url                                                        | Membro       |
+| `password-reset`              | Redefinicao de senha                             | Backend (auto, solicitacao do membro)      | name, reset_url                                                         | Membro       |
+| `welcome`                     | Bem-vindo ao Clube GeekPop & Toys!               | Frontend (apos ativacao)                   | name, plan                                                              | Membro       |
+| `payment-confirmed`           | Pagamento confirmado                             | Webhook Pagar.me / confirmacao manual      | name, amount, plan, expiry_date                                         | Membro       |
+| `payment-failed`              | Pagamento nao aprovado                           | Webhook Pagar.me                           | name                                                                    | Membro       |
+| `subscription-created`        | Assinatura ativada                               | Backend (auto)                             | name, plan, amount, card_last_four                                      | Membro       |
+| `subscription-payment`        | Cobranca recorrente processada                   | Webhook Pagar.me (`invoice.paid`)          | name, amount, plan, next_payment                                        | Membro       |
+| `subscription-paused`         | Assinatura pausada                               | Backend (auto)                             | name                                                                    | Membro       |
+| `subscription-resumed`        | Assinatura reativada                             | Backend (auto)                             | name                                                                    | Membro       |
+| `subscription-cancelled`      | Assinatura cancelada                             | Backend / Webhook (3 falhas)               | name                                                                    | Membro       |
+| `subscription-payment-failed` | Falha na cobranca recorrente                     | Webhook Pagar.me                           | name, amount, failed_count                                              | Membro       |
+| `renewal-reminder`            | Sua assinatura expira em breve                   | Cron diario (6h UTC, dedup via email_logs) | name, plan, expiry_date                                                 | Membro       |
+| `member-expired`              | Sua assinatura expirou                           | Cron diario                                | name, plan                                                              | Membro       |
+| `order-confirmed`             | Pedido confirmado                                | Webhook Pagar.me (`charge.paid`)           | name, order_number, total                                               | Cliente      |
+| `contract-signed`             | Contrato assinado                                | Frontend (apos assinatura digital)         | name, plan, signed_at, hash                                             | Membro       |
+| `admin-pix-pending`           | PIX pendente de confirmacao                      | Backend (auto, apos criacao de PIX)        | member_name, member_email, plan, amount, tx_id, payment_id              | Admin        |
+| `admin-new-member`            | Novo membro cadastrado                           | Backend (auto, apos cadastro)              | member_name, member_email, member_cpf, member_phone, plan, payment_type | Admin        |
+| `order-shipped`               | Pedido enviado                                   | Admin salva codigo de rastreio             | name, order_number, tracking_code, tracking_url, shipping_service       | Cliente      |
+| `question-answered`           | Sua pergunta foi respondida                      | Admin responde pergunta do produto         | name, product_name, question, answer, product_url                       | Cliente      |
+| `admin-pix-order-pending`     | Pedido PIX aguardando confirmacao                | Backend (auto, apos gerar PIX de loja)     | order_number, customer_name, customer_email, total, tx_id, admin_url    | Admin        |
+| `admin-order-cancelled`       | Pedido cancelado pelo cliente                    | Cliente cancela pedido nao pago            | order_number, customer_name, customer_email, total, admin_url           | Admin        |
+| `admin-daily-digest`          | Painel do dia                                    | Cron diario (6h UTC, so com pendencia)     | total_pending, contagem por fila, admin_url                             | Admin        |
+| `admin-payment-event`         | Pagamento recebido/recusado/estornado/chargeback | Servicos de pagamento e webhook            | event_label, subject, amount, method, customer_name, detail, admin_url  | Equipe       |
 
 ## 7. Roles e Permissoes
 
@@ -660,40 +662,41 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Backend — Obrigatorias
 
-| Variavel             | Tipo   | Descricao                                 |
-| -------------------- | ------ | ----------------------------------------- |
-| `DATABASE_URL`       | string | URL de conexao PostgreSQL                 |
-| `JWT_SECRET`         | string | Secret para access tokens (min 32 chars)  |
-| `JWT_REFRESH_SECRET` | string | Secret para refresh tokens (min 32 chars) |
-| `HMAC_SECRET`        | string | Secret para tokens HMAC (min 32 chars)    |
-| `STRIPE_SECRET_KEY`  | string | Chave secreta do Stripe                   |
-| `RESEND_API_KEY`     | string | Chave da API Resend                       |
-| `FRONTEND_URL`       | string | URL do SPA de membros (com https)         |
-| `API_URL`            | string | URL publica da API (com https)            |
+| Variavel             | Tipo   | Descricao                                       |
+| -------------------- | ------ | ----------------------------------------------- |
+| `DATABASE_URL`       | string | URL de conexao PostgreSQL                       |
+| `JWT_SECRET`         | string | Secret para access tokens (min 32 chars)        |
+| `JWT_REFRESH_SECRET` | string | Secret para refresh tokens (min 32 chars)       |
+| `HMAC_SECRET`        | string | Secret para tokens HMAC (min 32 chars)          |
+| `PAGARME_SECRET_KEY` | string | Chave secreta da Pagar.me (obrigatoria em prod) |
+| `RESEND_API_KEY`     | string | Chave da API Resend                             |
+| `FRONTEND_URL`       | string | URL do SPA de membros (com https)               |
+| `API_URL`            | string | URL publica da API (com https)                  |
 
 ### Backend — Opcionais
 
-| Variavel                | Tipo   | Default                                           | Descricao                                       |
-| ----------------------- | ------ | ------------------------------------------------- | ----------------------------------------------- |
-| `NODE_ENV`              | string | `development`                                     | Ambiente (development, production, test)        |
-| `PORT`                  | number | `3001`                                            | Porta do servidor Express                       |
-| `STRIPE_WEBHOOK_SECRET` | string | -                                                 | Secret do webhook Stripe (obrigatorio em prod)  |
-| `PIX_KEY`               | string | -                                                 | Chave PIX para geracao de QR Code               |
-| `PIX_MERCHANT_NAME`     | string | -                                                 | Nome do comerciante no PIX                      |
-| `PIX_MERCHANT_CITY`     | string | -                                                 | Cidade do comerciante no PIX                    |
-| `GOOGLE_CLIENT_ID`      | string | -                                                 | Client ID do Google OAuth                       |
-| `FROM_EMAIL`            | string | `Clube GeekPop & Toys <contato@geeketoys.com.br>` | Remetente dos emails                            |
-| `ADMIN_EMAIL`           | string | `admin@geeketoys.com.br`                          | Email que recebe notificacoes admin             |
-| `ALLOWED_ORIGINS`       | string | -                                                 | Origens CORS adicionais (separadas por virgula) |
+| Variavel                                            | Tipo   | Default                                           | Descricao                                       |
+| --------------------------------------------------- | ------ | ------------------------------------------------- | ----------------------------------------------- |
+| `NODE_ENV`                                          | string | `development`                                     | Ambiente (development, production, test)        |
+| `PORT`                                              | number | `3001`                                            | Porta do servidor Express                       |
+| `PAGARME_WEBHOOK_USER` / `PAGARME_WEBHOOK_PASSWORD` | string | -                                                 | Basic auth do webhook (obrigatorios em prod)    |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`       | string | -                                                 | Legado: so estorno de cobranca antiga           |
+| `PIX_KEY`                                           | string | -                                                 | Chave PIX para geracao de QR Code               |
+| `PIX_MERCHANT_NAME`                                 | string | -                                                 | Nome do comerciante no PIX                      |
+| `PIX_MERCHANT_CITY`                                 | string | -                                                 | Cidade do comerciante no PIX                    |
+| `GOOGLE_CLIENT_ID`                                  | string | -                                                 | Client ID do Google OAuth                       |
+| `FROM_EMAIL`                                        | string | `Clube GeekPop & Toys <contato@geeketoys.com.br>` | Remetente dos emails                            |
+| `ADMIN_EMAIL`                                       | string | `admin@geeketoys.com.br`                          | Email que recebe notificacoes admin             |
+| `ALLOWED_ORIGINS`                                   | string | -                                                 | Origens CORS adicionais (separadas por virgula) |
 
 ### Frontend (`.env`)
 
-| Variavel                      | Descricao                      |
-| ----------------------------- | ------------------------------ |
-| `VITE_API_URL`                | URL da API                     |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave publica do Stripe        |
-| `VITE_PIX_KEY`                | Chave PIX (exibida no QR Code) |
-| `VITE_ENVIRONMENT`            | Ambiente (production, etc.)    |
+| Variavel                          | Descricao                                               |
+| --------------------------------- | ------------------------------------------------------- |
+| `VITE_API_URL`                    | URL da API                                              |
+| ~~`VITE_STRIPE_PUBLISHABLE_KEY`~~ | Removida: a chave publica vem de `GET /payments/config` |
+| `VITE_PIX_KEY`                    | Chave PIX (exibida no QR Code)                          |
+| `VITE_ENVIRONMENT`                | Ambiente (production, etc.)                             |
 
 ## 9. Estrutura de Diretorios
 
@@ -795,7 +798,8 @@ clube-geek-toys/
 │   │           ├── disposable-emails.ts # Lista de emails descartaveis
 │   │           ├── hmac.ts              # HMAC para tokens
 │   │           ├── pix.ts              # Geracao de QR Code PIX (BR Code)
-│   │           └── stripe.ts            # Helpers Stripe SDK
+│   │           ├── pagarme.ts           # Cliente da API v5 (Orders, Charges, Subscriptions)
+│   │           └── stripe.ts            # Legado: estorno de cobranca antiga
 │   │
 │   ├── nginx/
 │   │   ├── nginx.conf                   # Configuracao principal
@@ -887,7 +891,7 @@ clube-geek-toys/
 │   │   ├── ContractModal.tsx, PaymentModal.tsx
 │   │   ├── MemberModal.tsx, UserModal.tsx, ProfileEditModal.tsx
 │   │   ├── RenewModal.tsx, UpgradeModal.tsx
-│   │   ├── StripePaymentForm.tsx
+│   │   ├── PagarmeCardForm.tsx
 │   │   ├── SubscriptionManagement.tsx
 │   │   ├── QRScanner.tsx, RadioMiniPlayer.tsx
 │   │   ├── MembersTable.tsx, MemberFilters.tsx
@@ -907,7 +911,7 @@ clube-geek-toys/
 │   │   ├── members.ts, payments.ts
 │   │   ├── products.ts, orders.ts       # Loja (catalogo e pedidos)
 │   │   ├── subscriptions.ts, email.ts, reports.ts
-│   │   ├── logs.ts, settings.ts, stripe.ts
+│   │   ├── logs.ts, settings.ts, pagarme.ts
 │   │   ├── contract-generator.ts        # Gera PDF do contrato
 │   │   ├── contract-storage.ts
 │   │   ├── analytics.ts, error-tracking.ts, logger.ts

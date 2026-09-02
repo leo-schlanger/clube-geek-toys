@@ -23,7 +23,7 @@ Duas stacks independentes compartilham a mesma VPS. O deploy automático cuida a
 - VPS com Ubuntu 22+ e Docker 27+ (com Docker Compose plugin)
 - Domínio apontado para o IP da VPS (registros A para todos os subdomínios)
 - Chave SSH configurada no GitHub Secrets para deploy automatizado
-- Conta Stripe ativa (publishable key + secret key)
+- Conta Pagar.me ativa (secret key `sk_` + public key `pk_`)
 - Conta Resend com API key e domínio verificado
 - Chave PIX (UUID) configurada
 
@@ -107,9 +107,19 @@ JWT_SECRET=<string aleatória, mínimo 32 caracteres>
 JWT_REFRESH_SECRET=<string aleatória diferente, mínimo 32 caracteres>
 HMAC_SECRET=<string aleatória diferente, mínimo 32 caracteres>
 
-# Stripe (pagamentos)
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+# Pagar.me (pagamentos) — ver docs/PAGARME.md
+PAGARME_SECRET_KEY=sk_...
+PAGARME_PUBLIC_KEY=pk_...
+PAGARME_ACCOUNT_ID=acc_...
+PAGARME_WEBHOOK_USER=<usuário do webhook, igual ao painel da Pagar.me>
+PAGARME_WEBHOOK_PASSWORD=<senha do webhook, igual ao painel da Pagar.me>
+PAGARME_STATEMENT_DESCRIPTOR=GEEKPOPTOYS
+PAGARME_MAX_INSTALLMENTS=6
+
+# Stripe — legado. Só para estornar cobrança anterior à migração de 01/09/2026.
+# Pode ficar vazio quando não houver mais nenhuma cobrança antiga em aberto.
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
 
 # Email (Resend)
 RESEND_API_KEY=re_...
@@ -133,12 +143,15 @@ PIX_MERCHANT_CITY=RIO DE JANEIRO
 
 Injetadas durante o build no GitHub Actions:
 
-| Variável                      | Descrição                                   |
-| ----------------------------- | ------------------------------------------- |
-| `VITE_API_URL`                | URL da API (`https://api.geeketoys.com.br`) |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave pública do Stripe                     |
-| `VITE_PIX_KEY`                | Chave PIX da empresa                        |
-| `VITE_ENVIRONMENT`            | `production`                                |
+| Variável           | Descrição                                   |
+| ------------------ | ------------------------------------------- |
+| `VITE_API_URL`     | URL da API (`https://api.geeketoys.com.br`) |
+| `VITE_PIX_KEY`     | Chave PIX da empresa                        |
+| `VITE_ENVIRONMENT` | `production`                                |
+
+> A chave pública da Pagar.me **não** é injetada no build: o checkout a lê de
+> `GET /payments/config` em runtime, para que uma rotação na VPS valha sem
+> deploy do frontend.
 
 ---
 
@@ -280,13 +293,12 @@ docker compose run --rm -T --entrypoint certbot certbot renew --dry-run
 
 ### GitHub Secrets necessários
 
-| Secret                        | Descrição                      |
-| ----------------------------- | ------------------------------ |
-| `VPS_HOST`                    | IP ou hostname da VPS          |
-| `VPS_USER`                    | Usuário SSH para deploy        |
-| `VPS_SSH_KEY`                 | Chave privada SSH              |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave pública do Stripe (live) |
-| `VITE_PIX_KEY`                | Chave PIX da empresa           |
+| Secret         | Descrição               |
+| -------------- | ----------------------- |
+| `VPS_HOST`     | IP ou hostname da VPS   |
+| `VPS_USER`     | Usuário SSH para deploy |
+| `VPS_SSH_KEY`  | Chave privada SSH       |
+| `VITE_PIX_KEY` | Chave PIX da empresa    |
 
 ### Deploy manual (emergência)
 
@@ -309,24 +321,37 @@ ssh $VPS_HOST "cd /opt/clube-geek-toys/server && \
 
 ---
 
-## 9. Stripe Webhook Setup
+## 9. Webhook da Pagar.me
 
-1. Acesse **Stripe Dashboard > Developers > Webhooks**
-2. Adicione o endpoint: `https://api.geeketoys.com.br/webhook/stripe`
-3. Selecione os eventos:
-   - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-   - `invoice.paid`
-   - `invoice.payment_failed`
-   - `customer.subscription.deleted`
-4. Copie o **signing secret** (`whsec_...`) para a variável `STRIPE_WEBHOOK_SECRET` no `.env`
+O webhook é **a única coisa que marca um PIX como pago**. Sem ele, todo pedido
+fica `pending` para sempre.
+
+1. Acesse **Pagar.me → Configurações → Webhooks**
+2. URL: `https://api.geeketoys.com.br/webhook/pagarme`
+3. **Autenticação**: informe usuário e senha — os mesmos valores de
+   `PAGARME_WEBHOOK_USER` e `PAGARME_WEBHOOK_PASSWORD` no `.env`
+4. Eventos:
+   - `charge.paid`, `charge.payment_failed`, `charge.refunded`, `charge.partial_canceled`
+   - `order.paid`, `order.payment_failed`, `order.canceled`
+   - `chargeback.received`
+   - `invoice.paid`, `invoice.payment_failed`, `subscription.canceled`
 5. Reinicie a API:
 
 ```bash
 ssh $VPS_HOST "cd /opt/clube-geek-toys/server && docker compose up -d --force-recreate api"
 ```
 
-> **Importante:** se o webhook foi criado em modo test e depois mudou para live, o signing secret muda. Verifique e atualize no `.env`.
+6. Confirme em `GET /health` → `payments.status` deve ser `"ok"`. Enquanto
+   estiver `webhook_unauthenticated`, as credenciais não bateram.
+
+> A Pagar.me v5 **não assina o corpo** — a proteção é essa Basic auth. Por isso o
+> processador ainda relê a cobrança na API antes de acreditar em qualquer evento
+> de dinheiro; ver [`docs/PAGARME.md`](docs/PAGARME.md).
+
+### Stripe (legado)
+
+O endpoint `POST /webhook/stripe` continua no ar para os eventos que cobranças
+anteriores à migração ainda emitem. Não crie novos webhooks lá.
 
 ---
 
@@ -443,10 +468,10 @@ ssh $VPS_HOST "cd /opt/clube-geek-toys/server && docker compose build --no-cache
 
 ### Webhook não processando
 
-1. Verificar se `STRIPE_WEBHOOK_SECRET` está correto no `.env`
+1. Verificar se `PAGARME_WEBHOOK_USER` e `PAGARME_WEBHOOK_PASSWORD` batem com o painel da Pagar.me
 2. Consultar tabela `processed_webhooks`: `SELECT * FROM processed_webhooks ORDER BY processed_at DESC LIMIT 10;`
 3. Verificar logs: `docker compose logs api | grep webhook`
-4. Confirmar endpoint no Stripe Dashboard
+4. Confirmar o endpoint no painel da Pagar.me (e as entregas com falha, que ela reenvia)
 
 ### Email não enviando
 

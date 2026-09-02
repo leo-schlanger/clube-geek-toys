@@ -24,6 +24,7 @@ const mockCanPauseSubscription = vi.fn(() => false)
 const mockCanResumeSubscription = vi.fn(() => false)
 const mockCanCancelSubscription = vi.fn(() => false)
 const mockCanUpdateCard = vi.fn(() => false)
+const mockUpdateSubscriptionCard = vi.fn()
 
 vi.mock('../lib/subscriptions', () => ({
   getSubscriptionByMemberId: (...args: unknown[]) => mockGetSubscriptionByMemberId(...args),
@@ -40,6 +41,26 @@ vi.mock('../lib/subscriptions', () => ({
   canResumeSubscription: (...args: unknown[]) => mockCanResumeSubscription(...args),
   canCancelSubscription: (...args: unknown[]) => mockCanCancelSubscription(...args),
   canUpdateCard: (...args: unknown[]) => mockCanUpdateCard(...args),
+  updateSubscriptionCard: (...args: unknown[]) => mockUpdateSubscriptionCard(...args),
+}))
+
+/**
+ * Stand-in for the card form: the real one collects and tokenizes the card, and
+ * what this component owns is what happens with the token afterwards.
+ */
+vi.mock('./PagarmeCardForm', () => ({
+  PagarmeCardForm: ({
+    onToken,
+    onCancel,
+  }: {
+    onToken: (token: string) => Promise<void> | void
+    onCancel: () => void
+  }) => (
+    <div data-testid="card-form">
+      <button onClick={() => void onToken('token_abc')}>card-submit</button>
+      <button onClick={onCancel}>card-cancel</button>
+    </div>
+  ),
 }))
 
 vi.mock('sonner', () => ({
@@ -473,7 +494,12 @@ describe('SubscriptionManagement', () => {
   })
 
   // ---------- Update card dialog ----------
-  it('should open and close update card dialog', async () => {
+  /**
+   * The card is swapped in place now. The dialog used to tell the member to
+   * cancel and subscribe again, which cost them the days they had already paid
+   * for — Pagar.me points the existing recurrence at a new token instead.
+   */
+  it('offers the card form and promises the cycle is untouched', async () => {
     mockGetSubscriptionByMemberId.mockResolvedValue(makeSub())
     mockGetSubscriptionPayments.mockResolvedValue([])
     mockCanUpdateCard.mockReturnValue(true)
@@ -485,12 +511,31 @@ describe('SubscriptionManagement', () => {
     })
 
     fireEvent.click(screen.getByText('Atualizar cartão'))
-    expect(screen.getByText('Atualizar Cartão')).toBeInTheDocument()
-    expect(screen.getByText(/Para atualizar o cartão, cancele a assinatura atual/)).toBeInTheDocument()
 
-    fireEvent.click(screen.getByText('Entendi'))
+    expect(screen.getByTestId('card-form')).toBeInTheDocument()
+    expect(screen.getByText(/não perde os dias já pagos/)).toBeInTheDocument()
+    expect(screen.queryByText(/cancele a assinatura atual/)).not.toBeInTheDocument()
+  })
+
+  it('sends the token to the API and closes on success', async () => {
+    mockGetSubscriptionByMemberId.mockResolvedValue(makeSub())
+    mockGetSubscriptionPayments.mockResolvedValue([])
+    mockCanUpdateCard.mockReturnValue(true)
+    mockUpdateSubscriptionCard.mockResolvedValue(true)
+
+    render(<SubscriptionManagement memberId="m1" />)
+
     await waitFor(() => {
-      expect(screen.queryByText('Atualizar Cartão')).not.toBeInTheDocument()
+      expect(screen.getByText('Atualizar cartão')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByText('Atualizar cartão'))
+    fireEvent.click(screen.getByText('card-submit'))
+
+    await waitFor(() => {
+      expect(mockUpdateSubscriptionCard).toHaveBeenCalledWith('sub-1', 'token_abc')
+    })
+    await waitFor(() => {
+      expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
     })
   })
 

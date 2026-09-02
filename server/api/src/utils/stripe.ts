@@ -1,12 +1,40 @@
 import Stripe from 'stripe';
 import { env } from '../config/env.js';
 import { query } from '../config/database.js';
+import { AppError } from '../middleware/error-handler.js';
+
+/**
+ * Stripe — legacy provider.
+ *
+ * Pagar.me took over every new charge in the 2026-09 migration. What stays here
+ * is what old money still needs: refunding a charge made before the cut-over,
+ * and acknowledging the webhooks those charges still emit. Nothing in this file
+ * is on a path a customer can reach today.
+ */
 
 // ─── Stripe client singleton ──────────────────────────────────────────────────
 
 let _stripe: Stripe | null = null;
 
+export function isStripeConfigured(): boolean {
+  return Boolean(env.STRIPE_SECRET_KEY);
+}
+
+/**
+ * The Stripe client, or a 503 explaining why there isn't one.
+ *
+ * The key became optional with the migration, so a deployment that has dropped
+ * it entirely is legitimate — but then a legacy refund cannot be processed, and
+ * saying so beats a TypeError halfway through.
+ */
 export function getStripe(): Stripe {
+  if (!env.STRIPE_SECRET_KEY) {
+    throw new AppError(
+      503,
+      'Cobrança antiga (Stripe) indisponível: a chave não está mais configurada neste ambiente.',
+      'STRIPE_NOT_CONFIGURED',
+    );
+  }
   if (!_stripe) {
     _stripe = new Stripe(env.STRIPE_SECRET_KEY);
   }

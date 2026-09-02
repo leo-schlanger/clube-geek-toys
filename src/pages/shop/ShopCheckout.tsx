@@ -17,7 +17,7 @@ import {
 import { toast } from 'sonner'
 import { QRCodeSVG } from 'qrcode.react'
 import type { CreateOrderResult } from '../../lib/orders'
-import { createOrder, cartToOrderItems } from '../../lib/orders'
+import { createOrder, cartToOrderItems, payOrderWithCard } from '../../lib/orders'
 import {
   lookupCep,
   quoteShipping,
@@ -39,7 +39,8 @@ import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { SeoHead } from '../../components/store/SeoHead'
 import { getStoreCredit } from '../../lib/reviews'
 import { useAuth } from '../../contexts/AuthContext'
-import { StripePaymentForm } from '../../components/StripePaymentForm'
+import { PagarmeCardForm } from '../../components/PagarmeCardForm'
+import { isValidCPFFormat } from '../../lib/cpf-validation'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -70,6 +71,9 @@ export default function ShopCheckout() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  // The acquirer refuses an order without a buyer document, so this is now a
+  // required field on both payment methods — not just an anti-fraud nicety.
+  const [customerDocument, setCustomerDocument] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<PaymentChoice>('pix')
   const [storeCreditBalance, setStoreCreditBalance] = useState(0)
@@ -106,6 +110,7 @@ export default function ShopCheckout() {
       setName((prev) => prev || member.fullName)
       setEmail((prev) => prev || member.email)
       setPhone((prev) => prev || member.phone || '')
+      setCustomerDocument((prev) => prev || member.cpf || '')
     }
   }, [member])
 
@@ -245,6 +250,13 @@ export default function ShopCheckout() {
       }
     }
 
+    // Retail always pays under a CPF. Checking here turns a 400 from the API
+    // into a corrected field, before the cart is committed.
+    if (!isWholesale && !isValidCPFFormat(customerDocument)) {
+      toast.error('Informe um CPF válido — a operadora exige o documento do comprador.')
+      return
+    }
+
     if (isWholesale) {
       if (wholesaleClosed) {
         toast.error('Ainda não estamos vendendo no atacado. Cadastre o CNPJ e avisamos ao abrir.')
@@ -265,6 +277,8 @@ export default function ShopCheckout() {
           name: name.trim(),
           email: email.trim(),
           phone: phone.trim() || undefined,
+          // Wholesale buys under the account's CNPJ; retail under the buyer's CPF.
+          document: isWholesale ? wholesaleAccount!.cnpj : customerDocument.replace(/\D/g, ''),
         },
         customerNote: customerNote.trim() || undefined,
         deliveryMethod,
@@ -390,6 +404,25 @@ export default function ShopCheckout() {
                         disabled={submitting}
                       />
                     </div>
+                    {/* Wholesale already identifies itself by the account's CNPJ,
+                        so the field only appears on the retail channel. */}
+                    {!isWholesale && (
+                      <div className="space-y-2">
+                        <Label htmlFor="document">CPF</Label>
+                        <Input
+                          id="document"
+                          inputMode="numeric"
+                          value={customerDocument}
+                          onChange={(e) => setCustomerDocument(e.target.value)}
+                          placeholder="000.000.000-00"
+                          required
+                          disabled={submitting}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Exigido pela operadora para emitir a cobrança, no PIX e no cartão.
+                        </p>
+                      </div>
+                    )}
                     {/* Collectible orders almost always come with a note
                         ("if you have more of the same singer, send them"). Without
                         a field, it arrived on another channel and off the order. */}
@@ -650,7 +683,7 @@ export default function ShopCheckout() {
                       onSelect={() => setPaymentMethod('pix')}
                       icon={<QrCode className="h-5 w-5" />}
                       title="PIX"
-                      description="QR Code e copia-e-cola. Confirmação após identificação do pagamento."
+                      description="QR Code e copia-e-cola. Confirmação automática em segundos."
                       disabled={submitting}
                     />
                     <PaymentOption
@@ -658,7 +691,7 @@ export default function ShopCheckout() {
                       onSelect={() => setPaymentMethod('credit_card')}
                       icon={<CreditCard className="h-5 w-5" />}
                       title="Cartão de crédito"
-                      description="Pagamento seguro processado pela Stripe."
+                      description="Processado pela Pagar.me. Parcelamento sem juros."
                       disabled={submitting}
                     />
                     <PaymentTrustBadges className="pt-2" />
@@ -693,21 +726,32 @@ export default function ShopCheckout() {
                   . Você tem 7 dias após o recebimento para desistir da compra.
                 </p>
               </form>
-            ) : paymentMethod === 'credit_card' && result.clientSecret ? (
+            ) : paymentMethod === 'credit_card' && result.requiresCard && order ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Pagamento com cartão</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <StripePaymentForm
-                    clientSecret={result.clientSecret}
-                    amount={order?.total}
-                    submitLabel={order ? `Pagar ${formatCurrency(order.total)}` : undefined}
-                    // `fromCheckout` is what tells the confirmation page it may
-                    // empty the cart. Reaching the same URL later — from the
-                    // confirmation e-mail, say — must not touch a new cart.
-                    onSuccess={() => navigate(`/pedido/${order?.id}`, { state: { fromCheckout: true } })}
-                    onError={(msg) => toast.error(msg)}
+                  {/*
+                    The order already exists and is holding its stock; this step
+                    only authorises the card. That separation is what makes a
+                    declined card a retry on pedido #{order.orderNumber} instead
+                    of a new order and a second reservation.
+                  */}
+                  <PagarmeCardForm
+                    amount={order.total}
+                    // Wholesale never filled the CPF field — it buys under the
+                    // account's CNPJ, which is the document on the order too.
+                    defaultDocument={isWholesale ? (wholesaleAccount?.cnpj ?? '') : customerDocument}
+                    defaultHolderName={name}
+                    submitLabel={`Pagar ${formatCurrency(order.total)}`}
+                    onToken={async (cardToken, installments) => {
+                      await payOrderWithCard(order.id, cardToken, installments)
+                      // `fromCheckout` is what tells the confirmation page it
+                      // may empty the cart. Reaching the same URL later — from
+                      // the confirmation e-mail, say — must not touch a new cart.
+                      navigate(`/pedido/${order.id}`, { state: { fromCheckout: true } })
+                    }}
                     onCancel={() => setResult(null)}
                   />
                 </CardContent>
@@ -750,8 +794,8 @@ export default function ShopCheckout() {
                   <div className="flex items-start gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
                     <Clock className="mt-0.5 h-4 w-4 shrink-0" />
                     <span>
-                      Após o pagamento, a confirmação pode levar alguns minutos. Acompanhe o status
-                      na página do pedido ou em Minhas compras.
+                      A confirmação é automática: assim que o PIX cair, o pedido muda para pago
+                      sozinho — normalmente em segundos. Não é preciso enviar comprovante.
                     </span>
                   </div>
 

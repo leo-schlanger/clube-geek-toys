@@ -11,35 +11,77 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     pass the `status === 'paid'` read-guard together and hand the member
  *     `payment_count + 1` twice and **two months** for one payment.
  *  3. A member only ever sees their own payment (`userOwnsPayment`).
- *  4. A refund marks the row only after Stripe accepted it, and never twice.
+ *  4. A refund marks the row only after the provider accepted it, and never twice.
  *  5. Proration credits the unused days instead of charging the full plan.
+ *  6. The card is never charged without a token, and a decline is a 402 with a
+ *     PT-BR reason — not a pending row the member waits on forever.
+ *
+ * Only the three network calls are mocked (`createOrder`, `getCharge`,
+ * `refundCharge`); the rest of `utils/pagarme` is the real module, so the money
+ * maths — reais to centavos, status mapping, instalment ceiling — is under test
+ * here rather than restated by a stub.
  */
 
-const { queryMock, auditMock, sendEmailMock, stripeMock, customerMock } = vi.hoisted(() => ({
+const {
+  queryMock,
+  auditMock,
+  sendEmailMock,
+  stripeMock,
+  notifyAdminsMock,
+  createOrderMock,
+  getChargeMock,
+  refundChargeMock,
+} = vi.hoisted(() => ({
   queryMock: vi.fn(),
   auditMock: vi.fn(async () => {}),
   sendEmailMock: vi.fn(async () => ({})),
   stripeMock: vi.fn(),
-  customerMock: vi.fn(async () => 'cus_1'),
+  notifyAdminsMock: vi.fn(),
+  createOrderMock: vi.fn(),
+  getChargeMock: vi.fn(),
+  refundChargeMock: vi.fn(async () => ({ id: 'ch_1', status: 'canceled' })),
 }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
+vi.mock('./admin-notification.service.js', () => ({
+  notifyAdminsOfPaymentAsync: notifyAdminsMock,
+  notifyAdminsOfPayment: notifyAdminsMock,
+}));
 vi.mock('../utils/stripe.js', () => ({
   getStripe: stripeMock,
-  getOrCreateCustomer: customerMock,
   mapStripePaymentStatus: (s: string) => (s === 'succeeded' ? 'paid' : 'pending'),
 }));
+vi.mock('../utils/pagarme.js', async () => {
+  const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
+  return {
+    ...actual,
+    createOrder: createOrderMock,
+    getCharge: getChargeMock,
+    // The throttled variant calls `getCharge` through the module's own closure,
+    // which an export override does not reach — so it is stubbed too, or the
+    // polling path would make a real request.
+    getChargeThrottled: getChargeMock,
+    refundCharge: refundChargeMock,
+  };
+});
 vi.mock('../config/env.js', () => ({
   env: {
+    NODE_ENV: 'test',
     PIX_KEY: 'geekpopee@gmail.com',
     PIX_MERCHANT_NAME: 'GEEKPOP E TOYS',
     PIX_MERCHANT_CITY: 'RIO DE JANEIRO',
     ADMIN_EMAIL: 'geeketoys@gmail.com',
     FRONTEND_URL: 'https://club.geeketoys.com.br',
+    PAGARME_SECRET_KEY: 'sk_test_x',
+    PAGARME_API_URL: 'https://api.pagar.me/core/v5',
+    PAGARME_STATEMENT_DESCRIPTOR: 'GEEKPOPTOYS',
+    PAGARME_MAX_INSTALLMENTS: 6,
+    PAGARME_MIN_INSTALLMENT_AMOUNT: 20,
+    PAGARME_PIX_EXPIRES_IN: 3600,
   },
-  // Fiel ao real; o `email-contract.test.ts` exercita a função sem mock.
+  // Fiel ao real; o `email-contract.test.ts` exercita a funcao sem mock.
   adminUrl: (path = '/admin') => `https://adm.geeketoys.com.br${path}`,
 }));
 
@@ -81,6 +123,26 @@ beforeEach(() => {
     }
     return { rows: [], rowCount: 0 };
   });
+
+  // Sensible default: an accepted PIX order carrying a QR. Tests that need a
+  // different outcome override it.
+  createOrderMock.mockResolvedValue({
+    id: 'or_1',
+    status: 'pending',
+    charges: [
+      {
+        id: 'ch_1',
+        status: 'pending',
+        amount: 1250,
+        payment_method: 'pix',
+        last_transaction: {
+          qr_code: '00020101br.gov.bcb.pix-GEEKPOP',
+          qr_code_url: 'https://api.pagar.me/qr/ch_1.png',
+          expires_at: '2026-09-01T23:00:00Z',
+        },
+      },
+    ],
+  });
 });
 
 const memberRow = {
@@ -88,7 +150,26 @@ const memberRow = {
   email: 'ana@example.com',
   full_name: 'Ana Souza',
   plan: 'basic',
-  stripe_customer_id: null,
+  // Valid check digits: the service refuses to build a Pagar.me customer
+  // without a real document, because the acquirer refuses the order without one.
+  cpf: '52998224725',
+  phone: '21999998888',
+  pagarme_customer_id: null,
+};
+
+/** What Pagar.me returns for an approved card. */
+const approvedCardOrder = {
+  id: 'or_card',
+  status: 'paid',
+  charges: [
+    {
+      id: 'ch_card',
+      status: 'paid',
+      amount: 1250,
+      payment_method: 'credit_card',
+      last_transaction: { card: { brand: 'visa', last_four_digits: '4242' } },
+    },
+  ],
 };
 
 // ─── Amount ──────────────────────────────────────────────────────────────────
@@ -122,10 +203,11 @@ describe('valor cobrado', () => {
         payerEmail: 'ana@example.com',
         payerName: 'Ana',
         memberId: 'member-1',
+        cardToken: 'token_1',
       })
     ).rejects.toThrow();
 
-    expect(stripeMock).not.toHaveBeenCalled();
+    expect(createOrderMock).not.toHaveBeenCalled();
   });
 
   /**
@@ -167,9 +249,34 @@ describe('valor cobrado', () => {
     });
 
     expect(result.pixData.amount).toBe(PLAN_PRICE);
-    // The EMV must carry the same figure the row does.
-    expect(result.pixData.emvCode).toContain('540512.50');
+    // The provider is asked for centavos; the row keeps reais. Getting this
+    // wrong by a factor of 100 is the classic way to charge R$ 1.250,00.
+    expect(createOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ items: [expect.objectContaining({ amount: 1250 })] }),
+      expect.anything(),
+    );
     expect(paramsOf('INSERT INTO payments')?.[2]).toBe(PLAN_PRICE);
+  });
+
+  /**
+   * A member with no usable CPF cannot be charged at all: the acquirer refuses
+   * the order. Failing here, before any row is written, is what keeps a broken
+   * profile from leaving a `pending` payment nobody can settle.
+   */
+  it('recusa quem não tem CPF válido no cadastro', async () => {
+    route('FROM members WHERE id', { rows: [{ ...memberRow, cpf: '11111111111' }] });
+
+    await expect(
+      createPixPayment({
+        amount: PLAN_PRICE,
+        description: 'Plano',
+        payerEmail: 'ana@example.com',
+        memberId: 'member-1',
+      })
+    ).rejects.toThrow('CPF válido');
+
+    expect(createOrderMock).not.toHaveBeenCalled();
+    expect(ran('INSERT INTO payments')).toBe(false);
   });
 });
 
@@ -189,7 +296,12 @@ describe('createPixPayment', () => {
     ).rejects.toThrow('Membro não encontrado.');
   });
 
-  it('avisa a admin, que é quem confirma o PIX à mão', async () => {
+  /**
+   * A PIX now settles itself: the notice to the staff says "aguardando", not
+   * "confirme no extrato". The manual confirmation still exists, but it is the
+   * exception — see `confirmPixPayment`.
+   */
+  it('avisa a equipe que há um PIX aguardando, sem pedir confirmação manual', async () => {
     route('FROM members WHERE id', { rows: [memberRow] });
 
     await createPixPayment({
@@ -199,12 +311,17 @@ describe('createPixPayment', () => {
       memberId: 'member-1',
     });
 
-    expect(sendEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({ template: 'admin-pix-pending', to: 'geeketoys@gmail.com' })
+    expect(notifyAdminsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'payment_pending', method: 'pix', amount: PLAN_PRICE })
     );
   });
 
-  it('grava o txid como provider_id, que é o que liga o extrato ao pagamento', async () => {
+  /**
+   * The QR is the provider's, not ours. A Pagar.me code is dynamic and carries
+   * their txid, so it cannot be regenerated later — storing the charge id is
+   * what ties the payment row to the charge the webhook will settle.
+   */
+  it('devolve o QR emitido pela Pagar.me e guarda a cobrança na linha', async () => {
     route('FROM members WHERE id', { rows: [memberRow] });
 
     const result = await createPixPayment({
@@ -214,9 +331,60 @@ describe('createPixPayment', () => {
       memberId: 'member-1',
     });
 
+    expect(result.pixData.emvCode).toBe('00020101br.gov.bcb.pix-GEEKPOP');
+    expect(result.pixData.qrCodeUrl).toBe('https://api.pagar.me/qr/ch_1.png');
+    expect(result.pixData.provider).toBe('pagarme');
+    expect(result.pixData.txId).toBe('ch_1');
+
     const params = paramsOf('INSERT INTO payments');
-    expect(params?.[3]).toBe(result.pixData.txId);
-    expect(result.pixData.emvCode).toContain(result.pixData.txId);
+    // provider_id and pagarme_charge_id are both the charge; pagarme_order_id
+    // is the order. Reconciliation in their dashboard starts from the charge.
+    expect(params?.[3]).toBe('ch_1');
+    expect(params?.[6]).toBe('or_1');
+  });
+
+  /**
+   * An order accepted with no `qr_code` is unpayable. Returning it anyway once
+   * meant a customer staring at an empty QR box with a `pending` row against
+   * their name — better to fail loudly and let them try again.
+   */
+  it('recusa quando a Pagar.me aceita o pedido mas não devolve QR', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    createOrderMock.mockResolvedValueOnce({
+      id: 'or_2',
+      status: 'pending',
+      charges: [{ id: 'ch_2', status: 'pending', amount: 1250, last_transaction: {} }],
+    });
+
+    await expect(
+      createPixPayment({
+        amount: PLAN_PRICE,
+        description: 'Plano',
+        payerEmail: 'ana@example.com',
+        memberId: 'member-1',
+      })
+    ).rejects.toThrow('QR Code');
+
+    expect(ran('INSERT INTO payments')).toBe(false);
+  });
+
+  /**
+   * Retrying the same payment must reuse the provider's stored response instead
+   * of opening a second charge. The key is derived from the payment id and the
+   * amount, so a genuinely new attempt still gets its own.
+   */
+  it('manda uma chave de idempotência para a cobrança', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+
+    await createPixPayment({
+      amount: PLAN_PRICE,
+      description: 'Plano',
+      payerEmail: 'ana@example.com',
+      memberId: 'member-1',
+    });
+
+    const [, opts] = createOrderMock.mock.calls[0] as [unknown, { idempotencyKey?: string }];
+    expect(opts?.idempotencyKey).toMatch(/^[0-9a-f]{40}$/);
   });
 });
 
@@ -305,14 +473,18 @@ describe('confirmPixPayment', () => {
 
 describe('userOwnsPayment', () => {
   /** The status route used to answer for anyone's payment. */
-  it('casa por provider_id quando o id é um PaymentIntent', async () => {
+  it.each([
+    ['PaymentIntent do Stripe (legado)', 'pi_abc'],
+    ['cobrança da Pagar.me', 'ch_abc'],
+    ['pedido da Pagar.me', 'or_abc'],
+  ])('casa por provider_id quando o id é uma %s', async (_label, id) => {
     route('FROM payments p', { rows: [{ '?column?': 1 }] });
 
-    await expect(userOwnsPayment('user-1', 'pi_abc')).resolves.toBe(true);
+    await expect(userOwnsPayment('user-1', id as string)).resolves.toBe(true);
     expect(ran('p.provider_id = $1')).toBe(true);
   });
 
-  it('casa pelo id local quando não é um PaymentIntent', async () => {
+  it('casa pelo id local quando não é id de provedor', async () => {
     route('FROM payments p', { rows: [{ '?column?': 1 }] });
 
     await userOwnsPayment('user-1', 'a3f1e0c2-0000-4000-8000-000000000000');
@@ -339,7 +511,22 @@ describe('refundPayment', () => {
     provider_id: 'pi_abc',
   };
 
-  it('só marca no banco depois que o Stripe aceitou', async () => {
+  /**
+   * The prefix on `provider_id` decides who gives the money back, not a stored
+   * column: rows written before the migration have no `provider`, and refusing
+   * to refund those would be worse than a slightly indirect check.
+   */
+  it('estorna na Pagar.me quando a cobrança é dela', async () => {
+    route('FROM payments p', { rows: [{ ...paidRow, provider_id: 'ch_abc' }] });
+
+    await refundPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' });
+
+    expect(refundChargeMock).toHaveBeenCalledWith('ch_abc');
+    expect(stripeMock).not.toHaveBeenCalled();
+    expect(ran("UPDATE payments SET status = 'refunded'")).toBe(true);
+  });
+
+  it('ainda estorna no Stripe uma cobrança anterior à migração', async () => {
     route('FROM payments p', { rows: [paidRow] });
     const refundsCreate = vi.fn(async () => ({ id: 're_1' }));
     stripeMock.mockReturnValue({ refunds: { create: refundsCreate } });
@@ -349,18 +536,13 @@ describe('refundPayment', () => {
     expect(refundsCreate).toHaveBeenCalledWith(
       expect.objectContaining({ payment_intent: 'pi_abc', reason: 'duplicate' })
     );
+    expect(refundChargeMock).not.toHaveBeenCalled();
     expect(ran("UPDATE payments SET status = 'refunded'")).toBe(true);
   });
 
-  it('não marca nada quando o Stripe recusa', async () => {
-    route('FROM payments p', { rows: [paidRow] });
-    stripeMock.mockReturnValue({
-      refunds: {
-        create: vi.fn(async () => {
-          throw new Error('charge_already_refunded');
-        }),
-      },
-    });
+  it('não marca nada quando a operadora recusa', async () => {
+    route('FROM payments p', { rows: [{ ...paidRow, provider_id: 'ch_abc' }] });
+    refundChargeMock.mockRejectedValueOnce(new Error('charge_already_refunded'));
 
     await expect(
       refundPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' })
@@ -376,6 +558,7 @@ describe('refundPayment', () => {
 
     expect(result).toMatchObject({ alreadyRefunded: true });
     expect(stripeMock).not.toHaveBeenCalled();
+    expect(refundChargeMock).not.toHaveBeenCalled();
   });
 
   it('recusa estornar um pagamento que nunca foi pago', async () => {
@@ -398,40 +581,86 @@ describe('refundPayment', () => {
 // ─── Card ────────────────────────────────────────────────────────────────────
 
 describe('createCardPayment', () => {
-  it('cobra em centavos e guarda a linha pendente', async () => {
-    route('FROM members WHERE id', { rows: [memberRow] });
-    const create = vi.fn(async () => ({
-      id: 'pi_new',
-      status: 'requires_payment_method',
-      client_secret: 'cs_1',
-    }));
-    stripeMock.mockReturnValue({ paymentIntents: { create } });
+  const cardInput = {
+    amount: PLAN_PRICE,
+    description: 'Plano',
+    payerEmail: 'ana@example.com',
+    payerName: 'Ana',
+    memberId: 'member-1',
+    cardToken: 'token_abc',
+  };
 
-    const out = await createCardPayment({
-      amount: PLAN_PRICE,
-      description: 'Plano',
-      payerEmail: 'ana@example.com',
-      payerName: 'Ana',
-      memberId: 'member-1',
+  it('cobra em centavos com o token, e nunca com dado de cartão', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    createOrderMock.mockResolvedValueOnce(approvedCardOrder);
+
+    const out = await createCardPayment(cardInput);
+
+    const [payload] = createOrderMock.mock.calls[0] as [Record<string, never>];
+    expect(payload).toMatchObject({
+      items: [expect.objectContaining({ amount: 1250 })],
+      payments: [
+        expect.objectContaining({
+          payment_method: 'credit_card',
+          credit_card: expect.objectContaining({ card_token: 'token_abc', installments: 1 }),
+        }),
+      ],
+    });
+    // No card credential may cross this boundary — only the token. (The
+    // customer's phone legitimately has a `number`, so the check names the
+    // card fields rather than matching that word.)
+    expect(JSON.stringify(payload)).not.toMatch(/"cvv"|"exp_month"|"exp_year"|"holder_name"/);
+
+    expect(out.status).toBe('paid');
+    expect(out.chargeId).toBe('ch_card');
+    expect(out.cardBrand).toBe('visa');
+    expect(out.cardLastFour).toBe('4242');
+    expect(paramsOf('INSERT INTO payments')?.[4]).toBe('ch_card');
+  });
+
+  it('exige o token do cartão', async () => {
+    await expect(createCardPayment({ ...cardInput, cardToken: '' })).rejects.toThrow(
+      'Cartão não informado.'
+    );
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A decline is synchronous at Pagar.me — unlike the old Stripe flow, there is
+   * no webhook worth waiting for and the member is still looking at the form.
+   * It must surface as a 402 with the acquirer's reason translated, and the row
+   * must be written as `failed` rather than left `pending` forever.
+   */
+  it('recusa na hora, com o motivo do banco em português', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    createOrderMock.mockResolvedValueOnce({
+      id: 'or_x',
+      status: 'failed',
+      charges: [
+        {
+          id: 'ch_x',
+          status: 'not_authorized',
+          amount: 1250,
+          payment_method: 'credit_card',
+          last_transaction: { acquirer_return_code: '51' },
+        },
+      ],
     });
 
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ amount: 1250, currency: 'brl' }));
-    expect(out.clientSecret).toBe('cs_1');
-    expect(paramsOf('INSERT INTO payments')?.[2]).toBe('pi_new');
+    await expect(createCardPayment(cardInput)).rejects.toThrow('saldo ou limite insuficiente');
+
+    expect(paramsOf('INSERT INTO payments')?.[3]).toBe('failed');
+    expect(notifyAdminsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'payment_failed' })
+    );
   });
 
   it('recusa quando o membro não existe', async () => {
     route('FROM members WHERE id', { rows: [] });
 
-    await expect(
-      createCardPayment({
-        amount: PLAN_PRICE,
-        description: 'Plano',
-        payerEmail: 'ana@example.com',
-        payerName: 'Ana',
-        memberId: 'ghost',
-      })
-    ).rejects.toThrow('Membro não encontrado.');
+    await expect(createCardPayment({ ...cardInput, memberId: 'ghost' })).rejects.toThrow(
+      'Membro não encontrado.'
+    );
   });
 });
 

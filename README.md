@@ -2,7 +2,7 @@
 
 Plataforma completa de clube de vantagens para a loja **GeekPop & Toys** -- cadastro, assinatura digital, pagamentos recorrentes, carteirinha digital, PDV, loja e-commerce própria e painel administrativo.
 
-> **Stack**: React 19 + Vite | Node.js + Express | PostgreSQL | Stripe | Docker | Nginx | AzuraCast
+> **Stack**: React 19 + Vite | Node.js + Express | PostgreSQL | Pagar.me | Docker | Nginx | AzuraCast
 
 ---
 
@@ -44,12 +44,12 @@ Assinatura eletronica com validade jurídica conforme a Lei 14.063/2020. Cada co
 
 ### Pagamentos
 
-- **Cartão de Crédito**: processado via Stripe com suporte a 3D Secure
+- **Cartão de Crédito**: processado pela Pagar.me, com tokenização no navegador e parcelamento sem juros
 - **PIX**: QR Code gerado localmente com confirmação manual pelo admin
 
 ### Assinatura Recorrente
 
-Gerenciada pelo Stripe Subscriptions. Suporte a pausa, retomada e cancelamento da assinatura mensal. Webhooks processam eventos de cobranca automaticamente.
+Gerenciada pelas assinaturas da Pagar.me. Suporte a pausa, cancelamento e **troca de cartao sem perder o ciclo**. Webhooks processam as cobrancas automaticamente. Ver [`docs/PAGARME.md`](docs/PAGARME.md).
 
 ### Carteirinha Digital
 
@@ -62,7 +62,7 @@ Loja online em `shop.geeketoys.com.br`, servida pelo mesmo bundle Vite (o subdom
 - Catálogo público com categorias, busca estilo Shopee (header) e páginas de produto
 - Variações de produto (cor/tamanho etc.) com preco/estoque e **foto por SKU** (admin + PDP)
 - Carrinho persistido em `localStorage` (`CartContext`)
-- Checkout com cartão (Stripe) ou PIX local
+- Checkout com cartão ou PIX, ambos pela Pagar.me — o PIX confirma sozinho
 - **Desconto de 10% do membro aplicado server-side no checkout** (`discount_reason = 'member_10'`) — nunca confiando no valor enviado pelo cliente
 - Webhook confirma o pagamento e baixa o estoque automaticamente; PIX de loja é confirmado manualmente pelo admin
 - O estoque fica **reservado** desde o checkout até o pagamento (ou até o TTL de 24h), então a mesma última unidade não é vendida duas vezes enquanto um PIX espera confirmação
@@ -171,15 +171,15 @@ Tarefas automáticas diárias (6h UTC):
 
 ### Stack Tecnológica
 
-| Camada         | Tecnologias                                                                                           |
-| -------------- | ----------------------------------------------------------------------------------------------------- |
-| **Frontend**   | React 19, TypeScript, Vite 7, Tailwind CSS, shadcn/ui, TanStack Query, Framer Motion, Stripe Elements |
-| **Backend**    | Node.js 20, Express, PostgreSQL 16, JWT + bcrypt, Zod                                                 |
-| **Infra**      | Docker Compose, Nginx, Let's Encrypt (Certbot), GitHub Actions                                        |
-| **Email**      | Resend API (21 templates)                                                                             |
-| **Pagamentos** | Stripe (cartão + subscriptions) + PIX local                                                           |
-| **Rádio**      | AzuraCast (stack Docker isolada)                                                                      |
-| **Analytics**  | Umami (self-hosted)                                                                                   |
+| Camada         | Tecnologias                                                                          |
+| -------------- | ------------------------------------------------------------------------------------ |
+| **Frontend**   | React 19, TypeScript, Vite 7, Tailwind CSS, shadcn/ui, TanStack Query, Framer Motion |
+| **Backend**    | Node.js 20, Express, PostgreSQL 16, JWT + bcrypt, Zod                                |
+| **Infra**      | Docker Compose, Nginx, Let's Encrypt (Certbot), GitHub Actions                       |
+| **Email**      | Resend API (21 templates)                                                            |
+| **Pagamentos** | Pagar.me API v5 — cartão, PIX dinâmico e assinatura recorrente                       |
+| **Rádio**      | AzuraCast (stack Docker isolada)                                                     |
+| **Analytics**  | Umami (self-hosted)                                                                  |
 
 ### Domínios
 

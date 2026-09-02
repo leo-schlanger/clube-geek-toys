@@ -1,14 +1,20 @@
 /**
- * Payment API client — Stripe integration.
+ * Payment API client — Pagar.me.
  *
- * Calls our backend which creates Stripe PaymentIntents.
- * The backend returns a `clientSecret` that the frontend uses with Stripe.js
- * to complete the payment (card, PIX, etc) directly with Stripe.
+ * Two shapes, and the difference matters:
+ *
+ *  - **PIX** returns a QR issued by Pagar.me. It is dynamic: the provider
+ *    reconciles the transfer and settles the payment through the webhook, so
+ *    the member is activated on their own. The old static BR Code waited for an
+ *    admin to read the bank statement.
+ *  - **Card** is authorised synchronously from a token the browser made against
+ *    Pagar.me with the public key. There is no `clientSecret` to redeem any
+ *    more — the call returns the outcome.
  */
 
 import { api, API_URL } from './api-client'
 import { paymentLogger } from './logger'
-import { isStripeConfigured } from './stripe'
+import { getPaymentConfig } from './pagarme'
 import type { Payment, PaymentStatus, PlanType, PaymentType } from '../types'
 import { CLUB_PLAN, PLANS } from '../types'
 
@@ -16,8 +22,21 @@ import { CLUB_PLAN, PLANS } from '../types'
 // CONFIGURATION
 // ============================================
 
+/**
+ * Is there an API to talk to at all?
+ *
+ * Whether the *provider* is configured is a server fact now, answered by
+ * `getPaymentConfig()` — a key rotated on the VPS must not need a frontend
+ * deploy to take effect.
+ */
 export function isPaymentConfigured(): boolean {
-  return Boolean(API_URL) && isStripeConfigured()
+  return Boolean(API_URL)
+}
+
+/** Whether card payment can actually be offered right now. */
+export async function isCardPaymentAvailable(): Promise<boolean> {
+  const config = await getPaymentConfig()
+  return config.configured
 }
 
 // ============================================
@@ -42,7 +61,7 @@ export async function getMemberPayments(memberId: string): Promise<Payment[]> {
 }
 
 // ============================================
-// STRIPE — PIX PAYMENT
+// PIX
 // ============================================
 
 export interface PixPaymentData {
@@ -57,9 +76,12 @@ export interface PixPaymentData {
 }
 
 /**
- * Create a PIX payment (generated locally by the backend, not via Stripe).
- * Returns EMV code for QR rendering + payment ID.
- * Admin confirms manually → member gets activated.
+ * Create a PIX payment.
+ *
+ * The QR comes from Pagar.me and settles itself: their webhook marks the
+ * charge paid and activates the member, usually within seconds of the transfer.
+ * `checkPixPaymentStatus` also asks the provider directly, so the screen flips
+ * without waiting on the webhook.
  */
 export async function generatePixPayment(
   amount: number,
@@ -81,6 +103,8 @@ export async function generatePixPayment(
         amount: number
         txId: string
         expiresAt: string
+        /** Hosted PNG of the same code, when the provider issues one. */
+        qrCodeUrl?: string
       }
     }>('/pix/create', {
       amount,
@@ -101,10 +125,10 @@ export async function generatePixPayment(
     const data = result.data
     return {
       paymentIntentId: data.paymentId,
-      clientSecret: '', // PIX doesn't use Stripe clientSecret
+      clientSecret: '', // nothing to redeem: the QR is already payable
       qrCode: data.pixData.emvCode,
       qrCodeBase64: '',
-      qrCodeImageUrl: '',
+      qrCodeImageUrl: data.pixData.qrCodeUrl ?? '',
       pixKey: data.pixData.pixKey,
       expiresAt: data.pixData.expiresAt,
       amount: data.pixData.amount,
@@ -116,18 +140,25 @@ export async function generatePixPayment(
 }
 
 // ============================================
-// STRIPE — CARD PAYMENT
+// CARD
 // ============================================
 
 export interface CardPaymentData {
-  paymentIntentId: string
-  clientSecret: string
+  paymentId: string
+  chargeId: string
   status: PaymentStatus
+  installments: number
+  cardBrand: string | null
+  cardLastFour: string | null
 }
 
 /**
- * Create a Stripe PaymentIntent for card.
- * Returns clientSecret — frontend uses Stripe Elements to collect card and confirm.
+ * Charge a card for the club plan.
+ *
+ * `cardToken` comes from `createCardToken()` — the browser made it against
+ * Pagar.me with the public key, so no card data passes through here. The call
+ * is synchronous: it resolves with the outcome, or throws a 402 carrying the
+ * bank's reason already translated. There is no clientSecret to redeem.
  */
 export async function createCardPayment(
   plan: PlanType,
@@ -135,21 +166,28 @@ export async function createCardPayment(
   payerEmail: string,
   payerName: string,
   memberId: string,
+  cardToken: string,
+  installments = 1,
 ): Promise<CardPaymentData | null> {
   const amount = calculatePlanPrice(plan, paymentType)
   const planName = PLANS[plan].name
 
   try {
     const result = await api.post<{
-      clientSecret: string
-      paymentIntentId: string
-      status?: string
+      paymentId: string
+      chargeId: string
+      status: string
+      installments: number
+      cardBrand: string | null
+      cardLastFour: string | null
     }>('/checkout/card/create', {
       amount,
       description: `Clube GeekPop & Toys - Plano ${planName}`,
       payer_email: payerEmail,
       payer_name: payerName,
       external_reference: memberId,
+      card_token: cardToken,
+      installments,
     })
 
     if (result.error) {
@@ -163,9 +201,12 @@ export async function createCardPayment(
     }
     const data = result.data
     return {
-      paymentIntentId: data.paymentIntentId,
-      clientSecret: data.clientSecret,
+      paymentId: data.paymentId,
+      chargeId: data.chargeId,
       status: (data.status as PaymentStatus) || 'pending',
+      installments: data.installments ?? 1,
+      cardBrand: data.cardBrand ?? null,
+      cardLastFour: data.cardLastFour ?? null,
     }
   } catch (error) {
     paymentLogger.error('Error creating card payment:', error)
@@ -196,24 +237,36 @@ export async function checkPixPaymentStatus(paymentId: string): Promise<PaymentS
 
 export interface SubscriptionPaymentData {
   subscriptionId: string
-  clientSecret: string
   status: string
+  cardBrand: string | null
+  cardLastFour: string | null
+  nextBillingAt: string | null
 }
 
+/**
+ * Start the monthly recurrence.
+ *
+ * Takes the same one-shot card token as a single charge: Pagar.me keeps the
+ * card on the subscription from there on, and bills it every month without
+ * anything else being stored on our side.
+ */
 export async function createSubscriptionPayment(
   plan: PlanType,
   paymentType: PaymentType,
   payerEmail: string,
   payerName: string,
   memberId: string,
+  cardToken: string,
 ): Promise<SubscriptionPaymentData | null> {
   const amount = calculatePlanPrice(plan, paymentType)
 
   try {
     const result = await api.post<{
       id: string
-      clientSecret: string
       status: string
+      cardBrand: string | null
+      cardLastFour: string | null
+      nextBillingAt: string | null
     }>('/subscription/create', {
       member_id: memberId,
       plan,
@@ -221,6 +274,7 @@ export async function createSubscriptionPayment(
       payer_email: payerEmail,
       payer_name: payerName,
       transaction_amount: amount,
+      card_token: cardToken,
     })
 
     if (result.error || !result.data) {
@@ -230,8 +284,10 @@ export async function createSubscriptionPayment(
     const data = result.data
     return {
       subscriptionId: data.id,
-      clientSecret: data.clientSecret,
       status: data.status,
+      cardBrand: data.cardBrand ?? null,
+      cardLastFour: data.cardLastFour ?? null,
+      nextBillingAt: data.nextBillingAt ?? null,
     }
   } catch (error) {
     paymentLogger.error('Error creating subscription:', error)

@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     that somehow goes uncovered leaves a trail instead of clamping silently.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock, shopPromoMock, checkCouponMock, claimCouponMock, recordRedemptionMock, releaseCouponMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock, shopPromoMock, checkCouponMock, claimCouponMock, recordRedemptionMock, releaseCouponMock, notifyAdminsMock, pagarmeCreateOrderMock, pagarmeRefundMock, pagarmeGetChargeMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -38,6 +38,10 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     claimCouponMock: vi.fn(),
     recordRedemptionMock: vi.fn(async () => {}),
     releaseCouponMock: vi.fn(async () => {}),
+    notifyAdminsMock: vi.fn(),
+    pagarmeCreateOrderMock: vi.fn(),
+    pagarmeRefundMock: vi.fn(async () => ({ id: 'ch_1', status: 'canceled' })),
+    pagarmeGetChargeMock: vi.fn(),
   }));
 
 vi.mock('../config/database.js', () => ({
@@ -54,6 +58,12 @@ vi.mock('../config/env.js', () => ({
     ADMIN_EMAIL: 'geeketoys@gmail.com',
     FRONTEND_URL: 'https://club.geeketoys.com.br',
     STOCK_RESERVATION_TTL_HOURS: 24,
+    PAGARME_SECRET_KEY: 'sk_test_x',
+    PAGARME_API_URL: 'https://api.pagar.me/core/v5',
+    PAGARME_STATEMENT_DESCRIPTOR: 'GEEKPOPTOYS',
+    PAGARME_MAX_INSTALLMENTS: 6,
+    PAGARME_MIN_INSTALLMENT_AMOUNT: 20,
+    PAGARME_PIX_EXPIRES_IN: 3600,
   },
   // Fiel ao real; o `email-contract.test.ts` exercita a função sem mock.
   adminUrl: (path = '/admin') => `https://adm.geeketoys.com.br${path}`,
@@ -104,7 +114,25 @@ vi.mock('./stock.service.js', () => ({
   recordMovement: recordMovementMock,
 }));
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
+vi.mock('./admin-notification.service.js', () => ({
+  notifyAdminsOfPaymentAsync: notifyAdminsMock,
+  notifyAdminsOfPayment: notifyAdminsMock,
+}));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
+// Only the network calls are stubbed; the money maths in `utils/pagarme`
+// (reais to centavos, status mapping, the instalment ceiling) stays real.
+vi.mock('../utils/pagarme.js', async () => {
+  const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
+  return {
+    ...actual,
+    createOrder: pagarmeCreateOrderMock,
+    refundCharge: pagarmeRefundMock,
+    getCharge: pagarmeGetChargeMock,
+    // The throttled variant calls `getCharge` through the module's own closure,
+    // which an export override does not reach — so it is stubbed too.
+    getChargeThrottled: pagarmeGetChargeMock,
+  };
+});
 
 /**
  * Only the database-touching half is faked. `pickBestDiscount` and
@@ -147,7 +175,9 @@ const ADDRESS = {
 function baseInput(over: Record<string, unknown> = {}) {
   return {
     items: [{ productId: 'p1', quantity: 1 }],
-    customer: { name: 'Laura', email: 'laura@example.com' },
+    // The acquirer refuses an order with no buyer document, so the checkout
+    // now collects a CPF and the service verifies its check digits.
+    customer: { name: 'Laura', email: 'laura@example.com', document: '52998224725' },
     shippingAddress: ADDRESS,
     shipping: { quoteToken: 'tok', serviceId: 'pac' },
     paymentMethod: 'pix' as const,
@@ -195,6 +225,7 @@ const COL = {
   shippingDays: 12,
   total: 14,
   deliveryMethod: 20,
+  customerDocument: 21,
 };
 
 /** Wires the transaction client: BEGIN, product and variant SELECTs, order and item INSERTs, COMMIT. */
@@ -276,6 +307,24 @@ beforeEach(() => {
     bannerText: '',
   });
   claimCouponMock.mockResolvedValue(true);
+  // Default: Pagar.me accepts the order and returns a payable PIX code.
+  pagarmeCreateOrderMock.mockResolvedValue({
+    id: 'or_1',
+    status: 'pending',
+    charges: [
+      {
+        id: 'ch_1',
+        status: 'pending',
+        amount: 12400,
+        payment_method: 'pix',
+        last_transaction: {
+          qr_code: '00020101br.gov.bcb.pix-GEEKPOP',
+          qr_code_url: 'https://api.pagar.me/qr/ch_1.png',
+          expires_at: '2026-09-01T23:00:00Z',
+        },
+      },
+    ],
+  });
 });
 
 // ─── Pricing and discounts ───────────────────────────────────────────────────
@@ -697,14 +746,47 @@ describe('createOrder — input validation', () => {
  * only when an admin checks the bank statement and confirms. Without a
  * notification the customer pays and the store never finds out.
  */
-describe('createOrder — aviso de PIX pendente', () => {
+describe('createOrder — PIX pela Pagar.me', () => {
   function pixEmail() {
     return sendEmailMock.mock.calls.find(
       (c) => (c[0] as { template?: string })?.template === 'admin-pix-order-pending'
     )?.[0] as { to: string; variables: Record<string, string> } | undefined;
   }
 
-  it('notifies the admin with order, customer, amount and TX ID', async () => {
+  /**
+   * The QR is the provider's, not ours. It cannot be rebuilt from an amount and
+   * a key the way the old static BR Code could, so it is stored on the order —
+   * losing the string means losing the only payable code.
+   */
+  it('guarda o QR emitido pela Pagar.me na linha do pedido', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    const result = await createOrder(baseInput());
+
+    expect(result.pixData?.emvCode).toBe('00020101br.gov.bcb.pix-GEEKPOP');
+    expect(result.pixData?.provider).toBe('pagarme');
+    expect(result.pixData?.txId).toBe('ch_1');
+
+    const stored = queryMock.mock.calls.find(
+      (c) => typeof c[0] === 'string' && c[0].includes('pix_qr_code = $3')
+    );
+    expect(stored, 'o QR tem de ser gravado').toBeDefined();
+    expect((stored![1] as unknown[])[2]).toBe('00020101br.gov.bcb.pix-GEEKPOP');
+  });
+
+  /** Centavos at the provider, reais in our rows. A factor of 100 here is a 100x charge. */
+  it('cobra o total em centavos', async () => {
+    setupTx({ products: [product({ price: '100.00' })] });
+
+    await createOrder(baseInput()); // 100 + 24 shipping
+
+    expect(pagarmeCreateOrderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ items: [expect.objectContaining({ amount: 12400 })] }),
+      expect.anything()
+    );
+  });
+
+  it('notifies the admin with order, customer, amount and charge id', async () => {
     setupTx({ products: [product({ price: '100.00' })] });
 
     await createOrder(baseInput());
@@ -717,8 +799,8 @@ describe('createOrder — aviso de PIX pendente', () => {
       customer_name: 'Laura',
       customer_email: 'laura@example.com',
     });
-    // The TX ID is what ties the bank statement to the order.
-    expect(email!.variables.tx_id).toMatch(/^CGT[A-Z0-9]+$/);
+    // The charge id is what ties the provider's dashboard to the order.
+    expect(email!.variables.tx_id).toBe('ch_1');
     expect(email!.variables.total).toMatch(/^\d+,\d{2}$/);
   });
 
@@ -734,14 +816,20 @@ describe('createOrder — aviso de PIX pendente', () => {
     );
   });
 
-  it('does not notify when the payment is by card', async () => {
+  /**
+   * The card is charged in a second step now: Pagar.me authorises from a token
+   * synchronously, so there is nothing to prepare while the order is created.
+   * `payOrderWithCard` runs the charge, which is what makes a decline a retry
+   * on the same order rather than a lost one.
+   */
+  it('cartão nasce sem cobrança, esperando o token', async () => {
     setupTx({});
-    stripeMock.mockReturnValue({
-      paymentIntents: { create: async () => ({ id: 'pi_1', client_secret: 'cs_1' }) },
-    });
 
-    await createOrder(baseInput({ paymentMethod: 'credit_card' }));
+    const result = await createOrder(baseInput({ paymentMethod: 'credit_card' }));
 
+    expect(result.requiresCard).toBe(true);
+    expect(result.pixData).toBeUndefined();
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
     expect(pixEmail()).toBeUndefined();
   });
 
@@ -772,6 +860,73 @@ describe('createOrder — aviso de PIX pendente', () => {
     const result = await createOrder(baseInput());
 
     expect(result.order.status).toBe('pending');
+  });
+
+  /**
+   * An order the provider accepted but returned no `qr_code` for is unpayable.
+   * Failing compensates — the order is cancelled and the hold released — which
+   * beats leaving the customer with an empty QR box and stock locked up.
+   */
+  it('cancela e libera a reserva quando a Pagar.me não devolve QR', async () => {
+    setupTx({});
+    pagarmeCreateOrderMock.mockResolvedValueOnce({
+      id: 'or_2',
+      status: 'pending',
+      charges: [{ id: 'ch_2', status: 'pending', amount: 12400, last_transaction: {} }],
+    });
+
+    await expect(createOrder(baseInput())).rejects.toThrow('QR Code');
+
+    expect(
+      queryMock.mock.calls.some(
+        (c) => typeof c[0] === 'string' && c[0].includes("status = 'cancelled'")
+      )
+    ).toBe(true);
+  });
+});
+
+// ─── Buyer document ──────────────────────────────────────────────────────────
+
+/**
+ * The CPF is checked before the transaction opens, so a typo costs the customer
+ * a corrected field — not a cancelled order, a released reservation and a
+ * coupon burned on a purchase that never existed.
+ */
+describe('createOrder — CPF do comprador', () => {
+  it.each([
+    ['vazio', ''],
+    ['curto', '123'],
+    ['com dígito verificador errado', '52998224726'],
+    ['de dígitos repetidos', '11111111111'],
+  ])('recusa um CPF %s antes de abrir a transação', async (_label, document) => {
+    setupTx({});
+
+    await expect(
+      createOrder(baseInput({ customer: { name: 'Laura', email: 'l@e.com', document } }))
+    ).rejects.toThrow('CPF ou CNPJ inválido');
+
+    expect(clientQueryMock).not.toHaveBeenCalled();
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('aceita CNPJ, que é o documento do atacado', async () => {
+    setupTx({});
+
+    await expect(
+      createOrder(
+        baseInput({ customer: { name: 'Loja', email: 'l@e.com', document: '11.222.333/0001-81' } })
+      )
+    ).resolves.toBeDefined();
+  });
+
+  it('grava o documento só com dígitos', async () => {
+    setupTx({});
+
+    await createOrder(
+      baseInput({ customer: { name: 'Laura', email: 'l@e.com', document: '529.982.247-25' } })
+    );
+
+    expect(insertedOrderValues()[COL.customerDocument]).toBe('52998224725');
   });
 });
 
@@ -1017,7 +1172,7 @@ describe('createOrder — retirada na loja', () => {
   function pickupInput(over: Record<string, unknown> = {}) {
     return {
       items: [{ productId: 'p1', quantity: 1 }],
-      customer: { name: 'Laura', email: 'laura@example.com' },
+      customer: { name: 'Laura', email: 'laura@example.com', document: '52998224725' },
       deliveryMethod: 'pickup' as const,
       paymentMethod: 'pix' as const,
       ...over,
@@ -1092,7 +1247,7 @@ describe('createOrder — retirada na loja', () => {
     await expect(
       createOrder({
         items: [{ productId: 'p1', quantity: 1 }],
-        customer: { name: 'Laura', email: 'laura@example.com' },
+        customer: { name: 'Laura', email: 'laura@example.com', document: '52998224725' },
         paymentMethod: 'pix',
       } as never)
     ).rejects.toThrow(AppError);

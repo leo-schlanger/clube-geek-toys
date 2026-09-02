@@ -15,7 +15,8 @@ export interface ShippingAddressPayload {
 
 export interface CreateOrderPayload {
   items: { productId: string; quantity: number; variantId?: string }[]
-  customer: { name: string; email: string; phone?: string }
+  /** `document` is the buyer's CPF (CNPJ on the wholesale channel), digits only. */
+  customer: { name: string; email: string; phone?: string; document: string }
   /** Free-form note to the shop, up to 500 characters. */
   customerNote?: string
   /** 'shipping' (default) goes via Correios; 'pickup' is store collection. */
@@ -34,8 +35,23 @@ export interface CreateOrderPayload {
 
 export interface CreateOrderResult {
   order: Order
-  clientSecret?: string
   pixData?: PixQRData
+  /**
+   * A card order comes back unpaid: Pagar.me authorises from a token in one
+   * synchronous call, so there is nothing to prepare up front. Call
+   * `payOrderWithCard` next. Keeping the two apart is what makes a declined
+   * card a retry on the same order rather than a new one.
+   */
+  requiresCard?: boolean
+}
+
+export interface PayOrderResult {
+  order: Order
+  status: 'paid' | 'pending' | 'failed'
+  chargeId: string
+  installments: number
+  cardBrand: string | null
+  cardLastFour: string | null
 }
 
 /** Create an order + charge. Member 10% or wholesale 25% applied server-side by channel. */
@@ -43,6 +59,28 @@ export async function createOrder(payload: CreateOrderPayload): Promise<CreateOr
   const result = await api.post<CreateOrderResult>('/orders', payload as unknown as Record<string, unknown>)
   if (result.error || !result.data) {
     throw new Error(result.error || 'Não foi possível criar o pedido.')
+  }
+  return result.data
+}
+
+/**
+ * Authorise a card against an order that is waiting for one.
+ *
+ * `cardToken` is produced in the browser by `createCardToken()`, so no card
+ * data passes through here. A decline arrives as a thrown error carrying the
+ * bank's reason, already in PT-BR — the order stays payable for another try.
+ */
+export async function payOrderWithCard(
+  orderId: string,
+  cardToken: string,
+  installments = 1
+): Promise<PayOrderResult> {
+  const result = await api.post<PayOrderResult>(`/orders/${orderId}/pay-card`, {
+    card_token: cardToken,
+    installments,
+  })
+  if (result.error || !result.data) {
+    throw new Error(result.error || 'Não foi possível processar o cartão.')
   }
   return result.data
 }

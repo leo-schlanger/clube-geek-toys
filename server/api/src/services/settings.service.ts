@@ -31,6 +31,15 @@ export const SETTINGS_CATALOGUE: SettingDefinition[] = [
   // Payment guards
   { key: 'payment.duplicate_window_days', default: 7, type: 'number', description: 'Janela em dias para bloquear pagamentos duplicados' },
 
+  // ─── Avisos de pagamento para a equipe ──────────────────────────────────────
+  //
+  // O sino do admin recebe tudo; o e-mail é o canal que interrompe alguém, e por
+  // isso tem chave e piso de valor. Estorno e chargeback ignoram as duas: são
+  // dinheiro saindo, e sempre avisam.
+  { key: 'notifications.admin_payment_inapp', default: true, type: 'boolean', description: 'Avisar a equipe no sino do admin a cada pagamento' },
+  { key: 'notifications.admin_payment_email', default: true, type: 'boolean', description: 'Enviar e-mail à equipe a cada pagamento' },
+  { key: 'notifications.admin_payment_min_amount', default: 0, type: 'number', description: 'Valor mínimo (R$) para o e-mail de pagamento' },
+
   // Store credit (BRL) rewarded for reviewing a delivered order.
   { key: 'review_reward_amount', default: 1, type: 'number', description: 'Crédito (R$) ao avaliar um pedido entregue' },
 

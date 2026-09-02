@@ -75,23 +75,25 @@ vi.mock('qrcode.react', () => ({
   ),
 }))
 
-vi.mock('../StripePaymentForm', () => ({
-  StripePaymentForm: ({
-    onSuccess,
+/**
+ * Stand-in for the card form. It collects and tokenizes the card; this step
+ * owns only what happens with the token afterwards.
+ */
+vi.mock('../PagarmeCardForm', () => ({
+  PagarmeCardForm: ({
+    onToken,
     onCancel,
   }: {
-    clientSecret: string
-    onSuccess: () => void
-    onError: (msg: string) => void
+    onToken: (token: string, installments: number) => Promise<void> | void
     onCancel: () => void
     amount: number
     submitLabel?: string
   }) => (
-    <div data-testid="stripe-form">
-      <button data-testid="stripe-pay" onClick={onSuccess}>
+    <div data-testid="card-form">
+      <button data-testid="card-pay" onClick={() => void onToken('token_abc', 1)}>
         Pay
       </button>
-      <button data-testid="stripe-cancel" onClick={onCancel}>
+      <button data-testid="card-cancel" onClick={onCancel}>
         Cancel
       </button>
     </div>
@@ -133,7 +135,7 @@ describe('StepPayment', () => {
     expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText(/assinatura mensal/i)).toBeInTheDocument()
     expect(screen.getByText(/12,50/)).toBeInTheDocument()
-    expect(screen.getByText(/pagamento seguro via stripe/i)).toBeInTheDocument()
+    expect(screen.getByText(/pagamento seguro via pagar\.me/i)).toBeInTheDocument()
   })
 
   it('renders payment mode toggle buttons', () => {
@@ -235,70 +237,71 @@ describe('StepPayment', () => {
 
   // ── Card flow ─────────────────────────────────────────────────────────
 
-  it('initializes card payment and shows Stripe form', async () => {
+  /**
+   * Opening the form no longer calls the server: Pagar.me authorises from a
+   * token in one go, so nothing is created until a card has been typed.
+   */
+  it('opens the card form without charging anything yet', async () => {
     vi.useRealTimers()
     const user = userEvent.setup()
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_test_secret', paymentIntentId: 'pi_test' },
-      error: null,
-    })
 
     render(<StepPayment {...defaultProps} />)
     await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('stripe-form')).toBeInTheDocument()
+      expect(screen.getByTestId('card-form')).toBeInTheDocument()
     })
+    expect(mockApiPost).not.toHaveBeenCalled()
   })
 
-  it('shows error when card payment initialization fails', async () => {
+  it('charges with the token and calls onSuccess', async () => {
     vi.useRealTimers()
     const user = userEvent.setup()
-    mockApiPost.mockResolvedValue({ data: null, error: 'Server error' })
+    mockApiPost.mockResolvedValue({ data: { status: 'paid' }, error: null })
 
     render(<StepPayment {...defaultProps} />)
     await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await waitFor(() => expect(screen.getByTestId('card-pay')).toBeInTheDocument())
+
+    await user.click(screen.getByTestId('card-pay'))
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalled()
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/checkout/card/create',
+        expect.objectContaining({ card_token: 'token_abc' })
+      )
     })
+    await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalledTimes(1))
   })
 
-  it('calls onSuccess on successful card payment', async () => {
+  /** A decline keeps the member on the form, with the reason, for another card. */
+  it('does not advance when the card is declined', async () => {
     vi.useRealTimers()
     const user = userEvent.setup()
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_test_secret', paymentIntentId: 'pi_test' },
-      error: null,
-    })
+    mockApiPost.mockResolvedValue({ data: null, error: 'Cartão recusado.' })
 
     render(<StepPayment {...defaultProps} />)
     await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await waitFor(() => expect(screen.getByTestId('card-pay')).toBeInTheDocument())
 
-    await waitFor(() => {
-      expect(screen.getByTestId('stripe-pay')).toBeInTheDocument()
-    })
+    await user.click(screen.getByTestId('card-pay'))
 
-    await user.click(screen.getByTestId('stripe-pay'))
-    expect(defaultProps.onSuccess).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    expect(defaultProps.onSuccess).not.toHaveBeenCalled()
   })
 
-  it('resets method when cancel is clicked on Stripe form', async () => {
+  it('resets method when cancel is clicked on the card form', async () => {
     vi.useRealTimers()
     const user = userEvent.setup()
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_test_secret' },
-      error: null,
-    })
 
     render(<StepPayment {...defaultProps} />)
     await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('stripe-cancel')).toBeInTheDocument()
+      expect(screen.getByTestId('card-cancel')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByTestId('stripe-cancel'))
+    await user.click(screen.getByTestId('card-cancel'))
 
     // Should go back to method selection
     await waitFor(() => {

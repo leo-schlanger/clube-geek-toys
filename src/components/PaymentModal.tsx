@@ -1,8 +1,13 @@
 /**
- * PaymentModal — Card via Stripe, PIX via QR code local.
+ * PaymentModal — card and PIX for the club plan, both through Pagar.me.
  *
- * Card flow: backend creates Stripe PaymentIntent → frontend uses Stripe Elements.
- * PIX flow: backend generates EMV QR code → frontend displays it → admin confirms manually.
+ * Card: the browser tokenizes the card against Pagar.me with the public key and
+ * posts only the token; the charge is authorised synchronously, so a decline
+ * comes back as a message on the form rather than as a status to poll.
+ *
+ * PIX: Pagar.me issues a dynamic QR and reconciles it. The polling below now
+ * exists to update the screen quickly, not to wait for a human — the member is
+ * activated by the webhook within seconds of paying, with no admin in the loop.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -14,7 +19,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-import { StripePaymentForm } from './StripePaymentForm'
+import { PagarmeCardForm } from './PagarmeCardForm'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../lib/payments'
 import { CLUB_PLAN, paymentTypeLabel, paymentTypeSuffix, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
 import { formatCurrency } from '../lib/utils'
@@ -65,7 +70,6 @@ export function PaymentModal({
 }: PaymentModalProps) {
   const [mode, setMode] = useState<PaymentMode>(defaultMode)
   const [method, setMethod] = useState<PaymentMethod>(null)
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
   const confirm = useConfirm()
 
@@ -226,48 +230,72 @@ export function PaymentModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amount, planData.name, memberEmail, memberId])
 
-  // ─── Card Flow (Stripe) ────────────────────────────────────────────────────
+  // ─── Card flow (Pagar.me) ──────────────────────────────────────────────────
 
-  const handleCardPayment = useCallback(async () => {
-    setLoading(true)
+  /**
+   * Choosing "cartão" no longer calls the server.
+   *
+   * Stripe needed a PaymentIntent up front so the browser had a clientSecret to
+   * redeem. Pagar.me authorises from a token in one call, so there is nothing
+   * to prepare: the form opens, the card becomes a token, and `handleCardToken`
+   * does the whole charge in one request.
+   */
+  const handleCardPayment = useCallback(() => {
     setError(null)
-    try {
-      let cs: string | undefined
+    setMethod('card')
+  }, [])
 
-      if (mode === 'subscription') {
-        const res = await api.post<{ clientSecret: string; id: string }>('/subscription/create', {
-          member_id: memberId,
-          plan,
-          frequency_type: paymentType === 'annual' ? 'years' : 'months',
-          payer_email: memberEmail,
-          payer_name: memberName,
-          transaction_amount: amount,
-        })
-        if (res.error) throw new Error(res.error)
-        cs = (res.data as { clientSecret?: string })?.clientSecret
-      } else {
-        const res = await api.post<{ clientSecret: string; paymentIntentId: string }>('/checkout/card/create', {
-          amount,
-          description: `Clube GeekPop & Toys - Plano ${planData.name}`,
-          payer_email: memberEmail,
-          payer_name: memberName,
-          external_reference: memberId,
-        })
-        if (res.error) throw new Error(res.error)
-        cs = (res.data as { clientSecret?: string })?.clientSecret
+  /**
+   * Charge (or subscribe) with a token the form just produced.
+   *
+   * Throws on failure so `PagarmeCardForm` keeps its fields and lets the member
+   * try another card — the order/membership is untouched by a decline.
+   */
+  const handleCardToken = useCallback(
+    async (cardToken: string, installments: number) => {
+      setError(null)
+
+      const endpoint = mode === 'subscription' ? '/subscription/create' : '/checkout/card/create'
+      const body =
+        mode === 'subscription'
+          ? {
+              member_id: memberId,
+              plan,
+              frequency_type: paymentType === 'annual' ? 'years' : 'months',
+              payer_email: memberEmail,
+              payer_name: memberName,
+              transaction_amount: amount,
+              card_token: cardToken,
+            }
+          : {
+              amount,
+              description: `Clube GeekPop & Toys - Plano ${planData.name}`,
+              payer_email: memberEmail,
+              payer_name: memberName,
+              external_reference: memberId,
+              card_token: cardToken,
+              installments,
+            }
+
+      const res = await api.post<{ status?: string }>(endpoint, body)
+      if (res.error) {
+        // The server already translated the acquirer's reason.
+        throw new Error(res.error)
       }
 
-      if (!cs) throw new Error('Não foi possível inicializar o pagamento.')
-      setClientSecret(cs)
-      setMethod('card')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao iniciar pagamento.'
-      setError(message)
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
-  }, [mode, memberId, plan, amount, memberEmail, planData.name])
+      const status = res.data?.status
+      if (status === 'failed') {
+        throw new Error('Pagamento recusado. Tente outro cartão ou use PIX.')
+      }
+
+      toast.success(
+        mode === 'subscription' ? 'Assinatura ativada!' : 'Pagamento confirmado!'
+      )
+      handlePaymentSuccess()
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mode, memberId, plan, paymentType, amount, memberEmail, memberName, planData.name]
+  )
 
   function handlePaymentSuccess() {
     if (memberId !== 'temp_member') clearPendingPayment(memberId).catch(() => {})
@@ -407,13 +435,16 @@ export function PaymentModal({
                   <li>Escolha pagar com PIX (QR Code ou Copia e Cola)</li>
                   <li>Escaneie o QR ou cole o código acima</li>
                   <li>Confirme o pagamento de <strong>{formatCurrency(amount)}</strong></li>
-                  <li>Aguarde a confirmação (nossa equipe verifica e ativa sua conta)</li>
+                  <li>Pronto — esta tela confirma sozinha em alguns segundos</li>
                 </ol>
               </div>
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Shield className="h-4 w-4 text-green-500" />
-                <span>Após o pagamento, nossa equipe será notificada e ativará sua conta.</span>
+                <span>
+                  A confirmação é automática: assim que o PIX cair, sua conta é ativada. Não é
+                  preciso enviar comprovante.
+                </span>
               </div>
 
               <Button variant="ghost" onClick={() => { setMethod(null); setPixData(null) }} className="w-full">
@@ -422,14 +453,16 @@ export function PaymentModal({
             </div>
           )}
 
-          {/* ═══ Card: Stripe Elements ═══ */}
-          {method === 'card' && clientSecret && (
-            <StripePaymentForm
-              clientSecret={clientSecret}
-              onSuccess={handlePaymentSuccess}
-              onError={(msg) => setError(msg)}
-              onCancel={() => { setMethod(null); setClientSecret(null); setError(null) }}
+          {/* ═══ Card: Pagar.me ═══ */}
+          {method === 'card' && (
+            <PagarmeCardForm
               amount={amount}
+              onToken={handleCardToken}
+              onCancel={() => { setMethod(null); setError(null) }}
+              // The plan is R$ 12,50 a month: splitting it would be absurd, and
+              // the provider refuses an instalment below its floor anyway.
+              allowInstallments={false}
+              defaultHolderName={memberName}
               submitLabel={mode === 'subscription'
                 ? `Assinar por ${formatCurrency(amount)}${paymentTypeSuffix(paymentType)}`
                 : undefined

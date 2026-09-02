@@ -53,10 +53,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # No provider key is baked in any more: the checkout reads the Pagar.me
+      # public key from `GET /payments/config` at runtime, so a key rotated on
+      # the VPS takes effect without a frontend deploy. `VITE_STRIPE_*` is gone
+      # with the Stripe integration.
       - name: Build frontend
         env:
           VITE_API_URL: https://api.geeketoys.com.br
-          VITE_STRIPE_PUBLISHABLE_KEY: ${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
           VITE_PIX_KEY: ${{ secrets.VITE_PIX_KEY }}
           VITE_ENVIRONMENT: production
         run: npx vite build --mode production

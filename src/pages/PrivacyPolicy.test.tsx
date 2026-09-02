@@ -79,9 +79,14 @@ describe('PrivacyPolicy', () => {
     expect(screen.getByText(/Lei Geral de Proteção de Dados/)).toBeInTheDocument()
   })
 
-  it('mentions Stripe as payment processor', () => {
+  /**
+   * The LGPD notice has to name the operator that actually handles the data.
+   * It said Stripe until the migration of 01/09/2026; naming the wrong company
+   * is not a cosmetic slip in a privacy policy.
+   */
+  it('names Pagar.me as the payment processor', () => {
     renderPage()
-    const matches = screen.getAllByText(/Stripe/)
-    expect(matches.length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Pagar\.me/).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Stripe/)).not.toBeInTheDocument()
   })
 })

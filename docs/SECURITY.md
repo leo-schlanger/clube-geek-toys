@@ -119,14 +119,14 @@ Todos os endpoints validam entrada com schemas Zod (request body, params e query
 
 Implementado via middleware `rate-limit.ts`, baseado em IP do cliente:
 
-| Limiter               | Limite  | Janela | Endpoints                        |
-| --------------------- | ------- | ------ | -------------------------------- |
-| `authLimiter`         | 20 req  | 5 min  | Register, login, refresh, logout |
-| `publicLookupLimiter` | 15 req  | 1 min  | Verificação de CPF existente     |
-| `paymentLimiter`      | 10 req  | 1 min  | Operações de pagamento           |
-| `emailLimiter`        | 5 req   | 5 min  | Envio de emails                  |
-| `webhookLimiter`      | 60 req  | 1 min  | Webhooks do Stripe               |
-| `defaultLimiter`      | 100 req | 1 min  | Demais endpoints                 |
+| Limiter               | Limite  | Janela | Endpoints                                 |
+| --------------------- | ------- | ------ | ----------------------------------------- |
+| `authLimiter`         | 20 req  | 5 min  | Register, login, refresh, logout          |
+| `publicLookupLimiter` | 15 req  | 1 min  | Verificação de CPF existente              |
+| `paymentLimiter`      | 10 req  | 1 min  | Operações de pagamento                    |
+| `emailLimiter`        | 5 req   | 5 min  | Envio de emails                           |
+| `webhookLimiter`      | 60 req  | 1 min  | Webhooks da Pagar.me (e do Stripe legado) |
+| `defaultLimiter`      | 100 req | 1 min  | Demais endpoints                          |
 
 Headers de resposta: `X-RateLimit-Remaining`, `Retry-After`.
 
@@ -152,25 +152,48 @@ cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
 
 ## 6. Segurança de Pagamentos
 
-### Stripe (Cartão de Crédito)
+### Pagar.me (cartão de crédito)
 
-- **PCI DSS compliant**: tokenização client-side via Stripe Elements
-- **Nenhum dado de cartão toca nosso servidor** — apenas tokens e IDs do Stripe
-- `PaymentIntent` criado no servidor, confirmado no cliente
-- Webhook verificado com **HMAC-SHA256** via Stripe SDK (`constructEvent`)
-- `STRIPE_WEBHOOK_SECRET` obrigatório em produção (validado pelo schema Zod de env)
+- **Fora do escopo PCI**: o navegador troca o cartão por um `card_token` direto
+  em `api.pagar.me/core/v5/tokens?appId=pk_...`, com a chave **pública**. A
+  requisição não pode nem carregar header de autorização.
+- **Nenhum dado de cartão toca nosso servidor** — só o token, a bandeira e os
+  quatro últimos dígitos.
+- Autorização **síncrona**: uma recusa volta como 402 com o motivo do banco
+  traduzido, em vez de uma linha `pending` que ninguém resolve.
+- `PAGARME_SECRET_KEY` obrigatória em produção (schema Zod de env).
+
+### Webhook da Pagar.me
+
+A v5 **não assina o corpo**. Duas camadas cobrem isso:
+
+1. **Basic auth** com `PAGARME_WEBHOOK_USER` / `PAGARME_WEBHOOK_PASSWORD`,
+   conferidas em tempo constante. As duas são obrigatórias em produção — sem
+   elas o endpoint que liquida pagamento ficaria aberto.
+2. **Releitura na API** (`GET /charges/:id`) antes de acreditar em qualquer
+   evento de dinheiro. Um `charge.paid` forjado não liquida nada.
+
+Falha na consulta = "não confirmado": o evento fica sem processar e a Pagar.me
+reentrega, em vez de o sistema decidir no chute.
 
 ### Idempotência de Webhooks
 
-- Chave: `stripe_{eventId}`
+- Chave: `pagarme_{eventId}` (e `stripe_{eventId}` para os eventos legados)
 - Tabela `processed_webhooks` com `INSERT ... ON CONFLICT DO NOTHING`
 - Impede processamento duplicado de qualquer evento
 
 ### PIX
 
-- QR code gerado localmente (padrão EMV)
-- Confirmação manual pelo admin no dashboard (assinatura e pedidos de loja)
+- QR **dinâmico** emitido pela Pagar.me e conciliado por ela; o pagamento
+  confirma sozinho via `charge.paid`, em segundos
+- O código é **guardado** na linha do pedido: carrega o txid do provedor e não
+  dá para reconstruir, ao contrário do BR Code estático que gerávamos antes
+- Confirmação manual (`confirmPixOrder` / `confirmPixPayment`) segue no painel
+  como exceção: para os códigos anteriores à migração e para o webhook que não
+  chega
 - Prevenção de pagamento duplicado: `findRecentPayment` (janela de 7 dias)
+- O CPF do comprador é obrigatório e tem o dígito verificador conferido antes de
+  a transação abrir — a operadora recusa cobrança sem documento válido
 
 ### Validação de Valores
 
@@ -244,7 +267,7 @@ não vai na rota pública. O deploy consome o `/health` e **reprova** em
 
 - Senhas: apenas hash bcrypt armazenado
 - Refresh tokens: apenas hash SHA-256 armazenado
-- Dados de cartão: nunca armazenados (tokenização via Stripe)
+- Dados de cartão: nunca armazenados (tokenização no navegador, direto com a Pagar.me)
 - CPF: armazenado sem formatação (11 dígitos), mascarado na UI
 
 ## 9. CORS e Headers
@@ -332,7 +355,7 @@ Logs são **imutáveis** (INSERT only, sem UPDATE/DELETE).
 | Consentimento        | Checkbox explícito durante o cadastro                                                  |
 | Finalidade           | Clube + loja própria (pedidos, frete, avaliações, crédito de loja)                     |
 | Mascaramento         | CPF exibido como `***.***.789-00` na interface                                         |
-| Não compartilhamento | Stripe (pagamentos), Resend (email), ViaCEP/Melhor Envio (frete)                       |
+| Não compartilhamento | Pagar.me (pagamentos), Resend (email), ViaCEP/Melhor Envio (frete)                     |
 
 ### Direitos do Titular (API)
 
@@ -411,16 +434,16 @@ seja, invisível em "Minhas compras" mesmo para quem depois cria conta com o
 
 ### CI/CD (GitHub Secrets)
 
-| Secret                        | Uso                                      |
-| ----------------------------- | ---------------------------------------- |
-| `VPS_HOST`                    | Endereço do servidor para deploy         |
-| `VPS_USER`                    | Usuário SSH                              |
-| `VPS_SSH_KEY`                 | Chave privada SSH                        |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Chave pública Stripe (injetada no build) |
-| `VITE_PIX_KEY`                | Chave PIX (injetada no build)            |
+| Secret                            | Uso                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| `VPS_HOST`                        | Endereço do servidor para deploy                                               |
+| `VPS_USER`                        | Usuário SSH                                                                    |
+| `VPS_SSH_KEY`                     | Chave privada SSH                                                              |
+| ~~`VITE_STRIPE_PUBLISHABLE_KEY`~~ | Removida: a chave pública da Pagar.me vem de `GET /payments/config` em runtime |
+| `VITE_PIX_KEY`                    | Chave PIX (injetada no build)                                                  |
 
 ## Contatos
 
 - **Incidentes de segurança**: contato@geeketoys.com.br
 - **ANPD (vazamento de dados)**: www.gov.br/anpd
-- **Status do Stripe**: status.stripe.com
+- **Status da Pagar.me**: status.pagar.me

@@ -1,8 +1,10 @@
 /**
  * Payments API client — Unit Tests
  *
- * Tests all exported functions from payments.ts.
- * Mocks api-client, logger, and stripe modules.
+ * Tests all exported functions from payments.ts. `api-client`, `logger` and
+ * `pagarme` are mocked; what is asserted is the **shape of the request** — the
+ * amount, the field names and, above all, that only a token is ever sent where
+ * a card used to go.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -34,15 +36,24 @@ vi.mock('./logger', () => ({
   },
 }))
 
-// Mock stripe
-vi.mock('./stripe', () => ({
-  isStripeConfigured: vi.fn(() => true),
+// Mock the Pagar.me client. `getPaymentConfig` is the only thing payments.ts
+// reaches for; tokenization itself lives in the card form, not here.
+vi.mock('./pagarme', () => ({
+  getPaymentConfig: vi.fn(async () => ({
+    provider: 'pagarme',
+    publicKey: 'pk_test',
+    configured: true,
+    maxInstallments: 6,
+    minInstallmentAmount: 20,
+    pixExpiresIn: 3600,
+  })),
 }))
 
 import { api } from './api-client'
-import { isStripeConfigured } from './stripe'
+import { getPaymentConfig } from './pagarme'
 import {
   isPaymentConfigured,
+  isCardPaymentAvailable,
   calculatePlanPrice,
   getMemberPayments,
   generatePixPayment,
@@ -53,7 +64,7 @@ import {
 } from './payments'
 
 const mockedApi = vi.mocked(api)
-const mockedIsStripeConfigured = vi.mocked(isStripeConfigured)
+const mockedGetPaymentConfig = vi.mocked(getPaymentConfig)
 
 // ============================================
 // Tests
@@ -62,20 +73,40 @@ const mockedIsStripeConfigured = vi.mocked(isStripeConfigured)
 describe('Payments API client', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockedIsStripeConfigured.mockReturnValue(true)
+    mockedGetPaymentConfig.mockResolvedValue({
+      provider: 'pagarme',
+      publicKey: 'pk_test',
+      configured: true,
+      maxInstallments: 6,
+      minInstallmentAmount: 20,
+      pixExpiresIn: 3600,
+    })
   })
 
   // ---- isPaymentConfigured ----
 
   describe('isPaymentConfigured', () => {
-    it('should return true when API_URL and Stripe are configured', () => {
+    it('only asks whether there is an API to talk to', () => {
       expect(isPaymentConfigured()).toBe(true)
     })
 
-    it('should return false when Stripe is not configured', () => {
-      mockedIsStripeConfigured.mockReturnValue(false)
+    /**
+     * Whether the *provider* is usable is a server fact now, not a build-time
+     * one: the key comes from `GET /payments/config`, so rotating it on the VPS
+     * takes effect without a frontend deploy.
+     */
+    it('reports card availability from the server config', async () => {
+      await expect(isCardPaymentAvailable()).resolves.toBe(true)
 
-      expect(isPaymentConfigured()).toBe(false)
+      mockedGetPaymentConfig.mockResolvedValueOnce({
+        provider: 'pagarme',
+        publicKey: null,
+        configured: false,
+        maxInstallments: 1,
+        minInstallmentAmount: 20,
+        pixExpiresIn: 3600,
+      })
+      await expect(isCardPaymentAvailable()).resolves.toBe(false)
     })
   })
 
@@ -142,8 +173,9 @@ describe('Payments API client', () => {
             emvCode: 'EMV_CODE_STRING',
             pixKey: 'pix-key-uuid',
             amount: 39.90,
-            txId: 'tx-abc',
+            txId: 'ch_abc',
             expiresAt: '2026-06-01T00:00:00Z',
+            qrCodeUrl: 'https://api.pagar.me/qr/ch_abc.png',
           },
         },
         status: 201,
@@ -160,10 +192,11 @@ describe('Payments API client', () => {
 
       expect(result).toEqual({
         paymentIntentId: 'pay-123',
+        // Nothing to redeem: a Pagar.me QR is already payable.
         clientSecret: '',
         qrCode: 'EMV_CODE_STRING',
         qrCodeBase64: '',
-        qrCodeImageUrl: '',
+        qrCodeImageUrl: 'https://api.pagar.me/qr/ch_abc.png',
         pixKey: 'pix-key-uuid',
         expiresAt: '2026-06-01T00:00:00Z',
         amount: 39.90,
@@ -202,17 +235,21 @@ describe('Payments API client', () => {
   // ---- createCardPayment ----
 
   describe('createCardPayment', () => {
-    it('should POST /checkout/card/create with computed amount and plan name', async () => {
-      mockedApi.post.mockResolvedValue({
-        data: {
-          paymentIntentId: 'pi_123',
-          clientSecret: 'cs_secret',
-          status: 'requires_payment_method',
-        },
-        status: 201,
-      })
+    const approved = {
+      paymentId: 'pay_1',
+      chargeId: 'ch_1',
+      status: 'paid',
+      installments: 1,
+      cardBrand: 'visa',
+      cardLastFour: '4242',
+    }
 
-      const result = await createCardPayment('club', 'annual', 'payer@test.com', 'Payer Name', 'member-1')
+    it('sends the card token and the split, never card data', async () => {
+      mockedApi.post.mockResolvedValue({ data: approved, status: 201 })
+
+      const result = await createCardPayment(
+        'club', 'annual', 'payer@test.com', 'Payer Name', 'member-1', 'token_abc', 1
+      )
 
       expect(mockedApi.post).toHaveBeenCalledWith('/checkout/card/create', {
         amount: 12.50,
@@ -220,46 +257,66 @@ describe('Payments API client', () => {
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
         external_reference: 'member-1',
+        card_token: 'token_abc',
+        installments: 1,
       })
 
+      // Nothing resembling a card credential may be in the payload.
+      const [, body] = mockedApi.post.mock.calls[0]
+      expect(JSON.stringify(body)).not.toMatch(/cvv|exp_month|exp_year|holder_name/)
+
       expect(result).toEqual({
-        paymentIntentId: 'pi_123',
-        clientSecret: 'cs_secret',
-        status: 'requires_payment_method',
+        paymentId: 'pay_1',
+        chargeId: 'ch_1',
+        status: 'paid',
+        installments: 1,
+        cardBrand: 'visa',
+        cardLastFour: '4242',
       })
+    })
+
+    it('defaults to a single instalment', async () => {
+      mockedApi.post.mockResolvedValue({ data: approved, status: 201 })
+
+      await createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1', 'token_abc')
+
+      expect(mockedApi.post.mock.calls[0][1]).toMatchObject({ installments: 1 })
     })
 
     it('should default status to pending when not provided', async () => {
       mockedApi.post.mockResolvedValue({
-        data: {
-          paymentIntentId: 'pi_123',
-          clientSecret: 'cs_secret',
-        },
+        data: { paymentId: 'pay_1', chargeId: 'ch_1' },
         status: 201,
       })
 
-      const result = await createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
+      const result = await createCardPayment(
+        'club', 'annual', 'a@b.com', 'Name', 'member-1', 'token_abc'
+      )
 
       expect(result?.status).toBe('pending')
     })
 
+    /**
+     * A decline is a 402 from the server, with the acquirer's reason already in
+     * Portuguese. The client only has to let it through.
+     */
     it('should throw when API returns an error', async () => {
       mockedApi.post.mockResolvedValue({
-        error: 'Invalid card',
+        error: 'Cartão recusado: saldo ou limite insuficiente.',
         code: 'CARD_DECLINED',
-        status: 400,
+        status: 402,
       })
 
       await expect(
-        createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
-      ).rejects.toThrow('Invalid card')
+        createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1', 'token_abc')
+      ).rejects.toThrow('saldo ou limite insuficiente')
     })
 
     it('should throw when API returns no data', async () => {
       mockedApi.post.mockResolvedValue({ data: undefined, status: 200 })
 
       await expect(
-        createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
+        createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1', 'token_abc')
       ).rejects.toThrow('Resposta inválida do servidor ao criar pagamento com cartão')
     })
 
@@ -267,7 +324,7 @@ describe('Payments API client', () => {
       mockedApi.post.mockRejectedValue(new Error('Connection refused'))
 
       await expect(
-        createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1')
+        createCardPayment('club', 'annual', 'a@b.com', 'Name', 'member-1', 'token_abc')
       ).rejects.toThrow('Connection refused')
     })
   })
@@ -317,18 +374,19 @@ describe('Payments API client', () => {
   // ---- createSubscriptionPayment ----
 
   describe('createSubscriptionPayment', () => {
-    it('POSTs /subscription/create with frequency_type months and the club price', async () => {
-      mockedApi.post.mockResolvedValue({
-        data: {
-          id: 'sub_123',
-          clientSecret: 'cs_sub_secret',
-          status: 'active',
-        },
-        status: 201,
-      })
+    const created = {
+      id: 'sub_123',
+      status: 'active',
+      cardBrand: 'visa',
+      cardLastFour: '4242',
+      nextBillingAt: '2026-10-01T00:00:00Z',
+    }
+
+    it('POSTs /subscription/create with the card token and the club price', async () => {
+      mockedApi.post.mockResolvedValue({ data: created, status: 201 })
 
       const result = await createSubscriptionPayment(
-        'club', 'monthly', 'payer@test.com', 'Payer Name', 'member-1'
+        'club', 'monthly', 'payer@test.com', 'Payer Name', 'member-1', 'token_abc'
       )
 
       expect(mockedApi.post).toHaveBeenCalledWith('/subscription/create', {
@@ -338,20 +396,26 @@ describe('Payments API client', () => {
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
         transaction_amount: 12.50,
+        card_token: 'token_abc',
       })
 
+      // Pagar.me authorises the first charge synchronously, so there is no
+      // `clientSecret` to hand back — only the outcome and the card billed.
       expect(result).toEqual({
         subscriptionId: 'sub_123',
-        clientSecret: 'cs_sub_secret',
         status: 'active',
+        cardBrand: 'visa',
+        cardLastFour: '4242',
+        nextBillingAt: '2026-10-01T00:00:00Z',
       })
+      expect(result).not.toHaveProperty('clientSecret')
     })
 
     it('throws when the API returns an error', async () => {
       mockedApi.post.mockResolvedValue({ error: 'Subscription failed', status: 400 })
 
       await expect(
-        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1')
+        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1', 'token_abc')
       ).rejects.toThrow('Subscription failed')
     })
 
@@ -359,7 +423,7 @@ describe('Payments API client', () => {
       mockedApi.post.mockResolvedValue({ data: undefined, status: 200 })
 
       await expect(
-        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1')
+        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1', 'token_abc')
       ).rejects.toThrow('Resposta inválida do servidor ao criar assinatura')
     })
 
@@ -367,7 +431,7 @@ describe('Payments API client', () => {
       mockedApi.post.mockRejectedValue(new Error('Timeout'))
 
       await expect(
-        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1')
+        createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1', 'token_abc')
       ).rejects.toThrow('Timeout')
     })
   })

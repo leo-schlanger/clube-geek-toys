@@ -15,6 +15,16 @@ vi.mock('../../contexts/CartContext', () => ({
   }),
 }))
 
+// Each card reads the storefront promotion through a TanStack query, so without
+// this the grid throws "No QueryClient set" before rendering a single product.
+// The promotion itself is covered in ProductCard.test.tsx; here it is off.
+vi.mock('../../hooks/useShopPromo', () => ({
+  useShopPromo: () => ({
+    promo: { enabled: false, percent: 0, bannerEnabled: false, bannerText: '' },
+    loading: false,
+  }),
+}))
+
 import { ProductGrid } from './ProductGrid'
 
 const product = {

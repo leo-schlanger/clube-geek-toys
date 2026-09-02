@@ -147,16 +147,30 @@ export async function cancelSubscription(subscriptionId: string): Promise<boolea
 /**
  * Update subscription card
  */
+/**
+ * Point the recurrence at a different card.
+ *
+ * `cardToken` is the one-shot token the browser made against Pagar.me, so the
+ * card itself never passes through here. The cycle is untouched: the member
+ * keeps the days they paid for and the next charge lands on the same date —
+ * which is why this replaced the old "cancel and subscribe again" advice.
+ *
+ * Throws with the server's message so the dialog can show why it failed;
+ * "false" alone left the member staring at a form that did nothing.
+ */
 export async function updateSubscriptionCard(
   subscriptionId: string,
-  paymentMethodId: string
+  cardToken: string
 ): Promise<boolean> {
   try {
-    const result = await api.put(`/subscription/${subscriptionId}/update-payment-method`, { paymentMethodId })
-    return !result.error
+    const result = await api.put(`/subscription/${subscriptionId}/update-payment-method`, {
+      cardToken,
+    })
+    if (result.error) throw new Error(result.error)
+    return true
   } catch (error) {
     paymentLogger.error('Error updating subscription card:', error)
-    return false
+    throw error instanceof Error ? error : new Error('Não foi possível atualizar o cartão.')
   }
 }
 

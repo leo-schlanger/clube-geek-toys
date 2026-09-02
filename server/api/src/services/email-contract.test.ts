@@ -72,12 +72,14 @@ beforeEach(() => {
 
 /** Templates addressed to `env.ADMIN_EMAIL`, from the call sites in services. */
 const ADMIN_TEMPLATES = [
-  'admin-pix-pending',
   'admin-new-member',
   'admin-pix-order-pending',
   'admin-order-cancelled',
   'admin-daily-digest',
   'admin-event-reservation',
+  // Um template para todo evento de pagamento (recebido, recusado, estornado,
+  // chargeback). O CTA é sempre o painel — mesma regra dos outros.
+  'admin-payment-event',
 ];
 
 /** Templates addressed to a shop customer. */
@@ -105,14 +107,15 @@ const MEMBER_TEMPLATES = [
 
 /**
  * `admin-order-disputed` sai desta lista de propósito: contestação se responde
- * no painel do Stripe, com prazo, não no nosso. O botão leva para lá.
+ * no painel da operadora, com prazo, não no nosso. O botão leva para lá — e
+ * mudou de host junto com a migração para a Pagar.me.
  */
-const ADMIN_TEMPLATE_TO_STRIPE = 'admin-order-disputed';
+const ADMIN_TEMPLATE_TO_PROVIDER = 'admin-order-disputed';
 
 describe('para onde cada e-mail leva', () => {
-  it('o aviso de chargeback leva ao painel do Stripe, onde se contesta', async () => {
-    const { html } = await render(ADMIN_TEMPLATE_TO_STRIPE);
-    expect(ctaHosts(html)).toEqual(['dashboard.stripe.com']);
+  it('o aviso de chargeback leva ao painel da Pagar.me, onde se contesta', async () => {
+    const { html } = await render(ADMIN_TEMPLATE_TO_PROVIDER);
+    expect(ctaHosts(html)).toEqual(['dash.pagar.me']);
   });
 
   it.each(ADMIN_TEMPLATES)('%s leva ao painel admin', async (template) => {

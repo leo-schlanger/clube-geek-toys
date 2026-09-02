@@ -4,9 +4,11 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
-// CardTokenizationForm removed — Stripe handles card updates via the update-payment-method API endpoint.
-// For now, updating card requires the member to cancel and re-subscribe (simpler UX until Stripe
-// SetupIntent flow is implemented for card-only updates).
+// The card is swapped in place now. Pagar.me takes a one-shot token and points
+// the existing recurrence at it, so the billing cycle and the member's expiry
+// date are untouched — this is what replaced "cancel and subscribe again",
+// which cost the member the days they had already paid for.
+import { PagarmeCardForm } from './PagarmeCardForm'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +34,7 @@ import {
   canResumeSubscription,
   canCancelSubscription,
   canUpdateCard,
+  updateSubscriptionCard,
 } from '../lib/subscriptions'
 import { toast } from 'sonner'
 import {
@@ -144,8 +147,20 @@ export function SubscriptionManagement({
     setConfirmAction(null)
   }
 
-  // handleUpdateCard — Stripe card update requires SetupIntent flow (future enhancement).
-  // The dialog below informs the user to cancel + re-subscribe. No function needed.
+  /**
+   * Swap the card the subscription bills.
+   *
+   * Throws on failure so `PagarmeCardForm` keeps the fields and shows why —
+   * the member is one typo away from fixing it, and closing the dialog on an
+   * error would make them start over.
+   */
+  async function handleCardToken(cardToken: string) {
+    if (!subscription) return
+    await updateSubscriptionCard(subscription.id, cardToken)
+    toast.success('Cartão atualizado. A próxima cobrança usa o novo cartão.')
+    setShowUpdateCard(false)
+    await fetchSubscriptionData()
+  }
 
   function getPaymentStatusIcon(status: string) {
     switch (status) {
@@ -604,22 +619,26 @@ export function SubscriptionManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Update Card Dialog — simplified for Stripe migration */}
+      {/* Update Card Dialog — swapped in place, no re-subscription needed */}
       <Dialog open={showUpdateCard} onOpenChange={setShowUpdateCard}>
         <DialogContent className="max-w-md">
           <DialogHeader className="text-center sm:text-left">
             <div className="mx-auto sm:mx-0 w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center mb-4">
               <CreditCard className="h-7 w-7 text-blue-500" />
             </div>
-            <DialogTitle className="text-xl">Atualizar Cartão</DialogTitle>
+            <DialogTitle className="text-xl">Atualizar cartão</DialogTitle>
             <DialogDescription className="text-base">
-              Para atualizar o cartão, cancele a assinatura atual e crie uma nova.
-              O saldo restante do período será creditado no novo pagamento.
+              A cobrança continua na mesma data e você não perde os dias já pagos —
+              só o cartão muda.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="ghost" onClick={() => setShowUpdateCard(false)}>Entendi</Button>
-          </div>
+          <PagarmeCardForm
+            amount={subscription?.transactionAmount ?? 0}
+            onToken={handleCardToken}
+            onCancel={() => setShowUpdateCard(false)}
+            allowInstallments={false}
+            submitLabel="Salvar cartão"
+          />
         </DialogContent>
       </Dialog>
     </>

@@ -12,7 +12,7 @@ const VALID_TEMPLATES = [
   'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
-  'verify-email', 'password-reset', 'contract-signed', 'admin-pix-pending',
+  'verify-email', 'password-reset', 'contract-signed',
   'admin-new-member', 'order-confirmed', 'order-shipped',
 ] as const;
 

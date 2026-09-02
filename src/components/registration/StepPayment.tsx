@@ -1,7 +1,7 @@
 /**
  * StepPayment — Step 5 of the registration flow (inline, not modal).
  *
- * Card flow: backend creates Stripe PaymentIntent -> frontend uses Stripe Elements.
+ * Card flow: the browser tokenizes the card with Pagar.me and the server charges the token.
  * PIX flow: backend generates EMV QR code -> frontend displays it -> admin confirms manually.
  * Subscription flow: goes straight to card (no PIX option).
  */
@@ -30,7 +30,7 @@ import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
-import { StripePaymentForm } from '../StripePaymentForm'
+import { PagarmeCardForm } from '../PagarmeCardForm'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../../lib/payments'
 import { CLUB_PLAN, type PlanType, type PaymentType } from '../../types'
 import { formatCurrency } from '../../lib/utils'
@@ -76,7 +76,6 @@ export function StepPayment({
 }: StepPaymentProps) {
   const [mode, setMode] = useState<PaymentMode>('one-time')
   const [method, setMethod] = useState<PaymentMethodChoice>(null)
-  const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
   const confirm = useConfirm()
 
@@ -217,48 +216,64 @@ export function StepPayment({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amount, planData.name, memberEmail, memberId])
 
-  // ─── Card Flow (Stripe) ────────────────────────────────────────────────────
+  // ─── Card flow (Pagar.me) ──────────────────────────────────────────────────
 
-  const handleCardPayment = useCallback(async () => {
-    setLoading(true)
+  /**
+   * Opening the form is all this does now.
+   *
+   * Stripe needed a PaymentIntent prepared server-side so the browser had a
+   * clientSecret to redeem. Pagar.me authorises from a token in a single call,
+   * so nothing is created until the member has actually typed a card.
+   */
+  const handleCardPayment = useCallback(() => {
     setError(null)
-    try {
-      let cs: string | undefined
+    setMethod('card')
+  }, [])
 
-      if (mode === 'subscription') {
-        const res = await api.post<{ clientSecret: string; id: string }>('/subscription/create', {
-          member_id: memberId,
-          plan,
-          frequency_type: 'months',
-          payer_email: memberEmail,
-          payer_name: memberName,
-          transaction_amount: amount,
-        })
-        if (res.error) throw new Error(res.error)
-        cs = (res.data as { clientSecret?: string })?.clientSecret
-      } else {
-        const res = await api.post<{ clientSecret: string; paymentIntentId: string }>('/checkout/card/create', {
-          amount,
-          description: `Clube GeekPop & Toys - Plano ${planData.name}`,
-          payer_email: memberEmail,
-          payer_name: memberName,
-          external_reference: memberId,
-        })
-        if (res.error) throw new Error(res.error)
-        cs = (res.data as { clientSecret?: string })?.clientSecret
+  /**
+   * Run the charge with the token the form produced.
+   *
+   * Throws on failure, which is what lets `PagarmeCardForm` show the reason and
+   * keep the member on the same screen to try another card.
+   */
+  const handleCardToken = useCallback(
+    async (cardToken: string, installments: number) => {
+      setError(null)
+
+      const endpoint = mode === 'subscription' ? '/subscription/create' : '/checkout/card/create'
+      const body =
+        mode === 'subscription'
+          ? {
+              member_id: memberId,
+              plan,
+              frequency_type: 'months',
+              payer_email: memberEmail,
+              payer_name: memberName,
+              transaction_amount: amount,
+              card_token: cardToken,
+            }
+          : {
+              amount,
+              description: `Clube GeekPop & Toys - Plano ${planData.name}`,
+              payer_email: memberEmail,
+              payer_name: memberName,
+              external_reference: memberId,
+              card_token: cardToken,
+              installments,
+            }
+
+      const res = await api.post<{ status?: string }>(endpoint, body)
+      if (res.error) throw new Error(res.error)
+      if (res.data?.status === 'failed') {
+        throw new Error('Pagamento recusado. Tente outro cartão ou use PIX.')
       }
 
-      if (!cs) throw new Error('Nao foi possivel inicializar o pagamento.')
-      setClientSecret(cs)
-      setMethod('card')
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao iniciar pagamento.'
-      setError(message)
-      toast.error(message)
-    } finally {
-      setLoading(false)
-    }
-  }, [mode, memberId, plan, amount, memberEmail, planData.name])
+      toast.success(mode === 'subscription' ? 'Assinatura ativada!' : 'Pagamento confirmado!')
+      handlePaymentSuccess()
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mode, memberId, plan, amount, memberEmail, memberName, planData.name]
+  )
 
   // ─── Success handler ───────────────────────────────────────────────────────
 
@@ -276,7 +291,6 @@ export function StepPayment({
     if (timerRef.current) clearInterval(timerRef.current)
     setMethod(null)
     setPixData(null)
-    setClientSecret(null)
     setError(null)
   }
 
@@ -310,7 +324,7 @@ export function StepPayment({
             <p className="text-2xl font-bold">{formatCurrency(amount)}</p>
           </div>
           <p className="text-xs text-muted-foreground mt-2">
-            Pagamento seguro via Stripe
+            Pagamento seguro via Pagar.me
           </p>
         </CardContent>
       </Card>
@@ -486,15 +500,17 @@ export function StepPayment({
         </div>
       )}
 
-      {/* ═══ Card: Stripe Elements ═══ */}
-      {method === 'card' && clientSecret && (
+      {/* ═══ Card: Pagar.me ═══ */}
+      {method === 'card' && (
         <div className="space-y-4">
-          <StripePaymentForm
-            clientSecret={clientSecret}
-            onSuccess={handlePaymentSuccess}
-            onError={(msg) => setError(msg)}
-            onCancel={resetMethod}
+          <PagarmeCardForm
             amount={amount}
+            onToken={handleCardToken}
+            onCancel={resetMethod}
+            // R$ 12,50 a month: there is nothing to split, and the provider
+            // refuses an instalment below its floor anyway.
+            allowInstallments={false}
+            defaultHolderName={memberName}
             submitLabel={
               mode === 'subscription'
                 ? `Assinar por ${formatCurrency(amount)}/mês`

@@ -12,8 +12,26 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   HMAC_SECRET: z.string().min(32),
 
-  // Stripe
-  STRIPE_SECRET_KEY: z.string().min(1),
+  // Pagar.me (API v5) — the payment provider for card, PIX and subscriptions.
+  PAGARME_SECRET_KEY: z.string().min(1).optional(),
+  PAGARME_PUBLIC_KEY: z.string().min(1).optional(),
+  PAGARME_ACCOUNT_ID: z.string().optional(),
+  PAGARME_API_URL: z.string().url().default('https://api.pagar.me/core/v5'),
+  // Basic-auth credentials configured on the Pagar.me webhook. Both must be set
+  // for the endpoint to accept anything in production.
+  PAGARME_WEBHOOK_USER: z.string().min(1).optional(),
+  PAGARME_WEBHOOK_PASSWORD: z.string().min(1).optional(),
+  // What the buyer reads on the card statement. PSP caps it at 13 characters.
+  PAGARME_STATEMENT_DESCRIPTOR: z.string().max(13).default('GEEKPOPTOYS'),
+  PAGARME_MAX_INSTALLMENTS: z.coerce.number().int().min(1).max(12).default(6),
+  /** Minimum value per installment, in reais — below it we offer fewer splits. */
+  PAGARME_MIN_INSTALLMENT_AMOUNT: z.coerce.number().positive().default(20),
+  /** How long a Pagar.me PIX QR stays payable, in seconds. */
+  PAGARME_PIX_EXPIRES_IN: z.coerce.number().int().positive().max(86400).default(3600),
+
+  // Stripe — legacy. Kept only so charges created before the Pagar.me migration
+  // can still be refunded and their webhooks acknowledged. No new charge uses it.
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
   // PIX
@@ -61,10 +79,22 @@ const envSchema = z.object({
   STOCK_RESERVATION_TTL_HOURS: z.coerce.number().int().positive().max(720).default(24),
 });
 
-const envSchemaRefined = envSchema.refine(
-  (e) => e.NODE_ENV !== 'production' || (e.STRIPE_WEBHOOK_SECRET && e.STRIPE_WEBHOOK_SECRET.length > 0),
-  { message: 'STRIPE_WEBHOOK_SECRET is required in production', path: ['STRIPE_WEBHOOK_SECRET'] },
-);
+const envSchemaRefined = envSchema
+  .refine((e) => e.NODE_ENV !== 'production' || Boolean(e.PAGARME_SECRET_KEY), {
+    message: 'PAGARME_SECRET_KEY is required in production',
+    path: ['PAGARME_SECRET_KEY'],
+  })
+  // The webhook is the only thing that marks a PIX paid, so an unauthenticated
+  // endpoint in production would let anyone settle an order for free.
+  .refine(
+    (e) =>
+      e.NODE_ENV !== 'production' ||
+      Boolean(e.PAGARME_WEBHOOK_USER && e.PAGARME_WEBHOOK_PASSWORD),
+    {
+      message: 'PAGARME_WEBHOOK_USER and PAGARME_WEBHOOK_PASSWORD are required in production',
+      path: ['PAGARME_WEBHOOK_USER'],
+    },
+  );
 
 export type Env = z.infer<typeof envSchema>;
 

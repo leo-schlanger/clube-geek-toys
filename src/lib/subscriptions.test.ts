@@ -265,25 +265,30 @@ describe('cancelSubscription', () => {
 })
 
 describe('updateSubscriptionCard', () => {
-  it('should return true on success', async () => {
+  it('sends the Pagar.me card token, never the card itself', async () => {
     mockedApi.put.mockResolvedValueOnce({ data: {}, status: 200 })
 
-    expect(await updateSubscriptionCard('sub-1', 'pm_abc')).toBe(true)
+    expect(await updateSubscriptionCard('sub-1', 'token_abc')).toBe(true)
     expect(mockedApi.put).toHaveBeenCalledWith('/subscription/sub-1/update-payment-method', {
-      paymentMethodId: 'pm_abc',
+      cardToken: 'token_abc',
     })
   })
 
-  it('should return false on error', async () => {
-    mockedApi.put.mockResolvedValueOnce({ error: 'Invalid', status: 400 })
+  /**
+   * It used to swallow the failure and return `false`, which the dialog had no
+   * way to explain — the member re-typed the same card into a form that did
+   * nothing. The reason now reaches the form.
+   */
+  it('throws with the server reason when the provider refuses', async () => {
+    mockedApi.put.mockResolvedValueOnce({ error: 'Cartão recusado.', status: 400 })
 
-    expect(await updateSubscriptionCard('sub-1', 'pm_abc')).toBe(false)
+    await expect(updateSubscriptionCard('sub-1', 'token_abc')).rejects.toThrow('Cartão recusado.')
   })
 
-  it('should return false on thrown error', async () => {
+  it('throws when the request itself fails', async () => {
     mockedApi.put.mockRejectedValueOnce(new Error('fail'))
 
-    expect(await updateSubscriptionCard('sub-1', 'pm_abc')).toBe(false)
+    await expect(updateSubscriptionCard('sub-1', 'token_abc')).rejects.toThrow('fail')
   })
 })
 

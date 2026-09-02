@@ -1,16 +1,16 @@
 import { query } from '../config/database.js';
-import { env, adminUrl } from '../config/env.js';
-import { getStripe, getOrCreateCustomer, mapStripePaymentStatus } from '../utils/stripe.js';
-import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
+import { env } from '../config/env.js';
+import { getStripe, mapStripePaymentStatus } from '../utils/stripe.js';
+import { type PixQRData } from '../utils/pix.js';
+import * as pagarme from '../utils/pagarme.js';
 import { sendTemplateEmail } from './email.service.js';
+import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { AppError } from '../middleware/error-handler.js';
+import { isValidCPF } from '../utils/cpf.js';
+import { isValidCnpj } from '../utils/cnpj.js';
 import { CLUB_PLAN_PRICE } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
 import crypto from 'crypto';
-
-const PIX_KEY = env.PIX_KEY || '';
-const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
-const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
 
 const MIN_AMOUNT = 1.00;
 /** Generous ceiling so admin and shop never hit an artificial low limit. */
@@ -138,24 +138,114 @@ export async function getPaymentById(id: string) {
   return mapPaymentRow(result.rows[0]);
 }
 
-// ─── Stripe PaymentIntent: PIX ───────────────────────────────────────────────
+// ─── Club membership: the member behind a payment ────────────────────────────
+
+interface ClubPayer {
+  id: string;
+  email: string;
+  fullName: string;
+  plan: string;
+  document: string;
+  phone: string | null;
+  pagarmeCustomerId: string | null;
+}
 
 /**
- * Create a Stripe PaymentIntent for PIX and persist a pending payment row.
+ * Load the member and the fields Pagar.me insists on.
  *
- * Returns the client secret (for the frontend to confirm) and any PIX QR code data
- * available immediately. If no QR code is returned yet, the frontend should poll
- * via getPaymentStatus().
+ * The document is not optional at the provider: a PSP order without a valid
+ * CPF/CNPJ is a 422, so it is better to fail here with a sentence the member
+ * can act on than to surface a field-path error from the acquirer.
  */
+async function loadClubPayer(memberId: string): Promise<ClubPayer> {
+  const result = await query(
+    `SELECT id, email, full_name, plan, cpf, phone, pagarme_customer_id
+       FROM members WHERE id = $1`,
+    [memberId],
+  );
+  if (result.rows.length === 0) {
+    throw new AppError(404, 'Membro não encontrado.', 'MEMBER_NOT_FOUND');
+  }
+  const row = result.rows[0];
+  const document = pagarme.normalizeDocument(row.cpf as string);
+  // Check digits, not just length. Registration validates the CPF, but rows
+  // predate that check and a placeholder like 111.111.111-11 has the right
+  // length — the acquirer would reject it with a field-path 422 the member
+  // cannot act on, several steps later.
+  const documentIsValid =
+    document.length === 11 ? isValidCPF(document) : document.length === 14 && isValidCnpj(document);
+  if (!documentIsValid) {
+    throw new AppError(
+      400,
+      'Cadastro sem CPF válido. Atualize seus dados antes de pagar.',
+      'MEMBER_DOCUMENT_MISSING',
+    );
+  }
+  return {
+    id: row.id as string,
+    email: row.email as string,
+    fullName: row.full_name as string,
+    plan: row.plan as string,
+    document,
+    phone: (row.phone as string) ?? null,
+    pagarmeCustomerId: (row.pagarme_customer_id as string) ?? null,
+  };
+}
+
+/** The customer block Pagar.me wants, built from a member row. */
+function payerToPagarmeCustomer(payer: ClubPayer): pagarme.PagarmeCustomerInput {
+  const phone = pagarme.parseBrazilianPhone(payer.phone);
+  return {
+    name: payer.fullName,
+    email: payer.email,
+    document: payer.document,
+    code: payer.id,
+    phones: phone ? { mobile_phone: phone } : undefined,
+    metadata: { memberId: payer.id },
+  };
+}
+
+/** Pull the PIX transaction out of a created order, or explain why there isn't one. */
+function requirePixTransaction(order: pagarme.PagarmeOrder): {
+  charge: pagarme.PagarmeCharge;
+  qrCode: string;
+  qrCodeUrl: string;
+  expiresAt: string;
+} {
+  const charge = order.charges?.[0];
+  const tx = charge?.last_transaction;
+  if (!charge || !tx?.qr_code) {
+    console.error('[PIX] Pagar.me order without qr_code:', JSON.stringify(order).slice(0, 800));
+    throw new AppError(
+      502,
+      'Não foi possível gerar o QR Code PIX agora. Tente novamente em instantes.',
+      'PIX_QRCODE_UNAVAILABLE',
+    );
+  }
+  return {
+    charge,
+    qrCode: tx.qr_code,
+    qrCodeUrl: tx.qr_code_url ?? '',
+    expiresAt:
+      tx.expires_at ??
+      new Date(Date.now() + env.PAGARME_PIX_EXPIRES_IN * 1000).toISOString(),
+  };
+}
+
+// ─── Pagar.me: PIX ───────────────────────────────────────────────────────────
+
 /**
- * PIX payment — generated locally (not via Stripe, since Stripe PIX isn't available).
+ * PIX for the club plan, issued by Pagar.me.
  *
- * Flow:
- * 1. Generate EMV code with the club's PIX key + amount + txId
- * 2. Save pending payment in DB
- * 3. Notify admin via email that there's a PIX payment to confirm
- * 4. Return QR data to frontend (EMV code for rendering)
- * 5. Admin confirms manually via POST /payments/:id/confirm
+ * This replaces the locally generated static BR Code. The difference that
+ * matters is not the QR itself but who watches it: Pagar.me reconciles the
+ * payment and fires `charge.paid`, so the member is activated automatically.
+ * Before, every PIX sat `pending` until an admin compared it against the bank
+ * statement and clicked confirm — the single most common way a paying member
+ * stayed locked out over a weekend.
+ *
+ * `confirmPixPayment` survives as the manual override for the codes issued
+ * under the old flow, and for the rare case where the webhook never lands.
  */
 export async function createPixPayment(data: {
   amount: number;
@@ -166,67 +256,99 @@ export async function createPixPayment(data: {
   paymentId: string;
   pixData: PixQRData;
 }> {
-  if (!PIX_KEY) {
-    throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
-  }
   validateAmount(data.amount);
+  const payer = await loadClubPayer(data.memberId);
+  const amountInCents = pagarme.toCents(data.amount);
 
-  const memberResult = await query(
-    'SELECT id, email, full_name, plan FROM members WHERE id = $1',
-    [data.memberId]
+  const paymentId = crypto.randomUUID();
+  const order = await pagarme.createOrder(
+    {
+      code: paymentId,
+      customer: payerToPagarmeCustomer(payer),
+      items: [
+        {
+          amount: amountInCents,
+          description: data.description.slice(0, 255),
+          quantity: 1,
+          code: `club-${payer.plan}`,
+        },
+      ],
+      payments: [
+        {
+          payment_method: 'pix',
+          pix: {
+            expires_in: env.PAGARME_PIX_EXPIRES_IN,
+            additional_information: [
+              { name: 'Plano', value: payer.plan },
+              { name: 'Membro', value: payer.fullName.slice(0, 60) },
+            ],
+          },
+        },
+      ],
+      metadata: { kind: 'club_membership', memberId: payer.id, paymentId },
+    },
+    // Keyed on the payment row we are about to write, so a retried request
+    // after a timeout returns the same QR instead of opening a second charge.
+    { idempotencyKey: pagarme.idempotencyKeyFor('club_pix', paymentId, amountInCents) },
   );
-  if (memberResult.rows.length === 0) {
-    throw new AppError(404, 'Membro não encontrado.', 'MEMBER_NOT_FOUND');
-  }
-  const member = memberResult.rows[0];
 
-  // Generate PIX EMV code locally
-  const txId = generatePixTxId();
-  const pixData = generatePixEMV({
-    pixKey: PIX_KEY,
+  const { charge, qrCode, qrCodeUrl, expiresAt } = requirePixTransaction(order);
+
+  await query(
+    `INSERT INTO payments
+       (id, member_id, amount, method, status, provider, provider_id, provider_status,
+        reference, pagarme_order_id, pagarme_charge_id)
+     VALUES ($1, $2, $3, 'pix', 'pending', 'pagarme', $4, $5, $6, $7, $4)`,
+    [paymentId, payer.id, data.amount, charge.id, charge.status, order.id, order.id],
+  );
+
+  await auditLog(
+    'payment.pix_created',
+    null,
+    {
+      paymentId,
+      memberId: payer.id,
+      amount: data.amount,
+      provider: 'pagarme',
+      pagarmeOrderId: order.id,
+      pagarmeChargeId: charge.id,
+    },
+    payer.id,
+  );
+
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_pending',
+    subject: `Assinatura — ${payer.fullName}`,
     amount: data.amount,
-    merchantName: PIX_MERCHANT_NAME,
-    merchantCity: PIX_MERCHANT_CITY,
-    txId,
+    method: 'pix',
+    customerName: payer.fullName,
+    customerEmail: payer.email,
+    link: '/admin?tab=members',
+    detail: 'PIX gerado. A Pagar.me confirma sozinha quando o pagamento cair.',
+    chargeId: charge.id,
   });
 
-  // Save pending payment
-  const paymentId = crypto.randomUUID();
-  await query(
-    `INSERT INTO payments (id, member_id, amount, method, status, provider_id, provider_status, reference)
-     VALUES ($1, $2, $3, 'pix', 'pending', $4, 'PIX_PENDING', $5)`,
-    [paymentId, data.memberId, data.amount, txId, txId]
-  );
-
-  await auditLog('payment.pix_created', null, {
+  return {
     paymentId,
-    memberId: data.memberId,
-    amount: data.amount,
-    txId,
-  }, data.memberId);
-
-  // Notify admin via email (non-blocking)
-  sendTemplateEmail({
-    template: 'admin-pix-pending',
-    to: env.ADMIN_EMAIL,
-    variables: {
-      member_name: member.full_name as string,
-      member_email: member.email as string,
-      plan: member.plan as string,
-      amount: data.amount.toFixed(2).replace('.', ','),
-      tx_id: txId,
-      payment_id: paymentId,
-      admin_url: adminUrl('/admin?tab=members'),
+    pixData: {
+      emvCode: qrCode,
+      qrCodeUrl,
+      pixKey: env.PIX_KEY || '',
+      amount: data.amount,
+      txId: charge.id,
+      expiresAt,
+      provider: 'pagarme',
     },
-    member_id: data.memberId,
-  }).catch((err) => console.error('[PIX] Failed to notify admin:', err));
-
-  return { paymentId, pixData };
+  };
 }
 
 /**
- * Admin manually confirms a PIX payment.
- * Sets payment status to 'paid' and activates the member.
+ * Admin settles a PIX by hand.
+ *
+ * With Pagar.me issuing the QR this is no longer the normal path — the webhook
+ * marks the charge paid on its own, usually within seconds. It survives for two
+ * cases: the static codes generated before the migration, which nothing watches,
+ * and the rare charge whose webhook never lands.
  */
 export async function confirmPixPayment(opts: {
   paymentId: string;
@@ -327,18 +449,35 @@ export async function confirmPixPayment(opts: {
     paymentId: opts.paymentId,
     memberId: payment.memberId,
     amount: payment.amount,
+    manual: true,
   }, payment.memberId as string);
+
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_received',
+    subject: `Assinatura — ${(payment.memberName as string) || 'membro'}`,
+    amount: payment.amount,
+    method: 'pix',
+    customerName: (payment.memberName as string) ?? null,
+    link: '/admin?tab=members',
+    detail: 'Confirmado manualmente no painel.',
+    chargeId: (payment.providerId as string) ?? null,
+  });
 
   return { success: true };
 }
 
-// ─── Stripe PaymentIntent: Card ──────────────────────────────────────────────
+// ─── Pagar.me: card ──────────────────────────────────────────────────────────
 
 /**
- * Create a Stripe PaymentIntent for card payment and persist a pending payment row.
+ * Charge a card for the club plan.
  *
- * The frontend uses the clientSecret with Stripe.js `confirmCardPayment()` to collect
- * and confirm the card details securely — no raw card data ever touches our server.
+ * The shape of this flow changed with the migration. Stripe handed the browser
+ * a `clientSecret` and the browser finished the payment; Pagar.me authorises
+ * synchronously, so by the time this returns the charge is already approved or
+ * already declined. The caller gets the outcome, not a secret to redeem.
+ *
+ * Raw card data never reaches this server: the browser exchanges it for a
+ * `card_token` against Pagar.me directly, using the public key.
  */
 export async function createCardPayment(data: {
   amount: number;
@@ -346,54 +485,142 @@ export async function createCardPayment(data: {
   payerEmail: string;
   payerName: string;
   memberId: string;
+  cardToken: string;
+  installments?: number;
 }): Promise<{
-  clientSecret: string;
-  paymentIntentId: string;
+  paymentId: string;
+  chargeId: string;
+  status: 'pending' | 'paid' | 'failed' | 'refunded';
+  providerStatus: string;
+  installments: number;
+  cardBrand: string | null;
+  cardLastFour: string | null;
 }> {
   validateAmount(data.amount);
-
-  // Ensure Stripe Customer exists for the member
-  const memberResult = await query(
-    'SELECT id, email, full_name, stripe_customer_id FROM members WHERE id = $1',
-    [data.memberId]
-  );
-  if (memberResult.rows.length === 0) {
-    throw new AppError(404, 'Membro não encontrado.', 'MEMBER_NOT_FOUND');
+  if (!data.cardToken) {
+    throw new AppError(400, 'Cartão não informado.', 'CARD_TOKEN_REQUIRED');
   }
-  const member = memberResult.rows[0];
-  const customerId = await getOrCreateCustomer({
-    id: member.id as string,
-    email: (member.email as string) || data.payerEmail,
-    fullName: (member.full_name as string) || data.payerName,
-    stripeCustomerId: member.stripe_customer_id as string | null,
-  });
 
-  const stripe = getStripe();
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(data.amount * 100), // Stripe uses cents
-    currency: 'brl',
-    payment_method_types: ['card'],
-    customer: customerId,
-    description: data.description,
-    metadata: { memberId: data.memberId },
-  });
+  const payer = await loadClubPayer(data.memberId);
+  const amountInCents = pagarme.toCents(data.amount);
+  // The plan is a small monthly amount; splitting it makes no sense and the
+  // provider would reject an instalment below its floor anyway.
+  const installments = Math.max(
+    1,
+    Math.min(data.installments ?? 1, pagarme.maxInstallmentsFor(data.amount)),
+  );
 
-  // Persist pending payment row
+  const paymentId = crypto.randomUUID();
+  const order = await pagarme.createOrder(
+    {
+      code: paymentId,
+      customer: payerToPagarmeCustomer(payer),
+      items: [
+        {
+          amount: amountInCents,
+          description: data.description.slice(0, 255),
+          quantity: 1,
+          code: `club-${payer.plan}`,
+        },
+      ],
+      payments: [
+        {
+          payment_method: 'credit_card',
+          credit_card: {
+            installments,
+            statement_descriptor: env.PAGARME_STATEMENT_DESCRIPTOR,
+            card_token: data.cardToken,
+          },
+        },
+      ],
+      metadata: { kind: 'club_membership', memberId: payer.id, paymentId },
+    },
+    { idempotencyKey: pagarme.idempotencyKeyFor('club_card', paymentId, amountInCents) },
+  );
+
+  const charge = order.charges?.[0];
+  if (!charge) {
+    throw new AppError(502, 'O processador não devolveu a cobrança.', 'PAGARME_NO_CHARGE');
+  }
+  const status = pagarme.mapChargeStatus(charge.status);
+  const card = charge.last_transaction?.card;
+
   await query(
-    `INSERT INTO payments (member_id, amount, method, status, provider_id, provider_status, reference)
-     VALUES ($1, $2, 'credit_card', 'pending', $3, $4, $5)`,
+    `INSERT INTO payments
+       (id, member_id, amount, method, status, provider, provider_id, provider_status,
+        reference, pagarme_order_id, pagarme_charge_id, installments, card_brand, card_last_four)
+     VALUES ($1, $2, $3, 'credit_card', $4, 'pagarme', $5, $6, $7, $8, $5, $9, $10, $11)`,
     [
-      data.memberId,
+      paymentId,
+      payer.id,
       data.amount,
-      paymentIntent.id,
-      paymentIntent.status,
-      paymentIntent.id,
-    ]
+      status,
+      charge.id,
+      charge.status,
+      order.id,
+      order.id,
+      installments,
+      card?.brand ?? null,
+      card?.last_four_digits ?? null,
+    ],
+  );
+
+  // A declined card never fires a webhook worth waiting for, and the member is
+  // staring at the form: refuse here, with the acquirer's reason translated.
+  if (status === 'failed') {
+    await auditLog(
+      'payment.failed',
+      null,
+      {
+        paymentId,
+        provider: 'pagarme',
+        pagarmeChargeId: charge.id,
+        providerStatus: charge.status,
+        acquirerCode: charge.last_transaction?.acquirer_return_code ?? null,
+      },
+      payer.id,
+    );
+    notifyAdminsOfPaymentAsync({
+      event: 'payment_failed',
+      subject: `Assinatura — ${payer.fullName}`,
+      amount: data.amount,
+      method: 'credit_card',
+      customerName: payer.fullName,
+      customerEmail: payer.email,
+      link: '/admin?tab=members',
+      detail: pagarme.describeChargeFailure(charge),
+      chargeId: charge.id,
+    });
+    throw new AppError(402, pagarme.describeChargeFailure(charge), 'CARD_DECLINED');
+  }
+
+  // The webhook still does the activating, so the member is activated exactly
+  // once whichever path wins the race. What this returns is only the outcome
+  // the browser needs in order to stop showing a spinner.
+  await auditLog(
+    'payment.card_created',
+    null,
+    {
+      paymentId,
+      memberId: payer.id,
+      amount: data.amount,
+      provider: 'pagarme',
+      pagarmeOrderId: order.id,
+      pagarmeChargeId: charge.id,
+      installments,
+      status,
+    },
+    payer.id,
   );
 
   return {
-    clientSecret: paymentIntent.client_secret!,
-    paymentIntentId: paymentIntent.id,
+    paymentId,
+    chargeId: charge.id,
+    status,
+    providerStatus: charge.status,
+    installments,
+    cardBrand: card?.brand ?? null,
+    cardLastFour: card?.last_four_digits ?? null,
   };
 }
 
@@ -415,7 +642,11 @@ export async function createCardPayment(data: {
  * answer for anyone's payment as long as the caller was logged in.
  */
 export async function userOwnsPayment(userId: string, paymentId: string): Promise<boolean> {
-  const column = paymentId.startsWith('pi_') ? 'p.provider_id' : 'p.id::text';
+  // Three id shapes reach this: a Stripe PaymentIntent (`pi_`, legacy), a
+  // Pagar.me charge or order (`ch_` / `or_`), and our own row UUID. The
+  // provider ids all live in `provider_id`, so only the UUID needs the cast.
+  const isProviderId = /^(pi_|ch_|or_)/.test(paymentId);
+  const column = isProviderId ? 'p.provider_id' : 'p.id::text';
   const result = await query(
     `SELECT 1
        FROM payments p
@@ -435,7 +666,35 @@ export async function getPaymentStatus(paymentId: string): Promise<{
   currency: string;
   paymentMethod: string | null;
 }> {
-  // Stripe PaymentIntent IDs always start with "pi_"
+  // Pagar.me charge — ask the provider, which is authoritative while the
+  // webhook is still in flight. This is what the PIX screen polls.
+  if (paymentId.startsWith('ch_')) {
+    const charge = await pagarme.getCharge(paymentId);
+    return {
+      id: charge.id,
+      status: charge.status,
+      mapped_status: pagarme.mapChargeStatus(charge.status),
+      amount: pagarme.fromCents(charge.amount),
+      currency: 'brl',
+      paymentMethod: charge.payment_method ?? null,
+    };
+  }
+
+  // Pagar.me order — the first charge on it carries the status.
+  if (paymentId.startsWith('or_')) {
+    const order = await pagarme.getOrder(paymentId);
+    const charge = order.charges?.[0];
+    return {
+      id: order.id,
+      status: charge?.status ?? order.status,
+      mapped_status: pagarme.mapChargeStatus(charge?.status ?? order.status),
+      amount: pagarme.fromCents(charge?.amount ?? order.amount),
+      currency: 'brl',
+      paymentMethod: charge?.payment_method ?? null,
+    };
+  }
+
+  // Stripe PaymentIntent — legacy, still queryable so old screens resolve.
   if (paymentId.startsWith('pi_')) {
     const stripe = getStripe();
     const pi = await stripe.paymentIntents.retrieve(paymentId);
@@ -449,9 +708,9 @@ export async function getPaymentStatus(paymentId: string): Promise<{
     };
   }
 
-  // Local payment (PIX) — check our database
+  // Our own row — the shape the club PIX screen holds on to.
   const result = await query(
-    `SELECT id, amount, status, method FROM payments WHERE id = $1`,
+    `SELECT id, amount, status, method, pagarme_charge_id FROM payments WHERE id = $1`,
     [paymentId]
   );
 
@@ -460,6 +719,33 @@ export async function getPaymentStatus(paymentId: string): Promise<{
   }
 
   const row = result.rows[0];
+
+  // A pending Pagar.me row is worth a question to the provider.
+  //
+  // The webhook is what activates the member, and it is quick — but the person
+  // is looking at the QR code with their bank app still open, and "aguardando"
+  // for the extra second or two it takes to arrive reads as a failed payment.
+  // Asking the charge directly makes the screen flip the moment the money
+  // lands. The webhook stays the thing that applies the effects; this only
+  // reports, so a lost webhook still cannot activate anyone by itself.
+  if (row.status === 'pending' && row.pagarme_charge_id) {
+    try {
+      const charge = await pagarme.getChargeThrottled(row.pagarme_charge_id as string);
+      const mapped = pagarme.mapChargeStatus(charge.status);
+      return {
+        id: row.id,
+        status: charge.status,
+        mapped_status: mapped,
+        amount: parseFloat(row.amount),
+        currency: 'brl',
+        paymentMethod: row.method || charge.payment_method || null,
+      };
+    } catch (err) {
+      // The stored status is still a truthful answer; polling must not 500.
+      console.error('[PAYMENT] live charge lookup failed, falling back to DB:', err);
+    }
+  }
+
   return {
     id: row.id,
     status: row.status,
@@ -506,23 +792,32 @@ export async function refundPayment(opts: {
     throw new AppError(400, 'Pagamento sem referência de provedor.', 'PAYMENT_NO_PROVIDER_ID');
   }
 
-  // Refund via Stripe
+  // Which provider took the money decides who gives it back. The prefix is the
+  // discriminator rather than a stored column, because rows written before the
+  // migration have no `provider` and would otherwise be unrefundable.
+  const providerId = payment.providerId as string;
+  const viaStripe = providerId.startsWith('pi_');
+
   try {
-    const stripe = getStripe();
-    const stripeReasonMap: Record<string, 'duplicate' | 'fraudulent' | 'requested_by_customer'> = {
-      duplicate: 'duplicate',
-      fraudulent: 'fraudulent',
-    };
-    await stripe.refunds.create({
-      payment_intent: payment.providerId as string,
-      reason: stripeReasonMap[opts.reason || ''] || 'requested_by_customer',
-    });
+    if (viaStripe) {
+      const stripe = getStripe();
+      const stripeReasonMap: Record<string, 'duplicate' | 'fraudulent' | 'requested_by_customer'> = {
+        duplicate: 'duplicate',
+        fraudulent: 'fraudulent',
+      };
+      await stripe.refunds.create({
+        payment_intent: providerId,
+        reason: stripeReasonMap[opts.reason || ''] || 'requested_by_customer',
+      });
+    } else {
+      await pagarme.refundCharge(providerId);
+    }
   } catch (err) {
-    console.error('[REFUND] Stripe refund call failed:', err);
+    console.error(`[REFUND] ${viaStripe ? 'Stripe' : 'Pagar.me'} refund call failed:`, err);
     throw new AppError(
       502,
       'Falha ao solicitar reembolso na operadora. Tente novamente em alguns minutos.',
-      'STRIPE_REFUND_FAILED',
+      viaStripe ? 'STRIPE_REFUND_FAILED' : 'PAGARME_REFUND_FAILED',
     );
   }
 
@@ -539,10 +834,22 @@ export async function refundPayment(opts: {
       paymentId: opts.paymentId,
       amount: payment.amount,
       providerId: payment.providerId,
+      provider: viaStripe ? 'stripe' : 'pagarme',
       reason: opts.reason || null,
     },
     payment.memberId as string,
   );
+
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_refunded',
+    subject: `Assinatura — ${(payment.memberName as string) || 'membro'}`,
+    amount: payment.amount,
+    method: payment.method as string,
+    customerName: (payment.memberName as string) ?? null,
+    link: '/admin?tab=members',
+    detail: opts.reason || 'Estorno solicitado no painel.',
+    chargeId: providerId,
+  });
 
   return { ...payment, status: 'refunded' as const };
 }

@@ -1,6 +1,41 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 22 de Agosto de 2026
+> **Ultima atualizacao:** 01 de Setembro de 2026
+
+## Entregue em 01/09/2026
+
+- [x] **Pagamentos migrados para a Pagar.me** (pedido Norberto) — ver
+      [`PAGARME.md`](PAGARME.md). Cartão, PIX e assinatura recorrente saíram do
+      Stripe. O que mais muda o dia a dia da loja: **o PIX confirma sozinho**.
+      O código antigo era um BR Code estático que provedor nenhum vigiava — o
+      cliente pagava e o pedido ficava `pending` até alguém conferir o extrato
+      e clicar em confirmar, o que em fim de semana significava horas. A
+      Pagar.me emite um PIX dinâmico, concilia e dispara `charge.paid`.
+      Três decisões que valem registro:
+      (1) o cartão da loja é cobrado em **duas etapas** (`POST /orders` cria e
+      segura o estoque, `POST /orders/:id/pay-card` autoriza) — é isso que faz
+      "cartão recusado, tenta outro" ser retentativa no mesmo pedido, e não um
+      pedido novo com uma segunda reserva;
+      (2) o webhook da Pagar.me **não é assinado** (a v5 não assina o corpo),
+      então o processador confere Basic auth **e** relê a cobrança na API antes
+      de liquidar — um `charge.paid` forjado não vale nada;
+      (3) o Stripe fica como legado: o `provider` guardado em cada linha decide
+      o ramo, e `NULL` significa Stripe, que é como está tudo o que veio antes.
+      De quebra: **trocar o cartão da assinatura** passou a funcionar sem perder
+      o ciclo (antes o painel mandava cancelar e assinar de novo, custando ao
+      membro os dias já pagos), e o checkout passou a pedir **CPF**, que a
+      operadora exige.
+- [x] **Avisos de pagamento para a equipe** (pedido Norberto) — sino no
+      cabeçalho do admin (`AdminNotificationBell`, atualiza a cada 60s) e e-mail
+      a cada pagamento recebido, recusado, estornado ou contestado. Piso de
+      valor e liga/desliga do e-mail ficam na aba **Configurações**; estorno e
+      chargeback ignoram as duas chaves e sempre avisam, porque é dinheiro
+      saindo. Nada disso pode derrubar um pagamento: cada canal engole o próprio
+      erro e loga.
+- [x] **Site institucional** — `geek-toys-home` ganhou a régua de formas de
+      pagamento no rodapé ("posso pagar no PIX?" é a pergunta semanal do
+      WhatsApp) e a política de privacidade passou a **nomear a operadora**, que
+      é o que a LGPD pede.
 
 ## Entregue em 22/08/2026
 

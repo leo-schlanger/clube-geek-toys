@@ -37,7 +37,7 @@ export default function PrivacyPolicy() {
                                 <li><strong>Compras e entrega:</strong> Itens do pedido, endereço de entrega, valor, forma de pagamento e código de rastreio.</li>
                                 <li><strong>Produtos salvos:</strong> A lista de produtos que você marca para comprar depois, visível apenas para você.</li>
                                 <li><strong>Atacado (CNPJ):</strong> Para contas de atacado, CNPJ, razão social, nome fantasia, inscrição estadual, ramo de atividade e contato da empresa.</li>
-                                <li><strong>Dados de Pagamento:</strong> Cartão processado pelo Stripe — não armazenamos dados do cartão. No PIX, geramos o código de cobrança e guardamos apenas o identificador da transação.</li>
+                                <li><strong>Dados de Pagamento:</strong> Cartão processado pela Pagar.me — o número vai do seu navegador direto para ela e não passa pelos nossos servidores; guardamos apenas a bandeira e os quatro últimos dígitos. No PIX, guardamos somente o identificador da cobrança.</li>
                                 <li><strong>Dados de Navegação:</strong> Endereço IP, tipo de navegador, páginas visitadas, data e hora de acesso.</li>
                                 <li><strong>Dados de Contrato:</strong> Assinatura digital, data/hora, IP no momento da assinatura.</li>
                                 <li><strong>Perguntas sobre produtos:</strong> O texto da pergunta e o <strong>primeiro nome</strong> de quem perguntou ficam públicos na página do produto, junto da nossa resposta. Nome completo, e-mail e telefone nunca aparecem.</li>
@@ -106,7 +106,7 @@ export default function PrivacyPolicy() {
                             <h2 className="text-2xl font-semibold text-foreground">5. Compartilhamento de Dados</h2>
                             <p>Não vendemos seus dados. Compartilhamos apenas com:</p>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li><strong>Stripe:</strong> Processamento de pagamentos com cartão.</li>
+                                <li><strong>Pagar.me (Stone):</strong> Processamento de pagamentos com cartão e PIX.</li>
                                 <li><strong>Melhor Envio e Correios:</strong> Cálculo de frete e envio. Para a cotação enviamos apenas o CEP de destino e as medidas do pacote; ao despachar, os dados de entrega necessários para a etiqueta.</li>
                                 <li><strong>Servidor próprio (VPS):</strong> Hospedagem e banco de dados PostgreSQL.</li>
                                 <li><strong>Resend:</strong> Envio de e-mails transacionais.</li>
@@ -117,7 +117,7 @@ export default function PrivacyPolicy() {
 
                         <section className="space-y-3">
                             <h2 className="text-2xl font-semibold text-foreground">6. Transferência Internacional</h2>
-                            <p>Alguns de nossos prestadores de serviços (Stripe, Resend) podem armazenar dados em servidores localizados fora do Brasil. Essas transferências são realizadas com base em:</p>
+                            <p>Alguns de nossos prestadores de serviços (Resend, entre outros) podem armazenar dados em servidores localizados fora do Brasil. O processamento de pagamentos é feito pela Pagar.me, no Brasil. Essas transferências são realizadas com base em:</p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>Cláusulas contratuais padrão aprovadas pela ANPD.</li>
                                 <li>Certificações de adequação dos prestadores às normas de proteção de dados.</li>

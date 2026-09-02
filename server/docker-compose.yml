@@ -48,7 +48,19 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       HMAC_SECRET: ${HMAC_SECRET}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      # Pagar.me — the payment provider. Every new charge goes through these.
+      PAGARME_SECRET_KEY: ${PAGARME_SECRET_KEY:-}
+      PAGARME_PUBLIC_KEY: ${PAGARME_PUBLIC_KEY:-}
+      PAGARME_ACCOUNT_ID: ${PAGARME_ACCOUNT_ID:-}
+      PAGARME_API_URL: ${PAGARME_API_URL:-https://api.pagar.me/core/v5}
+      PAGARME_WEBHOOK_USER: ${PAGARME_WEBHOOK_USER:-}
+      PAGARME_WEBHOOK_PASSWORD: ${PAGARME_WEBHOOK_PASSWORD:-}
+      PAGARME_STATEMENT_DESCRIPTOR: ${PAGARME_STATEMENT_DESCRIPTOR:-GEEKPOPTOYS}
+      PAGARME_MAX_INSTALLMENTS: ${PAGARME_MAX_INSTALLMENTS:-6}
+      PAGARME_MIN_INSTALLMENT_AMOUNT: ${PAGARME_MIN_INSTALLMENT_AMOUNT:-20}
+      PAGARME_PIX_EXPIRES_IN: ${PAGARME_PIX_EXPIRES_IN:-3600}
+      # Stripe — legacy, only for refunding charges made before the migration.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       # Nome e cidade aparecem no app do banco na hora de pagar. Sem o repasse
       # aqui o .env não chega no container e o código cai no default embutido.

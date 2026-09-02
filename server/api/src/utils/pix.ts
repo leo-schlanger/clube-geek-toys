@@ -68,6 +68,16 @@ export interface PixQRData {
   txId: string;
   /** Expiration timestamp (ISO string) */
   expiresAt: string;
+  /** Hosted PNG of the same code, when the provider issues one. */
+  qrCodeUrl?: string;
+  /**
+   * Who issued the code.
+   *
+   * 'pagarme' codes are watched by the provider and settle themselves through
+   * the webhook; 'local' ones are static BR Codes that only a human can
+   * reconcile. The UI says different things for each, so it has to know.
+   */
+  provider?: 'pagarme' | 'local';
 }
 
 /**

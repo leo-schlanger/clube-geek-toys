@@ -95,9 +95,9 @@ describe('TermsOfUse', () => {
     expect(screen.getByText(/Direito de Arrependimento/)).toBeInTheDocument()
   })
 
-  it('mentions Stripe as payment processor', () => {
+  it('names Pagar.me as the payment processor', () => {
     renderPage()
-    expect(screen.getByText(/Stripe/)).toBeInTheDocument()
+    expect(screen.getByText(/Pagar\.me/)).toBeInTheDocument()
   })
 
   it('mentions the 10% product discount benefit', () => {

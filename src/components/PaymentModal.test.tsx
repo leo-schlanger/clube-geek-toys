@@ -42,21 +42,23 @@ vi.mock('sonner', () => ({
   },
 }))
 
-// Mock StripePaymentForm
-vi.mock('./StripePaymentForm', () => ({
-  StripePaymentForm: ({
-    onSuccess,
+/**
+ * Stand-in for the card form. The real one collects and tokenizes the card;
+ * what the modal owns is what happens *after* — so the fake hands back a token
+ * and lets the tests drive the charge. Its own behaviour lives in
+ * `pagarme.test.ts` and the form's own tests.
+ */
+vi.mock('./PagarmeCardForm', () => ({
+  PagarmeCardForm: ({
+    onToken,
     onCancel,
-    onError,
   }: {
-    onSuccess: () => void
+    onToken: (token: string, installments: number) => Promise<void> | void
     onCancel: () => void
-    onError: (msg: string) => void
   }) => (
-    <div data-testid="stripe-form">
-      <button onClick={onSuccess}>stripe-success</button>
-      <button onClick={onCancel}>stripe-cancel</button>
-      <button onClick={() => onError('stripe error')}>stripe-error</button>
+    <div data-testid="card-form">
+      <button onClick={() => void onToken('token_abc', 1)}>card-submit</button>
+      <button onClick={onCancel}>card-cancel</button>
     </div>
   ),
 }))
@@ -285,101 +287,105 @@ describe('PaymentModal', () => {
 
   // ── Card Flow ──
 
-  it('starts card payment on Card button click (one-time)', async () => {
+  /**
+   * Choosing "cartão" no longer calls the server: Pagar.me authorises from a
+   * token in one go, so nothing is created until the member has typed a card.
+   * The old flow asked for a PaymentIntent up front just to get a clientSecret.
+   */
+  it('opens the card form without charging anything yet', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_test', paymentIntentId: 'pi_card' },
-      error: null,
-    })
 
     renderModal()
     await user.click(screen.getByText('Cartão'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('stripe-form')).toBeInTheDocument()
+      expect(screen.getByTestId('card-form')).toBeInTheDocument()
     })
-    expect(mockApiPost).toHaveBeenCalledWith('/checkout/card/create', expect.objectContaining({
-      amount: 12.50,
-      payer_email: 'test@example.com',
-    }))
+    expect(mockApiPost).not.toHaveBeenCalled()
   })
 
-  it('starts subscription card payment', async () => {
+  it('charges the club plan with the token the form produced', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_sub', id: 'sub_1' },
-      error: null,
-    })
-
-    renderModal()
-    await user.click(screen.getByText('Assinatura'))
-    await user.click(screen.getByText(/Iniciar Assinatura com Cartão/))
-
-    await waitFor(() => {
-      expect(screen.getByTestId('stripe-form')).toBeInTheDocument()
-    })
-    expect(mockApiPost).toHaveBeenCalledWith('/subscription/create', expect.objectContaining({
-      member_id: 'member-123',
-      plan: 'club',
-    }))
-  })
-
-  it('shows error when card API fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({ data: null, error: 'Card error' })
-
-    renderModal()
-    await user.click(screen.getByText('Cartão'))
-
-    await waitFor(() => {
-      expect(screen.getByText('Card error')).toBeInTheDocument()
-    })
-  })
-
-  it('shows error when no clientSecret returned', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({ data: {}, error: null })
-
-    renderModal()
-    await user.click(screen.getByText('Cartão'))
-
-    await waitFor(() => {
-      expect(screen.getByText('Não foi possível inicializar o pagamento.')).toBeInTheDocument()
-    })
-  })
-
-  it('handles stripe success callback', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_ok', paymentIntentId: 'pi_ok' },
-      error: null,
-    })
+    mockApiPost.mockResolvedValue({ data: { status: 'paid' }, error: null })
     mockClearPendingPayment.mockResolvedValue(true)
 
     renderModal()
     await user.click(screen.getByText('Cartão'))
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    await user.click(screen.getByText('card-submit'))
 
-    await waitFor(() => expect(screen.getByTestId('stripe-form')).toBeInTheDocument())
-
-    await user.click(screen.getByText('stripe-success'))
-    expect(defaultProps.onSuccess).toHaveBeenCalled()
+    expect(mockApiPost).toHaveBeenCalledWith(
+      '/checkout/card/create',
+      expect.objectContaining({
+        amount: 12.5,
+        payer_email: 'test@example.com',
+        card_token: 'token_abc',
+        installments: 1,
+      })
+    )
+    await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalled())
     expect(mockClearPendingPayment).toHaveBeenCalledWith('member-123')
   })
 
-  it('handles stripe cancel callback', async () => {
+  it('starts subscription card payment', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({
-      data: { clientSecret: 'cs_cancel', paymentIntentId: 'pi_c' },
-      error: null,
-    })
+    mockApiPost.mockResolvedValue({ data: { status: 'active' }, error: null })
+
+    renderModal()
+    await user.click(screen.getByText('Assinatura'))
+    await user.click(screen.getByText(/Iniciar Assinatura com Cartão/))
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    await user.click(screen.getByText('card-submit'))
+
+    expect(mockApiPost).toHaveBeenCalledWith(
+      '/subscription/create',
+      expect.objectContaining({
+        member_id: 'member-123',
+        plan: 'club',
+        card_token: 'token_abc',
+      })
+    )
+  })
+
+  /**
+   * A decline must reach the form, which keeps the fields and lets the member
+   * try another card. Swallowing it would leave them on a form that did nothing.
+   */
+  it('propagates the decline to the card form instead of closing', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    mockApiPost.mockResolvedValue({ data: null, error: 'Cartão recusado: saldo insuficiente.' })
 
     renderModal()
     await user.click(screen.getByText('Cartão'))
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    await user.click(screen.getByText('card-submit'))
 
-    await waitFor(() => expect(screen.getByTestId('stripe-form')).toBeInTheDocument())
+    // Still on the card form, and the payment did not "succeed".
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    expect(defaultProps.onSuccess).not.toHaveBeenCalled()
+  })
 
-    await user.click(screen.getByText('stripe-cancel'))
-    // Should go back to method selection
+  it('a `failed` status is a refusal, not a success', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    mockApiPost.mockResolvedValue({ data: { status: 'failed' }, error: null })
+
+    renderModal()
+    await user.click(screen.getByText('Cartão'))
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    await user.click(screen.getByText('card-submit'))
+
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+    expect(defaultProps.onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('cancelling the card form goes back to method selection', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    renderModal()
+    await user.click(screen.getByText('Cartão'))
+    await waitFor(() => expect(screen.getByTestId('card-form')).toBeInTheDocument())
+
+    await user.click(screen.getByText('card-cancel'))
     expect(screen.getByText('PIX')).toBeInTheDocument()
   })
 
@@ -387,10 +393,12 @@ describe('PaymentModal', () => {
 
   it('clears error on "try again" button', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    mockApiPost.mockResolvedValue({ data: null, error: 'Something broke' })
+    // PIX is the path that still surfaces an error on the modal itself; the
+    // card form owns its own error area now.
+    mockGeneratePixPayment.mockRejectedValue(new Error('Something broke'))
 
     renderModal()
-    await user.click(screen.getByText('Cartão'))
+    await user.click(screen.getByText('PIX'))
 
     await waitFor(() => expect(screen.getByText('Something broke')).toBeInTheDocument())
 

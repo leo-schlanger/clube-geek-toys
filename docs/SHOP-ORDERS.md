@@ -32,7 +32,7 @@ Origem de frete: loja física CEP **22011-001**.
 
 ## Fluxo admin (enviar pedido)
 
-1. Cliente paga → status `paid` (Stripe webhook ou confirmar PIX)
+1. Cliente paga → status `paid` (webhook da Pagar.me; PIX e cartão confirmam sozinhos)
 2. Separar → `processing`
 3. Postar nos Correios → colar código de rastreio no modal do pedido → salva e marca `shipped`
 4. Cliente vê em **Minhas compras → A caminho** com link dos Correios
@@ -81,16 +81,16 @@ Default embalagem se produto sem peso: **300 g · 16×11×6 cm**.
 
 ### Integridade de dados (resumo)
 
-| Tema                      | Comportamento                                                          |
-| ------------------------- | ---------------------------------------------------------------------- |
-| Preços                    | Sempre do DB sob `FOR UPDATE`                                          |
-| Qty duplicada no carrinho | Agregada antes do check de estoque                                     |
-| Desconto retail           | `member_10` se membro ativo                                            |
-| Desconto atacado          | `wholesale_25` se conta approved + CNPJ; **não empilha** com member_10 |
-| Crédito no pending        | Debitado no create; **devolvido** em cancel/fail/refund                |
-| Falha Stripe após create  | Pedido cancelado + crédito restaurado                                  |
-| Review reward             | Na mesma TX das reviews + unique index                                 |
-| LGPD                      | Export/delete cobrem pedidos, reviews, crédito e atacado               |
+| Tema                           | Comportamento                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| Preços                         | Sempre do DB sob `FOR UPDATE`                                                      |
+| Qty duplicada no carrinho      | Agregada antes do check de estoque                                                 |
+| Desconto retail                | `member_10` se membro ativo                                                        |
+| Desconto atacado               | `wholesale_25` se conta approved + CNPJ; **não empilha** com member_10             |
+| Crédito no pending             | Debitado no create; **devolvido** em cancel/fail/refund                            |
+| Falha na operadora após create | Pedido cancelado + crédito restaurado (cartão recusado NÃO cancela: é retentativa) |
+| Review reward                  | Na mesma TX das reviews + unique index                                             |
+| LGPD                           | Export/delete cobrem pedidos, reviews, crédito e atacado                           |
 
 ### Canais de pedido
 

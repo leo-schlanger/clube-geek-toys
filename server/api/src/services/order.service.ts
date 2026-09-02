@@ -3,7 +3,8 @@ import { query, getClient } from '../config/database.js';
 import { env, adminUrl } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { getStripe } from '../utils/stripe.js';
-import { generatePixEMV, generatePixTxId, type PixQRData } from '../utils/pix.js';
+import { type PixQRData } from '../utils/pix.js';
+import * as pagarme from '../utils/pagarme.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
 import { recordMovement, recordOrderMovements } from './stock.service.js';
@@ -29,6 +30,8 @@ import { redeemForOrder, restoreCreditForOrder } from './store-credit.service.js
 import { sendTemplateEmail } from './email.service.js';
 import { getApprovedAccountByUserId, isWholesaleSalesOpen } from './wholesale.service.js';
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
+import { isValidCPF } from '../utils/cpf.js';
+import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import {
   checkCoupon,
   claimCoupon,
@@ -40,13 +43,9 @@ import {
   retailDiscountCandidates,
 } from './promo.service.js';
 
-const PIX_KEY = env.PIX_KEY || '';
-const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
-const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
-
-// How long a pending order holds its stock. Deliberately generous: PIX is
-// confirmed by hand, and a short TTL would free the piece before the person who
-// ordered it manages to pay.
+// How long a pending order holds its stock. Still generous: a Pagar.me PIX
+// settles itself in seconds, but a buyer who generates the code and pays it
+// after dinner is normal, and the QR outlives the browser tab.
 const STOCK_RESERVATION_TTL_HOURS = env.STOCK_RESERVATION_TTL_HOURS;
 
 // ─── Row mappers ─────────────────────────────────────────────────────────────
@@ -80,7 +79,14 @@ function mapOrder(row: pg.QueryResultRow): Order {
     status: row.status,
     paymentMethod: row.payment_method,
     stripePaymentIntentId: row.stripe_payment_intent_id,
+    pagarmeOrderId: row.pagarme_order_id ?? null,
+    pagarmeChargeId: row.pagarme_charge_id ?? null,
+    paymentProvider: row.payment_provider ?? null,
     pixTxid: row.pix_txid,
+    cardBrand: row.card_brand ?? null,
+    cardLastFour: row.card_last_four ?? null,
+    installments: row.installments != null ? Number(row.installments) : null,
+    customerDocument: row.customer_document ?? null,
     paidAt: row.paid_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -108,11 +114,12 @@ function round2(n: number): number {
 }
 
 /**
- * Tells the admin a shop PIX is awaiting confirmation.
+ * Tells the admin a shop PIX was generated.
  *
- * Nothing confirms PIX on its own: with no webhook the order stays `pending`
- * until someone checks the statement. Without this notice a customer pays and
- * the store never finds out.
+ * It used to be the only thing standing between a paid PIX and an order nobody
+ * knew about: no webhook watched the code, so the store found out by reading
+ * the bank statement. Pagar.me settles the charge itself now, so this is a
+ * heads-up rather than a task — the wording in the template changed with it.
  *
  * Wrapped in try/catch **deliberately**: it is called from inside the checkout
  * `try`, whose `catch` cancels the order and restores credit. A failure while
@@ -172,7 +179,12 @@ function notifyCustomerOfPendingPix(order: Order, pix: PixQRData): void {
 
 export interface CreateOrderInput {
   items: { productId: string; quantity: number; variantId?: string }[];
-  customer: { name: string; email: string; phone?: string };
+  /**
+   * `document` is the buyer's CPF (or CNPJ on the wholesale channel). The
+   * acquirer refuses an order without one, so it is required at checkout —
+   * this is the field the migration added to the form.
+   */
+  customer: { name: string; email: string; phone?: string; document: string };
   /** Free-text note the customer writes for the shop at checkout. */
   customerNote?: string;
   /**
@@ -200,8 +212,27 @@ export interface CreateOrderInput {
 
 export interface CreateOrderResult {
   order: Order;
-  clientSecret?: string;   // card (Stripe)
-  pixData?: PixQRData;     // pix
+  pixData?: PixQRData;
+  /**
+   * Card orders come back unpaid and unauthorised.
+   *
+   * Pagar.me authorises a card synchronously from a token, so — unlike the
+   * Stripe `clientSecret` this replaced — there is nothing to hand the browser
+   * up front. The order reserves its stock, then `payOrderWithCard` runs the
+   * charge. Keeping them apart is what makes "card declined, try another one"
+   * a retry on the same order instead of a new one.
+   */
+  requiresCard?: boolean;
+}
+
+/** What the browser gets back after a card attempt on an existing order. */
+export interface PayOrderResult {
+  order: Order;
+  status: 'paid' | 'pending' | 'failed';
+  chargeId: string;
+  installments: number;
+  cardBrand: string | null;
+  cardLastFour: string | null;
 }
 
 /**
@@ -224,6 +255,19 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
   const deliveryMethod: DeliveryMethod = input.deliveryMethod === 'pickup' ? 'pickup' : 'shipping';
   const isPickup = deliveryMethod === 'pickup';
+
+  // The acquirer refuses an order without a valid buyer document, on either
+  // payment method. Checking it here — before any stock is held or any coupon
+  // is claimed — means a typo costs the customer a corrected field rather than
+  // a cancelled order and a released reservation.
+  const customerDocument = pagarme.normalizeDocument(input.customer.document);
+  const documentIsValid =
+    customerDocument.length === 11
+      ? isValidCPF(customerDocument)
+      : customerDocument.length === 14 && isValidCnpj(customerDocument);
+  if (!documentIsValid) {
+    throw new AppError(400, 'CPF ou CNPJ inválido.', 'INVALID_DOCUMENT');
+  }
 
   // Pickup carries no destination: validating an address the customer was never
   // asked for would reject every counter order.
@@ -563,10 +607,11 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
          member_id, user_id, customer_name, customer_email, customer_phone, shipping_address,
          subtotal, discount, discount_reason, shipping_cost, shipping_service, shipping_service_id,
          shipping_days, store_credit_applied, total, status, payment_method,
-         channel, customer_cnpj, wholesale_account_id, customer_note, delivery_method
+         channel, customer_cnpj, wholesale_account_id, customer_note, delivery_method,
+         customer_document, payment_provider
        )
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'pending', $16,
-               $17, $18, $19, $20, $21)
+               $17, $18, $19, $20, $21, $22, 'pagarme')
        RETURNING *`,
       [
         memberId,
@@ -590,6 +635,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         wholesaleAccountId,
         input.customerNote?.trim() ? input.customerNote.trim().slice(0, 500) : null,
         deliveryMethod,
+        customerDocument,
       ]
     );
     order = mapOrder(orderResult.rows[0]);
@@ -665,48 +711,19 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 
   // Create the charge outside the DB transaction. On failure, cancel + restore credit.
   try {
-    if (input.paymentMethod === 'credit_card') {
-      const stripe = getStripe();
-      const pi = await stripe.paymentIntents.create({
-        amount: Math.round(order.total * 100),
-        currency: 'brl',
-        payment_method_types: ['card'],
-        description: `Pedido #${order.orderNumber} - Loja GeekPop & Toys`,
-        receipt_email: order.customerEmail,
-        metadata: {
-          kind: 'shop_order',
-          orderId,
-          memberId: order.memberId ?? '',
-          userId: orderUserId ?? '',
-        },
-      });
-      await query(`UPDATE orders SET stripe_payment_intent_id = $1 WHERE id = $2`, [pi.id, orderId]);
-      order.stripePaymentIntentId = pi.id;
-      await auditLog('order.created', orderUserId, {
-        orderId,
-        orderNumber: order.orderNumber,
-        total: order.total,
-        storeCreditApplied: order.storeCreditApplied,
-        paymentMethod: 'credit_card',
-      });
-      return { order, clientSecret: pi.client_secret ?? undefined };
-    }
-
-    // PIX — generated locally; admin confirms manually.
-    if (!PIX_KEY) {
-      throw new AppError(503, 'Pagamento PIX não está configurado.', 'PIX_NOT_CONFIGURED');
-    }
     // A zero total has two very different causes, and only one is a sale.
     //
     // Store credit caps at the goods, so credit + pickup can legitimately leave
-    // nothing to charge. That order is already settled: a QR for R$ 0,00 is
-    // unpayable and `buildOrderPix` refuses to rebuild it, so it used to sit
-    // `pending` forever with the credit already spent.
+    // nothing to charge. That order is already settled: a charge for R$ 0,00 is
+    // not a thing any acquirer will take, so it used to sit `pending` forever
+    // with the credit already spent.
     //
     // Zero with no credit means the goods themselves are priced at R$ 0,00 —
     // a cataloguing mistake, not a giveaway. Seven such products were live on
     // 23/08/2026 with 47 units in stock. Settling those would hand them out for
     // free; refuse instead, and the compensation below restores everything.
+    //
+    // Checked before the method split because it applies to both.
     if (order.total <= 0) {
       if ((order.storeCreditApplied ?? 0) > 0) {
         // Credit requires an account, so there is always an actor here.
@@ -726,25 +743,40 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
         'ZERO_TOTAL_NO_CREDIT'
       );
     }
-    const txId = generatePixTxId();
-    const pixData = generatePixEMV({
-      pixKey: PIX_KEY,
-      amount: order.total,
-      merchantName: PIX_MERCHANT_NAME,
-      merchantCity: PIX_MERCHANT_CITY,
-      txId,
-    });
-    await query(`UPDATE orders SET pix_txid = $1 WHERE id = $2`, [txId, orderId]);
-    order.pixTxid = txId;
+
+    if (input.paymentMethod === 'credit_card') {
+      // No charge yet, on purpose. Pagar.me authorises a card from a token in
+      // one synchronous call, so there is nothing to prepare in advance — the
+      // browser tokenizes the card and calls `payOrderWithCard` next. The stock
+      // is already held by the transaction above, so the order is safe to sit
+      // here for the seconds that takes, and a declined card retries against
+      // this same order instead of building a new one.
+      await auditLog('order.created', orderUserId, {
+        orderId,
+        orderNumber: order.orderNumber,
+        total: order.total,
+        storeCreditApplied: order.storeCreditApplied,
+        paymentMethod: 'credit_card',
+      });
+      return { order, requiresCard: true };
+    }
+
+    // PIX — a dynamic code issued by Pagar.me, which reconciles it and fires
+    // `charge.paid`. This is the change the shop feels most: the old static BR
+    // Code was watched by nobody, and every order waited for an admin to read
+    // the bank statement and confirm by hand.
+    const pixData = await createPagarmePixCharge(order, customerDocument);
+
     await auditLog('order.created', orderUserId, {
       orderId,
       orderNumber: order.orderNumber,
       total: order.total,
       storeCreditApplied: order.storeCreditApplied,
       paymentMethod: 'pix',
+      provider: 'pagarme',
     });
 
-    notifyAdminOfPendingPix(order, txId);
+    notifyAdminOfPendingPix(order, order.pagarmeChargeId ?? '');
     notifyCustomerOfPendingPix(order, pixData);
 
     return { order, pixData };
@@ -779,6 +811,276 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
   }
 }
 
+// ─── Pagar.me charges for a shop order ───────────────────────────────────────
+
+/** The buyer, in the shape Pagar.me wants, built from a stored order row. */
+function orderToPagarmeCustomer(order: Order, document: string): pagarme.PagarmeCustomerInput {
+  const phone = pagarme.parseBrazilianPhone(order.customerPhone);
+  const addr = (order.shippingAddress ?? {}) as Record<string, string>;
+  const zip = (addr.cep ?? '').replace(/\D/g, '');
+  return {
+    name: order.customerName,
+    email: order.customerEmail,
+    document,
+    code: order.id,
+    phones: phone ? { mobile_phone: phone } : undefined,
+    // A pickup order carries the shop's own address, which is a real one and
+    // satisfies the acquirer's requirement without inventing anything.
+    address:
+      zip.length === 8
+        ? {
+            line_1: [addr.number, addr.street, addr.neighborhood].filter(Boolean).join(', '),
+            line_2: addr.complement || undefined,
+            zip_code: zip,
+            city: addr.city ?? '',
+            state: addr.state ?? '',
+            country: 'BR',
+          }
+        : undefined,
+    metadata: { orderId: order.id, orderNumber: String(order.orderNumber) },
+  };
+}
+
+/**
+ * The line items sent to Pagar.me.
+ *
+ * They must add up to the charged total, and ours do not on their own: the
+ * order total is subtotal − discount + shipping. Rather than restate every
+ * adjustment as a separate item (and risk a rounding cent turning into a 422),
+ * the whole order goes as one line. The itemisation the customer needs is in
+ * the confirmation e-mail and on the order page; Pagar.me only needs the money
+ * to reconcile.
+ */
+function orderToPagarmeItems(order: Order): pagarme.PagarmeItemInput[] {
+  return [
+    {
+      amount: pagarme.toCents(order.total),
+      description: `Pedido #${order.orderNumber} - Loja GeekPop & Toys`,
+      quantity: 1,
+      code: String(order.orderNumber),
+    },
+  ];
+}
+
+/**
+ * Issue the PIX charge for an order and persist the code.
+ *
+ * The QR is stored rather than regenerated: a Pagar.me code is dynamic and
+ * carries the provider's own txid, so unlike the old static BR Code it cannot
+ * be rebuilt from what we know. Mutates `order` so the caller sees the ids.
+ */
+async function createPagarmePixCharge(order: Order, document: string): Promise<PixQRData> {
+  const amountInCents = pagarme.toCents(order.total);
+  const created = await pagarme.createOrder(
+    {
+      code: String(order.orderNumber),
+      customer: orderToPagarmeCustomer(order, document),
+      items: orderToPagarmeItems(order),
+      payments: [
+        {
+          payment_method: 'pix',
+          pix: {
+            expires_in: env.PAGARME_PIX_EXPIRES_IN,
+            additional_information: [
+              { name: 'Pedido', value: `#${order.orderNumber}` },
+            ],
+          },
+        },
+      ],
+      metadata: { kind: 'shop_order', orderId: order.id, orderNumber: String(order.orderNumber) },
+    },
+    { idempotencyKey: pagarme.idempotencyKeyFor('shop_pix', order.id, amountInCents) },
+  );
+
+  const charge = created.charges?.[0];
+  const tx = charge?.last_transaction;
+  if (!charge || !tx?.qr_code) {
+    console.error('[PIX] Pagar.me order without qr_code:', JSON.stringify(created).slice(0, 800));
+    throw new AppError(
+      502,
+      'Não foi possível gerar o QR Code PIX agora. Tente novamente em instantes.',
+      'PIX_QRCODE_UNAVAILABLE',
+    );
+  }
+
+  const expiresAt =
+    tx.expires_at ?? new Date(Date.now() + env.PAGARME_PIX_EXPIRES_IN * 1000).toISOString();
+
+  await query(
+    `UPDATE orders
+        SET pagarme_order_id = $1, pagarme_charge_id = $2, payment_provider = 'pagarme',
+            pix_txid = $2, pix_qr_code = $3, pix_qr_code_url = $4, pix_expires_at = $5
+      WHERE id = $6`,
+    [created.id, charge.id, tx.qr_code, tx.qr_code_url ?? null, expiresAt, order.id],
+  );
+
+  order.pagarmeOrderId = created.id;
+  order.pagarmeChargeId = charge.id;
+  order.paymentProvider = 'pagarme';
+  order.pixTxid = charge.id;
+
+  return {
+    emvCode: tx.qr_code,
+    qrCodeUrl: tx.qr_code_url ?? '',
+    pixKey: env.PIX_KEY || '',
+    amount: order.total,
+    txId: charge.id,
+    expiresAt,
+    provider: 'pagarme',
+  };
+}
+
+/**
+ * Charge the card for an order that is waiting for one.
+ *
+ * Separate from `createOrder` so a decline is a retry rather than a lost order:
+ * the stock stays held, the coupon stays claimed, and the buyer types a
+ * different card against the same order number. Only `pending` orders are
+ * accepted, which is also what makes a double-submit harmless.
+ */
+export async function payOrderWithCard(
+  orderId: string,
+  input: { cardToken: string; installments?: number },
+  actorUserId?: string | null,
+): Promise<PayOrderResult> {
+  const order = await getOrderById(orderId, false);
+  if (!order) {
+    throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+  }
+  if (order.status === 'paid') {
+    // Idempotent: a second submit of a successful payment is not an error.
+    return {
+      order,
+      status: 'paid',
+      chargeId: order.pagarmeChargeId ?? '',
+      installments: order.installments ?? 1,
+      cardBrand: order.cardBrand ?? null,
+      cardLastFour: order.cardLastFour ?? null,
+    };
+  }
+  if (order.status !== 'pending') {
+    throw new AppError(
+      409,
+      `Este pedido não está mais aguardando pagamento (${order.status}).`,
+      'ORDER_NOT_PAYABLE',
+    );
+  }
+  if (order.total <= 0) {
+    throw new AppError(400, 'Pedido sem valor a cobrar.', 'ORDER_ZERO_TOTAL');
+  }
+  if (!order.customerDocument) {
+    throw new AppError(
+      400,
+      'Pedido sem CPF/CNPJ. Refaça o checkout informando o documento.',
+      'ORDER_DOCUMENT_MISSING',
+    );
+  }
+
+  const amountInCents = pagarme.toCents(order.total);
+  const installments = Math.max(
+    1,
+    Math.min(input.installments ?? 1, pagarme.maxInstallmentsFor(order.total)),
+  );
+
+  const created = await pagarme.createOrder(
+    {
+      code: String(order.orderNumber),
+      customer: orderToPagarmeCustomer(order, order.customerDocument),
+      items: orderToPagarmeItems(order),
+      payments: [
+        {
+          payment_method: 'credit_card',
+          credit_card: {
+            installments,
+            statement_descriptor: env.PAGARME_STATEMENT_DESCRIPTOR,
+            card_token: input.cardToken,
+          },
+        },
+      ],
+      metadata: { kind: 'shop_order', orderId: order.id, orderNumber: String(order.orderNumber) },
+    },
+    // The token is single-use, so every attempt is genuinely a new one; the key
+    // covers the retry of one attempt (a timeout), not the retry of a decline.
+    {
+      idempotencyKey: pagarme.idempotencyKeyFor(
+        `shop_card_${input.cardToken}`,
+        order.id,
+        amountInCents,
+      ),
+    },
+  );
+
+  const charge = created.charges?.[0];
+  if (!charge) {
+    throw new AppError(502, 'O processador não devolveu a cobrança.', 'PAGARME_NO_CHARGE');
+  }
+  const mapped = pagarme.mapChargeStatus(charge.status);
+  const card = charge.last_transaction?.card;
+
+  await query(
+    `UPDATE orders
+        SET pagarme_order_id = $1, pagarme_charge_id = $2, payment_provider = 'pagarme',
+            card_brand = $3, card_last_four = $4, installments = $5
+      WHERE id = $6`,
+    [
+      created.id,
+      charge.id,
+      card?.brand ?? null,
+      card?.last_four_digits ?? null,
+      installments,
+      order.id,
+    ],
+  );
+
+  if (mapped === 'failed') {
+    // The order stays `pending` and keeps its hold: the buyer is looking at the
+    // form and will very likely try another card. The TTL sweep is what closes
+    // it if they walk away, exactly as it does for an abandoned PIX.
+    await auditLog('order.payment_failed', actorUserId ?? null, {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      pagarmeChargeId: charge.id,
+      providerStatus: charge.status,
+      acquirerCode: charge.last_transaction?.acquirer_return_code ?? null,
+    });
+    notifyAdminsOfPaymentAsync({
+      event: 'payment_failed',
+      subject: `Pedido #${order.orderNumber}`,
+      amount: order.total,
+      method: 'credit_card',
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      link: '/admin?tab=orders',
+      detail: pagarme.describeChargeFailure(charge),
+      chargeId: charge.id,
+    });
+    throw new AppError(402, pagarme.describeChargeFailure(charge), 'CARD_DECLINED');
+  }
+
+  // Settling the order — decrementing stock, e-mailing the customer — is the
+  // webhook's job, so it happens exactly once no matter which of the two
+  // arrives first. What comes back here is only what the browser needs to stop
+  // showing a spinner and move to the confirmation page.
+  await auditLog('order.card_authorized', actorUserId ?? null, {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    pagarmeOrderId: created.id,
+    pagarmeChargeId: charge.id,
+    installments,
+    status: mapped,
+  });
+
+  const refreshed = (await getOrderById(order.id, false)) ?? order;
+  return {
+    order: refreshed,
+    status: mapped === 'paid' ? 'paid' : 'pending',
+    chargeId: charge.id,
+    installments,
+    cardBrand: card?.brand ?? null,
+    cardLastFour: card?.last_four_digits ?? null,
+  };
+}
+
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 export async function getOrderById(id: string, withItems = true): Promise<Order | null> {
@@ -792,20 +1094,38 @@ export async function getOrderById(id: string, withItems = true): Promise<Order 
   return order;
 }
 
-/** EMV rebuilt from the stored `pix_txid`: same code as checkout, same statement line. */
-export function buildOrderPix(order: Order): PixQRData | null {
-  if (!PIX_KEY) return null;
+/**
+ * The stored PIX code for an order.
+ *
+ * Read, not rebuilt. A Pagar.me code is dynamic and carries the provider's own
+ * txid, so it cannot be regenerated from the amount and a key the way the old
+ * static BR Code could — losing the stored string means losing the code.
+ * Orders created before the migration have `pix_txid` but no `pix_qr_code`, and
+ * correctly return null: the customer is sent to the order page instead.
+ */
+export async function buildOrderPix(order: Order): Promise<PixQRData | null> {
   if (order.status !== 'pending') return null;
   if (order.paymentMethod && order.paymentMethod !== 'pix') return null;
-  if (!order.pixTxid) return null;
   if (order.total <= 0) return null;
-  return generatePixEMV({
-    pixKey: PIX_KEY,
+
+  const stored = await query(
+    `SELECT pix_qr_code, pix_qr_code_url, pix_expires_at FROM orders WHERE id = $1`,
+    [order.id],
+  );
+  const row = stored.rows[0];
+  if (!row?.pix_qr_code) return null;
+
+  return {
+    emvCode: row.pix_qr_code as string,
+    qrCodeUrl: (row.pix_qr_code_url as string) ?? '',
+    pixKey: env.PIX_KEY || '',
     amount: order.total,
-    merchantName: PIX_MERCHANT_NAME,
-    merchantCity: PIX_MERCHANT_CITY,
-    txId: order.pixTxid,
-  });
+    txId: order.pagarmeChargeId ?? order.pixTxid ?? '',
+    expiresAt: row.pix_expires_at
+      ? new Date(row.pix_expires_at as string).toISOString()
+      : new Date(Date.now() + env.PAGARME_PIX_EXPIRES_IN * 1000).toISOString(),
+    provider: 'pagarme',
+  };
 }
 
 /**
@@ -820,16 +1140,49 @@ export async function getPublicOrderPix(
 ): Promise<{ orderNumber: number; total: number; pix: PixQRData } | null> {
   const order = await getOrderById(id, false);
   if (!order) return null;
-  const pix = buildOrderPix(order);
+  const pix = await buildOrderPix(order);
   if (!pix) return null;
   return { orderNumber: order.orderNumber, total: order.total, pix };
 }
 
-/** Lightweight status lookup for order-confirmation polling (public by order id). */
-export async function getOrderStatus(id: string): Promise<{ id: string; status: string; orderNumber: number } | null> {
-  const result = await query('SELECT id, status, order_number FROM orders WHERE id = $1', [id]);
+/**
+ * Lightweight status lookup for order-confirmation polling (public by order id).
+ *
+ * A `pending` Pagar.me order is checked against the provider before answering.
+ * The webhook is quick, but the buyer is watching the QR with their bank app
+ * still open, and "aguardando pagamento" for the second or two it takes to
+ * arrive reads as a payment that failed. This only *reports* the provider's
+ * status — the webhook remains the only thing that decrements stock and mails
+ * the customer, so a lost webhook still cannot settle an order by itself.
+ */
+export async function getOrderStatus(
+  id: string
+): Promise<{ id: string; status: string; orderNumber: number; providerStatus?: string } | null> {
+  const result = await query(
+    'SELECT id, status, order_number, pagarme_charge_id FROM orders WHERE id = $1',
+    [id]
+  );
   if (result.rows.length === 0) return null;
-  return { id: result.rows[0].id, status: result.rows[0].status, orderNumber: result.rows[0].order_number };
+  const row = result.rows[0];
+
+  if (row.status === 'pending' && row.pagarme_charge_id) {
+    try {
+      const charge = await pagarme.getChargeThrottled(row.pagarme_charge_id as string);
+      const mapped = pagarme.mapChargeStatus(charge.status);
+      return {
+        id: row.id,
+        // 'paid' at the provider with the webhook still in flight is reported
+        // as paid: the money is there, and the page may stop waiting.
+        status: mapped === 'paid' ? 'paid' : row.status,
+        orderNumber: row.order_number,
+        providerStatus: charge.status,
+      };
+    } catch (err) {
+      console.error('[order] live charge lookup failed, falling back to DB:', err);
+    }
+  }
+
+  return { id: row.id, status: row.status, orderNumber: row.order_number };
 }
 
 export async function listOrders(opts: { status?: string; page?: number; limit?: number }) {
@@ -1083,7 +1436,7 @@ export async function getMyOrderById(userId: string, orderId: string): Promise<O
   const order = mapOrder(result.rows[0]);
   const items = await query(`SELECT * FROM order_items WHERE order_id = $1 ORDER BY id`, [orderId]);
   order.items = items.rows.map(mapItem);
-  order.pixData = buildOrderPix(order) ?? undefined;
+  order.pixData = (await buildOrderPix(order)) ?? undefined;
   return order;
 }
 
@@ -1249,7 +1602,14 @@ export function formatPickupAddress(): string {
   return `${l.street}, ${l.number}, ${l.complement} — ${l.neighborhood}, ${l.city}/${l.state}`;
 }
 
-/** Admin confirms a PIX order manually: mark paid + decrement stock (idempotent). */
+/**
+ * Admin settles a PIX order by hand: mark paid + decrement stock (idempotent).
+ *
+ * No longer the normal path — a Pagar.me PIX confirms itself through the
+ * webhook, usually within seconds of the transfer. It stays for the orders
+ * generated before the migration, for a webhook that never lands, and for the
+ * credit-only order whose total is already zero.
+ */
 export async function confirmPixOrder(id: string, actorUserId: string): Promise<Order> {
   const client = await getClient();
   try {
@@ -1280,6 +1640,19 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
         delivery_method: order.deliveryMethod,
       },
     }).catch((err) => console.error('[email] order-confirmed (pix) failed', err));
+
+    notifyAdminsOfPaymentAsync({
+      event: 'payment_received',
+      subject: `Pedido #${order.orderNumber}`,
+      amount: order.total,
+      method: 'pix',
+      customerName: order.customerName,
+      customerEmail: order.customerEmail,
+      link: '/admin?tab=orders',
+      detail: 'Confirmado manualmente no painel.',
+      chargeId: order.pagarmeChargeId ?? null,
+    });
+
     return order;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -1289,21 +1662,31 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
   }
 }
 
-/** Refund a paid order via Stripe (card only). */
+/** Refund a paid order at whichever provider took the money. */
 export async function refundOrder(id: string, actorUserId: string): Promise<Order> {
   const order = await getOrderById(id, false);
   if (!order) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
   if (order.status === 'refunded' || order.status === 'cancelled') {
     throw new AppError(409, 'Pedido já cancelado/reembolsado.', 'ORDER_ALREADY_CLOSED');
   }
-  if (!order.stripePaymentIntentId) {
-    throw new AppError(400, 'Pedido sem cobrança no Stripe (ex.: PIX) — reembolse manualmente.', 'NO_STRIPE_CHARGE');
+  // Which provider holds the money. PIX is refundable now too: a Pagar.me PIX
+  // charge is a real charge, and `DELETE /charges/:id` gives it back — the old
+  // "PIX has no charge, refund it by hand" rule only applied to the static code
+  // the shop generated itself, which no provider ever saw.
+  const chargeId = order.pagarmeChargeId;
+  const viaStripe = !chargeId && Boolean(order.stripePaymentIntentId);
+  if (!chargeId && !order.stripePaymentIntentId) {
+    throw new AppError(
+      400,
+      'Pedido sem cobrança em nenhuma operadora (PIX antigo ou pago no balcão) — devolva manualmente.',
+      'NO_PROVIDER_CHARGE',
+    );
   }
   const hadStock = ['paid', 'processing', 'shipped', 'delivered'].includes(order.status);
 
-  // Claim the order BEFORE calling Stripe. The other order lost money quietly:
-  // if the UPDATE failed after `refunds.create` succeeded, the cash was gone and
-  // the order stayed `paid` — still counted as revenue — while a retry hit
+  // Claim the order BEFORE calling the provider. The other order lost money
+  // quietly: if the UPDATE failed after the refund succeeded, the cash was gone
+  // and the order stayed `paid` — still counted as revenue — while a retry hit
   // `charge_already_refunded` and 500'd forever.
   const result = await query(
     `UPDATE orders SET status = 'refunded' WHERE id = $1 AND status <> 'refunded' RETURNING *`,
@@ -1313,14 +1696,18 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
     throw new AppError(409, 'Pedido já reembolsado.', 'ORDER_ALREADY_REFUNDED');
   }
 
-  const stripe = getStripe();
   try {
-    // Same key for the same order: a retry after a network blip reuses the
-    // original refund instead of issuing a second one.
-    await stripe.refunds.create(
-      { payment_intent: order.stripePaymentIntentId },
-      { idempotencyKey: `refund_${id}` }
-    );
+    if (viaStripe) {
+      const stripe = getStripe();
+      // Same key for the same order: a retry after a network blip reuses the
+      // original refund instead of issuing a second one.
+      await stripe.refunds.create(
+        { payment_intent: order.stripePaymentIntentId as string },
+        { idempotencyKey: `refund_${id}` }
+      );
+    } else {
+      await pagarme.refundCharge(chargeId as string);
+    }
   } catch (err) {
     // Put the order back the way it was, so the panel still shows the truth.
     await query(`UPDATE orders SET status = $1 WHERE id = $2 AND status = 'refunded'`, [
@@ -1334,7 +1721,7 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
     throw err;
   }
   const restored = await restoreCreditForOrder(id, {
-    note: 'Crédito devolvido (reembolso Stripe)',
+    note: `Crédito devolvido (reembolso ${viaStripe ? 'Stripe' : 'Pagar.me'})`,
   });
   if (hadStock) {
     const client = await getClient();
@@ -1351,10 +1738,24 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   }
   await auditLog('order.refunded', actorUserId, {
     orderId: id,
-    paymentIntent: order.stripePaymentIntentId,
+    provider: viaStripe ? 'stripe' : 'pagarme',
+    chargeId: viaStripe ? order.stripePaymentIntentId : chargeId,
     creditRestored: restored,
     stockRestored: hadStock,
   });
+
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_refunded',
+    subject: `Pedido #${order.orderNumber}`,
+    amount: order.total,
+    method: order.paymentMethod,
+    customerName: order.customerName,
+    customerEmail: order.customerEmail,
+    link: '/admin?tab=orders',
+    detail: 'Estorno solicitado no painel.',
+    chargeId: (viaStripe ? order.stripePaymentIntentId : chargeId) ?? null,
+  });
+
   return mapOrder(result.rows[0]);
 }
 

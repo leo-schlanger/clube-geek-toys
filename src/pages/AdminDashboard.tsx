@@ -9,6 +9,7 @@ import { Skeleton, SkeletonStats } from '../components/ui/skeleton'
 import { MemberModal } from '../components/MemberModal'
 import { UserModal } from '../components/UserModal'
 import { AdminSidebar, type AdminTab } from '../components/admin/AdminSidebar'
+import { AdminNotificationBell } from '../components/admin/AdminNotificationBell'
 import { CLUB_PLAN, PLANS, paymentTypeLabel, type Member, type PlanType } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { getAllMembers, updateMember } from '../lib/members'
@@ -463,17 +464,22 @@ export default function AdminDashboard() {
                 {activeTab === 'settings' && 'Configure o sistema'}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchData(true)}
-              disabled={refreshing}
-              className="shrink-0"
-              aria-label="Atualizar"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
+            <div className="flex shrink-0 items-center gap-1">
+              {/* The bell is where a confirmed PIX now shows up. Before the
+                  Pagar.me migration the only signal was an e-mail and a manual
+                  check of the bank statement. */}
+              <AdminNotificationBell onOpenTab={setActiveTab} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchData(true)}
+                disabled={refreshing}
+                aria-label="Atualizar"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </Button>
+            </div>
           </div>
 
           {/* Dashboard Content */}
@@ -492,7 +498,7 @@ export default function AdminDashboard() {
                           {pendingMembers.length} pagamento{pendingMembers.length > 1 ? 's' : ''} aguardando confirmação
                         </h3>
                         <p className="text-sm text-yellow-200/80 mt-1">
-                          Verifique o extrato bancário. Se o PIX foi recebido, clique em <strong>Confirmar Pagamento</strong>.
+                          A Pagar.me confirma o PIX sozinha em segundos. Estes ficaram para trás — confira o extrato e use <strong>Confirmar Pagamento</strong> só se o valor já tiver caído.
                         </p>
                       </div>
                     </div>

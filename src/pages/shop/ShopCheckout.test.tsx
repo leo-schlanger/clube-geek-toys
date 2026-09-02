@@ -59,8 +59,8 @@ vi.mock('../../components/store/PaymentTrustBadges', () => ({
   PaymentTrustBadges: () => null,
 }))
 
-vi.mock('../../components/StripePaymentForm', () => ({
-  StripePaymentForm: () => <div data-testid="stripe-form" />,
+vi.mock('../../components/PagarmeCardForm', () => ({
+  PagarmeCardForm: () => <div data-testid="card-form" />,
 }))
 
 vi.mock('../../lib/reviews', () => ({
@@ -207,10 +207,10 @@ describe('ShopCheckout', () => {
       },
       pixData: {
         emvCode: '00020126PIXCODE',
-        qrCodeBase64: null,
-        txId: 'tx1',
+        qrCodeUrl: 'https://api.pagar.me/qr/ch_1.png',
+        txId: 'ch_1',
+        provider: 'pagarme',
       },
-      clientSecret: null,
     } as never)
 
     render(
@@ -221,6 +221,9 @@ describe('ShopCheckout', () => {
 
     await user.type(screen.getByLabelText(/Nome completo/i), 'Maria Silva')
     await user.type(screen.getByLabelText(/^Email/i), 'maria@test.com')
+    // The acquirer refuses an order with no buyer document, so the field is
+    // required and the checkout checks the digits before submitting.
+    await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
     const cep = screen.getByLabelText(/CEP/i)
     fireEvent.change(cep, { target: { value: '22011001' } })
     fireEvent.blur(cep)
@@ -298,8 +301,7 @@ describe('ShopCheckout', () => {
       const user = userEvent.setup()
       mockedCreate.mockResolvedValue({
         order: { id: 'ord-2', orderNumber: 100, status: 'pending', total: 100 },
-        pixData: { emvCode: '00020126PIXCODE', qrCodeBase64: null, txId: 'tx2' },
-        clientSecret: null,
+        pixData: { emvCode: '00020126PIXCODE', txId: 'ch_2', provider: 'pagarme' },
       } as never)
 
       render(
@@ -310,6 +312,7 @@ describe('ShopCheckout', () => {
 
       await user.type(screen.getByLabelText(/Nome completo/i), 'Maria Silva')
       await user.type(screen.getByLabelText(/^Email/i), 'maria@test.com')
+      await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
       await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
 
       const submit = screen
@@ -322,6 +325,7 @@ describe('ShopCheckout', () => {
         expect(mockedCreate).toHaveBeenCalled()
       })
       const payload = mockedCreate.mock.calls[0][0]
+      expect(payload.customer.document).toBe('52998224725')
       expect(payload.deliveryMethod).toBe('pickup')
       expect(payload.shippingAddress).toBeUndefined()
       expect(payload.shipping).toBeUndefined()

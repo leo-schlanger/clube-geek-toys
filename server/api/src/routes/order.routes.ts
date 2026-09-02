@@ -34,6 +34,9 @@ const createOrderSchema = z.object({
     name: z.string().min(1).max(200),
     email: z.string().email(),
     phone: z.string().max(30).optional(),
+    // CPF (or CNPJ on the wholesale channel). Required by the acquirer on both
+    // payment methods; the check digits are verified in the service.
+    document: z.string().min(11).max(18),
   }),
   // Free-text note for the shop ("send more photocards of the same artist").
   // Nothing in the system acts on it — it is for whoever packs the order.
@@ -145,6 +148,37 @@ orderRouter.get('/:id/pix', publicLookupLimiter, async (req, res, next) => {
     next(err);
   }
 });
+
+/**
+ * POST /orders/:id/pay-card — authorise a card against a pending order.
+ *
+ * Public for the same reason `/pix` and `/status` are: the order UUID is the
+ * key, guest checkout has no account, and nothing here reveals customer data —
+ * it charges a card the caller already holds a token for. Rate-limited as a
+ * payment endpoint, and the service refuses anything that is not `pending`.
+ */
+const payCardSchema = z.object({
+  card_token: z.string().min(1).max(200),
+  installments: z.number().int().min(1).max(12).optional(),
+});
+orderRouter.post(
+  '/:id/pay-card',
+  optionalAuth,
+  paymentLimiter,
+  validate(payCardSchema),
+  async (req, res, next) => {
+    try {
+      const result = await orderService.payOrderWithCard(
+        req.params.id as string,
+        { cardToken: req.body.card_token, installments: req.body.installments },
+        req.user?.userId ?? null,
+      );
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ─── Admin ───────────────────────────────────────────────────────────────────
 

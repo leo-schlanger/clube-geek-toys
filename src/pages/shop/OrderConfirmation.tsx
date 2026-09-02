@@ -196,11 +196,12 @@ export default function OrderConfirmation() {
                     {timedOut ? 'Aguardando confirmação' : 'Aguardando pagamento'}
                   </h1>
                   <p className="text-muted-foreground">
-                    {/* Card settles by Stripe webhook; PIX is checked by a
-                        person. Saying "automatic" for PIX was the promise the
-                        system could not keep. */}
+                    {/* Both methods settle themselves now: Pagar.me reconciles
+                        the PIX and fires the webhook. The old copy warned that
+                        a person had to check the statement, which was true of
+                        the static code the shop used to generate itself. */}
                     {isPending && pix
-                      ? 'A equipe confere o PIX e confirma o pedido — não é automático, e pode levar algumas horas em horário comercial. Enviamos o código para o seu e-mail: pode fechar esta página sem perder nada.'
+                      ? 'Assim que o PIX cair, o pedido é confirmado automaticamente — normalmente em segundos. Enviamos o código para o seu e-mail: pode fechar esta página sem perder nada.'
                       : isPending
                         ? 'Assim que o pagamento for identificado, seu pedido é confirmado e você recebe um e-mail.'
                         : 'Estamos verificando o status do seu pagamento.'}

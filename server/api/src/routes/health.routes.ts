@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { pool } from '../config/database.js';
 import { getSchemaState } from '../db/ensure-schema.js';
 import { getMelhorEnvioHealth } from '../services/shipping.service.js';
+import { isPagarmeConfigured } from '../utils/pagarme.js';
+import { webhookAuthConfigured } from '../services/pagarme-webhook.service.js';
+import { env } from '../config/env.js';
 
 export const healthRouter = Router();
 
@@ -32,6 +35,20 @@ healthRouter.get('/', async (_req, res) => {
         ranAt: schema.ranAt,
         failedSteps: schema.failed.length,
         totalSteps: schema.total,
+      },
+      // A shop whose provider keys are missing takes orders it cannot charge,
+      // and a webhook with no credentials never settles a PIX. Both fail
+      // silently at boot, so both are reported here.
+      payments: {
+        provider: 'pagarme',
+        configured: isPagarmeConfigured(),
+        publicKey: Boolean(env.PAGARME_PUBLIC_KEY),
+        webhookAuth: webhookAuthConfigured(),
+        status: !isPagarmeConfigured()
+          ? 'not_configured'
+          : !webhookAuthConfigured()
+            ? 'webhook_unauthenticated'
+            : 'ok',
       },
       shipping: {
         // 'live' requires an observed success, not merely a credential:
