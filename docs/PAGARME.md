@@ -327,10 +327,55 @@ npm run test:api    # 480 testes, ~40s
 
 ---
 
-## 8.1 O que ainda NÃO foi testado contra a API real ⚠️
+## 8.2 Validação contra a API real (02/09/2026)
 
-**Nenhuma cobrança real foi feita.** Sem a `sk_` não houve um único pedido, PIX
-ou webhook de verdade. Tudo o que está verde são testes de unidade com HTTP
+Chave de produção configurada e o fluxo exercitado de verdade. **Três bugs que
+os testes de unidade não pegavam** — todos corrigidos:
+
+| Erro real                                            | Causa                                                                                                                                                                                                                |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `422 customer.type: The type field is required`      | `createCustomer` preenchia `type`; o objeto `customer` **inline** do pedido não. Os dois caminhos discordavam. Agora tudo passa por `normalizeCustomer`.                                                             |
+| `error: inconsistent types deduced for parameter $2` | O mesmo placeholder alimentava `pagarme_charge_id` (VARCHAR 64) e `pix_txid` (TEXT). O Postgres recusa. **Mais dois inserts do clube tinham o mesmo defeito** e teriam quebrado no primeiro pagamento de assinatura. |
+| `412 The card verification failed`                   | Não é bug: `POST /customers/{id}/cards` **valida o cartão com o emissor** antes de salvar. Mapeado para uma frase sobre o cartão, não sobre a cobrança — a falha é um passo antes dela.                              |
+
+O terceiro só apareceu porque o teste usou um PAN falso; o valor está em saber
+que a validação acontece ali.
+
+### O que passou
+
+| Verificação                                         | Resultado                                                                     |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Autenticação na API (`GET /orders`)                 | ✅ HTTP 200                                                                   |
+| **PIX da loja de ponta a ponta**                    | ✅ pedido #8, `or_jX5rWYbHzhJO7AKN` / `ch_VNowGlF2xu5eK81J`, QR real da Stone |
+| QR e ids gravados na linha do pedido                | ✅ `pix_qr_code`, `pagarme_charge_id`, `payment_provider`                     |
+| Recuperação pública do PIX (`GET /orders/:id/pix`)  | ✅ devolve o mesmo código                                                     |
+| Reconciliação na leitura (`GET /orders/:id/status`) | ✅ `providerStatus: pending` vindo da operadora                               |
+| **PIX do clube sem endereço**                       | ✅ HTTP 200 — o risco que estava em aberto **não existe** para PIX            |
+| Tokenização com a chave pública                     | ✅ `token_...`, bandeira Visa detectada                                       |
+| Webhook sem credencial                              | ✅ 401                                                                        |
+| Webhook com senha errada                            | ✅ 401                                                                        |
+| **`charge.paid` forjado com senha certa**           | ✅ recusado — a API releu a cobrança, viu `pending` e não liquidou            |
+| Compensação quando a cobrança falha                 | ✅ pedido `cancelled`, reserva devolvida                                      |
+
+### O que continua sem validação
+
+- **Cobrança de cartão de verdade** — exige um cartão real e move dinheiro. O
+  formato está confirmado (o 412 é validação do cartão, não erro de schema).
+- **Webhook chegando da Pagar.me** — depende de um PIX realmente pago. O
+  endpoint, a autenticação e a recusa de evento forjado estão provados; falta
+  ver a entrega real virar o pedido para `paid`.
+- **Assinatura recorrente** — nenhuma foi criada.
+- **Antifraude** — não configurado.
+
+---
+
+## 8.1 Riscos mapeados antes da validação ⚠️
+
+> **Superado em parte pela seção 8.2** — a chave chegou e o PIX foi validado de
+> ponta a ponta. Mantido como registro do que se esperava quebrar, e do que de
+> fato quebrou.
+
+**Nenhuma cobrança real havia sido feita** quando esta seção foi escrita. Tudo o que está verde são testes de unidade com HTTP
 mockado: eles provam que **o nosso lado** se comporta como decidimos, não que a
 Pagar.me aceita o que mandamos.
 

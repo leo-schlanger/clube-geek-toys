@@ -294,12 +294,17 @@ export async function createPixPayment(data: {
 
   const { charge, qrCode, qrCodeUrl, expiresAt } = requirePixTransaction(order);
 
+  // The charge id is bound twice on purpose: `provider_id` is TEXT and
+  // `pagarme_charge_id` is VARCHAR(64), and Postgres refuses to deduce one type
+  // for a parameter used in both — "inconsistent types deduced for parameter".
+  // A mocked `query` in a unit test never runs the statement, so this only
+  // surfaces against a real database.
   await query(
     `INSERT INTO payments
        (id, member_id, amount, method, status, provider, provider_id, provider_status,
         reference, pagarme_order_id, pagarme_charge_id)
-     VALUES ($1, $2, $3, 'pix', 'pending', 'pagarme', $4, $5, $6, $7, $4)`,
-    [paymentId, payer.id, data.amount, charge.id, charge.status, order.id, order.id],
+     VALUES ($1, $2, $3, 'pix', 'pending', 'pagarme', $4, $5, $6, $7, $8)`,
+    [paymentId, payer.id, data.amount, charge.id, charge.status, order.id, order.id, charge.id],
   );
 
   await auditLog(
@@ -561,11 +566,13 @@ export async function createCardPayment(data: {
   const cardLastFour =
     charge.last_transaction?.card?.last_four_digits ?? savedCard.last_four_digits ?? null;
 
+  // Same reason as the PIX insert above: TEXT and VARCHAR(64) cannot share a
+  // placeholder, so the charge id is bound twice.
   await query(
     `INSERT INTO payments
        (id, member_id, amount, method, status, provider, provider_id, provider_status,
         reference, pagarme_order_id, pagarme_charge_id, installments, card_brand, card_last_four)
-     VALUES ($1, $2, $3, 'credit_card', $4, 'pagarme', $5, $6, $7, $8, $5, $9, $10, $11)`,
+     VALUES ($1, $2, $3, 'credit_card', $4, 'pagarme', $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       paymentId,
       payer.id,
@@ -575,6 +582,7 @@ export async function createCardPayment(data: {
       charge.status,
       order.id,
       order.id,
+      charge.id,
       installments,
       cardBrand,
       cardLastFour,

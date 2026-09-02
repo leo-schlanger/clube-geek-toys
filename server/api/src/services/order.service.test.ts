@@ -781,10 +781,12 @@ describe('createOrder — PIX pela Pagar.me', () => {
     expect(result.pixData?.txId).toBe('ch_1');
 
     const stored = queryMock.mock.calls.find(
-      (c) => typeof c[0] === 'string' && c[0].includes('pix_qr_code = $3')
+      (c) => typeof c[0] === 'string' && c[0].includes('pix_qr_code')
     );
     expect(stored, 'o QR tem de ser gravado').toBeDefined();
-    expect((stored![1] as unknown[])[2]).toBe('00020101br.gov.bcb.pix-GEEKPOP');
+    // The charge id is bound twice (TEXT vs VARCHAR columns cannot share a
+    // placeholder), so the QR is the fourth parameter, not the third.
+    expect(stored![1] as unknown[]).toContain('00020101br.gov.bcb.pix-GEEKPOP');
   });
 
   /** Centavos at the provider, reais in our rows. A factor of 100 here is a 100x charge. */

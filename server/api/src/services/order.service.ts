@@ -908,12 +908,24 @@ async function createPagarmePixCharge(order: Order, document: string): Promise<P
   const expiresAt =
     tx.expires_at ?? new Date(Date.now() + env.PAGARME_PIX_EXPIRES_IN * 1000).toISOString();
 
+  // The charge id goes into two columns of different declared types, so it is
+  // bound twice rather than reusing one placeholder: Postgres refuses to deduce
+  // a single type for a parameter used in both ("inconsistent types deduced for
+  // parameter $2"), and a mocked `query` in a unit test never surfaces that.
   await query(
     `UPDATE orders
         SET pagarme_order_id = $1, pagarme_charge_id = $2, payment_provider = 'pagarme',
-            pix_txid = $2, pix_qr_code = $3, pix_qr_code_url = $4, pix_expires_at = $5
-      WHERE id = $6`,
-    [created.id, charge.id, tx.qr_code, tx.qr_code_url ?? null, expiresAt, order.id],
+            pix_txid = $3, pix_qr_code = $4, pix_qr_code_url = $5, pix_expires_at = $6
+      WHERE id = $7`,
+    [
+      created.id,
+      charge.id,
+      charge.id,
+      tx.qr_code,
+      tx.qr_code_url ?? null,
+      expiresAt,
+      order.id,
+    ],
   );
 
   order.pagarmeOrderId = created.id;

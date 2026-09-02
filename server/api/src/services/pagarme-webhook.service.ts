@@ -321,6 +321,9 @@ async function settleShopOrder(
   // always land on the order — if anything cancelled it while the charge was in
   // flight, dropping the success silently is the worst of both worlds. Anything
   // already `paid` (or beyond) matches nothing and returns below.
+  // `$1` appears twice, and that is fine here: both uses are `pagarme_charge_id`
+  // (VARCHAR(64)), so Postgres deduces one type. Mixing it with a TEXT column
+  // is what fails — see the inserts in payment.service.
   const updated = await client.query(
     `UPDATE orders
         SET status = 'paid', paid_at = NOW(), payment_method = $2,

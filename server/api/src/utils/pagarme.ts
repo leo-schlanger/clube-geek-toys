@@ -198,6 +198,13 @@ function buildUserMessage(httpStatus: number, body: unknown): string {
   if (httpStatus === 401 || httpStatus === 403) {
     return 'Pagamento indisponível no momento. Já avisamos a equipe.';
   }
+  // `POST /customers/{id}/cards` verifies the card with the issuer before
+  // saving it, and answers 412 when that fails — measured against the live
+  // account. It happens *before* any charge, so "não foi possível criar a
+  // cobrança" would send the customer looking in the wrong place.
+  if (httpStatus === 412) {
+    return 'Não foi possível validar o cartão. Confira o número, a validade e o CVV, ou use outro cartão.';
+  }
   if (httpStatus >= 500) {
     return 'O processador de pagamentos está instável. Tente novamente em alguns minutos.';
   }
@@ -405,13 +412,27 @@ export function maxInstallmentsFor(amount: number): number {
 
 // ─── Customers ───────────────────────────────────────────────────────────────
 
-export async function createCustomer(input: PagarmeCustomerInput): Promise<{ id: string }> {
-  return request<{ id: string }>('POST', '/customers', {
+/**
+ * Fill in the fields Pagar.me derives from the document, and normalise it.
+ *
+ * `type` is **required** — a customer without it is a 422, and that is exactly
+ * how the first real order failed: `createCustomer` filled it in, but the
+ * inline `customer` object on a PIX order did not, so the two paths disagreed.
+ * Every customer object now goes through here, wherever it is sent.
+ */
+export function normalizeCustomer(input: PagarmeCustomerInput): PagarmeCustomerInput {
+  const document = normalizeDocument(input.document);
+  const kind = documentType(document);
+  return {
     ...input,
-    type: input.type ?? (documentType(input.document) === 'CNPJ' ? 'company' : 'individual'),
-    document_type: input.document_type ?? documentType(input.document),
-    document: normalizeDocument(input.document),
-  });
+    document,
+    type: input.type ?? (kind === 'CNPJ' ? 'company' : 'individual'),
+    document_type: input.document_type ?? kind,
+  };
+}
+
+export async function createCustomer(input: PagarmeCustomerInput): Promise<{ id: string }> {
+  return request<{ id: string }>('POST', '/customers', normalizeCustomer(input));
 }
 
 export async function getCustomer(id: string) {
@@ -476,6 +497,12 @@ export interface PagarmeCard {
  * The field is `token`, not `token_id`. `billing_address` is optional at this
  * endpoint even though the *customer* address is required on a PSP order.
  */
+/**
+ * NOTE: this endpoint **verifies the card with the issuer** before saving it,
+ * and answers 412 when that fails — confirmed against the live account with a
+ * test PAN. So a bad card is refused here, one step before the charge, and the
+ * message the customer sees comes from the 412 branch of `buildUserMessage`.
+ */
 export async function createCardForCustomer(
   customerId: string,
   token: string,
@@ -504,7 +531,12 @@ export async function createOrder(
   payload: CreateOrderPayload,
   opts: { idempotencyKey?: string } = {},
 ): Promise<PagarmeOrder> {
-  return request<PagarmeOrder>('POST', '/orders', payload, opts);
+  // An inline customer needs the same normalisation as one created through
+  // `/customers`; forgetting it here is what made the first real PIX 422.
+  const body: CreateOrderPayload = payload.customer
+    ? { ...payload, customer: normalizeCustomer(payload.customer) }
+    : payload;
+  return request<PagarmeOrder>('POST', '/orders', body, opts);
 }
 
 export async function getOrder(id: string): Promise<PagarmeOrder> {
