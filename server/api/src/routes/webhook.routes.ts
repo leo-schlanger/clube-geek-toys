@@ -6,6 +6,7 @@ import { processStripeEvent } from '../services/webhook.service.js';
 import {
   processPagarmeEvent,
   verifyWebhookAuth,
+  webhookAuthConfigured,
   type PagarmeWebhookEvent,
 } from '../services/pagarme-webhook.service.js';
 import { env } from '../config/env.js';
@@ -88,6 +89,27 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
  * before acting on it. The two together are what make a forged `charge.paid`
  * worth nothing.
  */
+/**
+ * GET /webhook/pagarme — a liveness answer, nothing more.
+ *
+ * The endpoint only accepts POST, so opening the URL in a browser used to give
+ * Express's "Cannot GET" 404. That reads as a broken endpoint to whoever is
+ * pasting the URL into the Pagar.me dashboard, and it would also fail a panel
+ * that pings the URL before letting you save it.
+ *
+ * It processes nothing and reveals nothing: whether the credentials are set is
+ * already public in `GET /health`.
+ */
+webhookRouter.get('/pagarme', webhookLimiter, (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    endpoint: 'pagarme',
+    accepts: 'POST',
+    authenticated: webhookAuthConfigured(),
+    message: 'Endpoint ativo. As notificações da Pagar.me chegam por POST com Basic auth.',
+  });
+});
+
 webhookRouter.post('/pagarme', webhookLimiter, async (req: Request, res: Response) => {
   try {
     if (!verifyWebhookAuth(req.headers.authorization)) {

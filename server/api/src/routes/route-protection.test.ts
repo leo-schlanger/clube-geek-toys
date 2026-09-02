@@ -246,6 +246,9 @@ const PUBLIC = new Set([
   // handler — e, para evento de dinheiro, a cobrança é relida na API antes de
   // valer. Ver `pagarme-webhook.service.ts`.
   'POST /webhook/pagarme',
+  // Resposta de vida, para quem cola a URL no painel da Pagar.me (e para um
+  // painel que faça ping antes de salvar). Não processa nada.
+  'GET /webhook/pagarme',
   'POST /webhook/pagbank', // 410 Gone, transicional
   // O navegador de quem autoriza, sem nossa sessão. Quem autentica é o `state`
   // assinado (`oauth.isValidState`).
@@ -276,6 +279,7 @@ const PUBLIC_WITHOUT_THROTTLE = new Set([
   'GET /health', // é o que o deploy consulta em laço
   'POST /webhook/stripe', // o Stripe reentrega; limitar aqui perde pagamento
   'POST /webhook/pagarme', // idem: tem limiter próprio no router, mais folgado
+  'GET /webhook/pagarme', // mesmo limiter do POST, definido no router
   'POST /webhook/pagbank', // 410 fixo
   'GET /shipping/melhor-envio/callback', // protegido pelo state assinado
 
