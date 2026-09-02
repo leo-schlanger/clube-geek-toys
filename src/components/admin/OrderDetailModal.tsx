@@ -256,8 +256,33 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                       ? 'Cartão'
                       : '—'}
                   </p>
+                  {order.cardBrand && order.cardLastFour && (
+                    <p className="text-xs capitalize text-muted-foreground">
+                      {order.cardBrand} ···· {order.cardLastFour}
+                      {order.installments && order.installments > 1
+                        ? ` · ${order.installments}x`
+                        : ''}
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/*
+                The charge id, so "o cliente diz que pagou, cadê?" can be
+                answered by searching the operator's dashboard. It was in the
+                notification e-mail and nowhere in the panel — the one place
+                someone actually looks at an order.
+              */}
+              {hasProviderCharge && (
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold">
+                    Cobrança {order.pagarmeChargeId ? 'na Pagar.me' : 'no Stripe (legado)'}
+                  </h4>
+                  <p className="select-all break-all font-mono text-xs text-muted-foreground">
+                    {order.pagarmeChargeId ?? order.stripePaymentIntentId}
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <h4 className="font-semibold text-sm">Cliente</h4>

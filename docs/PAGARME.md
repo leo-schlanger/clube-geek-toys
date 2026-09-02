@@ -249,6 +249,18 @@ A fila "PIX a confirmar" era **urgente** e dizia _"Confira o extrato e confirme"
 _"Confirma sozinho quando o PIX cair"_. O aviso do dashboard e o e-mail
 `admin-pix-order-pending` foram reescritos junto.
 
+### 6. O painel não mostrava a cobrança
+
+Para responder _"o cliente diz que pagou, cadê?"_ a loja procura a cobrança no
+painel da operadora — e o id só existia dentro do e-mail de notificação, nunca
+na tela onde alguém abre o pedido. O `OrderDetailModal` agora mostra a cobrança
+(rotulada **Pagar.me** ou **Stripe legado**, para não procurar no painel errado)
+e a bandeira / quatro últimos dígitos / parcelamento, que é o que casa uma linha
+de fatura com um pedido.
+
+O modal não tinha teste nenhum e passou a controlar uma ação de dinheiro:
+`OrderDetailModal.test.tsx` trava as regras do estorno e da reconciliação.
+
 ### Verificado e em ordem
 
 - **Relatórios** somam `payments`/`orders` sem filtrar provedor — cobrança
