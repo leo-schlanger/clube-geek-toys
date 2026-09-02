@@ -7,6 +7,7 @@ import { z } from 'zod';
 import * as paymentService from '../services/payment.service.js';
 import { env } from '../config/env.js';
 import { maxInstallmentsFor, isPagarmeConfigured } from '../utils/pagarme.js';
+import { reconcilePendingCharges } from '../services/reconcile.service.js';
 
 export const paymentRouter = Router();
 
@@ -124,6 +125,21 @@ paymentRouter.post('/card/create', authenticate, paymentLimiter, validate(cardCr
       installments: req.body.installments,
     });
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /payments/reconcile — ask the operator about every open charge now.
+ *
+ * The cron does this every ten minutes; this is the same sweep on demand, for
+ * the moment a customer says "já paguei" and nobody wants to wait for the
+ * clock. Admin-only because it talks to the provider on our behalf.
+ */
+paymentRouter.post('/reconcile', authenticate, requireRole('admin'), async (_req, res, next) => {
+  try {
+    res.json(await reconcilePendingCharges());
   } catch (err) {
     next(err);
   }

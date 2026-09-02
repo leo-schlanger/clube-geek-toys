@@ -415,6 +415,42 @@ para pendurar —, e é reaproveitado quando a pessoa tenta um segundo cartão.
 
 ---
 
+## 8.3 Conciliação — a rede sob o webhook
+
+O webhook é o caminho normal e liquida em segundos. Mas é uma entrega de rede
+vinda de outro sistema, e essas se perdem: endpoint fora do ar por um minuto,
+entrega que a Pagar.me parou de retentar, ou — o caso que motivou isto — webhook
+**ainda não cadastrado no painel**. Quando falha, o cliente pagou e o pedido
+fica `pending`: estoque não baixa, e-mail não sai, e a loja descobre pela
+reclamação.
+
+`reconcile.service.ts` varre as cobranças ainda abertas, pergunta ao provedor o
+que de fato aconteceu e liquida as pagas.
+
+- **Cron a cada 10 minutos** — rápido o bastante para uma entrega perdida custar
+  minutos, não um dia.
+- **`POST /payments/reconcile`** (admin) — a mesma varredura sob demanda, para
+  quando um cliente diz "já paguei" e ninguém quer esperar o relógio.
+
+Duas regras a não afrouxar:
+
+1. **Só o provedor decide.** Nada liquida a partir do estado local; cada
+   cobrança passa por um `GET /charges/:id` novo — e sem cache, ao contrário das
+   telas de polling.
+2. **A liquidação passa pelo processador do webhook.** Ela monta o mesmo evento
+   e chama `processPagarmeEvent`, então a claim em `processed_webhooks` é o que
+   impede aplicar a mesma cobrança duas vezes — por esta varredura e por uma
+   entrega real, ou por duas varreduras sobrepostas. O id do evento vem da
+   cobrança (`reconcile_<charge_id>`), então é estável entre execuções.
+
+Janela: 7 dias, teto de 100 cobranças por rodada.
+
+> **Com isto, a loja funciona sem o webhook cadastrado.** A diferença é a
+> latência: com webhook, segundos; sem ele, até 10 minutos. Cadastre mesmo
+> assim — a conciliação é rede de segurança, não substituto.
+
+---
+
 ## 9. Ir para produção
 
 1. `.env` da VPS com as sete variáveis `PAGARME_*`.

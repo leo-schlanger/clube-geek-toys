@@ -5,6 +5,7 @@ import { sendTemplateEmail } from './email.service.js';
 import { getActionItems } from './report.service.js';
 import { releaseReservationById } from './order.service.js';
 import { purgeExpiredRefreshSessions } from './auth.service.js';
+import { reconcilePendingCharges } from './reconcile.service.js';
 
 export function initCronJobs() {
   // Daily at 6:00 AM UTC (3:00 AM BRT)
@@ -52,7 +53,29 @@ export function initCronJobs() {
     console.log('[CRON] All daily jobs completed');
   });
 
+  /**
+   * Every 10 minutes: catch payments the webhook never told us about.
+   *
+   * The webhook settles within seconds and is the normal path. This exists for
+   * when it does not arrive — an endpoint that was down, a delivery Pagar.me
+   * stopped retrying, or a webhook not yet registered in the dashboard. Without
+   * it, a customer who paid sits `pending` until someone notices.
+   *
+   * Ten minutes is the compromise: fast enough that a lost delivery costs the
+   * buyer minutes rather than a day, slow enough to be a handful of API calls.
+   * Settling goes through the webhook processor, so the idempotency claim stops
+   * a charge being applied twice when both paths run.
+   */
+  cron.schedule('*/10 * * * *', async () => {
+    try {
+      await reconcilePendingCharges();
+    } catch (err) {
+      console.error('[CRON] Reconcile error:', err);
+    }
+  });
+
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
+  console.log('[CRON] Scheduled payment reconciliation every 10 minutes');
 }
 
 /**
