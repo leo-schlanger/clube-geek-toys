@@ -6,6 +6,7 @@ import { auditLog } from '../utils/audit.js';
 import { decrementStockForOrder, restoreStockForOrder, releaseReservation } from './order.service.js';
 import { restoreCreditForOrder } from './store-credit.service.js';
 import { env } from '../config/env.js';
+import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 
 /**
  * Email job collected during transaction processing — sent AFTER commit.
@@ -248,6 +249,19 @@ async function handleChargeRefunded(
     amountRefunded: charge.amount_refunded / 100,
     partial: charge.amount_refunded < charge.amount,
   });
+
+  // The bell was added with the Pagar.me migration and only the new processor
+  // rang it. A legacy charge refunded from the Stripe dashboard is still money
+  // leaving, and the staff should hear about it the same way.
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_refunded',
+    subject: `Pedido #${row.order_number}`,
+    amount: charge.amount_refunded / 100,
+    method: 'credit_card',
+    link: '/admin?tab=orders',
+    detail: 'Estorno feito no painel do Stripe (cobrança anterior à migração).',
+    chargeId: paymentIntentId,
+  });
 }
 
 // ─── charge.dispute.created ──────────────────────────────────────────────────
@@ -343,6 +357,18 @@ async function handleShopOrderPaid(
     orderNumber: order.order_number,
     paymentIntentId: paymentIntent.id,
     amount: paymentIntent.amount / 100,
+  });
+
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_received',
+    subject: `Pedido #${order.order_number}`,
+    amount: parseFloat(order.total),
+    method: 'credit_card',
+    customerName: order.customer_name,
+    customerEmail: order.customer_email,
+    link: '/admin?tab=orders',
+    detail: 'Cobrança anterior à migração (Stripe).',
+    chargeId: paymentIntent.id,
   });
 }
 

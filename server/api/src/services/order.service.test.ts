@@ -158,6 +158,8 @@ import {
   claimGuestOrders,
   listMyOrders,
   setOrderTracking,
+  updateOrderStatus,
+  refundOrder,
 } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -1493,5 +1495,104 @@ describe('createOrder — cupons', () => {
     expect(v[COL.discountReason]).toBe('wholesale_25');
     expect(checkCouponMock).not.toHaveBeenCalled();
     expect(claimCouponMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Closing a charged order ─────────────────────────────────────────────────
+
+/**
+ * There are two ways to reach the word "refunded" in the panel: the status
+ * dropdown and the Refund action. Only one of them gives the money back.
+ *
+ * `updateOrderStatus` restocks and returns store credit, but it never talks to
+ * the acquirer — so an admin picking "Reembolsado" from the list would close
+ * the order believing the customer was paid back, with the charge still taken.
+ * That is the failure these pin: the manual transition is refused, and the
+ * refund path is the one that reaches the provider.
+ */
+describe('fechar um pedido que tem cobrança', () => {
+  /** Local, because this file matches SQL inline everywhere else. */
+  const sqlOf = (a: unknown) => (typeof a === 'string' ? a.replace(/\s+/g, ' ').trim() : '');
+
+  function chargedOrder(over: Record<string, unknown> = {}) {
+    return {
+      id: 'o1',
+      order_number: 1001,
+      user_id: 'u1',
+      customer_name: 'Laura',
+      customer_email: 'laura@example.com',
+      status: 'paid',
+      payment_method: 'credit_card',
+      pagarme_charge_id: 'ch_1',
+      payment_provider: 'pagarme',
+      subtotal: '100.00',
+      discount: '0',
+      shipping_cost: '24.00',
+      store_credit_applied: '0',
+      total: '124.00',
+      ...over,
+    };
+  }
+
+  it.each([['refunded'], ['cancelled']])(
+    'recusa marcar %s à mão, e não mexe em nada',
+    async (status) => {
+      queryMock.mockResolvedValue({ rows: [chargedOrder()] });
+
+      await expect(updateOrderStatus('o1', status as string, 'admin-1')).rejects.toThrow(
+        'use "Reembolsar"'
+      );
+
+      // Nothing may move: no status write, no restock, no credit return.
+      expect(
+        queryMock.mock.calls.some((c) => sqlOf(c[0]).includes('UPDATE orders SET status'))
+      ).toBe(false);
+      expect(restoreCreditMock).not.toHaveBeenCalled();
+    }
+  );
+
+  /** An order settled at the counter or paid entirely with credit has no charge. */
+  it('deixa cancelar um pedido sem cobrança na operadora', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sqlOf(sql).includes('UPDATE orders SET status')) {
+        return { rows: [chargedOrder({ status: 'cancelled', pagarme_charge_id: null })] };
+      }
+      return { rows: [chargedOrder({ pagarme_charge_id: null })] };
+    });
+
+    await expect(updateOrderStatus('o1', 'cancelled', 'admin-1')).resolves.toBeDefined();
+  });
+
+  /** A pending order was never charged, so closing it by hand is fine. */
+  it('deixa cancelar um pedido ainda pendente', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sqlOf(sql).includes('UPDATE orders SET status')) {
+        return { rows: [chargedOrder({ status: 'cancelled' })] };
+      }
+      return { rows: [chargedOrder({ status: 'pending' })] };
+    });
+
+    await expect(updateOrderStatus('o1', 'cancelled', 'admin-1')).resolves.toBeDefined();
+  });
+
+  /**
+   * The buyer is the party whose money moved, and was the only one not being
+   * told. A refund nobody explains is a support message at best, a chargeback
+   * at worst.
+   */
+  it('o estorno avisa o cliente e devolve o dinheiro na operadora', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sqlOf(sql).includes("UPDATE orders SET status = 'refunded'")) {
+        return { rows: [chargedOrder({ status: 'refunded' })] };
+      }
+      return { rows: [chargedOrder()] };
+    });
+
+    await refundOrder('o1', 'admin-1');
+
+    expect(pagarmeRefundMock).toHaveBeenCalledWith('ch_1');
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'order-refunded', to: 'laura@example.com' })
+    );
   });
 });

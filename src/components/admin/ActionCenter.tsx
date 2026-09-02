@@ -39,11 +39,15 @@ interface QueueMeta {
 // jumps to are frontend concerns. The server only counts.
 const QUEUES: Record<ActionItemKey, QueueMeta> = {
   pix_pending: {
-    label: 'PIX a confirmar',
-    hint: 'Confira o extrato e confirme — o estoque só baixa depois',
+    label: 'PIX aguardando',
+    // No longer a task. The Pagar.me webhook settles these on its own, usually
+    // in seconds — the old copy sent the shop to the bank statement for work
+    // that no longer exists. What is left is a queue worth watching: an entry
+    // that sits here for hours is someone who generated a code and walked away.
+    hint: 'Confirma sozinho quando o PIX cair — só acompanhe',
     tab: 'orders',
     icon: <Banknote className="h-5 w-5" />,
-    severity: 'urgent',
+    severity: 'routine',
     age: 'waiting',
   },
   to_separate: {

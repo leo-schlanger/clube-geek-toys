@@ -28,7 +28,7 @@ const AVAILABLE_TEMPLATES = [
   'verify-email', 'password-reset', 'contract-signed',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
-  'order-pending-pix',
+  'order-pending-pix', 'order-refunded', 'order-cancelled-customer',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-order-disputed',
   'admin-daily-digest', 'admin-payment-event',
   'event-reservation-received', 'event-tickets-ready', 'admin-event-reservation',
@@ -307,6 +307,56 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         ${infoBox('O pedido <strong>não</strong> foi alterado automaticamente — chargeback precisa de decisão humana. Envie a evidência pelo painel da Pagar.me antes do prazo.')}`,
       cta: { text: 'Abrir na Pagar.me', url: 'https://dash.pagar.me/' },
+    },
+
+    /**
+     * Money going back to the customer, said out loud.
+     *
+     * Refunds reached the acquirer, the stock and the store credit, and told
+     * nobody. The person saw a charge disappear days later with no explanation,
+     * which is exactly the sequence that produces a WhatsApp message — or a
+     * chargeback, which costs far more than this e-mail.
+     */
+    'order-refunded': {
+      subject: `Reembolso do pedido #${v.order_number || ''} — GeekPop & Toys`,
+      preheader: `Estornamos R$ ${v.total || '0,00'} do pedido #${v.order_number || ''}.`,
+      body: `
+        <h2 style="color:#FCBE04;margin:0 0 12px">Pedido reembolsado</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>O pagamento do seu pedido foi <strong>estornado</strong>.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Valor estornado', `<strong>R$ ${v.total || '0,00'}</strong>`],
+          ...(v.payment_method ? [['Forma', v.payment_method]] : []),
+        ])}
+        ${infoBox(
+          v.payment_method === 'PIX'
+            ? '⏳ O valor volta para a mesma conta que fez o PIX. Costuma cair em minutos, mas o banco pode levar até 1 dia útil.'
+            : '⏳ O estorno aparece na fatura do cartão em até <strong>2 faturas</strong>, dependendo do banco — é o prazo da operadora, não da loja.'
+        )}
+        <p style="margin-top:16px">Qualquer dúvida, é só responder este e-mail.</p>`,
+      cta: {
+        text: 'Ver meu pedido',
+        url: v.order_id
+          ? `https://shop.geeketoys.com.br/pedido/${v.order_id}`
+          : 'https://shop.geeketoys.com.br/minhas-compras',
+      },
+    },
+
+    /** Cancelled by the shop — the customer did not do this, so it needs a reason. */
+    'order-cancelled-customer': {
+      subject: `Pedido #${v.order_number || ''} cancelado — GeekPop & Toys`,
+      preheader: `Seu pedido #${v.order_number || ''} foi cancelado.`,
+      body: `
+        <h2 style="color:#ef4444;margin:0 0 12px">Pedido cancelado</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Seu pedido foi cancelado${v.reason ? ` — ${escapeHtml(v.reason)}` : ''}.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ['Valor', `R$ ${v.total || '0,00'}`],
+        ])}
+        ${infoBox('Se você já tinha pago, o valor é devolvido — e você recebe um e-mail separado confirmando o estorno. Nenhuma cobrança fica em aberto.')}`,
+      cta: { text: 'Ver a loja', url: 'https://shop.geeketoys.com.br' },
     },
 
     'order-shipped': {

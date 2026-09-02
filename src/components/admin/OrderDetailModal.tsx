@@ -193,8 +193,22 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
   const address = order ? formatAddress(order.shippingAddress) : null
   const isPickup = order?.deliveryMethod === 'pickup'
   const canConfirmPix = order?.paymentMethod === 'pix' && order?.status === 'pending'
+  /**
+   * PIX is refundable too since the Pagar.me migration.
+   *
+   * The old rule was `credit_card` only, and it was right at the time: the PIX
+   * code was one we generated ourselves, no provider ever saw it, and the only
+   * way back was a manual transfer. A Pagar.me PIX is a real charge, and
+   * `DELETE /charges/:id` gives it back — hiding the button just sent the shop
+   * to the bank app for nothing.
+   *
+   * What decides it is the charge, not the method: an order settled at the
+   * counter or paid entirely with store credit has none, and there is nothing
+   * to ask the acquirer for.
+   */
+  const hasProviderCharge = Boolean(order?.pagarmeChargeId || order?.stripePaymentIntentId)
   const canRefund =
-    order?.paymentMethod === 'credit_card' &&
+    hasProviderCharge &&
     (order?.status === 'paid' || order?.status === 'processing' || order?.status === 'shipped')
 
   return (

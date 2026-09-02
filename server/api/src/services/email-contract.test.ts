@@ -88,6 +88,10 @@ const SHOP_TEMPLATES = [
   'order-pending-pix',
   'order-ready-for-pickup',
   'question-answered',
+  // Money going back, and an order dying, are the two things a customer used
+  // to find out about only by noticing.
+  'order-refunded',
+  'order-cancelled-customer',
 ];
 
 /** Templates addressed to a club member. */

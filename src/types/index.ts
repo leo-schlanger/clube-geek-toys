@@ -307,8 +307,17 @@ export interface Order {
   total: number
   status: OrderStatus
   paymentMethod: OrderPaymentMethod | null
+  /** Legacy: set only on orders charged before the Pagar.me migration. */
   stripePaymentIntentId: string | null
+  pagarmeOrderId?: string | null
+  pagarmeChargeId?: string | null
+  /** 'pagarme' | 'stripe' | 'manual' — who holds the charge, and so who refunds. */
+  paymentProvider?: string | null
   pixTxid: string | null
+  /** The card that paid, for the admin's order view. */
+  cardBrand?: string | null
+  cardLastFour?: string | null
+  installments?: number | null
   /** Pending order PIX, so the QR can be recovered after a closed tab. */
   pixData?: PixQRData
   paidAt: string | null

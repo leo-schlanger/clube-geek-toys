@@ -204,6 +204,64 @@ Nada aqui pode derrubar um pagamento — toda função engole o próprio erro e 
 
 ---
 
+## 5.1 Auditoria de ponta a ponta (02/09/2026)
+
+Revisão de todo o fluxo de cobrança, dos avisos e dos controles do painel.
+Cinco falhas encontradas e corrigidas — as duas primeiras eram graves.
+
+### 1. Marcar "Reembolsado" no painel não devolvia dinheiro ⚠️
+
+Havia **dois caminhos** para a palavra "reembolsado": o seletor de status e o
+botão **Reembolsar**. Só o botão falava com a operadora. O seletor devolvia
+estoque e crédito da loja e fechava o pedido — com a cobrança **ainda tomada**.
+Quem usasse o seletor acreditaria ter estornado.
+
+`updateOrderStatus` agora **recusa** `refunded` e `cancelled` quando o pedido
+tem cobrança na operadora, com `USE_REFUND_ACTION` apontando para o botão certo.
+Pedido pendente, pago no balcão ou quitado só com crédito não tem cobrança e
+continua fechando normalmente.
+
+### 2. O painel escondia o estorno de PIX ⚠️
+
+`canRefund` exigia `credit_card`. Era correto antes: o PIX era um código nosso
+que provedor nenhum via, e só dava para devolver por transferência manual. Um
+PIX da Pagar.me é cobrança de verdade e `DELETE /charges/:id` devolve. O botão
+some por não ter cobrança, não por ser PIX.
+
+### 3. Estorno e cancelamento não avisavam o cliente
+
+O dinheiro voltava (ou o pedido morria) e ninguém contava ao comprador — que
+descobria por notar uma cobrança sumindo dias depois. É a sequência que vira
+mensagem no WhatsApp, ou chargeback. Dois templates novos:
+`order-refunded` (com o prazo real: PIX em minutos, cartão em até 2 faturas) e
+`order-cancelled-customer`.
+
+### 4. `order_shipped` era um tipo de notificação que ninguém escrevia
+
+O sino da loja nunca mostrou um envio: o `kind` existia, nada gravava a linha.
+O único aviso era e-mail — o canal que cai em Promoções. `setOrderTracking`
+agora grava a notificação para quem tem conta (convidado segue só com e-mail).
+
+### 5. O painel ainda mandava conferir o extrato
+
+A fila "PIX a confirmar" era **urgente** e dizia _"Confira o extrato e confirme"_
+— trabalho que deixou de existir. Virou "PIX aguardando", **rotina**, com
+_"Confirma sozinho quando o PIX cair"_. O aviso do dashboard e o e-mail
+`admin-pix-order-pending` foram reescritos junto.
+
+### Verificado e em ordem
+
+- **Relatórios** somam `payments`/`orders` sem filtrar provedor — cobrança
+  Pagar.me entra na receita como qualquer outra.
+- **Estoque e crédito** ao fechar pedido: `updateOrderStatus` já tinha
+  compare-and-swap, devolvia crédito e desfazia a baixa corretamente.
+- **Sino também toca para o Stripe legado**: um estorno feito no painel antigo
+  é dinheiro saindo igual, e passou a avisar.
+- **Idempotência** do webhook, releitura da cobrança e rejeição sem credencial:
+  cobertos por 31 testes.
+
+---
+
 ## 6. Stripe, o que sobrou
 
 Nada novo passa por lá. O que ficou:

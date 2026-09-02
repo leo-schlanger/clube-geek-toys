@@ -32,6 +32,7 @@ import { getApprovedAccountByUserId, isWholesaleSalesOpen } from './wholesale.se
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
+import { notify } from './notification.service.js';
 import {
   checkCoupon,
   claimCoupon,
@@ -1490,6 +1491,21 @@ export async function setOrderTracking(
       shipping_service: order.shippingService || '',
     },
   }).catch((err) => console.error('[email] order-shipped failed', err));
+
+  // The bell in the shop header never showed a shipment. `order_shipped` was
+  // declared as a notification kind and nothing ever wrote one, so the only
+  // signal was an e-mail — which is the thing that lands in Promotions. Guest
+  // orders have no account to notify; they keep the e-mail.
+  if (order.userId) {
+    notify(null, {
+      userId: order.userId,
+      kind: 'order_shipped',
+      title: `Pedido #${order.orderNumber} a caminho`,
+      body: code ? `Código de rastreio: ${code}` : null,
+      link: `/pedido/${order.id}`,
+    }).catch((err) => console.error('[notify] order_shipped failed', err));
+  }
+
   return order;
 }
 
@@ -1503,6 +1519,26 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
   }
   const prev = await getOrderById(id, false);
   if (!prev) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
+
+  // Marking a charged order `refunded` (or `cancelled`) by hand gives the
+  // customer NOTHING back — this function restocks and returns store credit,
+  // but it never talks to the acquirer. The panel offers both a status dropdown
+  // and a Refund action, so an admin picking "Reembolsado" from the list would
+  // reasonably believe the money was returned, and the order would sit closed
+  // with the payment still taken. `refundOrder` is the path that actually
+  // refunds, and it writes the status itself, so it does not come through here.
+  const wouldCloseACharge =
+    (status === 'refunded' || status === 'cancelled') &&
+    ['paid', 'processing', 'shipped', 'delivered'].includes(prev.status) &&
+    Boolean(prev.pagarmeChargeId || prev.stripePaymentIntentId);
+  if (wouldCloseACharge) {
+    throw new AppError(
+      409,
+      'Este pedido tem cobrança na operadora: use "Reembolsar" para devolver o dinheiro. ' +
+        'Mudar o status à mão fecharia o pedido sem estornar nada.',
+      'USE_REFUND_ACTION',
+    );
+  }
 
   // Compare-and-swap on the status we just read. Without it, two clicks in the
   // panel both saw `prev.status = 'paid'`, both computed `closing &&
@@ -1572,6 +1608,21 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
   // e-mail is the only thing that tells them they can come get it.
   if (order.deliveryMethod === 'pickup' && status === 'shipped' && prev.status !== 'shipped') {
     notifyPickupReady(order);
+  }
+
+  // Cancelling from the panel used to be silent. The buyer had an order that
+  // simply stopped existing — no e-mail, nothing on the order page beyond a
+  // status word. `closing` is false for a repeat, so this cannot double-send.
+  if (closing && status === 'cancelled') {
+    sendTemplateEmail({
+      template: 'order-cancelled-customer',
+      to: order.customerEmail,
+      variables: {
+        name: order.customerName,
+        order_number: String(order.orderNumber),
+        total: order.total.toFixed(2).replace('.', ','),
+      },
+    }).catch((err) => console.error('[email] order-cancelled-customer failed', err));
   }
 
   await auditLog('order.status_changed', actorUserId, {
@@ -1743,6 +1794,21 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
     creditRestored: restored,
     stockRestored: hadStock,
   });
+
+  // The customer is the one whose money moved; they were the only party not
+  // being told. A refund the buyer does not understand is a support message at
+  // best and a chargeback at worst.
+  sendTemplateEmail({
+    template: 'order-refunded',
+    to: order.customerEmail,
+    variables: {
+      name: order.customerName,
+      order_number: String(order.orderNumber),
+      order_id: order.id,
+      total: order.total.toFixed(2).replace('.', ','),
+      payment_method: order.paymentMethod === 'pix' ? 'PIX' : 'Cartão de crédito',
+    },
+  }).catch((err) => console.error('[email] order-refunded failed', err));
 
   notifyAdminsOfPaymentAsync({
     event: 'payment_refunded',

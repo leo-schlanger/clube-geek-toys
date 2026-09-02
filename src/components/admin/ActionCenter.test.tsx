@@ -4,7 +4,7 @@
  * What these tests protect, ordered by how much a regression would cost:
  *
  *  1. Empty queues stay hidden, so the panel is only as long as the day's work.
- *  2. The most urgent queue (PIX, which no webhook confirms) sorts to the top.
+ *  2. Urgent queues sort above routine ones, whatever the counts say.
  *  3. Every card lands on the tab that can actually clear it.
  *  4. The age label reads forward for expiring memberships and backward for
  *     everything else — "vence em 3 dias" vs "espera há 3 dias".
@@ -41,7 +41,7 @@ describe('ActionCenter', () => {
     await renderPanel(report([{ key: 'pix_pending', count: 0 }]))
 
     expect(await screen.findByText('Nada pendente')).toBeInTheDocument()
-    expect(screen.queryByText('PIX a confirmar')).not.toBeInTheDocument()
+    expect(screen.queryByText('PIX aguardando')).not.toBeInTheDocument()
   })
 
   it('hides queues at zero and shows the ones with work', async () => {
@@ -52,22 +52,38 @@ describe('ActionCenter', () => {
       ])
     )
 
-    expect(await screen.findByText('PIX a confirmar')).toBeInTheDocument()
+    expect(await screen.findByText('PIX aguardando')).toBeInTheDocument()
     expect(screen.queryByText('Avaliações a moderar')).not.toBeInTheDocument()
   })
 
   it('puts urgent queues before routine ones regardless of count', async () => {
+    // `pix_pending` used to be the urgent example here. It stopped being one
+    // when Pagar.me took over: the webhook confirms it, so a pending PIX is
+    // something to watch, not something to do. An out-of-stock SKU still is.
     await renderPanel(
       report([
         { key: 'members_expiring', count: 40, oldestDays: 2 },
-        { key: 'pix_pending', count: 1, oldestDays: 1 },
+        { key: 'stock_out', count: 1, oldestDays: 1 },
       ])
     )
 
-    await screen.findByText('PIX a confirmar')
+    await screen.findByText('SKUs esgotados')
     const cards = screen.getAllByRole('button', { name: /abrir/i })
-    expect(cards[0]).toHaveTextContent('PIX a confirmar')
+    expect(cards[0]).toHaveTextContent('SKUs esgotados')
     expect(cards[1]).toHaveTextContent('Assinaturas vencendo')
+  })
+
+  /**
+   * The wording is the whole point of the card. It told the shop to check the
+   * bank statement and confirm by hand — work that no longer exists, and that
+   * someone following it would do on a payment already settled.
+   */
+  it('não manda mais conferir o extrato para um PIX pendente', async () => {
+    await renderPanel(report([{ key: 'pix_pending', count: 2, oldestDays: 1 }]))
+
+    expect(await screen.findByText('PIX aguardando')).toBeInTheDocument()
+    expect(screen.getByText(/Confirma sozinho quando o PIX cair/i)).toBeInTheDocument()
+    expect(screen.queryByText(/extrato/i)).not.toBeInTheDocument()
   })
 
   it('opens the tab that clears the queue', async () => {
@@ -113,7 +129,7 @@ describe('ActionCenter', () => {
       ])
     )
 
-    expect(await screen.findByText('PIX a confirmar')).toBeInTheDocument()
+    expect(await screen.findByText('PIX aguardando')).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /abrir/i })).toHaveLength(1)
   })
 

@@ -498,7 +498,7 @@ export default function AdminDashboard() {
                           {pendingMembers.length} pagamento{pendingMembers.length > 1 ? 's' : ''} aguardando confirmação
                         </h3>
                         <p className="text-sm text-yellow-200/80 mt-1">
-                          A Pagar.me confirma o PIX sozinha em segundos. Estes ficaram para trás — confira o extrato e use <strong>Confirmar Pagamento</strong> só se o valor já tiver caído.
+                          A Pagar.me confirma o PIX sozinha em segundos. Se algum ficou para trás, confira o extrato e use <strong>Confirmar Pagamento</strong> — só depois que o valor tiver caído.
                         </p>
                       </div>
                     </div>
