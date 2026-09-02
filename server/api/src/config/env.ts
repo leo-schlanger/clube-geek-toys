@@ -79,22 +79,53 @@ const envSchema = z.object({
   STOCK_RESERVATION_TTL_HOURS: z.coerce.number().int().positive().max(720).default(24),
 });
 
-const envSchemaRefined = envSchema
-  .refine((e) => e.NODE_ENV !== 'production' || Boolean(e.PAGARME_SECRET_KEY), {
-    message: 'PAGARME_SECRET_KEY is required in production',
-    path: ['PAGARME_SECRET_KEY'],
-  })
-  // The webhook is the only thing that marks a PIX paid, so an unauthenticated
-  // endpoint in production would let anyone settle an order for free.
-  .refine(
-    (e) =>
-      e.NODE_ENV !== 'production' ||
-      Boolean(e.PAGARME_WEBHOOK_USER && e.PAGARME_WEBHOOK_PASSWORD),
-    {
-      message: 'PAGARME_WEBHOOK_USER and PAGARME_WEBHOOK_PASSWORD are required in production',
-      path: ['PAGARME_WEBHOOK_USER'],
-    },
+/**
+ * Missing payment credentials **degrade** the API; they do not kill it.
+ *
+ * These were `.refine()` rules at first, and that took the whole site down on
+ * the deploy that introduced them: `process.exit(1)` on a missing key meant the
+ * catalogue, the login, the member card and the admin panel all went with the
+ * checkout. A shop that cannot take a payment is degraded; a shop that is
+ * entirely offline is broken, and the second is much worse than the first.
+ *
+ * Nothing is lost on the safety side, because the runtime guards were already
+ * there and are what actually protect the money:
+ *
+ *  - `authorizationHeader()` answers 503 PAGARME_NOT_CONFIGURED, so a checkout
+ *    refuses cleanly instead of crashing;
+ *  - `GET /payments/config` reports `configured: false`, so the card form says
+ *    so instead of collecting a card it cannot charge;
+ *  - `verifyWebhookAuth()` rejects **every** request in production when the
+ *    credentials are unset — an unauthenticated endpoint could otherwise let
+ *    anyone settle an order for free.
+ *
+ * What replaces the hard stop is noise: a banner in the logs at boot, and
+ * `payments.status` in `GET /health`.
+ */
+const envSchemaRefined = envSchema;
+
+function warnAboutPayments(e: Env): void {
+  if (e.NODE_ENV !== 'production') return;
+
+  const missing: string[] = [];
+  if (!e.PAGARME_SECRET_KEY) missing.push('PAGARME_SECRET_KEY');
+  if (!e.PAGARME_WEBHOOK_USER || !e.PAGARME_WEBHOOK_PASSWORD) {
+    missing.push('PAGARME_WEBHOOK_USER/PAGARME_WEBHOOK_PASSWORD');
+  }
+  if (missing.length === 0) return;
+
+  console.error(
+    '\n' +
+      '='.repeat(72) +
+      '\n[PAGAMENTOS] DEGRADADO — faltam variáveis em produção: ' +
+      missing.join(', ') +
+      '\n[PAGAMENTOS] A API sobe, mas NÃO cobra: checkout responde 503 e o' +
+      '\n[PAGAMENTOS] webhook recusa tudo, então nenhum PIX confirma sozinho.' +
+      '\n[PAGAMENTOS] Ver docs/PAGARME.md e GET /health → payments.status\n' +
+      '='.repeat(72) +
+      '\n',
   );
+}
 
 export type Env = z.infer<typeof envSchema>;
 
@@ -118,6 +149,8 @@ function loadEnv(): Env {
 }
 
 export const env = loadEnv();
+
+warnAboutPayments(env);
 
 /**
  * Canonical shop origin, used by the sitemap, link previews and notifications.

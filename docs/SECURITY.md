@@ -161,15 +161,17 @@ cita a pergunta) e apaga as notificações, que não têm valor de auditoria.
   quatro últimos dígitos.
 - Autorização **síncrona**: uma recusa volta como 402 com o motivo do banco
   traduzido, em vez de uma linha `pending` que ninguém resolve.
-- `PAGARME_SECRET_KEY` obrigatória em produção (schema Zod de env).
+- Sem `PAGARME_SECRET_KEY` o checkout responde 503 e o formulário avisa; a API
+  sobe assim mesmo, para não derrubar o resto da loja junto com o pagamento.
 
 ### Webhook da Pagar.me
 
 A v5 **não assina o corpo**. Duas camadas cobrem isso:
 
 1. **Basic auth** com `PAGARME_WEBHOOK_USER` / `PAGARME_WEBHOOK_PASSWORD`,
-   conferidas em tempo constante. As duas são obrigatórias em produção — sem
-   elas o endpoint que liquida pagamento ficaria aberto.
+   conferidas em tempo constante. Sem as duas, o endpoint **recusa tudo** em
+   produção — é a única trava contra alguém liquidar um pedido de graça, já que
+   não há mais guarda no boot.
 2. **Releitura na API** (`GET /charges/:id`) antes de acreditar em qualquer
    evento de dinheiro. Um `charge.paid` forjado não liquida nada.
 

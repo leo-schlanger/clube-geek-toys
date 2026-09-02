@@ -113,6 +113,8 @@ PAGARME_PUBLIC_KEY=pk_...
 PAGARME_ACCOUNT_ID=acc_...
 PAGARME_WEBHOOK_USER=<usuário do webhook, igual ao painel da Pagar.me>
 PAGARME_WEBHOOK_PASSWORD=<senha do webhook, igual ao painel da Pagar.me>
+# Faltando qualquer uma: a API sobe, mas não cobra — checkout responde 503 e o
+# webhook recusa tudo. Confira em GET /health → payments.status.
 PAGARME_STATEMENT_DESCRIPTOR=GEEKPOPTOYS
 PAGARME_MAX_INSTALLMENTS=6
 

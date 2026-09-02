@@ -16,21 +16,33 @@ pagamento para a equipe.
 
 | Variável                         | Onde                     | Para quê                                                                 |
 | -------------------------------- | ------------------------ | ------------------------------------------------------------------------ |
-| `PAGARME_SECRET_KEY`             | `.env` da VPS            | Autentica a API (Basic, `sk_...:`). **Obrigatória em produção.**         |
+| `PAGARME_SECRET_KEY`             | `.env` da VPS            | Autentica a API (Basic, `sk_...:`). Sem ela, o checkout responde 503.    |
 | `PAGARME_PUBLIC_KEY`             | `.env` da VPS            | Servida em `GET /payments/config`; o navegador tokeniza o cartão com ela |
 | `PAGARME_ACCOUNT_ID`             | `.env` da VPS            | Só registro (`acc_...`)                                                  |
 | `PAGARME_API_URL`                | default                  | `https://api.pagar.me/core/v5`                                           |
-| `PAGARME_WEBHOOK_USER`           | `.env` + painel Pagar.me | Basic auth do webhook. **Obrigatória em produção.**                      |
+| `PAGARME_WEBHOOK_USER`           | `.env` + painel Pagar.me | Basic auth do webhook. Sem ela, o webhook recusa tudo em produção.       |
 | `PAGARME_WEBHOOK_PASSWORD`       | `.env` + painel Pagar.me | idem                                                                     |
 | `PAGARME_STATEMENT_DESCRIPTOR`   | default `GEEKPOPTOYS`    | O que o comprador lê na fatura (PSP: máx. 13 caracteres)                 |
 | `PAGARME_MAX_INSTALLMENTS`       | default `6`              | Teto de parcelas                                                         |
 | `PAGARME_MIN_INSTALLMENT_AMOUNT` | default `20`             | Piso por parcela, em reais                                               |
 | `PAGARME_PIX_EXPIRES_IN`         | default `3600`           | Validade do QR, em segundos                                              |
 
-O `env.ts` **recusa subir em produção** sem `PAGARME_SECRET_KEY` e sem o par
-usuário/senha do webhook. A segunda regra existe porque o webhook é a única
-coisa que marca um PIX como pago: um endpoint sem autenticação em produção
-deixaria qualquer um quitar um pedido de graça.
+**Faltar essas variáveis degrada a API; não a mata.** Isso já foi um
+`.refine()` do Zod, e derrubou o site inteiro no deploy que introduziu a
+migração: `process.exit(1)` por causa de uma chave levou junto o catálogo, o
+login, a carteirinha e o painel. Loja que não cobra está degradada; loja fora do
+ar está quebrada.
+
+Nada se perde em segurança, porque as travas de runtime são as que valem:
+
+- o checkout responde **503 `PAGARME_NOT_CONFIGURED`** em vez de estourar;
+- `GET /payments/config` devolve `configured: false`, e o formulário de cartão
+  diz isso em vez de coletar um cartão que não dá para cobrar;
+- o webhook **recusa tudo** em produção sem as credenciais — senão qualquer um
+  quitaria um pedido de graça.
+
+No lugar do boot travado ficou barulho: um aviso em bloco nos logs e
+`payments.status` no `GET /health`.
 
 **A chave pública não é mais assada no build.** Ela vem de
 `GET /payments/config` a cada carregamento do checkout — uma chave rotacionada

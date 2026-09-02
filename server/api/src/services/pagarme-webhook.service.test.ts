@@ -170,9 +170,12 @@ describe('verifyWebhookAuth', () => {
   });
 
   /**
-   * A production deployment with no credentials would leave the endpoint that
-   * settles payments open to anyone. The env schema refuses that combination at
-   * boot; this is the second lock, in case it is ever relaxed.
+   * This is the **only** lock on an unconfigured production endpoint.
+   *
+   * A boot-time guard used to back it up, and it was removed after it took the
+   * whole site down over a missing key — payments degrade now instead of the
+   * API refusing to start. So the rejection here is what stands between an
+   * unconfigured deployment and anyone settling an order for free.
    */
   it('sem credenciais, recusa tudo em produção e libera fora dela', () => {
     envMock.PAGARME_WEBHOOK_USER = '';
