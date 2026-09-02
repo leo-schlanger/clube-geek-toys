@@ -510,11 +510,23 @@ export async function createCardPayment(data: {
     Math.min(data.installments ?? 1, pagarme.maxInstallmentsFor(data.amount)),
   );
 
+  // PSP bills a saved card, not a raw token: the token becomes a `card_id` on
+  // the member's Pagar.me customer first. See `createCardForCustomer`.
+  const customerId = await pagarme.getOrCreatePagarmeCustomer({
+    id: payer.id,
+    email: payer.email,
+    fullName: payer.fullName,
+    document: payer.document,
+    phone: payer.phone,
+    pagarmeCustomerId: payer.pagarmeCustomerId,
+  });
+  const savedCard = await pagarme.createCardForCustomer(customerId, data.cardToken);
+
   const paymentId = crypto.randomUUID();
   const order = await pagarme.createOrder(
     {
       code: paymentId,
-      customer: payerToPagarmeCustomer(payer),
+      customer_id: customerId,
       items: [
         {
           amount: amountInCents,
@@ -529,7 +541,7 @@ export async function createCardPayment(data: {
           credit_card: {
             installments,
             statement_descriptor: env.PAGARME_STATEMENT_DESCRIPTOR,
-            card_token: data.cardToken,
+            card_id: savedCard.id,
           },
         },
       ],
@@ -543,7 +555,11 @@ export async function createCardPayment(data: {
     throw new AppError(502, 'O processador não devolveu a cobrança.', 'PAGARME_NO_CHARGE');
   }
   const status = pagarme.mapChargeStatus(charge.status);
-  const card = charge.last_transaction?.card;
+  // A declined charge often comes back with no `last_transaction.card`; the
+  // saved card still says which one was tried.
+  const cardBrand = charge.last_transaction?.card?.brand ?? savedCard.brand ?? null;
+  const cardLastFour =
+    charge.last_transaction?.card?.last_four_digits ?? savedCard.last_four_digits ?? null;
 
   await query(
     `INSERT INTO payments
@@ -560,8 +576,8 @@ export async function createCardPayment(data: {
       order.id,
       order.id,
       installments,
-      card?.brand ?? null,
-      card?.last_four_digits ?? null,
+      cardBrand,
+      cardLastFour,
     ],
   );
 
@@ -619,8 +635,8 @@ export async function createCardPayment(data: {
     status,
     providerStatus: charge.status,
     installments,
-    cardBrand: card?.brand ?? null,
-    cardLastFour: card?.last_four_digits ?? null,
+    cardBrand,
+    cardLastFour,
   };
 }
 

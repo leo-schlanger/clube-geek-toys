@@ -327,6 +327,49 @@ npm run test:api    # 480 testes, ~40s
 
 ---
 
+## 8.1 O que ainda NÃO foi testado contra a API real ⚠️
+
+**Nenhuma cobrança real foi feita.** Sem a `sk_` não houve um único pedido, PIX
+ou webhook de verdade. Tudo o que está verde são testes de unidade com HTTP
+mockado: eles provam que **o nosso lado** se comporta como decidimos, não que a
+Pagar.me aceita o que mandamos.
+
+Riscos concretos, por ordem de probabilidade de morder:
+
+| Risco                               | Por quê                                                                                                                                                                                                                          | Como descobrir                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **`customer` incompleto no clube**  | PSP exige _"todos os campos do objeto `customer`, incluindo endereço e telefone"_. O membro **não tem endereço** no banco — só telefone. A loja manda endereço (entrega, ou o balcão na retirada); o clube não tem o que mandar. | Um PIX/cartão de assinatura de R$ 1. Se voltar 422 citando `address`, é isto.                       |
+| **Formato do webhook**              | O envelope (`id`/`type`/`data`) e a Basic auth vieram do meu conhecimento — as páginas de doc que busquei voltaram vazias nesse ponto.                                                                                           | Primeiro `charge.paid` real. Se o pedido não virar `paid` sozinho, o parse ou a auth estão errados. |
+| **`PATCH /subscriptions/:id/card`** | Endpoint não confirmado na doc.                                                                                                                                                                                                  | Trocar o cartão de uma assinatura de teste.                                                         |
+| **Antifraude**                      | Não configurado. Cobrança pode voltar `pending` esperando análise em vez de `paid`.                                                                                                                                              | Uma compra de valor mais alto.                                                                      |
+
+### O que já foi corrigido por causa desta revisão
+
+A primeira versão cobrava `card_token` direto no pedido. A doc é explícita:
+
+> _"Apenas clientes Gateway estão aptos a utilizar o `card_token` na Criação do
+> Pedido, caso seja cliente PSP, recomendamos usar o `card_id`"_
+
+E: _"To ensure the transaction will be performed with a network token, you must
+first create the card in /cards and then transact."_
+
+Esta conta é **PSP**. O fluxo passou a ser, nos três caminhos de cartão (loja,
+clube e assinatura):
+
+```
+navegador  POST /tokens?appId=pk_          → token_xxx
+servidor   POST /customers/{id}/cards      → card_xxx   ← este passo faltava
+servidor   POST /orders  credit_card.card_id
+```
+
+O cliente Pagar.me da loja é criado por pedido e guardado em
+`orders.pagarme_customer_id` — comprador convidado não tem linha em `members`
+para pendurar —, e é reaproveitado quando a pessoa tenta um segundo cartão.
+
+**Sem essa correção, o primeiro cartão real teria falhado.**
+
+---
+
 ## 9. Ir para produção
 
 1. `.env` da VPS com as sete variáveis `PAGARME_*`.

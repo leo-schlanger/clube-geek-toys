@@ -146,10 +146,14 @@ export async function createSubscription(data: CreateSubscriptionData) {
 
   // `prepaid` bills at the start of each cycle, which matches how the member's
   // `expiry_date` is extended when `invoice.paid` arrives.
+  // Same PSP rule as a one-off charge: the recurrence bills a saved card, not
+  // the browser token. See `createCardForCustomer`.
+  const savedCard = await pagarme.createCardForCustomer(customerId, data.card_token);
+
   const remote = await pagarme.createSubscription({
     customer_id: customerId,
     payment_method: 'credit_card',
-    card_token: data.card_token,
+    card_id: savedCard.id,
     interval,
     interval_count: 1,
     billing_type: 'prepaid',
@@ -190,8 +194,8 @@ export async function createSubscription(data: CreateSubscriptionData) {
         CLUB_PLAN_FREQUENCY_TYPE,
         amount,
         data.payer_email,
-        remote.card?.brand ?? null,
-        remote.card?.last_four_digits ?? null,
+        remote.card?.brand ?? savedCard.brand ?? null,
+        remote.card?.last_four_digits ?? savedCard.last_four_digits ?? null,
         remote.next_billing_at ?? null,
       ],
     );
@@ -226,7 +230,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
       name: member.full_name,
       plan: data.plan,
       amount: amount.toFixed(2).replace('.', ','),
-      card_last_four: remote.card?.last_four_digits ?? '****',
+      card_last_four: remote.card?.last_four_digits ?? savedCard.last_four_digits ?? '****',
     },
     member_id: data.member_id,
   }).catch((err: unknown) => console.error('[SUBSCRIPTION] Email error:', err));
@@ -247,8 +251,8 @@ export async function createSubscription(data: CreateSubscriptionData) {
     id: subscriptionId,
     status,
     provider: 'pagarme' as const,
-    cardBrand: remote.card?.brand ?? null,
-    cardLastFour: remote.card?.last_four_digits ?? null,
+    cardBrand: remote.card?.brand ?? savedCard.brand ?? null,
+    cardLastFour: remote.card?.last_four_digits ?? savedCard.last_four_digits ?? null,
     nextBillingAt: remote.next_billing_at ?? null,
   };
 }
@@ -494,9 +498,21 @@ export async function updatePaymentMethod(subscriptionId: string, token: string)
   let cardLastFour: string | null = null;
 
   if (provider === 'pagarme') {
-    const updated = await pagarme.updateSubscriptionCard(sub.provider_id, token);
-    cardBrand = updated.card?.brand ?? null;
-    cardLastFour = updated.card?.last_four_digits ?? null;
+    // The recurrence bills a `card_id`, so the new token has to become a saved
+    // card on the same customer before it can replace the old one.
+    const remote = await pagarme.getSubscription(sub.provider_id);
+    const customerId = remote.customer?.id;
+    if (!customerId) {
+      throw new AppError(
+        502,
+        'Não foi possível identificar o cliente desta assinatura na operadora.',
+        'PAGARME_SUBSCRIPTION_NO_CUSTOMER',
+      );
+    }
+    const savedCard = await pagarme.createCardForCustomer(customerId, token);
+    const updated = await pagarme.updateSubscriptionCard(sub.provider_id, savedCard.id);
+    cardBrand = updated.card?.brand ?? savedCard.brand ?? null;
+    cardLastFour = updated.card?.last_four_digits ?? savedCard.last_four_digits ?? null;
   } else {
     const stripe = getStripe();
     const stripeSubscription = await stripe.subscriptions.retrieve(sub.provider_id);

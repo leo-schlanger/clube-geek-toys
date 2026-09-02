@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     that somehow goes uncovered leaves a trail instead of clamping silently.
  */
 
-const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock, shopPromoMock, checkCouponMock, claimCouponMock, recordRedemptionMock, releaseCouponMock, notifyAdminsMock, pagarmeCreateOrderMock, pagarmeRefundMock, pagarmeGetChargeMock } =
+const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, memberIdMock, approvedAccountMock, salesOpenMock, stripeMock, auditMock, sendEmailMock, restoreCreditMock, recordOrderMovementsMock, recordMovementMock, shopPromoMock, checkCouponMock, claimCouponMock, recordRedemptionMock, releaseCouponMock, notifyAdminsMock, pagarmeCreateOrderMock, pagarmeRefundMock, pagarmeGetChargeMock, pagarmeCreateCustomerMock, pagarmeCreateCardMock } =
   vi.hoisted(() => ({
     queryMock: vi.fn(),
     clientQueryMock: vi.fn(),
@@ -42,6 +42,12 @@ const { queryMock, clientQueryMock, releaseMock, pickOptionMock, redeemMock, mem
     pagarmeCreateOrderMock: vi.fn(),
     pagarmeRefundMock: vi.fn(async () => ({ id: 'ch_1', status: 'canceled' })),
     pagarmeGetChargeMock: vi.fn(),
+    pagarmeCreateCustomerMock: vi.fn(async () => ({ id: 'cus_1' })),
+    pagarmeCreateCardMock: vi.fn(async () => ({
+      id: 'card_1',
+      brand: 'visa',
+      last_four_digits: '4242',
+    })),
   }));
 
 vi.mock('../config/database.js', () => ({
@@ -131,6 +137,10 @@ vi.mock('../utils/pagarme.js', async () => {
     // The throttled variant calls `getCharge` through the module's own closure,
     // which an export override does not reach — so it is stubbed too.
     getChargeThrottled: pagarmeGetChargeMock,
+    // PSP bills a saved card, so a card order first creates a customer and a
+    // card from the browser token.
+    createCustomer: pagarmeCreateCustomerMock,
+    createCardForCustomer: pagarmeCreateCardMock,
   };
 });
 
@@ -160,6 +170,7 @@ import {
   setOrderTracking,
   updateOrderStatus,
   refundOrder,
+  payOrderWithCard,
 } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -1594,5 +1605,160 @@ describe('fechar um pedido que tem cobrança', () => {
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({ template: 'order-refunded', to: 'laura@example.com' })
     );
+  });
+});
+
+// ─── Cobrar o cartão de um pedido ────────────────────────────────────────────
+
+/**
+ * The shop's card path, and the one rule that is easy to get wrong.
+ *
+ * This account is **PSP**, and the docs are explicit: "Apenas clientes Gateway
+ * estão aptos a utilizar o `card_token` na Criação do Pedido, caso seja cliente
+ * PSP, recomendamos usar o `card_id`". Network tokenization only happens if the
+ * card is created on the customer first. Charging straight from the browser
+ * token is the Gateway shape — it was this integration's first draft, and it
+ * would have failed on the first real card.
+ */
+describe('payOrderWithCard', () => {
+  const sqlOf2 = (a: unknown) => (typeof a === 'string' ? a.replace(/\s+/g, ' ').trim() : '');
+
+  function pendingCardOrder(over: Record<string, unknown> = {}) {
+    return {
+      id: 'o1',
+      order_number: 1001,
+      user_id: 'u1',
+      customer_name: 'Laura',
+      customer_email: 'laura@example.com',
+      customer_phone: '21999998888',
+      customer_document: '52998224725',
+      shipping_address: {
+        cep: '22041001',
+        street: 'Av. Atlântica',
+        number: '1702',
+        neighborhood: 'Copacabana',
+        city: 'Rio de Janeiro',
+        state: 'RJ',
+      },
+      status: 'pending',
+      payment_method: 'credit_card',
+      subtotal: '100.00',
+      discount: '0',
+      shipping_cost: '24.00',
+      store_credit_applied: '0',
+      total: '124.00',
+      ...over,
+    };
+  }
+
+  function approvedCharge() {
+    pagarmeCreateOrderMock.mockResolvedValueOnce({
+      id: 'or_1',
+      status: 'paid',
+      charges: [
+        {
+          id: 'ch_1',
+          status: 'paid',
+          amount: 12400,
+          payment_method: 'credit_card',
+          last_transaction: { card: { brand: 'visa', last_four_digits: '4242' } },
+        },
+      ],
+    });
+  }
+
+  beforeEach(() => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder()] });
+  });
+
+  it('troca o token por um cartão salvo e cobra o card_id, nunca o token', async () => {
+    approvedCharge();
+
+    await payOrderWithCard('o1', { cardToken: 'token_abc', installments: 3 }, 'u1');
+
+    expect(pagarmeCreateCustomerMock).toHaveBeenCalled();
+    expect(pagarmeCreateCardMock).toHaveBeenCalledWith(
+      'cus_1',
+      'token_abc',
+      expect.objectContaining({ zip_code: '22041001', city: 'Rio de Janeiro' })
+    );
+
+    const [payload] = pagarmeCreateOrderMock.mock.calls[0] as [Record<string, unknown>];
+    expect(payload.customer_id).toBe('cus_1');
+    expect(payload.payments).toEqual([
+      expect.objectContaining({
+        payment_method: 'credit_card',
+        credit_card: expect.objectContaining({ card_id: 'card_1', installments: 3 }),
+      }),
+    ]);
+    expect(JSON.stringify(payload)).not.toContain('card_token');
+  });
+
+  /** Retrying with another card must not litter the dashboard with customers. */
+  it('reaproveita o cliente já criado numa segunda tentativa', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder({ pagarme_customer_id: 'cus_ja' })] });
+    approvedCharge();
+
+    await payOrderWithCard('o1', { cardToken: 'token_2' }, 'u1');
+
+    expect(pagarmeCreateCustomerMock).not.toHaveBeenCalled();
+    expect(pagarmeCreateCardMock).toHaveBeenCalledWith('cus_ja', 'token_2', expect.anything());
+  });
+
+  /**
+   * A decline is a 402 with the bank's reason translated, and the order stays
+   * `pending` — it keeps its stock hold for the next card.
+   */
+  it('recusa com o motivo do banco e não fecha o pedido', async () => {
+    pagarmeCreateOrderMock.mockResolvedValueOnce({
+      id: 'or_x',
+      status: 'failed',
+      charges: [
+        {
+          id: 'ch_x',
+          status: 'not_authorized',
+          amount: 12400,
+          payment_method: 'credit_card',
+          last_transaction: { acquirer_return_code: '51' },
+        },
+      ],
+    });
+
+    await expect(
+      payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1')
+    ).rejects.toThrow('saldo ou limite insuficiente');
+
+    expect(
+      queryMock.mock.calls.some((c) => sqlOf2(c[0]).includes("status = 'cancelled'"))
+    ).toBe(false);
+  });
+
+  it('é idempotente para um pedido já pago', async () => {
+    queryMock.mockResolvedValue({
+      rows: [pendingCardOrder({ status: 'paid', pagarme_charge_id: 'ch_1' })],
+    });
+
+    const out = await payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1');
+
+    expect(out.status).toBe('paid');
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('recusa um pedido que não está mais aguardando pagamento', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder({ status: 'cancelled' })] });
+
+    await expect(payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1')).rejects.toThrow(
+      'não está mais aguardando pagamento'
+    );
+  });
+
+  /** The acquirer refuses an order with no buyer document. */
+  it('recusa um pedido sem CPF gravado', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder({ customer_document: null })] });
+
+    await expect(payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1')).rejects.toThrow(
+      'sem CPF/CNPJ'
+    );
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
   });
 });

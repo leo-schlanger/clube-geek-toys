@@ -31,6 +31,8 @@ const {
   createOrderMock,
   getChargeMock,
   refundChargeMock,
+  createCardMock,
+  getOrCreateCustomerMock,
 } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   auditMock: vi.fn(async () => {}),
@@ -40,6 +42,12 @@ const {
   createOrderMock: vi.fn(),
   getChargeMock: vi.fn(),
   refundChargeMock: vi.fn(async () => ({ id: 'ch_1', status: 'canceled' })),
+  createCardMock: vi.fn(async () => ({
+    id: 'card_1',
+    brand: 'visa',
+    last_four_digits: '4242',
+  })),
+  getOrCreateCustomerMock: vi.fn(async () => 'cus_1'),
 }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
@@ -58,6 +66,10 @@ vi.mock('../utils/pagarme.js', async () => {
   return {
     ...actual,
     createOrder: createOrderMock,
+    // PSP bills a saved card: the token becomes a `card_id` on the customer
+    // before the charge, so both steps are stubbed.
+    createCardForCustomer: createCardMock,
+    getOrCreatePagarmeCustomer: getOrCreateCustomerMock,
     getCharge: getChargeMock,
     // The throttled variant calls `getCharge` through the module's own closure,
     // which an export override does not reach — so it is stubbed too, or the
@@ -596,16 +608,23 @@ describe('createCardPayment', () => {
 
     const out = await createCardPayment(cardInput);
 
+    // The browser token is exchanged for a saved card first; the charge bills
+    // the `card_id`. Sending `card_token` straight to /orders is the Gateway
+    // flow, and this account is PSP.
+    expect(createCardMock).toHaveBeenCalledWith('cus_1', 'token_abc');
+
     const [payload] = createOrderMock.mock.calls[0] as [Record<string, never>];
     expect(payload).toMatchObject({
+      customer_id: 'cus_1',
       items: [expect.objectContaining({ amount: 1250 })],
       payments: [
         expect.objectContaining({
           payment_method: 'credit_card',
-          credit_card: expect.objectContaining({ card_token: 'token_abc', installments: 1 }),
+          credit_card: expect.objectContaining({ card_id: 'card_1', installments: 1 }),
         }),
       ],
     });
+    expect(JSON.stringify(payload)).not.toContain('card_token');
     // No card credential may cross this boundary — only the token. (The
     // customer's phone legitimately has a `number`, so the check names the
     // card fields rather than matching that word.)

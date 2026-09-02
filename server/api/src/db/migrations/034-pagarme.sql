@@ -22,6 +22,9 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_brand VARCHAR(20);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_last_four VARCHAR(4);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS installments SMALLINT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_document VARCHAR(14);
+-- A PSP order charges a `card_id`, which only exists on a customer — and a shop
+-- buyer is usually a guest, with no member row to hang it on.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS pagarme_customer_id VARCHAR(64);
 
 CREATE INDEX IF NOT EXISTS idx_orders_pagarme_order
   ON orders(pagarme_order_id) WHERE pagarme_order_id IS NOT NULL;

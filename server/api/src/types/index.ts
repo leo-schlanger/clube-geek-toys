@@ -287,6 +287,8 @@ export interface Order {
   stripePaymentIntentId: string | null;
   pagarmeOrderId?: string | null;
   pagarmeChargeId?: string | null;
+  /** The Pagar.me customer a PSP card charge bills against. */
+  pagarmeCustomerId?: string | null;
   /** 'pagarme' | 'stripe' | 'manual' — who holds the charge. */
   paymentProvider?: string | null;
   pixTxid: string | null;

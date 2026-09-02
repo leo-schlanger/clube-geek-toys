@@ -88,6 +88,7 @@ function mapOrder(row: pg.QueryResultRow): Order {
     cardLastFour: row.card_last_four ?? null,
     installments: row.installments != null ? Number(row.installments) : null,
     customerDocument: row.customer_document ?? null,
+    pagarmeCustomerId: row.pagarme_customer_id ?? null,
     paidAt: row.paid_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -932,6 +933,23 @@ async function createPagarmePixCharge(order: Order, document: string): Promise<P
 }
 
 /**
+ * The Pagar.me customer this order charges against, created once.
+ *
+ * A PSP order bills a `card_id`, and a card only exists on a customer — so the
+ * shop needs one even for a guest, who has no member row to hang it on. Stored
+ * on the order so a retry with a different card reuses the same customer
+ * instead of littering the operator's dashboard with duplicates.
+ */
+async function getOrCreateOrderCustomer(order: Order, document: string): Promise<string> {
+  if (order.pagarmeCustomerId) return order.pagarmeCustomerId;
+
+  const created = await pagarme.createCustomer(orderToPagarmeCustomer(order, document));
+  await query(`UPDATE orders SET pagarme_customer_id = $1 WHERE id = $2`, [created.id, order.id]);
+  order.pagarmeCustomerId = created.id;
+  return created.id;
+}
+
+/**
  * Charge the card for an order that is waiting for one.
  *
  * Separate from `createOrder` so a decline is a retry rather than a lost order:
@@ -983,10 +1001,20 @@ export async function payOrderWithCard(
     Math.min(input.installments ?? 1, pagarme.maxInstallmentsFor(order.total)),
   );
 
+  // PSP charges a saved card, not a raw token: the token becomes a `card_id` on
+  // the customer first. See `createCardForCustomer` for why this step exists.
+  const customerId = await getOrCreateOrderCustomer(order, order.customerDocument);
+  const billingAddress = orderToPagarmeCustomer(order, order.customerDocument).address;
+  const savedCard = await pagarme.createCardForCustomer(
+    customerId,
+    input.cardToken,
+    billingAddress,
+  );
+
   const created = await pagarme.createOrder(
     {
       code: String(order.orderNumber),
-      customer: orderToPagarmeCustomer(order, order.customerDocument),
+      customer_id: customerId,
       items: orderToPagarmeItems(order),
       payments: [
         {
@@ -994,7 +1022,7 @@ export async function payOrderWithCard(
           credit_card: {
             installments,
             statement_descriptor: env.PAGARME_STATEMENT_DESCRIPTOR,
-            card_token: input.cardToken,
+            card_id: savedCard.id,
           },
         },
       ],
@@ -1016,21 +1044,19 @@ export async function payOrderWithCard(
     throw new AppError(502, 'O processador não devolveu a cobrança.', 'PAGARME_NO_CHARGE');
   }
   const mapped = pagarme.mapChargeStatus(charge.status);
-  const card = charge.last_transaction?.card;
+  // The saved card is the more reliable source: a declined charge may come back
+  // without a `last_transaction.card`, and the panel still wants to show which
+  // card was tried.
+  const brand = charge.last_transaction?.card?.brand ?? savedCard.brand ?? null;
+  const lastFour =
+    charge.last_transaction?.card?.last_four_digits ?? savedCard.last_four_digits ?? null;
 
   await query(
     `UPDATE orders
         SET pagarme_order_id = $1, pagarme_charge_id = $2, payment_provider = 'pagarme',
             card_brand = $3, card_last_four = $4, installments = $5
       WHERE id = $6`,
-    [
-      created.id,
-      charge.id,
-      card?.brand ?? null,
-      card?.last_four_digits ?? null,
-      installments,
-      order.id,
-    ],
+    [created.id, charge.id, brand, lastFour, installments, order.id],
   );
 
   if (mapped === 'failed') {
@@ -1077,8 +1103,8 @@ export async function payOrderWithCard(
     status: mapped === 'paid' ? 'paid' : 'pending',
     chargeId: charge.id,
     installments,
-    cardBrand: card?.brand ?? null,
-    cardLastFour: card?.last_four_digits ?? null,
+    cardBrand: brand,
+    cardLastFour: lastFour,
   };
 }
 

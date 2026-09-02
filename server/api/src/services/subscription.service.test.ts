@@ -30,6 +30,8 @@ const {
   pagarmeCancelMock,
   pagarmeCustomerMock,
   pagarmeUpdateCardMock,
+  pagarmeCreateCardMock,
+  pagarmeGetSubscriptionMock,
 } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   clientQueryMock: vi.fn(),
@@ -45,6 +47,16 @@ const {
     id: 'psub_1',
     status: 'active',
     card: { brand: 'mastercard', last_four_digits: '1111' },
+  })),
+  pagarmeCreateCardMock: vi.fn(async () => ({
+    id: 'card_1',
+    brand: 'visa',
+    last_four_digits: '4242',
+  })),
+  pagarmeGetSubscriptionMock: vi.fn(async () => ({
+    id: 'psub1',
+    status: 'active',
+    customer: { id: 'cus_pagarme_1' },
   })),
 }));
 
@@ -67,6 +79,9 @@ vi.mock('../utils/pagarme.js', async () => {
     cancelSubscription: pagarmeCancelMock,
     getOrCreatePagarmeCustomer: pagarmeCustomerMock,
     updateSubscriptionCard: pagarmeUpdateCardMock,
+    // PSP bills a saved card, so the token becomes a `card_id` first.
+    createCardForCustomer: pagarmeCreateCardMock,
+    getSubscription: pagarmeGetSubscriptionMock,
   };
 });
 // Without this the real Zod env schema runs at import time and `process.exit(1)`s
@@ -220,6 +235,10 @@ describe('createSubscription', () => {
     } as never);
 
     const args = pagarmeCreateMock.mock.calls[0][0] as Record<string, unknown>;
+    // The recurrence bills a saved card, never the browser token.
+    expect(pagarmeCreateCardMock).toHaveBeenCalledWith('cus_pagarme_1', 'token_abc');
+    expect(args.card_id).toBe('card_1');
+    expect(args).not.toHaveProperty('card_token');
     const item = (args.items as Record<string, unknown>[])[0];
     expect((item.pricing_scheme as Record<string, unknown>).price).toBe(1250);
     expect(args.interval).toBe('month');
@@ -473,7 +492,9 @@ describe('updatePaymentMethod', () => {
 
     const out = await updatePaymentMethod('sub_psub1', 'token_new');
 
-    expect(pagarmeUpdateCardMock).toHaveBeenCalledWith('psub1', 'token_new');
+    // Same rule on a swap: token → saved card → point the recurrence at it.
+    expect(pagarmeCreateCardMock).toHaveBeenCalledWith('cus_pagarme_1', 'token_new');
+    expect(pagarmeUpdateCardMock).toHaveBeenCalledWith('psub1', 'card_1');
     expect(out).toMatchObject({ cardBrand: 'mastercard', cardLastFour: '1111' });
     expect(sqlLog.some((q) => q.includes('UPDATE subscriptions SET card_last_four'))).toBe(true);
   });

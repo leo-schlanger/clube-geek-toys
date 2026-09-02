@@ -452,6 +452,41 @@ export async function getOrCreatePagarmeCustomer(member: {
   return customer.id;
 }
 
+// ─── Cards ───────────────────────────────────────────────────────────────────
+
+export interface PagarmeCard {
+  id: string;
+  brand?: string;
+  last_four_digits?: string;
+  holder_name?: string;
+  exp_month?: number;
+  exp_year?: number;
+}
+
+/**
+ * Turn a one-shot browser token into a saved card on a customer.
+ *
+ * **This step is not optional on a PSP account**, which is what we are. The
+ * docs are explicit: "Apenas clientes Gateway estão aptos a utilizar o
+ * `card_token` na Criação do Pedido, caso seja cliente PSP, recomendamos usar o
+ * `card_id`" — and network tokenization only happens if the card is created
+ * here first. Charging straight from the token is the Gateway flow, and it was
+ * the first shape this integration had.
+ *
+ * The field is `token`, not `token_id`. `billing_address` is optional at this
+ * endpoint even though the *customer* address is required on a PSP order.
+ */
+export async function createCardForCustomer(
+  customerId: string,
+  token: string,
+  billingAddress?: PagarmeCustomerInput['address'],
+): Promise<PagarmeCard> {
+  return request<PagarmeCard>('POST', `/customers/${customerId}/cards`, {
+    token,
+    ...(billingAddress ? { billing_address: billingAddress } : {}),
+  });
+}
+
 // ─── Orders & charges ────────────────────────────────────────────────────────
 
 export interface CreateOrderPayload {
@@ -544,8 +579,9 @@ export async function refundCharge(chargeId: string, amountInCents?: number): Pr
 export interface CreateSubscriptionPayload {
   customer_id: string;
   payment_method: 'credit_card' | 'pix' | 'boleto';
-  card_token?: string;
+  /** PSP bills a saved card; `card_token` is the Gateway-only shape. */
   card_id?: string;
+  card_token?: string;
   interval: 'day' | 'week' | 'month' | 'year';
   interval_count: number;
   billing_type: 'prepaid' | 'postpaid' | 'exact_day';
@@ -580,10 +616,10 @@ export async function cancelSubscription(id: string): Promise<PagarmeSubscriptio
  */
 export async function updateSubscriptionCard(
   id: string,
-  cardToken: string,
+  cardId: string,
 ): Promise<PagarmeSubscription> {
   return request<PagarmeSubscription>('PATCH', `/subscriptions/${id}/card`, {
-    card_token: cardToken,
+    card_id: cardId,
   });
 }
 
