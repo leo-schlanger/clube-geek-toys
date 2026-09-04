@@ -115,5 +115,31 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
       `[RECONCILE] ${result.checked} verificada(s), ${result.settled} liquidada(s), ${result.failed} com erro`,
     );
   }
+
+  // Leave a heartbeat even on a quiet run.
+  //
+  // A sweep with nothing to settle logs nothing, which makes a working cron
+  // look exactly like a stopped one. That matters more here than in the daily
+  // jobs: while the webhook is not registered, this is the *only* thing that
+  // confirms a payment, and "it has been silent" would be indistinguishable
+  // from "it has been dead". Surfaced in `GET /health`.
+  await query(
+    `INSERT INTO config (key, value)
+     VALUES ('last_reconcile_run', to_jsonb(NOW()::text))
+     ON CONFLICT (key) DO UPDATE SET value = to_jsonb(NOW()::text), updated_at = NOW()`,
+  ).catch((err) => console.error('[RECONCILE] heartbeat falhou:', err));
+
   return result;
+}
+
+/**
+ * When the sweep last ran, for `GET /health`.
+ *
+ * Null means it has never run in this deployment — which, while the webhook is
+ * unregistered, means nothing is confirming payments at all.
+ */
+export async function lastReconcileRun(): Promise<string | null> {
+  const result = await query(`SELECT value FROM config WHERE key = 'last_reconcile_run'`);
+  const raw = result.rows[0]?.value;
+  return typeof raw === 'string' ? raw : null;
 }

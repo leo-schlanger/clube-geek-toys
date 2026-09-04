@@ -37,6 +37,9 @@ function mapPaymentRow(row: Record<string, unknown>) {
     id: row.id,
     memberId: row.member_id,
     memberName: row.member_name || null,
+    // `getPaymentById` selects it; the mapper used to drop it, so anything
+    // wanting to write to the member had nowhere to send.
+    memberEmail: (row.member_email as string) || null,
     amount: parseFloat(row.amount as string),
     method: row.method,
     status: row.status,
@@ -863,6 +866,23 @@ export async function refundPayment(opts: {
     },
     payment.memberId as string,
   );
+
+  // The shop's refund tells the buyer; the club's did not, and a member seeing
+  // a charge vanish unexplained is the same support message — or chargeback.
+  const memberEmail = payment.memberEmail as string | undefined;
+  if (memberEmail) {
+    sendTemplateEmail({
+      template: 'payment-refunded',
+      to: memberEmail,
+      variables: {
+        name: (payment.memberName as string) || 'Membro',
+        amount: payment.amount.toFixed(2).replace('.', ','),
+        method: payment.method === 'pix' ? 'PIX' : 'Cartão de crédito',
+        reason: opts.reason || '',
+      },
+      member_id: payment.memberId as string,
+    }).catch((err) => console.error('[email] payment-refunded failed', err));
+  }
 
   notifyAdminsOfPaymentAsync({
     event: 'payment_refunded',

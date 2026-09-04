@@ -150,3 +150,45 @@ describe('reconcilePendingCharges', () => {
     expect(sql).toContain('UNION ALL');
   });
 });
+
+describe('heartbeat', () => {
+  /**
+   * A sweep with nothing to settle logs nothing, which makes a working cron
+   * indistinguishable from a stopped one. While the webhook is unregistered
+   * this sweep is the *only* thing confirming payments, so "silent" must not
+   * be able to mean "dead".
+   */
+  it('registra que rodou mesmo sem nada para liquidar', async () => {
+    pending();
+
+    await reconcilePendingCharges();
+
+    const wrote = queryMock.mock.calls.some((c) =>
+      String(c[0]).includes('last_reconcile_run')
+    );
+    expect(wrote, 'a varredura tem de deixar rastro').toBe(true);
+  });
+
+  it('registra também quando liquidou', async () => {
+    pending({ charge_id: 'ch_1', ref: 'pedido #8' });
+    getChargeMock.mockResolvedValue(charge('ch_1', 'paid'));
+
+    await reconcilePendingCharges();
+
+    expect(
+      queryMock.mock.calls.some((c) => String(c[0]).includes('last_reconcile_run'))
+    ).toBe(true);
+  });
+
+  /** Bookkeeping must never take the sweep down with it. */
+  it('uma falha ao gravar o rastro não derruba a varredura', async () => {
+    pending({ charge_id: 'ch_1', ref: 'pedido #8' });
+    getChargeMock.mockResolvedValue(charge('ch_1', 'paid'));
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('last_reconcile_run')) throw new Error('disco cheio');
+      return { rows: [{ charge_id: 'ch_1', ref: 'pedido #8' }], rowCount: 1 };
+    });
+
+    await expect(reconcilePendingCharges()).resolves.toMatchObject({ settled: 1 });
+  });
+});

@@ -4,6 +4,7 @@ import { getSchemaState } from '../db/ensure-schema.js';
 import { getMelhorEnvioHealth } from '../services/shipping.service.js';
 import { isPagarmeConfigured } from '../utils/pagarme.js';
 import { webhookAuthConfigured } from '../services/pagarme-webhook.service.js';
+import { lastReconcileRun } from '../services/reconcile.service.js';
 import { env } from '../config/env.js';
 
 export const healthRouter = Router();
@@ -24,6 +25,8 @@ export const healthRouter = Router();
 healthRouter.get('/', async (_req, res) => {
   const schema = getSchemaState();
   const shipping = getMelhorEnvioHealth();
+  // Never let a health probe fail over a bookkeeping read.
+  const reconciledAt = await lastReconcileRun().catch(() => null);
   try {
     await pool.query('SELECT 1');
     res.json({
@@ -44,6 +47,13 @@ healthRouter.get('/', async (_req, res) => {
         configured: isPagarmeConfigured(),
         publicKey: Boolean(env.PAGARME_PUBLIC_KEY),
         webhookAuth: webhookAuthConfigured(),
+        // The reconciliation sweep is the safety net under the webhook, and it
+        // is silent on a run with nothing to settle. Without this timestamp a
+        // working cron and a stopped one look identical.
+        lastReconcile: reconciledAt,
+        reconcileStale: reconciledAt
+          ? Date.now() - new Date(reconciledAt).getTime() > 30 * 60 * 1000
+          : true,
         status: !isPagarmeConfigured()
           ? 'not_configured'
           : !webhookAuthConfigured()

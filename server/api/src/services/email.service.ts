@@ -29,6 +29,7 @@ const AVAILABLE_TEMPLATES = [
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
   'order-pending-pix', 'order-refunded', 'order-cancelled-customer',
+  'payment-refunded',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-order-disputed',
   'admin-daily-digest', 'admin-payment-event',
   'event-reservation-received', 'event-tickets-ready', 'admin-event-reservation',
@@ -418,6 +419,34 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         text: 'Ver na loja',
         url: v.product_url || 'https://shop.geeketoys.com.br',
       },
+    },
+
+    /**
+     * The club's mirror of `order-refunded`.
+     *
+     * The shop told the buyer when money came back; the club did not, and a
+     * member seeing a charge vanish with no explanation is the same support
+     * message — or the same chargeback.
+     */
+    'payment-refunded': {
+      subject: 'Reembolso do Clube GeekPop & Toys',
+      preheader: `Estornamos R$ ${v.amount || '0,00'} da sua assinatura.`,
+      body: `
+        <h2 style="color:#FCBE04;margin:0 0 12px">Pagamento reembolsado</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>O pagamento da sua assinatura do clube foi <strong>estornado</strong>.</p>
+        ${dataTable([
+          ['Valor estornado', `<strong>R$ ${v.amount || '0,00'}</strong>`],
+          ...(v.method ? [['Forma', v.method]] : []),
+          ...(v.reason ? [['Motivo', escapeHtml(v.reason)]] : []),
+        ])}
+        ${infoBox(
+          v.method === 'PIX'
+            ? '⏳ O valor volta para a conta que fez o PIX, normalmente em minutos.'
+            : '⏳ O estorno aparece na fatura do cartão em até <strong>2 faturas</strong> — é o prazo da operadora.'
+        )}
+        <p style="margin-top:16px">Qualquer dúvida, é só responder este e-mail.</p>`,
+      cta: { text: 'Ver minha conta', url: `${frontendUrl}/minha-conta` },
     },
 
     'payment-failed': {

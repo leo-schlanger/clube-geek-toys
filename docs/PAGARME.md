@@ -451,6 +451,62 @@ Janela: 7 dias, teto de 100 cobranças por rodada.
 
 ---
 
+## 8.4 Checkup geral (04/09/2026)
+
+### VPS — em ordem
+
+|                         |                                                                   |
+| ----------------------- | ----------------------------------------------------------------- |
+| Containers              | api, nginx, postgres, umami, certbot — todos `healthy`, 43h de pé |
+| Disco                   | 14 GB de 96 GB (**15%**)                                          |
+| Memória                 | 1,9 GB de 7,8 GB, load 0,43                                       |
+| Certificado             | válido até **17/10/2026**, certbot renova                         |
+| Erros na API (24h)      | **0**                                                             |
+| Backups                 | diários rodando (`db-20260902/03/04.sql.gz`)                      |
+| Estoque reservado órfão | 0                                                                 |
+
+### Pagamentos — dois problemas achados
+
+**1. Pedido anterior à migração ficou impagável.** O #5 (cliente real,
+R$ 2.054,73, `pending`) tem `pix_txid` mas não `pix_qr_code`, porque nasceu
+antes da migração. Ao mudar `buildOrderPix` para ler só o QR gravado, eu tirei a
+única forma daquele cliente pagar: `GET /orders/:id/pix` devolvia **404**. O
+método agora reconstrói o BR Code estático a partir do txid, exatamente como ele
+foi emitido. `provider: 'local'` continua distinguindo — código local liquida à
+mão, código Pagar.me liquida sozinho.
+
+**2. Estorno do clube não avisava o membro.** A loja ganhou `order-refunded` na
+revisão anterior; o clube ficou para trás. Pior: `mapPaymentRow` **descartava**
+o `member_email` que `getPaymentById` já buscava, então nada tinha para onde
+escrever. Template `payment-refunded` novo, com o prazo real por método.
+
+**3. A conciliação não deixava rastro numa rodada limpa.** Ela só loga quando
+liquida ou falha, então um cron funcionando e um cron parado eram idênticos —
+e enquanto o webhook não está cadastrado, ela é a **única** coisa que confirma
+pagamento. Agora grava `last_reconcile_run` e o `GET /health` expõe
+`payments.lastReconcile` e `payments.reconcileStale` (mais de 30 min sem rodar).
+
+### Cobertura de avisos, por evento
+
+| Evento                        | Cliente                             | Equipe                        |
+| ----------------------------- | ----------------------------------- | ----------------------------- |
+| Pedido pago (PIX/cartão)      | `order-confirmed`                   | sino + e-mail                 |
+| PIX gerado                    | `order-pending-pix`                 | sino ("aguardando")           |
+| Cartão recusado               | erro na tela, com o motivo do banco | sino + e-mail                 |
+| Pedido enviado                | `order-shipped` + **sino da loja**  | —                             |
+| Pronto para retirada          | `order-ready-for-pickup`            | —                             |
+| Pedido cancelado pela loja    | `order-cancelled-customer`          | —                             |
+| Pedido cancelado pelo cliente | —                                   | `admin-order-cancelled`       |
+| **Estorno de pedido**         | `order-refunded`                    | sino + e-mail                 |
+| **Estorno do clube**          | `payment-refunded`                  | sino + e-mail                 |
+| Chargeback                    | — (decisão humana)                  | `admin-order-disputed` + sino |
+| Assinatura cobrada            | `subscription-payment`              | sino                          |
+| Assinatura falhou             | `subscription-payment-failed`       | sino + e-mail                 |
+| Assinatura cancelada          | `subscription-cancelled`            | —                             |
+| Membro ativado                | `payment-confirmed` + `welcome`     | sino                          |
+
+---
+
 ## 9. Ir para produção
 
 1. `.env` da VPS com as sete variáveis `PAGARME_*`.

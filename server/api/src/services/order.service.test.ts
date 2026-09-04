@@ -171,6 +171,7 @@ import {
   updateOrderStatus,
   refundOrder,
   payOrderWithCard,
+  buildOrderPix,
 } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -1762,5 +1763,90 @@ describe('payOrderWithCard', () => {
       'sem CPF/CNPJ'
     );
     expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Recuperar o PIX de um pedido ────────────────────────────────────────────
+
+/**
+ * The endpoint the order page and the e-mail link both use.
+ *
+ * There are two kinds of pending PIX in the database and they behave
+ * differently. A Pagar.me code is dynamic and carries the provider's txid, so
+ * it is read back verbatim. A pre-migration order has only a `pix_txid` and a
+ * static BR Code built from the shop's key — and returning null for those took
+ * away the only way one real R$ 2.054 order had to be paid, because the
+ * checkout tab was long gone.
+ */
+describe('buildOrderPix', () => {
+  function order(over: Record<string, unknown> = {}) {
+    return {
+      id: 'o1',
+      status: 'pending',
+      paymentMethod: 'pix',
+      total: 124,
+      pixTxid: null,
+      pagarmeChargeId: null,
+      ...over,
+    } as never;
+  }
+
+  it('devolve o código da Pagar.me exatamente como foi gravado', async () => {
+    queryMock.mockResolvedValue({
+      rows: [
+        {
+          pix_qr_code: '00020101-PAGARME',
+          pix_qr_code_url: 'https://api.pagar.me/qr.png',
+          pix_expires_at: '2026-09-02T16:00:00Z',
+        },
+      ],
+    });
+
+    const pix = await buildOrderPix(order({ pagarmeChargeId: 'ch_1' }));
+
+    expect(pix?.emvCode).toBe('00020101-PAGARME');
+    expect(pix?.qrCodeUrl).toBe('https://api.pagar.me/qr.png');
+    expect(pix?.provider).toBe('pagarme');
+  });
+
+  /** The regression: a legacy order must still be payable. */
+  it('reconstrói o BR Code estático de um pedido anterior à migração', async () => {
+    queryMock.mockResolvedValue({ rows: [{ pix_qr_code: null }] });
+
+    const pix = await buildOrderPix(order({ pixTxid: 'CGT123' }));
+
+    expect(pix, 'pedido antigo tem de continuar pagável').not.toBeNull();
+    expect(pix!.emvCode).toContain('br.gov.bcb.pix');
+    expect(pix!.emvCode).toContain('CGT123');
+    // The amount has to be in the code, or the customer pays the wrong figure.
+    expect(pix!.emvCode).toContain('124.00');
+  });
+
+  it('devolve null quando não há código nem txid', async () => {
+    queryMock.mockResolvedValue({ rows: [{ pix_qr_code: null }] });
+
+    await expect(buildOrderPix(order())).resolves.toBeNull();
+  });
+
+  it.each([['paid'], ['cancelled'], ['refunded'], ['shipped']])(
+    'não devolve PIX de um pedido %s',
+    async (status) => {
+      queryMock.mockResolvedValue({ rows: [{ pix_qr_code: '00020101-PAGARME' }] });
+
+      await expect(buildOrderPix(order({ status }))).resolves.toBeNull();
+    }
+  );
+
+  it('não devolve PIX de um pedido de cartão', async () => {
+    queryMock.mockResolvedValue({ rows: [{ pix_qr_code: '00020101-PAGARME' }] });
+
+    await expect(buildOrderPix(order({ paymentMethod: 'credit_card' }))).resolves.toBeNull();
+  });
+
+  /** A R$ 0,00 QR is unpayable; offering one is worse than offering nothing. */
+  it('não devolve PIX de um pedido sem valor', async () => {
+    queryMock.mockResolvedValue({ rows: [{ pix_qr_code: '00020101-PAGARME' }] });
+
+    await expect(buildOrderPix(order({ total: 0 }))).resolves.toBeNull();
   });
 });

@@ -3,7 +3,7 @@ import { query, getClient } from '../config/database.js';
 import { env, adminUrl } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { getStripe } from '../utils/stripe.js';
-import { type PixQRData } from '../utils/pix.js';
+import { generatePixEMV, type PixQRData } from '../utils/pix.js';
 import * as pagarme from '../utils/pagarme.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
 import { auditLog } from '../utils/audit.js';
@@ -43,6 +43,13 @@ import {
   releaseCoupon,
   retailDiscountCandidates,
 } from './promo.service.js';
+
+// Still needed after the migration: orders created before it carry a static BR
+// Code, and `buildOrderPix` rebuilds those from the shop's own key so the
+// customer can still pay. Nothing new is generated from these.
+const PIX_KEY = env.PIX_KEY || '';
+const PIX_MERCHANT_NAME = env.PIX_MERCHANT_NAME || 'GEEK E TOYS';
+const PIX_MERCHANT_CITY = env.PIX_MERCHANT_CITY || 'RIO DE JANEIRO';
 
 // How long a pending order holds its stock. Still generous: a Pagar.me PIX
 // settles itself in seconds, but a buyer who generates the code and pays it
@@ -1134,13 +1141,21 @@ export async function getOrderById(id: string, withItems = true): Promise<Order 
 }
 
 /**
- * The stored PIX code for an order.
+ * The PIX code for a pending order.
  *
- * Read, not rebuilt. A Pagar.me code is dynamic and carries the provider's own
- * txid, so it cannot be regenerated from the amount and a key the way the old
- * static BR Code could — losing the stored string means losing the code.
- * Orders created before the migration have `pix_txid` but no `pix_qr_code`, and
- * correctly return null: the customer is sent to the order page instead.
+ * A Pagar.me code is **read, not rebuilt**: it is dynamic and carries the
+ * provider's own txid, so losing the stored string means losing the code.
+ *
+ * Orders created before the migration are the other case, and they are not
+ * hypothetical — there was a real R$ 2.054 order in that state. They have a
+ * `pix_txid` and no `pix_qr_code`, because their code was a static BR Code we
+ * generated from the shop's key. Returning null for those took away the only
+ * way that customer had to pay: the checkout tab was long gone, and this
+ * endpoint is what the order page and the e-mail link both use. So the legacy
+ * code is rebuilt exactly as it was first issued.
+ *
+ * The `provider` field is what tells the two apart downstream: a 'local' code
+ * settles by hand, a 'pagarme' one settles itself.
  */
 export async function buildOrderPix(order: Order): Promise<PixQRData | null> {
   if (order.status !== 'pending') return null;
@@ -1152,19 +1167,32 @@ export async function buildOrderPix(order: Order): Promise<PixQRData | null> {
     [order.id],
   );
   const row = stored.rows[0];
-  if (!row?.pix_qr_code) return null;
 
-  return {
-    emvCode: row.pix_qr_code as string,
-    qrCodeUrl: (row.pix_qr_code_url as string) ?? '',
-    pixKey: env.PIX_KEY || '',
+  if (row?.pix_qr_code) {
+    return {
+      emvCode: row.pix_qr_code as string,
+      qrCodeUrl: (row.pix_qr_code_url as string) ?? '',
+      pixKey: env.PIX_KEY || '',
+      amount: order.total,
+      txId: order.pagarmeChargeId ?? order.pixTxid ?? '',
+      expiresAt: row.pix_expires_at
+        ? new Date(row.pix_expires_at as string).toISOString()
+        : new Date(Date.now() + env.PAGARME_PIX_EXPIRES_IN * 1000).toISOString(),
+      provider: 'pagarme',
+    };
+  }
+
+  // Pre-migration order: rebuild the static BR Code from the stored txid, which
+  // is exactly what the customer was originally given. Needs the shop's PIX key
+  // — without it there is nothing to rebuild and null is the honest answer.
+  if (!order.pixTxid || !PIX_KEY) return null;
+  return generatePixEMV({
+    pixKey: PIX_KEY,
     amount: order.total,
-    txId: order.pagarmeChargeId ?? order.pixTxid ?? '',
-    expiresAt: row.pix_expires_at
-      ? new Date(row.pix_expires_at as string).toISOString()
-      : new Date(Date.now() + env.PAGARME_PIX_EXPIRES_IN * 1000).toISOString(),
-    provider: 'pagarme',
-  };
+    merchantName: PIX_MERCHANT_NAME,
+    merchantCity: PIX_MERCHANT_CITY,
+    txId: order.pixTxid,
+  });
 }
 
 /**

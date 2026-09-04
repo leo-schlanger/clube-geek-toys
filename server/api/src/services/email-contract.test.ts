@@ -98,6 +98,8 @@ const SHOP_TEMPLATES = [
 const MEMBER_TEMPLATES = [
   'welcome',
   'payment-confirmed',
+  // The club's mirror of `order-refunded`: money coming back, said out loud.
+  'payment-refunded',
   'payment-failed',
   'renewal-reminder',
   'subscription-created',

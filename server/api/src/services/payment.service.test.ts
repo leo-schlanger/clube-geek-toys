@@ -538,6 +538,33 @@ describe('refundPayment', () => {
     expect(ran("UPDATE payments SET status = 'refunded'")).toBe(true);
   });
 
+  /**
+   * The shop's refund told the buyer; the club's did not. A member watching a
+   * charge vanish with no explanation is the same support message — or the
+   * same chargeback.
+   */
+  it('avisa o membro por e-mail que o dinheiro voltou', async () => {
+    route('FROM payments p', {
+      rows: [{ ...paidRow, provider_id: 'ch_abc', member_email: 'ana@example.com', member_name: 'Ana' }],
+    });
+
+    await refundPayment({ paymentId: 'pay-1', adminUserId: 'admin-1', reason: 'duplicate' });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'payment-refunded', to: 'ana@example.com' })
+    );
+  });
+
+  /** No e-mail on file is not a reason to fail the refund. */
+  it('estorna mesmo sem e-mail do membro', async () => {
+    route('FROM payments p', { rows: [{ ...paidRow, provider_id: 'ch_abc', member_email: null }] });
+
+    await expect(
+      refundPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' })
+    ).resolves.toBeDefined();
+    expect(refundChargeMock).toHaveBeenCalled();
+  });
+
   it('ainda estorna no Stripe uma cobrança anterior à migração', async () => {
     route('FROM payments p', { rows: [paidRow] });
     const refundsCreate = vi.fn(async () => ({ id: 're_1' }));
