@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, UserPlus, ArrowLeft, Sparkles } from 'lucide-react'
@@ -279,7 +280,7 @@ export default function ShopRegister() {
 
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-accent" />
-                  Membros do clube têm 10% de desconto na loja
+                  Membros do clube têm {MEMBER_DISCOUNT_PERCENT}% de desconto na loja
                 </p>
               </CardFooter>
             </form>

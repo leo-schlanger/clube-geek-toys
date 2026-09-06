@@ -410,6 +410,20 @@ export function EventTicketsTab() {
                           <span className="flex items-center gap-2 truncate">
                             <Ticket className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                             <span className="truncate font-medium">{ticket.attendeeName}</span>
+                            {/*
+                              A half-price ticket is self-declared: the public
+                              reservation form takes `kind` at face value and
+                              nothing verifies membership. Confirming the
+                              payment is where the shop can ask for the card,
+                              and it could not — the row looked identical to a
+                              full one. Only the kinds that cost less are
+                              labelled; "Inteira" on every line is noise.
+                            */}
+                            {ticket.kind !== 'full' && (
+                              <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                {TICKET_KIND_LABEL[ticket.kind]}
+                              </span>
+                            )}
                           </span>
                           <span
                             className={`shrink-0 text-xs font-semibold ${

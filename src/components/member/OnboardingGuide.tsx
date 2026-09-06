@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import { Card, CardContent } from '../ui/card'
 import { Button } from '../ui/button'
 import { QrCode, ShoppingBag, Gift, ChevronDown, ChevronUp, X } from 'lucide-react'
@@ -34,7 +35,7 @@ export function OnboardingGuide({ memberStartDate }: OnboardingGuideProps) {
     },
     {
       icon: <ShoppingBag className="h-5 w-5 text-primary" />,
-      title: 'Ganhe 10% em qualquer produto',
+      title: `Ganhe ${MEMBER_DISCOUNT_PERCENT}% em qualquer produto`,
       description: 'Seu desconto de membro vale na loja física e na loja online — em toda a sua compra.',
     },
     {

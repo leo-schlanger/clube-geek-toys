@@ -84,9 +84,11 @@ export interface DiscountCandidate {
  * The largest candidate, or null when every one of them is worthless.
  *
  * Ties keep the **first** candidate, and callers pass them in order of who
- * should be credited: the member discount before the online promotion. When
- * both are 10% the order says `member_10`, because that is the one the
- * customer would lose by cancelling their membership.
+ * should be credited: the member discount before the online promotion. On a
+ * tie the order says `member_10`, because that is the one the customer would
+ * lose by cancelling their membership. (The reason string keeps its historical
+ * name even though the percentage is configurable now — the reports group by
+ * it, and renaming would split one line of business in two.)
  */
 export function pickBestDiscount(candidates: DiscountCandidate[]): DiscountCandidate | null {
   let best: DiscountCandidate | null = null;
@@ -111,10 +113,12 @@ export function retailDiscountCandidates(opts: {
 }): DiscountCandidate[] {
   const candidates: DiscountCandidate[] = [];
   if (opts.isMember) {
-    candidates.push({
-      reason: MEMBER_DISCOUNT_REASON,
-      percent: MEMBER_SHOP_DISCOUNT * 100,
-    });
+    // `MEMBER_SHOP_DISCOUNT` is deliberately a constant, not a setting. The
+    // percentage is part of the plan contract — it is written into the Terms of
+    // Use, the SEO description, the onboarding and the welcome screen — so
+    // changing it is a deploy no matter what, and a knob that pretends
+    // otherwise only lets the checkout disagree with the Terms.
+    candidates.push({ reason: MEMBER_DISCOUNT_REASON, percent: MEMBER_SHOP_DISCOUNT * 100 });
   }
   if (opts.promo.enabled) {
     candidates.push({ reason: ONLINE_DISCOUNT_REASON, percent: opts.promo.percent });

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import confetti from 'canvas-confetti'
 import { motion, AnimatePresence } from 'framer-motion'
 import { PartyPopper, Star, X } from 'lucide-react'
@@ -102,7 +103,7 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
             className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto"
           >
             Sua conta no Clube GeekPop & Toys está ativa!
-            Aproveite 10% de desconto em qualquer produto e os benefícios do clube.
+            Aproveite {MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto e os benefícios do clube.
           </motion.p>
 
           <motion.div

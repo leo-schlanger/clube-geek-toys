@@ -25,8 +25,14 @@ export const SETTINGS_CATALOGUE: SettingDefinition[] = [
   // Must match CLUB_PLAN.price on the frontend.
   { key: 'pricing.club_annual', default: 12.50, type: 'number', description: 'Plano do Clube — mensal (R$)' },
 
-  // Member benefit: a single discount on any product.
-  { key: 'plan.club.discount_products', default: 15, type: 'number', description: 'Desconto do membro em produtos (%)' },
+  // NOTE: `plan.club.discount_products` used to live here, defaulting to 15,
+  // described as the member's product discount — and nothing ever read it. The
+  // checkout applied `MEMBER_SHOP_DISCOUNT` (10%) throughout, so an admin who
+  // raised it for a promotion would have watched members keep paying the old
+  // rate. It is gone rather than wired up: the percentage is written into the
+  // Terms of Use, the SEO description, the onboarding and the welcome screen,
+  // so changing it is a deploy regardless — and a knob that suggests otherwise
+  // only lets the checkout disagree with the Terms.
 
   // Payment guards
   { key: 'payment.duplicate_window_days', default: 7, type: 'number', description: 'Janela em dias para bloquear pagamentos duplicados' },

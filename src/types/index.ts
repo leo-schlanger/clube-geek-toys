@@ -110,13 +110,27 @@ export interface Plan {
 // ============================================
 
 // Single monthly club plan.
+/**
+ * The member's product discount, as a percentage.
+ *
+ * Single source for every place that *states* the benefit — the plan features,
+ * onboarding, the welcome screen, the shop badge. The figure charged is always
+ * recomputed server-side from `MEMBER_SHOP_DISCOUNT`; these two are kept equal
+ * on purpose, and the copy derives from this one so a change cannot leave a
+ * screen promising the old number.
+ *
+ * Deliberately a constant and not a setting: it is written into the Terms of
+ * Use and the SEO description too, so changing it is a deploy regardless.
+ */
+export const MEMBER_DISCOUNT_PERCENT = 10
+
 export const CLUB_PLAN: Plan = {
   id: 'club',
   name: 'Clube GeekPop & Toys',
   price: 12.50,
-  discount: 10,
+  discount: MEMBER_DISCOUNT_PERCENT,
   benefits: [
-    '10% de desconto em qualquer produto',
+    `${MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto`,
     '50% de desconto nos ingressos dos eventos',
     'Brinde na primeira compra da loja',
   ],

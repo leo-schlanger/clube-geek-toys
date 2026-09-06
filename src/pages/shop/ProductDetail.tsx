@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ShoppingCart,
@@ -473,7 +474,7 @@ export default function ProductDetail() {
                   >
                     <Sparkles className="h-4 w-4 shrink-0 text-primary" />
                     <span>
-                      Entre e ganhe <strong className="text-primary">10% de desconto</strong> de
+                      Entre e ganhe <strong className="text-primary">{MEMBER_DISCOUNT_PERCENT}% de desconto</strong> de
                       membro ({formatCurrency(memberPrice)})
                     </span>
                   </Link>

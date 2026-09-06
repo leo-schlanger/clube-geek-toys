@@ -1,4 +1,5 @@
 import { BadgePercent } from 'lucide-react'
+import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import { Badge } from '../ui/badge'
 import { cn } from '../../lib/utils'
 
@@ -18,7 +19,7 @@ export function MemberDiscountBadge({ className }: MemberDiscountBadgeProps) {
       title="Desconto de membro do Clube GeekPop & Toys"
     >
       <BadgePercent className="h-3.5 w-3.5" />
-      Membro -10%
+      Membro -{MEMBER_DISCOUNT_PERCENT}%
     </Badge>
   )
 }

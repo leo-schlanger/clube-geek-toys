@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { MEMBER_DISCOUNT_PERCENT } from '../types'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardFooter } from '../components/ui/card'
 import { CLUB_PLAN } from '../types'
@@ -107,7 +108,7 @@ export default function Subscribe() {
           >
             <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-500" /> Pagamento seguro</span>
             <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Ativação imediata</span>
-            <span className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 text-primary" /> 10% em qualquer produto</span>
+            <span className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 text-primary" /> {MEMBER_DISCOUNT_PERCENT}% em qualquer produto</span>
             <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-blue-400" /> PIX ou cartão</span>
           </motion.div>
         </div>
@@ -174,7 +175,7 @@ export default function Subscribe() {
           <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">Por que ser VIP?</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             {[
-              { icon: <ShoppingBag className="h-6 w-6 text-primary" />, title: '10% de desconto', desc: 'Em qualquer produto, na loja física e na loja online' },
+              { icon: <ShoppingBag className="h-6 w-6 text-primary" />, title: `${MEMBER_DISCOUNT_PERCENT}% de desconto`, desc: 'Em qualquer produto, na loja física e na loja online' },
               { icon: <Gift className="h-6 w-6 text-pink-400" />, title: 'Brinde na 1ª compra', desc: 'Um mimo geek na primeira compra da loja física ou online' },
               { icon: <Zap className="h-6 w-6 text-blue-400" />, title: 'Eventos participantes', desc: '50% de desconto nos ingressos dos eventos do Clube' },
               { icon: <Shield className="h-6 w-6 text-green-400" />, title: 'Carteirinha digital', desc: 'QR Code exclusivo para identificação na loja' },
@@ -218,7 +219,7 @@ export default function Subscribe() {
               <div className="p-3 rounded-full bg-primary/10 border border-primary/20">
                 <ShoppingBag className="h-6 w-6 text-primary" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">10% desde o 1º dia</span>
+              <span className="text-xs font-medium text-muted-foreground">{MEMBER_DISCOUNT_PERCENT}% desde o 1º dia</span>
             </div>
           </div>
         </div>
