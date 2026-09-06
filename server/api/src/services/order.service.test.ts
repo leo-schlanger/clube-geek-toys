@@ -1736,6 +1736,92 @@ describe('payOrderWithCard', () => {
     ).toBe(false);
   });
 
+  /**
+   * The window that would charge a customer twice.
+   *
+   * An authorised card leaves the order `pending` — settling is the webhook's
+   * job — so the status guard stays open for as long as settlement takes.
+   * Someone who clicks again because the page has not changed must not reach
+   * the acquirer a second time.
+   */
+  it('não cobra de novo enquanto a cobrança anterior está liquidando', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder({ pagarme_charge_id: 'ch_ja' })] });
+    pagarmeGetChargeMock.mockResolvedValue({ id: 'ch_ja', status: 'paid', amount: 12400 });
+
+    const out = await payOrderWithCard('o1', { cardToken: 'token_2' }, 'u1');
+
+    expect(out.status).toBe('paid');
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('também não cobra de novo quando a anterior ainda está pendente', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder({ pagarme_charge_id: 'ch_ja' })] });
+    pagarmeGetChargeMock.mockResolvedValue({ id: 'ch_ja', status: 'processing', amount: 12400 });
+
+    await payOrderWithCard('o1', { cardToken: 'token_2' }, 'u1');
+
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  /** A refusal is the one case where trying another card is the point. */
+  it('deixa tentar outro cartão depois de uma recusa', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sqlOf2(sql).includes('card_payment_started_at = NOW()')) {
+        return { rows: [{ id: 'o1' }] };
+      }
+      return { rows: [pendingCardOrder({ pagarme_charge_id: 'ch_recusada' })] };
+    });
+    pagarmeGetChargeMock.mockResolvedValue({
+      id: 'ch_recusada',
+      status: 'not_authorized',
+      amount: 12400,
+    });
+    approvedCharge();
+
+    await payOrderWithCard('o1', { cardToken: 'token_2' }, 'u1');
+
+    expect(pagarmeCreateOrderMock).toHaveBeenCalled();
+  });
+
+  /** Charging on a guess is worse than making the buyer wait a moment. */
+  it('recusa quando não consegue confirmar a cobrança anterior', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder({ pagarme_charge_id: 'ch_ja' })] });
+    pagarmeGetChargeMock.mockRejectedValue(new Error('502'));
+
+    await expect(payOrderWithCard('o1', { cardToken: 'token_2' }, 'u1')).rejects.toThrow(
+      'confirmar a cobrança anterior'
+    );
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  /** Two requests in flight: only the one that takes the claim may charge. */
+  it('recusa uma segunda tentativa simultânea', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sqlOf2(sql).includes('card_payment_started_at = NOW()')) {
+        return { rows: [] }; // another request holds the claim
+      }
+      return { rows: [pendingCardOrder()] };
+    });
+
+    await expect(payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1')).rejects.toThrow(
+      'pagamento em andamento'
+    );
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  /** The claim must expire, or a crashed request locks the order forever. */
+  it('a trava expira, para um processo morto não travar o pedido', async () => {
+    queryMock.mockResolvedValue({ rows: [pendingCardOrder()] });
+    approvedCharge();
+
+    await payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1');
+
+    const claim = queryMock.mock.calls.find((c) =>
+      sqlOf2(c[0]).includes('card_payment_started_at = NOW()')
+    );
+    expect(sqlOf2(claim![0])).toContain("INTERVAL '2 minutes'");
+  });
+
   it('é idempotente para um pedido já pago', async () => {
     queryMock.mockResolvedValue({
       rows: [pendingCardOrder({ status: 'paid', pagarme_charge_id: 'ch_1' })],

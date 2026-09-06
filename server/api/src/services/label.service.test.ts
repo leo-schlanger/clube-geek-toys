@@ -108,9 +108,20 @@ function calls(): string[] {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('fetch', fetchMock);
-  queryMock.mockResolvedValue({ rows: [], rowCount: 0 });
+  // The claim is the first write; granting it by default keeps every other
+  // test about the purchase itself.
+  queryMock.mockResolvedValue({ rows: [{ id: 'o1' }], rowCount: 1 });
   tokenMock.mockResolvedValue('tok_123');
 });
+
+/** Refuse the claim, as if another request already held it. */
+function claimTaken() {
+  queryMock.mockImplementation(async (sql: string) =>
+    String(sql).includes('label_purchase_started_at = NOW()')
+      ? { rows: [], rowCount: 0 }
+      : { rows: [], rowCount: 0 },
+  );
+}
 
 describe('buyAndPrintLabel', () => {
   it('percorre carrinho → checkout → geração → impressão', async () => {
@@ -331,5 +342,72 @@ describe('reprintLabel', () => {
     orderMock.mockResolvedValue(order({ melhorEnvioOrderId: null }));
 
     await expect(reprintLabel('o1')).rejects.toThrow('ainda não tem etiqueta');
+  });
+});
+
+describe('trava contra compra dupla', () => {
+  /**
+   * Two clicks a second apart both read `melhor_envio_order_id` as null, both
+   * create a cart item and both reach checkout — two labels, two debits from
+   * the shop's balance. Only the request that takes the claim may buy.
+   */
+  it('recusa uma segunda compra simultânea', async () => {
+    orderMock.mockResolvedValue(order());
+    claimTaken();
+
+    await expect(buyAndPrintLabel('o1', 'admin-1')).rejects.toThrow('em andamento');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /** A crashed request must not lock the order forever. */
+  it('a trava expira sozinha', async () => {
+    orderMock.mockResolvedValue(order());
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: null, generated_at: null } },
+      { body: {} },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: null } },
+      { body: {} },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: 'y', tracking: 'BR1' } },
+      { body: { url: 'u' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    const claim = queryMock.mock.calls.find((c) =>
+      String(c[0]).includes('label_purchase_started_at = NOW()'),
+    );
+    expect(claim, 'a compra tem de reivindicar o pedido').toBeDefined();
+    expect(String(claim![0])).toContain("INTERVAL '3 minutes'");
+  });
+
+  /** A refusal before any money moved should let the shop retry at once. */
+  it('libera a trava quando o Melhor Envio recusa', async () => {
+    orderMock.mockResolvedValue(order());
+    replies({ ok: false, status: 422, body: { message: 'Endereço inválido' } });
+
+    await expect(buyAndPrintLabel('o1', 'admin-1')).rejects.toThrow('Endereço inválido');
+
+    const released = queryMock.mock.calls.some((c) =>
+      String(c[0]).includes('label_purchase_started_at = NULL'),
+    );
+    expect(released, 'a trava tem de ser liberada').toBe(true);
+  });
+
+  /**
+   * A timeout is the one case where the money may already have left without us
+   * hearing back. Letting the claim expire on its own beats freeing it for an
+   * immediate second purchase.
+   */
+  it('NÃO libera a trava quando a operadora fica inalcançável', async () => {
+    orderMock.mockResolvedValue(order());
+    fetchMock.mockRejectedValue(new Error('timeout'));
+
+    await expect(buyAndPrintLabel('o1', 'admin-1')).rejects.toThrow();
+
+    const released = queryMock.mock.calls.some((c) =>
+      String(c[0]).includes('label_purchase_started_at = NULL'),
+    );
+    expect(released, 'com dinheiro em dúvida, a trava expira sozinha').toBe(false);
   });
 });

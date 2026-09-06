@@ -373,6 +373,46 @@ export async function buyAndPrintLabel(
   actorUserId: string,
 ): Promise<LabelState> {
   const order = await loadShippableOrder(orderId);
+
+  // Claim the order first. Without it, two clicks a second apart both read
+  // `melhor_envio_order_id` as null, both create a cart item and both reach
+  // checkout — two labels, two debits from the shop's Melhor Envio balance.
+  // The claim expires so a process that dies mid-purchase does not lock the
+  // order forever; three minutes covers the four calls comfortably.
+  const claim = await query(
+    `UPDATE orders
+        SET label_purchase_started_at = NOW()
+      WHERE id = $1
+        AND (label_purchase_started_at IS NULL
+             OR label_purchase_started_at < NOW() - INTERVAL '3 minutes')
+      RETURNING id`,
+    [order.id],
+  );
+  if (claim.rows.length === 0) {
+    throw new AppError(
+      409,
+      'Já existe uma compra de etiqueta em andamento para este pedido. Aguarde alguns segundos.',
+      'LABEL_PURCHASE_IN_FLIGHT',
+    );
+  }
+
+  try {
+    return await runLabelPurchase(order, actorUserId);
+  } catch (err) {
+    // Release on failure so the shop can correct and retry immediately —
+    // except when the money may already have left, where the claim expiring on
+    // its own is the safer default.
+    const code = (err as { code?: string }).code;
+    if (code !== 'MELHOR_ENVIO_UNREACHABLE') {
+      await query(`UPDATE orders SET label_purchase_started_at = NULL WHERE id = $1`, [
+        order.id,
+      ]).catch(() => {});
+    }
+    throw err;
+  }
+}
+
+async function runLabelPurchase(order: Order, actorUserId: string): Promise<LabelState> {
   const meOrderId = await ensureCartItem(order);
 
   let shipment = await fetchShipment(meOrderId);

@@ -507,6 +507,54 @@ pagamento. Agora grava `last_reconcile_run` e o `GET /health` expõe
 
 ---
 
+## 8.5 Revisão fina da dinâmica (06/09/2026)
+
+Três falhas achadas relendo o fluxo inteiro à procura de concorrência e de
+estados que ninguém fecha. As duas primeiras custam dinheiro.
+
+### 1. Cobrança dupla no cartão ⚠️
+
+Um cartão autorizado deixa o pedido **`pending`** — quem liquida é o webhook —
+então o guard `status !== 'pending'` fica aberto durante toda a liquidação:
+segundos com webhook, **até dez minutos** na conciliação. Um cliente que
+clicasse de novo porque a página não mudou seria **cobrado duas vezes**.
+
+Agora, antes de tocar na operadora:
+
+- se o pedido já tem cobrança e ela está `paid` ou `pending`, devolve aquele
+  estado em vez de cobrar;
+- se não dá para consultar a cobrança anterior, **recusa** — cobrar no chute é
+  pior que pedir para recarregar;
+- só uma cobrança **recusada** libera nova tentativa, que é o ponto do "tenta
+  outro cartão";
+- e uma trava (`card_payment_started_at`, 2 min, expira sozinha) fecha a corrida
+  entre duas requisições simultâneas. Uma recusa libera a trava na hora.
+
+### 2. Compra dupla de etiqueta ⚠️
+
+`ensureCartItem` lia `melhor_envio_order_id` e criava carrinho se fosse null.
+Dois cliques com um segundo de diferença: dois carrinhos, dois checkouts, **dois
+fretes debitados** da conta da loja. Mesma solução
+(`label_purchase_started_at`, 3 min). Uma recusa do Melhor Envio libera a trava;
+um **timeout não libera** — com o dinheiro em dúvida, esperar a trava expirar é
+mais seguro que permitir uma segunda compra imediata.
+
+### 3. PIX expirado nunca fechava o pedido
+
+Medido em cobranças reais dois dias após o vencimento: um PIX expirado da
+Pagar.me **não muda de status** — segue `pending` / `waiting_payment` para
+sempre. Nada fechava esses pedidos, então a fila "PIX aguardando" do painel só
+crescia e só esvaziava à mão.
+
+A conciliação agora cancela o pedido quando o código passou do `expires_at` com
+**1 hora de carência** (proteção contra relógio dessincronizado e contra um
+pagamento que caia no mesmo minuto). O cancelamento passa por
+`updateOrderStatus`, que é o que devolve a reserva, restitui o crédito e avisa o
+cliente — um `UPDATE` cru pularia os três. Cartão não é cancelado: cartão se
+retenta.
+
+---
+
 ## 9. Ir para produção
 
 1. `.env` da VPS com as sete variáveis `PAGARME_*`.

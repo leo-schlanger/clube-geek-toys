@@ -1016,6 +1016,55 @@ export async function payOrderWithCard(
     );
   }
 
+  // An authorised card leaves the order `pending` — settling is the webhook's
+  // job — so the status guard above is open for as long as settlement takes:
+  // seconds with a webhook, up to ten minutes on the reconciliation sweep. A
+  // customer who clicks again in that window because the page has not changed
+  // would be charged twice. So a charge that already exists decides, and only
+  // a genuinely refused one may be retried.
+  if (order.pagarmeChargeId) {
+    const existing = await pagarme.getChargeThrottled(order.pagarmeChargeId).catch(() => null);
+    const mapped = existing ? pagarme.mapChargeStatus(existing.status) : null;
+    if (mapped === 'paid' || mapped === 'pending') {
+      return {
+        order,
+        status: mapped,
+        chargeId: order.pagarmeChargeId,
+        installments: order.installments ?? 1,
+        cardBrand: order.cardBrand ?? null,
+        cardLastFour: order.cardLastFour ?? null,
+      };
+    }
+    // Could not reach the provider: refusing beats charging on a guess.
+    if (!existing) {
+      throw new AppError(
+        503,
+        'Não conseguimos confirmar a cobrança anterior deste pedido. Aguarde um instante e recarregue.',
+        'CHARGE_STATUS_UNKNOWN',
+      );
+    }
+  }
+
+  // Claim the order, so two requests in flight cannot both reach the acquirer.
+  // The claim expires: a process that dies mid-call must not lock the order
+  // forever, and two minutes covers the slowest card round-trip.
+  const claim = await query(
+    `UPDATE orders
+        SET card_payment_started_at = NOW()
+      WHERE id = $1 AND status = 'pending'
+        AND (card_payment_started_at IS NULL
+             OR card_payment_started_at < NOW() - INTERVAL '2 minutes')
+      RETURNING id`,
+    [order.id],
+  );
+  if (claim.rows.length === 0) {
+    throw new AppError(
+      409,
+      'Já existe um pagamento em andamento para este pedido. Aguarde alguns segundos.',
+      'PAYMENT_IN_FLIGHT',
+    );
+  }
+
   const amountInCents = pagarme.toCents(order.total);
   const installments = Math.max(
     1,
@@ -1102,6 +1151,12 @@ export async function payOrderWithCard(
       detail: pagarme.describeChargeFailure(charge),
       chargeId: charge.id,
     });
+    // Free the claim at once: "cartão recusado, tenta outro" is the whole
+    // reason this is a retry on the same order, and making the buyer wait two
+    // minutes for a lock to expire would defeat it.
+    await query(`UPDATE orders SET card_payment_started_at = NULL WHERE id = $1`, [
+      order.id,
+    ]).catch(() => {});
     throw new AppError(402, pagarme.describeChargeFailure(charge), 'CARD_DECLINED');
   }
 

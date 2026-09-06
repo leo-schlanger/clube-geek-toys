@@ -24,6 +24,7 @@
 import { query } from '../config/database.js';
 import * as pagarme from '../utils/pagarme.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
+import { updateOrderStatus } from './order.service.js';
 
 /**
  * How far back to look.
@@ -41,7 +42,34 @@ const MAX_PER_RUN = 100;
 export interface ReconcileResult {
   checked: number;
   settled: number;
+  /** Orders closed because their PIX code can no longer be paid. */
+  expired: number;
   failed: number;
+}
+
+/**
+ * Grace after `expires_at` before an order is written off.
+ *
+ * Guards against clock skew between us and the provider, and against a payment
+ * that lands in the same minute the code lapses — cancelling an order somebody
+ * just paid would be far worse than leaving it open an extra hour.
+ */
+const EXPIRY_GRACE_MS = 60 * 60 * 1000;
+
+/**
+ * Can this PIX still be paid?
+ *
+ * An expired Pagar.me PIX does **not** change status: it stays `pending` with
+ * `waiting_payment` forever — measured on real charges two days past their
+ * `expires_at`. So nothing ever closes those orders, and the shop's "PIX
+ * aguardando" queue fills with dead rows it can only clear by hand.
+ */
+function isDeadPix(charge: pagarme.PagarmeCharge): boolean {
+  if (charge.payment_method !== 'pix') return false;
+  const expiresAt = charge.last_transaction?.expires_at;
+  if (!expiresAt) return false;
+  const at = new Date(expiresAt).getTime();
+  return Number.isFinite(at) && Date.now() - at > EXPIRY_GRACE_MS;
 }
 
 /**
@@ -50,15 +78,15 @@ export interface ReconcileResult {
  * Orders and club payments are swept together because they settle through the
  * same event — `processPagarmeEvent` routes on the charge's own metadata.
  */
-async function pendingCharges(): Promise<{ chargeId: string; ref: string }[]> {
+async function pendingCharges(): Promise<{ chargeId: string; ref: string; orderId: string | null }[]> {
   const result = await query(
-    `SELECT pagarme_charge_id AS charge_id, 'pedido #' || order_number AS ref
+    `SELECT pagarme_charge_id AS charge_id, 'pedido #' || order_number AS ref, id AS order_id
        FROM orders
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
         AND created_at > NOW() - ($1::int * INTERVAL '1 day')
       UNION ALL
-     SELECT pagarme_charge_id AS charge_id, 'pagamento ' || id::text AS ref
+     SELECT pagarme_charge_id AS charge_id, 'pagamento ' || id::text AS ref, NULL AS order_id
        FROM payments
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
@@ -66,7 +94,11 @@ async function pendingCharges(): Promise<{ chargeId: string; ref: string }[]> {
       LIMIT $2`,
     [LOOKBACK_DAYS, MAX_PER_RUN],
   );
-  return result.rows.map((r) => ({ chargeId: r.charge_id as string, ref: r.ref as string }));
+  return result.rows.map((r) => ({
+    chargeId: r.charge_id as string,
+    ref: r.ref as string,
+    orderId: (r.order_id as string) ?? null,
+  }));
 }
 
 /**
@@ -77,11 +109,16 @@ async function pendingCharges(): Promise<{ chargeId: string; ref: string }[]> {
  */
 export async function reconcilePendingCharges(): Promise<ReconcileResult> {
   if (!pagarme.isPagarmeConfigured()) {
-    return { checked: 0, settled: 0, failed: 0 };
+    return { checked: 0, settled: 0, expired: 0, failed: 0 };
   }
 
   const rows = await pendingCharges();
-  const result: ReconcileResult = { checked: 0, settled: 0, failed: 0 };
+  const result: ReconcileResult = { checked: 0, settled: 0, expired: 0, failed: 0 };
+
+  // Charge → order, so a dead PIX can be closed on the right row.
+  const orderIdByCharge = new Map(
+    rows.filter((r) => r.orderId).map((r) => [r.chargeId, r.orderId as string]),
+  );
 
   for (const { chargeId, ref } of rows) {
     result.checked += 1;
@@ -89,7 +126,23 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
       // Deliberately the uncached lookup: settling money must never act on a
       // few-seconds-old answer kept for the polling screens.
       const charge = await pagarme.getCharge(chargeId);
-      if (pagarme.mapChargeStatus(charge.status) !== 'paid') continue;
+
+      if (pagarme.mapChargeStatus(charge.status) !== 'paid') {
+        // A PIX past its expiry can never be paid, so leaving the order open
+        // only grows a queue nobody can clear. Cancelling goes through
+        // `updateOrderStatus`, which is what releases the stock hold, returns
+        // store credit and tells the customer — doing it with a bare UPDATE
+        // here would skip all three.
+        if (isDeadPix(charge) && ref.startsWith('pedido ')) {
+          const orderId = orderIdByCharge.get(chargeId);
+          if (orderId) {
+            await updateOrderStatus(orderId, 'cancelled', 'system-reconcile');
+            result.expired += 1;
+            console.log(`[RECONCILE] ${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pedido cancelado`);
+          }
+        }
+        continue;
+      }
 
       // Hand it to the webhook processor rather than settling here. The claim
       // on `processed_webhooks` is what makes this safe to run next to a real
@@ -110,9 +163,10 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
     }
   }
 
-  if (result.settled > 0 || result.failed > 0) {
+  if (result.settled > 0 || result.expired > 0 || result.failed > 0) {
     console.log(
-      `[RECONCILE] ${result.checked} verificada(s), ${result.settled} liquidada(s), ${result.failed} com erro`,
+      `[RECONCILE] ${result.checked} verificada(s), ${result.settled} liquidada(s), ` +
+        `${result.expired} expirada(s), ${result.failed} com erro`,
     );
   }
 

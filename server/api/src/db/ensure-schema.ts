@@ -1207,6 +1207,19 @@ const STEPS: SchemaStep[] = [
       await query(`UPDATE subscriptions SET provider = 'stripe' WHERE provider IS NULL`);
     },
   },
+  {
+    name: "Payment claims against double charging (migration 035)",
+    run: async () => {
+      // Two places spent money with no mutual exclusion: charging a card (the
+      // order stays `pending` until the webhook settles, so a second click in
+      // that window charged the customer again) and buying a shipping label
+      // (two clicks, two carts, two checkouts). The claim is a timestamp taken
+      // by a conditional UPDATE, and it expires on its own — a process that
+      // dies mid-call must not lock the order forever.
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_payment_started_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_purchase_started_at TIMESTAMPTZ`);
+    },
+  },
 ];
 
 let state: SchemaState = {
