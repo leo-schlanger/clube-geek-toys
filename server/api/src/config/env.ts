@@ -63,7 +63,16 @@ const envSchema = z.object({
   // remains a manual escape hatch and takes precedence when set.
   MELHOR_ENVIO_CLIENT_ID: z.string().min(1).optional(),
   MELHOR_ENVIO_CLIENT_SECRET: z.string().min(1).optional(),
-  MELHOR_ENVIO_SCOPES: z.string().default('shipping-calculate'),
+  // Quoting alone was `shipping-calculate`. Buying and printing a label needs
+  // the cart, the checkout and the print scopes too — a token without them
+  // answers 403, which `label.service` turns into "reautorize a integração".
+  // Changing this does NOT change an existing token: the shop has to authorise
+  // once more (one click, on the shop's own account — no customer involved).
+  MELHOR_ENVIO_SCOPES: z
+    .string()
+    .default(
+      'shipping-calculate cart-read cart-write shipping-checkout shipping-generate shipping-print shipping-cancel shipping-tracking orders-read',
+    ),
   // Separate from API_URL because that one is baked into stored upload URLs.
   MELHOR_ENVIO_REDIRECT_URI: z.string().url().optional(),
   MELHOR_ENVIO_TOKEN: z.string().min(1).optional(),

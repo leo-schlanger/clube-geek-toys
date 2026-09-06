@@ -252,3 +252,54 @@ cartão.
 6. Validar: `POST /shipping/quote` deve retornar `"source":"melhor_envio"` (não `fallback`)
 
 > Quem tem a conta ME (Norberto/Laura) envia o token por canal seguro; aí colamos na VPS em 1 min.
+
+## Etiqueta de envio (Melhor Envio)
+
+Antes disto a compra da etiqueta acontecia **fora do sistema**: a loja ia ao
+site do Melhor Envio, comprava, imprimia e voltava para colar o rastreio no
+painel. As colunas `melhor_envio_cart_id` / `melhor_envio_order_id` existiam
+desde sempre e nunca foram preenchidas por nada.
+
+Agora o painel faz, no detalhe do pedido, em **um botão**:
+
+```
+POST /me/cart               → item no carrinho   (grava melhor_envio_order_id)
+POST /me/shipment/checkout  → COMPRA a etiqueta  ← o dinheiro sai aqui
+POST /me/shipment/generate  → torna imprimível
+POST /me/shipment/print     → devolve o PDF
+```
+
+**A ordem importa.** O id do envio é gravado no pedido assim que o item entra no
+carrinho, _antes_ do checkout — se o processo morresse entre pagar e registrar,
+a loja teria comprado uma etiqueta que nunca encontraria. Cada passo é pulado
+quando o Melhor Envio diz que já foi feito, então apertar duas vezes não compra
+duas etiquetas e uma compra interrompida é retomável.
+
+Quando o rastreio aparece, ele é gravado pelo mesmo caminho de um código
+digitado: o pedido vira `shipped` e o cliente recebe `order-shipped`.
+
+| Endpoint                         | O quê                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `GET /orders/:id/label`          | Estado, perguntado ao Melhor Envio. Barato, pode abrir junto do pedido |
+| `POST /orders/:id/label`         | Compra + gera + imprime. **Gasta dinheiro** — a UI confirma antes      |
+| `POST /orders/:id/label/reprint` | Só o PDF de uma etiqueta já paga. Não cobra                            |
+
+Recusa antes de gastar: pedido não pago, retirada na loja, sem CEP válido, sem
+serviço de frete escolhido, ou com item cujo produto foi apagado do catálogo
+(não há como pesar o pacote — e chutar compra uma etiqueta que os Correios
+podem recusar no balcão).
+
+### Escopo do token
+
+Cotar exige `shipping-calculate`. Comprar e imprimir exige também `cart-read`,
+`cart-write`, `shipping-checkout`, `shipping-generate`, `shipping-print`,
+`shipping-cancel`, `shipping-tracking` e `orders-read`.
+
+Trocar `MELHOR_ENVIO_SCOPES` **não muda um token que já existe**: é preciso
+autorizar de novo, em **Configurações → Melhor Envio → Autorizar**. É um clique,
+na conta da própria loja — o comprador não participa e não fica sabendo. Um
+token sem os escopos novos responde 403, e a API traduz isso para "reautorize a
+integração" em vez de mostrar o erro cru.
+
+O campo manual de rastreio continua: é o caminho para etiqueta comprada em
+outro lugar, e para os casos que a compra automática recusa.

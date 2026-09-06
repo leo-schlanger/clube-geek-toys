@@ -10,6 +10,10 @@ import {
   confirmPixOrder,
   refundOrder,
   setOrderTracking,
+  getLabelState,
+  buyOrderLabel,
+  reprintOrderLabel,
+  type LabelState,
 } from '../../lib/orders'
 import { formatCurrency, cn } from '../../lib/utils'
 import { logger } from '../../lib/logger'
@@ -76,6 +80,8 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
   const [actionLoading, setActionLoading] = useState(false)
   const [statusValue, setStatusValue] = useState<OrderStatus | ''>('')
   const [trackingCode, setTrackingCode] = useState('')
+  const [label, setLabel] = useState<LabelState | null>(null)
+  const [labelLoading, setLabelLoading] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -87,6 +93,14 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
         setOrder(data)
         setStatusValue(data?.status ?? '')
         setTrackingCode(data?.trackingCode ?? '')
+        // Asked of Melhor Envio, so the panel shows what is really bought
+        // rather than guessing from our own columns. A failure here must not
+        // stop the order rendering.
+        if (data && data.deliveryMethod !== 'pickup') {
+          getLabelState(data.id)
+            .then((l) => { if (active) setLabel(l) })
+            .catch(() => {})
+        }
       })
       .catch((error) => {
         logger.error('Error fetching order:', error)
@@ -190,6 +204,48 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
     setActionLoading(false)
   }
 
+  /**
+   * Buys, generates and prints in one action — and it spends money, so it
+   * confirms first. The PDF opens in a new tab; the tracking code lands on the
+   * order through the same path a typed one does.
+   */
+  async function handleBuyLabel() {
+    if (!order) return
+    if (
+      !window.confirm(
+        `Comprar a etiqueta do pedido #${order.orderNumber} no Melhor Envio?\n\n` +
+          'O valor do frete é debitado da sua conta Melhor Envio.'
+      )
+    ) {
+      return
+    }
+    setLabelLoading(true)
+    try {
+      const state = await buyOrderLabel(order.id)
+      setLabel(state)
+      if (state.trackingCode) setTrackingCode(state.trackingCode)
+      if (state.printUrl) window.open(state.printUrl, '_blank', 'noopener')
+      toast.success('Etiqueta comprada e gerada.')
+      onChanged()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao gerar etiqueta')
+      logger.error('Error buying label:', error)
+    }
+    setLabelLoading(false)
+  }
+
+  /** Re-opens the PDF of a label already paid for. Costs nothing. */
+  async function handleReprint() {
+    if (!order) return
+    setLabelLoading(true)
+    try {
+      window.open(await reprintOrderLabel(order.id), '_blank', 'noopener')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao abrir a etiqueta')
+    }
+    setLabelLoading(false)
+  }
+
   const address = order ? formatAddress(order.shippingAddress) : null
   const isPickup = order?.deliveryMethod === 'pickup'
   const canConfirmPix = order?.paymentMethod === 'pix' && order?.status === 'pending'
@@ -207,6 +263,11 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
    * to ask the acquirer for.
    */
   const hasProviderCharge = Boolean(order?.pagarmeChargeId || order?.stripePaymentIntentId)
+  // Only a paid order has a shipment worth buying, and only a shipped-by-post
+  // one has a journey at all.
+  const canBuyLabel =
+    order?.deliveryMethod !== 'pickup' &&
+    (order?.status === 'paid' || order?.status === 'processing' || order?.status === 'shipped')
   const canRefund =
     hasProviderCharge &&
     (order?.status === 'paid' || order?.status === 'processing' || order?.status === 'shipped')
@@ -334,6 +395,44 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                       {order.shippingCost > 0 ? ` · ${formatCurrency(order.shippingCost)}` : ''}
                     </p>
                   )}
+                </div>
+              )}
+
+              {/*
+                Buying the label used to happen entirely off-system: the shop
+                went to melhorenvio.com.br, bought it, and came back to paste
+                the code below. That field stays — it is the fallback when the
+                automatic path cannot be used (a deleted product, an unusual
+                parcel) and for labels bought elsewhere.
+              */}
+              {!isPickup && canBuyLabel && (
+                <div className="space-y-2 border-t pt-4">
+                  <h4 className="text-sm font-semibold">Etiqueta de envio</h4>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      type="button"
+                      onClick={handleBuyLabel}
+                      disabled={labelLoading || label?.purchased}
+                      className="flex-1"
+                    >
+                      {label?.purchased ? 'Etiqueta já comprada' : 'Comprar e imprimir etiqueta'}
+                    </Button>
+                    {label?.purchased && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleReprint}
+                        disabled={labelLoading}
+                      >
+                        Reimprimir
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {label?.purchased
+                      ? 'Comprada no Melhor Envio. Reimprimir não cobra de novo.'
+                      : 'O frete é debitado da conta Melhor Envio da loja.'}
+                  </p>
                 </div>
               )}
 

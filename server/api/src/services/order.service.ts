@@ -96,6 +96,8 @@ function mapOrder(row: pg.QueryResultRow): Order {
     installments: row.installments != null ? Number(row.installments) : null,
     customerDocument: row.customer_document ?? null,
     pagarmeCustomerId: row.pagarme_customer_id ?? null,
+    melhorEnvioOrderId: row.melhor_envio_order_id ?? null,
+    melhorEnvioCartId: row.melhor_envio_cart_id ?? null,
     paidAt: row.paid_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

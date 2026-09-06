@@ -85,6 +85,46 @@ export async function payOrderWithCard(
   return result.data
 }
 
+// ─── Etiqueta de envio (Melhor Envio) ────────────────────────────────────────
+
+export interface LabelState {
+  melhorEnvioOrderId: string | null
+  purchased: boolean
+  generated: boolean
+  trackingCode: string | null
+  printUrl?: string
+}
+
+/** Where the label stands, asked of Melhor Envio. Safe to call on open. */
+export async function getLabelState(orderId: string): Promise<LabelState | null> {
+  const result = await api.get<LabelState>(`/orders/${orderId}/label`)
+  return result.data ?? null
+}
+
+/**
+ * Buy, generate and print in one action.
+ *
+ * **Spends the shop's money.** Throws with the server's message — which names
+ * the missing Melhor Envio permission when that is the cause, since that is the
+ * failure the shop will actually hit first.
+ */
+export async function buyOrderLabel(orderId: string): Promise<LabelState> {
+  const result = await api.post<LabelState>(`/orders/${orderId}/label`, {})
+  if (result.error || !result.data) {
+    throw new Error(result.error || 'Não foi possível gerar a etiqueta.')
+  }
+  return result.data
+}
+
+/** Re-fetch the PDF URL for a label already paid for. Costs nothing. */
+export async function reprintOrderLabel(orderId: string): Promise<string> {
+  const result = await api.post<{ printUrl: string }>(`/orders/${orderId}/label/reprint`, {})
+  if (result.error || !result.data?.printUrl) {
+    throw new Error(result.error || 'Não foi possível recuperar a etiqueta.')
+  }
+  return result.data.printUrl
+}
+
 /** Helper: build the order payload from cart items. */
 export function cartToOrderItems(
   items: CartItem[]

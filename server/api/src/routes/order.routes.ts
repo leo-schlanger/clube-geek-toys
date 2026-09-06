@@ -4,6 +4,7 @@ import { authenticate, requireRole, optionalAuth } from '../middleware/auth.js';
 import { paymentLimiter, publicLookupLimiter } from '../middleware/rate-limit.js';
 import { validate } from '../middleware/validate.js';
 import * as orderService from '../services/order.service.js';
+import * as labelService from '../services/label.service.js';
 
 export const orderRouter = Router();
 
@@ -242,6 +243,37 @@ orderRouter.post('/:id/refund', authenticate, requireRole('admin'), async (req, 
 const trackingSchema = z.object({
   trackingCode: z.string().min(5).max(64),
   trackingUrl: z.string().url().optional(),
+});
+
+/**
+ * Shipping label, through Melhor Envio.
+ *
+ * `GET` is the state (safe to poll), `POST` buys-generates-prints in one go,
+ * and `/reprint` re-fetches the PDF URL for a label already paid for. All admin
+ * only: the POST spends the shop's money.
+ */
+orderRouter.get('/:id/label', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json(await labelService.getLabelState(req.params.id as string));
+  } catch (err) {
+    next(err);
+  }
+});
+
+orderRouter.post('/:id/label', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json(await labelService.buyAndPrintLabel(req.params.id as string, req.user!.userId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+orderRouter.post('/:id/label/reprint', authenticate, requireRole('admin'), async (req, res, next) => {
+  try {
+    res.json(await labelService.reprintLabel(req.params.id as string));
+  } catch (err) {
+    next(err);
+  }
 });
 
 orderRouter.patch('/:id/tracking', authenticate, requireRole('admin'), validate(trackingSchema), async (req, res, next) => {

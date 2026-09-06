@@ -298,6 +298,9 @@ export interface Order {
   installments?: number | null;
   /** CPF/CNPJ of the buyer, required by the acquirer. Digits only. */
   customerDocument?: string | null;
+  /** Melhor Envio shipment id — exists from the moment the label is carted. */
+  melhorEnvioOrderId?: string | null;
+  melhorEnvioCartId?: string | null;
   paidAt: string | null;
   createdAt: string;
   updatedAt: string;
