@@ -60,7 +60,16 @@ app.use(helmet({
       scriptSrc: ["'self'", "https://js.stripe.com", "https://accounts.google.com"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https://api.stripe.com", "https://accounts.google.com"],
+      // `api.pagar.me` is where the browser exchanges the card for a token —
+      // without it the CSP blocks the call and card payment fails with nothing
+      // in the UI to explain why. Stripe stays for charges made before the
+      // 2026-09-01 migration.
+      connectSrc: [
+        "'self'",
+        'https://api.pagar.me',
+        'https://api.stripe.com',
+        'https://accounts.google.com',
+      ],
       fontSrc: ["'self'"],
       frameSrc: ["https://js.stripe.com", "https://accounts.google.com"],
     },

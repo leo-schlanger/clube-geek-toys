@@ -1,6 +1,11 @@
 # Segurança — Clube GeekPop & Toys
 
-> **Última atualização:** 8 de Agosto de 2026
+> **Última atualização:** 7 de Setembro de 2026
+>
+> A auditoria com evidência de 07/09/2026 — o que foi verificado, o que foi
+> corrigido e as fraquezas que ficam por decisão — está em
+> [`SECURITY-AUDIT-2026-09.md`](SECURITY-AUDIT-2026-09.md). Este documento
+> descreve a postura; aquele registra a medição.
 
 ## 1. Visão Geral de Segurança
 
@@ -14,7 +19,7 @@ A plataforma adota uma postura de **defesa em profundidade**:
 
 ### Hash de Senhas
 
-- Algoritmo: **bcrypt** com **12 rounds** de salt
+- Algoritmo: **bcrypt** (v6, desde 07/09/2026) com **12 rounds** de salt
 - Requisitos mínimos: 8 caracteres, pelo menos 1 maiúscula e 1 número
 - Senhas nunca armazenadas em texto puro — apenas o hash bcrypt na coluna `password_hash`
 

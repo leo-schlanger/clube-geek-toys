@@ -305,21 +305,22 @@ Detalhes completos em `scripts/rádio/README.md`.
 
 ## Documentação
 
-| Documento                                              | Conteudo                                |
-| ------------------------------------------------------ | --------------------------------------- |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)         | Arquitetura técnica detalhada           |
-| [`docs/PROJECT.md`](docs/PROJECT.md)                   | Escopo, modelos de dados, endpoints API |
-| [`docs/SECURITY.md`](docs/SECURITY.md)                 | Segurança, LGPD, autenticação           |
-| [`docs/RADIO.md`](docs/RADIO.md)                       | Operação da rádio AzuraCast             |
-| [`docs/TODO.md`](docs/TODO.md)                         | Roadmap e progresso                     |
-| [`docs/DESIGN.md`](docs/DESIGN.md)                     | Design system e marca                   |
-| [`docs/WHOLESALE.md`](docs/WHOLESALE.md)               | Canal atacado B2B                       |
-| [`docs/EVENTS.md`](docs/EVENTS.md)                     | Eventos na loja                         |
-| [`docs/SHOP-ORDERS.md`](docs/SHOP-ORDERS.md)           | Pedidos da loja                         |
-| [`docs/PRODUCT-VARIANTS.md`](docs/PRODUCT-VARIANTS.md) | Variações de produto                    |
-| [`docs/DOC-STATUS.md`](docs/DOC-STATUS.md)             | Auditoria docs vs código                |
-| [`DEPLOY.md`](DEPLOY.md)                               | Deploy e infraestrutura na VPS          |
-| [`CLAUDE.md`](CLAUDE.md)                               | Guia operacional para sessoes do Claude |
+| Documento                                                          | Conteudo                                |
+| ------------------------------------------------------------------ | --------------------------------------- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                     | Arquitetura técnica detalhada           |
+| [`docs/PROJECT.md`](docs/PROJECT.md)                               | Escopo, modelos de dados, endpoints API |
+| [`docs/SECURITY.md`](docs/SECURITY.md)                             | Segurança, LGPD, autenticação           |
+| [`docs/SECURITY-AUDIT-2026-09.md`](docs/SECURITY-AUDIT-2026-09.md) | Auditoria de segurança de 07/09/2026    |
+| [`docs/RADIO.md`](docs/RADIO.md)                                   | Operação da rádio AzuraCast             |
+| [`docs/TODO.md`](docs/TODO.md)                                     | Roadmap e progresso                     |
+| [`docs/DESIGN.md`](docs/DESIGN.md)                                 | Design system e marca                   |
+| [`docs/WHOLESALE.md`](docs/WHOLESALE.md)                           | Canal atacado B2B                       |
+| [`docs/EVENTS.md`](docs/EVENTS.md)                                 | Eventos na loja                         |
+| [`docs/SHOP-ORDERS.md`](docs/SHOP-ORDERS.md)                       | Pedidos da loja                         |
+| [`docs/PRODUCT-VARIANTS.md`](docs/PRODUCT-VARIANTS.md)             | Variações de produto                    |
+| [`docs/DOC-STATUS.md`](docs/DOC-STATUS.md)                         | Auditoria docs vs código                |
+| [`DEPLOY.md`](DEPLOY.md)                                           | Deploy e infraestrutura na VPS          |
+| [`CLAUDE.md`](CLAUDE.md)                                           | Guia operacional para sessoes do Claude |
 
 ---
 
