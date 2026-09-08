@@ -247,3 +247,36 @@ em 5 segundos. E validado ao contrário, que é o que dá valor ao teste —
 
 Falta ligar o bucket: `BACKUP_OFFSITE_*` no `.env` (o `rclone` já está
 instalado). Até lá, a cópia externa é manual, via `scripts/backup-pull.sh`.
+
+### 6. Os uploads, que não estavam em backup nenhum
+
+Achado ao dimensionar o bucket: o backup cobria só o Postgres. As **220 MB de
+arquivos** — 454 fotos de produto, 41 da galeria, banners de evento, fotos de
+perfil e **contratos de associado** — viviam num volume Docker que nada copiava.
+
+Restaurar o banco sem eles devolve um catálogo em que os 252 produtos estão sem
+foto, e o contrato assinado (documento com dado pessoal) simplesmente some. É
+pior que perder o dump: o dump se refaz em segundos; a foto que a Laura tirou,
+não.
+
+`uploads-offsite.sh` espelha o volume no mesmo bucket, com duas diferenças em
+relação ao banco:
+
+- **`rclone crypt` no lugar do gpg** — cifra o **nome** do arquivo também (um
+  contrato nomeado com o id do membro vazaria por si só) e envia só o que mudou.
+  Reenviar 220 MB toda noite não escala conforme o catálogo cresce.
+- **Exclusão é reversível por 30 dias** (`--backup-dir`), o que também protege
+  contra apagar foto sem querer no painel.
+
+A verificação é `rclone cryptcheck`, o único check que lê **através** da camada
+de cifra e compara com a origem.
+
+Validado de ponta a ponta contra um destino local no lugar do bucket
+(`BACKUP_OFFSITE_LOCAL_DIR`, que também serve para uma segunda cópia num disco):
+
+- 504 arquivos sincronizados e verificados em 4,5 s
+- segunda execução em 1,7 s, sem transferir nada — o incremental funciona
+- **nenhum nome legível no destino**, nem extensão, nem diretório
+- foto apagada foi parar em `uploads-deleted/2026-09-08/products/<id>/<arquivo>`
+  e voltou **byte a byte idêntica**
+- restauração completa para um diretório limpo: 504 → 504, sem diferença

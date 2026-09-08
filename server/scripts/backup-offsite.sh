@@ -22,35 +22,16 @@ set -euo pipefail
 
 BACKUP_DIR="${1:-/opt/clube-geek-toys/backups}"
 
-if [[ -z "${BACKUP_OFFSITE_BUCKET:-}" ]]; then
+# shellcheck source=/dev/null
+. "$(dirname "$0")/offsite-remote.sh"
+
+DEST=$(offsite_base_dest) || exit $?
+if [[ -z "$DEST" ]]; then
   echo "[$(date)] offsite: not configured (BACKUP_OFFSITE_BUCKET unset) — skipping."
   exit 0
 fi
 
-for var in BACKUP_OFFSITE_ENDPOINT BACKUP_OFFSITE_ACCESS_KEY BACKUP_OFFSITE_SECRET_KEY; do
-  if [[ -z "${!var:-}" ]]; then
-    echo "[$(date)] offsite: ERROR — ${var} is missing while BACKUP_OFFSITE_BUCKET is set." >&2
-    exit 1
-  fi
-done
-
-if ! command -v rclone >/dev/null 2>&1; then
-  echo "[$(date)] offsite: ERROR — rclone not installed (apt-get install -y rclone)." >&2
-  exit 1
-fi
-
-PREFIX="${BACKUP_OFFSITE_PREFIX:-clube-geek-toys}"
-
-# rclone takes its whole configuration from the environment, so nothing is
-# written to disk and no credential lands in a config file.
-export RCLONE_CONFIG_OFFSITE_TYPE=s3
-export RCLONE_CONFIG_OFFSITE_PROVIDER="${BACKUP_OFFSITE_PROVIDER:-Cloudflare}"
-export RCLONE_CONFIG_OFFSITE_ENDPOINT="$BACKUP_OFFSITE_ENDPOINT"
-export RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID="$BACKUP_OFFSITE_ACCESS_KEY"
-export RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY="$BACKUP_OFFSITE_SECRET_KEY"
-export RCLONE_CONFIG_OFFSITE_NO_CHECK_BUCKET=true
-
-REMOTE="offsite:${BACKUP_OFFSITE_BUCKET}/${PREFIX}"
+REMOTE="${DEST}/db"
 
 echo "[$(date)] offsite: pushing ${BACKUP_DIR} → ${REMOTE}"
 # Only the encrypted files, never a stray plaintext dump.

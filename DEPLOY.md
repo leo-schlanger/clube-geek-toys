@@ -502,6 +502,45 @@ copy` dizer "ok" só significa que os bytes foram aceitos; o que precisa ser
 verdade é que a cópia no bucket ainda decifra — ela é a que vai ser usada no dia
 em que o servidor não existir.
 
+### Uploads (fotos, galeria, contratos)
+
+`uploads-offsite.sh` roda junto com o dump e espelha o volume `server_uploads`
+(~220 MB, 500+ arquivos) no mesmo bucket. Duas diferenças em relação ao banco:
+
+- **`rclone crypt`, não gpg.** O nome do arquivo também é cifrado — um contrato
+  nomeado com o id do membro vazaria sozinho — e só o que mudou sobe. Reenviar o
+  volume inteiro toda noite não escalaria conforme o catálogo cresce. Mesma
+  `BACKUP_PASSPHRASE`.
+- **Exclusão é guardada.** `--backup-dir` põe o que foi apagado ou substituído em
+  `uploads-deleted/<data>/`, por 30 dias (`UPLOADS_DELETED_RETENTION_DAYS`).
+  Apagar uma foto sem querer no painel deixa de ser definitivo.
+
+A verificação é `rclone cryptcheck`, que lê **através** da camada de cifra e
+compara com a origem — é o único check que prova que o que está lá decifra de
+volta nos bytes que temos aqui.
+
+Restaurar:
+
+```bash
+# tudo, direto no volume (VPS nova, depois de restaurar o banco)
+/opt/clube-geek-toys/server/scripts/uploads-restore.sh
+
+# só olhar, sem mexer no volume
+/opt/clube-geek-toys/server/scripts/uploads-restore.sh /tmp/conferir
+
+# recuperar o que foi apagado num dia
+/opt/clube-geek-toys/server/scripts/uploads-restore.sh --deleted 2026-09-08 /tmp/recuperado
+```
+
+Ele usa `copy`, nunca `sync`: restauração não é hora de apagar arquivo que já
+está no destino.
+
+### Testar o pipeline sem bucket
+
+`BACKUP_OFFSITE_LOCAL_DIR=/tmp/x` troca o bucket por um diretório. Exercita
+cifra, sync, verificação e restauração inteiras — e serve também para manter uma
+segunda cópia num disco montado.
+
 ### Cópia na sua máquina
 
 ```bash
