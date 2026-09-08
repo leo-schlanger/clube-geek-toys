@@ -4,8 +4,12 @@ Revisão do projeto inteiro com evidência: dependências, autenticação,
 autorização, injeção, XSS, cabeçalhos, segredos e superfície pública.
 
 **08/09** acrescentou a camada que faltava — infraestrutura da VPS, ciclo de
-vida de token, upload e CORS. Está na segunda metade do documento, a partir de
-[Segunda passada](#segunda-passada--0809).
+vida de token, upload e origens aceitas.
+
+> **Leia antes de acrescentar coisa aqui.** O repositório é **público**. Este
+> arquivo registra o que **já foi corrigido** e as regras que decorrem disso.
+> Falha ainda aberta vai para `docs/SECURITY-PRIVATE.md`, fora do repositório —
+> descrever em público um buraco que ainda existe é publicar o mapa dele.
 
 ---
 
@@ -96,31 +100,19 @@ pelo `rsync --delete` do deploy.
 
 ---
 
-## Pontos fracos conhecidos (decisão, não descuido)
+## O que ficou em aberto
 
-**Tokens no `localStorage`.** O access token e o refresh ficam lá além do
-cookie httpOnly, porque a API é cross-origin. Um XSS os leria — mas não há
-superfície de XSS hoje, e a CSP é restritiva. O cookie httpOnly já é o caminho
-preferencial do refresh.
+Fica fora deste arquivo, de propósito.
 
-**Sem bloqueio por conta.** A proteção contra força bruta é só rate limit por
-IP (20 tentativas / 5 min). Um atacante distribuído contorna. Aceitável para o
-volume atual; se virar problema, o próximo passo é contar falhas por conta.
+**Este repositório é público.** Uma lista de fraquezas ainda não corrigidas,
+com endpoint, limite e mecanismo, é um mapa pronto para quem quiser usá-lo — e
+não ajuda ninguém que trabalhe no código, porque o que se precisa saber para
+não reintroduzir um problema são as **regras**, e essas estão aqui e no
+`CLAUDE.md`.
 
-**`GET /members/cpf-exists/:cpf` é público.** Devolve `{exists: boolean}` e
-permite sondar se um CPF é membro. Trade-off registrado: é o que avisa "CPF já
-cadastrado" antes de criar a conta, e está a 15 req/min.
-
-**Meia-entrada de evento é autodeclarada** — ver `MEMBER-CARD-TICKETS.md`.
-
----
-
-## Ação pendente do dono do projeto
-
-**Rotacionar a `PAGARME_SECRET_KEY`.** Ela foi colada no chat durante a
-configuração e está no histórico daquela conversa. Trocar no painel e atualizar
-o `.env` leva um minuto. A senha do webhook idem — embora essa seja menos grave,
-porque o processador relê a cobrança na API antes de liquidar qualquer coisa.
+O inventário do que segue aberto está em `docs/SECURITY-PRIVATE.md`, que o
+`.gitignore` mantém fora do repositório. Item resolvido migra para cá:
+corrigido, deixa de ser mapa e vira história.
 
 ---
 
@@ -129,7 +121,8 @@ porque o processador relê a cobrança na API antes de liquidar qualquer coisa.
 A primeira passada olhou o código de aplicação. Esta olhou o que está **abaixo
 e ao redor** dele: sistema operacional, rede, contêineres, e os pedaços do
 código onde a falha não é lógica de negócio mas manuseio de caminho, token e
-origem.
+origem. O que ela achou e foi corrigido está abaixo; o que achou e continua
+aberto está na nota privada.
 
 ## Achado corrigido: upload escrevia fora do volume
 
@@ -158,91 +151,6 @@ Corrigido com uma regra só, compartilhada pelos cinco:
 `uploadDir()` em `server/api/src/utils/upload-path.ts` — a pasta só pode ser
 nomeada por um UUID ou pelo sentinela `temp`. 11 testes, incluindo a invariante
 "o que sair daqui nunca escapa da base".
-
-## Infraestrutura da VPS
-
-### O que está certo
-
-|              |                                                                                                                                                    |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Firewall** | `ufw` ativo, default **deny incoming**. Só 80, 443, 22, 2022 (SFTP da rádio) e 8000-8046 (streams)                                                 |
-| **Postgres** | Escuta em **127.0.0.1:5432** apenas — não está na internet                                                                                         |
-| **Docker**   | Nenhum contêiner privilegiado, e **o socket do Docker não está montado em lugar nenhum** (é assim que um contêiner comprometido vira root no host) |
-| **Segredos** | `.env` em `600 root`. Backups em `700 root`, diário às 03:00 e semanal, o de hoje presente                                                         |
-| **Patches**  | `unattended-upgrades` ativo, Ubuntu 24.04.4, kernel 6.8                                                                                            |
-| **SSH**      | Chave funciona; root **não** entra por senha (`permitrootlogin without-password`)                                                                  |
-
-### O que precisa de atenção
-
-**1. `PasswordAuthentication` está ligado, por conflito de arquivos.**
-O `/etc/ssh/sshd_config` diz `no`, mas o `Include` da linha 12 lê o diretório
-antes, e no SSH **vale o primeiro valor encontrado**:
-`50-cloud-init.conf` diz `yes` e ganha de `60-cloudimg-settings.conf`, que diz
-`no`. Conferido com `sshd -T`: **`passwordauthentication yes`**.
-
-Hoje isso não abre nada, porque o único usuário com senha é o root e o root está
-proibido de usar senha. É uma armadilha: no dia em que alguém criar um usuário
-comum com senha, ele fica exposto a força bruta sem que ninguém tenha mudado a
-configuração de propósito.
-
-> Correção: um `/etc/ssh/sshd_config.d/99-hardening.conf` com
-> `PasswordAuthentication no` — o `99` garante que ele é lido depois, mas como
-> vale o primeiro valor, o certo é **editar o `50-cloud-init.conf`** ou removê-lo.
-> Testar em uma segunda sessão antes de fechar a atual.
-
-**2. Sem `fail2ban`.** 20 tentativas falhas no `auth.log`. Com autenticação
-efetiva por chave, força bruta não passa — mas o custo de instalar é baixo e o
-ruído nos logs some.
-
-**3. A API roda como `root` dentro do contêiner.** Não é privilegiado nem tem o
-socket do Docker, então o alcance é o próprio contêiner. Ainda assim, um
-`USER node` no Dockerfile é a diferença entre "execução de código no contêiner"
-e "execução de código como root no contêiner".
-
-**4. Backups não são cifrados e ficam no mesmo host.** Contêm CPF, endereço,
-e-mail e hash de senha de todos os membros. Quem comprometer a VPS, ou obtiver um
-snapshot do disco, leva a base inteira. É o item de maior impacto LGPD da lista.
-
-## Autenticação — ciclo de vida do token
-
-**O que está certo.** Refresh token: 64 bytes aleatórios, guardado **hasheado**
-em `refresh_sessions`, cookie httpOnly. Token de redefinição de senha:
-HMAC-SHA256 com comparação em tempo constante, 1h de validade, e o uso
-**revoga todas as sessões** — o caminho certo para uma conta possivelmente
-roubada. Códigos de ingresso: `crypto.randomBytes` sobre alfabeto sem
-ambiguidade, 60 bits no ingresso e 40 na reserva, com a entrada **queimando** o
-código num UPDATE condicional (sem replay).
-
-**Duas fraquezas.**
-
-_O link de redefinição não é de uso único._ O token é stateless — não há linha
-no banco — então ele continua valendo até expirar, **inclusive depois de já ter
-sido usado**. Se o e-mail vazar dentro da hora (caixa compartilhada, encaminhado,
-histórico do navegador), dá para redefinir a senha de novo. Guardar o `jti` numa
-tabela e apagá-lo no primeiro uso resolve.
-
-_Refresh token não rotaciona._ O uso estende a validade em vez de emitir um novo,
-então um token roubado vale pelo prazo inteiro e não há como detectar reuso.
-
-## CORS
-
-Aceita **qualquer subdomínio** de `geeketoys.com.br` e `geekpoptoys.com.br`
-sobre HTTPS, com `credentials: true`. Funciona e é conveniente, mas confia num
-espaço maior do que os seis subdomínios que existem: um subdomínio pendurado
-(DNS apontando para serviço de terceiro já liberado) passaria a falar com a API
-com as credenciais do usuário. Listar os seis explicitamente custa pouco.
-
-## Pendências do dono do projeto
-
-Por ordem de impacto:
-
-1. **Cifrar os backups e mandar uma cópia para fora do host** (LGPD)
-2. **Rotacionar a `PAGARME_SECRET_KEY`** — colada no chat durante a configuração
-3. **Desligar `PasswordAuthentication` de verdade**, corrigindo o drop-in do cloud-init
-4. Instalar `fail2ban`
-5. `USER node` no Dockerfile da API
-
----
 
 ## Aplicado em 08/09
 

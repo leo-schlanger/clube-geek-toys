@@ -32,7 +32,7 @@ vi.mock('../config/env.js', () => ({
   env: {
     ADMIN_EMAIL: 'admin@geeketoys.com.br',
     FRONTEND_URL: 'https://club.geeketoys.com.br',
-    PIX_KEY: 'geekpopee@gmail.com',
+    PIX_KEY: 'pix-teste@exemplo.com',
     PIX_MERCHANT_NAME: 'GEEKPOP E TOYS',
     PIX_MERCHANT_CITY: 'RIO DE JANEIRO',
   },
@@ -232,7 +232,7 @@ describe('PIX da reserva', () => {
       ],
     });
 
-    expect(reservation.pix?.emvCode).toContain('geekpopee@gmail.com');
+    expect(reservation.pix?.emvCode).toContain('pix-teste@exemplo.com');
     expect(reservation.pix?.amount).toBe(40);
 
     const insert = clientQueryMock.mock.calls.find(([sql]) =>
@@ -261,7 +261,7 @@ describe('PIX da reserva', () => {
       ([arg]) => (arg as { template?: string })?.template === 'event-reservation-received'
     )!;
     const vars = (call[0] as { variables: Record<string, string> }).variables;
-    expect(vars.pix_code).toContain('geekpopee@gmail.com');
+    expect(vars.pix_code).toContain('pix-teste@exemplo.com');
   });
 
   // A paid reservation must not show a QR: that invites paying twice.
@@ -286,7 +286,7 @@ describe('PIX da reserva', () => {
     const call = sendEmailMock.mock.calls.at(-1)!;
     const payload = call[0] as { to: string; variables: Record<string, string> };
     expect(payload.to).toBe('ana@example.com');
-    expect(payload.variables.pix_code).toContain('geekpopee@gmail.com');
+    expect(payload.variables.pix_code).toContain('pix-teste@exemplo.com');
   });
 
   it('recusa reenvio de reserva já confirmada', async () => {

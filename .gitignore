@@ -115,3 +115,6 @@ graphify-out/
 
 # claude-flow generated agent state (neural patterns, policy, metrics)
 .claude-flow/
+
+# Inventário do que ainda está aberto em segurança — o repo é público.
+docs/SECURITY-PRIVATE.md

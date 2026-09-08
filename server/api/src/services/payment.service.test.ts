@@ -81,7 +81,7 @@ vi.mock('../utils/pagarme.js', async () => {
 vi.mock('../config/env.js', () => ({
   env: {
     NODE_ENV: 'test',
-    PIX_KEY: 'geekpopee@gmail.com',
+    PIX_KEY: 'pix-teste@exemplo.com',
     PIX_MERCHANT_NAME: 'GEEKPOP E TOYS',
     PIX_MERCHANT_CITY: 'RIO DE JANEIRO',
     ADMIN_EMAIL: 'geeketoys@gmail.com',
