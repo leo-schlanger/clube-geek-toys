@@ -241,3 +241,63 @@ Por ordem de impacto:
 3. **Desligar `PasswordAuthentication` de verdade**, corrigindo o drop-in do cloud-init
 4. Instalar `fail2ban`
 5. `USER node` no Dockerfile da API
+
+---
+
+## Aplicado em 08/09
+
+As três correções de servidor foram feitas e verificadas.
+
+### 1. SSH só por chave
+
+`50-cloud-init.conf` passou a dizer `PasswordAuthentication no` — é o arquivo
+que vencia o conflito, então mudá-lo é o que muda o valor efetivo. Um
+`/etc/cloud/cloud.cfg.d/99-disable-ssh-pwauth.cfg` impede o cloud-init de
+reescrever `yes` no próximo boot.
+
+Feito com rollback armado: antes de tocar em nada, um `systemd-run --on-active=600`
+restauraria o arquivo original se eu perdesse o acesso. Só cancelei depois de
+uma conexão **nova** entrar por chave. `sshd -T` confirma
+`passwordauthentication no`.
+
+**Não afeta o deploy**: o workflow usa `VPS_SSH_KEY` com
+`IdentitiesOnly=yes -i deploy_key` nos três passos. Nunca houve senha ali.
+
+Como autorizar uma máquina nova: [`DEPLOY.md` §3.6](../DEPLOY.md).
+
+### 2. fail2ban
+
+Instalado, `enabled`, com jail **só do sshd** (`bantime 1h`, `maxretry 5`,
+`banaction = ufw`, para não ter duas ferramentas escrevendo regras).
+
+Uma jail de HTTP foi deixada de fora de propósito: o nginx roda em contêiner e
+o tráfego dele passa por `DOCKER-USER`/`FORWARD`, não pela cadeia `INPUT` onde o
+fail2ban escreve — banir ali daria falsa sensação de proteção.
+
+### 3. Backups cifrados
+
+O dump agora sai `pg_dump | gzip | gpg --symmetric --cipher-algo AES256`, com a
+senha em `BACKUP_PASSPHRASE` no `.env` da VPS (que o `rsync --delete` do deploy
+exclui, então sobrevive).
+
+Três decisões que valem registro:
+
+- **Sem senha, o backup recusa rodar** em vez de gravar em claro. Fallback
+  silencioso é exatamente como se descobre, tarde demais, que "o backup estava
+  cifrado" era mentira. Uma execução falha aparece no log e os dias anteriores
+  seguem em disco.
+- **A verificação decifra o arquivo de volta** e testa o gzip resultante.
+  Conferir só o ciphertext passaria num backup que nada consegue abrir — a falha
+  que só aparece no dia em que ele é necessário.
+- **Os 11 backups antigos foram cifrados** e os originais apagados, cada um
+  só depois de provar que voltava a ser um gzip íntegro. Não sobrou nenhum
+  `.sql.gz` em claro.
+
+`restore-postgres.sh` reconhece `.gpg` e ainda restaura um `.sql.gz` anterior a
+esta data, para que backup antigo não fique órfão.
+
+> **Pendência sua**: guardar a `BACKUP_PASSPHRASE` num gerenciador de senhas,
+> **fora da VPS**. Ela está só no `.env` do servidor — se o servidor se perder,
+> perde-se junto a chave dos backups, e cifrar terá sido inútil. E os backups
+> continuam no mesmo host: cifrados, resolvem confidencialidade, não perda do
+> disco. Cópia para fora ainda está em aberto.

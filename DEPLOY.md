@@ -87,6 +87,71 @@ curl https://api.geeketoys.com.br/health
 
 ---
 
+## 3.6 Acesso SSH — entrar de outra máquina
+
+**Desde 08/09/2026 a VPS só aceita chave.** Senha foi desligada no SSH, então
+uma máquina nova não entra sozinha: alguém precisa autorizar a chave dela a
+partir de uma máquina que já entra.
+
+Hoje entram como root três chaves — `geekpop-vps@Leo-...` (a sua),
+`github-actions-deploy` (o CI) e `radio-hetzner`. Confira quando quiser:
+
+```bash
+ssh geekpop-vps 'ssh-keygen -lf /root/.ssh/authorized_keys'
+```
+
+### Autorizar uma máquina nova
+
+**Na máquina nova**, gere um par e copie a parte pública (a que termina em
+`.pub` — a outra nunca sai dali):
+
+```bash
+ssh-keygen -t ed25519 -C "descricao-da-maquina" -f ~/.ssh/id_ed25519_geekpop
+cat ~/.ssh/id_ed25519_geekpop.pub
+```
+
+**De uma máquina que já entra**, autorize aquela linha:
+
+```bash
+ssh geekpop-vps 'cat >> /root/.ssh/authorized_keys' <<'PUB'
+<cole aqui a linha inteira do .pub>
+PUB
+ssh geekpop-vps 'ssh-keygen -lf /root/.ssh/authorized_keys'   # confira que apareceu
+```
+
+**De volta na máquina nova**, adicione ao `~/.ssh/config` e teste:
+
+```
+Host geekpop-vps
+  HostName <ip>
+  User root
+  IdentityFile ~/.ssh/id_ed25519_geekpop
+  IdentitiesOnly yes
+```
+
+Use **uma chave por máquina**, com o comentário dizendo qual é. Assim, quando
+uma máquina for vendida ou perdida, dá para revogar só ela apagando a linha
+correspondente do `authorized_keys` — com uma chave compartilhada, revogar uma
+tira todas do ar.
+
+### Se nenhuma máquina entrar mais
+
+Não há como se trancar do lado de fora: o **console do provedor** (VNC/recovery,
+no painel web) não passa por SSH e ainda aceita a senha do root. Entre por ele e
+acrescente a chave nova no `authorized_keys`. Guarde essa senha num gerenciador
+— ela deixou de ser o acesso do dia a dia e virou o plano B.
+
+### Por que não voltar a ligar a senha
+
+Senha exposta na internet é adivinhável; chave não. A configuração que valia
+antes vinha de um conflito, não de uma decisão: o `sshd_config` dizia `no`, mas
+o `Include` da linha 12 lê `/etc/ssh/sshd_config.d/` **antes**, e no SSH vale o
+**primeiro** valor encontrado — o `50-cloud-init.conf` dizia `yes` e ganhava.
+Hoje esse arquivo diz `no`, e `/etc/cloud/cloud.cfg.d/99-disable-ssh-pwauth.cfg`
+impede o cloud-init de reescrevê-lo no próximo boot. Confira o valor que vale
+de verdade com `sshd -T | grep -i passwordauthentication` — ler o
+`sshd_config` engana.
+
 ## 4. Variáveis de Ambiente (.env)
 
 Arquivo: `server/.env`
