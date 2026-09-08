@@ -222,3 +222,28 @@ na fechadura.
 > **Pendência sua**: passar a `BACKUP_PASSPHRASE` para um gerenciador de senhas.
 > Os dois lugares onde ela está hoje somem junto com a máquina ou com o
 > servidor — exatamente o cenário em que os backups seriam necessários.
+
+### 5. Off-site e drill de restauração
+
+Duas camadas que faltavam, implementadas em 08/09:
+
+**`backup-offsite.sh`** empurra os `.gpg` para um bucket S3-compatível depois de
+cada dump. Como os arquivos já saem cifrados do host, o provedor de storage não
+entra na fronteira de confiança — guarda bytes que não sabe ler. Depois de
+enviar, **baixa o mais recente de volta e abre**: `rclone copy` dizer "ok" só diz
+que os bytes foram aceitos, e a cópia que importa é a do bucket. Sem bucket
+configurado ele pula e avisa; jogar fora um dump bom porque a cópia não saiu do
+host seria a troca errada.
+
+**`backup-restore-test.sh`** (cron `0 5 1 * *`) sobe um `postgres:16-alpine`
+descartável, restaura o backup mais recente e confere o resultado: as tabelas
+essenciais existem e `users`/`products` voltaram com linhas — uma loja vazia
+"restaura com sucesso" e ainda assim é um desastre. Nunca toca a produção:
+container próprio, nome único por execução, dados em `tmpfs`.
+
+Validado em 08/09 contra os dados reais: 35 tabelas, 252 produtos, 30 usuários,
+em 5 segundos. E validado ao contrário, que é o que dá valor ao teste —
+**reprova** com backup truncado e **reprova** com senha errada.
+
+Falta ligar o bucket: `BACKUP_OFFSITE_*` no `.env` (o `rclone` já está
+instalado). Até lá, a cópia externa é manual, via `scripts/backup-pull.sh`.

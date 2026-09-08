@@ -426,12 +426,16 @@ anteriores à migração ainda emitem. Não crie novos webhooks lá.
 
 ### Backup automático
 
-Dois dumps `pg_dump | gzip` no disco da VPS (`/opt/clube-geek-toys/backups/`). Credenciais vêm do `.env` via `cron-backup*.sh` (nada de senha no crontab).
+Dumps `pg_dump | gzip | gpg` no disco da VPS (`/opt/clube-geek-toys/backups/`),
+**cifrados em AES-256** desde 08/09/2026 — carregam CPF, endereço, e-mail e hash
+de senha de todo membro. Credenciais e senha de cifra vêm do `.env` via
+`cron-backup*.sh` (nada de segredo no crontab).
 
-| Job     | Quando (UTC)                    | Pasta                                  | Retenção   |
-| ------- | ------------------------------- | -------------------------------------- | ---------- |
-| Diário  | `0 3 * * *` (00:00 BRT)         | `/opt/clube-geek-toys/backups/`        | 7 dias     |
-| Semanal | `0 4 * * 0` (domingo 01:00 BRT) | `/opt/clube-geek-toys/backups/weekly/` | 12 semanas |
+| Job          | Quando (UTC)                    | Pasta                                  | Retenção   |
+| ------------ | ------------------------------- | -------------------------------------- | ---------- |
+| Diário       | `0 3 * * *` (00:00 BRT)         | `/opt/clube-geek-toys/backups/`        | 7 dias     |
+| Semanal      | `0 4 * * 0` (domingo 01:00 BRT) | `/opt/clube-geek-toys/backups/weekly/` | 12 semanas |
+| Drill mensal | `0 5 1 * *` (dia 1º)            | — (container descartável)              | —          |
 
 ```bash
 chmod 755 /opt/clube-geek-toys/server/scripts/*.sh
@@ -439,7 +443,69 @@ chmod 755 /opt/clube-geek-toys/server/scripts/*.sh
 # crontab root — /bin/bash so a future deploy that drops +x cannot break cron:
 # 0 3 * * * /bin/bash /opt/clube-geek-toys/server/scripts/cron-backup.sh >> /var/log/clube-backup.log 2>&1
 # 0 4 * * 0 /bin/bash /opt/clube-geek-toys/server/scripts/cron-backup-weekly.sh >> /var/log/clube-backup-weekly.log 2>&1
+# 0 5 1 * * /bin/bash /opt/clube-geek-toys/server/scripts/cron-restore-test.sh >> /var/log/clube-restore-test.log 2>&1
 # */5 * * * * /bin/bash /opt/clube-geek-toys/server/scripts/health-check.sh >> /var/log/clube-health.log 2>&1
+```
+
+> Os scripts são versionados e o deploy faz `rsync --delete` em `server/`:
+> **edite no repositório, nunca direto na VPS**, senão o próximo deploy desfaz.
+> O `.env` está no `--exclude`, então os segredos sobrevivem.
+
+### Três camadas, e o que cada uma cobre
+
+| Camada                  | Resolve                                   | Não resolve         |
+| ----------------------- | ----------------------------------------- | ------------------- |
+| Dump cifrado no disco   | erro humano, `DROP TABLE`, migration ruim | perder a VPS        |
+| Cópia off-site (bucket) | perder a VPS, trocar de plano/servidor    | backup que não abre |
+| Drill de restauração    | backup que não abre, dump que não carrega | —                   |
+
+Um backup que ninguém restaurou é fé, não garantia. O drill (`0 5 1 * *`) sobe um
+`postgres:16-alpine` descartável, restaura o backup mais recente e **confere o que
+saiu**: as tabelas essenciais existem e `users`/`products` voltaram com linhas.
+Uma loja vazia "restaura com sucesso" e ainda assim é um desastre.
+
+Rodar à mão:
+
+```bash
+ssh $VPS_HOST '/bin/bash /opt/clube-geek-toys/server/scripts/cron-restore-test.sh'
+```
+
+Ele nunca toca na produção: container próprio, nome único por execução, dados em
+`tmpfs`. O único ponto de contato com o sistema vivo é ler o arquivo de backup.
+
+### Cópia off-site (object storage)
+
+Enquanto o backup mora no mesmo disco do banco, perder a VPS perde os dois. O
+`backup-offsite.sh` empurra os `.gpg` para um bucket S3-compatível (Cloudflare R2
+ou Backblaze B2 — no volume deste banco, centavos por mês) depois de cada dump.
+
+Os arquivos já saem cifrados do host, então **o provedor de storage não entra na
+fronteira de confiança**: ele guarda bytes que não sabe ler.
+
+Configure no `.env` da VPS e instale o `rclone` (`apt-get install -y rclone`):
+
+```bash
+BACKUP_OFFSITE_BUCKET=clube-geek-backups
+BACKUP_OFFSITE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+BACKUP_OFFSITE_ACCESS_KEY=...
+BACKUP_OFFSITE_SECRET_KEY=...
+# BACKUP_OFFSITE_PROVIDER=Cloudflare   # use "Other" no Backblaze B2
+# BACKUP_OFFSITE_PREFIX=clube-geek-toys
+```
+
+Sem `BACKUP_OFFSITE_BUCKET` ele **pula e avisa**, sem derrubar o backup: jogar
+fora um dump bom porque a cópia dele não saiu do host seria a troca errada. Com o
+bucket setado e algo faltando, aí sim falha com a variável nomeada.
+
+Depois de enviar, ele **baixa o mais recente de volta do bucket e abre**. `rclone
+copy` dizer "ok" só significa que os bytes foram aceitos; o que precisa ser
+verdade é que a cópia no bucket ainda decifra — ela é a que vai ser usada no dia
+em que o servidor não existir.
+
+### Cópia na sua máquina
+
+```bash
+bash scripts/backup-pull.sh    # baixa e confere que cada arquivo abre
 ```
 
 Dump manual (hoje, sem esperar o domingo):
