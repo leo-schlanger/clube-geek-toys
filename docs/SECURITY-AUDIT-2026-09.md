@@ -296,8 +296,21 @@ Três decisões que valem registro:
 `restore-postgres.sh` reconhece `.gpg` e ainda restaura um `.sql.gz` anterior a
 esta data, para que backup antigo não fique órfão.
 
-> **Pendência sua**: guardar a `BACKUP_PASSPHRASE` num gerenciador de senhas,
-> **fora da VPS**. Ela está só no `.env` do servidor — se o servidor se perder,
-> perde-se junto a chave dos backups, e cifrar terá sido inútil. E os backups
-> continuam no mesmo host: cifrados, resolvem confidencialidade, não perda do
-> disco. Cópia para fora ainda está em aberto.
+### 4. Cópia fora do host
+
+Os 13 backups foram copiados para `Desktop\geekpop-backups\` e **os 13 foram
+verificados nesta máquina, sem o servidor** — decifram e o gzip está íntegro (35
+tabelas). Um backup que nunca foi lido não é backup: o dia em que ele é preciso
+é um péssimo dia para descobrir que a senha não bate.
+
+`scripts/backup-pull.sh` repete a cópia e refaz essa verificação. Ele aceita
+`BACKUP_PASSPHRASE` do ambiente justamente para conferir a pasta **quando o
+servidor não existir mais**, que é o cenário para o qual ela existe.
+
+A senha ficou no `CLAUDE.local.md` (fora do repositório), além do `.env` da VPS.
+Deliberadamente **não** foi colocada dentro da pasta de backups — seria a chave
+na fechadura.
+
+> **Pendência sua**: passar a `BACKUP_PASSPHRASE` para um gerenciador de senhas.
+> Os dois lugares onde ela está hoje somem junto com a máquina ou com o
+> servidor — exatamente o cenário em que os backups seriam necessários.
