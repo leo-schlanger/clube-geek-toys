@@ -96,3 +96,25 @@ export function videoKindLabel(kind: ProductVideo['kind']): string {
       return 'MP4'
   }
 }
+
+/**
+ * Photos and videos as one list, for the product gallery.
+ *
+ * Videos come after the photos, and only the photos are variant-resolved — a
+ * video belongs to the product, not to a colour. Keeping that order is what
+ * lets a media index double as an image index while it points at a photo,
+ * which is how the fullscreen viewer stays in sync with the gallery.
+ */
+export type ProductMediaItem =
+  | { type: 'image'; url: string }
+  | { type: 'video'; video: ProductVideo }
+
+export function buildProductMedia(
+  images: string[],
+  videos: ProductVideo[] | undefined
+): ProductMediaItem[] {
+  return [
+    ...images.map((url): ProductMediaItem => ({ type: 'image', url })),
+    ...(videos ?? []).map((video): ProductMediaItem => ({ type: 'video', video })),
+  ]
+}

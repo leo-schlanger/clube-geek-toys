@@ -79,9 +79,21 @@ Migration 016 — `products.videos JSONB`, itens `{ kind, url, title? }`.
 - `youtube` / `instagram` — link colado, embedado na PDP (YouTube via domínio _nocookie_)
 - `file` — MP4 no volume `/uploads`, `POST /products/:id/video`, até 100 MB
 
-Máx. 5 por produto. Na PDP os vídeos ficam **abaixo** da galeria de fotos, não
-misturados: o índice da galeria já governa a troca de foto por variação, e
-intercalar vídeo ali quebraria essa correspondência.
+Máx. 5 por produto. Na PDP os vídeos ficam **dentro** da galeria, como itens
+depois das fotos: mesma tira de miniaturas, mesmo quadro, mesmas setas
+(mudado em 07/09/2026 — antes eram um bloco separado embaixo, que no celular
+caía fora da tela e parecia outro produto).
+
+A ordem é o que sustenta isso. Só as fotos mudam por variação — um vídeo é do
+produto, não da cor — e mantê-los depois faz o índice da galeria valer também
+como índice de foto **enquanto aponta para uma foto**, que é como o
+visualizador em tela cheia continua na imagem certa. Quem monta a lista é
+`buildProductMedia` (`src/lib/product-video.ts`); o quadro e a miniatura de
+vídeo ficam em `src/components/store/ProductMedia.tsx`.
+
+Dois detalhes de comportamento: o quadro é quadrado e o vídeo é centralizado
+sem corte (a maioria é reel vertical, e cortar tiraria o produto de cena), e um
+toque sobre o vídeo pertence aos controles dele — só a foto abre o zoom.
 
 ## Fase 3 — perguntas e notificações
 

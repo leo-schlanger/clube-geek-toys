@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 const mockAddItem = vi.fn()
@@ -158,6 +158,15 @@ const productWithVariants: Product = {
   ],
 }
 
+const productWithVideo: Product = {
+  ...product,
+  id: 'p3',
+  name: 'Balas azedas',
+  slug: 'balas-azedas',
+  images: ['https://example.com/1.jpg', 'https://example.com/2.jpg'],
+  videos: [{ kind: 'file', url: 'https://example.com/reel.mp4' }],
+}
+
 function renderPdp(slug = 'bolsa-jeans') {
   return render(
     <MemoryRouter initialEntries={[`/produto/${slug}`]}>
@@ -310,6 +319,94 @@ describe('ProductDetail', () => {
         expect(screen.getByText('Os clientes também compram')).toBeInTheDocument()
       })
       expect(screen.queryByText('Você também pode gostar')).not.toBeInTheDocument()
+    })
+  })
+
+  /**
+   * The video used to sit in a block of its own under the photos, which on a
+   * phone put it below the fold and made it look like a different product.
+   * Laura asked for it inside the gallery: same strip, same frame.
+   */
+  describe('galeria com vídeo', () => {
+    /** The photo in the main frame — the thumbnails carry the same alt text. */
+    const mainPhoto = () =>
+      within(screen.getByRole('button', { name: 'Ampliar foto' })).getByRole('img')
+
+    it('mostra o vídeo como mais um item da tira de fotos', async () => {
+      mockedGet.mockResolvedValue(productWithVideo)
+      renderPdp('balas-azedas')
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Balas azedas' })).toBeInTheDocument()
+      })
+
+      expect(screen.getByRole('button', { name: 'Foto 1' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Foto 2' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Vídeo 1' })).toBeInTheDocument()
+      // The separate block below the gallery is gone.
+      expect(screen.queryByText('Vídeo do produto')).not.toBeInTheDocument()
+    })
+
+    it('toca o vídeo no mesmo quadro em que aparecem as fotos', async () => {
+      mockedGet.mockResolvedValue(productWithVideo)
+      renderPdp('balas-azedas')
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Balas azedas' })).toBeInTheDocument()
+      })
+
+      // Opens on the photo, as before.
+      expect(mainPhoto()).toHaveAttribute('src', 'https://example.com/1.jpg')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Vídeo 1' }))
+
+      const player = await screen.findByLabelText('Vídeo de Balas azedas')
+      expect(player).toHaveAttribute('src', 'https://example.com/reel.mp4')
+      // A video is not a photo: zooming it makes no sense, so the control goes.
+      expect(screen.queryByRole('button', { name: 'Ampliar foto' })).not.toBeInTheDocument()
+    })
+
+    it('volta para a foto ao clicar na miniatura dela', async () => {
+      mockedGet.mockResolvedValue(productWithVideo)
+      renderPdp('balas-azedas')
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Balas azedas' })).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByRole('button', { name: 'Vídeo 1' }))
+      await screen.findByLabelText('Vídeo de Balas azedas')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Foto 2' }))
+
+      await waitFor(() => {
+        expect(mainPhoto()).toHaveAttribute('src', 'https://example.com/2.jpg')
+      })
+      expect(screen.getByRole('button', { name: 'Ampliar foto' })).toBeInTheDocument()
+    })
+
+    /**
+     * Only the photos are variant-resolved. If a video ever counted as one, the
+     * index the viewer uses would point past the end of the photo list.
+     */
+    it('mantém o vídeo depois das fotos da variação escolhida', async () => {
+      mockedGet.mockResolvedValue({
+        ...productWithVariants,
+        name: 'Balas azedas',
+        slug: 'balas-azedas',
+        videos: [{ kind: 'file' as const, url: 'https://example.com/reel.mp4' }],
+      })
+      renderPdp('balas-azedas')
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Balas azedas' })).toBeInTheDocument()
+      })
+
+      expect(screen.getByRole('button', { name: 'Foto 1' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Vídeo 1' })).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /Preto/i }))
+
+      await waitFor(() => {
+        expect(mainPhoto()).toHaveAttribute('src', 'https://example.com/preto.jpg')
+      })
+      expect(screen.getByRole('button', { name: 'Vídeo 1' })).toBeInTheDocument()
     })
   })
 })

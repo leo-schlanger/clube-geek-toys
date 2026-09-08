@@ -41,7 +41,8 @@ import {
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
-import { ProductVideoGallery } from '../../components/store/ProductVideoGallery'
+import { ProductVideoSlide, ProductVideoThumb } from '../../components/store/ProductMedia'
+import { buildProductMedia } from '../../lib/product-video'
 import { ProductImageViewer, HoverZoom, ZoomHint } from '../../components/store/ProductImageZoom'
 import { ProductQuestions } from '../../components/store/ProductQuestions'
 import { StarRating } from '../../components/store/StarRating'
@@ -161,6 +162,15 @@ export default function ProductDetail() {
     [product, variantSel, matched]
   )
 
+  // Photos and videos share one gallery: Laura asked for the video next to the
+  // photos instead of in a block of its own below them.
+  const media = useMemo(
+    () => buildProductMedia(displayImages, product?.videos),
+    [displayImages, product?.videos]
+  )
+  const activeIndex = Math.min(activeImage, Math.max(media.length - 1, 0))
+  const current = media[activeIndex]
+
   // Switching variant returns to the first photo of that variant's gallery.
   const galleryKey = displayImages[0] ?? ''
   useEffect(() => {
@@ -168,10 +178,10 @@ export default function ProductDetail() {
   }, [galleryKey])
 
   /** Steps through the gallery, wrapping at both ends. */
-  function stepImage(delta: number) {
-    const total = displayImages.length
+  function stepMedia(delta: number) {
+    const total = media.length
     if (total < 2) return
-    setActiveImage((current) => (Math.min(current, total - 1) + delta + total) % total)
+    setActiveImage((position) => (Math.min(position, total - 1) + delta + total) % total)
   }
 
   function handleTouchStart(e: React.TouchEvent) {
@@ -187,10 +197,11 @@ export default function ProductDetail() {
     // Below the threshold this was a tap, not a swipe: on mobile that is how
     // the enlarged photo opens, since hover does not exist.
     if (Math.abs(delta) < 40) {
-      if (displayImages.length > 0) setViewerOpen(true)
+      // A tap on a video belongs to its own controls, not to the zoom.
+      if (current?.type === 'image') setViewerOpen(true)
       return
     }
-    stepImage(delta < 0 ? 1 : -1)
+    stepMedia(delta < 0 ? 1 : -1)
   }
 
   const outOfStock = product
@@ -274,11 +285,14 @@ export default function ProductDetail() {
               {/* bg-white: non-square photos leave a frame, and grey stained the
                   product. White blends into the shop card background. */}
               <div
-                className="relative aspect-square touch-pan-y select-none overflow-hidden rounded-xl border bg-white"
+                className={cn(
+                  'relative aspect-square touch-pan-y select-none overflow-hidden rounded-xl border',
+                  current?.type === 'video' ? 'bg-black' : 'bg-white'
+                )}
                 onTouchStart={handleTouchStart}
                 onTouchEnd={handleTouchEnd}
               >
-                {displayImages.length > 0 ? (
+                {current?.type === 'image' ? (
                   <>
                     <button
                       type="button"
@@ -287,45 +301,45 @@ export default function ProductDetail() {
                       className="block h-full w-full cursor-zoom-in overflow-hidden"
                     >
                       <HoverZoom
-                        src={displayImages[Math.min(activeImage, displayImages.length - 1)]}
+                        src={current.url}
                         alt={matched ? `${product.name} — ${matched.name}` : product.name}
                       />
                     </button>
                     <ZoomHint />
                   </>
+                ) : current?.type === 'video' ? (
+                  <ProductVideoSlide video={current.video} productName={product.name} />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                     <ImageOff className="h-16 w-16" />
                   </div>
                 )}
 
-                {displayImages.length > 1 && (
+                {media.length > 1 && (
                   <>
                     <button
                       type="button"
-                      onClick={() => stepImage(-1)}
-                      aria-label="Foto anterior"
+                      onClick={() => stepMedia(-1)}
+                      aria-label="Anterior"
                       className="absolute left-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/40 p-1.5 text-white transition-colors hover:bg-black/60 sm:block"
                     >
                       <ChevronLeft className="h-5 w-5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => stepImage(1)}
-                      aria-label="Próxima foto"
+                      onClick={() => stepMedia(1)}
+                      aria-label="Próximo"
                       className="absolute right-2 top-1/2 hidden -translate-y-1/2 rounded-full bg-black/40 p-1.5 text-white transition-colors hover:bg-black/60 sm:block"
                     >
                       <ChevronRight className="h-5 w-5" />
                     </button>
                     <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
-                      {displayImages.map((img, i) => (
+                      {media.map((item, i) => (
                         <span
-                          key={`dot-${img}-${i}`}
+                          key={`dot-${item.type === 'image' ? item.url : item.video.url}-${i}`}
                           className={cn(
                             'h-1.5 rounded-full transition-all',
-                            i === Math.min(activeImage, displayImages.length - 1)
-                              ? 'w-4 bg-primary'
-                              : 'w-1.5 bg-black/25'
+                            i === activeIndex ? 'w-4 bg-primary' : 'w-1.5 bg-black/25'
                           )}
                         />
                       ))}
@@ -334,32 +348,41 @@ export default function ProductDetail() {
                 )}
               </div>
 
-              {displayImages.length > 1 && (
+              {media.length > 1 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
-                  {displayImages.map((img, i) => (
+                  {media.map((item, i) => (
                     <button
-                      key={img + i}
+                      key={`${item.type === 'image' ? item.url : item.video.url}-${i}`}
                       type="button"
                       onClick={() => setActiveImage(i)}
+                      aria-label={
+                        item.type === 'image'
+                          ? `Foto ${i + 1}`
+                          : `Vídeo ${i - displayImages.length + 1}`
+                      }
                       className={cn(
                         'h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors',
-                        activeImage === i ? 'border-primary' : 'border-transparent'
+                        activeIndex === i ? 'border-primary' : 'border-transparent'
                       )}
                     >
-                      <img src={img} alt={`${product.name} ${i + 1}`} className="h-full w-full object-cover" />
+                      {item.type === 'image' ? (
+                        <img
+                          src={item.url}
+                          alt={`${product.name} ${i + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <ProductVideoThumb video={item.video} />
+                      )}
                     </button>
                   ))}
                 </div>
               )}
 
-              {product.videos && product.videos.length > 0 && (
-                <ProductVideoGallery videos={product.videos} productName={product.name} />
-              )}
-
-              {viewerOpen && displayImages.length > 0 && (
+              {viewerOpen && current?.type === 'image' && (
                 <ProductImageViewer
                   images={displayImages}
-                  index={Math.min(activeImage, displayImages.length - 1)}
+                  index={activeIndex}
                   alt={matched ? `${product.name} — ${matched.name}` : product.name}
                   onIndexChange={setActiveImage}
                   onClose={() => setViewerOpen(false)}

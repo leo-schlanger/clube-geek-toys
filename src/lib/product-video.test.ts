@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { parseVideoUrl, youtubeId, embedUrl, videoThumbnail, videoKindLabel } from './product-video'
+import {
+  parseVideoUrl,
+  youtubeId,
+  embedUrl,
+  videoThumbnail,
+  videoKindLabel,
+  buildProductMedia,
+} from './product-video'
 
 describe('youtubeId', () => {
   it('reads every URL shape YouTube uses', () => {
@@ -83,5 +90,30 @@ describe('videoThumbnail / videoKindLabel', () => {
     expect(videoKindLabel('youtube')).toBe('YouTube')
     expect(videoKindLabel('instagram')).toBe('Instagram')
     expect(videoKindLabel('file')).toBe('MP4')
+  })
+})
+
+describe('buildProductMedia', () => {
+  const reel = { kind: 'file' as const, url: 'https://cdn.example.com/reel.mp4' }
+
+  /**
+   * Order is load-bearing: while a media index points at a photo it doubles as
+   * an index into the photo list, which is what keeps the fullscreen viewer on
+   * the picture the gallery is showing.
+   */
+  it('puts the videos after the photos', () => {
+    expect(buildProductMedia(['a.jpg', 'b.jpg'], [reel])).toEqual([
+      { type: 'image', url: 'a.jpg' },
+      { type: 'image', url: 'b.jpg' },
+      { type: 'video', video: reel },
+    ])
+  })
+
+  it('handles a product with no video', () => {
+    expect(buildProductMedia(['a.jpg'], undefined)).toEqual([{ type: 'image', url: 'a.jpg' }])
+  })
+
+  it('handles a video with no photo', () => {
+    expect(buildProductMedia([], [reel])).toEqual([{ type: 'video', video: reel }])
   })
 })
