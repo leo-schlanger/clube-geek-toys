@@ -4,10 +4,10 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/auth.js';
 import { verifyMemberOwnership } from '../middleware/ownership.js';
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
 import * as contractService from '../services/contract.service.js';
 import { query } from '../config/database.js';
+import { uploadDir } from '../utils/upload-path.js';
 import { AppError } from '../middleware/error-handler.js';
 
 const contractBodySchema = z.object({
@@ -32,13 +32,17 @@ const storage = multer.diskStorage({
     // magic-byte check, on a value that comes straight from the multipart body.
     // A `memberId` of `../../../x` therefore wrote a file anywhere the container
     // could reach, and the rejection path only unlinks the final path — the file
-    // was already on disk. Refuse anything that is not a plain UUID.
+    // was already on disk. `uploadDir` is that rule, shared with every other
+    // upload; here there is no `temp` stage, so the id must be a real one.
     const memberId = req.body?.memberId || req.params?.memberId;
-    if (typeof memberId !== 'string' || !MEMBER_ID_RE.test(memberId)) {
+    const dir =
+      typeof memberId === 'string' && MEMBER_ID_RE.test(memberId)
+        ? uploadDir('/app/uploads/contracts', memberId)
+        : null;
+    if (!dir) {
       cb(new AppError(400, 'memberId inválido.', 'INVALID_MEMBER_ID'), '');
       return;
     }
-    const dir = path.join('/app/uploads/contracts', memberId);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },

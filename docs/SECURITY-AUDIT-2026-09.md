@@ -1,7 +1,11 @@
-# Auditoria de segurança — 07/09/2026
+# Auditoria de segurança — 07 e 08/09/2026
 
 Revisão do projeto inteiro com evidência: dependências, autenticação,
 autorização, injeção, XSS, cabeçalhos, segredos e superfície pública.
+
+**08/09** acrescentou a camada que faltava — infraestrutura da VPS, ciclo de
+vida de token, upload e CORS. Está na segunda metade do documento, a partir de
+[Segunda passada](#segunda-passada--0809).
 
 ---
 
@@ -117,3 +121,123 @@ cadastrado" antes de criar a conta, e está a 15 req/min.
 configuração e está no histórico daquela conversa. Trocar no painel e atualizar
 o `.env` leva um minuto. A senha do webhook idem — embora essa seja menos grave,
 porque o processador relê a cobrança na API antes de liquidar qualquer coisa.
+
+---
+
+# Segunda passada — 08/09
+
+A primeira passada olhou o código de aplicação. Esta olhou o que está **abaixo
+e ao redor** dele: sistema operacional, rede, contêineres, e os pedaços do
+código onde a falha não é lógica de negócio mas manuseio de caminho, token e
+origem.
+
+## Achado corrigido: upload escrevia fora do volume
+
+`destination` do multer roda **antes** da validação da rota e antes de qualquer
+checagem de conteúdo, sobre um valor tirado direto da URL:
+
+```ts
+const dir = path.join("/app/uploads/products", String(req.params.id || "temp"));
+fs.mkdirSync(dir, { recursive: true });
+```
+
+O Express decodifica o parâmetro, então `..%2F..%2F` chega como `../../` e o
+`path.join` sai do volume — criando diretório e gravando arquivo em qualquer
+lugar que o contêiner alcance. Cinco lugares construíam a pasta assim; **quatro
+sem nenhuma proteção** (fotos e vídeo de produto, foto de álbum, banner de
+evento). O quinto, o upload de contrato, já tinha exatamente esse guarda, com um
+comentário descrevendo o mesmo bug — a correção nunca foi propagada.
+
+**Severidade real: média, não alta.** As cinco rotas exigem `authenticate` +
+`requireRole('admin')`, então isso é defesa em profundidade, não porta aberta.
+E o nome do arquivo sempre foi um UUID gerado por nós com extensão fixa, então
+não dava para plantar um `.js` nem sobrescrever arquivo existente. O que dava
+era criar diretório e despejar imagem/MP4 fora da árvore de uploads.
+
+Corrigido com uma regra só, compartilhada pelos cinco:
+`uploadDir()` em `server/api/src/utils/upload-path.ts` — a pasta só pode ser
+nomeada por um UUID ou pelo sentinela `temp`. 11 testes, incluindo a invariante
+"o que sair daqui nunca escapa da base".
+
+## Infraestrutura da VPS
+
+### O que está certo
+
+|              |                                                                                                                                                    |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Firewall** | `ufw` ativo, default **deny incoming**. Só 80, 443, 22, 2022 (SFTP da rádio) e 8000-8046 (streams)                                                 |
+| **Postgres** | Escuta em **127.0.0.1:5432** apenas — não está na internet                                                                                         |
+| **Docker**   | Nenhum contêiner privilegiado, e **o socket do Docker não está montado em lugar nenhum** (é assim que um contêiner comprometido vira root no host) |
+| **Segredos** | `.env` em `600 root`. Backups em `700 root`, diário às 03:00 e semanal, o de hoje presente                                                         |
+| **Patches**  | `unattended-upgrades` ativo, Ubuntu 24.04.4, kernel 6.8                                                                                            |
+| **SSH**      | Chave funciona; root **não** entra por senha (`permitrootlogin without-password`)                                                                  |
+
+### O que precisa de atenção
+
+**1. `PasswordAuthentication` está ligado, por conflito de arquivos.**
+O `/etc/ssh/sshd_config` diz `no`, mas o `Include` da linha 12 lê o diretório
+antes, e no SSH **vale o primeiro valor encontrado**:
+`50-cloud-init.conf` diz `yes` e ganha de `60-cloudimg-settings.conf`, que diz
+`no`. Conferido com `sshd -T`: **`passwordauthentication yes`**.
+
+Hoje isso não abre nada, porque o único usuário com senha é o root e o root está
+proibido de usar senha. É uma armadilha: no dia em que alguém criar um usuário
+comum com senha, ele fica exposto a força bruta sem que ninguém tenha mudado a
+configuração de propósito.
+
+> Correção: um `/etc/ssh/sshd_config.d/99-hardening.conf` com
+> `PasswordAuthentication no` — o `99` garante que ele é lido depois, mas como
+> vale o primeiro valor, o certo é **editar o `50-cloud-init.conf`** ou removê-lo.
+> Testar em uma segunda sessão antes de fechar a atual.
+
+**2. Sem `fail2ban`.** 20 tentativas falhas no `auth.log`. Com autenticação
+efetiva por chave, força bruta não passa — mas o custo de instalar é baixo e o
+ruído nos logs some.
+
+**3. A API roda como `root` dentro do contêiner.** Não é privilegiado nem tem o
+socket do Docker, então o alcance é o próprio contêiner. Ainda assim, um
+`USER node` no Dockerfile é a diferença entre "execução de código no contêiner"
+e "execução de código como root no contêiner".
+
+**4. Backups não são cifrados e ficam no mesmo host.** Contêm CPF, endereço,
+e-mail e hash de senha de todos os membros. Quem comprometer a VPS, ou obtiver um
+snapshot do disco, leva a base inteira. É o item de maior impacto LGPD da lista.
+
+## Autenticação — ciclo de vida do token
+
+**O que está certo.** Refresh token: 64 bytes aleatórios, guardado **hasheado**
+em `refresh_sessions`, cookie httpOnly. Token de redefinição de senha:
+HMAC-SHA256 com comparação em tempo constante, 1h de validade, e o uso
+**revoga todas as sessões** — o caminho certo para uma conta possivelmente
+roubada. Códigos de ingresso: `crypto.randomBytes` sobre alfabeto sem
+ambiguidade, 60 bits no ingresso e 40 na reserva, com a entrada **queimando** o
+código num UPDATE condicional (sem replay).
+
+**Duas fraquezas.**
+
+_O link de redefinição não é de uso único._ O token é stateless — não há linha
+no banco — então ele continua valendo até expirar, **inclusive depois de já ter
+sido usado**. Se o e-mail vazar dentro da hora (caixa compartilhada, encaminhado,
+histórico do navegador), dá para redefinir a senha de novo. Guardar o `jti` numa
+tabela e apagá-lo no primeiro uso resolve.
+
+_Refresh token não rotaciona._ O uso estende a validade em vez de emitir um novo,
+então um token roubado vale pelo prazo inteiro e não há como detectar reuso.
+
+## CORS
+
+Aceita **qualquer subdomínio** de `geeketoys.com.br` e `geekpoptoys.com.br`
+sobre HTTPS, com `credentials: true`. Funciona e é conveniente, mas confia num
+espaço maior do que os seis subdomínios que existem: um subdomínio pendurado
+(DNS apontando para serviço de terceiro já liberado) passaria a falar com a API
+com as credenciais do usuário. Listar os seis explicitamente custa pouco.
+
+## Pendências do dono do projeto
+
+Por ordem de impacto:
+
+1. **Cifrar os backups e mandar uma cópia para fora do host** (LGPD)
+2. **Rotacionar a `PAGARME_SECRET_KEY`** — colada no chat durante a configuração
+3. **Desligar `PasswordAuthentication` de verdade**, corrigindo o drop-in do cloud-init
+4. Instalar `fail2ban`
+5. `USER node` no Dockerfile da API

@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { uploadDir } from '../utils/upload-path.js';
+import { AppError } from '../middleware/error-handler.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { publicLookupLimiter } from '../middleware/rate-limit.js';
@@ -123,7 +125,11 @@ galleryRouter.delete('/albums/:id', ...adminOnly, async (req, res, next) => {
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const dir = path.join('/app/uploads/gallery', String(req.params.id || 'temp'));
+    const dir = uploadDir('/app/uploads/gallery', req.params.id);
+    if (!dir) {
+      cb(new AppError(400, 'Álbum inválido.', 'INVALID_ALBUM_ID'), '');
+      return;
+    }
     try {
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);

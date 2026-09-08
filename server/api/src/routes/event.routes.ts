@@ -3,6 +3,8 @@ import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { uploadDir } from '../utils/upload-path.js';
+import { AppError } from '../middleware/error-handler.js';
 import crypto from 'crypto';
 import { authenticate, optionalAuth, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -247,7 +249,11 @@ const BANNER_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const bannerStorage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const dir = path.join('/app/uploads/events', String(req.params.id || 'temp'));
+    const dir = uploadDir('/app/uploads/events', req.params.id);
+    if (!dir) {
+      cb(new AppError(400, 'Evento inválido.', 'INVALID_EVENT_ID'), '');
+      return;
+    }
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },

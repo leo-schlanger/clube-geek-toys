@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { uploadDir } from '../utils/upload-path.js';
+import { AppError } from '../middleware/error-handler.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { env, SHOP_CANONICAL_URL } from '../config/env.js';
@@ -387,8 +389,11 @@ function isLikelyImageUpload(file: Express.Multer.File): boolean {
 
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const productId = String(req.params.id || 'temp');
-    const dir = path.join('/app/uploads/products', productId);
+    const dir = uploadDir('/app/uploads/products', req.params.id);
+    if (!dir) {
+      cb(new AppError(400, 'Produto inválido.', 'INVALID_PRODUCT_ID'), '');
+      return;
+    }
     try {
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
@@ -600,7 +605,11 @@ productRouter.post(
 
 const videoStorage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const dir = path.join('/app/uploads/products', String(req.params.id || 'temp'));
+    const dir = uploadDir('/app/uploads/products', req.params.id);
+    if (!dir) {
+      cb(new AppError(400, 'Produto inválido.', 'INVALID_PRODUCT_ID'), '');
+      return;
+    }
     try {
       fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
