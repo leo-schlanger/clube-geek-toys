@@ -28,11 +28,8 @@ DELETED_RETENTION_DAYS="${UPLOADS_DELETED_RETENTION_DAYS:-30}"
 # shellcheck source=/dev/null
 . "$(dirname "$0")/offsite-remote.sh"
 
-DEST=$(offsite_base_dest) || exit $?
-if [[ -z "$DEST" ]]; then
-  echo "[$(date)] uploads: off-site not configured — skipping."
-  exit 0
-fi
+offsite_require "uploads: off-site not configured"
+DEST="$OFFSITE_DEST"
 
 if [[ -z "${BACKUP_PASSPHRASE:-}" ]]; then
   echo "[$(date)] uploads: ERROR — BACKUP_PASSPHRASE unset, refusing to send files in the clear." >&2

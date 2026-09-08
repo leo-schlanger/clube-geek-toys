@@ -32,6 +32,11 @@ if [[ -z "$BACKUP_FILE" ]]; then
     | sort -rn | head -1 | cut -d' ' -f2-)
 fi
 
+if [[ -n "${1:-}" && ! -f "$BACKUP_FILE" ]]; then
+  echo "ERROR: ${BACKUP_FILE}: no such file." >&2
+  exit 1
+fi
+
 if [[ -z "$BACKUP_FILE" || ! -f "$BACKUP_FILE" ]]; then
   echo "ERROR: no backup found to test (looked in ${BACKUP_DIR})." >&2
   exit 1

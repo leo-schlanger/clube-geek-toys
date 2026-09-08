@@ -25,11 +25,8 @@ BACKUP_DIR="${1:-/opt/clube-geek-toys/backups}"
 # shellcheck source=/dev/null
 . "$(dirname "$0")/offsite-remote.sh"
 
-DEST=$(offsite_base_dest) || exit $?
-if [[ -z "$DEST" ]]; then
-  echo "[$(date)] offsite: not configured (BACKUP_OFFSITE_BUCKET unset) — skipping."
-  exit 0
-fi
+offsite_require "offsite: not configured (BACKUP_OFFSITE_BUCKET unset)"
+DEST="$OFFSITE_DEST"
 
 REMOTE="${DEST}/db"
 

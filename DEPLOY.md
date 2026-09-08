@@ -482,16 +482,43 @@ ou Backblaze B2 — no volume deste banco, centavos por mês) depois de cada dum
 Os arquivos já saem cifrados do host, então **o provedor de storage não entra na
 fronteira de confiança**: ele guarda bytes que não sabe ler.
 
-Configure no `.env` da VPS e instale o `rclone` (`apt-get install -y rclone`):
+**Instale o rclone oficial, não o do apt.** O pacote do Ubuntu é a v1.60 (2022) e
+falha contra o R2: o PUT funciona, o R2 devolve `X-Amz-Version-Id`, o rclone relê
+o objeto com `?versionId=` e o R2 responde **501 Not Implemented** — porque não
+implementa endereçar objeto por versão. A retentativa passa, então parece só
+barulho no log, mas dobra o trabalho e **pula a etapa de exclusões**. Verifique com
+`rclone version` — precisa ser 1.75 ou mais novo.
+
+```bash
+V=$(curl -fsSL https://downloads.rclone.org/version.txt | awk '{print $2}')
+cd /tmp && curl -fsSLO "https://downloads.rclone.org/${V}/rclone-${V}-linux-amd64.zip" \
+        && curl -fsSLO "https://downloads.rclone.org/${V}/SHA256SUMS"
+# A chave vem de um keyserver independente do site do download.
+gpg --keyserver keyserver.ubuntu.com --recv-keys FBF737ECE9F8AB18604BD2AC93935E02FF3B54FA
+gpg --verify SHA256SUMS && sha256sum -c SHA256SUMS 2>/dev/null | grep linux-amd64
+unzip -qo "rclone-${V}-linux-amd64.zip"
+install -m 755 "rclone-${V}-linux-amd64/rclone" /usr/local/bin/rclone
+```
+
+Vai para `/usr/local/bin`, que **não está no PATH do cron** (`/usr/bin:/bin`) — por
+isso `offsite-remote.sh` prefixa o PATH. Sem isso o cron voltaria a usar a v1.60
+silenciosamente.
+
+Configure no `.env` da VPS:
 
 ```bash
 BACKUP_OFFSITE_BUCKET=clube-geek-backups
 BACKUP_OFFSITE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 BACKUP_OFFSITE_ACCESS_KEY=...
 BACKUP_OFFSITE_SECRET_KEY=...
-# BACKUP_OFFSITE_PROVIDER=Cloudflare   # use "Other" no Backblaze B2
+BACKUP_OFFSITE_PROVIDER=Cloudflare      # use "Other" no Backblaze B2
 # BACKUP_OFFSITE_PREFIX=clube-geek-toys
 ```
+
+Valores reais em `CLAUDE.local.md` (fora do repo). O token é restrito ao bucket:
+se vazar, o alcance é escrever num bucket que só contém dado cifrado.
+
+**Ativo desde 08/09/2026.** Uso: 220 MB de 10 GB gratuitos (2,2%).
 
 Sem `BACKUP_OFFSITE_BUCKET` ele **pula e avisa**, sem derrubar o backup: jogar
 fora um dump bom porque a cópia dele não saiu do host seria a troca errada. Com o

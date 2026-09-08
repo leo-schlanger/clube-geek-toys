@@ -280,3 +280,35 @@ Validado de ponta a ponta contra um destino local no lugar do bucket
 - foto apagada foi parar em `uploads-deleted/2026-09-08/products/<id>/<arquivo>`
   e voltou **byte a byte idêntica**
 - restauração completa para um diretório limpo: 504 → 504, sem diferença
+
+### 7. Off-site ativo (08/09)
+
+Bucket Cloudflare R2 ligado, com token restrito a ele. O bucket guarda **só dado
+cifrado** — dumps em gpg AES-256, uploads em rclone crypt com nome de arquivo
+cifrado — então o provedor não entra na fronteira de confiança, e um vazamento do
+token dá acesso a escrever num bucket de ruído.
+
+Ensaio de desastre completo, feito de verdade contra o bucket:
+
+| Verificação                                | Resultado                             |
+| ------------------------------------------ | ------------------------------------- |
+| Dump baixado do R2 e restaurado            | 35 tabelas, 252 produtos, 30 usuários |
+| Uploads restaurados do R2 para pasta limpa | 504 arquivos, idênticos ao volume     |
+| Job diário sob o PATH exato do cron        | 0 erros                               |
+
+Dois defeitos meus que só apareceram contra o serviço real:
+
+**O rclone do apt não serve para o R2.** A v1.60 do Ubuntu faz o PUT, o R2
+devolve `X-Amz-Version-Id`, ela relê o objeto com `?versionId=` e o R2 responde
+**501** — não implementa endereçar por versão. A retentativa passava, então o
+resultado parecia certo: 504 erros no log, "Attempt 2/3 succeeded", e a etapa de
+exclusões silenciosamente pulada. Trocado pelo binário oficial 1.75, instalado
+com verificação de assinatura PGP (chave vinda de um keyserver **independente**
+do site do download) além do SHA256.
+
+**Uma função que exporta credencial não pode ser chamada em `$( )`.** No refactor
+que uniu os dois scripts, `DEST=$(offsite_base_dest)` passou a rodar numa
+subshell, e todos os `export` das chaves morriam com ela. O teste com destino
+local **não pegava**: caminho simples não usa credencial. Destino de mentira
+exercita o fluxo, não a autenticação — e foi por isso que a primeira execução
+contra o bucket real falhou.

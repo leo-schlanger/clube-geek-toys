@@ -25,11 +25,12 @@ fi
 # shellcheck source=/dev/null
 . "$(dirname "$0")/offsite-remote.sh"
 
-DEST=$(offsite_base_dest) || exit $?
-if [[ -z "$DEST" ]]; then
+OFFSITE_DEST=""
+if ! offsite_setup; then
   echo "ERROR: off-site is not configured — nothing to restore from." >&2
   exit 1
 fi
+DEST="$OFFSITE_DEST"
 
 if [[ -z "${BACKUP_PASSPHRASE:-}" ]]; then
   echo "ERROR: BACKUP_PASSPHRASE not set — the copy is encrypted." >&2
