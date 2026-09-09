@@ -62,6 +62,24 @@ export function buildPickupAddress(recipientName: string): ShippingAddressInput 
   };
 }
 
+/**
+ * The shop as a legal sender, for the shipping label.
+ *
+ * Melhor Envio validates the sender's document, so this is not decoration: an
+ * absent one makes them fall back to the account registration, and a wrong one
+ * is refused. It lives here beside the address rather than only in the VPS
+ * `.env` because it is not a secret — the CNPJ is on the storefront footer by
+ * law (Decreto 7.962/2013, art. 2) — and config that exists on one server only
+ * is config that goes missing the day that server is rebuilt.
+ *
+ * `SHIPPING_ORIGIN_DOCUMENT` and `SHIPPING_ORIGIN_PHONE` still override it.
+ */
+export const STORE_SENDER = {
+  /** Digits only. 14 = CNPJ, which rides in `company_document`, not `document`. */
+  document: '52846344000110',
+  phone: '11914662881',
+} as const;
+
 export interface ShippingAddressInput {
   cep: string;
   street: string;

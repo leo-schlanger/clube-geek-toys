@@ -48,6 +48,7 @@ vi.mock('./shipping.service.js', () => ({
     state: 'RJ',
     cep: '22011001',
   },
+  STORE_SENDER: { document: '52846344000110', phone: '11914662881' },
 }));
 vi.mock('../config/env.js', () => ({
   env: {
@@ -321,12 +322,50 @@ describe('buyAndPrintLabel', () => {
     const cart = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
     expect(Object.values(cart.from)).not.toContain('');
     expect(Object.values(cart.to)).not.toContain('');
-    expect(cart.from).not.toHaveProperty('document');
     expect(cart.to).not.toHaveProperty('phone');
     // The order number rides in `tags`; `options.invoice` only documents the
     // 44-digit NF-e key, which we do not have.
     expect(cart.options).not.toHaveProperty('invoice');
     expect(cart.tags).toEqual([{ tag: '10' }]);
+  });
+
+  /**
+   * A CPF and a CNPJ are different fields at Melhor Envio, not the same field
+   * with more digits — `document` is validated as a CPF. The shop ships under a
+   * CNPJ and the wholesale channel takes one from the customer, so a wholesale
+   * label had both ends in the wrong field.
+   */
+  it('manda CNPJ em company_document e CPF em document', async () => {
+    orderMock.mockResolvedValue(order({ customerDocument: '52846344000110' }));
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: 'x', tracking: 'AA1' } },
+      { body: { url: 'https://me/etiqueta.pdf' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    const cart = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(cart.to.company_document).toBe('52846344000110');
+    expect(cart.to).not.toHaveProperty('document');
+  });
+
+  /** The shop's own CNPJ and phone ship with the code, not only in a VPS .env. */
+  it('preenche o remetente com o CNPJ e o telefone da loja', async () => {
+    orderMock.mockResolvedValue(order());
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: 'x', tracking: 'AA1' } },
+      { body: { url: 'https://me/etiqueta.pdf' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    const cart = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(cart.from.company_document).toBe('52846344000110');
+    expect(cart.from.phone).toBe('11914662881');
+    // The recipient is a person: CPF, in the CPF field.
+    expect(cart.to.document).toBe('52998224725');
   });
 
   /**

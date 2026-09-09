@@ -27,6 +27,7 @@ import { auditLog } from '../utils/audit.js';
 import { getAccessToken, melhorEnvioBaseUrl } from './melhor-envio-oauth.service.js';
 import {
   STORE_PICKUP_LOCATION,
+  STORE_SENDER,
   buildPackageFromItems,
   normalizeCep,
   trackingUrlForCode,
@@ -154,7 +155,7 @@ function addressOf(order: Order) {
     name: (addr.recipientName || order.customerName || '').slice(0, 60),
     phone: onlyDigits(order.customerPhone),
     email: order.customerEmail,
-    document: onlyDigits(order.customerDocument),
+    ...documentFields(order.customerDocument),
     address: addr.street ?? '',
     complement: addr.complement ?? '',
     number: addr.number ?? '',
@@ -172,6 +173,22 @@ function onlyDigits(value: string | null | undefined): string {
 }
 
 /**
+ * A CPF and a CNPJ are different fields, not the same field with more digits.
+ *
+ * Melhor Envio validates `document` as a CPF and `company_document` as a CNPJ,
+ * so a CNPJ sent as `document` is refused. That is not hypothetical on either
+ * side: the shop itself ships under a CNPJ, and the wholesale channel takes a
+ * CNPJ as the customer's document, so both ends of a wholesale label would have
+ * been wrong.
+ */
+function documentFields(raw: string | null | undefined): Record<string, string> {
+  const digits = onlyDigits(raw);
+  if (digits.length === 14) return { company_document: digits };
+  if (digits.length === 11) return { document: digits };
+  return {};
+}
+
+/**
  * The shop, as the sender.
  *
  * `SHIPPING_ORIGIN_CEP` is what the quote used, so the label has to leave from
@@ -181,12 +198,12 @@ function onlyDigits(value: string | null | undefined): string {
 function senderPayload() {
   return compact({
     name: env.SHIPPING_ORIGIN_NAME || STORE_PICKUP_LOCATION.name,
-    phone: onlyDigits(env.SHIPPING_ORIGIN_PHONE),
+    phone: onlyDigits(env.SHIPPING_ORIGIN_PHONE) || STORE_SENDER.phone,
     email:
       env.SHIPPING_ORIGIN_EMAIL ||
       env.FROM_EMAIL.replace(/.*<|>.*/g, '') ||
       'contato@geeketoys.com.br',
-    document: onlyDigits(env.SHIPPING_ORIGIN_DOCUMENT),
+    ...documentFields(env.SHIPPING_ORIGIN_DOCUMENT || STORE_SENDER.document),
     address: STORE_PICKUP_LOCATION.street,
     complement: STORE_PICKUP_LOCATION.complement,
     number: STORE_PICKUP_LOCATION.number,

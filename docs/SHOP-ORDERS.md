@@ -305,8 +305,22 @@ em vez do botão.
 
 O Melhor Envio valida o que recebe, então campo vazio é erro de validação onde
 campo ausente é apenas ausente — e, no remetente, ausente faz ele usar o
-cadastro da própria conta. Quatro variáveis opcionais preenchem o que a conta
-não tiver:
+cadastro da própria conta.
+
+**CPF e CNPJ são campos diferentes, não o mesmo campo com mais dígitos**:
+`document` é validado como CPF e `company_document` como CNPJ. Vale dos dois
+lados — a loja despacha com CNPJ, e o canal atacado recebe CNPJ do cliente, de
+modo que uma etiqueta de atacado tinha as duas pontas no campo errado. O
+roteamento é por tamanho: 14 dígitos → `company_document`, 11 → `document`.
+
+O CNPJ (`52.846.344/0001-10`) e o telefone da loja são **constantes no código**,
+em `STORE_SENDER` (`shipping.service.ts`), ao lado do endereço que já morava
+ali. Não são segredo — o CNPJ está no rodapé da loja por exigência do Decreto
+7.962/2013 — e configuração que só existe num servidor é configuração que some
+no dia em que aquele servidor for reconstruído.
+
+As quatro variáveis abaixo continuam existindo, agora como **override** (mudança
+de titularidade, endereço de outro CD):
 
 | Variável                   | Para quê                                |
 | -------------------------- | --------------------------------------- |
