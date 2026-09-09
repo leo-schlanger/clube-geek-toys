@@ -14,6 +14,12 @@ vi.mock('../../lib/settings', () => ({
 
 const mockToastSuccess = vi.fn()
 const mockToastError = vi.fn()
+// Stubbed so these tests stay about the settings form — the card talks to the
+// API on mount and has its own suite in MelhorEnvioCard.test.tsx.
+vi.mock('./MelhorEnvioCard', () => ({
+  MelhorEnvioCard: () => <div data-testid="melhor-envio-card" />,
+}))
+
 vi.mock('sonner', () => ({
   toast: {
     success: (...args: unknown[]) => mockToastSuccess(...args),

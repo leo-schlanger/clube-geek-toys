@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Save, RotateCcw, AlertTriangle, Loader2, Database, Palette, Building2 } from 'lucide-react'
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 import { ThemeToggle } from '../ThemeToggle'
+import { MelhorEnvioCard } from './MelhorEnvioCard'
 
 interface SettingsState {
   values: Record<string, unknown>
@@ -210,6 +211,8 @@ export function SettingsTab() {
           </label>
         </CardContent>
       </Card>
+
+      <MelhorEnvioCard />
 
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" onClick={handleReset} disabled={!hasChanges || saving} className="shrink-0">

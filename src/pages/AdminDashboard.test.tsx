@@ -72,14 +72,33 @@ vi.mock('sonner', () => ({
 
 vi.mock('lucide-react', () => {
   const icon = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>
+  // Everything the tree renders unstubbed — ActionCenter and the notification
+  // bell included. An icon missing here is not a missing icon: vitest refuses
+  // the whole module, the file fails to load, and the report says "no tests"
+  // with nothing naming the cause.
   return {
-    Users: icon,
-    CreditCard: icon,
-    TrendingUp: icon,
-    Star: icon,
-    RefreshCw: icon,
-    ShoppingCart: icon,
     AlertCircle: icon,
+    AlertTriangle: icon,
+    Banknote: icon,
+    Bell: icon,
+    Building2: icon,
+    CalendarClock: icon,
+    Check: icon,
+    CheckCircle2: icon,
+    CreditCard: icon,
+    HelpCircle: icon,
+    Hourglass: icon,
+    PackageCheck: icon,
+    PackageX: icon,
+    RefreshCw: icon,
+    RotateCcw: icon,
+    ShieldAlert: icon,
+    ShoppingCart: icon,
+    Star: icon,
+    Ticket: icon,
+    TrendingUp: icon,
+    Truck: icon,
+    Users: icon,
   }
 })
 

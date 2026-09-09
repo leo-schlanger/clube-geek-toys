@@ -228,7 +228,17 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
       toast.success('Etiqueta comprada e gerada.')
       onChanged()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao gerar etiqueta')
+      const message = error instanceof Error ? error.message : 'Erro ao gerar etiqueta'
+      // A missing permission does not get better by pressing again — the admin
+      // tried six times before anyone looked at a log. Say what to do instead,
+      // and keep it on screen long enough to act on.
+      const isPermission = /permiss|autoriz/i.test(message)
+      toast.error(message, {
+        duration: isPermission ? 15000 : 6000,
+        description: isPermission
+          ? 'Abra a aba Configurações e use "Reautorizar" no cartão do Melhor Envio. Tentar de novo aqui não resolve.'
+          : undefined,
+      })
       logger.error('Error buying label:', error)
     }
     setLabelLoading(false)

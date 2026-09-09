@@ -152,6 +152,29 @@ impede o cloud-init de reescrevê-lo no próximo boot. Confira o valor que vale
 de verdade com `sshd -T | grep -i passwordauthentication` — ler o
 `sshd_config` engana.
 
+## 3.7 Melhor Envio — autorizar a conta da loja
+
+Cotar frete e **comprar etiqueta** são permissões diferentes. Um token emitido
+antes de a compra automática existir cotava frete e falhava em toda etiqueta com
+403 — e um token já emitido **não ganha escopo novo** quando a lista muda no
+`.env`: só reautorizando.
+
+No painel: aba **Configurações** → cartão **Melhor Envio** → **Autorizar**. Abre
+a página do Melhor Envio noutra aba, você confirma na conta da loja e volta. O
+cliente nunca participa disso, e o cartão diz em qual dos três estados está:
+
+- **Conectado e com permissão** — etiqueta funciona
+- **Conectado, mas sem permissão para comprar etiqueta** — reautorize
+- **Ainda não autorizado**
+
+O terceiro estado é o óbvio; o do meio é o que já deixou a loja parada, porque
+`authorized` respondia "sim" enquanto toda etiqueta morria. Conferir por fora:
+
+```bash
+curl -s -H "Authorization: Bearer <token-admin>" \
+  https://api.geeketoys.com.br/shipping/melhor-envio/status | jq '{authorized, canBuyLabel, missingScopes}'
+```
+
 ## 4. Variáveis de Ambiente (.env)
 
 Arquivo: `server/.env`

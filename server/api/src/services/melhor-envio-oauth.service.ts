@@ -227,11 +227,56 @@ export interface OAuthStatus {
   canRefresh: boolean;
   redirectUri: string;
   manualTokenOverride: boolean;
+  /** What the stored token may actually do. Empty when it cannot be read. */
+  scopes: string[];
+  /** Scopes the shop needs for labels and does not have. */
+  missingScopes: string[];
+  /**
+   * Whether buying and printing a label would work *today*.
+   *
+   * `authorized` only says a token exists. A token from before the scope list
+   * was widened is authorized and still cannot buy a label — which is exactly
+   * what happened: the panel reported the integration as connected while every
+   * label attempt died with a 403, and nothing on screen explained the gap.
+   */
+  canBuyLabel: boolean;
+}
+
+/** Scopes without which the label flow cannot work. */
+const LABEL_SCOPES = [
+  'cart-read',
+  'cart-write',
+  'shipping-checkout',
+  'shipping-generate',
+  'shipping-print',
+];
+
+/**
+ * Reads the scopes out of the access token.
+ *
+ * Melhor Envio issues a JWT and lists the granted scopes in it, which is the
+ * only way to know what a stored token can do without spending a request — and
+ * without it the panel cannot tell "not connected" from "connected but unable
+ * to buy". The payload is read, never trusted for authorization: it only ever
+ * drives what the panel says.
+ */
+export function scopesOf(accessToken: string): string[] {
+  try {
+    const payload = accessToken.split('.')[1];
+    if (!payload) return [];
+    const json = Buffer.from(payload, 'base64url').toString('utf8');
+    const claims = JSON.parse(json) as { scopes?: unknown };
+    return Array.isArray(claims.scopes) ? claims.scopes.filter((s): s is string => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Admin-panel status. Never includes the token itself. */
 export async function getOAuthStatus(): Promise<OAuthStatus> {
   const stored = await loadToken();
+  const scopes = stored ? scopesOf(stored.accessToken) : [];
+  const missingScopes = LABEL_SCOPES.filter((s) => !scopes.includes(s));
   return {
     credentialsConfigured: Boolean(
       env.MELHOR_ENVIO_CLIENT_ID && env.MELHOR_ENVIO_CLIENT_SECRET
@@ -243,5 +288,11 @@ export async function getOAuthStatus(): Promise<OAuthStatus> {
     canRefresh: Boolean(stored?.refreshToken),
     redirectUri: redirectUri(),
     manualTokenOverride: Boolean(env.MELHOR_ENVIO_TOKEN),
+    scopes,
+    missingScopes,
+    // A manually pasted token is opaque to us, so we do not claim it cannot
+    // buy: we simply have no evidence either way, and blocking on a guess
+    // would be worse than letting the attempt report the truth.
+    canBuyLabel: Boolean(stored) && (missingScopes.length === 0 || Boolean(env.MELHOR_ENVIO_TOKEN)),
   };
 }
