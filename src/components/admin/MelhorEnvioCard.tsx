@@ -45,18 +45,28 @@ export function MelhorEnvioCard() {
     }
   }, [reloads])
 
+  /**
+   * Navigates this tab, rather than opening another.
+   *
+   * A new tab reads better on a desktop, but the link only exists after the
+   * server answers — and a `window.open` that comes after an `await` is no
+   * longer part of the tap, so a phone blocks it silently. The panel is
+   * operated from a phone, so the button would have done nothing while the
+   * toast said an authorization tab had opened. That is the same shape of
+   * failure as pointing someone at a button that does not exist.
+   *
+   * Coming back costs nothing: the callback page has a link straight to this
+   * tab of the panel, and the session survives the round trip.
+   */
   async function handleAuthorize() {
     setStarting(true)
     try {
       const url = await startMelhorEnvioAuthorization()
-      // A new tab, not a redirect: the panel keeps its place, and coming back
-      // is one tab-close instead of a fresh login.
-      window.open(url, '_blank', 'noopener')
-      toast.info('Autorize na aba que abriu e volte aqui.')
+      window.location.assign(url)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não foi possível iniciar a autorização.')
+      setStarting(false)
     }
-    setStarting(false)
   }
 
   const ok = status?.canBuyLabel === true
@@ -134,8 +144,17 @@ export function MelhorEnvioCard() {
               ) : (
                 <ExternalLink className="h-4 w-4" />
               )}
-              {status.authorized ? 'Reautorizar' : 'Autorizar'}
+              {starting
+                ? 'Abrindo o Melhor Envio…'
+                : status.authorized
+                  ? 'Reautorizar'
+                  : 'Autorizar'}
             </Button>
+
+            <p className="text-xs text-muted-foreground">
+              Leva você ao site do Melhor Envio e traz de volta para cá. Confira que está na
+              conta da <strong>loja</strong>, não numa conta pessoal.
+            </p>
 
             <Button
               variant="ghost"

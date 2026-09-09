@@ -327,6 +327,22 @@ na conta da própria loja — o comprador não participa e não fica sabendo. Um
 token sem os escopos novos responde 403, e a API traduz isso para "reautorize a
 integração" em vez de mostrar o erro cru.
 
+### Como autorizar (passo a passo)
+
+1. **adm.geeketoys.com.br** → aba **Configurações**.
+2. Rolar até o cartão **Melhor Envio** (ícone de caminhão), logo abaixo de
+   "Canal Atacado".
+3. Tocar em **Autorizar** / **Reautorizar**. A própria aba vai para o Melhor
+   Envio — **não** abre aba nova, porque celular bloqueia janela que não nasce
+   direto do toque, e o botão parecia não fazer nada.
+4. Conferir que está logado na conta **da loja**, não numa conta pessoal: o
+   token sai vinculado a quem estiver logado ali.
+5. Confirmar a autorização na tela do Melhor Envio.
+6. A página de retorno tem **Voltar ao painel**, que cai direto em
+   Configurações. Lá, tocar em **"Já autorizei — verificar de novo"**.
+7. O cartão fica **verde** ("Conectado e com permissão para comprar etiqueta")
+   com a data de validade. Amarelo ainda é só cotação.
+
 Duas armadilhas que faziam a reautorização não adiantar nada:
 
 - **O `docker-compose.yml` fixava `MELHOR_ENVIO_SCOPES` em `shipping-calculate`**,

@@ -13,7 +13,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 const mockStatus = vi.fn()
 const mockAuthorize = vi.fn()
-const mockOpen = vi.fn()
+const mockAssign = vi.fn()
 
 vi.mock('../../lib/shipping-oauth', () => ({
   getMelhorEnvioStatus: () => mockStatus(),
@@ -42,7 +42,11 @@ const base = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.stubGlobal('open', mockOpen)
+  // jsdom refuses a real navigation, so the method itself is replaced.
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...window.location, assign: mockAssign },
+  })
 })
 
 describe('MelhorEnvioCard', () => {
@@ -80,7 +84,15 @@ describe('MelhorEnvioCard', () => {
     expect(screen.getByRole('button', { name: /^Autorizar$/i })).toBeInTheDocument()
   })
 
-  it('opens the authorization page in another tab', async () => {
+  /**
+   * In this tab, not another one.
+   *
+   * The link only exists after the server answers, so a `window.open` placed
+   * after that `await` is no longer part of the tap — and a phone blocks it
+   * without a word. The panel is operated from a phone, so the button did
+   * nothing while the toast announced a tab that never opened.
+   */
+  it('navega para a autorização na própria aba, que o celular não bloqueia', async () => {
     mockStatus.mockResolvedValue(base)
     mockAuthorize.mockResolvedValue('https://melhorenvio.example/oauth?x=1')
     render(<MelhorEnvioCard />)
@@ -88,11 +100,20 @@ describe('MelhorEnvioCard', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Reautorizar/i }))
 
     await waitFor(() => {
-      expect(mockOpen).toHaveBeenCalledWith(
-        'https://melhorenvio.example/oauth?x=1',
-        '_blank',
-        'noopener'
-      )
+      expect(mockAssign).toHaveBeenCalledWith('https://melhorenvio.example/oauth?x=1')
+    })
+  })
+
+  it('mostra o erro e devolve o botão quando o link não vem', async () => {
+    mockStatus.mockResolvedValue(base)
+    mockAuthorize.mockRejectedValue(new Error('O servidor não devolveu o link de autorização.'))
+    render(<MelhorEnvioCard />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Reautorizar/i }))
+
+    await waitFor(() => {
+      expect(mockAssign).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: /Reautorizar/i })).not.toBeDisabled()
     })
   })
 

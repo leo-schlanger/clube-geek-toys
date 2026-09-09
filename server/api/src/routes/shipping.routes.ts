@@ -5,6 +5,7 @@ import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import * as shippingService from '../services/shipping.service.js';
 import * as oauth from '../services/melhor-envio-oauth.service.js';
+import { adminUrl } from '../config/env.js';
 
 export const shippingRouter = Router();
 
@@ -70,8 +71,8 @@ shippingRouter.get(
     try {
       const url = oauth.buildAuthorizeUrl();
       // ?redirect=1 sends the browser straight there; otherwise the URL is
-      // returned so the panel can open a tab, since a 302 would drop the
-      // Authorization header the panel's own call carries.
+      // returned so the panel can navigate to it itself, since a 302 would drop
+      // the Authorization header the panel's own call carries.
       if (req.query.redirect === '1') {
         res.redirect(url);
         return;
@@ -92,7 +93,7 @@ shippingRouter.get('/melhor-envio/callback', async (req, res, next) => {
     const { code, state, error } = req.query as Record<string, string | undefined>;
 
     if (error) {
-      res.status(400).send(oauthPage('Autorização negada', `O Melhor Envio recusou: ${escapeHtml(error)}`));
+      res.status(400).send(oauthPage('Autorização negada', `O Melhor Envio recusou: ${error}`));
       return;
     }
     if (!oauth.isValidState(state)) {
@@ -108,7 +109,8 @@ shippingRouter.get('/melhor-envio/callback', async (req, res, next) => {
     res.send(
       oauthPage(
         'Melhor Envio conectado',
-        'O token foi salvo. Pode fechar esta aba — a loja já passa a cotar frete real.'
+        'A autorização foi salva. Volte ao painel e toque em "Já autorizei — verificar de ' +
+          'novo" no cartão do Melhor Envio para confirmar que a etiqueta liberou.'
       )
     );
   } catch (err) {
@@ -137,8 +139,17 @@ function escapeHtml(value: string): string {
   );
 }
 
-/** Minimal page: the callback opens in a browser, not in code. */
+/**
+ * Minimal page: the callback opens in a browser, not in code.
+ *
+ * The way back matters as much as the message. The panel used to send the
+ * authorization to a second tab, which a phone blocks silently — so it now
+ * navigates in place, and this page is where the person lands. Without a link
+ * home they would be stranded on an API domain, typing the panel address from
+ * memory on a phone keyboard.
+ */
 function oauthPage(title: string, message: string): string {
+  const back = adminUrl('/admin?tab=settings');
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
@@ -146,6 +157,7 @@ function oauthPage(title: string, message: string): string {
 <body style="font-family:system-ui,sans-serif;background:#0f0f14;color:#f5f5f7;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0">
 <div style="max-width:34rem;padding:2rem;text-align:center">
 <h1 style="color:#F04080;font-size:1.5rem;margin:0 0 .75rem">${escapeHtml(title)}</h1>
-<p style="color:#a1a1aa;line-height:1.6;margin:0">${escapeHtml(message)}</p>
+<p style="color:#a1a1aa;line-height:1.6;margin:0 0 1.5rem">${escapeHtml(message)}</p>
+<a href="${escapeHtml(back)}" style="display:inline-block;background:#F04080;color:#fff;text-decoration:none;font-weight:600;padding:.85rem 1.5rem;border-radius:.6rem">Voltar ao painel</a>
 </div></body></html>`;
 }
