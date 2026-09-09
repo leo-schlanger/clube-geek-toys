@@ -157,7 +157,18 @@ export async function lookupCep(cepRaw: string): Promise<ViaCepResult> {
 
 // ─── Package from cart items ─────────────────────────────────────────────────
 
-export async function buildPackageFromItems(items: QuoteItemInput[]): Promise<PackageDims> {
+/**
+ * `requireActive` is what separates quoting from shipping.
+ *
+ * At the till an inactive product must stop the sale. On a paid order it must
+ * not: the goods are already sold and the box still has to be measured, and a
+ * product archived after the sale — the normal end of a one-off K-pop item —
+ * would otherwise make its label unbuyable.
+ */
+export async function buildPackageFromItems(
+  items: QuoteItemInput[],
+  { requireActive = true }: { requireActive?: boolean } = {}
+): Promise<PackageDims> {
   if (!items.length) {
     throw new AppError(400, 'Carrinho vazio para cotação.', 'EMPTY_CART');
   }
@@ -176,7 +187,7 @@ export async function buildPackageFromItems(items: QuoteItemInput[]): Promise<Pa
 
   for (const it of items) {
     const p = byId.get(it.productId);
-    if (!p || !p.active) {
+    if (!p || (requireActive && !p.active)) {
       throw new AppError(400, 'Produto indisponível no carrinho.', 'PRODUCT_UNAVAILABLE');
     }
     const qty = Math.floor(it.quantity);

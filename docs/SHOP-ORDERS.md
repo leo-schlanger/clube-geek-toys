@@ -285,9 +285,35 @@ digitado: o pedido vira `shipped` e o cliente recebe `order-shipped`.
 | `POST /orders/:id/label/reprint` | Só o PDF de uma etiqueta já paga. Não cobra                            |
 
 Recusa antes de gastar: pedido não pago, retirada na loja, sem CEP válido, sem
-serviço de frete escolhido, ou com item cujo produto foi apagado do catálogo
-(não há como pesar o pacote — e chutar compra uma etiqueta que os Correios
-podem recusar no balcão).
+serviço de frete escolhido, sem CPF do destinatário, com frete cotado pela
+tabela interna, ou com item cujo produto foi apagado do catálogo (não há como
+pesar o pacote — e chutar compra uma etiqueta que os Correios podem recusar no
+balcão).
+
+Produto **desativado** não recusa: a venda já aconteceu e a caixa ainda precisa
+ser medida. Item de K-pop é peça única, e tirar do ar depois de vender é o fim
+normal dele — se isso barrasse a etiqueta, a loja perdia justamente o pedido que
+mais importa.
+
+**Frete cotado pela tabela interna não tem etiqueta para comprar.** Um id
+`fallback-pac` é da nossa tabela, não um serviço do Melhor Envio: `Number()`
+nele dava `NaN`, saía como `service: null` e voltava como um 502 sem
+explicação. Agora o painel diz o que houve e mostra o campo de rastreio manual
+em vez do botão.
+
+### Remetente na etiqueta
+
+O Melhor Envio valida o que recebe, então campo vazio é erro de validação onde
+campo ausente é apenas ausente — e, no remetente, ausente faz ele usar o
+cadastro da própria conta. Quatro variáveis opcionais preenchem o que a conta
+não tiver:
+
+| Variável                   | Para quê                                |
+| -------------------------- | --------------------------------------- |
+| `SHIPPING_ORIGIN_DOCUMENT` | CPF (11) ou CNPJ (14) do remetente      |
+| `SHIPPING_ORIGIN_PHONE`    | Telefone do remetente                   |
+| `SHIPPING_ORIGIN_NAME`     | Nome, quando difere de "GeekPop & Toys" |
+| `SHIPPING_ORIGIN_EMAIL`    | E-mail, quando difere do `FROM_EMAIL`   |
 
 ### Escopo do token
 
@@ -300,6 +326,17 @@ autorizar de novo, em **Configurações → Melhor Envio → Autorizar**. É um 
 na conta da própria loja — o comprador não participa e não fica sabendo. Um
 token sem os escopos novos responde 403, e a API traduz isso para "reautorize a
 integração" em vez de mostrar o erro cru.
+
+Duas armadilhas que faziam a reautorização não adiantar nada:
+
+- **O `docker-compose.yml` fixava `MELHOR_ENVIO_SCOPES` em `shipping-calculate`**,
+  então o default do código (a lista completa) nunca chegava à VPS e o clique em
+  "Reautorizar" emitia outro token só de cotação. Agora o compose repassa vazio
+  e o default do `env.ts` é a fonte única.
+- **A renovação não pede escopo.** Um refresh não pode pedir mais do que foi
+  concedido; mandar a lista larga contra um token de `shipping-calculate` faz o
+  próprio refresh ser recusado, e isso só aparece um mês depois, como cotação de
+  volta na tabela fallback. Alargar escopo é autorização nova, nunca renovação.
 
 O campo manual de rastreio continua: é o caminho para etiqueta comprada em
 outro lugar, e para os casos que a compra automática recusa.

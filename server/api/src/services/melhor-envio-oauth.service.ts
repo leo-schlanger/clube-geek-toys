@@ -168,12 +168,16 @@ async function refresh(stored: StoredToken): Promise<StoredToken | null> {
   if (!stored.refreshToken) return null;
   const { clientId, clientSecret } = requireCredentials();
   try {
+    // No `scope` here on purpose. A refresh may not ask for more than was
+    // granted, so sending the full label list against a token authorized only
+    // for `shipping-calculate` gets the refresh itself rejected — and the
+    // failure surfaces a month later as quotes silently back on the fallback
+    // table. Widening scopes is a new authorization, never a refresh.
     const token = await postToken({
       grant_type: 'refresh_token',
       client_id: clientId,
       client_secret: clientSecret,
       refresh_token: stored.refreshToken,
-      scope: env.MELHOR_ENVIO_SCOPES,
     });
     await saveToken(token);
     console.log('[shipping] Melhor Envio: token renovado');

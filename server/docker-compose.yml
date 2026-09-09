@@ -77,11 +77,19 @@ services:
       # Frete Correios via Melhor Envio (opcional — sem token usa tabela fallback)
       MELHOR_ENVIO_CLIENT_ID: ${MELHOR_ENVIO_CLIENT_ID:-}
       MELHOR_ENVIO_CLIENT_SECRET: ${MELHOR_ENVIO_CLIENT_SECRET:-}
-      MELHOR_ENVIO_SCOPES: ${MELHOR_ENVIO_SCOPES:-shipping-calculate}
+      # Empty on purpose: the API normalizes "" to unset and applies its own
+      # default, which is the full label list. Pinning a value here meant a
+      # reauthorization asked for `shipping-calculate` again and minted the
+      # same quote-only token the panel was complaining about.
+      MELHOR_ENVIO_SCOPES: ${MELHOR_ENVIO_SCOPES:-}
       MELHOR_ENVIO_REDIRECT_URI: ${MELHOR_ENVIO_REDIRECT_URI:-}
       MELHOR_ENVIO_TOKEN: ${MELHOR_ENVIO_TOKEN:-}
       MELHOR_ENVIO_SANDBOX: ${MELHOR_ENVIO_SANDBOX:-false}
       SHIPPING_ORIGIN_CEP: ${SHIPPING_ORIGIN_CEP:-22011001}
+      SHIPPING_ORIGIN_NAME: ${SHIPPING_ORIGIN_NAME:-}
+      SHIPPING_ORIGIN_DOCUMENT: ${SHIPPING_ORIGIN_DOCUMENT:-}
+      SHIPPING_ORIGIN_PHONE: ${SHIPPING_ORIGIN_PHONE:-}
+      SHIPPING_ORIGIN_EMAIL: ${SHIPPING_ORIGIN_EMAIL:-}
     volumes:
       - uploads:/app/uploads
     expose:

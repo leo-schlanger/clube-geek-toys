@@ -130,14 +130,31 @@ async function meRequest<T>(path: string, body?: unknown, method = 'POST'): Prom
 
 // ─── Payload ─────────────────────────────────────────────────────────────────
 
+/**
+ * Drop the keys we have nothing for.
+ *
+ * Melhor Envio validates the fields it is given, so `document: ''` is a
+ * validation error where an absent `document` is merely absent — and for the
+ * sender it makes them fall back to the account's own registered data, which
+ * is right. An empty string is never better than saying nothing.
+ */
+function compact<T extends Record<string, unknown>>(obj: T): T {
+  const out = {} as Record<string, unknown>;
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === undefined || v === null || v === '') continue;
+    out[k] = v;
+  }
+  return out as T;
+}
+
 /** Split "Rua X, 123" style data the way Melhor Envio wants it. */
 function addressOf(order: Order) {
   const addr = (order.shippingAddress ?? {}) as Record<string, string>;
-  return {
+  return compact({
     name: (addr.recipientName || order.customerName || '').slice(0, 60),
-    phone: order.customerPhone ?? '',
+    phone: onlyDigits(order.customerPhone),
     email: order.customerEmail,
-    document: order.customerDocument ?? '',
+    document: onlyDigits(order.customerDocument),
     address: addr.street ?? '',
     complement: addr.complement ?? '',
     number: addr.number ?? '',
@@ -146,7 +163,12 @@ function addressOf(order: Order) {
     state_abbr: (addr.state ?? '').toUpperCase().slice(0, 2),
     country_id: 'BR',
     postal_code: normalizeCep(addr.cep ?? ''),
-  };
+  });
+}
+
+/** Documents and phones travel as digits: Melhor Envio rejects the mask. */
+function onlyDigits(value: string | null | undefined): string {
+  return (value ?? '').replace(/\D/g, '');
 }
 
 /**
@@ -157,11 +179,14 @@ function addressOf(order: Order) {
  * the Correios refuse it at the counter.
  */
 function senderPayload() {
-  return {
-    name: STORE_PICKUP_LOCATION.name,
-    phone: '',
-    email: env.FROM_EMAIL.replace(/.*<|>.*/g, '') || 'contato@geeketoys.com.br',
-    document: '',
+  return compact({
+    name: env.SHIPPING_ORIGIN_NAME || STORE_PICKUP_LOCATION.name,
+    phone: onlyDigits(env.SHIPPING_ORIGIN_PHONE),
+    email:
+      env.SHIPPING_ORIGIN_EMAIL ||
+      env.FROM_EMAIL.replace(/.*<|>.*/g, '') ||
+      'contato@geeketoys.com.br',
+    document: onlyDigits(env.SHIPPING_ORIGIN_DOCUMENT),
     address: STORE_PICKUP_LOCATION.street,
     complement: STORE_PICKUP_LOCATION.complement,
     number: STORE_PICKUP_LOCATION.number,
@@ -170,7 +195,7 @@ function senderPayload() {
     state_abbr: STORE_PICKUP_LOCATION.state,
     country_id: 'BR',
     postal_code: env.SHIPPING_ORIGIN_CEP || STORE_PICKUP_LOCATION.cep,
-  };
+  });
 }
 
 /**
@@ -226,9 +251,34 @@ async function loadShippableOrder(orderId: string): Promise<Order> {
       'ORDER_NO_SERVICE',
     );
   }
+  // A Melhor Envio service id is a number. `fallback-pac` means the quote came
+  // off our own table because Melhor Envio was unreachable that minute, and
+  // there is no such service to buy — `Number()` on it produced NaN, which went
+  // out as `service: null` and came back as an opaque 502.
+  if (!/^\d+$/.test(order.shippingServiceId)) {
+    throw new AppError(
+      409,
+      'O frete deste pedido foi cotado pela tabela interna, não pelo Melhor Envio, ' +
+        'então não existe serviço para comprar. Compre a etiqueta no site do Melhor ' +
+        'Envio e cole o código de rastreio aqui.',
+      'ORDER_FALLBACK_SERVICE',
+    );
+  }
   const addr = (order.shippingAddress ?? {}) as Record<string, string>;
   if (normalizeCep(addr.cep ?? '').length !== 8) {
     throw new AppError(400, 'Pedido sem CEP de entrega válido.', 'ORDER_NO_CEP');
+  }
+  // The Correios declaration carries the recipient's CPF. Checkout has required
+  // one since the document column was added, but an order from before that has
+  // none — and finding out at the cart call is finding out one step from the
+  // money.
+  if (onlyDigits(order.customerDocument).length < 11) {
+    throw new AppError(
+      400,
+      'Pedido sem CPF do destinatário — o Melhor Envio exige o documento na etiqueta. ' +
+        'Peça o CPF ao cliente e compre a etiqueta pelo site do Melhor Envio.',
+      'ORDER_NO_DOCUMENT',
+    );
   }
   return order;
 }
@@ -261,6 +311,9 @@ async function ensureCartItem(order: Order): Promise<string> {
   }
   const pkg = await buildPackageFromItems(
     weighable.map((it) => ({ productId: it.productId as string, quantity: it.quantity })),
+    // The sale already happened. A product archived since — the normal end of a
+    // one-off K-pop item — must not stop its own parcel from being measured.
+    { requireActive: false },
   );
 
   const created = await meRequest<{ id: string }>('/me/cart', {
@@ -282,8 +335,11 @@ async function ensureCartItem(order: Order): Promise<string> {
       own_hand: false,
       reverse: false,
       non_commercial: true,
-      invoice: { number: String(order.orderNumber) },
     },
+    // Our order number, so a shipment can be found from the Melhor Envio panel.
+    // It used to ride in `options.invoice`, whose only documented field is the
+    // 44-digit NF-e key — a shape we do not have and they may validate.
+    tags: [{ tag: String(order.orderNumber) }],
   });
 
   if (!created?.id) {
@@ -397,19 +453,29 @@ export async function buyAndPrintLabel(
   }
 
   try {
-    return await runLabelPurchase(order, actorUserId);
+    const state = await runLabelPurchase(order, actorUserId);
+    // Release on success too. The claim only guards the four calls; leaving it
+    // set made the next three minutes answer "compra em andamento" to an admin
+    // who just wanted the PDF back after closing the tab too early.
+    await releaseClaim(order.id);
+    return state;
   } catch (err) {
     // Release on failure so the shop can correct and retry immediately —
     // except when the money may already have left, where the claim expiring on
     // its own is the safer default.
     const code = (err as { code?: string }).code;
     if (code !== 'MELHOR_ENVIO_UNREACHABLE') {
-      await query(`UPDATE orders SET label_purchase_started_at = NULL WHERE id = $1`, [
-        order.id,
-      ]).catch(() => {});
+      await releaseClaim(order.id);
     }
     throw err;
   }
+}
+
+/** Never let the bookkeeping write mask the result of the purchase itself. */
+async function releaseClaim(orderId: string): Promise<void> {
+  await query(`UPDATE orders SET label_purchase_started_at = NULL WHERE id = $1`, [
+    orderId,
+  ]).catch(() => {});
 }
 
 async function runLabelPurchase(order: Order, actorUserId: string): Promise<LabelState> {

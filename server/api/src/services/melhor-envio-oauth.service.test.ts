@@ -193,6 +193,22 @@ describe('getAccessToken', () => {
     expect(sentBody(fetchMock as ReturnType<typeof vi.fn>).grant_type).toBe('refresh_token');
   });
 
+  /**
+   * A refresh may not ask for more than was granted. Sending the widened label
+   * list against a token authorized only for `shipping-calculate` gets the
+   * refresh itself rejected — and that shows up a month later as quotes
+   * silently back on the fallback table. Widening is a new authorization.
+   */
+  it('não pede escopo na renovação', async () => {
+    queryMock.mockResolvedValue(storedRow({ expiresAt: Date.now() + 2 * 60 * 60 * 1000 }));
+    const fetchMock = mockFetch(200, { access_token: 'token-renovado', expires_in: 2592000 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await oauth.getAccessToken();
+
+    expect(sentBody(fetchMock as ReturnType<typeof vi.fn>)).not.toHaveProperty('scope');
+  });
+
   it('keeps the current token when the refresh fails but it is still valid', async () => {
     queryMock.mockResolvedValue(storedRow({ expiresAt: Date.now() + 2 * 60 * 60 * 1000 }));
     vi.stubGlobal('fetch', mockFetch(500, {}));

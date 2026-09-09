@@ -267,6 +267,69 @@ describe('buyAndPrintLabel', () => {
   });
 
   /**
+   * A `fallback-*` id is our own table, not a Melhor Envio service. `Number()`
+   * on it is NaN, which went out as `service: null` and came back as an opaque
+   * 502 — the shop had no way to know the order simply cannot be bought here.
+   */
+  it('recusa um pedido cotado pela tabela interna, sem chamar o Melhor Envio', async () => {
+    orderMock.mockResolvedValue(order({ shippingServiceId: 'fallback-pac' }));
+
+    await expect(buyAndPrintLabel('o1', 'admin-1')).rejects.toThrow('tabela interna');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /** The Correios declaration carries the recipient's CPF. */
+  it('recusa quando o pedido não tem CPF do destinatário', async () => {
+    orderMock.mockResolvedValue(order({ customerDocument: null }));
+
+    await expect(buyAndPrintLabel('o1', 'admin-1')).rejects.toThrow('CPF do destinatário');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The sale already happened, so an archived product must still be weighable —
+   * otherwise a one-off item makes its own parcel unbuyable the day it sells out
+   * and gets taken down.
+   */
+  it('mede o pacote mesmo com produto já desativado', async () => {
+    orderMock.mockResolvedValue(order());
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: '2026-09-09', generated_at: '2026-09-09', tracking: 'AA1' } },
+      { body: { url: 'https://me/etiqueta.pdf' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    expect(packageMock).toHaveBeenCalledWith(expect.anything(), { requireActive: false });
+  });
+
+  /**
+   * `document: ''` is a validation error at Melhor Envio where an absent
+   * `document` simply falls back to the account's registered data.
+   */
+  it('não manda campo vazio no remetente nem no destinatário', async () => {
+    orderMock.mockResolvedValue(order({ customerPhone: null }));
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: 'x', tracking: 'AA1' } },
+      { body: { url: 'https://me/etiqueta.pdf' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    const cart = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(Object.values(cart.from)).not.toContain('');
+    expect(Object.values(cart.to)).not.toContain('');
+    expect(cart.from).not.toHaveProperty('document');
+    expect(cart.to).not.toHaveProperty('phone');
+    // The order number rides in `tags`; `options.invoice` only documents the
+    // 44-digit NF-e key, which we do not have.
+    expect(cart.options).not.toHaveProperty('invoice');
+    expect(cart.tags).toEqual([{ tag: '10' }]);
+  });
+
+  /**
    * A line whose product was deleted cannot be weighed. Guessing a parcel buys
    * a label the Correios may refuse; dropping the line understates the box.
    */
@@ -379,6 +442,26 @@ describe('trava contra compra dupla', () => {
     );
     expect(claim, 'a compra tem de reivindicar o pedido').toBeDefined();
     expect(String(claim![0])).toContain("INTERVAL '3 minutes'");
+  });
+
+  /**
+   * The claim guards the four calls, not the next three minutes: an admin who
+   * closed the tab before the PDF opened has to be able to press again.
+   */
+  it('libera a trava depois de comprar', async () => {
+    orderMock.mockResolvedValue(order());
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: 'x', tracking: 'AA1' } },
+      { body: { url: 'https://me/etiqueta.pdf' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    const released = queryMock.mock.calls.some((c) =>
+      String(c[0]).includes('label_purchase_started_at = NULL'),
+    );
+    expect(released, 'a trava tem de ser liberada no sucesso').toBe(true);
   });
 
   /** A refusal before any money moved should let the shop retry at once. */

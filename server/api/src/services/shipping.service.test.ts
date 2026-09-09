@@ -21,7 +21,9 @@ vi.mock('../config/env.js', () => ({
   },
 }));
 
-const { quoteShipping, getMelhorEnvioHealth } = await import('./shipping.service.js');
+const { quoteShipping, getMelhorEnvioHealth, buildPackageFromItems } = await import(
+  './shipping.service.js'
+);
 
 const PRODUCT_ROW = {
   id: 'p1',
@@ -155,5 +157,38 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
     const health = getMelhorEnvioHealth();
     expect(health.configured).toBe(true);
     expect(health.sandbox).toBe(false);
+  });
+});
+
+/**
+ * Quoting and shipping ask the same question of different things.
+ *
+ * At the till an inactive product must stop the sale; on a paid order it must
+ * not, or a one-off item archived the day it sold out takes its own label down
+ * with it.
+ */
+describe('buildPackageFromItems', () => {
+  it('recusa produto inativo na cotação', async () => {
+    queryMock.mockResolvedValue({ rows: [{ ...PRODUCT_ROW, active: false }] });
+
+    await expect(buildPackageFromItems([{ productId: 'p1', quantity: 1 }])).rejects.toThrow(
+      'indisponível'
+    );
+  });
+
+  it('mede produto inativo quando o pedido já foi pago', async () => {
+    queryMock.mockResolvedValue({ rows: [{ ...PRODUCT_ROW, active: false }] });
+
+    await expect(
+      buildPackageFromItems([{ productId: 'p1', quantity: 1 }], { requireActive: false })
+    ).resolves.toMatchObject({ weightG: 300, heightCm: 4, widthCm: 12 });
+  });
+
+  it('continua recusando um produto que sumiu do catálogo', async () => {
+    queryMock.mockResolvedValue({ rows: [] });
+
+    await expect(
+      buildPackageFromItems([{ productId: 'p1', quantity: 1 }], { requireActive: false })
+    ).rejects.toThrow('indisponível');
   });
 });

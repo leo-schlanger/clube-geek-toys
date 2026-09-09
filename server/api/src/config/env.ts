@@ -81,6 +81,18 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v === 'true'),
   SHIPPING_ORIGIN_CEP: z.string().regex(/^\d{8}$/).default('22011001'),
+  // Who the Correios see as the sender. Melhor Envio validates the sender's
+  // document on the label — an empty string is a validation error, so when
+  // these are unset the payload omits the field and Melhor Envio falls back to
+  // the registered account data instead of failing.
+  SHIPPING_ORIGIN_NAME: z.string().min(1).max(60).optional(),
+  SHIPPING_ORIGIN_DOCUMENT: z
+    .string()
+    .transform((v) => v.replace(/\D/g, ''))
+    .refine((v) => v.length === 11 || v.length === 14, 'CPF (11) ou CNPJ (14) dígitos')
+    .optional(),
+  SHIPPING_ORIGIN_PHONE: z.string().min(8).max(20).optional(),
+  SHIPPING_ORIGIN_EMAIL: z.string().email().optional(),
 
   // How long a pending order holds stock before the cron hands the units back.
   // It has a default so the correct behaviour ships without touching the VPS

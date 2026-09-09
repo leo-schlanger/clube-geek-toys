@@ -275,9 +275,18 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
   const hasProviderCharge = Boolean(order?.pagarmeChargeId || order?.stripePaymentIntentId)
   // Only a paid order has a shipment worth buying, and only a shipped-by-post
   // one has a journey at all.
-  const canBuyLabel =
+  const isShippable =
     order?.deliveryMethod !== 'pickup' &&
     (order?.status === 'paid' || order?.status === 'processing' || order?.status === 'shipped')
+  /**
+   * A Melhor Envio service id is a number. `fallback-pac` means the quote came
+   * off our own table because Melhor Envio was unreachable when the customer
+   * checked out, and there is no such service to buy — so the button would only
+   * ever return an error. Say why instead of offering it.
+   */
+  const isFallbackService =
+    !!order?.shippingServiceId && !/^\d+$/.test(order.shippingServiceId)
+  const canBuyLabel = isShippable && !isFallbackService
   const canRefund =
     hasProviderCharge &&
     (order?.status === 'paid' || order?.status === 'processing' || order?.status === 'shipped')
@@ -415,6 +424,17 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 automatic path cannot be used (a deleted product, an unusual
                 parcel) and for labels bought elsewhere.
               */}
+              {!isPickup && isShippable && isFallbackService && (
+                <div className="space-y-2 border-t pt-4">
+                  <h4 className="text-sm font-semibold">Etiqueta de envio</h4>
+                  <p className="text-xs text-muted-foreground">
+                    O frete deste pedido saiu da tabela interna, não do Melhor Envio, então não
+                    há serviço para comprar aqui. Compre a etiqueta no site do Melhor Envio e cole
+                    o código de rastreio abaixo.
+                  </p>
+                </div>
+              )}
+
               {!isPickup && canBuyLabel && (
                 <div className="space-y-2 border-t pt-4">
                   <h4 className="text-sm font-semibold">Etiqueta de envio</h4>

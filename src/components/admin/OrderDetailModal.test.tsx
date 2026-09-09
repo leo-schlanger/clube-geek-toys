@@ -29,6 +29,9 @@ vi.mock('../../lib/orders', () => ({
   confirmPixOrder: vi.fn(),
   refundOrder: refundOrderMock,
   setOrderTracking: vi.fn(),
+  getLabelState: vi.fn(async () => null),
+  buyOrderLabel: vi.fn(),
+  reprintOrderLabel: vi.fn(),
 }))
 vi.mock('../../lib/logger', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -166,5 +169,29 @@ describe('OrderDetailModal — reconciliação', () => {
     )
 
     expect(await screen.findByText(/visa ···· 4242 · 3x/i)).toBeInTheDocument()
+  })
+})
+
+/**
+ * A `fallback-*` service id means the quote came off our own table because
+ * Melhor Envio was unreachable at checkout. There is no such service to buy, so
+ * the button could only ever return an error — the admin who pressed the label
+ * button six times had already shown what that costs.
+ */
+describe('OrderDetailModal — etiqueta', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('oferece a etiqueta quando o frete veio do Melhor Envio', async () => {
+    await open(order({ shippingServiceId: '2', shippingService: 'SEDEX' }))
+    expect(screen.getByRole('button', { name: /comprar e imprimir etiqueta/i })).toBeInTheDocument()
+  })
+
+  it('explica, em vez de oferecer um botão que só falha, quando o frete veio da tabela interna', async () => {
+    await open(order({ shippingServiceId: 'fallback-pac', shippingService: 'PAC' }))
+
+    expect(screen.queryByRole('button', { name: /comprar e imprimir etiqueta/i })).toBeNull()
+    expect(screen.getByText(/tabela interna/i)).toBeInTheDocument()
   })
 })
