@@ -18,6 +18,7 @@ import { MEMBER_SHOP_DISCOUNT, WHOLESALE_SHOP_DISCOUNT } from '../../types'
 import {
   availableStock,
   getProductBySlug,
+  hasSellablePrice,
   listAlsoBoughtProducts,
   listRelatedProducts,
 } from '../../lib/products'
@@ -209,6 +210,10 @@ export default function ProductDetail() {
       ? !matched || availableStock(matched) <= 0
       : availableStock(product) <= 0
     : false
+  // A product (or the chosen variation) left at R$ 0,00 has no price to charge.
+  // `createOrder` refuses it anyway; refusing here spares the customer the
+  // address, the shipping quote and a dead end at the last click.
+  const unpriced = !hasSellablePrice(displayPrice)
   const compareAt = matched?.compareAtPrice ?? product?.compareAtPrice ?? null
   const onSale = compareAt != null && compareAt > displayPrice
   // What the customer pays online. Wholesale prices itself; the member discount
@@ -220,7 +225,7 @@ export default function ProductDetail() {
     isWholesale && product ? Math.max(1, product.wholesaleMinQty ?? 1) : 1
 
   function handleAddToCart() {
-    if (!product || outOfStock || !canBuy) return
+    if (!product || outOfStock || unpriced || !canBuy) return
     if (product.hasVariants && !matched) {
       toast.error('Selecione a variação (cor/tamanho) antes de adicionar.')
       return
@@ -526,6 +531,8 @@ export default function ProductDetail() {
               <div className="mt-4 text-sm">
                 {outOfStock ? (
                   <Badge variant="secondary">Esgotado</Badge>
+                ) : unpriced ? (
+                  <Badge variant="secondary">Indisponível — sem preço definido</Badge>
                 ) : displayStock <= 5 ? (
                   <span className="text-yellow-600">
                     Últimas {displayStock} unidades!
@@ -573,10 +580,16 @@ export default function ProductDetail() {
                   size="lg"
                   className="flex-1"
                   onClick={handleAddToCart}
-                  disabled={outOfStock || !canBuy}
+                  disabled={outOfStock || unpriced || !canBuy}
                 >
                   <ShoppingCart className="h-5 w-5" />
-                  {!canBuy ? 'Em breve no atacado' : outOfStock ? 'Esgotado' : 'Adicionar ao carrinho'}
+                  {!canBuy
+                    ? 'Em breve no atacado'
+                    : outOfStock
+                      ? 'Esgotado'
+                      : unpriced
+                        ? 'Indisponível'
+                        : 'Adicionar ao carrinho'}
                 </Button>
 
                 {/* Out of stock is when saving matters most. */}

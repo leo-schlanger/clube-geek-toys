@@ -12,7 +12,7 @@ import { applyShopPromo, formatPercent } from '../../lib/shop-discount'
 import { useShopPromo } from '../../hooks/useShopPromo'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { SaveProductButton } from './SaveProductButton'
-import { availableStock } from '../../lib/products'
+import { availableStock, hasSellablePrice } from '../../lib/products'
 
 interface ProductCardProps {
   product: Product
@@ -49,6 +49,9 @@ export function ProductCard({
   // de" its cheapest SKU, so the promotion comes off that same figure.
   const listPrice =
     product.hasVariants && product.priceFrom != null ? product.priceFrom : product.price
+  // A product left at R$ 0,00 has no price to charge, so it cannot be sold —
+  // see `hasSellablePrice`. Shown, but not buyable.
+  const unpriced = !hasSellablePrice(listPrice)
   const sitePromo = isWholesale ? null : applyShopPromo(listPrice, promo)
   // One struck price, not two: `compareAtPrice` is the older, higher number
   // whenever the seller set one, and it is the one worth crossing out.
@@ -66,7 +69,7 @@ export function ProductCard({
   function handleAdd(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (outOfStock || !canBuy) return
+    if (outOfStock || unpriced || !canBuy) return
     addItem(product, minQty)
     toast.success(
       minQty > 1
@@ -115,10 +118,10 @@ export function ProductCard({
           )}
         </div>
 
-        {outOfStock && (
+        {(outOfStock || unpriced) && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
             <Badge variant="secondary" className="text-sm">
-              Esgotado
+              {outOfStock ? 'Esgotado' : 'Indisponível'}
             </Badge>
           </div>
         )}
@@ -199,12 +202,18 @@ export function ProductCard({
 
         <Button
           onClick={handleAdd}
-          disabled={outOfStock || !canBuy}
-          className={cn('mt-2 w-full', (outOfStock || !canBuy) && 'opacity-60')}
+          disabled={outOfStock || unpriced || !canBuy}
+          className={cn('mt-2 w-full', (outOfStock || unpriced || !canBuy) && 'opacity-60')}
           size="sm"
         >
           <ShoppingCart className="h-4 w-4" />
-          {!canBuy ? 'Em breve' : outOfStock ? 'Esgotado' : 'Adicionar'}
+          {!canBuy
+            ? 'Em breve'
+            : outOfStock
+              ? 'Esgotado'
+              : unpriced
+                ? 'Indisponível'
+                : 'Adicionar'}
         </Button>
       </CardContent>
     </Card>

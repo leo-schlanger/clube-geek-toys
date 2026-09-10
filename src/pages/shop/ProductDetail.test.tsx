@@ -20,6 +20,8 @@ vi.mock('../../lib/products', () => ({
   // Real, not a stub: availability is exactly what these tests exercise.
   availableStock: (item: { stock: number; available?: number }) =>
     Math.max(0, item.available ?? item.stock),
+  hasSellablePrice: (price: number | null | undefined) =>
+    typeof price === 'number' && Number.isFinite(price) && price > 0,
 }))
 
 vi.mock('../../contexts/CartContext', () => ({
@@ -216,6 +218,22 @@ describe('ProductDetail', () => {
     fireEvent.click(screen.getByRole('button', { name: /Adicionar ao carrinho|Adicionar/i }))
     expect(mockAddItem).toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalled()
+  })
+
+  // The checkout already refuses a zero total, but only after the address and
+  // the shipping quote. One customer spent six attempts finding that out on
+  // 09/09/2026; the page has to say so before the cart.
+  it('refuses a product priced at R$ 0,00', async () => {
+    mockedGet.mockResolvedValue({ ...product, price: 0 })
+    renderPdp()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Bolsa jeans' })).toBeInTheDocument()
+    })
+    const button = screen.getByRole('button', { name: /Indispon/i })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(mockAddItem).not.toHaveBeenCalled()
+    expect(screen.getByText(/sem preço definido/i)).toBeInTheDocument()
   })
 
   it('handles load error as not found', async () => {

@@ -231,6 +231,19 @@ export default function ShopCheckout() {
       toast.error('Preencha seu nome e email.')
       return
     }
+
+    // A line at R$ 0,00 cannot be charged, and `createOrder` says so only after
+    // writing and cancelling the order. The shelf blocks these now, but a cart
+    // saved in the browser before that still carries one — name the item here
+    // instead of failing on the last click with nothing to act on.
+    const unpriced = items.find((i) => !(i.price > 0))
+    if (unpriced) {
+      toast.error(
+        `"${unpriced.name}" está sem preço e não pode ser comprado agora. ` +
+          'Remova o item do carrinho e fale com a loja.'
+      )
+      return
+    }
     const digits = cep.replace(/\D/g, '')
     if (!isPickup) {
       if (

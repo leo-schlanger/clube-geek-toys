@@ -102,6 +102,22 @@ describe('ProductCard', () => {
     expect(screen.getAllByText(/Esgotado/i).length).toBeGreaterThan(0)
   })
 
+  // A product left at R$ 0,00 used to add to the cart like any other and only
+  // fail at the last click of the checkout, with the order already written and
+  // cancelled. Six such attempts by one customer on 09/09/2026 is what the shop
+  // saw as "o cliente não consegue comprar".
+  it('refuses to add a product priced at R$ 0,00', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={{ ...product, price: 0, compareAtPrice: null }} />
+      </MemoryRouter>
+    )
+    const button = screen.getByRole('button', { name: /Indispon/i })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(addItem).not.toHaveBeenCalled()
+  })
+
   // The promotion was live and priced orders correctly for two days and still
   // read as "não foi aplicado", because the catalogue went on printing the
   // counter price. The number on the card is the point of the feature.

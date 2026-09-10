@@ -289,6 +289,36 @@ describe('ProductModal — rascunho pendente no Salvar', () => {
     ])
   })
 
+  /**
+   * A live product at R$ 0,00 is not a giveaway, it is a gap — and the only
+   * thing that noticed was `createOrder`, at the customer's last click. On
+   * 09/09/2026 one of them took six runs at the checkout and left.
+   */
+  it('refuses to publish a product without a price', async () => {
+    renderModal(semVariacao)
+
+    fireEvent.change(screen.getByPlaceholderText(/Ex\.: 7500 ou 149\.90/i), {
+      target: { value: '0' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(String(mockedUpdate.mock.calls.length)).toBe('0')
+  })
+
+  // Zero stays legal while the listing is off: that is how a product gets
+  // drafted before its price is decided.
+  it('accepts R$ 0,00 on an inactive product', async () => {
+    renderModal({ ...semVariacao, active: false })
+
+    fireEvent.change(screen.getByPlaceholderText(/Ex\.: 7500 ou 149\.90/i), {
+      target: { value: '0' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalled())
+  })
+
   it('blocks the save when the pasted video link is invalid', async () => {
     renderModal(semVariacao)
 

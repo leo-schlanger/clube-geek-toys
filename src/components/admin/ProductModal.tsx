@@ -1162,6 +1162,30 @@ export function ProductModal({
       );
     }
 
+    /**
+     * A product on sale at R$ 0,00 cannot be sold, and nothing said so.
+     *
+     * `createOrder` refuses a zero total — rightly, since it would hand the
+     * goods out for free — but it refuses at the last click of the checkout.
+     * On 09/09/2026 a customer took six runs at it from Instagram and left; the
+     * catalogue had "Photocards Blackpink" live at R$ 0,00 with 10 in stock.
+     * Zero stays allowed while the product is off: that is how a listing gets
+     * drafted before its price is decided.
+     */
+    if (form.active) {
+      const sellable = hasVariants
+        ? rows.some((r) => Number(r.price) > 0)
+        : price > 0;
+      if (!sellable) {
+        return fail(
+          hasVariants ? "variacoes" : "basico",
+          hasVariants
+            ? "Produto ativo precisa de pelo menos uma variação com preço acima de R$ 0,00."
+            : "Produto ativo precisa de preço acima de R$ 0,00. Desmarque \"Ativo\" para deixá-lo como rascunho.",
+        );
+      }
+    }
+
     const variantImages: string[][] = [];
     for (const [idx, row] of rows.entries()) {
       const resolved = resolvePendingVariantImages(row, idx);

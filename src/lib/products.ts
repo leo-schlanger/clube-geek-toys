@@ -91,6 +91,20 @@ export function availableStock(item: { stock: number; available?: number }): num
   return Math.max(0, item.available ?? item.stock)
 }
 
+/**
+ * A price of R$ 0,00 is a catalogue gap, not a giveaway.
+ *
+ * `createOrder` refuses a zero total outright, and it is right to: seven such
+ * products were live on 23/08/2026 with stock behind them. But it refuses at
+ * the very last click, after the address and the shipping quote — on 09/09/2026
+ * one customer took six runs at the checkout from Instagram before giving up,
+ * and the shop only learned of it from the API log. Stop it at the shelf, where
+ * "Indisponível" costs nothing, instead of at the till.
+ */
+export function hasSellablePrice(price: number | null | undefined): boolean {
+  return typeof price === 'number' && Number.isFinite(price) && price > 0
+}
+
 // ─── Admin ─────────────────────────────────────────────────────────────────
 
 /**
