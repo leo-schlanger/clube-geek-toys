@@ -5,11 +5,11 @@ import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
 import { OrderDetailModal, ORDER_STATUS_META, ORDER_STATUSES } from './OrderDetailModal'
 import type { Order, OrderStatus } from '../../types'
-import { adminListOrders, refundOrder } from '../../lib/orders'
+import { adminListOrders, needsShippingLabel, refundOrder } from '../../lib/orders'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
-import { ClipboardList, Eye, RotateCcw, Store } from 'lucide-react'
+import { ClipboardList, Eye, RotateCcw, Store, Tag } from 'lucide-react'
 
 export function OrdersTab() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -92,7 +92,63 @@ export function OrdersTab() {
             <Loading />
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/*
+              Two layouts for one list, because the shop runs the panel from a
+              phone. The table needs six columns and puts "Ações" in the last
+              one, so on a 390 px screen the only way into an order — a 32 px
+              eye icon with no label — sits off the right edge behind a
+              horizontal scroll nobody thinks to try. "Não acho o botão" was
+              exactly that. The cards carry the same data with the action
+              spelled out.
+            */}
+            <div className="space-y-3 sm:hidden">
+              {orders.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => setDetailId(order.id)}
+                  className="flex w-full flex-col gap-2 rounded-lg border border-border p-3 text-left transition-colors active:bg-muted/50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="font-mono font-medium">#{order.orderNumber}</span>
+                      {order.deliveryMethod === 'pickup' && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+                          <Store className="h-3 w-3" />
+                          Retirada
+                        </span>
+                      )}
+                      {needsShippingLabel(order) && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-accent">
+                          <Tag className="h-3 w-3" />
+                          Etiqueta pendente
+                        </span>
+                      )}
+                      <p className="truncate font-medium">{order.customerName}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {order.customerEmail}
+                      </p>
+                    </div>
+                    <Badge variant={ORDER_STATUS_META[order.status].variant}>
+                      {ORDER_STATUS_META[order.status].label}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                    </span>
+                    <span className="font-medium">{formatCurrency(order.total)}</span>
+                  </div>
+                  <span className="flex items-center justify-center gap-1 rounded-md bg-muted py-2 text-sm font-medium">
+                    <Eye className="h-4 w-4" />
+                    Abrir pedido
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto sm:block">
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/50">
@@ -115,6 +171,14 @@ export function OrdersTab() {
                         <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
                           <Store className="h-3 w-3" />
                           Retirada
+                        </span>
+                      )}
+                      {/* The queue the shop kept asking for and could only find
+                          by opening every order one at a time. */}
+                      {needsShippingLabel(order) && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                          <Tag className="h-3 w-3" />
+                          Etiqueta pendente
                         </span>
                       )}
                     </td>
@@ -161,6 +225,7 @@ export function OrdersTab() {
                 ))}
               </tbody>
             </table>
+            </div>
 
             {orders.length === 0 && (
               <div className="text-center py-12">
@@ -173,7 +238,7 @@ export function OrdersTab() {
                 </p>
               </div>
             )}
-          </div>
+          </>
         )}
       </CardContent>
 

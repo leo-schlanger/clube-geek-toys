@@ -95,6 +95,29 @@ export interface LabelState {
   printUrl?: string
 }
 
+/**
+ * Whether this order is still waiting for a shipping label to be bought.
+ *
+ * Answered from the row the list already has, because the real answer costs a
+ * call to Melhor Envio per order and the point is to flag the queue at a
+ * glance. `trackingCode` is the tell: buying a label writes it (label.service
+ * sets `tracking_code` as soon as Melhor Envio returns one), and a code typed
+ * in by hand means the label was bought elsewhere — either way there is nothing
+ * left to buy here.
+ *
+ * A fallback quote (`fallback-pac`) has no Melhor Envio service behind it, so
+ * it is not a queue item; the order detail explains that case on its own.
+ */
+export function needsShippingLabel(order: Order): boolean {
+  return (
+    order.deliveryMethod !== 'pickup' &&
+    (order.status === 'paid' || order.status === 'processing') &&
+    !!order.shippingServiceId &&
+    /^\d+$/.test(order.shippingServiceId) &&
+    !order.trackingCode
+  )
+}
+
 /** Where the label stands, asked of Melhor Envio. Safe to call on open. */
 export async function getLabelState(orderId: string): Promise<LabelState | null> {
   const result = await api.get<LabelState>(`/orders/${orderId}/label`)

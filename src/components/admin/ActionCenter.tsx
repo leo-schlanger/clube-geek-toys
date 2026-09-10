@@ -52,7 +52,10 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
   },
   to_separate: {
     label: 'Pedidos a separar',
-    hint: 'Pagos e esperando separação',
+    // Names the label on purpose. The button to buy it lives inside the order,
+    // and the shop went looking for it on the shipping screen and in the
+    // settings tab before reporting it as missing.
+    hint: 'Pagos e esperando separação — a etiqueta se compra dentro do pedido',
     tab: 'orders',
     icon: <PackageCheck className="h-5 w-5" />,
     severity: 'attention',

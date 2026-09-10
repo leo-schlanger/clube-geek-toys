@@ -28,6 +28,7 @@ import {
   RotateCcw,
   MessageSquare,
   Store,
+  Tag,
 } from 'lucide-react'
 
 // Shared status metadata (label + badge variant) used across the orders UI.
@@ -435,9 +436,35 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </div>
               )}
 
-              {!isPickup && canBuyLabel && (
-                <div className="space-y-2 border-t pt-4">
+              {/*
+                Silence was read as a missing feature. A pending order simply
+                had no "Etiqueta de envio" block at all, so the shop went
+                looking for a button that the code had decided not to draw and
+                reported it as broken. Say which step is missing instead.
+              */}
+              {!isPickup && !isShippable && (
+                <div className="space-y-1 border-t pt-4">
                   <h4 className="text-sm font-semibold">Etiqueta de envio</h4>
+                  <p className="text-xs text-muted-foreground">
+                    {order.status === 'pending'
+                      ? 'A etiqueta aparece aqui assim que o pagamento for confirmado. Use "Confirmar PIX" no rodapé se o dinheiro já caiu.'
+                      : 'Pedido cancelado ou reembolsado — não há etiqueta a comprar.'}
+                  </p>
+                </div>
+              )}
+
+              {/*
+                Boxed and coloured like the pickup warning, and for the same
+                reason: this is what the staff has to *do* with the order, not a
+                detail about it. As a plain `border-t` section between the
+                address and the tracking field it read as neither — the shop
+                reported it as "não acho onde clicar" while looking at it.
+              */}
+              {!isPickup && canBuyLabel && (
+                <div className="space-y-2 rounded-lg border border-accent/40 bg-accent/10 p-3">
+                  <h4 className="flex items-center gap-1 text-sm font-semibold">
+                    <Tag className="h-4 w-4 text-accent" /> Etiqueta de envio
+                  </h4>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
                       type="button"
@@ -461,7 +488,8 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                   <p className="text-xs text-muted-foreground">
                     {label?.purchased
                       ? 'Comprada no Melhor Envio. Reimprimir não cobra de novo.'
-                      : 'O frete é debitado da conta Melhor Envio da loja.'}
+                      : 'Um clique compra, gera e abre o PDF para imprimir. O frete é ' +
+                        'debitado da conta Melhor Envio da loja.'}
                   </p>
                 </div>
               )}
@@ -586,7 +614,10 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
           )}
         </CardContent>
 
-        <CardFooter className="gap-2 flex-wrap">
+        {/* Sticky because the shop works from a phone: the actions that close
+            an order sat below the address, the items and the totals, and a
+            pending PIX needs the button, not the scroll. */}
+        <CardFooter className="sticky bottom-0 gap-2 flex-wrap border-t bg-card">
           <Button type="button" variant="outline" onClick={onClose} className="flex-1">
             Fechar
           </Button>

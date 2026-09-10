@@ -194,4 +194,21 @@ describe('OrderDetailModal — etiqueta', () => {
     expect(screen.queryByRole('button', { name: /comprar e imprimir etiqueta/i })).toBeNull()
     expect(screen.getByText(/tabela interna/i)).toBeInTheDocument()
   })
+
+  // Silence reads as a broken feature: a pending order drew no "Etiqueta de
+  // envio" block at all, and the shop reported the button as missing rather
+  // than the payment as unconfirmed.
+  it('diz que falta o pagamento, em vez de não desenhar nada, num pedido pendente', async () => {
+    await open(order({ status: 'pending', shippingServiceId: '2', shippingService: 'SEDEX' }))
+
+    expect(screen.queryByRole('button', { name: /comprar e imprimir etiqueta/i })).toBeNull()
+    expect(screen.getByText(/assim que o pagamento for confirmado/i)).toBeInTheDocument()
+  })
+
+  it('diz que não há etiqueta a comprar num pedido cancelado', async () => {
+    await open(order({ status: 'cancelled', shippingServiceId: '2', shippingService: 'SEDEX' }))
+
+    expect(screen.queryByRole('button', { name: /comprar e imprimir etiqueta/i })).toBeNull()
+    expect(screen.getByText(/cancelado ou reembolsado/i)).toBeInTheDocument()
+  })
 })

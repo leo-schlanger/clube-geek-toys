@@ -21,6 +21,7 @@ import {
   setOrderTracking,
   listMyOrders,
   getMyOrder,
+  needsShippingLabel,
 } from './orders'
 
 const mockedApi = vi.mocked(api)
@@ -135,5 +136,53 @@ describe('orders API client', () => {
       .mockResolvedValueOnce({ data: { id: 'o1' }, status: 200 })
     expect(await listMyOrders({ tab: 'to_pay' })).toMatchObject({ total: 0 })
     expect(await getMyOrder('o1')).toMatchObject({ id: 'o1' })
+  })
+})
+
+/**
+ * The queue marker on the orders list.
+ *
+ * It exists because the only way to know an order still needed a label was to
+ * open every order in turn — which is how "não acho onde clicar" started. It is
+ * answered from the list row, so it must not claim a label is pending for an
+ * order that has no label to buy.
+ */
+describe('needsShippingLabel', () => {
+  const base = {
+    id: 'o1',
+    deliveryMethod: 'shipping' as const,
+    status: 'paid' as const,
+    shippingServiceId: '2',
+    trackingCode: null,
+  }
+  const order = (over: Record<string, unknown> = {}) =>
+    ({ ...base, ...over }) as Parameters<typeof needsShippingLabel>[0]
+
+  it('flags a paid postal order with no tracking yet', () => {
+    expect(needsShippingLabel(order())).toBe(true)
+  })
+
+  it('still flags one already in separation', () => {
+    expect(needsShippingLabel(order({ status: 'processing' }))).toBe(true)
+  })
+
+  it('leaves a pickup order alone — there is nothing to post', () => {
+    expect(needsShippingLabel(order({ deliveryMethod: 'pickup' }))).toBe(false)
+  })
+
+  it('leaves an unpaid order alone', () => {
+    expect(needsShippingLabel(order({ status: 'pending' }))).toBe(false)
+  })
+
+  // Buying the label writes the tracking code, and one typed in by hand means
+  // the label was bought elsewhere. Either way the queue is clear.
+  it('clears once there is a tracking code', () => {
+    expect(needsShippingLabel(order({ trackingCode: 'AA123456789BR' }))).toBe(false)
+  })
+
+  // A fallback quote has no Melhor Envio service to buy against; the order
+  // detail explains that case instead.
+  it('does not flag a fallback quote', () => {
+    expect(needsShippingLabel(order({ shippingServiceId: 'fallback-pac' }))).toBe(false)
   })
 })
