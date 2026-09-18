@@ -365,6 +365,11 @@ export interface PixQRData {
   amount: number
   txId: string
   expiresAt: string
+  /**
+   * 'pagarme' settles itself through the webhook; 'local' is a static BR Code
+   * from before 01/09/2026 that only a human can reconcile.
+   */
+  provider?: 'pagarme' | 'local'
 }
 
 // Cart item, persisted in localStorage on the shop subdomain

@@ -13,7 +13,7 @@ import {
   Truck,
 } from 'lucide-react'
 import type { Order } from '../../types'
-import { getMyOrder, cancelMyOrder } from '../../lib/orders'
+import { getMyOrder, cancelMyOrder, pixConfirmationCopy } from '../../lib/orders'
 import { STORE_PICKUP } from '../../lib/shipping'
 import { getStoreCredit, listOrderReviews } from '../../lib/reviews'
 import { formatCurrency } from '../../lib/utils'
@@ -377,7 +377,7 @@ export default function MyOrderDetail() {
                 amount={order.pixData.amount}
                 reference={`#${order.orderNumber}`}
                 title="Pague por PIX para concluir"
-                description="A confirmação é manual: assim que o pagamento cair e a equipe conferir, seu pedido sai da fila."
+                description={pixConfirmationCopy(order.pixData)}
               />
             )}
 

@@ -23,6 +23,7 @@ import {
   getMyOrder,
   needsShippingLabel,
   awaitingPosting,
+  pixConfirmationCopy,
 } from './orders'
 
 const mockedApi = vi.mocked(api)
@@ -212,5 +213,16 @@ describe('awaitingPosting', () => {
 
   it('never flags a pickup order', () => {
     expect(awaitingPosting(order({ deliveryMethod: 'pickup' }))).toBe(false)
+  })
+})
+
+describe('pixConfirmationCopy', () => {
+  it('says a Pagar.me PIX confirms by itself', () => {
+    expect(pixConfirmationCopy({ provider: 'pagarme' })).toMatch(/automática/)
+  })
+
+  // A code with no provider tag is the static BR Code — nobody watches it.
+  it.each([['local' as const], [undefined]])('keeps the manual note for provider %s', (provider) => {
+    expect(pixConfirmationCopy({ provider })).toMatch(/manual/)
   })
 })

@@ -203,6 +203,20 @@ export interface OrderPixInfo {
  * "Acompanhar pedido" unmounted it. This is how the order page gets the code
  * back, for a guest too. `null` = nothing left to pay (or already settled).
  */
+/**
+ * What to promise about confirming this PIX.
+ *
+ * The order page said "a confirmação é manual" long after Pagar.me started
+ * settling PIX by itself, which told the customer to wait for a person — and
+ * invited a receipt on WhatsApp for something that already went through. Only a
+ * pre-migration code still needs the shop to check the statement.
+ */
+export function pixConfirmationCopy(pix: Pick<PixQRData, 'provider'>): string {
+  return pix.provider === 'pagarme'
+    ? 'A confirmação é automática: assim que o PIX cair, o pedido é liberado e você recebe um e-mail. Não precisa mandar comprovante.'
+    : 'A confirmação deste código é manual: assim que o pagamento cair e a equipe conferir, seu pedido sai da fila.'
+}
+
 export async function getOrderPix(id: string): Promise<OrderPixInfo | null> {
   const result = await api.get<OrderPixInfo>(`/orders/${id}/pix`, { skipAuth: true })
   return result.data ?? null

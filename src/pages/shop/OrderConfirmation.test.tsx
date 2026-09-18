@@ -4,7 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 const mockClear = vi.fn()
 
-vi.mock('../../lib/orders', () => ({
+vi.mock('../../lib/orders', async (importOriginal) => ({
+  pixConfirmationCopy: (await importOriginal<typeof import('../../lib/orders')>()).pixConfirmationCopy,
   getOrderStatus: vi.fn(),
   // The page fetches the PIX itself now — the EMV used to live only in the
   // checkout component's state, so closing the tab lost it for good.

@@ -11,8 +11,9 @@ vi.mock('react-router-dom', async (importOriginal) => {
   }
 })
 
-vi.mock('../../lib/orders', () => ({
+vi.mock('../../lib/orders', async (importOriginal) => ({
   getMyOrder: vi.fn(),
+  pixConfirmationCopy: (await importOriginal<typeof import('../../lib/orders')>()).pixConfirmationCopy,
 }))
 
 vi.mock('../../lib/reviews', () => ({
@@ -142,6 +143,34 @@ describe('MyOrderDetail', () => {
     renderDetail()
     await screen.findByText(/Pedido #55/i)
     expect(screen.queryByText(/assim que o pacote for entregue aos Correios/i)).toBeNull()
+  })
+
+  /**
+   * Pagar.me settles PIX by itself since 01/09/2026, and the page kept saying
+   * the team would check the statement — an invitation to send a receipt for
+   * something already confirmed.
+   */
+  it('promises automatic confirmation for a Pagar.me PIX', async () => {
+    mockedGet.mockResolvedValue({
+      ...order,
+      status: 'pending',
+      trackingCode: null,
+      pixData: { emvCode: '000201', pixKey: 'k', amount: 200, txId: 'ch_1', expiresAt: '', provider: 'pagarme' },
+    } as never)
+    renderDetail()
+    expect(await screen.findByText(/confirmação é automática/i)).toBeInTheDocument()
+    expect(screen.queryByText(/equipe conferir/i)).toBeNull()
+  })
+
+  it('keeps the manual note for a pre-migration static code', async () => {
+    mockedGet.mockResolvedValue({
+      ...order,
+      status: 'pending',
+      trackingCode: null,
+      pixData: { emvCode: '000201', pixKey: 'k', amount: 200, txId: 'tx1', expiresAt: '', provider: 'local' },
+    } as never)
+    renderDetail()
+    expect(await screen.findByText(/equipe conferir/i)).toBeInTheDocument()
   })
 
   it('renders order detail with tracking', async () => {

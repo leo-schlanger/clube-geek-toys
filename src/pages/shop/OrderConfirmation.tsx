@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, Link } from 'react-router-dom'
 import { CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Home } from 'lucide-react'
 import type { OrderStatus } from '../../types'
-import { getOrderStatus, getOrderPix, type OrderPixInfo } from '../../lib/orders'
+import { getOrderStatus, getOrderPix, pixConfirmationCopy, type OrderPixInfo } from '../../lib/orders'
 import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { useShopMember } from '../../components/store/useShopMember'
@@ -230,6 +230,7 @@ export default function OrderConfirmation() {
                 pixKey={pix.pix.pixKey}
                 amount={pix.total}
                 reference={`#${pix.orderNumber}`}
+                description={pixConfirmationCopy(pix.pix)}
                 className="w-full text-left"
               />
             )}
