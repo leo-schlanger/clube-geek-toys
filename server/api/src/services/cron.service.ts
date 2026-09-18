@@ -6,6 +6,7 @@ import { getActionItems } from './report.service.js';
 import { releaseReservationById } from './order.service.js';
 import { purgeExpiredRefreshSessions } from './auth.service.js';
 import { reconcilePendingCharges } from './reconcile.service.js';
+import { syncShipments } from './label.service.js';
 
 export function initCronJobs() {
   // Daily at 6:00 AM UTC (3:00 AM BRT)
@@ -74,8 +75,27 @@ export function initCronJobs() {
     }
   });
 
+  /**
+   * Every 15 minutes: follow the parcels whose labels were bought in the panel.
+   *
+   * Melhor Envio sends us nothing when a label gets its tracking code, is
+   * scanned by the Correios or is delivered, so without this the order sat in
+   * "Em separação" with no code while the parcel was already at the customer's
+   * door. Idle when no label is open — the query finds nothing and no call goes
+   * out.
+   */
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      const touched = await syncShipments();
+      if (touched > 0) console.log(`[CRON] Shipment sync updated ${touched} order(s)`);
+    } catch (err) {
+      console.error('[CRON] Shipment sync error:', err);
+    }
+  });
+
   console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
   console.log('[CRON] Scheduled payment reconciliation every 10 minutes');
+  console.log('[CRON] Scheduled shipment sync every 15 minutes');
 }
 
 /**

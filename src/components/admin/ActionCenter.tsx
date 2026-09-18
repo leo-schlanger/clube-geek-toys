@@ -63,7 +63,9 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
   },
   to_ship: {
     label: 'Pedidos a postar',
-    hint: 'Separados, aguardando código de rastreio',
+    // Labels bought in the panel leave this queue by themselves, on the
+    // Correios scan; only a label bought elsewhere needs its code typed in.
+    hint: 'Separados, aguardando postagem — etiqueta comprada aqui atualiza sozinha',
     tab: 'orders',
     icon: <Truck className="h-5 w-5" />,
     severity: 'attention',

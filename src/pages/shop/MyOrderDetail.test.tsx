@@ -127,6 +127,23 @@ describe('MyOrderDetail', () => {
     })
   })
 
+  /**
+   * The code exists from the label, but until the scan the Correios site says
+   * "objeto não encontrado" — which reads as a lost parcel.
+   */
+  it('explains that a code from a fresh label shows movement only after posting', async () => {
+    mockedGet.mockResolvedValue({ ...order, status: 'processing' } as never)
+    renderDetail()
+    expect(await screen.findByText(/assim que o pacote for entregue aos Correios/i)).toBeInTheDocument()
+  })
+
+  it('drops that note once the order is shipped', async () => {
+    mockedGet.mockResolvedValue(order as never)
+    renderDetail()
+    await screen.findByText(/Pedido #55/i)
+    expect(screen.queryByText(/assim que o pacote for entregue aos Correios/i)).toBeNull()
+  })
+
   it('renders order detail with tracking', async () => {
     mockedGet.mockResolvedValue(order as never)
     renderDetail()

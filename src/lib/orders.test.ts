@@ -22,6 +22,7 @@ import {
   listMyOrders,
   getMyOrder,
   needsShippingLabel,
+  awaitingPosting,
 } from './orders'
 
 const mockedApi = vi.mocked(api)
@@ -184,5 +185,32 @@ describe('needsShippingLabel', () => {
   // detail explains that case instead.
   it('does not flag a fallback quote', () => {
     expect(needsShippingLabel(order({ shippingServiceId: 'fallback-pac' }))).toBe(false)
+  })
+})
+
+describe('awaitingPosting', () => {
+  const order = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 'o1',
+      deliveryMethod: 'shipping',
+      status: 'processing',
+      trackingCode: 'AP507306235BR',
+      ...over,
+    }) as Parameters<typeof awaitingPosting>[0]
+
+  it('flags a label bought and not yet posted', () => {
+    expect(awaitingPosting(order())).toBe(true)
+  })
+
+  it('stops once the Correios scan moves it to shipped', () => {
+    expect(awaitingPosting(order({ status: 'shipped' }))).toBe(false)
+  })
+
+  it('is not a label queue item without a code', () => {
+    expect(awaitingPosting(order({ trackingCode: null }))).toBe(false)
+  })
+
+  it('never flags a pickup order', () => {
+    expect(awaitingPosting(order({ deliveryMethod: 'pickup' }))).toBe(false)
   })
 })

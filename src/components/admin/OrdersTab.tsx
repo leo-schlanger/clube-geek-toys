@@ -5,7 +5,7 @@ import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
 import { OrderDetailModal, ORDER_STATUS_META, ORDER_STATUSES } from './OrderDetailModal'
 import type { Order, OrderStatus } from '../../types'
-import { adminListOrders, needsShippingLabel, refundOrder } from '../../lib/orders'
+import { adminListOrders, awaitingPosting, needsShippingLabel, refundOrder } from '../../lib/orders'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
@@ -125,6 +125,12 @@ export function OrdersTab() {
                           Etiqueta pendente
                         </span>
                       )}
+                      {awaitingPosting(order) && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+                          <Tag className="h-3 w-3" />
+                          Etiqueta pronta · levar aos Correios
+                        </span>
+                      )}
                       <p className="truncate font-medium">{order.customerName}</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {order.customerEmail}
@@ -179,6 +185,12 @@ export function OrdersTab() {
                         <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
                           <Tag className="h-3 w-3" />
                           Etiqueta pendente
+                        </span>
+                      )}
+                      {awaitingPosting(order) && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
+                          <Tag className="h-3 w-3" />
+                          Etiqueta pronta · levar aos Correios
                         </span>
                       )}
                     </td>

@@ -547,30 +547,30 @@ Todos os emails usam a API do **Resend** com templates HTML inline renderizados 
 
 > **Gap conhecido:** o shell atual em `email.service.ts` ainda usa dourado `#d4a520` e o wordmark "GEEK & TOYS". Migrar para a paleta oficial no mesmo PR de design.
 
-| #   | Template                      | Gatilho                                                           |
-| --- | ----------------------------- | ----------------------------------------------------------------- |
-| 1   | `verify-email`                | Apos registro de conta — link HMAC valido por 24h                 |
-| 2   | `password-reset`              | Solicitacao de redefinicao de senha — link valido por 1h          |
-| 3   | `welcome`                     | Primeira ativacao do membro (pagamento confirmado)                |
-| 4   | `payment-confirmed`           | Qualquer pagamento confirmado (cartao ou PIX)                     |
-| 5   | `payment-failed`              | Cobranca recusada (`charge.payment_failed`)                       |
-| 6   | `subscription-created`        | Assinatura recorrente criada                                      |
-| 7   | `subscription-payment`        | Cobranca recorrente processada (`invoice.paid`)                   |
-| 8   | `subscription-paused`         | Membro pausou assinatura                                          |
-| 9   | `subscription-resumed`        | Membro reativou assinatura                                        |
-| 10  | `subscription-cancelled`      | Cancelamento (manual ou apos 3 falhas)                            |
-| 11  | `subscription-payment-failed` | Falha na cobranca recorrente (`invoice.payment_failed`)           |
-| 12  | `renewal-reminder`            | Cron: 5-8 dias antes da expiracao (apenas `auto_renewal = FALSE`) |
-| 13  | `member-expired`              | Cron: membro marcado como expirado                                |
-| 14  | `order-confirmed`             | Pedido de loja pago (webhook ou confirmacao manual de PIX)        |
-| 15  | `contract-signed`             | Apos assinatura do contrato digital — PDF anexado                 |
-| 16  | `admin-pix-pending`           | Pagamento PIX gerado — notifica admin para confirmacao manual     |
-| 17  | `admin-new-member`            | Novo membro completou cadastro                                    |
-| 18  | `order-shipped`               | Admin salvou o codigo de rastreio — pedido vai para `shipped`     |
-| 19  | `question-answered`           | Admin respondeu uma pergunta na pagina do produto                 |
-| 20  | `admin-pix-order-pending`     | Pedido de loja gerou PIX — notifica admin para confirmacao manual |
-| 21  | `admin-order-cancelled`       | Cliente cancelou um pedido ainda nao pago                         |
-| 22  | `admin-daily-digest`          | Cron 6h UTC: filas do Painel do dia, so quando ha pendencia       |
+| #   | Template                      | Gatilho                                                                                  |
+| --- | ----------------------------- | ---------------------------------------------------------------------------------------- |
+| 1   | `verify-email`                | Apos registro de conta — link HMAC valido por 24h                                        |
+| 2   | `password-reset`              | Solicitacao de redefinicao de senha — link valido por 1h                                 |
+| 3   | `welcome`                     | Primeira ativacao do membro (pagamento confirmado)                                       |
+| 4   | `payment-confirmed`           | Qualquer pagamento confirmado (cartao ou PIX)                                            |
+| 5   | `payment-failed`              | Cobranca recusada (`charge.payment_failed`)                                              |
+| 6   | `subscription-created`        | Assinatura recorrente criada                                                             |
+| 7   | `subscription-payment`        | Cobranca recorrente processada (`invoice.paid`)                                          |
+| 8   | `subscription-paused`         | Membro pausou assinatura                                                                 |
+| 9   | `subscription-resumed`        | Membro reativou assinatura                                                               |
+| 10  | `subscription-cancelled`      | Cancelamento (manual ou apos 3 falhas)                                                   |
+| 11  | `subscription-payment-failed` | Falha na cobranca recorrente (`invoice.payment_failed`)                                  |
+| 12  | `renewal-reminder`            | Cron: 5-8 dias antes da expiracao (apenas `auto_renewal = FALSE`)                        |
+| 13  | `member-expired`              | Cron: membro marcado como expirado                                                       |
+| 14  | `order-confirmed`             | Pedido de loja pago (webhook ou confirmacao manual de PIX)                               |
+| 15  | `contract-signed`             | Apos assinatura do contrato digital — PDF anexado                                        |
+| 16  | `admin-pix-pending`           | Pagamento PIX gerado — notifica admin para confirmacao manual                            |
+| 17  | `admin-new-member`            | Novo membro completou cadastro                                                           |
+| 18  | `order-shipped`               | Pedido vai para `shipped`: rastreio digitado ou leitura nos Correios (sync Melhor Envio) |
+| 19  | `question-answered`           | Admin respondeu uma pergunta na pagina do produto                                        |
+| 20  | `admin-pix-order-pending`     | Pedido de loja gerou PIX — notifica admin para confirmacao manual                        |
+| 21  | `admin-order-cancelled`       | Cliente cancelou um pedido ainda nao pago                                                |
+| 22  | `admin-daily-digest`          | Cron 6h UTC: filas do Painel do dia, so quando ha pendencia                              |
 
 ### Deduplicacao
 

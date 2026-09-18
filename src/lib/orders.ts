@@ -92,6 +92,9 @@ export interface LabelState {
   purchased: boolean
   generated: boolean
   trackingCode: string | null
+  /** Correios scan — from here the order is `shipped`, set by the server. */
+  postedAt: string | null
+  deliveredAt: string | null
   printUrl?: string
 }
 
@@ -101,7 +104,8 @@ export interface LabelState {
  * Answered from the row the list already has, because the real answer costs a
  * call to Melhor Envio per order and the point is to flag the queue at a
  * glance. `trackingCode` is the tell: buying a label writes it (label.service
- * sets `tracking_code` as soon as Melhor Envio returns one), and a code typed
+ * records it on purchase or, since Melhor Envio assigns it a few seconds later,
+ * on the next sync — at most 15 minutes, or on opening the order), and a code typed
  * in by hand means the label was bought elsewhere — either way there is nothing
  * left to buy here.
  *
@@ -115,6 +119,21 @@ export function needsShippingLabel(order: Order): boolean {
     !!order.shippingServiceId &&
     /^\d+$/.test(order.shippingServiceId) &&
     !order.trackingCode
+  )
+}
+
+/**
+ * Label in hand, parcel not yet at the Correios.
+ *
+ * The state the shop asked to see as "etiqueta impressa". Only a label bought
+ * here leaves an unshipped order with a code — typing one by hand ships the
+ * order at once — and the server moves it to `shipped` on the Correios scan.
+ */
+export function awaitingPosting(order: Order): boolean {
+  return (
+    order.deliveryMethod !== 'pickup' &&
+    (order.status === 'paid' || order.status === 'processing') &&
+    !!order.trackingCode
   )
 }
 

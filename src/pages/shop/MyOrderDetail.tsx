@@ -202,6 +202,16 @@ export default function MyOrderDetail() {
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       )}
+                      {/* The code exists from the label, but the Correios
+                          only know it after the scan — before that their site
+                          says "objeto não encontrado", which reads as a lost
+                          parcel. */}
+                      {rank < STATUS_RANK.shipped && (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          A etiqueta já foi gerada. O rastreio passa a mostrar movimento
+                          assim que o pacote for entregue aos Correios.
+                        </p>
+                      )}
                     </div>
                   )}
                 </CardContent>

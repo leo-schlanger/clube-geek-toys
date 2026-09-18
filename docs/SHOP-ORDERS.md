@@ -33,10 +33,20 @@ Origem de frete: loja física CEP **22011-001**.
 ## Fluxo admin (enviar pedido)
 
 1. Cliente paga → status `paid` (webhook da Pagar.me; PIX e cartão confirmam sozinhos)
-2. Separar → `processing`
-3. Postar nos Correios → colar código de rastreio no modal do pedido → salva e marca `shipped`
-4. Cliente vê em **Minhas compras → A caminho** com link dos Correios
-5. Marcar `delivered` quando confirmar entrega (manual)
+2. **Comprar e imprimir etiqueta** no modal do pedido → `processing`, e o rastreio
+   chega sozinho em segundos. A lista marca **Etiqueta pronta · levar aos Correios**
+3. Levar aos Correios → na leitura do pacote o pedido vira `shipped` e o cliente
+   recebe `order-shipped` — **sozinho**, ninguém precisa mudar status
+4. Entregue → vira `delivered` sozinho, e o cliente ganha aviso para avaliar
+
+Etiqueta comprada **fora** do painel (ou frete da tabela interna): colar o
+rastreio no campo manual, que marca `shipped` na hora; `delivered` fica manual.
+
+O cliente acompanha em **Minhas compras** (`/minhas-compras/:id`): linha do
+tempo Pedido criado → Pago → Preparando → A caminho → Entregue, e o código com
+link dos Correios assim que existe. Antes da postagem a página avisa que o
+rastreio só mostra movimento depois que os Correios recebem o pacote — o site
+deles responde "objeto não encontrado" até lá.
 
 ## Retirada na loja (`delivery_method = 'pickup'`)
 
@@ -275,8 +285,35 @@ a loja teria comprado uma etiqueta que nunca encontraria. Cada passo é pulado
 quando o Melhor Envio diz que já foi feito, então apertar duas vezes não compra
 duas etiquetas e uma compra interrompida é retomável.
 
-Quando o rastreio aparece, ele é gravado pelo mesmo caminho de um código
-digitado: o pedido vira `shipped` e o cliente recebe `order-shipped`.
+### O pacote se acompanha sozinho (desde 18/09/2026)
+
+O Melhor Envio **não entrega o rastreio na hora da compra**: o código aparece
+alguns segundos depois da geração. A compra lia o envio uma única vez, no fim, e
+nunca mais perguntava — então todo pedido etiquetado pelo painel ficava sem
+código. Em 17/09 dois pacotes foram postados e um **entregue** enquanto o painel
+dizia "Etiqueta pendente" e a página do cliente dizia "Preparando"; a loja mudou
+o status à mão e o aviso não saiu, porque ele olha o rastreio, não o status.
+
+Agora `syncShipments()` (`label.service.ts`) roda **a cada 15 min** no cron, e o
+mesmo acerto acontece **ao abrir o pedido** no painel. Uma chamada só
+(`POST /me/shipment/tracking`) cobre todos os pedidos com etiqueta aberta:
+
+| O Melhor Envio diz        | O pedido vira                   | Aviso ao cliente           |
+| ------------------------- | ------------------------------- | -------------------------- |
+| etiqueta paga, com código | `processing` + rastreio gravado | nenhum                     |
+| `posted_at` (leitura)     | `shipped`                       | `order-shipped` + sino     |
+| `delivered_at`            | `delivered`                     | sino, convidando a avaliar |
+
+Regras que não se desfazem sem querer:
+
+- **O status só anda para a frente**, e com compare-and-swap no status lido: o
+  painel e o cron podem correr juntos, e quem perde não manda e-mail duplicado.
+- **Comprar não é postar.** O `order-shipped` diz "foi postado pelos Correios";
+  mandá-lo na compra fazia o cliente abrir um rastreio que ainda não existe.
+- **Rastreio digitado à mão vence.** Código diferente do Melhor Envio é etiqueta
+  comprada em outro lugar — o pedido não é tocado.
+- **Item de carrinho não pago não é etiqueta.** Cancelado, expirado ou nunca
+  pago é ignorado (o pedido #10 tem um desses, largado no carrinho de lá).
 
 | Endpoint                         | O quê                                                                  |
 | -------------------------------- | ---------------------------------------------------------------------- |

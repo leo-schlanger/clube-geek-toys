@@ -18,9 +18,10 @@ import type { Order } from '../../types'
  *     someone looks. It used to exist only inside a notification e-mail.
  */
 
-const { getOrderMock, refundOrderMock } = vi.hoisted(() => ({
+const { getOrderMock, refundOrderMock, labelStateMock } = vi.hoisted(() => ({
   getOrderMock: vi.fn(),
   refundOrderMock: vi.fn(),
+  labelStateMock: vi.fn(async () => null as unknown),
 }))
 
 vi.mock('../../lib/orders', () => ({
@@ -29,7 +30,7 @@ vi.mock('../../lib/orders', () => ({
   confirmPixOrder: vi.fn(),
   refundOrder: refundOrderMock,
   setOrderTracking: vi.fn(),
-  getLabelState: vi.fn(async () => null),
+  getLabelState: labelStateMock,
   buyOrderLabel: vi.fn(),
   reprintOrderLabel: vi.fn(),
 }))
@@ -77,6 +78,7 @@ async function open(o: Order | null) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  labelStateMock.mockResolvedValue(null)
 })
 
 describe('OrderDetailModal — estorno', () => {
@@ -210,5 +212,50 @@ describe('OrderDetailModal — etiqueta', () => {
 
     expect(screen.queryByRole('button', { name: /comprar e imprimir etiqueta/i })).toBeNull()
     expect(screen.getByText(/cancelado ou reembolsado/i)).toBeInTheDocument()
+  })
+
+  /**
+   * The shop printed two labels, moved the orders to "Em separação" by hand and
+   * the panel still said the label was pending — the code had not been read
+   * back. The box now says where the parcel is.
+   */
+  const bought = {
+    melhorEnvioOrderId: 'me_1',
+    purchased: true,
+    generated: true,
+    trackingCode: 'AP507306235BR',
+    postedAt: null as string | null,
+    deliveredAt: null as string | null,
+  }
+
+  it('etiqueta comprada e não postada: diz que falta levar aos Correios', async () => {
+    labelStateMock.mockResolvedValue(bought)
+    await open(order({ status: 'processing', shippingServiceId: '1', shippingService: 'PAC' }))
+
+    expect(await screen.findByText(/falta levar o pacote aos Correios/i)).toBeInTheDocument()
+    expect(screen.getByText(/se atualizam sozinhos/i)).toBeInTheDocument()
+  })
+
+  it('mostra quando foi postada', async () => {
+    labelStateMock.mockResolvedValue({ ...bought, postedAt: '2026-09-17 18:58:35' })
+    await open(order({ status: 'shipped', shippingServiceId: '1', shippingService: 'PAC' }))
+
+    expect(await screen.findByText('Postada nos Correios em 17/09 às 18:58')).toBeInTheDocument()
+  })
+
+  /** Opening the order syncs it on the server; the badge must follow. */
+  it('recarrega o pedido quando a consulta ao Melhor Envio mudou o status', async () => {
+    const onChanged = vi.fn()
+    getOrderMock
+      .mockResolvedValueOnce(order({ status: 'processing', shippingServiceId: '2', shippingService: 'SEDEX' }))
+      .mockResolvedValueOnce(
+        order({ status: 'delivered', trackingCode: 'AD929173832BR', shippingServiceId: '2', shippingService: 'SEDEX' }),
+      )
+    labelStateMock.mockResolvedValue({ ...bought, deliveredAt: '2026-09-17 20:04:52' })
+    render(<OrderDetailModal orderId="o1" onClose={vi.fn()} onChanged={onChanged} />)
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
+    expect(getOrderMock).toHaveBeenCalledTimes(2)
+    expect(screen.getByDisplayValue('AD929173832BR')).toBeInTheDocument()
   })
 })

@@ -1602,7 +1602,13 @@ export async function setOrderTracking(
   if (result.rows.length === 0) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
   await auditLog('order.tracking_set', actorUserId, { orderId: id, trackingCode: code });
   const order = mapOrder(result.rows[0]);
-  // Non-blocking ship notification
+  notifyOrderShipped(order);
+  return order;
+}
+
+/** Non-blocking "your order was posted" e-mail and bell notice. */
+export function notifyOrderShipped(order: Order): void {
+  const code = order.trackingCode ?? '';
   sendTemplateEmail({
     template: 'order-shipped',
     to: order.customerEmail,
@@ -1610,7 +1616,7 @@ export async function setOrderTracking(
       name: order.customerName,
       order_number: String(order.orderNumber),
       tracking_code: code,
-      tracking_url: url,
+      tracking_url: order.trackingUrl || trackingUrlForCode(code),
       shipping_service: order.shippingService || '',
     },
   }).catch((err) => console.error('[email] order-shipped failed', err));
@@ -1628,8 +1634,18 @@ export async function setOrderTracking(
       link: `/pedido/${order.id}`,
     }).catch((err) => console.error('[notify] order_shipped failed', err));
   }
+}
 
-  return order;
+/** Non-blocking bell notice that the parcel arrived — and that it can be reviewed. */
+export function notifyOrderDelivered(order: Order): void {
+  if (!order.userId) return;
+  notify(null, {
+    userId: order.userId,
+    kind: 'generic',
+    title: `Pedido #${order.orderNumber} entregue`,
+    body: 'Conta pra gente o que achou — dá para avaliar a compra na página do pedido.',
+    link: `/minhas-compras/${order.id}`,
+  }).catch((err) => console.error('[notify] order_delivered failed', err));
 }
 
 // ─── Admin mutations ─────────────────────────────────────────────────────────

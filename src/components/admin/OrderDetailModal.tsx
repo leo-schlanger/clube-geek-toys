@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
@@ -83,6 +83,11 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
   const [trackingCode, setTrackingCode] = useState('')
   const [label, setLabel] = useState<LabelState | null>(null)
   const [labelLoading, setLabelLoading] = useState(false)
+  // Read from the effect without re-running it when the parent re-renders.
+  const onChangedRef = useRef(onChanged)
+  useEffect(() => {
+    onChangedRef.current = onChanged
+  })
 
   useEffect(() => {
     let active = true
@@ -99,7 +104,21 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
         // stop the order rendering.
         if (data && data.deliveryMethod !== 'pickup') {
           getLabelState(data.id)
-            .then((l) => { if (active) setLabel(l) })
+            .then(async (l) => {
+              if (!active) return
+              setLabel(l)
+              // Asking also syncs: the server may have just recorded the code
+              // or moved the status, and the panel should show that now.
+              if (!l?.purchased) return
+              const fresh = await getOrder(data.id)
+              if (!active || !fresh) return
+              if (fresh.status !== data.status || fresh.trackingCode !== data.trackingCode) {
+                setOrder(fresh)
+                setStatusValue(fresh.status)
+                setTrackingCode(fresh.trackingCode ?? '')
+                onChangedRef.current()
+              }
+            })
             .catch(() => {})
         }
       })
@@ -485,9 +504,20 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                       </Button>
                     )}
                   </div>
+                  {label?.purchased && (
+                    <p className="text-sm font-medium">
+                      {label.deliveredAt
+                        ? `Entregue ao cliente em ${formatShipmentDate(label.deliveredAt)}`
+                        : label.postedAt
+                          ? `Postada nos Correios em ${formatShipmentDate(label.postedAt)}`
+                          : 'Etiqueta pronta — falta levar o pacote aos Correios'}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {label?.purchased
-                      ? 'Comprada no Melhor Envio. Reimprimir não cobra de novo.'
+                      ? 'O rastreio e o status do pedido se atualizam sozinhos pelo Melhor ' +
+                        'Envio: Enviado quando os Correios recebem, Entregue quando chega. ' +
+                        'Reimprimir não cobra de novo.'
                       : 'Um clique compra, gera e abre o PDF para imprimir. O frete é ' +
                         'debitado da conta Melhor Envio da loja.'}
                   </p>
@@ -649,4 +679,10 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
       </Card>
     </div>
   )
+}
+
+/** Melhor Envio dates come as "2026-09-17 18:58:35", in Brasília time. */
+function formatShipmentDate(value: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(value)
+  return m ? `${m[3]}/${m[2]} às ${m[4]}:${m[5]}` : value
 }

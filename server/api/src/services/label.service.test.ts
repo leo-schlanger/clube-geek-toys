@@ -18,13 +18,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     403 is not.
  */
 
-const { queryMock, tokenMock, orderMock, packageMock, fetchMock, auditMock } = vi.hoisted(() => ({
+const { queryMock, tokenMock, orderMock, packageMock, fetchMock, auditMock, shippedMock, deliveredMock } = vi.hoisted(() => ({
   queryMock: vi.fn(async () => ({ rows: [], rowCount: 0 })),
   tokenMock: vi.fn(async () => 'tok_123'),
   orderMock: vi.fn(),
   packageMock: vi.fn(async () => ({ weightG: 300, heightCm: 4, widthCm: 12, lengthCm: 17 })),
   fetchMock: vi.fn(),
   auditMock: vi.fn(async () => {}),
+  shippedMock: vi.fn(),
+  deliveredMock: vi.fn(),
 }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
@@ -33,7 +35,11 @@ vi.mock('./melhor-envio-oauth.service.js', () => ({
   getAccessToken: tokenMock,
   melhorEnvioBaseUrl: () => 'https://melhorenvio.com.br',
 }));
-vi.mock('./order.service.js', () => ({ getOrderById: orderMock }));
+vi.mock('./order.service.js', () => ({
+  getOrderById: orderMock,
+  notifyOrderShipped: shippedMock,
+  notifyOrderDelivered: deliveredMock,
+}));
 vi.mock('./shipping.service.js', () => ({
   buildPackageFromItems: packageMock,
   normalizeCep: (v: string) => String(v).replace(/\D/g, ''),
@@ -58,7 +64,7 @@ vi.mock('../config/env.js', () => ({
   },
 }));
 
-import { buyAndPrintLabel, getLabelState, reprintLabel } from './label.service.js';
+import { buyAndPrintLabel, getLabelState, reprintLabel, syncShipments } from './label.service.js';
 
 function order(over: Record<string, unknown> = {}) {
   return {
@@ -215,8 +221,12 @@ describe('buyAndPrintLabel', () => {
     expect(calls()).not.toContain('POST /me/shipment/checkout');
   });
 
-  /** The tracking code takes the same path a typed one does. */
-  it('grava o rastreio e move o pedido para enviado', async () => {
+  /**
+   * Buying is not posting. The shipped e-mail says "foi postado pelos
+   * Correios", so it waits for the scan; the purchase only records the code
+   * and moves the order into preparation.
+   */
+  it('grava o rastreio e deixa o pedido em separação, sem avisar o cliente', async () => {
     orderMock.mockResolvedValue(order());
     replies(
       { body: { id: 'me_1' } },
@@ -233,7 +243,9 @@ describe('buyAndPrintLabel', () => {
     const write = queryMock.mock.calls.find((c) => String(c[0]).includes('tracking_code'));
     expect(write, 'o rastreio tem de ser gravado').toBeDefined();
     expect(write![1] as unknown[]).toContain('BR777');
-    expect(String(write![0])).toContain("'shipped'");
+    expect(write![1] as unknown[]).toContain('processing');
+    expect(write![1] as unknown[]).not.toContain('shipped');
+    expect(shippedMock).not.toHaveBeenCalled();
   });
 
   // ── Guards ───────────────────────────────────────────────────────────────
@@ -415,6 +427,8 @@ describe('getLabelState', () => {
       purchased: false,
       generated: false,
       trackingCode: 'MANUAL1',
+      postedAt: null,
+      deliveredAt: null,
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -428,6 +442,143 @@ describe('getLabelState', () => {
       melhorEnvioOrderId: 'me_1',
       purchased: false,
     });
+  });
+
+  /** Opening the order catches up with the parcel instead of waiting for the timer. */
+  it('ao abrir o pedido, aplica o que o Melhor Envio já sabe', async () => {
+    orderMock.mockResolvedValue(order({ status: 'processing', melhorEnvioOrderId: 'me_1' }));
+    replies({
+      body: { id: 'me_1', paid_at: 'x', generated_at: 'y', posted_at: '2026-09-17 18:58', tracking: 'AP1BR' },
+    });
+
+    const state = await getLabelState('o1');
+
+    expect(state).toMatchObject({ trackingCode: 'AP1BR', postedAt: '2026-09-17 18:58' });
+    const write = queryMock.mock.calls.find((c) => String(c[0]).includes('SET tracking_code'));
+    expect(write![1] as unknown[]).toEqual(['AP1BR', 'https://rastreio/AP1BR', 'shipped', 'o1', 'processing']);
+    expect(shippedMock).toHaveBeenCalledOnce();
+  });
+});
+
+describe('syncShipments', () => {
+  /**
+   * The bug this exists for: the code arrives seconds after the purchase, the
+   * purchase read it once, and two parcels were posted — one delivered — while
+   * the panel said "Etiqueta pendente" and the customer's page "Preparando".
+   */
+  function openOrders(...rows: Record<string, unknown>[]) {
+    queryMock.mockImplementation(async (sql: string) =>
+      String(sql).includes('FROM orders')
+        ? { rows, rowCount: rows.length }
+        : { rows: [{ id: 'o1' }], rowCount: 1 },
+    );
+  }
+  const row = (over: Record<string, unknown> = {}) => ({
+    id: 'o1',
+    status: 'processing',
+    tracking_code: null,
+    melhor_envio_order_id: 'me_1',
+    ...over,
+  });
+  const writes = () =>
+    queryMock.mock.calls.filter((c) => String(c[0]).includes('SET tracking_code'));
+
+  beforeEach(() => {
+    orderMock.mockResolvedValue(order({ status: 'shipped' }));
+  });
+
+  it('sem etiqueta aberta, não chama o Melhor Envio', async () => {
+    openOrders();
+
+    await expect(syncShipments()).resolves.toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('pede todos os envios numa chamada só', async () => {
+    openOrders(row(), row({ id: 'o2', melhor_envio_order_id: 'me_2' }));
+    replies({ body: {} });
+
+    await syncShipments();
+
+    expect(calls()).toEqual(['POST /me/shipment/tracking']);
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.orders).toEqual(['me_1', 'me_2']);
+  });
+
+  it('código gerado mas não postado: grava o rastreio, segue em separação, sem e-mail', async () => {
+    openOrders(row({ status: 'paid' }));
+    replies({ body: { me_1: { paid_at: 'x', generated_at: 'y', tracking: 'AP1BR' } } });
+
+    await expect(syncShipments()).resolves.toBe(1);
+
+    expect(writes()[0]![1]).toEqual(['AP1BR', 'https://rastreio/AP1BR', 'processing', 'o1', 'paid']);
+    expect(shippedMock).not.toHaveBeenCalled();
+  });
+
+  it('postado nos Correios: move para enviado e avisa o cliente', async () => {
+    openOrders(row());
+    replies({ body: { me_1: { paid_at: 'x', posted_at: 'z', tracking: 'AP1BR' } } });
+
+    await syncShipments();
+
+    expect(writes()[0]![1]).toContain('shipped');
+    expect(shippedMock).toHaveBeenCalledOnce();
+    expect(deliveredMock).not.toHaveBeenCalled();
+  });
+
+  it('entregue: move para entregue e avisa, sem mandar o "a caminho" atrasado', async () => {
+    openOrders(row());
+    replies({ body: { me_1: { paid_at: 'x', posted_at: 'z', delivered_at: 'w', tracking: 'AD1BR' } } });
+
+    await syncShipments();
+
+    expect(writes()[0]![1]).toContain('delivered');
+    expect(deliveredMock).toHaveBeenCalledOnce();
+    expect(shippedMock).not.toHaveBeenCalled();
+  });
+
+  it('já enviado com o mesmo código: só avança quando entrega', async () => {
+    openOrders(row({ status: 'shipped', tracking_code: 'AP1BR' }));
+    replies({ body: { me_1: { paid_at: 'x', posted_at: 'z', tracking: 'AP1BR' } } });
+
+    await expect(syncShipments()).resolves.toBe(0);
+    expect(writes()).toHaveLength(0);
+  });
+
+  /** A code typed by hand means the label was bought elsewhere; that one wins. */
+  it('não mexe no pedido com rastreio digitado diferente', async () => {
+    openOrders(row({ status: 'shipped', tracking_code: 'OY502041562BR' }));
+    replies({ body: { me_1: { paid_at: 'x', delivered_at: 'w', tracking: 'AD1BR' } } });
+
+    await syncShipments();
+
+    expect(writes()).toHaveLength(0);
+  });
+
+  /** A cart item never paid for is not a label — the case of order #10. */
+  it.each([
+    ['não paga', { paid_at: null }],
+    ['cancelada', { paid_at: 'x', canceled_at: 'y', tracking: 'AA1' }],
+    ['expirada', { paid_at: 'x', expired_at: 'y', tracking: 'AA1' }],
+  ])('ignora etiqueta %s', async (_label, shipment) => {
+    openOrders(row());
+    replies({ body: { me_1: shipment } });
+
+    await syncShipments();
+
+    expect(writes()).toHaveLength(0);
+  });
+
+  /** The panel and the timer can race; the loser must not e-mail twice. */
+  it('perdeu a corrida do status: não avisa ninguém', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('FROM orders')) return { rows: [row()], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    replies({ body: { me_1: { paid_at: 'x', posted_at: 'z', tracking: 'AP1BR' } } });
+
+    await expect(syncShipments()).resolves.toBe(0);
+    expect(shippedMock).not.toHaveBeenCalled();
   });
 });
 

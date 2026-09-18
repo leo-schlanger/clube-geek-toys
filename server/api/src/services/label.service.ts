@@ -32,7 +32,7 @@ import {
   normalizeCep,
   trackingUrlForCode,
 } from './shipping.service.js';
-import { getOrderById } from './order.service.js';
+import { getOrderById, notifyOrderDelivered, notifyOrderShipped } from './order.service.js';
 import type { Order } from '../types/index.js';
 
 const USER_AGENT = 'GeekPopToys Loja (contato@geeketoys.com.br)';
@@ -46,6 +46,9 @@ export interface LabelState {
   /** Set once it is generated and therefore printable. */
   generated: boolean;
   trackingCode: string | null;
+  /** When the Correios scanned the parcel in — the order is `shipped` from here. */
+  postedAt: string | null;
+  deliveredAt: string | null;
   /** Short-lived URL to the PDF; fetched on demand, never stored. */
   printUrl?: string;
 }
@@ -375,17 +378,130 @@ async function ensureCartItem(order: Order): Promise<string> {
   return created.id;
 }
 
+/** A shipment as Melhor Envio reports it; every date is null until it happens. */
+interface Shipment {
+  id: string;
+  status?: string;
+  tracking?: string | null;
+  paid_at?: string | null;
+  generated_at?: string | null;
+  posted_at?: string | null;
+  delivered_at?: string | null;
+  canceled_at?: string | null;
+  expired_at?: string | null;
+}
+
 /** Read one shipment back, to know which steps are already done. */
 async function fetchShipment(meOrderId: string) {
-  return meRequest<{
-    id: string;
-    status?: string;
-    tracking?: string | null;
-    self_tracking?: string | null;
-    protocol?: string | null;
-    generated_at?: string | null;
-    paid_at?: string | null;
-  }>(`/me/orders/${meOrderId}`, undefined, 'GET');
+  return meRequest<Shipment>(`/me/orders/${meOrderId}`, undefined, 'GET');
+}
+
+// ─── Following the parcel ────────────────────────────────────────────────────
+
+const STATUS_RANK: Record<string, number> = { paid: 1, processing: 2, shipped: 3, delivered: 4 };
+
+/** The order columns `applyShipment` needs; a full `Order` has them too. */
+interface ShipmentTarget {
+  id: string;
+  status: string;
+  trackingCode?: string | null;
+}
+
+/**
+ * Bring an order in line with what Melhor Envio knows about its parcel.
+ *
+ * The tracking code is not there at purchase time: Melhor Envio assigns it a
+ * few seconds after the label is generated, and reading it once, at the end of
+ * the purchase, left every order bought through the panel with no code — two
+ * parcels were posted and one delivered while the panel still said "Etiqueta
+ * pendente" and the customer's page said "Preparando".
+ *
+ * Status only moves forward, and only as far as the parcel really went: a
+ * bought label means the order is being prepared, a Correios scan means it was
+ * shipped, a delivery means delivered. The shipped e-mail says "foi postado",
+ * so it goes out on the scan, not on the purchase.
+ */
+async function applyShipment(order: ShipmentTarget, shipment: Shipment): Promise<boolean> {
+  if (!shipment.paid_at || shipment.canceled_at || shipment.expired_at) return false;
+  if (!['paid', 'processing', 'shipped'].includes(order.status)) return false;
+
+  const tracking = shipment.tracking || null;
+  // A code typed by hand is a label bought somewhere else — that one wins.
+  if (order.trackingCode && tracking && order.trackingCode !== tracking) return false;
+
+  const reached = shipment.delivered_at ? 'delivered' : shipment.posted_at ? 'shipped' : 'processing';
+  const status = STATUS_RANK[reached]! > STATUS_RANK[order.status]! ? reached : order.status;
+  const newTracking = tracking && !order.trackingCode ? tracking : null;
+  if (status === order.status && !newTracking) return false;
+
+  // Compare-and-swap on the status we read: the panel and this sync can race,
+  // and the loser must not send a second e-mail.
+  const result = await query(
+    `UPDATE orders
+        SET tracking_code = COALESCE(tracking_code, $1),
+            tracking_url = COALESCE(tracking_url, $2),
+            status = $3
+      WHERE id = $4 AND status = $5
+      RETURNING id`,
+    [newTracking, newTracking ? trackingUrlForCode(newTracking) : null, status, order.id, order.status],
+  );
+  if (result.rows.length === 0) return false;
+
+  await auditLog('order.shipment_synced', null, {
+    orderId: order.id,
+    from: order.status,
+    status,
+    trackingCode: tracking,
+    source: 'melhor_envio',
+  });
+
+  if (status !== order.status) {
+    const fresh = await getOrderById(order.id, false);
+    if (fresh && status === 'shipped') notifyOrderShipped(fresh);
+    if (fresh && status === 'delivered') notifyOrderDelivered(fresh);
+  }
+  return true;
+}
+
+/**
+ * Every order with a label bought through the panel, brought up to date.
+ *
+ * Runs on a timer because nothing else would: Melhor Envio posts no webhook to
+ * us, and the shop should not have to open each order to move it along. One
+ * batched call covers them all.
+ */
+export async function syncShipments(): Promise<number> {
+  const open = await query(
+    `SELECT id, status, tracking_code, melhor_envio_order_id
+       FROM orders
+      WHERE melhor_envio_order_id IS NOT NULL
+        AND delivery_method = 'shipping'
+        AND status IN ('paid', 'processing', 'shipped')
+      ORDER BY created_at DESC
+      LIMIT 100`,
+  );
+  if (open.rows.length === 0) return 0;
+
+  const shipments = await meRequest<Record<string, Shipment>>('/me/shipment/tracking', {
+    orders: open.rows.map((r) => r.melhor_envio_order_id),
+  });
+
+  let touched = 0;
+  for (const row of open.rows) {
+    const shipment = shipments?.[row.melhor_envio_order_id];
+    if (!shipment) continue;
+    try {
+      const changed = await applyShipment(
+        { id: row.id, status: row.status, trackingCode: row.tracking_code },
+        shipment,
+      );
+      if (changed) touched++;
+    } catch (err) {
+      // One order must not stop the rest.
+      console.error(`[LABEL] shipment sync failed for order ${row.id}:`, err);
+    }
+  }
+  return touched;
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -406,16 +522,25 @@ export async function getLabelState(orderId: string): Promise<LabelState> {
       purchased: false,
       generated: false,
       trackingCode: order.trackingCode ?? null,
+      postedAt: null,
+      deliveredAt: null,
     };
   }
 
   try {
     const shipment = await fetchShipment(order.melhorEnvioOrderId);
+    // Opening the order is also a moment to catch up, so the panel never shows
+    // a state older than the timer's last run.
+    await applyShipment(order, shipment).catch((err) =>
+      console.error('[LABEL] shipment sync on open failed:', err),
+    );
     return {
       melhorEnvioOrderId: order.melhorEnvioOrderId,
       purchased: Boolean(shipment.paid_at),
       generated: Boolean(shipment.generated_at),
       trackingCode: shipment.tracking ?? order.trackingCode ?? null,
+      postedAt: shipment.posted_at ?? null,
+      deliveredAt: shipment.delivered_at ?? null,
     };
   } catch (err) {
     // The panel must still render if Melhor Envio is having a bad minute.
@@ -425,6 +550,8 @@ export async function getLabelState(orderId: string): Promise<LabelState> {
       purchased: false,
       generated: false,
       trackingCode: order.trackingCode ?? null,
+      postedAt: null,
+      deliveredAt: null,
     };
   }
 }
@@ -523,29 +650,17 @@ async function runLabelPurchase(order: Order, actorUserId: string): Promise<Labe
     orders: [meOrderId],
   });
 
-  const tracking = shipment.tracking ?? null;
-  if (tracking && tracking !== order.trackingCode) {
-    // Same write the manual field does, so the customer gets the same e-mail
-    // and the order moves to `shipped` exactly as before.
-    await query(
-      `UPDATE orders
-          SET tracking_code = $1, tracking_url = $2,
-              status = CASE WHEN status IN ('paid','processing') THEN 'shipped' ELSE status END
-        WHERE id = $3`,
-      [tracking, trackingUrlForCode(tracking), order.id],
-    );
-    await auditLog('order.tracking_set', actorUserId, {
-      orderId: order.id,
-      trackingCode: tracking,
-      source: 'melhor_envio',
-    });
-  }
+  // Usually no tracking code yet — it arrives seconds later and the sync picks
+  // it up. What this does record is that the order is now being prepared.
+  await applyShipment(order, shipment);
 
   return {
     melhorEnvioOrderId: meOrderId,
     purchased: true,
     generated: true,
-    trackingCode: tracking,
+    trackingCode: shipment.tracking ?? null,
+    postedAt: shipment.posted_at ?? null,
+    deliveredAt: shipment.delivered_at ?? null,
     printUrl: printed?.url,
   };
 }
