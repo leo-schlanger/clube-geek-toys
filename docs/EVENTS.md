@@ -33,6 +33,14 @@ Só o evento com status **`published`** aparece. Entre vários publicados ganha 
 que ainda não terminou e começa antes; se todos já passaram, o mais recente.
 Isso faz o banner sumir sozinho quando o evento acaba.
 
+> **Quem esconde o evento passado é a vitrine, não a API** (26/09/2026). A API
+> continua devolvendo o último publicado depois que ele termina, e o
+> `FALLBACK_EVENT` embutido nos bundles é sempre um evento passado. Até 26/09,
+> `isEventVisible` olhava só o `status`, então o evento de 20/09 seguia no ar
+> no primeiro paint e em toda falha de rede — no navegador do Instagram, no 4G.
+> Agora ela exige `published` **e** não terminado (`endsAt`, ou 24h depois do
+> início quando não há término). A regra é a mesma nos dois repos.
+
 Fluxo da Laura quando um evento termina:
 
 1. Aba **Eventos** → **Duplicar** no evento que acabou (nasce rascunho, sem

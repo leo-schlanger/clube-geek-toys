@@ -45,7 +45,8 @@ function renderBanner() {
 
 describe('EventAnnouncementBanner da loja — empilhamento', () => {
   it('the event must be active, or this file tests nothing', () => {
-    expect(isEventVisible(FALLBACK_EVENT)).toBe(true)
+    // Pinned to the fallback's own day: it is a past event, and those hide.
+    expect(isEventVisible(FALLBACK_EVENT, Date.parse('2026-09-20T15:00:00-03:00'))).toBe(true)
   })
 
   it('is NOT sticky: two sticky elements at top-0 fight and the header loses', () => {

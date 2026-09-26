@@ -18,10 +18,31 @@ describe('event data', () => {
   })
 
   it('isEventVisible só deixa passar o publicado', () => {
-    expect(isEventVisible(FALLBACK_EVENT)).toBe(true)
-    expect(isEventVisible({ ...FALLBACK_EVENT, status: 'draft' })).toBe(false)
-    expect(isEventVisible({ ...FALLBACK_EVENT, status: 'archived' })).toBe(false)
-    expect(isEventVisible(null)).toBe(false)
+    const during = Date.parse('2026-09-20T15:00:00-03:00')
+    expect(isEventVisible(FALLBACK_EVENT, during)).toBe(true)
+    expect(isEventVisible({ ...FALLBACK_EVENT, status: 'draft' }, during)).toBe(false)
+    expect(isEventVisible({ ...FALLBACK_EVENT, status: 'archived' }, during)).toBe(false)
+    expect(isEventVisible(null, during)).toBe(false)
+  })
+
+  // On 26/09 the 20/09 event was still on the site: the fallback is always a
+  // past event, and a status-only rule never let it go.
+  it('isEventVisible esconde o evento que já terminou', () => {
+    const end = Date.parse(FALLBACK_EVENT.endsAt!)
+    expect(isEventVisible(FALLBACK_EVENT, end)).toBe(true)
+    expect(isEventVisible(FALLBACK_EVENT, end + 1)).toBe(false)
+    expect(isEventVisible(FALLBACK_EVENT, Date.parse('2026-09-26T21:00:00-03:00'))).toBe(false)
+  })
+
+  it('sem término, o evento vale até 24h depois do início', () => {
+    const event = { ...FALLBACK_EVENT, endsAt: null }
+    const start = Date.parse(event.startsAt)
+    expect(isEventVisible(event, start + 23 * 3600_000)).toBe(true)
+    expect(isEventVisible(event, start + 25 * 3600_000)).toBe(false)
+  })
+
+  it('data ilegível não esconde um evento publicado', () => {
+    expect(isEventVisible({ ...FALLBACK_EVENT, endsAt: 'amanhã' }, Date.now())).toBe(true)
   })
 
   it('formatEventDateRange with and without end', () => {

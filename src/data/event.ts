@@ -102,8 +102,25 @@ export const FALLBACK_EVENT: EventConfig = {
 }
 
 /** Draft and archived stay off the storefront. */
-export function isEventVisible(event: EventConfig | null | undefined): boolean {
-  return event?.status === 'published'
+/** Without an end time, an event is taken as over one day after it starts. */
+const DEFAULT_EVENT_SPAN_MS = 24 * 60 * 60 * 1000
+
+/**
+ * Published **and** not over. The date check is what takes an event off the
+ * site on its own: the API keeps answering with the last published event
+ * after it ends, and the bundled `FALLBACK_EVENT` is always a past one — with
+ * a status-only rule, the 20/09 event kept showing on 26/09.
+ */
+export function isEventVisible(
+  event: EventConfig | null | undefined,
+  now: number = Date.now()
+): boolean {
+  if (event?.status !== 'published') return false
+  const end = event.endsAt
+    ? Date.parse(event.endsAt)
+    : Date.parse(event.startsAt) + DEFAULT_EVENT_SPAN_MS
+  // An unparseable date should not hide an event the admin published.
+  return Number.isNaN(end) || end >= now
 }
 
 export function formatEventDateRange(
