@@ -1220,6 +1220,15 @@ const STEPS: SchemaStep[] = [
       await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_purchase_started_at TIMESTAMPTZ`);
     },
   },
+  {
+    name: "Event flyers and link buttons (migration 036)",
+    run: async () => {
+      // A second poster and an external sign-up form had nowhere to go: the
+      // event had one banner slot and no links.
+      await query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS flyers JSONB NOT NULL DEFAULT '[]'::jsonb`);
+      await query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS links JSONB NOT NULL DEFAULT '[]'::jsonb`);
+    },
+  },
 ];
 
 let state: SchemaState = {

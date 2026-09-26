@@ -42,6 +42,28 @@ Fluxo da Laura quando um evento termina:
 
 Nada de deploy, nada de mexer nos dois repos.
 
+### Mais imagens e botões de link (26/09/2026)
+
+Um evento pode ter mais de uma arte e mais de uma chamada. O caso que motivou:
+o evento de 11/10 tem o cartaz do evento **e** o da competição de dança, e a
+inscrição da competição é um formulário externo. A Laura procurou como "criar
+link para imagem" e não havia onde — o cadastro tinha um banner e nenhum link.
+
+Na aba **Eventos**, ao editar:
+
+- **Mais imagens** — envia outra arte (até 6). Aparece depois do banner, na
+  ordem de envio. `POST /events/admin/events/:id/flyers`; remover é `PATCH` com
+  a lista `flyers` sem ela.
+- **Botões de link** — texto + link (até 6), salvos com o botão **Salvar**. Link
+  colado sem `https://` ganha o prefixo; qualquer outro esquema é recusado no
+  painel, na API (Zod) e de novo na vitrine, porque vira `href`.
+
+Na página do evento (loja `/evento` e `geeketoys.com.br#evento`) as artes ficam
+lado a lado — tocar abre em tamanho cheio, porque o texto de cartaz é pequeno no
+celular — e embaixo vêm **Reservar ingresso** (se as reservas estão abertas) e
+os botões cadastrados. Colunas `flyers`/`links` em JSONB, migration 036.
+**Duplicar** leva os botões (revise o link) e não leva as artes.
+
 > **Os arquivos `event.ts` ainda existem, mas viraram fallback.** Eles cobrem só
 > o primeiro paint (e a API fora do ar). **Editá-los não muda o que o site
 > mostra.** São três, e devem espelhar a linha semeada pela migration:

@@ -20,6 +20,20 @@ import { FALLBACK_EVENT, type EventDefinition } from '../config/events.js';
 
 export type EventStatus = 'draft' | 'published' | 'archived';
 
+export interface EventFlyer {
+  url: string;
+}
+
+/** Call-to-action button under the art — typically an external form. */
+export interface EventLink {
+  label: string;
+  url: string;
+}
+
+/** Caps per event. The page is a flyer wall, not a gallery. */
+export const MAX_EVENT_FLYERS = 6;
+export const MAX_EVENT_LINKS = 6;
+
 export interface EventRecord {
   id: string;
   slug: string;
@@ -28,6 +42,9 @@ export interface EventRecord {
   shortTitle: string;
   bannerText: string;
   bannerImageUrl: string | null;
+  /** Art shown after the banner, in order. */
+  flyers: EventFlyer[];
+  links: EventLink[];
   startsAt: string;
   endsAt: string | null;
   location: { name: string; address: string; mapsUrl: string | null };
@@ -53,6 +70,38 @@ function toStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === 'string');
 }
 
+/** Only http(s): a `javascript:` URL in a stored link would run on click. */
+export function isWebUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function toFlyers(value: unknown): EventFlyer[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((v): v is { url: string } => typeof v === 'object' && v !== null && isWebUrl(v.url))
+    .map((v) => ({ url: v.url }));
+}
+
+function toLinks(value: unknown): EventLink[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (v): v is EventLink =>
+        typeof v === 'object' &&
+        v !== null &&
+        typeof v.label === 'string' &&
+        v.label.trim().length > 0 &&
+        isWebUrl(v.url)
+    )
+    .map((v) => ({ label: v.label, url: v.url }));
+}
+
 function mapEvent(row: pg.QueryResultRow): EventRecord {
   const priceCents: number | null = row.price_cents ?? null;
   return {
@@ -63,6 +112,8 @@ function mapEvent(row: pg.QueryResultRow): EventRecord {
     shortTitle: row.short_title ?? '',
     bannerText: row.banner_text ?? '',
     bannerImageUrl: row.banner_image_url ?? null,
+    flyers: toFlyers(row.flyers),
+    links: toLinks(row.links),
     startsAt: row.starts_at instanceof Date ? row.starts_at.toISOString() : row.starts_at,
     endsAt: row.ends_at instanceof Date ? row.ends_at.toISOString() : (row.ends_at ?? null),
     location: {
@@ -166,6 +217,8 @@ export interface EventInput {
   shortTitle?: string;
   bannerText?: string;
   bannerImageUrl?: string | null;
+  flyers?: EventFlyer[];
+  links?: EventLink[];
   startsAt: string;
   endsAt?: string | null;
   locationName?: string;
@@ -225,10 +278,12 @@ export async function createEvent(input: EventInput, actorUserId?: string): Prom
        id, slug, status, title, short_title, banner_text, banner_image_url,
        starts_at, ends_at, location_name, location_address, location_maps_url,
        description, highlights, member_perk, reservations_open,
-       price_cents, currency_label, max_per_reservation, whatsapp_number, reservation_notes
+       price_cents, currency_label, max_per_reservation, whatsapp_number, reservation_notes,
+       flyers, links
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-       $13::jsonb, $14::jsonb, $15, $16, $17, $18, $19, $20, $21
+       $13::jsonb, $14::jsonb, $15, $16, $17, $18, $19, $20, $21,
+       $22::jsonb, $23::jsonb
      ) RETURNING *`,
     [
       id,
@@ -252,6 +307,8 @@ export async function createEvent(input: EventInput, actorUserId?: string): Prom
       input.maxPerReservation ?? null,
       input.whatsappNumber ?? '',
       input.reservationNotes ?? null,
+      JSON.stringify(input.flyers ?? []),
+      JSON.stringify(input.links ?? []),
     ]
   );
   const event = mapEvent(result.rows[0]);
@@ -266,6 +323,8 @@ const FIELD_MAP: Record<keyof EventInput & string, string> = {
   shortTitle: 'short_title',
   bannerText: 'banner_text',
   bannerImageUrl: 'banner_image_url',
+  flyers: 'flyers',
+  links: 'links',
   startsAt: 'starts_at',
   endsAt: 'ends_at',
   locationName: 'location_name',
@@ -283,7 +342,7 @@ const FIELD_MAP: Record<keyof EventInput & string, string> = {
   id: 'id',
 };
 
-const JSON_FIELDS = new Set(['description', 'highlights']);
+const JSON_FIELDS = new Set(['description', 'highlights', 'flyers', 'links']);
 
 export async function updateEvent(
   id: string,
@@ -336,7 +395,8 @@ export async function updateEvent(
  * Copies an event as a starting point for the next one.
  *
  * The path used when an event ends: duplicate the previous, change date and
- * venue, publish. Born `draft` and without a banner — the art is always new.
+ * venue, publish. Born `draft` and without banner or flyers — the art is
+ * always new. Links are kept: the labels carry over, the URLs get reviewed.
  */
 export async function duplicateEvent(id: string, actorUserId?: string): Promise<EventRecord> {
   const source = await getEventById(id);
@@ -350,6 +410,8 @@ export async function duplicateEvent(id: string, actorUserId?: string): Promise<
       shortTitle: source.shortTitle,
       bannerText: source.bannerText,
       bannerImageUrl: null,
+      flyers: [],
+      links: source.links,
       startsAt: source.startsAt,
       endsAt: source.endsAt,
       locationName: source.location.name,
@@ -367,6 +429,36 @@ export async function duplicateEvent(id: string, actorUserId?: string): Promise<
     },
     actorUserId
   );
+}
+
+/**
+ * Appends an uploaded flyer. The cap is checked in the same UPDATE, so two
+ * uploads at once cannot both slip under it.
+ */
+export async function addEventFlyer(
+  id: string,
+  url: string,
+  actorUserId?: string
+): Promise<EventRecord> {
+  const result = await query(
+    `UPDATE events SET flyers = flyers || $1::jsonb
+      WHERE id = $2 AND jsonb_array_length(flyers) < $3
+      RETURNING *`,
+    [JSON.stringify([{ url }]), id, MAX_EVENT_FLYERS]
+  );
+  if (result.rows.length === 0) {
+    if (!(await getEventById(id))) {
+      throw new AppError(404, 'Evento não encontrado.', 'EVENT_NOT_FOUND');
+    }
+    throw new AppError(
+      409,
+      `O evento já tem ${MAX_EVENT_FLYERS} imagens. Remova uma antes de enviar outra.`,
+      'EVENT_FLYER_LIMIT'
+    );
+  }
+  const event = mapEvent(result.rows[0]);
+  await auditLog('event.updated', actorUserId ?? null, { eventId: id, fields: ['flyers'] });
+  return event;
 }
 
 /**

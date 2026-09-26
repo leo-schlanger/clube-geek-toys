@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 // Event comes from the API via `useActiveEvent`. `isPlaceholder: false` is
@@ -101,5 +101,69 @@ describe('EventPage', () => {
     expect(screen.getByTestId('ticket-form')).toBeInTheDocument()
     expect(screen.getByText(/Voltar à loja/i)).toBeInTheDocument()
   })
-})
 
+  function renderPage(event: Record<string, unknown>) {
+    mockUseActiveEvent.mockReturnValue({ event, visible: true, loading: false, isPlaceholder: false })
+    render(
+      <MemoryRouter initialEntries={['/evento']}>
+        <Routes>
+          <Route path="/evento" element={<EventPage />} />
+        </Routes>
+      </MemoryRouter>
+    )
+  }
+
+  // Laura's ask: both posters, and under them "reserve a ticket" and the
+  // competition sign-up form.
+  it('shows every flyer and the link buttons under them', () => {
+    renderPage({
+      ...EVENT,
+      bannerImageUrl: 'https://api.example/uploads/events/e1/banner-1.jpg',
+      flyers: [{ url: 'https://api.example/uploads/events/e1/flyer-1.jpg' }],
+      links: [{ label: 'Inscrição da competição', url: 'https://forms.gle/abc' }],
+    })
+
+    const art = screen.getByRole('region', { name: 'Divulgação' })
+    const images = within(art).getAllByRole('img')
+    expect(images.map((img) => img.getAttribute('src'))).toEqual([
+      'https://api.example/uploads/events/e1/banner-1.jpg',
+      'https://api.example/uploads/events/e1/flyer-1.jpg',
+    ])
+
+    expect(within(art).getByRole('link', { name: /Reservar ingresso/ })).toHaveAttribute(
+      'href',
+      '#ingressos'
+    )
+    const signUp = within(art).getByRole('link', { name: /Inscrição da competição/ })
+    expect(signUp).toHaveAttribute('href', 'https://forms.gle/abc')
+    expect(signUp).toHaveAttribute('target', '_blank')
+    expect(signUp).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('never renders a link that is not http(s)', () => {
+    renderPage({
+      ...EVENT,
+      links: [
+        { label: 'Mal', url: 'javascript:alert(1)' },
+        { label: 'Ok', url: 'https://forms.gle/ok' },
+      ],
+    })
+    expect(screen.queryByRole('link', { name: 'Mal' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Ok/ })).toHaveAttribute('href', 'https://forms.gle/ok')
+  })
+
+  it('hides the reserve button there when reservations are closed', () => {
+    renderPage({
+      ...EVENT,
+      ticketReservation: { ...EVENT.ticketReservation, enabled: false },
+      links: [{ label: 'Inscrição', url: 'https://forms.gle/abc' }],
+    })
+    const art = screen.getByRole('region', { name: 'Divulgação' })
+    expect(within(art).queryByRole('link', { name: /Reservar ingresso/ })).not.toBeInTheDocument()
+  })
+
+  it('draws no art block for an event without flyers or links (older API payload)', () => {
+    renderPage(EVENT)
+    expect(screen.queryByRole('region', { name: 'Divulgação' })).not.toBeInTheDocument()
+  })
+})

@@ -1,5 +1,5 @@
 import { api } from './api-client'
-import { FALLBACK_EVENT, type EventConfig } from '../data/event'
+import { FALLBACK_EVENT, type EventConfig, type EventLink } from '../data/event'
 
 /**
  * Event catalogue.
@@ -15,6 +15,8 @@ export interface EventInput {
   shortTitle?: string
   bannerText?: string
   bannerImageUrl?: string | null
+  flyers?: { url: string }[]
+  links?: EventLink[]
   startsAt: string
   endsAt?: string | null
   locationName?: string
@@ -96,4 +98,49 @@ export async function uploadEventBanner(id: string, file: File): Promise<EventCo
   )
   if (!res.data?.event) throw new Error(res.error || 'Falha ao enviar o banner.')
   return res.data.event
+}
+
+/** One more flyer, appended after the ones already there. */
+export async function uploadEventFlyer(id: string, file: File): Promise<EventConfig> {
+  const form = new FormData()
+  form.append('flyer', file)
+  const res = await api.post<{ event: EventConfig; url: string }>(
+    `/events/admin/events/${encodeURIComponent(id)}/flyers`,
+    undefined,
+    { body: form }
+  )
+  if (!res.data?.event) throw new Error(res.error || 'Falha ao enviar a imagem.')
+  return res.data.event
+}
+
+/**
+ * `forms.gle/abc` → `https://forms.gle/abc`. What gets pasted from a phone
+ * often has no scheme, and the API only takes http(s).
+ */
+export function normalizeLinkUrl(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed // other scheme: let validation refuse it
+  return `https://${trimmed}`
+}
+
+/** Drops blank rows; a half-filled row is an error, not a silent drop. */
+export function linksToPayload(links: EventLink[]): EventLink[] | { error: string } {
+  const out: EventLink[] = []
+  for (const link of links) {
+    const label = link.label.trim()
+    const url = normalizeLinkUrl(link.url)
+    if (!label && !url) continue
+    if (!label) return { error: 'Dê um texto ao botão do link.' }
+    if (!url) return { error: `Falta o endereço do botão "${label}".` }
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error()
+    } catch {
+      return { error: `O link do botão "${label}" não é um endereço válido.` }
+    }
+    out.push({ label, url })
+  }
+  return out
 }

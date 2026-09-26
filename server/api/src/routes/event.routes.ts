@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
@@ -139,6 +139,15 @@ eventRouter.get('/my-reservations', authenticate, async (req, res, next) => {
 
 const isoDate = z.string().datetime({ offset: true });
 
+// http(s) only: the storefront renders these as `href`, and `z.url()` alone
+// accepts `javascript:`.
+const webUrl = z
+  .string()
+  .trim()
+  .url()
+  .max(500)
+  .refine(eventConfig.isWebUrl, 'Use um link que comece com https://');
+
 const eventSchema = z.object({
   title: z.string().min(2).max(160),
   slug: z.string().max(60).optional(),
@@ -146,6 +155,14 @@ const eventSchema = z.object({
   shortTitle: z.string().max(80).optional(),
   bannerText: z.string().max(300).optional(),
   bannerImageUrl: z.string().url().max(500).optional().nullable(),
+  flyers: z
+    .array(z.object({ url: webUrl }))
+    .max(eventConfig.MAX_EVENT_FLYERS)
+    .optional(),
+  links: z
+    .array(z.object({ label: z.string().trim().min(1).max(60), url: webUrl }))
+    .max(eventConfig.MAX_EVENT_LINKS)
+    .optional(),
   startsAt: isoDate,
   endsAt: isoDate.optional().nullable(),
   locationName: z.string().max(160).optional(),
@@ -261,7 +278,8 @@ const bannerStorage = multer.diskStorage({
     // Fresh filename per upload: the old one stays in browser and WhatsApp
     // cache, so reusing the name would show the previous flyer.
     const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-    cb(null, `banner-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+    const prefix = file.fieldname === 'flyer' ? 'flyer' : 'banner';
+    cb(null, `${prefix}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
   },
 });
 
@@ -277,12 +295,9 @@ const bannerUpload = multer({
   },
 });
 
-eventRouter.post(
-  '/admin/events/:id/banner',
-  authenticate,
-  requireRole('admin'),
-  (req, res, next) => {
-    bannerUpload.single('banner')(req, res, (err: unknown) => {
+function receiveImage(field: 'banner' | 'flyer') {
+  return (req: Request, res: Response, next: NextFunction) => {
+    bannerUpload.single(field)(req, res, (err: unknown) => {
       if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
         res.status(413).json({ error: 'Imagem acima de 8 MB.' });
         return;
@@ -293,7 +308,14 @@ eventRouter.post(
       }
       next();
     });
-  },
+  };
+}
+
+eventRouter.post(
+  '/admin/events/:id/banner',
+  authenticate,
+  requireRole('admin'),
+  receiveImage('banner'),
   async (req, res, next) => {
     try {
       const file = req.file;
@@ -309,6 +331,31 @@ eventRouter.post(
       );
       res.status(201).json({ event, url });
     } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /events/admin/events/:id/flyers — one more piece of art (competition
+// poster, schedule…). Removal and reordering go through PATCH `flyers`.
+eventRouter.post(
+  '/admin/events/:id/flyers',
+  authenticate,
+  requireRole('admin'),
+  receiveImage('flyer'),
+  async (req, res, next) => {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'Envie um arquivo no campo "flyer".' });
+      return;
+    }
+    try {
+      const url = `${env.API_URL}/uploads/events/${req.params.id}/${path.basename(file.path)}`;
+      const event = await eventConfig.addEventFlyer(req.params.id as string, url, req.user!.userId);
+      res.status(201).json({ event, url });
+    } catch (err) {
+      // Refused (limit, missing event): the file is not referenced anywhere.
+      fs.promises.unlink(file.path).catch(() => {});
       next(err);
     }
   }

@@ -6,13 +6,15 @@ import {
   Gift,
   Clock,
   ArrowRight,
+  ExternalLink,
   Images,
+  Ticket,
 } from 'lucide-react'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { EventTicketForm } from '../../components/store/EventTicketForm'
 import { useShopMember } from '../../components/store/useShopMember'
 import { Button } from '../../components/ui/button'
-import { formatEventDateRange } from '../../data/event'
+import { eventArt, eventLinks, formatEventDateRange } from '../../data/event'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { CreatorCredit } from '../../components/CreatorCredit'
 
@@ -32,6 +34,9 @@ export default function EventPage() {
   }
 
   const dateLabel = formatEventDateRange(event.startsAt, event.endsAt)
+  const art = eventArt(event)
+  const links = eventLinks(event)
+  const canReserve = event.ticketReservation.enabled
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,12 +60,49 @@ export default function EventPage() {
           </p>
         </div>
 
-        {event.bannerImageUrl && (
-          <img
-            src={event.bannerImageUrl}
-            alt={`Divulgação: ${event.title}`}
-            className="mx-auto w-full max-w-lg rounded-2xl border border-border object-contain shadow-sm"
-          />
+        {(art.length > 0 || links.length > 0) && (
+          <section aria-label="Divulgação" className="space-y-5">
+            {art.length > 0 && (
+              <div
+                className={
+                  art.length > 1
+                    ? 'grid items-start gap-4 sm:grid-cols-2'
+                    : 'mx-auto w-full max-w-lg'
+                }
+              >
+                {art.map((url, i) => (
+                  // Flyer text is small on a phone: a tap opens it full size.
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                    <img
+                      src={url}
+                      alt={`Divulgação${art.length > 1 ? ` ${i + 1}` : ''}: ${event.title}`}
+                      className="w-full rounded-2xl border border-border object-contain shadow-sm"
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+            {(canReserve || links.length > 0) && (
+              <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+                {canReserve && (
+                  <Button asChild size="lg" className="gap-2">
+                    <a href="#ingressos">
+                      <Ticket className="h-4 w-4" />
+                      Reservar ingresso
+                    </a>
+                  </Button>
+                )}
+                {links.map((link) => (
+                  <Button key={link.url} asChild size="lg" variant="outline" className="gap-2">
+                    <a href={link.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                      {link.label}
+                    </a>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </section>
         )}
 
         <div className="grid gap-6 lg:grid-cols-5">

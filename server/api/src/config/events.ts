@@ -41,6 +41,8 @@ export const FALLBACK_EVENT: EventRecord = {
   shortTitle: 'Photocard Trading',
   bannerText: '🎉 Photocard Trading + Dança Livre · domingo 20/set, 14h–18h · Entrada R$ 20',
   bannerImageUrl: null,
+  flyers: [],
+  links: [],
   startsAt: '2026-09-20T14:00:00-03:00',
   endsAt: '2026-09-20T18:00:00-03:00',
   location: {

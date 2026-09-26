@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   CalendarDays,
   Copy,
+  ExternalLink,
   ImageUp,
   MapPin,
   Plus,
@@ -18,7 +19,12 @@ import { Label } from '../ui/label'
 import { Loading } from '../ui/loading'
 import { logger } from '../../lib/logger'
 import { useConfirm } from '../../hooks/useConfirm'
-import { formatEventDateRange, type EventConfig, type EventStatus } from '../../data/event'
+import {
+  formatEventDateRange,
+  type EventConfig,
+  type EventLink,
+  type EventStatus,
+} from '../../data/event'
 import {
   createEvent,
   deleteEvent,
@@ -26,6 +32,8 @@ import {
   listEvents,
   updateEvent,
   uploadEventBanner,
+  uploadEventFlyer,
+  linksToPayload,
   type EventInput,
 } from '../../lib/events'
 
@@ -54,6 +62,10 @@ const STATUS_VARIANT: Record<EventStatus, 'default' | 'secondary' | 'outline'> =
 
 const BANNER_ACCEPT = 'image/jpeg,image/png,image/webp'
 const BANNER_MAX_BYTES = 8 * 1024 * 1024
+/** Same caps as the API (`MAX_EVENT_FLYERS` / `MAX_EVENT_LINKS`). */
+const MAX_FLYERS = 6
+const MAX_LINKS = 6
+
 
 /** Offset ISO → `YYYY-MM-DDTHH:mm` for `datetime-local`, in the browser timezone. */
 function toLocalInput(iso: string | null | undefined): string {
@@ -102,6 +114,7 @@ type FormState = {
   maxPerReservation: string
   whatsappNumber: string
   reservationNotes: string
+  links: EventLink[]
 }
 
 function toForm(event: EventConfig): FormState {
@@ -129,6 +142,7 @@ function toForm(event: EventConfig): FormState {
         : String(event.ticketReservation.maxPerReservation),
     whatsappNumber: event.ticketReservation.whatsappNumber,
     reservationNotes: event.ticketReservation.notes ?? '',
+    links: (event.links ?? []).map((link) => ({ ...link })),
   }
 }
 
@@ -151,6 +165,7 @@ const EMPTY_FORM: FormState = {
   maxPerReservation: '',
   whatsappNumber: '',
   reservationNotes: '',
+  links: [],
 }
 
 function toLines(value: string): string[] {
@@ -170,6 +185,9 @@ function toPayload(form: FormState): EventInput | { error: string } {
   if (endsAt && new Date(endsAt) <= new Date(startsAt)) {
     return { error: 'O término precisa ser depois do início.' }
   }
+
+  const links = linksToPayload(form.links)
+  if ('error' in links) return links
 
   const max = form.maxPerReservation.trim()
   return {
@@ -191,6 +209,7 @@ function toPayload(form: FormState): EventInput | { error: string } {
     maxPerReservation: max ? Number(max) : null,
     whatsappNumber: form.whatsappNumber.replace(/\D/g, ''),
     reservationNotes: form.reservationNotes.trim() || null,
+    links,
   }
 }
 
@@ -207,7 +226,9 @@ export function EventConfigTab() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingFlyer, setUploadingFlyer] = useState(false)
   const bannerInputRef = useRef<HTMLInputElement>(null)
+  const flyerInputRef = useRef<HTMLInputElement>(null)
 
   const fetchEvents = useCallback(async () => {
     setLoading(true)
@@ -227,6 +248,12 @@ export function EventConfigTab() {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
+
+  const setLink = (index: number, key: keyof EventLink, value: string) =>
+    setForm((prev) => ({
+      ...prev,
+      links: prev.links.map((link, i) => (i === index ? { ...link, [key]: value } : link)),
+    }))
 
   function openCreate() {
     setForm(EMPTY_FORM)
@@ -356,7 +383,44 @@ export function EventConfigTab() {
     }
   }
 
+  function replaceEvent(saved: EventConfig) {
+    setEditing(saved)
+    setEvents((prev) => prev.map((e) => (e.id === saved.id ? saved : e)))
+  }
+
+  async function handleFlyer(file: File) {
+    if (!editing) return
+    if (file.size > BANNER_MAX_BYTES) {
+      toast.error('Imagem acima de 8 MB. Reduza antes de enviar.')
+      return
+    }
+
+    setUploadingFlyer(true)
+    try {
+      replaceEvent(await uploadEventFlyer(editing.id, file))
+      toast.success('Imagem adicionada')
+    } catch (error) {
+      logger.error('Error uploading event flyer:', error)
+      toast.error(error instanceof Error ? error.message : 'Erro ao enviar a imagem')
+    }
+    setUploadingFlyer(false)
+    if (flyerInputRef.current) flyerInputRef.current.value = ''
+  }
+
+  async function handleRemoveFlyer(url: string) {
+    if (!editing) return
+    try {
+      const flyers = (editing.flyers ?? []).filter((f) => f.url !== url)
+      replaceEvent(await updateEvent(editing.id, { flyers }))
+      toast.success('Imagem removida')
+    } catch (error) {
+      logger.error('Error removing event flyer:', error)
+      toast.error('Erro ao remover a imagem')
+    }
+  }
+
   if (creating || editing) {
+    const flyers = editing?.flyers ?? []
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -579,6 +643,135 @@ export function EventConfigTab() {
                 />
               </div>
             )}
+
+            {editing && (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+                <Label>Mais imagens</Label>
+                <p className="text-xs text-muted-foreground">
+                  Outro cartaz do mesmo evento — uma competição, a programação. Aparecem ao lado
+                  do banner na página do evento, na ordem em que foram enviadas.
+                </p>
+                {flyers.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {flyers.map((flyer, i) => (
+                      <div key={flyer.url} className="flex flex-col items-center gap-1.5">
+                        <img
+                          src={flyer.url}
+                          alt={`Imagem ${i + 1} do evento`}
+                          className="max-h-40 rounded-lg border border-border object-contain"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 text-destructive"
+                          onClick={() => handleRemoveFlyer(flyer.url)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remover
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {flyers.length < MAX_FLYERS ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => flyerInputRef.current?.click()}
+                    disabled={uploadingFlyer}
+                  >
+                    {uploadingFlyer ? <Loading size="sm" /> : <ImageUp className="h-4 w-4" />}
+                    Adicionar imagem
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Limite de {MAX_FLYERS} imagens. Remova uma para enviar outra.
+                  </p>
+                )}
+                <input
+                  ref={flyerInputRef}
+                  type="file"
+                  accept={BANNER_ACCEPT}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void handleFlyer(file)
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="space-y-3 rounded-lg border border-border p-4">
+              <div className="flex items-center gap-2">
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Botões de link</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Aparecem embaixo das imagens, ao lado de “Reservar ingresso” — por exemplo, o
+                formulário de inscrição da competição. Cole o link inteiro e clique em{' '}
+                <strong>Salvar</strong>.
+              </p>
+              {form.links.map((link, i) => (
+                <div
+                  key={i}
+                  className="grid gap-2 rounded-md border border-border p-3 sm:grid-cols-[1fr_2fr_auto] sm:items-end sm:border-0 sm:p-0"
+                >
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`ev-link-label-${i}`}>Texto do botão</Label>
+                    <Input
+                      id={`ev-link-label-${i}`}
+                      value={link.label}
+                      maxLength={60}
+                      onChange={(e) => setLink(i, 'label', e.target.value)}
+                      placeholder="Inscrição da competição"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`ev-link-url-${i}`}>Link</Label>
+                    <Input
+                      id={`ev-link-url-${i}`}
+                      type="url"
+                      inputMode="url"
+                      value={link.url}
+                      onChange={(e) => setLink(i, 'url', e.target.value)}
+                      placeholder="https://forms.gle/..."
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-destructive"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        links: prev.links.filter((_, index) => index !== i),
+                      }))
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remover
+                  </Button>
+                </div>
+              ))}
+              {form.links.length < MAX_LINKS && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() =>
+                    setForm((prev) => ({ ...prev, links: [...prev.links, { label: '', url: '' }] }))
+                  }
+                >
+                  <Plus className="h-4 w-4" />
+                  Adicionar botão
+                </Button>
+              )}
+            </div>
 
             <div className="space-y-4 rounded-lg border border-border p-4">
               <div className="flex items-center gap-2">
