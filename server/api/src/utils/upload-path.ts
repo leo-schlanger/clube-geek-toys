@@ -11,15 +11,24 @@ import path from 'path';
  * upload was building its folder the unguarded way.
  *
  * So the folder may only be named by the row it belongs to: a UUID, or the
- * `temp` sentinel used before the row exists.
+ * `temp` sentinel used before the row exists. Events are keyed by slug
+ * (`evento-geekpop`), so their uploads opt into `slug` ids — lowercase letters,
+ * digits and inner hyphens, which leaves no room for `.` or `/`.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SLUG_MAX = 80;
 
 export const TEMP_UPLOAD_SEGMENT = 'temp';
 
 /** Null when the id could name anything other than its own folder. */
-export function uploadDir(base: string, id: unknown): string | null {
+export function uploadDir(
+  base: string,
+  id: unknown,
+  { allowSlug = false }: { allowSlug?: boolean } = {}
+): string | null {
   const segment = typeof id === 'string' && id.length > 0 ? id : TEMP_UPLOAD_SEGMENT;
-  if (segment !== TEMP_UPLOAD_SEGMENT && !UUID_RE.test(segment)) return null;
+  const isSlug = allowSlug && segment.length <= SLUG_MAX && SLUG_RE.test(segment);
+  if (segment !== TEMP_UPLOAD_SEGMENT && !UUID_RE.test(segment) && !isSlug) return null;
   return path.join(base, segment);
 }

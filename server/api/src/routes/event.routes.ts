@@ -266,7 +266,7 @@ const BANNER_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const bannerStorage = multer.diskStorage({
   destination: (req, _file, cb) => {
-    const dir = uploadDir('/app/uploads/events', req.params.id);
+    const dir = uploadDir('/app/uploads/events', req.params.id, { allowSlug: true });
     if (!dir) {
       cb(new AppError(400, 'Evento inválido.', 'INVALID_EVENT_ID'), '');
       return;

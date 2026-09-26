@@ -46,4 +46,33 @@ describe('uploadDir', () => {
       if (dir !== null) expect(dir.startsWith(`${BASE}/`)).toBe(true);
     }
   });
+
+  // Event ids are slugs. Until they were allowed here, every event banner
+  // upload answered "Evento inválido." and the admin had no way to add art.
+  describe('slug ids (events)', () => {
+    const EVENTS = '/app/uploads/events';
+
+    it.each([['evento-geekpop'], ['kpop-night-2026-09-06'], ['evento']])('accepts %s', (id) => {
+      expect(uploadDir(EVENTS, id, { allowSlug: true })).toBe(`${EVENTS}/${id}`);
+    });
+
+    it('stays off unless the caller opts in', () => {
+      expect(uploadDir(BASE, 'evento-geekpop')).toBeNull();
+    });
+
+    it.each([
+      ['../../etc'],
+      ['..'],
+      ['a/../../b'],
+      ['evento/..'],
+      ['evento.geekpop'],
+      ['-evento'],
+      ['evento-'],
+      ['Evento'],
+      ['evento%2F..'],
+      ['a'.repeat(81)],
+    ])('refuses %s', (id) => {
+      expect(uploadDir(EVENTS, id, { allowSlug: true })).toBeNull();
+    });
+  });
 });

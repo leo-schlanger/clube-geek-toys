@@ -64,6 +64,11 @@ celular — e embaixo vêm **Reservar ingresso** (se as reservas estão abertas)
 os botões cadastrados. Colunas `flyers`/`links` em JSONB, migration 036.
 **Duplicar** leva os botões (revise o link) e não leva as artes.
 
+> **O envio de imagem estava quebrado de 08/09 a 26/09.** A guarda contra path
+> traversal no upload (`uploadDir`) só aceitava UUID, e o id do evento é slug —
+> todo envio de banner respondia "Evento inválido.". Corrigido com
+> `{ allowSlug: true }`, que aceita só letras minúsculas, dígitos e hífen interno.
+
 > **Os arquivos `event.ts` ainda existem, mas viraram fallback.** Eles cobrem só
 > o primeiro paint (e a API fora do ar). **Editá-los não muda o que o site
 > mostra.** São três, e devem espelhar a linha semeada pela migration:
