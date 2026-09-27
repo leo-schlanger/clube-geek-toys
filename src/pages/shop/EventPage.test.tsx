@@ -113,9 +113,23 @@ describe('EventPage', () => {
     )
   }
 
-  // Laura's ask: both posters, and under them "reserve a ticket" and the
-  // competition sign-up form.
-  it('shows every flyer and the link buttons under them', () => {
+  // What ticketing pages put on the first screen: when, where, how much.
+  it('answers date, time, place and price in the hero, in Rio time', () => {
+    renderPage(EVENT)
+    const hero = screen.getByRole('region', { name: 'GeekPop Night' })
+    expect(within(hero).getByText('Domingo, 6 de setembro de 2026')).toBeInTheDocument()
+    expect(within(hero).getByText('14h às 18h')).toBeInTheDocument()
+    expect(within(hero).getByText('GeekPop & Toys')).toBeInTheDocument()
+    expect(within(hero).getByText('R$ 20 por pessoa')).toBeInTheDocument()
+    expect(within(hero).getByText('Membros do Clube: R$ 10')).toBeInTheDocument()
+    expect(within(hero).getByRole('link', { name: /Reservar ingresso/ })).toHaveAttribute(
+      'href',
+      '#ingressos'
+    )
+  })
+
+  // Laura's ask: both posters, and the competition sign-up form next to them.
+  it('shows the cover in the hero and the other flyers with the link buttons', () => {
     renderPage({
       ...EVENT,
       bannerImageUrl: 'https://api.example/uploads/events/e1/banner-1.jpg',
@@ -123,21 +137,23 @@ describe('EventPage', () => {
       links: [{ label: 'Inscrição da competição', url: 'https://forms.gle/abc' }],
     })
 
-    const art = screen.getByRole('region', { name: 'Divulgação' })
-    const images = within(art).getAllByRole('img')
-    expect(images.map((img) => img.getAttribute('src'))).toEqual([
-      'https://api.example/uploads/events/e1/banner-1.jpg',
-      'https://api.example/uploads/events/e1/flyer-1.jpg',
-    ])
-
-    expect(within(art).getByRole('link', { name: /Reservar ingresso/ })).toHaveAttribute(
-      'href',
-      '#ingressos'
+    const hero = screen.getByRole('region', { name: 'GeekPop Night' })
+    expect(within(hero).getByRole('img')).toHaveAttribute(
+      'src',
+      'https://api.example/uploads/events/e1/banner-1.jpg'
     )
-    const signUp = within(art).getByRole('link', { name: /Inscrição da competição/ })
+
+    const more = screen.getByRole('region', { name: 'Mais sobre o evento' })
+    expect(within(more).getByRole('img')).toHaveAttribute(
+      'src',
+      'https://api.example/uploads/events/e1/flyer-1.jpg'
+    )
+    const signUp = within(more).getByRole('link', { name: /Inscrição da competição/ })
     expect(signUp).toHaveAttribute('href', 'https://forms.gle/abc')
     expect(signUp).toHaveAttribute('target', '_blank')
     expect(signUp).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    // Also in the hero, next to "Reservar ingresso".
+    expect(within(hero).getByRole('link', { name: /Inscrição da competição/ })).toBeInTheDocument()
   })
 
   it('never renders a link that is not http(s)', () => {
@@ -152,18 +168,21 @@ describe('EventPage', () => {
     expect(screen.getByRole('link', { name: /Ok/ })).toHaveAttribute('href', 'https://forms.gle/ok')
   })
 
-  it('hides the reserve button there when reservations are closed', () => {
-    renderPage({
-      ...EVENT,
-      ticketReservation: { ...EVENT.ticketReservation, enabled: false },
-      links: [{ label: 'Inscrição', url: 'https://forms.gle/abc' }],
-    })
-    const art = screen.getByRole('region', { name: 'Divulgação' })
-    expect(within(art).queryByRole('link', { name: /Reservar ingresso/ })).not.toBeInTheDocument()
+  it('keeps a reserve bar on phones while reservations are open', () => {
+    renderPage(EVENT)
+    expect(screen.getByTestId('mobile-reserve-bar')).toBeInTheDocument()
   })
 
-  it('draws no art block for an event without flyers or links (older API payload)', () => {
+  it('says reservations are closed and drops every reserve button', () => {
+    renderPage({ ...EVENT, ticketReservation: { ...EVENT.ticketReservation, enabled: false } })
+    expect(screen.getByText('Reservas encerradas')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Reservar/ })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('mobile-reserve-bar')).not.toBeInTheDocument()
+  })
+
+  it('draws no art for an event without flyers (older API payload)', () => {
     renderPage(EVENT)
-    expect(screen.queryByRole('region', { name: 'Divulgação' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Mais sobre o evento' })).not.toBeInTheDocument()
   })
 })

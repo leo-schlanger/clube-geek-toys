@@ -139,7 +139,7 @@ export default function TicketPage({ mode }: Props) {
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
                       Data e horário
                     </p>
-                    <p className="mt-0.5 text-sm font-medium capitalize leading-snug">
+                    <p className="mt-0.5 text-sm font-medium leading-snug">
                       {formatEventDateRange(event.startsAt, event.endsAt)}
                     </p>
                   </div>

@@ -150,7 +150,7 @@ export function formatEventDateRange(
     timeZone: EVENT_TIME_ZONE,
   })
 
-  const datePart = dateFmt.format(start)
+  const datePart = capitalizeFirst(dateFmt.format(start))
   const startTime = timeFmt.format(start)
   if (!end) return `${datePart} · ${startTime}`
   return `${datePart} · ${startTime} – ${timeFmt.format(end)}`
@@ -266,4 +266,51 @@ export function eventLinks(event: EventConfig): EventLink[] {
   return (event.links ?? []).filter(
     (link) => link && link.label?.trim() && isWebUrl(link.url)
   )
+}
+
+/** `domingo, 11 de…` → `Domingo, 11 de…`. CSS `capitalize` did every word. */
+function capitalizeFirst(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/** `Domingo, 11 de outubro de 2026` (or without the year), in Rio time. */
+export function formatEventDay(startsAt: string, { withYear = true } = {}): string {
+  return capitalizeFirst(
+    new Intl.DateTimeFormat('pt-BR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: withYear ? 'numeric' : undefined,
+      timeZone: EVENT_TIME_ZONE,
+    }).format(new Date(startsAt))
+  )
+}
+
+/** `14h`, `14h30` — how times are written on a Brazilian flyer. */
+function hourLabel(iso: string): string {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: EVENT_TIME_ZONE,
+  }).formatToParts(new Date(iso))
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0')
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00'
+  return minute === '00' ? `${hour}h` : `${hour}h${minute}`
+}
+
+/** `14h às 18h`, or `A partir das 14h` without an end. */
+export function formatEventTime(startsAt: string, endsAt?: string | null): string {
+  return endsAt
+    ? `${hourLabel(startsAt)} às ${hourLabel(endsAt)}`
+    : `A partir das ${hourLabel(startsAt)}`
+}
+
+/** `R$ 22`, `R$ 22,50` — no cents when there are none. */
+export function formatPriceShort(value: number, currencyLabel = 'R$'): string {
+  const cents = Math.round(value * 100) % 100 !== 0
+  return `${currencyLabel} ${value.toLocaleString('pt-BR', {
+    minimumFractionDigits: cents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`
 }

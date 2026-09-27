@@ -894,7 +894,7 @@ export function EventConfigTab() {
                     )}
                   </div>
                   <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5 capitalize">
+                    <span className="inline-flex items-center gap-1.5">
                       <CalendarDays className="h-3.5 w-3.5" />
                       {formatEventDateRange(event.startsAt, event.endsAt)}
                     </span>

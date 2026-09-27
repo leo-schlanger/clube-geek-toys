@@ -50,6 +50,22 @@ Fluxo da Laura quando um evento termina:
 
 Nada de deploy, nada de mexer nos dois repos.
 
+### Layout da página do evento (27/09/2026)
+
+A loja (`/evento`) e o site (`#evento`) seguem o desenho das páginas de
+ingresso: a primeira tela responde **o quê, quando, onde e quanto** — título,
+"Quando" (data + horário), "Local" (com mapa), "Entrada" (com o preço de membro)
+— e traz **Reservar ingresso** e os botões de link. O cartaz principal fica ao
+lado no desktop e abaixo no celular; os outros cartazes vêm em "Mais sobre o
+evento" com os botões de novo. No celular da loja há uma barra fixa "Reservar"
+que some quando o formulário entra na tela. Antes, os dois cartazes vinham
+primeiro e empurravam tudo isso para depois de ~1000 px de imagem.
+
+Datas e horas saem de `formatEventDay` / `formatEventTime` (`14h às 18h`), em
+horário do Rio. O último evento lido fica em `localStorage` e pinta de imediato
+na próxima visita — sem isso, com o fallback sempre passado, uma rede lenta
+mostrava a loja sem evento até a API responder.
+
 ### Mais imagens e botões de link (26/09/2026)
 
 Um evento pode ter mais de uma arte e mais de uma chamada. O caso que motivou:

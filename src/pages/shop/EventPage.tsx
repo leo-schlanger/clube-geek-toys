@@ -1,26 +1,38 @@
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import {
   ArrowLeft,
-  Calendar,
-  MapPin,
-  Gift,
-  Clock,
   ArrowRight,
+  CalendarDays,
+  Check,
   ExternalLink,
+  Gift,
   Images,
+  MapPin,
   Ticket,
 } from 'lucide-react'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { EventTicketForm } from '../../components/store/EventTicketForm'
 import { useShopMember } from '../../components/store/useShopMember'
 import { Button } from '../../components/ui/button'
-import { eventArt, eventLinks, formatEventDateRange } from '../../data/event'
+import {
+  eventArt,
+  eventLinks,
+  formatEventDay,
+  formatEventTime,
+  formatPriceShort,
+  ticketPriceBRL,
+  type EventConfig,
+} from '../../data/event'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { CreatorCredit } from '../../components/CreatorCredit'
 
 /**
- * Event page in the shop: details and reservation. Photos live in the main
- * site's gallery.
+ * Event page in the shop.
+ *
+ * Laid out the way ticketing pages are: the first screen answers what, when,
+ * where and how much, with the button to reserve. The flyers used to come
+ * first and pushed all of that below ~1000px of images on a phone.
  */
 export default function EventPage() {
   const { isMember } = useShopMember()
@@ -33,67 +45,152 @@ export default function EventPage() {
     return <Navigate to="/" replace />
   }
 
-  const dateLabel = formatEventDateRange(event.startsAt, event.endsAt)
   const art = eventArt(event)
+  const [cover, ...moreArt] = art
   const links = eventLinks(event)
   const canReserve = event.ticketReservation.enabled
+  const subtitle = event.shortTitle.trim() !== event.title.trim() ? event.shortTitle.trim() : ''
 
   return (
     <div className="min-h-screen bg-background">
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto max-w-5xl space-y-10 px-4 py-6 pb-16">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2 gap-1.5">
-            <Link to="/">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar à loja
-            </Link>
-          </Button>
+      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:pb-16">
+        <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2 gap-1.5">
+          <Link to="/">
+            <ArrowLeft className="h-4 w-4" />
+            Voltar à loja
+          </Link>
+        </Button>
 
-          <span className="mb-3 inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
-            Evento
-          </span>
-          <h1 className="font-heading text-3xl font-bold sm:text-4xl">{event.title}</h1>
-          <p className="mt-2 text-muted-foreground">
-            Informações e reserva de ingresso online.
-          </p>
-        </div>
-
-        {(art.length > 0 || links.length > 0) && (
-          <section aria-label="Divulgação" className="space-y-5">
-            {art.length > 0 && (
-              <div
+        {/* Hero: what, when, where, how much — then the art. */}
+        <section
+          aria-labelledby="event-title"
+          className="grid items-start gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-12"
+        >
+          <div className="order-1 space-y-6 lg:order-2 lg:sticky lg:top-24">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-primary">
+                Evento
+              </span>
+              <span
                 className={
-                  art.length > 1
-                    ? 'grid items-start gap-4 sm:grid-cols-2'
-                    : 'mx-auto w-full max-w-lg'
+                  canReserve
+                    ? 'rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400'
+                    : 'rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'
                 }
               >
-                {art.map((url, i) => (
-                  // Flyer text is small on a phone: a tap opens it full size.
-                  <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-                    <img
-                      src={url}
-                      alt={`Divulgação${art.length > 1 ? ` ${i + 1}` : ''}: ${event.title}`}
-                      className="w-full rounded-2xl border border-border object-contain shadow-sm"
-                    />
+                {canReserve ? 'Ingressos à venda' : 'Reservas encerradas'}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <h1
+                id="event-title"
+                className="font-heading text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl"
+              >
+                {event.title}
+              </h1>
+              {subtitle && <p className="text-lg text-muted-foreground">{subtitle}</p>}
+            </div>
+
+            <EventFacts event={event} />
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              {canReserve && (
+                <Button asChild size="lg" className="h-12 gap-2 px-8 text-base">
+                  <a href="#ingressos">
+                    <Ticket className="h-5 w-5" />
+                    Reservar ingresso
                   </a>
-                ))}
-              </div>
-            )}
-            {(canReserve || links.length > 0) && (
-              <div className="mx-auto flex max-w-2xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
-                {canReserve && (
-                  <Button asChild size="lg" className="gap-2">
-                    <a href="#ingressos">
-                      <Ticket className="h-4 w-4" />
-                      Reservar ingresso
-                    </a>
-                  </Button>
-                )}
+                </Button>
+              )}
+              {links.map((link) => (
+                <Button
+                  key={link.url}
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="h-12 gap-2 px-6 text-base"
+                >
+                  <a href={link.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                    {link.label}
+                  </a>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {cover && (
+            <div className="order-2 lg:order-1">
+              <Artwork url={cover} alt={`Cartaz: ${event.title}`} priority />
+            </div>
+          )}
+        </section>
+
+        {(event.description.length > 0 || event.highlights.length > 0) && (
+          <section aria-labelledby="event-about" className="mt-16 grid gap-8 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <h2 id="event-about" className="font-heading text-2xl font-bold">
+                Sobre o evento
+              </h2>
+              {event.description.map((para) => (
+                <p key={para.slice(0, 32)} className="leading-relaxed text-muted-foreground">
+                  {para}
+                </p>
+              ))}
+            </div>
+
+            <aside className="space-y-4">
+              {event.highlights.length > 0 && (
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <h3 className="mb-4 font-heading text-lg font-bold">O que vai rolar</h3>
+                  <ul className="space-y-3">
+                    {event.highlights.map((item) => (
+                      <li key={item} className="flex gap-3 text-sm leading-snug">
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                          <Check className="h-3 w-3 text-primary" />
+                        </span>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {event.memberPerk && (
+                <div className="flex gap-3 rounded-2xl border border-accent/40 bg-accent/10 p-5">
+                  <Gift className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                  <p className="text-sm font-medium">{event.memberPerk}</p>
+                </div>
+              )}
+            </aside>
+          </section>
+        )}
+
+        {moreArt.length > 0 && (
+          <section aria-labelledby="event-more" className="mt-16">
+            <h2 id="event-more" className="font-heading text-2xl font-bold">
+              Mais sobre o evento
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Toque na imagem para ver em tamanho cheio.
+            </p>
+            <div
+              className={
+                moreArt.length === 1
+                  ? 'mx-auto mt-6 max-w-xl'
+                  : 'mt-6 grid items-start gap-6 sm:grid-cols-2'
+              }
+            >
+              {moreArt.map((url, i) => (
+                <Artwork key={url} url={url} alt={`Divulgação ${i + 2}: ${event.title}`} />
+              ))}
+            </div>
+            {links.length > 0 && (
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
                 {links.map((link) => (
-                  <Button key={link.url} asChild size="lg" variant="outline" className="gap-2">
+                  <Button key={link.url} asChild size="lg" className="h-12 gap-2 px-8 text-base">
                     <a href={link.url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-4 w-4" />
                       {link.label}
@@ -105,102 +202,163 @@ export default function EventPage() {
           </section>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="space-y-6 rounded-2xl border border-border bg-card p-6 lg:col-span-3 md:p-8">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex gap-3 rounded-xl bg-muted/50 p-4">
-                <Calendar className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Data e horário
-                  </p>
-                  <p className="mt-0.5 text-sm font-medium capitalize leading-snug">
-                    {dateLabel}
-                  </p>
-                </div>
-              </div>
-              <div className="flex gap-3 rounded-xl bg-muted/50 p-4">
-                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                <div>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    Local
-                  </p>
-                  <p className="mt-0.5 text-sm font-medium">{event.location.name}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {event.location.address}
-                  </p>
-                  {event.location.mapsUrl && (
-                    <a
-                      href={event.location.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                    >
-                      Ver no mapa <ArrowRight className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {event.description.map((para) => (
-                <p key={para.slice(0, 32)} className="leading-relaxed text-muted-foreground">
-                  {para}
-                </p>
-              ))}
-            </div>
-
-            {event.memberPerk && (
-              <div className="flex gap-3 rounded-xl border border-accent/40 bg-accent/10 p-4">
-                <Gift className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                <p className="text-sm font-medium">{event.memberPerk}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-border bg-card p-6 lg:col-span-2 md:p-8">
-            <div className="mb-4 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              <h2 className="font-heading text-lg font-bold">Destaques</h2>
-            </div>
-            <ul className="space-y-3">
-              {event.highlights.map((item) => (
-                <li
-                  key={item}
-                  className="flex gap-2.5 text-sm leading-snug text-muted-foreground"
-                >
-                  <span
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-                    aria-hidden
-                  />
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <Button asChild className="mt-6 w-full" size="lg">
-              <a href="#ingressos">Reservar ingresso</a>
-            </Button>
-            <Button asChild variant="outline" className="mt-2 w-full gap-2">
-              <a
-                href="https://geeketoys.com.br#galeria"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Images className="h-4 w-4" />
-                Ver galeria no site
-              </a>
-            </Button>
-          </div>
+        <div className="mt-16">
+          <EventTicketForm event={event} />
         </div>
 
-        <EventTicketForm event={event} />
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          <a
+            href="https://geeketoys.com.br#galeria"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
+          >
+            <Images className="h-4 w-4" />
+            Fotos dos eventos anteriores
+          </a>
+        </p>
       </main>
+
+      {canReserve && <MobileReserveBar event={event} />}
 
       <footer className="space-y-2 border-t py-6 text-center text-sm text-muted-foreground">
         <p>Clube GeekPop &amp; Toys — Loja oficial</p>
         <CreatorCredit />
       </footer>
+    </div>
+  )
+}
+
+function Fact({
+  icon,
+  label,
+  children,
+}: {
+  icon: ReactNode
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <li className="flex gap-4 p-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
+        <div className="mt-0.5">{children}</div>
+      </div>
+    </li>
+  )
+}
+
+/** The four answers a visitor looks for first, one per row. */
+function EventFacts({ event }: { event: EventConfig }) {
+  const price = event.ticketReservation.priceBRL
+  const currency = event.ticketReservation.currencyLabel
+  const memberPrice = price ? ticketPriceBRL(event, 'member') : null
+
+  return (
+    <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+      <Fact icon={<CalendarDays className="h-5 w-5" />} label="Quando">
+        <p className="font-semibold">{formatEventDay(event.startsAt)}</p>
+        <p className="text-sm text-muted-foreground">
+          {formatEventTime(event.startsAt, event.endsAt)}
+        </p>
+      </Fact>
+      {(event.location.name || event.location.address) && (
+        <Fact icon={<MapPin className="h-5 w-5" />} label="Local">
+          {event.location.name && <p className="font-semibold">{event.location.name}</p>}
+          {event.location.address && (
+            <p className="text-sm text-muted-foreground">{event.location.address}</p>
+          )}
+          {event.location.mapsUrl && (
+            <a
+              href={event.location.mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+            >
+              Ver no mapa <ArrowRight className="h-3.5 w-3.5" />
+            </a>
+          )}
+        </Fact>
+      )}
+      {price != null && (
+        <Fact icon={<Ticket className="h-5 w-5" />} label="Entrada">
+          <p className="font-semibold">
+            {price === 0 ? 'Gratuita' : `${formatPriceShort(price, currency)} por pessoa`}
+          </p>
+          {memberPrice != null && (
+            <p className="text-sm text-muted-foreground">
+              Membros do Clube: {formatPriceShort(memberPrice, currency)}
+            </p>
+          )}
+        </Fact>
+      )}
+    </ul>
+  )
+}
+
+/** Flyer text is small on a phone: a tap opens it full size. */
+function Artwork({ url, alt, priority }: { url: string; alt: string; priority?: boolean }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block overflow-hidden rounded-3xl border border-border bg-card shadow-lg transition-shadow hover:shadow-xl"
+    >
+      <img
+        src={url}
+        alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        className="h-auto w-full"
+      />
+    </a>
+  )
+}
+
+/**
+ * Phone-only bar that keeps "reserve" one tap away while reading. It steps
+ * aside once the reservation form is on screen, where it would cover the
+ * form's own button.
+ */
+function MobileReserveBar({ event }: { event: EventConfig }) {
+  const [formInView, setFormInView] = useState(false)
+
+  useEffect(() => {
+    const form = document.getElementById('ingressos')
+    if (!form || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(([entry]) => setFormInView(entry.isIntersecting))
+    observer.observe(form)
+    return () => observer.disconnect()
+  }, [])
+
+  if (formInView) return null
+  const price = event.ticketReservation.priceBRL
+
+  return (
+    <div
+      data-testid="mobile-reserve-bar"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:hidden"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{event.title}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatEventDay(event.startsAt, { withYear: false })}
+            {price ? ` · ${formatPriceShort(price, event.ticketReservation.currencyLabel)}` : ''}
+          </p>
+        </div>
+        <Button asChild className="shrink-0 gap-1.5">
+          <a href="#ingressos">
+            <Ticket className="h-4 w-4" />
+            Reservar
+          </a>
+        </Button>
+      </div>
     </div>
   )
 }

@@ -3,6 +3,9 @@ import {
   FALLBACK_EVENT,
   isEventVisible,
   formatEventDateRange,
+  formatEventDay,
+  formatEventTime,
+  formatPriceShort,
   photoPublicUrl,
   buildReservationWhatsAppUrl,
 } from './event'
@@ -62,6 +65,23 @@ describe('event data', () => {
     expect(label).not.toContain('22:00')
     // Late start in Rio is already the next day in UTC: the date must stay Rio's.
     expect(formatEventDateRange('2026-10-12T01:30:00.000Z')).toMatch(/11 de outubro/)
+  })
+
+  it('formatEventDay / formatEventTime / formatPriceShort escrevem como no cartaz', () => {
+    expect(formatEventDay('2026-10-11T17:00:00.000Z')).toBe('Domingo, 11 de outubro de 2026')
+    expect(formatEventDay('2026-10-11T17:00:00.000Z', { withYear: false })).toBe(
+      'Domingo, 11 de outubro'
+    )
+    expect(formatEventTime('2026-10-11T17:00:00.000Z', '2026-10-11T21:00:00.000Z')).toBe(
+      '14h às 18h'
+    )
+    expect(formatEventTime('2026-10-11T17:30:00.000Z')).toBe('A partir das 14h30')
+    expect(formatPriceShort(22)).toBe('R$ 22')
+    expect(formatPriceShort(12.5)).toBe('R$ 12,50')
+  })
+
+  it('formatEventDateRange só capitaliza a primeira letra', () => {
+    expect(formatEventDateRange('2026-10-11T17:00:00.000Z')).toMatch(/^Domingo, 11 de outubro de 2026/)
   })
 
   it('photoPublicUrl', () => {
