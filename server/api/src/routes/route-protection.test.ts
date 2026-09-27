@@ -231,6 +231,7 @@ const PUBLIC = new Set([
 
   // ── Evento e ingresso: reservar não exige conta, e o QR circula ──
   'GET /events/active',
+  'GET /events/active/share', // preview do link do evento (só crawler, via nginx)
   'POST /events/:eventId/reservations',
   'GET /events/reservations/:code',
   'GET /events/tickets/:code',
@@ -296,6 +297,7 @@ const PUBLIC_WITHOUT_THROTTLE = new Set([
   'GET /products/categories',
   'GET /products/sitemap.xml',
   'GET /events/active', // Cache-Control de 60s
+  'GET /events/active/share', // HTML estático de preview, Cache-Control de 5 min
   'GET /promo', // idem: o aviso é lido em toda página da loja, com Cache-Control de 60s
   'GET /wholesale/status', // devolve um booleano
 ]);

@@ -482,3 +482,145 @@ export async function deleteEvent(id: string, actorUserId?: string): Promise<voi
   }
   await auditLog('event.deleted', actorUserId ?? null, { eventId: id });
 }
+
+// ─── Link preview ────────────────────────────────────────────────────────────
+
+const EVENT_TIME_ZONE = 'America/Sao_Paulo';
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** `Domingo, 11 de outubro` — the event happens in Rio, so Rio time. */
+function eventDayLabel(iso: string): string {
+  const label = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: EVENT_TIME_ZONE,
+  }).format(new Date(iso));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/** `14h`, `14h30`. */
+function hourLabel(iso: string): string {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    timeZone: EVENT_TIME_ZONE,
+  }).formatToParts(new Date(iso));
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return minute === '00' ? `${hour}h` : `${hour}h${minute}`;
+}
+
+function priceLabel(cents: number): string {
+  const value = cents / 100;
+  return `R$ ${value.toLocaleString('pt-BR', {
+    minimumFractionDigits: cents % 100 ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/**
+ * Minimal HTML with the event's meta tags, for link previews and search.
+ *
+ * `/evento` is the link the shop shares most, and WhatsApp/Instagram do not
+ * run JavaScript: they read the static shell and previewed the generic store
+ * card — no poster, date or price. nginx sends only crawlers here. The
+ * schema.org `Event` block is what Google reads for event results.
+ */
+export function buildEventShareHtml(event: EventRecord, shopBaseUrl: string): string {
+  const base = shopBaseUrl.replace(/\/$/, '');
+  const url = `${base}/evento`;
+  const when = `${eventDayLabel(event.startsAt)}, ${
+    event.endsAt
+      ? `${hourLabel(event.startsAt)} às ${hourLabel(event.endsAt)}`
+      : `a partir das ${hourLabel(event.startsAt)}`
+  }`;
+  const price = event.priceCents;
+  const priceText =
+    price == null
+      ? ''
+      : price === 0
+        ? ' Entrada gratuita.'
+        : ` Entrada ${priceLabel(price)}${
+            event.priceCents ? ` (membros do Clube: ${priceLabel(Math.round(price / 2))})` : ''
+          }.`;
+  const place = event.location.name || event.location.address;
+  const title = `${event.title} — ${when}`;
+  const description = `${when}${place ? ` · ${place}` : ''}.${priceText} Reserve seu ingresso online.`;
+  const images = [event.bannerImageUrl, ...event.flyers.map((f) => f.url)].filter(
+    (u): u is string => !!u && isWebUrl(u)
+  );
+  const image = images[0] ?? `${base}/og-image.png`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: event.title,
+    description: event.description[0] ?? description,
+    startDate: event.startsAt,
+    ...(event.endsAt ? { endDate: event.endsAt } : {}),
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    image: images.length ? images : [image],
+    url,
+    location: {
+      '@type': 'Place',
+      name: event.location.name || 'GeekPop & Toys',
+      address: event.location.address || 'Rio de Janeiro — RJ',
+    },
+    organizer: { '@type': 'Organization', name: 'GeekPop & Toys', url: base },
+    ...(price != null
+      ? {
+          offers: {
+            '@type': 'Offer',
+            price: (price / 100).toFixed(2),
+            priceCurrency: 'BRL',
+            url: `${url}#ingressos`,
+            availability: event.ticketReservation.enabled
+              ? 'https://schema.org/InStock'
+              : 'https://schema.org/SoldOut',
+          },
+        }
+      : {}),
+  };
+  // `</` inside JSON would close the script tag early.
+  const jsonLdText = JSON.stringify(jsonLd).replace(/</g, '\\u003c');
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>${escapeHtml(title)}</title>
+<link rel="canonical" href="${escapeHtml(url)}" />
+<meta name="description" content="${escapeHtml(description)}" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Loja GeekPop & Toys" />
+<meta property="og:locale" content="pt_BR" />
+<meta property="og:url" content="${escapeHtml(url)}" />
+<meta property="og:title" content="${escapeHtml(title)}" />
+<meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:image" content="${escapeHtml(image)}" />
+<meta property="og:image:alt" content="${escapeHtml(`Cartaz: ${event.title}`)}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(title)}" />
+<meta name="twitter:description" content="${escapeHtml(description)}" />
+<meta name="twitter:image" content="${escapeHtml(image)}" />
+<script type="application/ld+json">${jsonLdText}</script>
+<meta http-equiv="refresh" content="0; url=${escapeHtml(url)}" />
+</head>
+<body>
+<h1>${escapeHtml(event.title)}</h1>
+<p>${escapeHtml(description)}</p>
+<a href="${escapeHtml(url)}">Ver o evento e reservar ingresso</a>
+</body>
+</html>
+`;
+}

@@ -126,6 +126,12 @@ describe('ShopHome', () => {
     })
   })
 
+  // The hero holds the <h1> and is hidden here; the category page had none.
+  it('makes the category name the page heading', async () => {
+    renderHome('/categoria/musica')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Música' })).toBeInTheDocument()
+  })
+
   it('shows search heading from query string', async () => {
     renderHome('/?search=bts')
     await waitFor(() => {

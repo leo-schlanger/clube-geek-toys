@@ -10,7 +10,7 @@ import { authenticate, optionalAuth, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { publicLookupLimiter, emailLimiter } from '../middleware/rate-limit.js';
 import { MAX_TICKETS_PER_RESERVATION } from '../config/events.js';
-import { env } from '../config/env.js';
+import { env, SHOP_CANONICAL_URL } from '../config/env.js';
 import * as eventService from '../services/event.service.js';
 import * as eventConfig from '../services/event-config.service.js';
 
@@ -35,6 +35,25 @@ eventRouter.get('/active', async (_req, res, next) => {
     // is requested on every shop page.
     res.set('Cache-Control', 'public, max-age=60');
     res.json({ event });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /events/active/share — the event's meta as HTML, for link previews.
+// nginx routes only crawlers here (`/evento` + `$is_link_crawler`).
+eventRouter.get('/active/share', async (_req, res, next) => {
+  try {
+    const event = await eventConfig.getActiveEventOrFallback();
+    // Same rule as the storefront: an ended event is not advertised.
+    const end = event ? Date.parse(event.endsAt ?? event.startsAt) + (event.endsAt ? 0 : 86_400_000) : 0;
+    if (!event || event.status !== 'published' || end < Date.now()) {
+      res.status(404).type('html').send('<!DOCTYPE html><title>Nenhum evento em cartaz</title>');
+      return;
+    }
+    // Short: the crawler refetches the same link several times in a row.
+    res.set('Cache-Control', 'public, max-age=300');
+    res.type('html').send(eventConfig.buildEventShareHtml(event, SHOP_CANONICAL_URL));
   } catch (err) {
     next(err);
   }

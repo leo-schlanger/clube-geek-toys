@@ -177,4 +177,12 @@ describe('EventPage', () => {
     renderPage(EVENT)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
+
+  // It inherited the store's title and a canonical pointing at the shop home.
+  it('declares its own title and canonical', () => {
+    renderPage(EVENT)
+    expect(document.title).toContain('GeekPop Night')
+    const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute('href')
+    expect(canonical).toMatch(/\/evento$/)
+  })
 })

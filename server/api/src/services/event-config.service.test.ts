@@ -23,6 +23,7 @@ vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 
 import {
   addEventFlyer,
+  buildEventShareHtml,
   duplicateEvent,
   getEventById,
   isWebUrl,
@@ -207,5 +208,56 @@ describe('duplicateEvent', () => {
     expect(insert?.[1][22]).toBe(JSON.stringify(links));
     expect(copy.flyers).toEqual([]);
     expect(copy.links).toEqual(links);
+  });
+});
+
+describe('buildEventShareHtml', () => {
+  // `EventRecord` as the mapper produces it: reuse the row fixture.
+  async function record(overrides: Record<string, unknown> = {}) {
+    routeSql([['SELECT * FROM events WHERE id', () => ({ rows: [row(overrides)] })]]);
+    return (await getEventById('evento-geekpop'))!;
+  }
+
+  it('previews the poster, the Rio date and time, and both prices', async () => {
+    const event = await record({
+      flyers: [{ url: 'https://api.geeketoys.com.br/uploads/events/evento-geekpop/flyer-1.jpg' }],
+    });
+    const html = buildEventShareHtml(event, 'https://shop.geekpoptoys.com.br/');
+
+    expect(html).toContain('<link rel="canonical" href="https://shop.geekpoptoys.com.br/evento" />');
+    expect(html).toContain(
+      '<meta property="og:image" content="https://api.geeketoys.com.br/uploads/events/evento-geekpop/banner-1.jpg" />'
+    );
+    // 17:00Z is 14h in Rio.
+    expect(html).toContain('Domingo, 11 de outubro, 14h às 18h');
+    expect(html).toContain('Entrada R$ 22 (membros do Clube: R$ 11)');
+  });
+
+  it('carries a schema.org Event with the offer', async () => {
+    const html = buildEventShareHtml(await record(), 'https://shop.geekpoptoys.com.br');
+    const json = JSON.parse(html.match(/<script type="application\/ld\+json">(.*?)<\/script>/s)![1]);
+    expect(json['@type']).toBe('Event');
+    expect(json.startDate).toBe('2026-10-11T17:00:00.000Z');
+    expect(json.location.name).toBe('Mar Palace');
+    expect(json.offers).toMatchObject({ price: '22.00', priceCurrency: 'BRL' });
+    expect(json.image).toHaveLength(1);
+  });
+
+  it('escapes the admin text, in attributes and inside the JSON-LD', async () => {
+    const html = buildEventShareHtml(
+      await record({ title: 'K-pop "night" </script><script>alert(1)</script>' }),
+      'https://shop.geekpoptoys.com.br'
+    );
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('K-pop &quot;night&quot;');
+    expect(html.match(/<\/script>/g)).toHaveLength(1);
+  });
+
+  it('falls back to the store image when the event has no art', async () => {
+    const html = buildEventShareHtml(
+      await record({ banner_image_url: null }),
+      'https://shop.geekpoptoys.com.br'
+    );
+    expect(html).toContain('content="https://shop.geekpoptoys.com.br/og-image.png"');
   });
 });

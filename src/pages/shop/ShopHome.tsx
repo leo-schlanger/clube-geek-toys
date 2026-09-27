@@ -235,7 +235,13 @@ export default function ShopHome() {
               {search ? (
                 <SearchIcon className="h-5 w-5 text-muted-foreground" />
               ) : null}
-              <h2 className="text-lg font-heading font-semibold">{heading}</h2>
+              {/* Category and search pages hide the hero, which holds the
+                  page's <h1>; the listing title takes its place there. */}
+              {categorySlug || search ? (
+                <h1 className="text-lg font-heading font-semibold">{heading}</h1>
+              ) : (
+                <h2 className="text-lg font-heading font-semibold">{heading}</h2>
+              )}
             </div>
             <ProductSortSelect value={sort} onChange={setSort} />
           </div>
