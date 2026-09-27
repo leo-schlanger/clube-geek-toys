@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, Navigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -10,11 +10,11 @@ import {
   Images,
   MapPin,
   Ticket,
-} from 'lucide-react'
-import { ShopHeader } from '../../components/store/ShopHeader'
-import { EventTicketForm } from '../../components/store/EventTicketForm'
-import { useShopMember } from '../../components/store/useShopMember'
-import { Button } from '../../components/ui/button'
+} from "lucide-react";
+import { ShopHeader } from "../../components/store/ShopHeader";
+import { EventTicketForm } from "../../components/store/EventTicketForm";
+import { useShopMember } from "../../components/store/useShopMember";
+import { Button } from "../../components/ui/button";
 import {
   eventArt,
   eventLinks,
@@ -23,9 +23,9 @@ import {
   formatPriceShort,
   ticketPriceBRL,
   type EventConfig,
-} from '../../data/event'
-import { useActiveEvent } from '../../hooks/useActiveEvent'
-import { CreatorCredit } from '../../components/CreatorCredit'
+} from "../../data/event";
+import { useActiveEvent } from "../../hooks/useActiveEvent";
+import { CreatorCredit } from "../../components/CreatorCredit";
 
 /**
  * Event page in the shop.
@@ -35,28 +35,35 @@ import { CreatorCredit } from '../../components/CreatorCredit'
  * first and pushed all of that below ~1000px of images on a phone.
  */
 export default function EventPage() {
-  const { isMember } = useShopMember()
-  const { event, visible, isPlaceholder } = useActiveEvent()
+  const { isMember } = useShopMember();
+  const { event, visible, isPlaceholder } = useActiveEvent();
 
   // Redirect only after the API answers: with the fallback still on screen,
   // an unpublished DB event would kick the visitor out for no reason —
   // and a newly published one would be hidden.
   if (!visible && !isPlaceholder) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/" replace />;
   }
 
-  const art = eventArt(event)
-  const [cover, ...moreArt] = art
-  const links = eventLinks(event)
-  const canReserve = event.ticketReservation.enabled
-  const subtitle = event.shortTitle.trim() !== event.title.trim() ? event.shortTitle.trim() : ''
+  const art = eventArt(event);
+  const links = eventLinks(event);
+  const canReserve = event.ticketReservation.enabled;
+  const subtitle =
+    event.shortTitle.trim() !== event.title.trim()
+      ? event.shortTitle.trim()
+      : "";
 
   return (
     <div className="min-h-screen bg-background">
       <ShopHeader isMember={isMember} />
 
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:pb-16">
-        <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2 gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          className="mb-6 -ml-2 gap-1.5"
+        >
           <Link to="/">
             <ArrowLeft className="h-4 w-4" />
             Voltar à loja
@@ -66,7 +73,7 @@ export default function EventPage() {
         {/* Hero: what, when, where, how much — then the art. */}
         <section
           aria-labelledby="event-title"
-          className="grid items-start gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-12"
+          className={`grid items-start gap-8 lg:gap-12 ${art.length > 1 ? "lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]" : "lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]"}`}
         >
           <div className="order-1 space-y-6 lg:order-2 lg:sticky lg:top-24">
             <div className="flex flex-wrap items-center gap-2">
@@ -76,11 +83,11 @@ export default function EventPage() {
               <span
                 className={
                   canReserve
-                    ? 'rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400'
-                    : 'rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground'
+                    ? "rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400"
+                    : "rounded-full bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground"
                 }
               >
-                {canReserve ? 'Ingressos à venda' : 'Reservas encerradas'}
+                {canReserve ? "Ingressos à venda" : "Reservas encerradas"}
               </span>
             </div>
 
@@ -91,7 +98,9 @@ export default function EventPage() {
               >
                 {event.title}
               </h1>
-              {subtitle && <p className="text-lg text-muted-foreground">{subtitle}</p>}
+              {subtitle && (
+                <p className="text-lg text-muted-foreground">{subtitle}</p>
+              )}
             </div>
 
             <EventFacts event={event} />
@@ -122,21 +131,27 @@ export default function EventPage() {
             </div>
           </div>
 
-          {cover && (
+          {art.length > 0 && (
             <div className="order-2 lg:order-1">
-              <Artwork url={cover} alt={`Cartaz: ${event.title}`} priority />
+              <Posters art={art} title={event.title} />
             </div>
           )}
         </section>
 
         {(event.description.length > 0 || event.highlights.length > 0) && (
-          <section aria-labelledby="event-about" className="mt-16 grid gap-8 lg:grid-cols-3">
+          <section
+            aria-labelledby="event-about"
+            className="mt-16 grid gap-8 lg:grid-cols-3"
+          >
             <div className="space-y-4 lg:col-span-2">
               <h2 id="event-about" className="font-heading text-2xl font-bold">
                 Sobre o evento
               </h2>
               {event.description.map((para) => (
-                <p key={para.slice(0, 32)} className="leading-relaxed text-muted-foreground">
+                <p
+                  key={para.slice(0, 32)}
+                  className="leading-relaxed text-muted-foreground"
+                >
                   {para}
                 </p>
               ))}
@@ -145,10 +160,15 @@ export default function EventPage() {
             <aside className="space-y-4">
               {event.highlights.length > 0 && (
                 <div className="rounded-2xl border border-border bg-card p-6">
-                  <h3 className="mb-4 font-heading text-lg font-bold">O que vai rolar</h3>
+                  <h3 className="mb-4 font-heading text-lg font-bold">
+                    O que vai rolar
+                  </h3>
                   <ul className="space-y-3">
                     {event.highlights.map((item) => (
-                      <li key={item} className="flex gap-3 text-sm leading-snug">
+                      <li
+                        key={item}
+                        className="flex gap-3 text-sm leading-snug"
+                      >
                         <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10">
                           <Check className="h-3 w-3 text-primary" />
                         </span>
@@ -165,40 +185,6 @@ export default function EventPage() {
                 </div>
               )}
             </aside>
-          </section>
-        )}
-
-        {moreArt.length > 0 && (
-          <section aria-labelledby="event-more" className="mt-16">
-            <h2 id="event-more" className="font-heading text-2xl font-bold">
-              Mais sobre o evento
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Toque na imagem para ver em tamanho cheio.
-            </p>
-            <div
-              className={
-                moreArt.length === 1
-                  ? 'mx-auto mt-6 max-w-xl'
-                  : 'mt-6 grid items-start gap-6 sm:grid-cols-2'
-              }
-            >
-              {moreArt.map((url, i) => (
-                <Artwork key={url} url={url} alt={`Divulgação ${i + 2}: ${event.title}`} />
-              ))}
-            </div>
-            {links.length > 0 && (
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                {links.map((link) => (
-                  <Button key={link.url} asChild size="lg" className="h-12 gap-2 px-8 text-base">
-                    <a href={link.url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4" />
-                      {link.label}
-                    </a>
-                  </Button>
-                ))}
-              </div>
-            )}
           </section>
         )}
 
@@ -226,7 +212,7 @@ export default function EventPage() {
         <CreatorCredit />
       </footer>
     </div>
-  )
+  );
 }
 
 function Fact({
@@ -234,9 +220,9 @@ function Fact({
   label,
   children,
 }: {
-  icon: ReactNode
-  label: string
-  children: ReactNode
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
 }) {
   return (
     <li className="flex gap-4 p-4">
@@ -250,14 +236,14 @@ function Fact({
         <div className="mt-0.5">{children}</div>
       </div>
     </li>
-  )
+  );
 }
 
 /** The four answers a visitor looks for first, one per row. */
 function EventFacts({ event }: { event: EventConfig }) {
-  const price = event.ticketReservation.priceBRL
-  const currency = event.ticketReservation.currencyLabel
-  const memberPrice = price ? ticketPriceBRL(event, 'member') : null
+  const price = event.ticketReservation.priceBRL;
+  const currency = event.ticketReservation.currencyLabel;
+  const memberPrice = price ? ticketPriceBRL(event, "member") : null;
 
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
@@ -269,9 +255,13 @@ function EventFacts({ event }: { event: EventConfig }) {
       </Fact>
       {(event.location.name || event.location.address) && (
         <Fact icon={<MapPin className="h-5 w-5" />} label="Local">
-          {event.location.name && <p className="font-semibold">{event.location.name}</p>}
+          {event.location.name && (
+            <p className="font-semibold">{event.location.name}</p>
+          )}
           {event.location.address && (
-            <p className="text-sm text-muted-foreground">{event.location.address}</p>
+            <p className="text-sm text-muted-foreground">
+              {event.location.address}
+            </p>
           )}
           {event.location.mapsUrl && (
             <a
@@ -288,7 +278,9 @@ function EventFacts({ event }: { event: EventConfig }) {
       {price != null && (
         <Fact icon={<Ticket className="h-5 w-5" />} label="Entrada">
           <p className="font-semibold">
-            {price === 0 ? 'Gratuita' : `${formatPriceShort(price, currency)} por pessoa`}
+            {price === 0
+              ? "Gratuita"
+              : `${formatPriceShort(price, currency)} por pessoa`}
           </p>
           {memberPrice != null && (
             <p className="text-sm text-muted-foreground">
@@ -298,11 +290,45 @@ function EventFacts({ event }: { event: EventConfig }) {
         </Fact>
       )}
     </ul>
-  )
+  );
+}
+
+/**
+ * Every poster, side by side — the event one and the competition one. Laura
+ * asked for both on the site; one of them tucked further down read as missing.
+ */
+function Posters({ art, title }: { art: string[]; title: string }) {
+  if (art.length === 1)
+    return <Artwork url={art[0]} alt={`Cartaz: ${title}`} priority />;
+  return (
+    <div>
+      <div className="grid grid-cols-2 items-start gap-3 sm:gap-4">
+        {art.map((url, i) => (
+          <Artwork
+            key={url}
+            url={url}
+            alt={`Cartaz ${i + 1}: ${title}`}
+            priority
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-center text-xs text-muted-foreground">
+        Toque em um cartaz para ver em tamanho cheio.
+      </p>
+    </div>
+  );
 }
 
 /** Flyer text is small on a phone: a tap opens it full size. */
-function Artwork({ url, alt, priority }: { url: string; alt: string; priority?: boolean }) {
+function Artwork({
+  url,
+  alt,
+  priority,
+}: {
+  url: string;
+  alt: string;
+  priority?: boolean;
+}) {
   return (
     <a
       href={url}
@@ -313,11 +339,11 @@ function Artwork({ url, alt, priority }: { url: string; alt: string; priority?: 
       <img
         src={url}
         alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
+        loading={priority ? "eager" : "lazy"}
         className="h-auto w-full"
       />
     </a>
-  )
+  );
 }
 
 /**
@@ -326,18 +352,20 @@ function Artwork({ url, alt, priority }: { url: string; alt: string; priority?: 
  * form's own button.
  */
 function MobileReserveBar({ event }: { event: EventConfig }) {
-  const [formInView, setFormInView] = useState(false)
+  const [formInView, setFormInView] = useState(false);
 
   useEffect(() => {
-    const form = document.getElementById('ingressos')
-    if (!form || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(([entry]) => setFormInView(entry.isIntersecting))
-    observer.observe(form)
-    return () => observer.disconnect()
-  }, [])
+    const form = document.getElementById("ingressos");
+    if (!form || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) =>
+      setFormInView(entry.isIntersecting),
+    );
+    observer.observe(form);
+    return () => observer.disconnect();
+  }, []);
 
-  if (formInView) return null
-  const price = event.ticketReservation.priceBRL
+  if (formInView) return null;
+  const price = event.ticketReservation.priceBRL;
 
   return (
     <div
@@ -349,7 +377,9 @@ function MobileReserveBar({ event }: { event: EventConfig }) {
           <p className="truncate text-sm font-semibold">{event.title}</p>
           <p className="text-xs text-muted-foreground">
             {formatEventDay(event.startsAt, { withYear: false })}
-            {price ? ` · ${formatPriceShort(price, event.ticketReservation.currencyLabel)}` : ''}
+            {price
+              ? ` · ${formatPriceShort(price, event.ticketReservation.currencyLabel)}`
+              : ""}
           </p>
         </div>
         <Button asChild className="shrink-0 gap-1.5">
@@ -360,5 +390,5 @@ function MobileReserveBar({ event }: { event: EventConfig }) {
         </Button>
       </div>
     </div>
-  )
+  );
 }

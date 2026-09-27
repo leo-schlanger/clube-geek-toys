@@ -129,7 +129,8 @@ describe('EventPage', () => {
   })
 
   // Laura's ask: both posters, and the competition sign-up form next to them.
-  it('shows the cover in the hero and the other flyers with the link buttons', () => {
+  // With the second poster further down, it read as missing.
+  it('shows every poster side by side in the hero, with the link buttons', () => {
     renderPage({
       ...EVENT,
       bannerImageUrl: 'https://api.example/uploads/events/e1/banner-1.jpg',
@@ -138,22 +139,14 @@ describe('EventPage', () => {
     })
 
     const hero = screen.getByRole('region', { name: 'GeekPop Night' })
-    expect(within(hero).getByRole('img')).toHaveAttribute(
-      'src',
-      'https://api.example/uploads/events/e1/banner-1.jpg'
-    )
-
-    const more = screen.getByRole('region', { name: 'Mais sobre o evento' })
-    expect(within(more).getByRole('img')).toHaveAttribute(
-      'src',
-      'https://api.example/uploads/events/e1/flyer-1.jpg'
-    )
-    const signUp = within(more).getByRole('link', { name: /Inscrição da competição/ })
+    expect(within(hero).getAllByRole('img').map((img) => img.getAttribute('src'))).toEqual([
+      'https://api.example/uploads/events/e1/banner-1.jpg',
+      'https://api.example/uploads/events/e1/flyer-1.jpg',
+    ])
+    const signUp = within(hero).getByRole('link', { name: /Inscrição da competição/ })
     expect(signUp).toHaveAttribute('href', 'https://forms.gle/abc')
     expect(signUp).toHaveAttribute('target', '_blank')
     expect(signUp).toHaveAttribute('rel', expect.stringContaining('noopener'))
-    // Also in the hero, next to "Reservar ingresso".
-    expect(within(hero).getByRole('link', { name: /Inscrição da competição/ })).toBeInTheDocument()
   })
 
   it('never renders a link that is not http(s)', () => {
@@ -183,6 +176,5 @@ describe('EventPage', () => {
   it('draws no art for an event without flyers (older API payload)', () => {
     renderPage(EVENT)
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Mais sobre o evento' })).not.toBeInTheDocument()
   })
 })
