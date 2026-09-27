@@ -59,7 +59,9 @@ const upload = multer({
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
     } else {
-      cb(new Error('Apenas arquivos PDF são permitidos'));
+      // AppError, not Error: a wrong file type is the client's mistake (400),
+      // and a plain Error reached the handler as a 500.
+      cb(new AppError(400, 'Apenas arquivos PDF são permitidos', 'INVALID_FILE_TYPE'));
     }
   },
 });
