@@ -66,6 +66,24 @@ horário do Rio. O último evento lido fica em `localStorage` e pinta de imediat
 na próxima visita — sem isso, com o fallback sempre passado, uma rede lenta
 mostrava a loja sem evento até a API responder.
 
+### Preview do link do evento (27/09/2026)
+
+Link de **produto** já saía com foto, nome e preço no WhatsApp; o de
+**`/evento`** — o que a loja mais divulga — saía com o card genérico da loja,
+porque WhatsApp/Instagram não rodam JavaScript e leem só o shell estático.
+Agora o nginx manda crawler (`$is_link_crawler`) de `/evento` para
+`GET /events/active/share`, que devolve um HTML mínimo com:
+
+- `og:image` = o cartaz (banner, ou a primeira arte extra)
+- título com a data (`Evento GeeKpop! — Domingo, 11 de outubro, 14h às 18h`) e
+  descrição com local e preço (e o de membro)
+- JSON-LD `schema.org/Event` com local, horário e oferta — é o que o Google lê
+  para resultado de evento
+
+Mesma regra da vitrine: evento que já terminou responde 404. Cache de 5 min. O
+WhatsApp guarda o preview do link por dias — para ver o novo, compartilhe o link
+com um parâmetro qualquer (`/evento?v=2`).
+
 ### Mais imagens e botões de link (26/09/2026)
 
 Um evento pode ter mais de uma arte e mais de uma chamada. O caso que motivou:

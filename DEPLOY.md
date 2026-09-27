@@ -372,12 +372,27 @@ docker compose run --rm -T --entrypoint certbot certbot renew --dry-run
 
 ### Pipeline
 
-1. Build do frontend Vite com variáveis de produção
+1. Portões: `tsc -b`, build e testes do backend, `npm run typecheck`, lint, build do frontend
 2. `rsync` de `server/` para `/opt/clube-geek-toys/server/` na VPS
-3. `rsync` de `dist/` para `/opt/clube-geek-toys/dist/` na VPS
-4. SSH: `docker compose build --no-cache api`
+3. `rsync` de `dist/assets/` **sem `--delete`**, depois o resto do `dist/` com
+   `--delete` (menos `assets/`), e limpeza dos chunks com mais de 14 dias —
+   ver abaixo
+4. SSH: cria `/opt/clube-geek-toys/.deploying` (silencia o monitor), `docker compose build --no-cache api`
 5. SSH: `docker compose up -d --force-recreate api nginx`
-6. Health check: `curl https://api.geeketoys.com.br/health`
+6. Health check: `curl https://api.geeketoys.com.br/health` (e `schema.status` ≠ `degraded`)
+7. Apaga o marcador `.deploying` — também quando o deploy falha
+
+**Por que os chunks antigos ficam 14 dias.** Quem ainda tem o `index.html` do
+build anterior — aba aberta, service worker, e o Googlebot, que renderiza dias
+depois de buscar o HTML — pede os chunks com hash daquele build. Com um
+`rsync --delete` único eles sumiam no instante do deploy e a página ficava em
+branco. O `rsync -a` carimba cada arquivo com a hora do build, então "mais de
+14 dias" é "de um build que ninguém deveria mais ter".
+
+**Por que o monitor fica quieto no deploy.** Recriar a API derruba o `/health`
+por um instante, e o `health-check.sh` (cron de 5 min) mandava "[DOWN]" a cada
+deploy — 13 dos 14 alertas até setembro. Agora ele só alerta na segunda falha
+seguida, e não alerta enquanto o marcador `.deploying` tiver menos de 15 min.
 
 > **Nota:** o `--no-cache` é intencional — qualquer mudança em validação de env precisa rebuild completo.
 
@@ -396,8 +411,10 @@ docker compose run --rm -T --entrypoint certbot certbot renew --dry-run
 # No repositório local
 npm run build
 
-# Copiar frontend
-rsync -avz --delete dist/ $VPS_HOST:/opt/clube-geek-toys/dist/
+# Copiar frontend — chunks primeiro e sem --delete (ver "Por que os chunks
+# antigos ficam 14 dias" acima), depois o resto
+rsync -avz dist/assets/ $VPS_HOST:/opt/clube-geek-toys/dist/assets/
+rsync -avz --delete --exclude='/assets/' dist/ $VPS_HOST:/opt/clube-geek-toys/dist/
 
 # Copiar servidor
 rsync -avz --delete --exclude='node_modules' --exclude='.env' \

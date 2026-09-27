@@ -154,12 +154,12 @@ o sistema me diz o que fazer?
 
 ### Em aberto — por impacto no caixa
 
-- [ ] **ALTO — PIX continua sem confirmação automática.** Não há webhook: cada
+- [x] **ALTO — PIX continua sem confirmação automática.** Não há webhook: cada _(Resolvido — desde 01/09/2026 o PIX da loja é da Pagar.me e confirma sozinho pelo webhook; conferido em 27/09. Reserva de ingresso ainda usa PIX estático, confirmado pela equipe.)_
       pedido PIX exige alguém comparar o TX ID com o extrato. É a fila mais cara
       do painel (o cliente já pagou e não é atendido). Gateway PIX com webhook
       resolveria de vez; enquanto não vier, o painel + digest ao menos tornam a
       fila visível.
-- [ ] **MEDIO — Não existe cupom / código promocional.** Os únicos descontos são
+- [x] **MEDIO — Não existe cupom / código promocional.** Os únicos descontos são _(Resolvido — aba **Cupons** e `lib/promo.ts`; conferido em 27/09.)_
       automáticos por perfil (`member_15`, `wholesale_25`). Não dá pra rodar
       campanha (Black Friday, comeback, cupom de influencer, primeira compra),
       que é a alavanca de marketing mais básica de uma loja. Precisaria de
@@ -178,12 +178,26 @@ o sistema me diz o que fazer?
 - [ ] **BAIXO — Sem nota fiscal.** Nenhuma emissão de NF-e/NFC-e nem campo pra
       anexar. Com CNPJ ativo (52.846.344/0001-10) e venda a atacado, em algum
       momento isso deixa de ser opcional.
-- [ ] **BAIXO — `shipped` → `delivered` é 100% manual e sem data.** Não existe
+- [x] **BAIXO — `shipped` → `delivered` é 100% manual e sem data.** Não existe _(Resolvido — `syncShipments()` a cada 15 min desde 18/09/2026.)_
       `shipped_at`/`delivered_at`; o card "enviados sem entrega" usa `updated_at`
       como aproximação da data de postagem. Rastreio automático pelos Correios /
       Melhor Envio fecharia o ciclo e daria prazo médio de entrega real.
-- [ ] **BAIXO — Etiqueta Melhor Envio + token em produção** — já rastreado na
+- [x] **BAIXO — Etiqueta Melhor Envio + token em produção** — já rastreado na _(Resolvido — OAuth guardado no banco, `canBuyLabel: true` em 27/09; o `MELHOR_ENVIO_TOKEN` vazio no `.env` é o esperado (é só override manual) e o token se renova sozinho.)_
       seção da loja; segue bloqueado no `MELHOR_ENVIO_TOKEN` vazio.
+
+## Aberto pelo checkup de 27/09/2026
+
+Detalhes em [`CHECKUP-2026-09-27.md`](CHECKUP-2026-09-27.md). Quase tudo foi
+resolvido no mesmo dia; ficou:
+
+- [ ] **BAIXO** — Site institucional: Vite 5 → 7 (e Vitest junto). Fecha os
+      alertas restantes, todos de ferramenta de desenvolvimento — nada disso vai
+      para produção.
+- [ ] **MEDIO** — Cobertura abaixo da **meta** de 70% nos dois lados. Os pisos
+      voltaram a valer e agora rodam toda segunda no CI; suba o piso junto quando
+      a cobertura subir.
+- [ ] **MEDIO** — `e2e-admin@geeketoys.com.br` continua admin de produção (foi
+      usado neste checkup para operar o evento pela API). Ver o item de 15/08.
 
 ## Aberto pelo checkup de 16/08/2026
 
@@ -240,16 +254,16 @@ Foco: base de dados, estrutura e layout.
 
 ### Em aberto
 
-- [ ] **MEDIO** — ~99 erros de tipo em arquivos de teste (mocks do `apiRequest`
+- [x] **MEDIO** — ~99 erros de tipo em arquivos de teste (mocks do `apiRequest` _(Resolvido — 27/09/2026: `npm run typecheck` com **0 erros** (eram 60) e no CI.)_
       sem o campo `status`). Não bloqueiam deploy desde a separação
       build × typecheck; medir com `npm run typecheck`.
 - [ ] **MEDIO** — Cobertura do backend em **11,80%** (meta 70%). Próximos por
       prejuízo se quebrarem: `webhook.service` (confirma pagamento e baixa
       estoque), `payment.service`, `stock.service`.
-- [ ] **MEDIO** — Cobertura do front em **67,55%** (meta 70%). Recuperar os
+- [ ] **MEDIO** — Cobertura do front em **67,55%** (meta 70%). _27/09/2026: tinha caído para abaixo do próprio piso (funções 62,4% < 64%) e voltou para cima com testes de clientes de API, do cache do evento e das telas do painel no celular._ Recuperar os
       ~2,5 pontos perdidos desde 10/08 — as telas de catálogo que entraram sem
       teste são o buraco.
-- [ ] **BAIXO** — Rodar cobertura no CI. Hoje a única forma de saber que ela
+- [x] **BAIXO** — Rodar cobertura no CI. Hoje a única forma de saber que ela _(Resolvido — 27/09/2026: `.github/workflows/coverage.yml`, semanal e sob demanda, fora do deploy.)_
       caiu é rodar 26 min na mão, que é por isso que a queda de 74% → 67,55%
       passou despercebida por seis dias.
 - [ ] **BAIXO** — Tipos duplicados: front (466 linhas) × backend (257). Duas
@@ -264,16 +278,16 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 
 ### Em aberto
 
-- [ ] **ALTO** — Conferir a renovação do certificado por volta de **17/09/2026**. O
+- [x] **ALTO** — Conferir a renovação do certificado por volta de **17/09/2026**. O _(Resolvido — renovado; válido até 15/12/2026, conferido em 27/09.)_
       certbot ficou 3 semanas parado; foi religado, o webroot ACME está validado
       nos 5 domínios testados e o deploy agora garante o container de pé — mas o
       primeiro ciclo real de renovação merece um olhar.
-- [ ] **ALTO** — Preencher `MELHOR_ENVIO_TOKEN` na VPS. Sem ele toda cotação é
+- [x] **ALTO** — Preencher `MELHOR_ENVIO_TOKEN` na VPS. Sem ele toda cotação é _(Resolvido — substituído pelo OAuth; ver o item de etiqueta acima.)_
       PAC R$ 24 / SEDEX R$ 42 fixo, sem variar por distância: prejuízo na primeira
       venda para fora do Sudeste.
 - [ ] **MEDIO** — Rotacionar/isolar `e2e-admin@geeketoys.com.br`: é admin de
       produção com senha fixa documentada. Ideal seria E2E contra staging.
-- [ ] **MEDIO** — SSH: `PasswordAuthentication no` do `sshd_config` está sendo
+- [x] **MEDIO** — SSH: `PasswordAuthentication no` do `sshd_config` está sendo _(Resolvido — desde 08/09/2026; `sshd -T` e fail2ban ativos conferidos em 27/09.)_
       sobrescrito por `sshd_config.d/50-cloud-init.conf` (`yes`). Hoje ninguém
       entra por senha (root barrado por `PermitRootLogin without-password`,
       `ubuntu` com senha travada), mas o efetivo contraria a intenção. Corrigir o
@@ -505,7 +519,7 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 - [x] **35 fotos do evento** - `public/eventos/kpop-night/` nos dois repos (sem duplicatas)
 - [x] **WhatsApp loja principal** - (11) 91466-2881 + secundário (21) 98546-4666
 - [x] **E2E users** - e2e-admin@ / e2e-member@ (CLAUDE.local.md)
-- [ ] **ALTO** Laura: enviar fotos reais dos 14 produtos ativos (vitrine mostra "Sem foto")
+- [x] **ALTO** Laura: enviar fotos reais dos 14 produtos ativos (vitrine mostra "Sem foto") _(Resolvido — 27/09/2026: 0 produto ativo sem foto.)_
 - [x] **Filtro seed Checkup** - não listar na API pública / categorias
 - [x] **Admin highlight** - badge "Sem foto" + contagem no catálogo
 - [ ] **FUTURO** Validar membro do Clube na reserva / pagamento Stripe de ingresso
@@ -521,7 +535,7 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 - [x] **Rastreio** - admin salva código Correios; cliente vê link em Minhas compras
 - [x] **Você também pode gostar** - related por categoria no PDP
 - [x] **Formas de pagamento (trust)** - badges PIX/cartão no checkout, PDP e footer
-- [ ] **ALTO** Conta Melhor Envio + `MELHOR_ENVIO_TOKEN` em produção — **token ainda vazio** na VPS (cotação = fallback PAC/SEDEX). Código OK; falta o Bearer da conta ME (ver SHOP-ORDERS.md)
+- [x] **ALTO** Conta Melhor Envio + `MELHOR_ENVIO_TOKEN` em produção — **token ainda vazio** na VPS (cotação = fallback PAC/SEDEX). Código OK; falta o Bearer da conta ME (ver SHOP-ORDERS.md) _(Resolvido — ver o item de etiqueta na seção de caixa.)_
 - [x] **Avaliações + crédito fixo** - review pós-entrega, R$1 default, checkout com crédito, admin moderação
 - [ ] **MEDIO** Etiqueta automática Melhor Envio
 - [x] **Sitemap dinâmico de produtos** + OG title shop via nginx sub_filter
@@ -538,10 +552,10 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 - [ ] **Testes E2E** - Playwright (cadastro, login, pagamento)
 - [ ] **Settings/preferencias do membro** - Permitir editar preferencias pessoais e notificacoes
 - [ ] **Structured logging** - Substituir console.log por logger com niveis (Pino/Winston)
-- [ ] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze (local: diario 7d + semanal 12 sem. na VPS)
+- [x] **Backup off-site** - Upload automatico de backups para S3/GCS/Backblaze (local: diario 7d + semanal 12 sem. na VPS) _(Resolvido — desde 08/09/2026, R2 cifrado, verificado todo dia.)_
 - [ ] **Fluxo de atualizar metodo de pagamento** - Atualmente requer cancelar e re-assinar
 - [x] **Calculo de frete na loja** - ViaCEP + Melhor Envio / fallback (migration 010)
-- [ ] **Gateway PIX automatico na loja** - Confirmacao de PIX de pedido ainda e manual pelo admin
+- [x] **Gateway PIX automatico na loja** - Confirmacao de PIX de pedido ainda e manual pelo admin _(Resolvido — Pagar.me desde 01/09/2026.)_
 
 ### Dados / LGPD / integridade loja (Ago/2026)
 
