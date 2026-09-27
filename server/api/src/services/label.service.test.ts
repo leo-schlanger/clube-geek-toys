@@ -19,12 +19,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const { queryMock, tokenMock, orderMock, packageMock, fetchMock, auditMock, shippedMock, deliveredMock } = vi.hoisted(() => ({
-  queryMock: vi.fn(async () => ({ rows: [], rowCount: 0 })),
-  tokenMock: vi.fn(async () => 'tok_123'),
+  queryMock: vi.fn(async (_sql: string, _params?: unknown[]) => ({ rows: [] as unknown[], rowCount: 0 })),
+  tokenMock: vi.fn(async (..._args: unknown[]) => 'tok_123'),
   orderMock: vi.fn(),
-  packageMock: vi.fn(async () => ({ weightG: 300, heightCm: 4, widthCm: 12, lengthCm: 17 })),
+  packageMock: vi.fn(async (..._args: unknown[]) => ({ weightG: 300, heightCm: 4, widthCm: 12, lengthCm: 17 })),
   fetchMock: vi.fn(),
-  auditMock: vi.fn(async () => {}),
+  auditMock: vi.fn(async (..._args: unknown[]) => {}),
   shippedMock: vi.fn(),
   deliveredMock: vi.fn(),
 }));

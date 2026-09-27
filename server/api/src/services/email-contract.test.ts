@@ -17,9 +17,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const { queryMock, fetchMock } = vi.hoisted(() => ({
-  queryMock: vi.fn(async () => ({ rows: [], rowCount: 0 })),
+  queryMock: vi.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[], rowCount: 0 })),
   // `sendTemplateEmail` checa `response.ok` e lança se for falso.
-  fetchMock: vi.fn(async () => ({ ok: true, json: async () => ({ id: 'resend_1' }) })),
+  fetchMock: vi.fn(async (..._args: unknown[]) => ({ ok: true, json: async () => ({ id: 'resend_1' }) })),
 }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));

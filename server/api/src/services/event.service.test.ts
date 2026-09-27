@@ -19,8 +19,8 @@ const { queryMock, clientQueryMock, releaseMock, sendEmailMock, auditMock } = vi
   queryMock: vi.fn(),
   clientQueryMock: vi.fn(),
   releaseMock: vi.fn(),
-  sendEmailMock: vi.fn(async () => ({ status: 'sent' })),
-  auditMock: vi.fn(async () => {}),
+  sendEmailMock: vi.fn(async (..._args: unknown[]) => ({ status: 'sent' })),
+  auditMock: vi.fn(async (..._args: unknown[]) => {}),
 }));
 
 vi.mock('../config/database.js', () => ({

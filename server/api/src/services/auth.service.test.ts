@@ -156,7 +156,9 @@ describe('sessões de refresh', () => {
       .mockResolvedValue({ rows: [], rowCount: 0 });
 
     const { createHmacToken } = await import('../utils/hmac.js');
-    await resetPassword(createHmacToken({ email: 'laura@example.com' }), 'novaSenha123');
+    // A real, unexpired token: without the expiry `exp` was NaN, which never
+    // compares as past — the test passed without exercising expiry at all.
+    await resetPassword(createHmacToken({ email: 'laura@example.com' }, 60 * 60 * 1000), 'novaSenha123');
 
     expect(
       statements().some((s) => s.includes('DELETE FROM refresh_sessions WHERE user_id = $1'))

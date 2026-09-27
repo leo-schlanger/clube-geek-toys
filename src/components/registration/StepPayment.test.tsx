@@ -1,46 +1,37 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
-vi.mock("../../hooks/useConfirm", () => ({
+vi.mock('../../hooks/useConfirm', () => ({
   useConfirm: () => vi.fn().mockResolvedValue(true),
-}));
+}))
 
-vi.mock("framer-motion", () => ({
+vi.mock('framer-motion', () => ({
   motion: {
-    div: ({
-      children,
-      ...props
-    }: React.PropsWithChildren<Record<string, unknown>>) => {
-      const {
-        initial: _i,
-        animate: _a,
-        transition: _t,
-        exit: _e,
-        ...rest
-      } = props;
-      return <div {...rest}>{children}</div>;
+    div: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
+      const { initial: _i, animate: _a, transition: _t, exit: _e, ...rest } = props
+      return <div {...rest}>{children}</div>
     },
   },
-}));
+}))
 
-const mockToastSuccess = vi.fn();
-const mockToastError = vi.fn();
-const mockToastLoading = vi.fn();
-vi.mock("sonner", () => ({
+const mockToastSuccess = vi.fn()
+const mockToastError = vi.fn()
+const mockToastLoading = vi.fn()
+vi.mock('sonner', () => ({
   toast: {
     success: (...args: unknown[]) => mockToastSuccess(...args),
     error: (...args: unknown[]) => mockToastError(...args),
     loading: (...args: unknown[]) => mockToastLoading(...args),
   },
-}));
+}))
 
-vi.mock("lucide-react", () => {
+vi.mock('lucide-react', () => {
   const icon = ({ children, ...props }: Record<string, unknown>) => (
     <span {...props}>{children as string}</span>
-  );
+  )
   return {
     CreditCard: icon,
     QrCode: icon,
@@ -54,48 +45,45 @@ vi.mock("lucide-react", () => {
     RefreshCw: icon,
     ArrowLeft: icon,
     Loader2: icon,
-  };
-});
+  }
+})
 
-const mockGeneratePixPayment = vi.fn();
-const mockCheckPaymentStatus = vi.fn();
-vi.mock("../../lib/payments", () => ({
+const mockGeneratePixPayment = vi.fn()
+const mockCheckPaymentStatus = vi.fn()
+vi.mock('../../lib/payments', () => ({
   generatePixPayment: (...args: unknown[]) => mockGeneratePixPayment(...args),
   checkPaymentStatus: (...args: unknown[]) => mockCheckPaymentStatus(...args),
-}));
+}))
 
-const mockSavePendingPayment = vi.fn().mockResolvedValue(undefined);
-const mockClearPendingPayment = vi.fn().mockResolvedValue(undefined);
-vi.mock("../../lib/members", () => ({
+const mockSavePendingPayment = vi.fn().mockResolvedValue(undefined)
+const mockClearPendingPayment = vi.fn().mockResolvedValue(undefined)
+vi.mock('../../lib/members', () => ({
   savePendingPayment: (...args: unknown[]) => mockSavePendingPayment(...args),
   clearPendingPayment: (...args: unknown[]) => mockClearPendingPayment(...args),
-}));
+}))
 
-const mockApiPost = vi.fn();
-vi.mock("../../lib/api-client", () => ({
+const mockApiPost = vi.fn()
+vi.mock('../../lib/api-client', () => ({
   api: {
     post: (...args: unknown[]) => mockApiPost(...args),
   },
-}));
+}))
 
-vi.mock("../../lib/utils", () => ({
-  formatCurrency: (n: number) =>
-    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
-  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
-}));
+vi.mock('../../lib/utils', () => ({
+  formatCurrency: (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
+}))
 
-vi.mock("qrcode.react", () => ({
-  QRCodeSVG: ({ value }: { value: string }) => (
-    <div data-testid="qrcode-svg">{value}</div>
-  ),
-}));
+vi.mock('qrcode.react', () => ({
+  QRCodeSVG: ({ value }: { value: string }) => <div data-testid="qrcode-svg">{value}</div>,
+}))
 
 /**
  * Stand-in for the card form. It collects and tokenizes the card; this step
  * owns only what happens with the token afterwards.
  */
-vi.mock("../PagarmeCardForm", async () => {
-  const { useState } = await vi.importActual<typeof import("react")>("react");
+vi.mock('../PagarmeCardForm', async () => {
+  const { useState } = await vi.importActual<typeof import('react')>('react')
   return {
     // Same contract as the real form: a rejected `onToken` is a decline it
     // catches and shows. `void onToken()` left it as an unhandled rejection.
@@ -103,19 +91,19 @@ vi.mock("../PagarmeCardForm", async () => {
       onToken,
       onCancel,
     }: {
-      onToken: (token: string, installments: number) => Promise<void> | void;
-      onCancel: () => void;
-      amount: number;
-      submitLabel?: string;
+      onToken: (token: string, installments: number) => Promise<void> | void
+      onCancel: () => void
+      amount: number
+      submitLabel?: string
     }) {
-      const [error, setError] = useState<string | null>(null);
+      const [error, setError] = useState<string | null>(null)
       const submit = async () => {
         try {
-          await onToken("token_abc", 1);
+          await onToken('token_abc', 1)
         } catch (err) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(err instanceof Error ? err.message : String(err))
         }
-      };
+      }
       return (
         <div data-testid="card-form">
           <button data-testid="card-pay" onClick={submit}>
@@ -126,159 +114,147 @@ vi.mock("../PagarmeCardForm", async () => {
           </button>
           {error && <p role="alert">{error}</p>}
         </div>
-      );
+      )
     },
-  };
-});
+  }
+})
 
-import { StepPayment } from "./StepPayment";
+import { StepPayment } from './StepPayment'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const defaultProps = {
-  plan: "club" as const,
-  paymentType: "monthly" as const,
-  memberId: "member-123",
-  memberEmail: "test@example.com",
-  memberName: "Test User",
+  plan: 'club' as const,
+  paymentType: 'monthly' as const,
+  memberId: 'member-123',
+  memberEmail: 'test@example.com',
+  memberName: 'Test User',
   onSuccess: vi.fn(),
   onBack: vi.fn(),
-};
+}
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
-describe("StepPayment", () => {
+describe('StepPayment', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-  });
+    vi.clearAllMocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
 
   afterEach(() => {
-    vi.useRealTimers();
-  });
+    vi.useRealTimers()
+  })
 
   // ── Rendering ──────────────────────────────────────────────────────────
 
-  it("renders order summary with plan name and price", () => {
-    vi.useRealTimers();
-    render(<StepPayment {...defaultProps} />);
+  it('renders order summary with plan name and price', () => {
+    vi.useRealTimers()
+    render(<StepPayment {...defaultProps} />)
 
-    expect(
-      screen.getAllByText("Clube GeekPop & Toys").length,
-    ).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/assinatura mensal/i)).toBeInTheDocument();
-    expect(screen.getByText(/12,50/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/pagamento seguro via pagar\.me/i),
-    ).toBeInTheDocument();
-  });
+    expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(/assinatura mensal/i)).toBeInTheDocument()
+    expect(screen.getByText(/12,50/)).toBeInTheDocument()
+    expect(screen.getByText(/pagamento seguro via pagar\.me/i)).toBeInTheDocument()
+  })
 
-  it("renders payment mode toggle buttons", () => {
-    vi.useRealTimers();
-    render(<StepPayment {...defaultProps} />);
+  it('renders payment mode toggle buttons', () => {
+    vi.useRealTimers()
+    render(<StepPayment {...defaultProps} />)
 
-    expect(screen.getByText(/pagamento unico/i)).toBeInTheDocument();
-    expect(screen.getByText(/cobranca recorrente/i)).toBeInTheDocument();
-  });
+    expect(screen.getByText(/pagamento unico/i)).toBeInTheDocument()
+    expect(screen.getByText(/cobranca recorrente/i)).toBeInTheDocument()
+  })
 
-  it("renders PIX and card method selection in one-time mode", () => {
-    vi.useRealTimers();
-    render(<StepPayment {...defaultProps} />);
+  it('renders PIX and card method selection in one-time mode', () => {
+    vi.useRealTimers()
+    render(<StepPayment {...defaultProps} />)
 
-    expect(
-      screen.getByRole("button", { name: /pix.*qr code/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /^cartao.*credito$/i }),
-    ).toBeInTheDocument();
-  });
+    expect(screen.getByRole('button', { name: /pix.*qr code/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^cartao.*credito$/i })).toBeInTheDocument()
+  })
 
-  it("renders back button", () => {
-    vi.useRealTimers();
-    render(<StepPayment {...defaultProps} />);
+  it('renders back button', () => {
+    vi.useRealTimers()
+    render(<StepPayment {...defaultProps} />)
 
-    expect(screen.getByRole("button", { name: /voltar/i })).toBeInTheDocument();
-  });
+    expect(screen.getByRole('button', { name: /voltar/i })).toBeInTheDocument()
+  })
 
-  it("calls onBack when back button is clicked", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    render(<StepPayment {...defaultProps} />);
+  it('calls onBack when back button is clicked', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    render(<StepPayment {...defaultProps} />)
 
-    await user.click(screen.getByRole("button", { name: /voltar/i }));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
-  });
+    await user.click(screen.getByRole('button', { name: /voltar/i }))
+    expect(defaultProps.onBack).toHaveBeenCalledTimes(1)
+  })
 
   // ── Subscription mode ─────────────────────────────────────────────────
 
-  it("shows card-only button in subscription mode", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    render(<StepPayment {...defaultProps} />);
+  it('shows card-only button in subscription mode', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    render(<StepPayment {...defaultProps} />)
 
-    await user.click(screen.getByText(/cobranca recorrente/i));
+    await user.click(screen.getByText(/cobranca recorrente/i))
 
     expect(
-      screen.getByRole("button", { name: /iniciar assinatura com cartao/i }),
-    ).toBeInTheDocument();
+      screen.getByRole('button', { name: /iniciar assinatura com cartao/i })
+    ).toBeInTheDocument()
     // PIX method button should not be visible (only the mode toggle remains)
-    expect(
-      screen.queryByRole("button", { name: /pix.*qr code/i }),
-    ).not.toBeInTheDocument();
-  });
+    expect(screen.queryByRole('button', { name: /pix.*qr code/i })).not.toBeInTheDocument()
+  })
 
   // ── PIX flow ──────────────────────────────────────────────────────────
 
-  it("generates PIX payment and shows QR code", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
+  it('generates PIX payment and shows QR code', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
     mockGeneratePixPayment.mockResolvedValue({
-      paymentIntentId: "pi_test123",
-      clientSecret: "cs_test",
-      qrCode: "00020126580014BR.GOV.BCB.PIX...",
-      qrCodeBase64: "base64data",
-      qrCodeImageUrl: "",
+      paymentIntentId: 'pi_test123',
+      clientSecret: 'cs_test',
+      qrCode: '00020126580014BR.GOV.BCB.PIX...',
+      qrCodeBase64: 'base64data',
+      qrCodeImageUrl: '',
       amount: 39.9,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-    });
+    })
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: /pix.*qr code/i }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("qrcode-svg")).toBeInTheDocument();
-    });
-
-    expect(mockSavePendingPayment).toHaveBeenCalled();
-  });
-
-  it("shows error when PIX generation fails", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    mockGeneratePixPayment.mockResolvedValue(null);
-
-    render(<StepPayment {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: /pix.*qr code/i }));
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/erro ao gerar qr code pix/i),
-      ).toBeInTheDocument();
-    });
-  });
+      expect(screen.getByTestId('qrcode-svg')).toBeInTheDocument()
+    })
 
-  it("shows error when PIX generation throws", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    mockGeneratePixPayment.mockRejectedValue(new Error("Network error"));
+    expect(mockSavePendingPayment).toHaveBeenCalled()
+  })
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: /pix.*qr code/i }));
+  it('shows error when PIX generation fails', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockGeneratePixPayment.mockResolvedValue(null)
+
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("Network error");
-    });
-  });
+      expect(screen.getByText(/erro ao gerar qr code pix/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows error when PIX generation throws', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockGeneratePixPayment.mockRejectedValue(new Error('Network error'))
+
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Network error')
+    })
+  })
 
   // ── Card flow ─────────────────────────────────────────────────────────
 
@@ -286,114 +262,92 @@ describe("StepPayment", () => {
    * Opening the form no longer calls the server: Pagar.me authorises from a
    * token in one go, so nothing is created until a card has been typed.
    */
-  it("opens the card form without charging anything yet", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
+  it('opens the card form without charging anything yet', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(
-      screen.getByRole("button", { name: /^cartao.*credito$/i }),
-    );
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId("card-form")).toBeInTheDocument();
-    });
-    expect(mockApiPost).not.toHaveBeenCalled();
-  });
+      expect(screen.getByTestId('card-form')).toBeInTheDocument()
+    })
+    expect(mockApiPost).not.toHaveBeenCalled()
+  })
 
-  it("charges with the token and calls onSuccess", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    mockApiPost.mockResolvedValue({ data: { status: "paid" }, error: null });
+  it('charges with the token and calls onSuccess', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockApiPost.mockResolvedValue({ data: { status: 'paid' }, error: null })
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(
-      screen.getByRole("button", { name: /^cartao.*credito$/i }),
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("card-pay")).toBeInTheDocument(),
-    );
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await waitFor(() => expect(screen.getByTestId('card-pay')).toBeInTheDocument())
 
-    await user.click(screen.getByTestId("card-pay"));
+    await user.click(screen.getByTestId('card-pay'))
 
     await waitFor(() => {
       expect(mockApiPost).toHaveBeenCalledWith(
-        "/checkout/card/create",
-        expect.objectContaining({ card_token: "token_abc" }),
-      );
-    });
-    await waitFor(() =>
-      expect(defaultProps.onSuccess).toHaveBeenCalledTimes(1),
-    );
-  });
+        '/checkout/card/create',
+        expect.objectContaining({ card_token: 'token_abc' })
+      )
+    })
+    await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalledTimes(1))
+  })
 
   /** A decline keeps the member on the form, with the reason, for another card. */
-  it("does not advance when the card is declined", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    mockApiPost.mockResolvedValue({ data: null, error: "Cartão recusado." });
+  it('does not advance when the card is declined', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockApiPost.mockResolvedValue({ data: null, error: 'Cartão recusado.' })
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(
-      screen.getByRole("button", { name: /^cartao.*credito$/i }),
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId("card-pay")).toBeInTheDocument(),
-    );
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await waitFor(() => expect(screen.getByTestId('card-pay')).toBeInTheDocument())
 
-    await user.click(screen.getByTestId("card-pay"));
+    await user.click(screen.getByTestId('card-pay'))
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Cartão recusado.",
-    );
-    expect(screen.getByTestId("card-form")).toBeInTheDocument();
-    expect(defaultProps.onSuccess).not.toHaveBeenCalled();
-  });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cartão recusado.')
+    expect(screen.getByTestId('card-form')).toBeInTheDocument()
+    expect(defaultProps.onSuccess).not.toHaveBeenCalled()
+  })
 
-  it("resets method when cancel is clicked on the card form", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
+  it('resets method when cancel is clicked on the card form', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(
-      screen.getByRole("button", { name: /^cartao.*credito$/i }),
-    );
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
 
     await waitFor(() => {
-      expect(screen.getByTestId("card-cancel")).toBeInTheDocument();
-    });
+      expect(screen.getByTestId('card-cancel')).toBeInTheDocument()
+    })
 
-    await user.click(screen.getByTestId("card-cancel"));
+    await user.click(screen.getByTestId('card-cancel'))
 
     // Should go back to method selection
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /pix.*qr code/i }),
-      ).toBeInTheDocument();
-    });
-  });
+      expect(screen.getByRole('button', { name: /pix.*qr code/i })).toBeInTheDocument()
+    })
+  })
 
   // ── Error display ─────────────────────────────────────────────────────
 
-  it("shows retry button on error and clears on click", async () => {
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    mockGeneratePixPayment.mockResolvedValue(null);
+  it('shows retry button on error and clears on click', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockGeneratePixPayment.mockResolvedValue(null)
 
-    render(<StepPayment {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: /pix.*qr code/i }));
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/erro ao gerar qr code pix/i),
-      ).toBeInTheDocument();
-    });
+      expect(screen.getByText(/erro ao gerar qr code pix/i)).toBeInTheDocument()
+    })
 
-    await user.click(screen.getByRole("button", { name: /tentar novamente/i }));
+    await user.click(screen.getByRole('button', { name: /tentar novamente/i }))
 
     // Error should be cleared, method selection should be back
-    expect(
-      screen.queryByText(/erro ao gerar qr code pix/i),
-    ).not.toBeInTheDocument();
-  });
-});
+    expect(screen.queryByText(/erro ao gerar qr code pix/i)).not.toBeInTheDocument()
+  })
+})

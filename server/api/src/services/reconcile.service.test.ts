@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { queryMock, getChargeMock, processEventMock, updateStatusMock } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   getChargeMock: vi.fn(),
-  processEventMock: vi.fn(async () => {}),
+  processEventMock: vi.fn(async (..._args: unknown[]) => {}),
   updateStatusMock: vi.fn(async () => ({})),
 }));
 

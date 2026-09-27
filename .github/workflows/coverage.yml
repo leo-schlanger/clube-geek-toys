@@ -1,0 +1,39 @@
+name: Coverage
+
+# The per-area floors in vitest.config.ts are a ratchet, but nothing ran them:
+# measuring takes ~26 min on the dev machine, so coverage stayed out of the
+# deploy — and on 27/09/2026 the front had been under its own floor for weeks
+# without anyone knowing. Weekly and on demand, apart from the deploy, so it
+# never holds a release back but a drop still turns something red.
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Mondays, 06:00 in Rio
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server/api
+
+      - name: Tests with coverage (fails under the floors)
+        run: npm run test:coverage
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: .coverage/
+          retention-days: 30

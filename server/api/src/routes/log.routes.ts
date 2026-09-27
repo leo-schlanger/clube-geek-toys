@@ -26,10 +26,30 @@ const errorLogSchema = z.object({
  */
 const EXTENSION_STACK = /(chrome|moz|safari-web|ms-browser)-extension:\/\//i;
 
+/**
+ * Errors reported by search and link crawlers rendering the SPA.
+ *
+ * On 27/09/2026, 135 of 163 frontend rows in ten days came from crawlers —
+ * Googlebot's renderer rejects the service worker ("Rejected", with
+ * `wrsParams` in the stack) and asks for chunks of builds it fetched days
+ * earlier. None of that is something a person saw, and it buried what was.
+ */
+const CRAWLER_UA =
+  /bot\b|bot\/|spider|crawl|slurp|facebookexternalhit|HeadlessChrome|Lighthouse|Google-InspectionTool/i;
+
+export function isCrawlerReport(userAgent: string | undefined, stack: string | undefined): boolean {
+  return (!!userAgent && CRAWLER_UA.test(userAgent)) || (!!stack && stack.includes('wrsParams'));
+}
+
 // POST /logs/errors — receives frontend errors (auth optional, rate limited, schema validated)
 logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, res, next) => {
   try {
     const { severity, message, stack, context, url } = req.body as z.infer<typeof errorLogSchema>;
+
+    if (isCrawlerReport(req.headers['user-agent'], stack)) {
+      res.status(202).json({ logged: false, reason: 'crawler' });
+      return;
+    }
 
     if (stack && EXTENSION_STACK.test(stack)) {
       // 202: the client need not learn it was dropped, nor retry.

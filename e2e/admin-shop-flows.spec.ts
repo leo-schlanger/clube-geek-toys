@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 
 /**
  * Core production flows: admin product create + shop purchase funnel.
@@ -28,7 +28,7 @@ test.describe.configure({ mode: 'serial' })
 
 // Seed cookie consent so the banner (fixed bottom, z-9998) cannot intercept
 // clicks on footer buttons (e.g. "Criar Produto").
-async function preConsent(target: { addInitScript: (fn: () => void) => Promise<void> }) {
+async function preConsent(target: BrowserContext | Page) {
   await target.addInitScript(() => {
     try {
       localStorage.setItem(
