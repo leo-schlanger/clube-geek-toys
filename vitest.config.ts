@@ -68,6 +68,7 @@ export default defineConfig({
         'src/vite-env.d.ts',
         'server/api/src/**/*.test.ts',
         'server/api/src/**/*.spec.ts',
+        'server/api/src/test-support/**',
       ],
       /**
        * Per-area thresholds; each floor is the value **measured 16/08/2026**.
@@ -84,14 +85,16 @@ export default defineConfig({
        * failed** — unnoticed, because a full run takes ~26 min and is not
        * on CI.
        *
-       * Next backend targets, by cost if they break: `webhook.service`
-       * (confirms payment and decrements stock), `payment.service`,
-       * `stock.service`.
+       * 27/09/2026: the 70% line goal was reached on both sides and is now
+       * the floor itself — a drop below it turns the weekly CI run red
+       * (.github/workflows/coverage.yml). The backend went from 46% to 71%
+       * mostly through route tests over real HTTP (`test-support/http.ts`),
+       * which cover the guard, the validation and the handler in one go.
        */
       /*
-       * Measured 16/08/2026 (2278 tests):
-       *   src/**          67.55 stmts · 69.31 lines · 64.94 funcs · 64.18 branch
-       *   server/api/src  11.80 stmts · 11.78 lines ·  9.07 funcs · 10.59 branch
+       * Measured 27/09/2026 (2611 web + 881 api tests):
+       *   src/**          68.90 stmts · 70.89 lines · 65.57 funcs · 65.31 branch
+       *   server/api/src  70.30 stmts · 71.04 lines · 66.98 funcs · 61.81 branch
        *
        * Floors sit ~1 point below measured, on purpose. Zero slack turns
        * any new untested function into red CI noise — and a false alarm
@@ -100,16 +103,16 @@ export default defineConfig({
        */
       thresholds: {
         'src/**': {
-          statements: 66,
-          branches: 63,
+          statements: 68,
+          branches: 64,
           functions: 64,
-          lines: 68,
+          lines: 70,
         },
         'server/api/src/**': {
-          statements: 11,
-          branches: 10,
-          functions: 8,
-          lines: 11,
+          statements: 69,
+          branches: 60,
+          functions: 66,
+          lines: 70,
         },
       },
     },

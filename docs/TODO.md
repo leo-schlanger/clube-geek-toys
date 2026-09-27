@@ -190,10 +190,10 @@ o sistema me diz o que fazer?
 Detalhes em [`CHECKUP-2026-09-27.md`](CHECKUP-2026-09-27.md). Quase tudo foi
 resolvido no mesmo dia; ficou:
 
-- [ ] **BAIXO** — Site institucional: Vite 5 → 7 (e Vitest junto). Fecha os
+- [x] **BAIXO** — Site institucional: Vite 5 → 7 (e Vitest junto). _(Resolvido em 27/09/2026 — Vite 7.3, plugin-react-swc 4, Vitest 4; 0 vulnerabilidades; diff de pixels zero.)_ Fecha os
       alertas restantes, todos de ferramenta de desenvolvimento — nada disso vai
       para produção.
-- [ ] **MEDIO** — Cobertura abaixo da **meta** de 70% nos dois lados. Os pisos
+- [x] **MEDIO** — Cobertura abaixo da **meta** de 70% nos dois lados. _(Resolvido em 27/09/2026 — front 70,89%, backend 71,04% de linhas; o piso de linhas passou a ser 70% nos dois lados.)_ Os pisos
       voltaram a valer e agora rodam toda segunda no CI; suba o piso junto quando
       a cobertura subir.
 - [ ] **MEDIO** — `e2e-admin@geeketoys.com.br` continua admin de produção (foi
@@ -257,10 +257,10 @@ Foco: base de dados, estrutura e layout.
 - [x] **MEDIO** — ~99 erros de tipo em arquivos de teste (mocks do `apiRequest` _(Resolvido — 27/09/2026: `npm run typecheck` com **0 erros** (eram 60) e no CI.)_
       sem o campo `status`). Não bloqueiam deploy desde a separação
       build × typecheck; medir com `npm run typecheck`.
-- [ ] **MEDIO** — Cobertura do backend em **11,80%** (meta 70%). Próximos por
+- [x] **MEDIO** — Cobertura do backend em **11,80%** (meta 70%). _(Resolvido — 71,04% em 27/09/2026.)_ Próximos por
       prejuízo se quebrarem: `webhook.service` (confirma pagamento e baixa
       estoque), `payment.service`, `stock.service`.
-- [ ] **MEDIO** — Cobertura do front em **67,55%** (meta 70%). _27/09/2026: tinha caído para abaixo do próprio piso (funções 62,4% < 64%) e voltou para cima com testes de clientes de API, do cache do evento e das telas do painel no celular._ Recuperar os
+- [x] **MEDIO** — Cobertura do front em **67,55%** (meta 70%). _(Resolvido — 70,89% em 27/09/2026.)_ _27/09/2026: tinha caído para abaixo do próprio piso (funções 62,4% < 64%) e voltou para cima com testes de clientes de API, do cache do evento e das telas do painel no celular._ Recuperar os
       ~2,5 pontos perdidos desde 10/08 — as telas de catálogo que entraram sem
       teste são o buraco.
 - [x] **BAIXO** — Rodar cobertura no CI. Hoje a única forma de saber que ela _(Resolvido — 27/09/2026: `.github/workflows/coverage.yml`, semanal e sob demanda, fora do deploy.)_
