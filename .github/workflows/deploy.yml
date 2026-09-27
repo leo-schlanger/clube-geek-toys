@@ -50,6 +50,13 @@ jobs:
       - name: API tests
         run: npm run test:api
 
+      # Types of the tests themselves (front + e2e, and the backend under its
+      # own NodeNext config). It stayed out of CI while it carried a known
+      # backlog; that went from 60 errors to 0 on 27/09/2026, and without a
+      # gate it grows back — the 60 had piled up in a month.
+      - name: Typecheck tests
+        run: npm run typecheck
+
       - name: Lint
         run: npm run lint
 
@@ -112,14 +119,28 @@ jobs:
             'chmod 755 /opt/clube-geek-toys/server/scripts/*.sh'
 
       - name: Deploy frontend
+        # The previous build's hashed chunks stay on the server for 14 days.
+        # `--delete` on the whole dist removed them the moment a build landed,
+        # and anything still holding the old index.html — a tab left open, the
+        # service worker, and Googlebot, which renders pages days after it
+        # fetched the HTML — asked for a chunk that was now a 404: a blank
+        # page for people and for search. Order matters too: chunks first, so
+        # the new HTML never points at a file that has not arrived yet.
         run: |
-          rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-            dist/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/dist/
+          SSH="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          TARGET=${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          rsync -avz -e "$SSH" dist/assets/ $TARGET:/opt/clube-geek-toys/dist/assets/
+          rsync -avz --delete --exclude='/assets/' -e "$SSH" dist/ $TARGET:/opt/clube-geek-toys/dist/
+          # rsync -a stamps each file with this build's time, so anything
+          # older than 14 days belongs to a build nobody should still hold.
+          $SSH $TARGET 'find /opt/clube-geek-toys/dist/assets -type f -mtime +14 -delete; echo "assets kept: $(ls /opt/clube-geek-toys/dist/assets | wc -l)"'
 
       - name: Rebuild and restart containers
         run: |
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
+            # The health-check cron skips alerting while this is fresh: the API
+            # is recreated below, and that minute is not an outage.
+            touch /opt/clube-geek-toys/.deploying
             cd /opt/clube-geek-toys/server
             docker compose build --no-cache api
             docker compose up -d --force-recreate api nginx
@@ -181,3 +202,11 @@ jobs:
             echo "Health check FAILED!"
             exit 1
           fi
+
+      - name: Clear the deploy marker
+        # Also on failure: a deploy that broke the API must not keep the
+        # health-check cron quiet for the rest of the grace window.
+        if: always()
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -f /opt/clube-geek-toys/.deploying' || true
