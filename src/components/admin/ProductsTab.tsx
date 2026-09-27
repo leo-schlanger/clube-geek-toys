@@ -360,15 +360,17 @@ export function ProductsTab() {
                       </div>
                     </button>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" className="h-9 flex-1 gap-1.5" onClick={() => openEdit(product)}>
+                  {/* Even grid: three flex buttons pushed "Desativar" past the
+                      card's edge at 390px. */}
+                  <div className={`mt-3 grid gap-2 ${product.active ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                    <Button size="sm" className="h-9 w-full gap-1 px-1 text-xs" onClick={() => openEdit(product)}>
                       <Pencil className="h-4 w-4" />
                       Editar
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-9 gap-1.5"
+                      className="h-9 w-full gap-1 px-1 text-xs"
                       onClick={() => handleDuplicate(product)}
                     >
                       <Copy className="h-4 w-4" />
@@ -378,7 +380,7 @@ export function ProductsTab() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-9 gap-1.5 text-red-600"
+                        className="h-9 w-full gap-1 px-1 text-xs text-red-600"
                         onClick={() => handleDelete(product)}
                       >
                         <Trash2 className="h-4 w-4" />
