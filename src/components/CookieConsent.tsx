@@ -3,6 +3,7 @@ import { Button } from './ui/button'
 import { Cookie, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { loadAnalytics } from '../lib/analytics'
+import { isAdminSubdomain } from '../lib/subdomain'
 
 const COOKIE_CONSENT_KEY = 'clube_geek_cookie_consent'
 
@@ -10,6 +11,10 @@ export function CookieConsent() {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    // The staff panel keeps only the login (essential) and never loads
+    // analytics, so there is nothing to consent to — and on a phone the banner
+    // sat on top of the "Acessar Painel" button.
+    if (isAdminSubdomain()) return
     const consent = localStorage.getItem(COOKIE_CONSENT_KEY)
     if (!consent) {
       // Small delay so it doesn't flash on page load

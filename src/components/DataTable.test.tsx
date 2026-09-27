@@ -5,8 +5,9 @@
  * column visibility, empty state, loading skeleton, export, and row clicks.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
+import { mockPhoneScreen } from '../test/mobile'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DataTable, type Column, type FilterConfig } from './DataTable'
 
@@ -512,5 +513,32 @@ describe('DataTable', () => {
         expect.objectContaining({ search: 'A' })
       )
     })
+  })
+})
+
+describe('DataTable — no celular', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('renders one card per row, with every column labelled and the actions inside', () => {
+    mockPhoneScreen()
+    const onRowClick = vi.fn()
+    const onAction = vi.fn()
+    render(
+      <DataTable
+        {...defaultProps}
+        onRowClick={onRowClick}
+        actions={(row) => <button onClick={() => onAction(row.id)}>Editar {row.name}</button>}
+      />
+    )
+    expect(document.querySelector('table')).toBeNull()
+    expect(screen.getAllByText('Idade').length).toBeGreaterThan(0)
+
+    // The action must not also open the row.
+    fireEvent.click(screen.getByRole('button', { name: 'Editar Alice' }))
+    expect(onAction).toHaveBeenCalledWith('1')
+    expect(onRowClick).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByText('Bob'))
+    expect(onRowClick).toHaveBeenCalledWith(sampleData[1])
   })
 })

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
@@ -34,6 +35,7 @@ const FILTERS: { id: StockFilter; label: string }[] = [
 ]
 
 export function StockTab() {
+  const isMobile = useIsMobile()
   const [rows, setRows] = useState<StockRow[]>([])
   const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState({ out: 0, low: 0, ok: 0 })
@@ -70,7 +72,6 @@ export function StockTab() {
   }, [debouncedSearch, filter, page, pageSize])
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount/filter change
     fetchStock()
   }, [fetchStock])
 
@@ -115,8 +116,11 @@ export function StockTab() {
       } catch (error) {
         logger.error('Error adjusting stock:', error)
         toast.error('Erro ao salvar o estoque')
+      } finally {
+        // `finally`, not after the try: the empty-response path returns early,
+        // and the field stayed disabled until the page was reloaded.
+        setSaving(null)
       }
-      setSaving(null)
     },
     [drafts]
   )
@@ -160,6 +164,39 @@ export function StockTab() {
   }, [])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  // Empty state and pagination, shared by the cards and the table.
+  const stockFooter = () => (
+    <>
+      {rows.length === 0 && (
+        <div className="py-12 text-center">
+          <Boxes className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <p className="font-medium text-muted-foreground">
+            {filter === 'out'
+              ? 'Nenhum item esgotado'
+              : filter === 'low'
+                ? 'Nenhum item acabando'
+                : 'Nenhum item no estoque'}
+          </p>
+        </div>
+      )}
+
+      {total > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          pageSizeOptions={[25, 50, 100, 200]}
+        />
+      )}
+    </>
+  )
 
   return (
     <Card>
@@ -225,6 +262,103 @@ export function StockTab() {
         {loading ? (
           <div className="flex justify-center py-12">
             <Loading />
+          </div>
+        ) : isMobile ? (
+          // Phone: the stock field and the history button sat past the right
+          // edge of a six-column table.
+          <div className="space-y-3">
+            {rows.map((row) => {
+              const key = rowKey(row)
+              const draft = drafts[key]
+              const label = `${row.productName}${row.variantName ? ` ${row.variantName}` : ''}`
+              return (
+                <div
+                  key={key}
+                  className={`rounded-lg border p-3 ${
+                    row.status === 'out'
+                      ? 'border-red-500/40 bg-red-500/5'
+                      : row.status === 'low'
+                        ? 'border-amber-500/40 bg-amber-500/5'
+                        : 'border-border'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
+                      {row.imageUrl ? (
+                        <img src={row.imageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <ImageOff className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium leading-snug">{row.productName}</p>
+                      {row.variantName && (
+                        <p className="text-xs text-muted-foreground">{row.variantName}</p>
+                      )}
+                      {row.sku && <p className="font-mono text-[11px] text-muted-foreground">{row.sku}</p>}
+                    </div>
+                    {row.status === 'out' ? (
+                      <Badge variant="destructive">Esgotado</Badge>
+                    ) : row.status === 'low' ? (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/50 text-amber-700 dark:text-amber-400"
+                      >
+                        Acabando
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">Ok</Badge>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-end gap-2">
+                    <label className="flex-1 space-y-1">
+                      <span className="text-xs font-medium text-muted-foreground">Estoque</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        inputMode="numeric"
+                        className="h-10 text-base"
+                        aria-label={`Estoque de ${label}`}
+                        value={draft ?? String(row.stock)}
+                        disabled={saving === key}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [key]: e.target.value }))}
+                        onBlur={() => commitStock(row)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            ;(e.target as HTMLInputElement).blur()
+                          }
+                        }}
+                      />
+                    </label>
+                    <label className="w-24 space-y-1">
+                      <span className="text-xs font-medium text-muted-foreground">Avisar em</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={1}
+                        inputMode="numeric"
+                        className="h-10 text-base"
+                        aria-label={`Limite de aviso de ${row.productName}`}
+                        defaultValue={row.lowStockThreshold}
+                        onBlur={(e) => commitThreshold(row, e.target.value)}
+                      />
+                    </label>
+                    <Button
+                      variant="outline"
+                      className="h-10 gap-1.5"
+                      aria-label={`Histórico de ${row.productName}`}
+                      onClick={() => openHistory(row)}
+                    >
+                      <History className="h-4 w-4" />
+                      Histórico
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+            {stockFooter()}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -336,33 +470,7 @@ export function StockTab() {
               </tbody>
             </table>
 
-            {rows.length === 0 && (
-              <div className="py-12 text-center">
-                <Boxes className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <p className="font-medium text-muted-foreground">
-                  {filter === 'out'
-                    ? 'Nenhum item esgotado'
-                    : filter === 'low'
-                      ? 'Nenhum item acabando'
-                      : 'Nenhum item no estoque'}
-                </p>
-              </div>
-            )}
-
-            {total > 0 && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalItems={total}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={(size) => {
-                  setPageSize(size)
-                  setPage(1)
-                }}
-                pageSizeOptions={[25, 50, 100, 200]}
-              />
-            )}
+            {stockFooter()}
           </div>
         )}
       </CardContent>

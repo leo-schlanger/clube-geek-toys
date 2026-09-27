@@ -19,6 +19,7 @@ import { errorMessage } from '../../lib/api-client'
 import { reportAdminError } from '../../lib/admin-errors'
 import { formatCurrency } from '../../lib/utils'
 import { useConfirm } from '../../hooks/useConfirm'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 /**
  * Coupon codes.
@@ -62,6 +63,7 @@ const EMPTY_FORM = {
 }
 
 export function CouponsTab() {
+  const isMobile = useIsMobile()
   const [coupons, setCoupons] = useState<Coupon[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -303,6 +305,67 @@ export function CouponsTab() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Crie um acima para divulgar no Instagram ou com influenciadores.
               </p>
+            </div>
+          ) : isMobile ? (
+            // Phone: status and the on/off and remove buttons sat past the
+            // right edge of the table.
+            <div className="space-y-3">
+              {coupons.map((c) => {
+                const status = statusOf(c)
+                return (
+                  <div
+                    key={c.id}
+                    className={`rounded-lg border border-border p-3 ${c.active ? '' : 'opacity-60'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-base font-semibold">{c.code}</p>
+                        {c.description && (
+                          <p className="text-xs text-muted-foreground">{c.description}</p>
+                        )}
+                      </div>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                    </div>
+                    <p className="mt-2 text-sm">
+                      <strong className="tabular-nums">{c.percent}%</strong> de desconto ·{' '}
+                      <span className="tabular-nums">
+                        {c.usedCount}
+                        {c.maxUses != null ? ` / ${c.maxUses}` : ''}
+                      </span>{' '}
+                      uso(s)
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      até {shortDate(c.endsAt)}
+                      {c.maxUsesPerCustomer != null && ` · ${c.maxUsesPerCustomer}x por pessoa`}
+                      {c.minSubtotal != null && ` · mín. ${formatCurrency(c.minSubtotal)}`}
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 flex-1 gap-1.5"
+                        disabled={busyId === c.id}
+                        onClick={() => void handleToggle(c)}
+                      >
+                        <Power className="h-4 w-4" />
+                        {c.active ? 'Desligar' : 'Ligar'}
+                      </Button>
+                      {c.active && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-9 gap-1.5 text-red-600"
+                          disabled={busyId === c.id}
+                          onClick={() => void handleDeactivate(c)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Remover
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <div className="overflow-x-auto">

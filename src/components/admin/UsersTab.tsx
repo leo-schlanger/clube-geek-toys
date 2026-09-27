@@ -2,6 +2,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Button } from '../ui/button'
 import { Badge } from '../ui/badge'
 import { Plus, Shield, UserCog, UserX, Ban } from 'lucide-react'
+import { useIsMobile } from '../../hooks/useIsMobile'
+
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Admin',
+  seller: 'Vendedor',
+  member: 'Membro',
+  disabled: 'Desativado',
+}
 
 interface SystemUser {
   id: string
@@ -19,6 +27,22 @@ interface UsersTabProps {
 }
 
 export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: UsersTabProps) {
+  const isMobile = useIsMobile()
+
+  const roleSelect = (user: SystemUser, className: string) => (
+    <select
+      value={user.role}
+      aria-label={`Cargo de ${user.email}`}
+      onChange={(e) => onUpdateRole(user.id, e.target.value)}
+      className={className}
+    >
+      <option value="member">Membro</option>
+      <option value="seller">Vendedor</option>
+      <option value="admin">Admin</option>
+      {user.role === 'disabled' && <option value="disabled">Desativado</option>}
+    </select>
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -34,6 +58,53 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
         </div>
       </CardHeader>
       <CardContent>
+        {isMobile ? (
+          // Phone: the role picker and the disable button sat past the right edge.
+          <div className="space-y-3">
+            {users.map((user) => (
+              <div
+                key={user.id}
+                className={`rounded-lg border border-border p-3 ${user.role === 'disabled' ? 'opacity-60' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 break-all font-medium">{user.email}</p>
+                  {user.role === 'disabled' ? (
+                    <Badge variant="destructive">Desativado</Badge>
+                  ) : (
+                    <Badge
+                      variant={user.role === 'admin' ? 'club' : user.role === 'seller' ? 'default' : 'secondary'}
+                    >
+                      {ROLE_LABEL[user.role] ?? user.role}
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Cadastro em{' '}
+                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : 'N/A'}
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  {roleSelect(user, 'h-9 flex-1 rounded-md border border-border bg-background px-2 text-sm')}
+                  {user.role !== 'disabled' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 gap-1.5 text-red-600"
+                      onClick={() => onDeleteUser(user.id, user.email)}
+                    >
+                      <UserX className="h-4 w-4" />
+                      Desativar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {users.length === 0 && (
+              <p className="py-12 text-center font-medium text-muted-foreground">
+                Nenhum usuário encontrado
+              </p>
+            )}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -65,7 +136,7 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
                         className="inline-flex items-center gap-1"
                       >
                         {user.role === 'admin' && <Shield className="h-3 w-3" />}
-                        <span className="capitalize">{user.role}</span>
+                        <span>{ROLE_LABEL[user.role] ?? user.role}</span>
                       </Badge>
                     )}
                   </td>
@@ -74,16 +145,7 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
                   </td>
                   <td className="py-4 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <select
-                        value={user.role}
-                        onChange={(e) => onUpdateRole(user.id, e.target.value)}
-                        className="bg-muted text-xs p-1 rounded border border-border"
-                      >
-                        <option value="member">Membro</option>
-                        <option value="seller">Vendedor</option>
-                        <option value="admin">Admin</option>
-                        {user.role === 'disabled' && <option value="disabled">Desativado</option>}
-                      </select>
+                      {roleSelect(user, 'bg-muted text-xs p-1 rounded border border-border')}
                       {user.role !== 'disabled' && (
                         <Button
                           variant="ghost"
@@ -112,6 +174,7 @@ export function UsersTab({ users, onCreateUser, onUpdateRole, onDeleteUser }: Us
             </div>
           )}
         </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, type ReactNode } from 'react'
+import { useIsMobile } from '../hooks/useIsMobile'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Badge } from './ui/badge'
@@ -119,6 +120,7 @@ export function DataTable<T extends Record<string, any>>({
   initialState,
   onStateChange,
 }: DataTableProps<T>) {
+  const isMobile = useIsMobile()
   // State (initialized from initialState if provided)
   const [search, setSearch] = useState(initialState?.search ?? '')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -562,7 +564,71 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       )}
 
-      {/* Table */}
+      {/* Phone: one card per row. The table pushed every column after the
+          first — and the actions — past the right edge. */}
+      {isMobile ? (
+        <div className="space-y-3" role="region" aria-label="Tabela de dados">
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={`skeleton-card-${i}`} className="space-y-2 rounded-lg border p-4">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            ))
+          ) : paginatedData.length === 0 ? (
+            <div className="rounded-lg border py-12 text-center">
+              {emptyState || (
+                <p className="font-medium text-muted-foreground">Nenhum resultado encontrado</p>
+              )}
+            </div>
+          ) : (
+            paginatedData.map((item) => {
+              const [lead, ...rest] = displayColumns.filter((col) => col.header)
+              const bare = displayColumns.filter((col) => !col.header)
+              return (
+                <div
+                  key={keyExtractor(item)}
+                  onClick={() => onRowClick?.(item)}
+                  className={`rounded-lg border p-3 transition-colors ${
+                    onRowClick ? 'cursor-pointer active:bg-muted/50' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {bare.map((col) => (
+                      <div key={col.key} className="pt-1">
+                        {col.render ? col.render(item) : item[col.key]}
+                      </div>
+                    ))}
+                    {lead && (
+                      <div className="min-w-0 flex-1">
+                        {lead.render ? lead.render(item) : item[lead.key]}
+                      </div>
+                    )}
+                  </div>
+                  {rest.length > 0 && (
+                    <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                      {rest.map((col) => (
+                        <div key={col.key} className="min-w-0">
+                          <dt className="text-xs font-medium text-muted-foreground">{col.header}</dt>
+                          <dd className="mt-0.5">{col.render ? col.render(item) : item[col.key]}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {actions && (
+                    <div
+                      className="mt-3 flex justify-end border-t pt-2"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {actions(item)}
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      ) : (
       <div className="border rounded-lg overflow-hidden" role="region" aria-label="Tabela de dados">
         <div className="overflow-x-auto">
           <table className="w-full" role="table" aria-describedby="table-description">
@@ -670,6 +736,7 @@ export function DataTable<T extends Record<string, any>>({
           </table>
         </div>
       </div>
+      )}
 
       {/* Pagination */}
       {!loading && filteredData.length > 0 && (

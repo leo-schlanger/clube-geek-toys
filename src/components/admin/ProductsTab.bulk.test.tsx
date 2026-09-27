@@ -8,7 +8,8 @@
  * outlives its row is a product being edited off-screen.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mockPhoneScreen } from '../../test/mobile'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import type { Product } from '../../types'
 
@@ -30,6 +31,7 @@ vi.mock('./ProductModal', () => ({ ProductModal: () => null }))
 import {
   adminListProducts,
   bulkSetProductCategories,
+  getProductForEdit,
   listCategories,
 } from '../../lib/products'
 import { ProductsTab } from './ProductsTab'
@@ -134,5 +136,40 @@ describe('ProductsTab — categoria em massa', () => {
     })
 
     await waitFor(() => expect(screen.queryByText(/selecionado\(s\)/)).not.toBeInTheDocument())
+  })
+})
+
+// Laura runs the panel from her phone: the table hid price, stock and every
+// action past the right edge. On a phone each product is a card.
+describe('ProductsTab — no celular', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPhoneScreen()
+    mockedList.mockResolvedValue({ products: PRODUCTS, total: 2 } as never)
+    mockedCategories.mockResolvedValue([] as never)
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('shows one card per product, with labelled actions, and no table', async () => {
+    render(<ProductsTab />)
+    await waitFor(() => expect(screen.getByText('Photocard BTS')).toBeInTheDocument())
+    expect(document.querySelector('table')).toBeNull()
+    expect(screen.getAllByRole('button', { name: /Editar/ })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /Duplicar/ })).toHaveLength(2)
+  })
+
+  it('opens the full product from the card', async () => {
+    vi.mocked(getProductForEdit).mockResolvedValue(PRODUCTS[0] as never)
+    render(<ProductsTab />)
+    await waitFor(() => expect(screen.getByText('Photocard BTS')).toBeInTheDocument())
+    fireEvent.click(screen.getAllByRole('button', { name: /Editar/ })[0])
+    await waitFor(() => expect(getProductForEdit).toHaveBeenCalledWith('p1'))
+  })
+
+  it('keeps bulk selection working', async () => {
+    render(<ProductsTab />)
+    await waitFor(() => expect(screen.getByText('Photocard BTS')).toBeInTheDocument())
+    fireEvent.click(screen.getByLabelText('Selecionar Photocard BTS'))
+    expect(screen.getByText('1 selecionado(s)')).toBeInTheDocument()
   })
 })

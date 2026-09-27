@@ -23,10 +23,12 @@ import { parseProductSort, ADMIN_CATALOG_PAGE_SIZE, type ProductSort } from '../
 import { ProductSortSelect } from '../store/ProductSortSelect'
 import { Pagination } from '../ui/pagination'
 import { useDebounce } from '../../hooks/useDebounce'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 type ModalState = { mode: 'create' | 'edit'; product: Product | null } | null
 
 export function ProductsTab() {
+  const isMobile = useIsMobile()
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
@@ -102,6 +104,23 @@ export function ProductsTab() {
     [fetchProducts]
   )
 
+  // Never fall back to the list row. It is the lean projection — no images,
+  // variants or videos — and saving from that modal wrote the gaps back over
+  // the real product.
+  const openEdit = useCallback(async (product: Product) => {
+    try {
+      const full = await getProductForEdit(product.id)
+      if (!full) {
+        toast.error('Não foi possível carregar o produto completo.')
+        return
+      }
+      setModal({ mode: 'edit', product: full })
+    } catch (err) {
+      reportAdminError('product.load_for_edit', err)
+      toast.error(errorMessage(err, 'Não foi possível carregar o produto. Tente de novo.'))
+    }
+  }, [])
+
   const handleDuplicate = useCallback(async (product: Product) => {
     try {
       const clone = await duplicateProduct(product.id)
@@ -155,6 +174,40 @@ export function ProductsTab() {
 
   const term = search.trim()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  // Empty state and pagination, shared by the cards and the table.
+  const productsFooter = () => (
+    <>
+      {products.length === 0 && (
+        <div className="text-center py-12">
+          <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <p className="text-muted-foreground font-medium">
+            {term ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {term
+              ? 'Tente ajustar a busca'
+              : 'Clique em "Novo Produto" para adicionar o primeiro item'}
+          </p>
+        </div>
+      )}
+
+      {total > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={total}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+          pageSizeOptions={[10, 25, 50, 100]}
+        />
+      )}
+    </>
+  )
 
   return (
     <Card>
@@ -247,6 +300,96 @@ export function ProductsTab() {
         {loading ? (
           <div className="flex justify-center py-12">
             <Loading />
+          </div>
+        ) : isMobile ? (
+          // Phone: the table put price, stock, status and every action past
+          // the right edge, behind a sideways scroll nobody tries.
+          <div className="space-y-3">
+            {products.map((product) => {
+              const hasPhoto = Boolean(product.images?.[0])
+              return (
+                <div
+                  key={product.id}
+                  className={`rounded-lg border border-border p-3 ${!product.active ? 'opacity-60' : ''} ${
+                    product.active && !hasPhoto ? 'border-amber-500/50 bg-amber-500/5' : ''
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Selecionar ${product.name}`}
+                      checked={selected.has(product.id)}
+                      onChange={() => toggleRow(product.id)}
+                      className="mt-4 h-5 w-5 shrink-0 accent-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openEdit(product)}
+                      className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                    >
+                      <div
+                        className={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted ${
+                          hasPhoto ? 'border-border' : 'border-amber-500/50'
+                        }`}
+                      >
+                        {hasPhoto ? (
+                          <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <ImageOff className="h-5 w-5 text-amber-600" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1 font-medium leading-snug">
+                          {product.featured && <Star className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
+                          <span className="line-clamp-2">{product.name}</span>
+                        </p>
+                        <p className="mt-0.5 text-sm font-semibold">{formatCurrency(product.price)}</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <Badge variant={product.stock > 0 ? 'secondary' : 'destructive'}>
+                            {product.stock > 0 ? `${product.stock} un.` : 'Esgotado'}
+                          </Badge>
+                          <Badge variant={product.active ? 'success' : 'outline'}>
+                            {product.active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                          {product.active && !hasPhoto && (
+                            <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
+                              Sem foto
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" className="h-9 flex-1 gap-1.5" onClick={() => openEdit(product)}>
+                      <Pencil className="h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 gap-1.5"
+                      onClick={() => handleDuplicate(product)}
+                    >
+                      <Copy className="h-4 w-4" />
+                      Duplicar
+                    </Button>
+                    {product.active && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 gap-1.5 text-red-600"
+                        onClick={() => handleDelete(product)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Desativar
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {productsFooter()}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -353,25 +496,7 @@ export function ProductsTab() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={async () => {
-                            // Never fall back to the list row. It is the lean
-                            // projection — no images, variants or videos — and
-                            // saving from that modal wrote the gaps back over
-                            // the real product.
-                            try {
-                              const full = await getProductForEdit(product.id)
-                              if (!full) {
-                                toast.error('Não foi possível carregar o produto completo.')
-                                return
-                              }
-                              setModal({ mode: 'edit', product: full })
-                            } catch (err) {
-                              reportAdminError('product.load_for_edit', err)
-                              toast.error(
-                                errorMessage(err, 'Não foi possível carregar o produto. Tente de novo.')
-                              )
-                            }
-                          }}
+                          onClick={() => openEdit(product)}
                           className="h-8 w-8 p-0"
                           title="Editar produto"
                         >
@@ -405,34 +530,7 @@ export function ProductsTab() {
               </tbody>
             </table>
 
-            {products.length === 0 && (
-              <div className="text-center py-12">
-                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground font-medium">
-                  {term ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {term
-                    ? 'Tente ajustar a busca'
-                    : 'Clique em "Novo Produto" para adicionar o primeiro item'}
-                </p>
-              </div>
-            )}
-
-            {total > 0 && (
-              <Pagination
-                currentPage={page}
-                totalPages={totalPages}
-                totalItems={total}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={(size) => {
-                  setPageSize(size)
-                  setPage(1)
-                }}
-                pageSizeOptions={[10, 25, 50, 100]}
-              />
-            )}
+            {productsFooter()}
           </div>
         )}
       </CardContent>

@@ -18,6 +18,11 @@ vi.mock('../lib/analytics', () => ({
   loadAnalytics: () => mockLoadAnalytics(),
 }))
 
+const mockIsAdmin = vi.fn(() => false)
+vi.mock('../lib/subdomain', () => ({
+  isAdminSubdomain: () => mockIsAdmin(),
+}))
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('CookieConsent', () => {
@@ -42,6 +47,17 @@ describe('CookieConsent', () => {
 
   it('does not show immediately (has a delay)', () => {
     renderConsent()
+    expect(screen.queryByText('Este site utiliza cookies')).not.toBeInTheDocument()
+  })
+
+  // On a phone the banner covered "Acessar Painel"; the panel has nothing
+  // to consent to.
+  it('never shows on the staff panel', async () => {
+    mockIsAdmin.mockReturnValueOnce(true)
+    renderConsent()
+    await act(async () => {
+      vi.advanceTimersByTime(1500)
+    })
     expect(screen.queryByText('Este site utiliza cookies')).not.toBeInTheDocument()
   })
 

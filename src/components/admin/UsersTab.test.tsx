@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest'
+import { mockPhoneScreen } from '../../test/mobile'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UsersTab } from './UsersTab'
 
@@ -84,13 +85,14 @@ describe('UsersTab', () => {
     expect(screen.getByText('user-2')).toBeInTheDocument()
   })
 
-  it('renders role badges', () => {
+  it('renders role badges in Portuguese, never the internal role name', () => {
     renderTab()
-    // Role text may appear in both the badge and the select dropdown
-    expect(screen.getAllByText('admin').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('seller').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('member').length).toBeGreaterThanOrEqual(1)
-    // "Desativado" appears in the badge for the disabled user
+    // The badge used to print the raw `seller` / `member`.
+    expect(screen.queryByText('seller')).not.toBeInTheDocument()
+    expect(screen.queryByText('member')).not.toBeInTheDocument()
+    // Badge + one <option> per row: more than the options alone.
+    const rows = screen.getAllByRole('combobox').length
+    expect(screen.getAllByText('Vendedor').length).toBeGreaterThan(rows - 1)
     expect(screen.getAllByText('Desativado').length).toBeGreaterThanOrEqual(1)
   })
 
@@ -186,5 +188,21 @@ describe('UsersTab', () => {
     renderTab({ users: [] })
     expect(screen.getByText('Nenhum usuário encontrado')).toBeInTheDocument()
     expect(screen.getByText(/Os usuários aparecem aqui após se cadastrarem/)).toBeInTheDocument()
+  })
+})
+
+describe('UsersTab — no celular', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('gives each user a card with the role picker and a labelled disable button', () => {
+    mockPhoneScreen()
+    renderTab()
+    expect(document.querySelector('table')).toBeNull()
+    expect(screen.getAllByRole('combobox')).toHaveLength(sampleUsers.length)
+    // The disabled user has no disable button.
+    const disable = screen.getAllByRole('button', { name: /Desativar/ })
+    expect(disable).toHaveLength(sampleUsers.length - 1)
+    fireEvent.click(disable[1])
+    expect(defaultProps.onDeleteUser).toHaveBeenCalledWith('user-2', 'seller@example.com')
   })
 })
