@@ -54,6 +54,16 @@ describe('event data', () => {
     expect(noEnd).not.toMatch(/–/)
   })
 
+  it('formatEventDateRange mostra o horário do Rio em qualquer fuso', () => {
+    // 17:00Z is 14:00 in Rio; a browser in UTC+1 used to print 18:00.
+    const label = formatEventDateRange('2026-10-11T17:00:00.000Z', '2026-10-11T21:00:00.000Z')
+    expect(label).toContain('14:00')
+    expect(label).toContain('18:00')
+    expect(label).not.toContain('22:00')
+    // Late start in Rio is already the next day in UTC: the date must stay Rio's.
+    expect(formatEventDateRange('2026-10-12T01:30:00.000Z')).toMatch(/11 de outubro/)
+  })
+
   it('photoPublicUrl', () => {
     expect(photoPublicUrl(FALLBACK_EVENT, 'foto 1.jpg')).toBe(
       `/eventos/${FALLBACK_EVENT.slug}/foto%201.jpg`

@@ -123,6 +123,12 @@ export function isEventVisible(
   return Number.isNaN(end) || end >= now
 }
 
+/**
+ * Events happen in Rio: their time is Rio time wherever the visitor is. With
+ * the browser's zone, a phone set to another zone showed 14h–18h as 18h–22h.
+ */
+const EVENT_TIME_ZONE = 'America/Sao_Paulo'
+
 export function formatEventDateRange(
   startsAt: string,
   endsAt?: string | null,
@@ -136,10 +142,12 @@ export function formatEventDateRange(
     day: '2-digit',
     month: 'long',
     year: 'numeric',
+    timeZone: EVENT_TIME_ZONE,
   })
   const timeFmt = new Intl.DateTimeFormat(locale, {
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: EVENT_TIME_ZONE,
   })
 
   const datePart = dateFmt.format(start)
