@@ -207,6 +207,20 @@ describe('OrderDetailModal — etiqueta', () => {
     expect(screen.getByText(/assim que o pagamento for confirmado/i)).toBeInTheDocument()
   })
 
+  it('num cartão pendente, não manda procurar um "Confirmar PIX" que não existe', async () => {
+    await open(
+      order({
+        status: 'pending',
+        paymentMethod: 'credit_card',
+        shippingServiceId: '2',
+        shippingService: 'SEDEX',
+      })
+    )
+
+    expect(screen.getByText(/O cartão ainda não passou/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Confirmar PIX/i)).toBeNull()
+  })
+
   it('diz que não há etiqueta a comprar num pedido cancelado', async () => {
     await open(order({ status: 'cancelled', shippingServiceId: '2', shippingService: 'SEDEX' }))
 

@@ -465,9 +465,11 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 <div className="space-y-1 border-t pt-4">
                   <h4 className="text-sm font-semibold">Etiqueta de envio</h4>
                   <p className="text-xs text-muted-foreground">
-                    {order.status === 'pending'
-                      ? 'A etiqueta aparece aqui assim que o pagamento for confirmado. Use "Confirmar PIX" no rodapé se o dinheiro já caiu.'
-                      : 'Pedido cancelado ou reembolsado — não há etiqueta a comprar.'}
+                    {order.status !== 'pending'
+                      ? 'Pedido cancelado ou reembolsado — não há etiqueta a comprar.'
+                      : canConfirmPix
+                        ? 'A etiqueta aparece aqui assim que o pagamento for confirmado. Use "Confirmar PIX" no rodapé se o dinheiro já caiu.'
+                        : 'A etiqueta aparece aqui assim que o pagamento for aprovado. O cartão ainda não passou — não há nada a confirmar à mão.'}
                   </p>
                 </div>
               )}
