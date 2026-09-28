@@ -53,7 +53,7 @@ describe('createReservation', () => {
   })
 
   it('devolve o erro da API para a loja poder cair no WhatsApp', async () => {
-    postMock.mockResolvedValue({ error: 'Muitas consultas. Aguarde um momento.' })
+    postMock.mockResolvedValue({ error: 'Muitas consultas. Aguarde um momento.', status: 429 })
 
     const result = await createReservation('kpop-night-2026-09-06', {
       buyerName: 'Ana',
@@ -62,7 +62,29 @@ describe('createReservation', () => {
       attendees: [{ name: 'Ana', kind: 'full' }],
     })
 
-    expect(result).toEqual({ ok: false, error: 'Muitas consultas. Aguarde um momento.' })
+    expect(result).toEqual({
+      ok: false,
+      error: 'Muitas consultas. Aguarde um momento.',
+      retryable: true,
+    })
+  })
+
+  it('recusa do servidor (CPF inválido) não é para cair no WhatsApp', async () => {
+    postMock.mockResolvedValue({ error: 'Informe um CPF válido para pagar com PIX.', status: 400 })
+
+    const result = await createReservation('kpop-night-2026-09-06', {
+      buyerName: 'Ana',
+      buyerEmail: 'ana@example.com',
+      buyerPhone: '21999999999',
+      buyerDocument: '111',
+      attendees: [{ name: 'Ana', kind: 'full' }],
+    })
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Informe um CPF válido para pagar com PIX.',
+      retryable: false,
+    })
   })
 })
 

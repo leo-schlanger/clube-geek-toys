@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   uploadEventFlyer: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  confirm: vi.fn(async (..._args: unknown[]) => true),
 }))
 
 vi.mock('../../lib/events', async () => {
@@ -34,7 +35,7 @@ vi.mock('../../lib/events', async () => {
 })
 vi.mock('../../lib/api-client', () => ({ api: {} }))
 vi.mock('sonner', () => ({ toast: { success: mocks.toastSuccess, error: mocks.toastError } }))
-vi.mock('../../hooks/useConfirm', () => ({ useConfirm: () => async () => true }))
+vi.mock('../../hooks/useConfirm', () => ({ useConfirm: () => mocks.confirm }))
 
 import { EventConfigTab } from './EventConfigTab'
 
@@ -62,7 +63,7 @@ const EVENT: EventConfig = {
     priceBRL: 22,
     currencyLabel: 'R$',
     maxPerReservation: null,
-    whatsappNumber: '',
+    whatsappNumber: '5511914662881',
     notes: null,
   },
   priceCents: 2200,
@@ -144,5 +145,120 @@ describe('EventConfigTab — flyers and links', () => {
 
     expect(screen.queryByRole('button', { name: /Adicionar imagem/ })).not.toBeInTheDocument()
     expect(screen.getByText(/Limite de 6 imagens/)).toBeInTheDocument()
+  })
+})
+
+/**
+ * Field validation. On 28/09/2026 the event said R$ 22 in the price and in
+ * three texts while the owner meant R$ 20, and a typo in the price used to
+ * turn silently into a free event. Now it is the price that is charged by
+ * PIX, so the panel refuses what it cannot charge and flags texts that quote
+ * another price.
+ */
+describe('EventConfigTab — validação dos campos', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.confirm.mockResolvedValue(true)
+    mocks.updateEvent.mockImplementation(async (_id: string, input: Partial<EventConfig>) => ({
+      ...EVENT,
+      ...input,
+    }))
+  })
+
+  async function setPrice(value: string) {
+    const price = screen.getByLabelText('Entrada inteira')
+    await userEvent.clear(price)
+    if (value) await userEvent.type(price, value)
+  }
+
+  it('recusa um valor de entrada que não é número', async () => {
+    await openEditor()
+    await setPrice('vinte')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/Valor da entrada inválido/))
+    expect(mocks.updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('não abre reservas sem valor de entrada', async () => {
+    await openEditor()
+    await setPrice('')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/Informe o valor da entrada/))
+    expect(mocks.updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('salva 20,00 como 2000 centavos', async () => {
+    await openEditor()
+    await setPrice('20,00')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(mocks.updateEvent).toHaveBeenCalled())
+    expect(mocks.updateEvent.mock.calls[0][1].priceCents).toBe(2000)
+    expect(mocks.confirm).not.toHaveBeenCalled()
+  })
+
+  it('recusa máximo por reserva fora de 1 a 500', async () => {
+    await openEditor()
+    const max = screen.getByLabelText('Máx. por reserva')
+    await userEvent.type(max, '0')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/Máx. por reserva/))
+    expect(mocks.updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('recusa WhatsApp sem DDI com as reservas abertas', async () => {
+    await openEditor()
+    const whats = screen.getByLabelText('WhatsApp da loja')
+    await userEvent.clear(whats)
+    await userEvent.type(whats, '21999999999')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    expect(mocks.toastError).toHaveBeenCalledWith(expect.stringMatching(/WhatsApp da loja/))
+    expect(mocks.updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('avisa quando a faixa fala em outro preço, e não salva se ela for corrigir', async () => {
+    mocks.confirm.mockResolvedValue(false)
+    await openEditor({ ...EVENT, bannerText: 'Evento de K-pop · Entrada R$ 22' })
+    await setPrice('20,00')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+    const [options] = mocks.confirm.mock.calls[0] as [{ description: string }]
+    expect(options.description).toContain('Faixa do topo: R$ 22')
+    expect(mocks.updateEvent).not.toHaveBeenCalled()
+  })
+
+  it('confere também as linhas de entrada da descrição e dos destaques, não a premiação', async () => {
+    mocks.confirm.mockResolvedValue(false)
+    await openEditor({
+      ...EVENT,
+      priceCents: 2000,
+      description: ['Entrada: R$ 22 por pessoa.', 'Premiação: 1º lugar R$ 200.'],
+      highlights: ['Entrada R$ 22 por pessoa', '1º lugar R$ 200 · 2º R$ 100'],
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled())
+    const [options] = mocks.confirm.mock.calls[0] as [{ description: string }]
+    expect(options.description).toContain('Descrição: R$ 22')
+    expect(options.description).toContain('Destaques: R$ 22')
+    expect(options.description).not.toContain('200')
+  })
+
+  it('aceita o preço de membro (metade) nos textos', async () => {
+    await openEditor({
+      ...EVENT,
+      priceCents: 2000,
+      bannerText: 'Entrada R$ 20',
+      memberPerk: 'Membros: R$ 10',
+    })
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+
+    await waitFor(() => expect(mocks.updateEvent).toHaveBeenCalled())
+    expect(mocks.confirm).not.toHaveBeenCalled()
   })
 })

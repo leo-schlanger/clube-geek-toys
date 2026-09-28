@@ -7,8 +7,12 @@ import {
   createEvent,
   deleteEvent,
   duplicateEvent,
+  entryPriceLines,
+  findPriceMismatches,
   getActiveEvent,
+  isValidWhatsappNumber,
   linksToPayload,
+  parsePriceInput,
   listEvents,
   normalizeLinkUrl,
   updateEvent,
@@ -107,5 +111,65 @@ describe('event API client', () => {
 
     api.post.mockResolvedValue({ error: 'Imagem acima de 8 MB.' })
     await expect(uploadEventFlyer('e1', file)).rejects.toThrow('Imagem acima de 8 MB.')
+  })
+})
+
+describe('parsePriceInput', () => {
+  it('lê os jeitos em que um preço é digitado', () => {
+    expect(parsePriceInput('20')).toBe(2000)
+    expect(parsePriceInput('20,00')).toBe(2000)
+    expect(parsePriceInput('20.00')).toBe(2000)
+    expect(parsePriceInput('R$ 22,50')).toBe(2250)
+    expect(parsePriceInput('1.234,56')).toBe(123456)
+    expect(parsePriceInput('0')).toBe(0)
+  })
+
+  it('vazio é "sem preço"; lixo é inválido, nunca gratuito', () => {
+    expect(parsePriceInput('')).toBeNull()
+    expect(parsePriceInput('  ')).toBeNull()
+    expect(parsePriceInput('vinte')).toBe('invalid')
+    expect(parsePriceInput('20,,00')).toBe('invalid')
+    expect(parsePriceInput('-5')).toBe('invalid')
+    expect(parsePriceInput('20,005')).toBe('invalid')
+  })
+})
+
+describe('findPriceMismatches', () => {
+  it('aponta o texto que fala em outro preço', () => {
+    expect(
+      findPriceMismatches(2000, [
+        { label: 'Faixa do topo', text: 'Evento · Entrada R$ 22' },
+        { label: 'Vantagem do membro', text: 'Membros: R$ 11' },
+      ])
+    ).toEqual(['Faixa do topo: R$ 22', 'Vantagem do membro: R$ 11'])
+  })
+
+  it('aceita inteira, meia de membro e zero', () => {
+    expect(
+      findPriceMismatches(2000, [
+        { label: 'x', text: 'Entrada R$ 20 (membros R$ 10,00). Criança de colo: R$ 0' },
+      ])
+    ).toEqual([])
+  })
+
+  it('sem preço não há o que comparar', () => {
+    expect(findPriceMismatches(null, [{ label: 'x', text: 'R$ 22' }])).toEqual([])
+  })
+})
+
+describe('entryPriceLines', () => {
+  it('pega só as linhas que falam de entrada ou ingresso', () => {
+    expect(
+      entryPriceLines(['Entrada R$ 20 por pessoa', 'Premiação: R$ 200', 'Ingresso nominal R$ 20'])
+    ).toEqual(['Entrada R$ 20 por pessoa', 'Ingresso nominal R$ 20'])
+  })
+})
+
+describe('isValidWhatsappNumber', () => {
+  it('exige DDI 55 + DDD + número', () => {
+    expect(isValidWhatsappNumber('5511914662881')).toBe(true)
+    expect(isValidWhatsappNumber('+55 (21) 3333-4444')).toBe(true)
+    expect(isValidWhatsappNumber('21999999999')).toBe(false)
+    expect(isValidWhatsappNumber('')).toBe(false)
   })
 })

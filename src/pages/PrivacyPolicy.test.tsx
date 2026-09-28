@@ -71,7 +71,15 @@ describe('PrivacyPolicy', () => {
   it('renders last-updated date', () => {
     renderPage()
     expect(screen.getByText(/Última atualização:/)).toBeInTheDocument()
-    expect(screen.getByText(/17 de agosto de 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/28 de setembro de 2026/)).toBeInTheDocument()
+  })
+
+  // Buying a ticket collects the payer's CPF and sends it to Pagar.me
+  // (28/09/2026); the policy has to say so.
+  it('declares the ticket data and what goes to Pagar.me', () => {
+    renderPage()
+    expect(screen.getAllByText(/Ingressos de eventos:/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/na compra de ingressos/)).toBeInTheDocument()
   })
 
   it('mentions LGPD compliance', () => {

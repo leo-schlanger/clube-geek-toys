@@ -65,6 +65,9 @@ const reservationSchema = z.object({
   buyerName: z.string().min(2).max(120),
   buyerEmail: z.string().email().max(160),
   buyerPhone: z.string().min(8).max(30),
+  // CPF/CNPJ, masked or not. Required by the service only when the purchase is
+  // charged through Pagar.me — a free event does not ask for it.
+  buyerDocument: z.string().trim().max(20).optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
   attendees: z
     .array(

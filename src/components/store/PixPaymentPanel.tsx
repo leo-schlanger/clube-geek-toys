@@ -9,6 +9,10 @@ import { usePixExitGuard } from '../../hooks/usePixExitGuard'
 interface Props {
   /** EMV copy-paste payload; also the QR content. */
   emvCode: string
+  /**
+   * Empty for a Pagar.me code: paying by key reaches the account but not the
+   * charge, so it would never confirm itself. The key line is hidden then.
+   */
   pixKey: string
   /** Amount in BRL. */
   amount: number
@@ -30,7 +34,7 @@ interface Props {
   className?: string
 }
 
-/** On-screen PIX for a shop order or a ticket reservation. Manual settlement. */
+/** On-screen PIX for a shop order or a ticket reservation. */
 export function PixPaymentPanel({
   emvCode,
   pixKey,
@@ -120,16 +124,23 @@ export function PixPaymentPanel({
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            {merchantName && (
-              <>
-                Recebedor: <strong className="text-foreground">{merchantName}</strong> ·{' '}
-              </>
-            )}
-            chave <strong className="text-foreground">{pixKey}</strong>. {referenceLabel}{' '}
-            <strong className="text-foreground">{reference}</strong> — informe esse código se pagar
-            pela chave.
-          </p>
+          {pixKey ? (
+            <p className="text-xs text-muted-foreground">
+              {merchantName && (
+                <>
+                  Recebedor: <strong className="text-foreground">{merchantName}</strong> ·{' '}
+                </>
+              )}
+              chave <strong className="text-foreground">{pixKey}</strong>. {referenceLabel}{' '}
+              <strong className="text-foreground">{reference}</strong> — informe esse código se
+              pagar pela chave.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {referenceLabel} <strong className="text-foreground">{reference}</strong>. Pague pelo
+              QR Code ou pelo copia-e-cola: é ele que confirma o pagamento sozinho.
+            </p>
+          )}
         </div>
       </div>
     </div>

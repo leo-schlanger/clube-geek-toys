@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
                 <div className="glass p-8 md:p-12 rounded-2xl border border-border shadow-2xl">
                     <h1 className="text-4xl font-heading font-bold mb-8 gradient-text">Política de Privacidade</h1>
                     <div className="prose max-w-none space-y-6 text-muted-foreground">
-                        <p className="text-sm"><strong>Última atualização:</strong> 17 de agosto de 2026</p>
+                        <p className="text-sm"><strong>Última atualização:</strong> 28 de setembro de 2026</p>
 
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Controlador dos Dados</h2>
@@ -35,6 +35,7 @@ export default function PrivacyPolicy() {
                                 <li><strong>Dados de Cadastro:</strong> Nome completo, e-mail, CPF, telefone e senha (armazenada com criptografia).</li>
                                 <li><strong>Perfil da loja (opcional):</strong> Data de nascimento, gênero, endereço e foto de perfil. Nenhum desses campos é obrigatório — você pode criar conta e comprar sem preencher qualquer um deles, e apagá-los quando quiser. O campo gênero inclui a opção "prefiro não dizer".</li>
                                 <li><strong>Compras e entrega:</strong> Itens do pedido, endereço de entrega, valor, forma de pagamento e código de rastreio.</li>
+                                <li><strong>Ingressos de eventos:</strong> Nome, e-mail, telefone e CPF de quem compra, o nome de cada pessoa que vai entrar (impresso no ingresso) e as observações que você escrever. O CPF é exigido pela Pagar.me para emitir o PIX; ingresso gratuito não pede CPF. Na portaria registramos a hora em que cada ingresso foi usado.</li>
                                 <li><strong>Produtos salvos:</strong> A lista de produtos que você marca para comprar depois, visível apenas para você.</li>
                                 <li><strong>Atacado (CNPJ):</strong> Para contas de atacado, CNPJ, razão social, nome fantasia, inscrição estadual, ramo de atividade e contato da empresa.</li>
                                 <li><strong>Dados de Pagamento:</strong> Cartão processado pela Pagar.me — o número vai do seu navegador direto para ela e não passa pelos nossos servidores; guardamos apenas a bandeira e os quatro últimos dígitos. No PIX, guardamos somente o identificador da cobrança.</li>
@@ -49,7 +50,7 @@ export default function PrivacyPolicy() {
                             <h2 className="text-2xl font-semibold text-foreground">2. Base Legal e Finalidade</h2>
                             <p>Tratamos seus dados com as seguintes bases legais (Art. 7º, LGPD):</p>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li><strong>Execução de contrato:</strong> Gestão da assinatura do Clube de Vantagens, processamento de pagamentos, entrega de benefícios.</li>
+                                <li><strong>Execução de contrato:</strong> Gestão da assinatura do Clube de Vantagens, processamento de pagamentos, entrega de benefícios, emissão e validação de ingressos de eventos.</li>
                                 <li><strong>Consentimento:</strong> Envio de comunicações promocionais e novidades (você pode revogar a qualquer momento).</li>
                                 <li><strong>Obrigação legal:</strong> Cumprimento de obrigações fiscais e regulatórias.</li>
                                 <li><strong>Legítimo interesse:</strong> Melhoria dos serviços, segurança da plataforma, prevenção a fraudes.</li>
@@ -66,7 +67,8 @@ export default function PrivacyPolicy() {
                                 <li><strong>Perguntas e respostas:</strong> Mantidas enquanto o produto estiver no catálogo. Ao excluir a conta, o texto é anonimizado e sai da vitrine.</li>
                                 <li><strong>Fotos da galeria:</strong> Mantidas enquanto a divulgação fizer sentido, ou até pedido de remoção.</li>
                                 <li><strong>Perfil da loja:</strong> Mantido enquanto a conta existir. Ao excluir a conta, os dados de perfil e os produtos salvos são apagados, não apenas anonimizados.</li>
-                                <li><strong>Pedidos da loja:</strong> Mantidos por 5 anos por obrigação fiscal. Ao excluir a conta, os dados pessoais do pedido são anonimizados e apenas os valores permanecem, para fins contábeis.</li>
+                                <li><strong>Pedidos da loja:</strong> Mantidos por 5 anos por obrigação fiscal. Ao excluir a conta, os dados pessoais do pedido (incluindo o CPF) são anonimizados e apenas os valores permanecem, para fins contábeis.</li>
+                                <li><strong>Ingressos de eventos:</strong> Mantidos por 5 anos por obrigação fiscal. Ao excluir a conta, nome, e-mail, telefone, CPF e os nomes impressos nos ingressos comprados com o seu e-mail são anonimizados; ficam apenas os valores.</li>
                             </ul>
                         </section>
 
@@ -106,7 +108,7 @@ export default function PrivacyPolicy() {
                             <h2 className="text-2xl font-semibold text-foreground">5. Compartilhamento de Dados</h2>
                             <p>Não vendemos seus dados. Compartilhamos apenas com:</p>
                             <ul className="list-disc pl-5 space-y-2">
-                                <li><strong>Pagar.me (Stone):</strong> Processamento de pagamentos com cartão e PIX.</li>
+                                <li><strong>Pagar.me (Stone):</strong> Processamento de pagamentos com cartão e PIX, na loja, no clube e na compra de ingressos. Para emitir a cobrança enviamos nome, e-mail, telefone e CPF de quem paga.</li>
                                 <li><strong>Melhor Envio e Correios:</strong> Cálculo de frete e envio. Para a cotação enviamos apenas o CEP de destino e as medidas do pacote; ao despachar, os dados de entrega necessários para a etiqueta.</li>
                                 <li><strong>Servidor próprio (VPS):</strong> Hospedagem e banco de dados PostgreSQL.</li>
                                 <li><strong>Resend:</strong> Envio de e-mails transacionais.</li>

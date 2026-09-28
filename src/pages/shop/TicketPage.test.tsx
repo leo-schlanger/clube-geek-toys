@@ -1,11 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
-const { getTicketMock, getReservationMock } = vi.hoisted(() => ({
+const { getTicketMock, getReservationMock, polling } = vi.hoisted(() => ({
   getTicketMock: vi.fn(),
   getReservationMock: vi.fn(),
+  polling: {
+    active: false,
+    onUpdate: null as null | ((r: unknown) => void),
+  },
 }))
+
+vi.mock('../../hooks/useReservationPolling', () => ({
+  useReservationPolling: (_code: unknown, active: boolean, onUpdate: (r: unknown) => void) => {
+    polling.active = active
+    polling.onUpdate = onUpdate
+  },
+}))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 vi.mock('../../lib/event-tickets', async () => {
   const actual = await vi.importActual<typeof import('../../lib/event-tickets')>(
@@ -55,7 +67,11 @@ function renderAt(path: string, mode: 'ticket' | 'reservation') {
   )
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  polling.active = false
+  polling.onUpdate = null
+})
 
 describe('TicketPage', () => {
   it('mostra o ingresso avulso sem exigir login', async () => {
@@ -90,5 +106,71 @@ describe('TicketPage', () => {
     expect(
       await screen.findByRole('heading', { name: /Ingresso não encontrado/i })
     ).toBeInTheDocument()
+  })
+
+  const pendingPagarme = {
+    code: 'R-AAAA-BBBB',
+    buyerName: 'Ana Souza',
+    status: 'pending' as const,
+    quantity: 1,
+    totalCents: 2000,
+    createdAt: '2026-09-28T12:00:00.000Z',
+    tickets: [{ ...ticket, status: 'pending' as const }],
+    paymentProvider: 'pagarme' as const,
+    pixExpired: false,
+    pix: {
+      emvCode: '00020126PAGARME',
+      pixKey: 'geekpopee@gmail.com',
+      merchantName: 'GEEKPOP E TOYS',
+      amount: 20,
+      txId: 'ch_1',
+      provider: 'pagarme' as const,
+    },
+  }
+
+  it('PIX da Pagar.me: espera o pagamento e libera os ingressos na mesma tela', async () => {
+    getReservationMock.mockResolvedValue(pendingPagarme)
+    renderAt('/ingressos/R-AAAA-BBBB', 'reservation')
+
+    expect(await screen.findByText(/esta página atualiza sozinha/i)).toBeInTheDocument()
+    expect(polling.active).toBe(true)
+    // Paying by key never reaches the charge: the key is not offered.
+    expect(screen.queryByText('geekpopee@gmail.com')).not.toBeInTheDocument()
+
+    act(() =>
+      polling.onUpdate!({
+        ...pendingPagarme,
+        status: 'confirmed',
+        pix: null,
+        tickets: [{ ...ticket, status: 'valid' }],
+      })
+    )
+
+    expect(await screen.findByText(/Pagamento confirmado\./)).toBeInTheDocument()
+    expect(screen.queryByText(/esta página atualiza sozinha/i)).not.toBeInTheDocument()
+  })
+
+  it('PIX vencido: some o QR e a página oferece nova reserva', async () => {
+    getReservationMock.mockResolvedValue({ ...pendingPagarme, pix: null, pixExpired: true })
+    renderAt('/ingressos/R-AAAA-BBBB', 'reservation')
+
+    expect(await screen.findByText('O PIX desta reserva expirou.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Fazer nova reserva' })).toHaveAttribute(
+      'href',
+      '/evento#ingressos'
+    )
+    expect(polling.active).toBe(false)
+  })
+
+  it('PIX manual antigo continua mostrando a chave e não espera sozinho', async () => {
+    getReservationMock.mockResolvedValue({
+      ...pendingPagarme,
+      paymentProvider: 'local',
+      pix: { ...pendingPagarme.pix, provider: 'local' },
+    })
+    renderAt('/ingressos/R-AAAA-BBBB', 'reservation')
+
+    expect(await screen.findByText('geekpopee@gmail.com')).toBeInTheDocument()
+    expect(polling.active).toBe(false)
   })
 })

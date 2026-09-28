@@ -726,7 +726,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     // closing the tab.
     'event-reservation-received': {
       subject: `Reserva recebida — ${v.event_title || 'Evento GeekPop & Toys'}`,
-      preheader: `Reserva ${v.reservation_code || ''} registrada. Falta a confirmação do pagamento.`,
+      preheader: v.pix_auto
+        ? `Reserva ${v.reservation_code || ''} registrada. Pague o PIX e os ingressos saem na hora.`
+        : `Reserva ${v.reservation_code || ''} registrada. Falta a confirmação do pagamento.`,
       body: `
         <h2 style="color:#F04080;margin:0 0 12px">Reserva recebida! 🎫</h2>
         <p>Olá, <strong>${name}</strong>!</p>
@@ -737,8 +739,10 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
         ])}
         ${v.pix_code ? pixBox(v.pix_code, v.pix_key || '', v.total || '0,00') : ''}
-        ${infoBox('⏳ Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o pagamento. Assim que confirmarmos, cada pessoa recebe o QR Code de entrada neste mesmo link.')}`,
-      cta: { text: 'Ver meus ingressos', url: v.tickets_url || '#' },
+        ${v.pix_auto
+          ? infoBox('⚡ A confirmação é <strong>automática</strong>: assim que o PIX cair, os ingressos são liberados e você recebe outro e-mail com o QR Code de cada pessoa. Não precisa mandar comprovante. O código PIX vale por 24 horas.')
+          : infoBox('⏳ Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o pagamento. Assim que confirmarmos, cada pessoa recebe o QR Code de entrada neste mesmo link.')}`,
+      cta: { text: v.pix_auto ? 'Pagar e ver meus ingressos' : 'Ver meus ingressos', url: v.tickets_url || '#' },
     },
 
     'event-tickets-ready': {
@@ -754,7 +758,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
 
     'admin-event-reservation': {
       subject: `🎫 Nova reserva de ingresso — ${v.buyer_name || ''}`,
-      preheader: `${v.quantity || '1'} ingresso(s) aguardando confirmação de pagamento.`,
+      preheader: v.pix_auto
+        ? `${v.quantity || '1'} ingresso(s) aguardando o PIX — a confirmação é automática.`
+        : `${v.quantity || '1'} ingresso(s) aguardando confirmação de pagamento.`,
       body: `
         <h2 style="color:#F04080;margin:0 0 12px">Nova reserva de ingresso</h2>
         ${dataTable([
@@ -766,7 +772,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Ingressos', v.quantity || '1'],
           ['Total', `<strong style="color:#FCBE04">R$ ${v.total || '0,00'}</strong>`],
         ])}
-        ${infoBox('💰 Os ingressos só ficam válidos depois que alguém confirmar o pagamento no painel — antes disso a portaria recusa a entrada.')}`,
+        ${v.pix_auto
+          ? infoBox('⚡ PIX pela Pagar.me: quando o cliente pagar, a reserva é confirmada sozinha e os ingressos são liberados. Não precisa conferir extrato nem clicar em nada.')
+          : infoBox('💰 Os ingressos só ficam válidos depois que alguém confirmar o pagamento no painel — antes disso a portaria recusa a entrada.')}`,
       cta: { text: 'Abrir no painel', url: v.admin_url || adminUrl() },
     },
   };

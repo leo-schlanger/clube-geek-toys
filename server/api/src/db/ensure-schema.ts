@@ -1229,6 +1229,25 @@ const STEPS: SchemaStep[] = [
       await query(`ALTER TABLE events ADD COLUMN IF NOT EXISTS links JSONB NOT NULL DEFAULT '[]'::jsonb`);
     },
   },
+  {
+    name: "Event tickets paid through Pagar.me (migration 037)",
+    run: async () => {
+      // The ticket PIX was a static code settled by hand. A PSP order needs the
+      // buyer's CPF, and the dynamic code is stored because it cannot be rebuilt.
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS buyer_document VARCHAR(14)`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS payment_provider VARCHAR(20)`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pagarme_order_id VARCHAR(64)`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pagarme_charge_id VARCHAR(64)`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pix_qr_code TEXT`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pix_qr_code_url TEXT`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS pix_expires_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE event_reservations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ`);
+      await query(`CREATE INDEX IF NOT EXISTS idx_event_reservations_pagarme_charge
+        ON event_reservations(pagarme_charge_id) WHERE pagarme_charge_id IS NOT NULL`);
+      await query(`UPDATE event_reservations SET payment_provider = 'local'
+        WHERE payment_provider IS NULL AND pix_txid IS NOT NULL AND total_cents > 0`);
+    },
+  },
 ];
 
 let state: SchemaState = {

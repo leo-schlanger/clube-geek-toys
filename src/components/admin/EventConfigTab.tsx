@@ -34,6 +34,10 @@ import {
   uploadEventBanner,
   uploadEventFlyer,
   linksToPayload,
+  entryPriceLines,
+  findPriceMismatches,
+  isValidWhatsappNumber,
+  parsePriceInput,
   type EventInput,
 } from '../../lib/events'
 
@@ -87,13 +91,6 @@ function priceToInput(cents: number | null): string {
   return cents == null ? '' : (cents / 100).toFixed(2).replace('.', ',')
 }
 
-/** `20,00` and `20.00` become 2000. Empty becomes `null` (free event). */
-function inputToPriceCents(value: string): number | null {
-  const cleaned = value.trim().replace(/\./g, '').replace(',', '.')
-  if (!cleaned) return null
-  const parsed = Number(cleaned)
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null
-}
 
 type FormState = {
   title: string
@@ -175,10 +172,69 @@ function toLines(value: string): string[] {
     .filter((line) => line.length > 0)
 }
 
+/** Same ceilings as the API schema, so the panel names the field instead of a bare 400. */
+const TEXT_LIMITS: { key: keyof FormState; label: string; max: number }[] = [
+  { key: 'title', label: 'Título', max: 160 },
+  { key: 'shortTitle', label: 'Título curto', max: 80 },
+  { key: 'bannerText', label: 'Texto da faixa', max: 300 },
+  { key: 'locationName', label: 'Local', max: 160 },
+  { key: 'locationAddress', label: 'Endereço', max: 300 },
+  { key: 'memberPerk', label: 'Vantagem do membro', max: 400 },
+  { key: 'reservationNotes', label: 'Observações da reserva', max: 1000 },
+]
+
 function toPayload(form: FormState): EventInput | { error: string } {
   const startsAt = fromLocalInput(form.startsAt)
   if (!form.title.trim()) return { error: 'Dê um título ao evento.' }
   if (!startsAt) return { error: 'Informe a data e a hora de início.' }
+
+  for (const { key, label, max } of TEXT_LIMITS) {
+    const value = String(form[key]).trim()
+    if (value.length > max) {
+      return { error: `${label}: no máximo ${max} caracteres (está com ${value.length}).` }
+    }
+  }
+  const description = toLines(form.description)
+  if (description.length > 10) return { error: 'Descrição: no máximo 10 parágrafos.' }
+  if (description.some((line) => line.length > 1500)) {
+    return { error: 'Descrição: cada parágrafo pode ter até 1500 caracteres.' }
+  }
+  const highlights = toLines(form.highlights)
+  if (highlights.length > 15) return { error: 'Destaques: no máximo 15 linhas.' }
+  if (highlights.some((line) => line.length > 200)) {
+    return { error: 'Destaques: cada linha pode ter até 200 caracteres.' }
+  }
+
+  const priceCents = parsePriceInput(form.price)
+  if (priceCents === 'invalid') {
+    return { error: 'Valor da entrada inválido. Use só o número, como 20,00.' }
+  }
+  if (form.reservationsOpen && priceCents == null) {
+    return {
+      error: 'Informe o valor da entrada para abrir as reservas (0,00 se a entrada for gratuita).',
+    }
+  }
+
+  const maxInput = form.maxPerReservation.trim()
+  const maxPerReservation = maxInput ? Number(maxInput) : null
+  if (
+    maxPerReservation != null &&
+    (!/^\d+$/.test(maxInput) || maxPerReservation < 1 || maxPerReservation > 500)
+  ) {
+    return { error: 'Máx. por reserva: um número de 1 a 500, ou vazio para sem limite.' }
+  }
+
+  const whatsapp = form.whatsappNumber.replace(/\D/g, '')
+  if ((whatsapp || form.reservationsOpen) && !isValidWhatsappNumber(whatsapp)) {
+    return {
+      error: 'WhatsApp da loja: DDI + DDD + número, como 5521999999999 — é para onde vão as dúvidas das reservas.',
+    }
+  }
+
+  const mapsUrl = form.locationMapsUrl.trim()
+  if (mapsUrl && !/^https?:\/\/\S+$/i.test(mapsUrl)) {
+    return { error: 'Link do Google Maps: cole o endereço completo, começando com https://' }
+  }
 
   const endsAt = fromLocalInput(form.endsAt)
   if (form.endsAt && !endsAt) return { error: 'Data de término inválida.' }
@@ -189,7 +245,6 @@ function toPayload(form: FormState): EventInput | { error: string } {
   const links = linksToPayload(form.links)
   if ('error' in links) return links
 
-  const max = form.maxPerReservation.trim()
   return {
     title: form.title.trim(),
     shortTitle: form.shortTitle.trim() || form.title.trim(),
@@ -199,15 +254,15 @@ function toPayload(form: FormState): EventInput | { error: string } {
     endsAt,
     locationName: form.locationName.trim(),
     locationAddress: form.locationAddress.trim(),
-    locationMapsUrl: form.locationMapsUrl.trim() || null,
-    description: toLines(form.description),
-    highlights: toLines(form.highlights),
+    locationMapsUrl: mapsUrl || null,
+    description,
+    highlights,
     memberPerk: form.memberPerk.trim() || null,
     reservationsOpen: form.reservationsOpen,
-    priceCents: inputToPriceCents(form.price),
+    priceCents,
     currencyLabel: form.currencyLabel.trim() || 'R$',
-    maxPerReservation: max ? Number(max) : null,
-    whatsappNumber: form.whatsappNumber.replace(/\D/g, ''),
+    maxPerReservation,
+    whatsappNumber: whatsapp,
     reservationNotes: form.reservationNotes.trim() || null,
     links,
   }
@@ -277,6 +332,29 @@ export function EventConfigTab() {
     if ('error' in payload) {
       toast.error(payload.error)
       return
+    }
+
+    // The price is repeated by hand in three texts; a mismatch is what the
+    // buyer reads next to a total that says something else.
+    const mismatches = findPriceMismatches(payload.priceCents ?? null, [
+      { label: 'Faixa do topo', text: payload.bannerText ?? '' },
+      { label: 'Vantagem do membro', text: payload.memberPerk ?? '' },
+      { label: 'Observações da reserva', text: payload.reservationNotes ?? '' },
+      ...entryPriceLines(payload.description ?? []).map((text) => ({ label: 'Descrição', text })),
+      ...entryPriceLines(payload.highlights ?? []).map((text) => ({ label: 'Destaques', text })),
+    ])
+    if (mismatches.length > 0) {
+      const price = (payload.priceCents ?? 0) / 100
+      const ok = await confirm({
+        title: 'O preço nos textos não bate com a entrada',
+        description:
+          `A entrada está em R$ ${price.toFixed(2).replace('.', ',')} ` +
+          `(membro R$ ${(Math.round((payload.priceCents ?? 0) / 2) / 100).toFixed(2).replace('.', ',')}), mas ` +
+          `os textos citam outro valor — ${mismatches.join('; ')}. O PIX cobra o valor da entrada. Salvar mesmo assim?`,
+        confirmText: 'Salvar assim',
+        cancelText: 'Corrigir os textos',
+      })
+      if (!ok) return
     }
 
     setSaving(true)
@@ -800,7 +878,9 @@ export function EventConfigTab() {
                     onChange={(e) => set('price', e.target.value)}
                     placeholder="20,00"
                   />
-                  <p className="text-[11px] text-muted-foreground">Vazio = gratuito / a combinar</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    É o valor cobrado no PIX. Membro paga metade; 0,00 = gratuita
+                  </p>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="ev-currency">Moeda</Label>

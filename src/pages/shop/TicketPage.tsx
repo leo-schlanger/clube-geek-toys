@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Calendar, MapPin, Printer } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  MapPin,
+  Printer,
+} from 'lucide-react'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { TicketCard } from '../../components/store/TicketCard'
 import { useShopMember } from '../../components/store/useShopMember'
@@ -15,6 +25,7 @@ import {
 } from '../../lib/event-tickets'
 import { ReservationPixPanel } from '../../components/store/ReservationPixPanel'
 import { SeoHead } from '../../components/store/SeoHead'
+import { useReservationPolling } from '../../hooks/useReservationPolling'
 
 type Props = {
   /** `ticket` shows one ticket; `reservation` shows every ticket in the purchase. */
@@ -71,6 +82,27 @@ export default function TicketPage({ mode }: Props) {
     }
   }, [code, mode])
 
+  // A Pagar.me PIX confirms itself: the page waits on screen and the tickets
+  // appear the moment the payment lands, without a reload.
+  const handleUpdate = useCallback((found: PublicReservation) => {
+    setReservation((current) => {
+      if (current?.status === 'pending' && found.status === 'confirmed') {
+        toast.success('Pagamento confirmado! Seus ingressos foram liberados.')
+      }
+      return found
+    })
+    setTickets(found.tickets)
+  }, [])
+
+  const waitingForPix = Boolean(
+    reservation &&
+      reservation.status === 'pending' &&
+      reservation.paymentProvider === 'pagarme' &&
+      reservation.pix &&
+      !reservation.pixExpired
+  )
+  useReservationPolling(mode === 'reservation' ? code : null, waitingForPix, handleUpdate)
+
   if (loading) return <LoadingPage />
 
   const event = tickets?.[0]?.event
@@ -123,12 +155,45 @@ export default function TicketPage({ mode }: Props) {
 
             {/* Pending PIX: the ticket QR is not valid at the door yet. */}
             {reservation?.pix && reservation.status === 'pending' && (
-              <ReservationPixPanel
-                code={reservation.code}
-                pix={reservation.pix}
-                totalCents={reservation.totalCents}
-                className="print:hidden"
-              />
+              <div className="space-y-3 print:hidden">
+                <ReservationPixPanel
+                  code={reservation.code}
+                  pix={reservation.pix}
+                  totalCents={reservation.totalCents}
+                />
+                {waitingForPix && (
+                  <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Aguardando o pagamento — esta página atualiza sozinha.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {reservation?.status === 'pending' && reservation.pixExpired && (
+              <div className="flex gap-3 rounded-2xl border border-destructive/40 bg-destructive/10 p-4 text-sm print:hidden">
+                <Clock className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+                <div>
+                  <p className="font-semibold">O PIX desta reserva expirou.</p>
+                  <p className="mt-1 text-muted-foreground">
+                    O código vale 24 horas. Se você já pagou, fale com a loja pelo WhatsApp; se
+                    não, faça uma nova reserva.
+                  </p>
+                  <Button asChild size="sm" className="mt-3">
+                    <Link to="/evento#ingressos">Fazer nova reserva</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {reservation?.status === 'confirmed' && (
+              <div className="flex gap-3 rounded-2xl border border-green-500/40 bg-green-500/10 p-4 text-sm print:hidden">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                <p>
+                  <strong>Pagamento confirmado.</strong> Os ingressos abaixo já valem na entrada —
+                  cada QR Code uma única vez.
+                </p>
+              </div>
             )}
 
             {event && (

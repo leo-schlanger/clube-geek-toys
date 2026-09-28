@@ -1,7 +1,8 @@
 # Eventos na loja (shop.geeketoys.com.br)
 
-> **Última atualização:** 23 de Agosto de 2026  
-> **Evento em cartaz:** **20/set/2026 (domingo) 14h–18h**, Mar Palace Copacabana Hotel, entrada **R$ 20** (criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
+> **Última atualização:** 28 de Setembro de 2026  
+> **Evento em cartaz:** **11/out/2026 (domingo) 14h–18h**, Mar Palace Copacabana Hotel, entrada **R$ 20** (membro R$ 10; criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
+> **Pagamento:** PIX da Pagar.me — **confirma sozinho** e libera os ingressos. Ver [Compra do ingresso](#compra-do-ingresso-pagarme-28092026).  
 > **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)  
 > **Quem edita:** a admin, na aba **Eventos** — não é mais deploy. Ver [Trocar de evento](#trocar-de-evento-sem-deploy).
 
@@ -49,6 +50,45 @@ Fluxo da Laura quando um evento termina:
 3. **Publicar** — o antigo pode ser **Encerrado** (arquivado)
 
 Nada de deploy, nada de mexer nos dois repos.
+
+### Compra do ingresso: Pagar.me (28/09/2026)
+
+Até aqui o ingresso ainda usava o PIX **estático** anterior à migração: a
+cliente pagava e os ingressos ficavam "aguardando confirmação" até alguém
+conferir o extrato e clicar em **Confirmar pagamento** na aba **Ingressos**.
+Agora é o mesmo PIX dinâmico da loja:
+
+1. O formulário (loja `/evento` e `geeketoys.com.br#ingressos`) pede também o
+   **CPF de quem paga** — a Pagar.me não emite a cobrança sem ele. Reserva só de
+   isentos não pede.
+2. A API cria a cobrança e devolve o QR. Na loja o QR aparece na hora; no site
+   institucional, o botão leva a `shop.*/ingressos/<código>`.
+3. A tela fica esperando ("esta tela atualiza sozinha"). Quando o PIX cai, a
+   reserva vira **confirmada**, os ingressos ficam **válidos** e a cliente recebe
+   o e-mail com os QR Codes. Ninguém precisa clicar em nada.
+4. O código vale **24 horas**. Vencido, a página avisa e oferece nova reserva.
+
+Na aba **Ingressos** do painel, a reserva pendente mostra **PIX automático**.
+"Confirmar à mão" continua existindo para dinheiro que chegou por outro meio, e
+pede confirmação. **Cancelar uma reserva paga estorna o valor** pela Pagar.me.
+Detalhes técnicos em [`PAGARME.md`](PAGARME.md#pix-de-ingresso-de-evento-desde-28092026).
+
+### Validação do cadastro (28/09/2026)
+
+O valor da entrada é o que o PIX cobra, então o painel passou a recusar o que
+não dá para cobrar: valor que não é número (antes virava "gratuito" em
+silêncio), reserva aberta sem valor (use 0,00 para gratuito), máximo por reserva
+fora de 1–500, WhatsApp sem DDI e link do Maps que não começa com `https://`.
+Os limites de tamanho de cada texto são os mesmos da API, com o nome do campo na
+mensagem.
+
+E o **preço nos textos**: a faixa do topo, a vantagem do membro, as observações
+da reserva, a descrição e os destaques repetem o preço à mão. Se algum deles
+citar um valor diferente da entrada ou da meia de membro, o painel pergunta
+antes de salvar — foi assim que o evento de 11/10 ficou dizendo R$ 22 em cinco
+lugares quando a entrada era R$ 20. Da descrição e dos destaques só entram as
+linhas que falam em "entrada" ou "ingresso": a linha da premiação (R$ 200 ao 1º
+lugar) não é preço.
 
 ### Layout da página do evento (27/09/2026)
 
@@ -138,7 +178,7 @@ Arquivos de foto (para a galeria do home):
 | Link “Evento” no header       | `ShopHeader`                                                   |
 | Card na home                  | `EventPromoCard` em `ShopHome`                                 |
 | Página completa               | `/evento` → `EventPage`                                        |
-| Reserva + ingresso nominal    | `EventTicketForm`                                              |
+| Reserva + ingresso nominal    | `EventTicketForm` (CPF + PIX Pagar.me, espera a confirmação)   |
 | Ingressos da compra           | `/ingressos/:code` → `TicketPage mode="reservation"`           |
 | Ingresso avulso (QR)          | `/ingresso/:code` → `TicketPage mode="ticket"`                 |
 | Portaria e reservas (admin)   | aba **Ingressos** → `EventTicketsTab`                          |
@@ -163,11 +203,11 @@ reservas** — os ingressos já emitidos continuam válidos na portaria.
 
 | Campo                 | Valor                                                      |
 | --------------------- | ---------------------------------------------------------- |
-| Título                | Photocard Trading + Dança Livre de K-pop                   |
-| Data                  | Domingo, 20 de setembro de 2026                            |
+| Título                | Evento GeeKpop! (id `evento-geekpop`)                      |
+| Data                  | Domingo, 11 de outubro de 2026                             |
 | Horário               | 14h–18h                                                    |
 | Local                 | Mar Palace Copacabana Hotel — Av. N. S. de Copacabana, 552 |
-| Entrada               | R$ 20 / pessoa (lanches grátis)                            |
+| Entrada               | R$ 20 / pessoa · membro do Clube R$ 10                     |
 | Isentos               | Criança de colo e criança PCD                              |
 | WhatsApp reserva      | (11) 91466-2881                                            |
 | Ingressos por reserva | sem teto (freio anti-abuso da API: 50)                     |

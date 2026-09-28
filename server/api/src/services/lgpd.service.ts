@@ -49,6 +49,22 @@ export async function exportUserData(userId: string) {
     [userId, memberId, userEmail]
   );
 
+  // Event tickets: by account or by the e-mail a guest reserved with.
+  const reservationsResult = await query(
+    `SELECT * FROM event_reservations
+     WHERE user_id = $1 OR lower(buyer_email) = lower($2)
+     ORDER BY created_at DESC`,
+    [userId, userEmail]
+  );
+  const reservationIds = reservationsResult.rows.map((r) => r.id as string);
+  const eventTicketsResult =
+    reservationIds.length > 0
+      ? await query(
+          `SELECT * FROM event_tickets WHERE reservation_id = ANY($1::uuid[]) ORDER BY created_at`,
+          [reservationIds]
+        )
+      : { rows: [] };
+
   const orderIds = ordersResult.rows.map((r) => r.id as string);
   const orderItemsResult =
     orderIds.length > 0
@@ -178,6 +194,8 @@ export async function exportUserData(userId: string) {
     subscriptions: subscriptionsResult.rows,
     shopOrders: ordersResult.rows,
     shopOrderItems: orderItemsResult.rows,
+    eventReservations: reservationsResult.rows,
+    eventTickets: eventTicketsResult.rows,
     productReviews: reviewsResult.rows,
     storeCredit: storeCreditResult.rows[0] || { balance: 0 },
     storeCreditLedger: storeCreditLedgerResult.rows,
@@ -319,6 +337,7 @@ export async function deleteUserAccount(userId: string, password: string) {
          tracking_code = NULL,
          tracking_url = NULL,
          customer_cnpj = NULL,
+         customer_document = NULL,
          -- Free-text from the customer: it can hold any personal data they
          -- chose to tell the shop, so it goes with the rest.
          customer_note = NULL
@@ -327,6 +346,29 @@ export async function deleteUserAccount(userId: string, password: string) {
           OR lower(customer_email) = lower($3)`,
       [userId, memberId, originalEmail]
     );
+
+    // Event tickets: the amounts stay for the books, the people go. Attendee
+    // names are redacted too — they were typed by this buyer. The codes keep
+    // working at the door; they just no longer carry a name.
+    const reservations = await client.query(
+      `UPDATE event_reservations SET
+         buyer_name = 'REDACTED',
+         buyer_email = 'redacted@redacted',
+         buyer_phone = 'REDACTED',
+         buyer_document = NULL,
+         notes = NULL,
+         updated_at = NOW()
+       WHERE user_id = $1 OR lower(buyer_email) = lower($2)
+       RETURNING id`,
+      [userId, originalEmail]
+    );
+    if (reservations.rows.length > 0) {
+      await client.query(
+        `UPDATE event_tickets SET attendee_name = 'REDACTED', updated_at = NOW()
+          WHERE reservation_id = ANY($1::uuid[])`,
+        [reservations.rows.map((r) => r.id as string)]
+      );
+    }
 
     // Redact reviews (keep rating for aggregate integrity; hide text)
     await client.query(

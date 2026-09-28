@@ -129,6 +129,19 @@ describe('exportUserData', () => {
     );
   });
 
+  it('inclui as reservas de ingresso, pela conta ou pelo e-mail', async () => {
+    route('FROM users WHERE id', { rows: [userRow] });
+    route('FROM members WHERE user_id', { rows: [] });
+    route('FROM event_reservations', { rows: [{ id: 'res-1', code: 'R-AAAA-BBBB' }] });
+    route('FROM event_tickets', { rows: [{ id: 't-1', attendee_name: 'Ana' }] });
+
+    const out = await exportUserData(USER_ID);
+
+    expect(out.eventReservations).toEqual([{ id: 'res-1', code: 'R-AAAA-BBBB' }]);
+    expect(out.eventTickets).toEqual([{ id: 't-1', attendee_name: 'Ana' }]);
+    expect(sqlLog.some((q) => q.includes('FROM event_reservations') && q.includes('buyer_email'))).toBe(true);
+  });
+
   it('registra a exportação no audit log', async () => {
     route('FROM users WHERE id', { rows: [userRow] });
     route('FROM members WHERE user_id', { rows: [{ id: 'member-1' }] });
@@ -235,6 +248,40 @@ describe('deleteUserAccount — o que a exclusão faz', () => {
       true
     );
     expect(ranClient('UPDATE contracts SET', "member_cpf = '00000000000'")).toBe(true);
+  });
+
+  /**
+   * The CPF went into `orders.customer_document` with the Pagar.me migration
+   * (01/09/2026) and the erasure never learned about it.
+   */
+  it('apaga o CPF dos pedidos da loja', async () => {
+    erasureAllowed();
+
+    await deleteUserAccount(USER_ID, 'senha');
+
+    expect(ranClient('UPDATE orders SET', 'customer_document = NULL')).toBe(true);
+  });
+
+  it('redige as reservas de ingresso e o nome em cada ingresso', async () => {
+    erasureAllowed();
+    clientRoute('UPDATE event_reservations SET', { rows: [{ id: 'res-1' }] });
+
+    await deleteUserAccount(USER_ID, 'senha');
+
+    expect(
+      ranClient('UPDATE event_reservations SET', "buyer_name = 'REDACTED'", 'buyer_document = NULL')
+    ).toBe(true);
+    expect(clientParamsOf('UPDATE event_reservations SET')).toEqual([USER_ID, 'ana@example.com']);
+    expect(ranClient('UPDATE event_tickets SET', "attendee_name = 'REDACTED'")).toBe(true);
+    expect(clientParamsOf('UPDATE event_tickets SET')).toEqual([['res-1']]);
+  });
+
+  it('não toca em ingressos quando não há reserva', async () => {
+    erasureAllowed();
+
+    await deleteUserAccount(USER_ID, 'senha');
+
+    expect(ranClient('UPDATE event_tickets')).toBe(false);
   });
 
   it('cancela assinatura que ainda esteja de pé', async () => {

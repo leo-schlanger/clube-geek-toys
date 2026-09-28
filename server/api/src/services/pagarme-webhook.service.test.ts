@@ -79,7 +79,10 @@ const { envMock } = vi.hoisted(() => ({
     PAGARME_WEBHOOK_PASSWORD: 'hook-pass' as string,
   },
 }));
-vi.mock('../config/env.js', () => ({ env: envMock }));
+vi.mock('../config/env.js', () => ({
+  env: envMock,
+  SHOP_CANONICAL_URL: 'https://shop.geekpoptoys.com.br',
+}));
 
 import {
   processPagarmeEvent,
@@ -518,6 +521,148 @@ describe('charge.refunded', () => {
 
     expect(restoreStockMock).not.toHaveBeenCalled();
     expect(restoreCreditMock).not.toHaveBeenCalled();
+  });
+});
+
+// ─── Event tickets ───────────────────────────────────────────────────────────
+
+describe('ingresso de evento', () => {
+  const ticketCharge = {
+    id: 'ch_evt',
+    status: 'paid',
+    amount: 4000,
+    paid_amount: 4000,
+    payment_method: 'pix',
+    metadata: { kind: 'event_reservation', reservationId: 'res-1', reservationCode: 'R-AAAA-BBBB' },
+  };
+  const reservationRow = {
+    id: 'res-1',
+    code: 'R-AAAA-BBBB',
+    event_id: 'evento-geekpop',
+    buyer_name: 'Ana Souza',
+    buyer_email: 'ana@example.com',
+    quantity: 2,
+    total_cents: 4000,
+  };
+
+  /**
+   * The point of the migration: the PIX lands and the tickets are valid, with
+   * nobody opening the panel. Before 28/09/2026 every ticket waited for a click.
+   */
+  it('PIX pago confirma a reserva, libera os ingressos e manda o QR sozinho', async () => {
+    getChargeMock.mockResolvedValue(ticketCharge);
+    claimWins();
+    route('UPDATE event_reservations', { rows: [reservationRow] });
+    route('SELECT title FROM events', { rows: [{ title: 'Evento GeeKpop!' }] });
+
+    await processPagarmeEvent(chargeEvent({ ...ticketCharge }));
+
+    expect(getChargeMock).toHaveBeenCalledWith('ch_evt');
+    expect(ran("UPDATE event_reservations SET status = 'confirmed'", "status IN ('pending', 'cancelled')")).toBe(true);
+    expect(ran("UPDATE event_tickets SET status = 'valid'", "status IN ('pending', 'cancelled')")).toBe(true);
+    // Never mistaken for a shop order or a club payment.
+    expect(ran('UPDATE orders')).toBe(false);
+    expect(ran('UPDATE payments')).toBe(false);
+    expect(decrementStockMock).not.toHaveBeenCalled();
+
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: 'event-tickets-ready',
+        to: 'ana@example.com',
+        variables: expect.objectContaining({
+          reservation_code: 'R-AAAA-BBBB',
+          event_title: 'Evento GeeKpop!',
+          tickets_url: 'https://shop.geekpoptoys.com.br/ingressos/R-AAAA-BBBB',
+        }),
+      })
+    );
+    expect(notifyAdminsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'payment_received', amount: 40 })
+    );
+  });
+
+  it('localiza a reserva pela cobrança e pelo id gravado na própria cobrança', async () => {
+    getChargeMock.mockResolvedValue(ticketCharge);
+    claimWins();
+    route('UPDATE event_reservations', { rows: [reservationRow] });
+
+    await processPagarmeEvent(chargeEvent({ ...ticketCharge }));
+
+    const call = clientQueryMock.mock.calls.find(([sql]) =>
+      sqlOf(sql).startsWith("UPDATE event_reservations SET status = 'confirmed'")
+    );
+    expect(call?.[1]).toEqual(['ch_evt', 'res-1']);
+  });
+
+  it('não acredita num corpo "paid" de ingresso que a Pagar.me não confirma', async () => {
+    getChargeMock.mockResolvedValue({ ...ticketCharge, status: 'pending' });
+    claimWins();
+
+    await expect(processPagarmeEvent(chargeEvent({ ...ticketCharge }))).rejects.toThrow(/not paid/);
+    expect(ran('UPDATE event_reservations')).toBe(false);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('reentrega de reserva já confirmada não reenvia o e-mail', async () => {
+    getChargeMock.mockResolvedValue(ticketCharge);
+    claimWins();
+    route('UPDATE event_reservations', { rows: [] });
+
+    await processPagarmeEvent(chargeEvent({ ...ticketCharge }));
+
+    expect(ran('UPDATE event_tickets')).toBe(false);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('estorno feito no painel da Pagar.me cancela os ingressos que não entraram', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [] });
+    route('UPDATE event_reservations', { rows: [reservationRow] });
+
+    await processPagarmeEvent({
+      id: 'hook_evt_refund',
+      type: 'charge.refunded',
+      data: { id: 'ch_evt', status: 'canceled', amount: 4000, payment_method: 'pix' },
+    } as PagarmeWebhookEvent);
+
+    expect(ran("UPDATE event_tickets SET status = 'cancelled'", "status IN ('pending', 'valid')")).toBe(true);
+    expect(ran('UPDATE payments')).toBe(false);
+    expect(notifyAdminsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'payment_refunded' })
+    );
+  });
+
+  it('PIX recusado não cancela a reserva nem procura pagamento do clube', async () => {
+    claimWins();
+
+    await processPagarmeEvent({
+      id: 'hook_evt_fail',
+      type: 'charge.payment_failed',
+      data: { ...ticketCharge, status: 'failed' },
+    } as PagarmeWebhookEvent);
+
+    expect(ran('UPDATE event_reservations')).toBe(false);
+    expect(ran('UPDATE payments')).toBe(false);
+    expect(auditMock).toHaveBeenCalledWith(
+      'event.reservation_payment_failed',
+      null,
+      expect.objectContaining({ reservationId: 'res-1' })
+    );
+  });
+
+  it('pedido cancelado na Pagar.me fecha a reserva pendente', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [] });
+    route('UPDATE event_reservations', { rows: [reservationRow] });
+
+    await processPagarmeEvent({
+      id: 'hook_evt_cancel',
+      type: 'order.canceled',
+      data: { id: 'or_evt', charges: [{ id: 'ch_evt', status: 'canceled', amount: 4000 }] },
+    } as PagarmeWebhookEvent);
+
+    expect(ran("UPDATE event_reservations SET status = 'cancelled'", "status = 'pending'")).toBe(true);
+    expect(ran("UPDATE event_tickets SET status = 'cancelled'")).toBe(true);
   });
 });
 

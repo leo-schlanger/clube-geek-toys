@@ -94,6 +94,17 @@ export function EventTicketsTab() {
   }, [fetchReservations])
 
   const handleConfirm = useCallback(async (reservation: EventReservation) => {
+    // A Pagar.me PIX confirms itself; confirming by hand is for when the money
+    // arrived another way (cash, transfer to the key) — say so before it happens.
+    if (
+      reservation.paymentProvider === 'pagarme' &&
+      !window.confirm(
+        `A reserva de ${reservation.buyerName} é confirmada sozinha quando o PIX cai. ` +
+          'Confirmar à mão só se o pagamento chegou por outro meio (dinheiro, transferência). Liberar os ingressos agora?'
+      )
+    ) {
+      return
+    }
     setBusyId(reservation.id)
     try {
       const updated = await confirmReservation(reservation.id)
@@ -118,7 +129,11 @@ export function EventTicketsTab() {
   }, [])
 
   const handleCancel = useCallback(async (reservation: EventReservation) => {
-    if (!window.confirm(`Cancelar a reserva de ${reservation.buyerName}? Os ingressos deixam de valer.`)) {
+    const refunds = reservation.paymentProvider === 'pagarme' && reservation.status === 'confirmed'
+    const message = refunds
+      ? `Cancelar a reserva de ${reservation.buyerName}? ${brl(reservation.totalCents)} voltam para o cliente pela Pagar.me e os ingressos deixam de valer.`
+      : `Cancelar a reserva de ${reservation.buyerName}? Os ingressos deixam de valer.`
+    if (!window.confirm(message)) {
       return
     }
     setBusyId(reservation.id)
@@ -129,10 +144,12 @@ export function EventTicketsTab() {
         return
       }
       setReservations((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)))
-      toast.success('Reserva cancelada')
+      toast.success(refunds ? 'Reserva cancelada e valor estornado' : 'Reserva cancelada')
     } catch (error) {
       logger.error('Error cancelling reservation:', error)
-      toast.error('Erro ao cancelar a reserva')
+      toast.error(
+        refunds ? 'Não foi possível estornar — a reserva continua ativa' : 'Erro ao cancelar a reserva'
+      )
     } finally {
       setBusyId(null)
     }
@@ -341,6 +358,12 @@ export function EventTicketsTab() {
                         <span className="font-mono text-xs font-bold text-muted-foreground">
                           {reservation.code}
                         </span>
+                        {reservation.paymentProvider === 'pagarme' && reservation.status === 'pending' && (
+                          <Badge variant="outline">PIX automático</Badge>
+                        )}
+                        {reservation.paymentProvider === 'local' && reservation.status === 'pending' && (
+                          <Badge variant="outline">PIX manual — confira o extrato</Badge>
+                        )}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {reservation.buyerPhone} · {reservation.buyerEmail}
@@ -369,7 +392,9 @@ export function EventTicketsTab() {
                           onClick={() => void handleConfirm(reservation)}
                         >
                           <CheckCircle2 className="h-4 w-4" />
-                          Confirmar pagamento
+                          {reservation.paymentProvider === 'pagarme'
+                            ? 'Confirmar à mão'
+                            : 'Confirmar pagamento'}
                         </Button>
                       )}
                       {reservation.status !== 'cancelled' && (

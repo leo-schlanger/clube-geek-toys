@@ -227,7 +227,7 @@ export default function OrderConfirmation() {
             {isPending && pix && (
               <PixPaymentPanel
                 emvCode={pix.pix.emvCode}
-                pixKey={pix.pix.pixKey}
+                pixKey={pix.pix.provider === 'pagarme' ? '' : pix.pix.pixKey}
                 amount={pix.total}
                 reference={`#${pix.orderNumber}`}
                 description={pixConfirmationCopy(pix.pix)}

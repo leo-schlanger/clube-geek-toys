@@ -1,6 +1,6 @@
 import { toast } from 'sonner'
 import { PixPaymentPanel } from './PixPaymentPanel'
-import { resendPaymentLink, type ReservationPix } from '../../lib/event-tickets'
+import { reservationPixCopy, resendPaymentLink, type ReservationPix } from '../../lib/event-tickets'
 
 interface Props {
   code: string
@@ -21,12 +21,12 @@ export function ReservationPixPanel({ code, pix, totalCents, className }: Props)
   return (
     <PixPaymentPanel
       emvCode={pix.emvCode}
-      pixKey={pix.pixKey}
+      pixKey={pix.provider === 'pagarme' ? '' : pix.pixKey}
       merchantName={pix.merchantName}
       amount={totalCents / 100}
       reference={code}
       referenceLabel="Reserva"
-      description="Assim que o pagamento cair, a equipe confirma e cada pessoa recebe o QR Code de entrada."
+      description={reservationPixCopy(pix)}
       onResend={handleResend}
       className={className}
     />

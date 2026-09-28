@@ -22,6 +22,16 @@ interface ErrorBody {
   details?: Record<string, unknown>;
 }
 
+interface ProviderError extends Error {
+  httpStatus: number;
+  userMessage: string;
+}
+
+function isPagarmeError(err: Error): err is ProviderError {
+  const e = err as Partial<ProviderError>;
+  return err.name === 'PagarmeError' && typeof e.httpStatus === 'number' && typeof e.userMessage === 'string';
+}
+
 export function errorHandler(
   err: Error,
   req: Request,
@@ -71,6 +81,30 @@ export function errorHandler(
       error: 'Não foi possível se comunicar com a operadora de pagamento. Tente novamente em alguns instantes.',
       code: 'STRIPE_UPSTREAM_ERROR',
     });
+    return;
+  }
+
+  // Pagar.me failures carry a PT-BR message meant for the buyer. Without this
+  // branch they fell through to the generic 500 and the checkout said only
+  // "Erro interno do servidor". Matched by name, not `instanceof`: importing
+  // utils/pagarme here would pull the database module into every AppError user.
+  if (isPagarmeError(err)) {
+    createErrorLog({
+      severity: 'error',
+      message: err.message,
+      source: 'backend',
+      context: { path: req.path, method: req.method, providerStatus: err.httpStatus },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch(() => { /* noop */ });
+
+    const status =
+      err.httpStatus === 401 || err.httpStatus === 403
+        ? 503
+        : err.httpStatus >= 500
+          ? 502
+          : 400;
+    res.status(status).json({ error: err.userMessage, code: 'PAYMENT_PROVIDER_ERROR' });
     return;
   }
 

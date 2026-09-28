@@ -5,8 +5,12 @@ import type { TicketKind } from '../data/event'
  * Event tickets.
  *
  * Named ticket per person; door staff burns the code on entry.
- * On-screen PIX, manual settlement (no webhook): starts as `pending`.
+ * PIX through Pagar.me: the webhook confirms the reservation and the tickets go
+ * valid by themselves. Reservations from before 28/09/2026 carry a static code
+ * (`provider: 'local'`) that an admin confirms by hand.
  */
+
+export type ReservationPaymentProvider = 'pagarme' | 'local'
 
 /** Reservation PIX. `emvCode` is the copy-paste payload and the QR content. */
 export interface ReservationPix {
@@ -15,6 +19,9 @@ export interface ReservationPix {
   merchantName: string
   amount: number
   txId: string
+  provider: ReservationPaymentProvider
+  qrCodeUrl?: string | null
+  expiresAt?: string | null
 }
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled'
@@ -40,10 +47,13 @@ export interface EventReservation {
   buyerName: string
   buyerEmail: string
   buyerPhone: string
+  buyerDocument?: string | null
   quantity: number
   totalCents: number
   status: ReservationStatus
   notes: string | null
+  paymentProvider?: ReservationPaymentProvider | null
+  paidAt?: string | null
   confirmedAt: string | null
   cancelledAt: string | null
   createdAt: string
@@ -77,6 +87,17 @@ export interface PublicReservation {
   tickets: PublicTicket[]
   /** Present only while the reservation is still pending. */
   pix: ReservationPix | null
+  /** 'pagarme' confirms itself, so the page can wait for it. */
+  paymentProvider?: ReservationPaymentProvider | null
+  /** Still pending, but the code can no longer be paid. */
+  pixExpired?: boolean
+}
+
+/** Copy under the QR: whether the buyer waits for a machine or for a person. */
+export function reservationPixCopy(pix: Pick<ReservationPix, 'provider'>): string {
+  return pix.provider === 'pagarme'
+    ? 'A confirmação é automática: assim que o PIX cair, os ingressos são liberados aqui e por e-mail. Não precisa mandar comprovante.'
+    : 'Assim que o pagamento cair, a equipe confirma e cada pessoa recebe o QR Code de entrada.'
 }
 
 export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
@@ -94,7 +115,11 @@ export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
 
 export type CreateReservationResult =
   | { ok: true; reservation: EventReservation; ticketsUrl: string }
-  | { ok: false; error: string }
+  /**
+   * `retryable` separates "the server said no" (a bad CPF: fix the field) from
+   * "the server did not answer" (WhatsApp keeps the sale alive).
+   */
+  | { ok: false; error: string; retryable: boolean }
 
 export async function createReservation(
   eventId: string,
@@ -102,6 +127,7 @@ export async function createReservation(
     buyerName: string
     buyerEmail: string
     buyerPhone: string
+    buyerDocument?: string
     notes?: string
     attendees: { name: string; kind: TicketKind }[]
   }
@@ -111,9 +137,16 @@ export async function createReservation(
     input,
     { skipAuth: true }
   )
-  return result.data
-    ? { ok: true, reservation: result.data.reservation, ticketsUrl: result.data.ticketsUrl }
-    : { ok: false, error: result.error || 'Não foi possível registrar a reserva.' }
+  if (result.data) {
+    return { ok: true, reservation: result.data.reservation, ticketsUrl: result.data.ticketsUrl }
+  }
+  return {
+    ok: false,
+    error: result.error || 'Não foi possível registrar a reserva.',
+    // No answer, a server error or the rate limit: the request never became a
+    // reservation, so WhatsApp still carries the sale.
+    retryable: !result.status || result.status >= 500 || result.status === 429,
+  }
 }
 
 /** Always sent to the reservation email; the API returns it masked. */

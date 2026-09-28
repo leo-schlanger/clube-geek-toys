@@ -14,18 +14,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     provider hiccup on the first row must not hide the paid one behind it.
  */
 
-const { queryMock, getChargeMock, processEventMock, updateStatusMock } = vi.hoisted(() => ({
-  queryMock: vi.fn(),
-  getChargeMock: vi.fn(),
-  processEventMock: vi.fn(async (..._args: unknown[]) => {}),
-  updateStatusMock: vi.fn(async () => ({})),
-}));
+const { queryMock, getChargeMock, processEventMock, updateStatusMock, expireReservationMock } =
+  vi.hoisted(() => ({
+    queryMock: vi.fn(),
+    getChargeMock: vi.fn(),
+    processEventMock: vi.fn(async (..._args: unknown[]) => {}),
+    updateStatusMock: vi.fn(async () => ({})),
+    expireReservationMock: vi.fn(async (..._args: unknown[]) => true),
+  }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 vi.mock('./pagarme-webhook.service.js', () => ({ processPagarmeEvent: processEventMock }));
 // Also keeps `bcrypt` out of this suite: order.service pulls it in transitively
 // and its native binding does not load here.
 vi.mock('./order.service.js', () => ({ updateOrderStatus: updateStatusMock }));
+vi.mock('./event.service.js', () => ({ expireReservation: expireReservationMock }));
 vi.mock('../utils/pagarme.js', async () => {
   const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
   return { ...actual, getCharge: getChargeMock, isPagarmeConfigured: () => true };
@@ -42,7 +45,9 @@ vi.mock('../config/env.js', () => ({
 
 import { reconcilePendingCharges } from './reconcile.service.js';
 
-function pending(...rows: { charge_id: string; ref: string; order_id?: string }[]) {
+function pending(
+  ...rows: { charge_id: string; ref: string; order_id?: string; reservation_id?: string }[]
+) {
   queryMock.mockResolvedValue({ rows, rowCount: rows.length });
 }
 
@@ -288,5 +293,48 @@ describe('PIX expirado', () => {
 
     expect(out).toMatchObject({ settled: 1, expired: 0 });
     expect(updateStatusMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reservas de ingresso', () => {
+  it('varre as reservas pendentes junto com pedidos e pagamentos', async () => {
+    pending();
+    await reconcilePendingCharges();
+    const sql = String(queryMock.mock.calls[0]![0]);
+    expect(sql).toContain('FROM event_reservations');
+    expect(sql).toContain("'reserva ' || code");
+  });
+
+  it('liquida o PIX de ingresso pago pelo mesmo processador do webhook', async () => {
+    pending({ charge_id: 'ch_evt', ref: 'reserva R-AAAA-BBBB', reservation_id: 'res-1' });
+    getChargeMock.mockResolvedValue(charge('ch_evt', 'paid'));
+
+    const out = await reconcilePendingCharges();
+
+    expect(out.settled).toBe(1);
+    expect(processEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'reconcile_ch_evt', type: 'charge.paid' })
+    );
+    expect(expireReservationMock).not.toHaveBeenCalled();
+  });
+
+  it('fecha a reserva cujo PIX venceu, e só ela', async () => {
+    pending({ charge_id: 'ch_evt', ref: 'reserva R-AAAA-BBBB', reservation_id: 'res-1' });
+    getChargeMock.mockResolvedValue(expiredPix('ch_evt', 3));
+
+    const out = await reconcilePendingCharges();
+
+    expect(out.expired).toBe(1);
+    expect(expireReservationMock).toHaveBeenCalledWith('res-1');
+    expect(updateStatusMock).not.toHaveBeenCalled();
+  });
+
+  it('respeita a carência antes de fechar a reserva', async () => {
+    pending({ charge_id: 'ch_evt', ref: 'reserva R-AAAA-BBBB', reservation_id: 'res-1' });
+    getChargeMock.mockResolvedValue(expiredPix('ch_evt', 0.5));
+
+    await reconcilePendingCharges();
+
+    expect(expireReservationMock).not.toHaveBeenCalled();
   });
 });

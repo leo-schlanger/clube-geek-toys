@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Loader2, MessageCircle, Plus, Ticket, Trash2 } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { CheckCircle2, Loader2, MessageCircle, Plus, Ticket, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '../ui/button'
@@ -14,7 +14,13 @@ import {
   type EventConfig,
   type TicketKind,
 } from '../../data/event'
-import { createReservation, type ReservationPix } from '../../lib/event-tickets'
+import {
+  createReservation,
+  type PublicReservation,
+  type ReservationPix,
+} from '../../lib/event-tickets'
+import { formatCPF, validateCPF } from '../../lib/utils'
+import { useReservationPolling } from '../../hooks/useReservationPolling'
 import { ReservationPixPanel } from './ReservationPixPanel'
 
 type Props = {
@@ -26,14 +32,21 @@ type Attendee = { name: string; kind: TicketKind }
 const SELECT_CLASS =
   'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
+/** Typing mask: digits only, formatted once all eleven are in. */
+function maskCPF(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  return digits.length === 11 ? formatCPF(digits) : digits
+}
+
 /**
  * Ticket reservation.
  *
  * One ticket **per person**, named for who is entering. The API returns the
- * codes and the PIX, so paying does not depend on the WhatsApp popup opening.
+ * codes and a Pagar.me PIX; paying it confirms the reservation on its own, and
+ * this form waits on screen until the tickets are released.
  */
 export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
-  const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', notes: '' })
+  const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', document: '', notes: '' })
   const [attendees, setAttendees] = useState<Attendee[]>([{ name: '', kind: 'full' }])
   const [submitting, setSubmitting] = useState(false)
   /** Until the first name is edited, it tracks whoever is reserving. */
@@ -43,6 +56,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
     ticketsPath: string
     pix: ReservationPix | null
     totalCents: number
+    confirmed: boolean
   } | null>(null)
 
   const max = event.ticketReservation.maxPerReservation
@@ -52,6 +66,20 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   const total = useMemo(
     () => attendees.reduce((sum, a) => sum + ticketPriceBRL(event, a.kind), 0),
     [attendees, event]
+  )
+  // The acquirer needs the buyer's CPF; a free reservation charges nothing.
+  const needsDocument = total > 0
+
+  const handlePaid = useCallback((found: PublicReservation) => {
+    if (found.status !== 'confirmed') return
+    setResult((current) => (current ? { ...current, confirmed: true, pix: null } : current))
+    toast.success('Pagamento confirmado! Seus ingressos foram liberados.')
+  }, [])
+
+  useReservationPolling(
+    result?.code,
+    Boolean(result && !result.confirmed && result.pix?.provider === 'pagarme'),
+    handlePaid
   )
 
   if (!event.ticketReservation.enabled) {
@@ -115,6 +143,11 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
       toast.error(`Informe o nome da pessoa ${missing + 1}.`)
       return
     }
+    if (needsDocument && !validateCPF(buyer.document)) {
+      toast.error('Informe um CPF válido — a operadora exige o documento de quem paga.')
+      document.getElementById('evt-document')?.focus()
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -122,35 +155,75 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         buyerName: buyer.name.trim(),
         buyerEmail: buyer.email.trim(),
         buyerPhone: buyer.phone.trim(),
+        buyerDocument: needsDocument ? buyer.document.replace(/\D/g, '') : undefined,
         notes: buyer.notes.trim() || undefined,
         attendees: filled,
       })
 
       if (created.ok) {
+        const pix = created.reservation.pix ?? null
+        const free = created.reservation.totalCents <= 0
         setResult({
           code: created.reservation.code,
           ticketsPath: `/ingressos/${created.reservation.code}`,
-          pix: created.reservation.pix ?? null,
+          pix,
           totalCents: created.reservation.totalCents,
+          confirmed: false,
         })
         // No PIX (free event or missing key), WhatsApp becomes the path again.
-        if (!created.reservation.pix) {
+        if (!pix) {
           openWhatsApp(created.reservation.code, created.ticketsUrl)
         }
         toast.success(
-          created.reservation.pix
+          pix
             ? 'Reserva registrada! Pague o PIX para liberar os ingressos.'
-            : 'Reserva registrada! Confirme o pagamento pelo WhatsApp.'
+            : free
+              ? 'Reserva registrada! Confirme pelo WhatsApp.'
+              : 'Reserva registrada! Confirme o pagamento pelo WhatsApp.'
         )
-      } else {
-        // The reservation did not persist, but the sale cannot die here:
-        // WhatsApp still carries the full order for staff to enter by hand.
+      } else if (created.retryable) {
+        // The server did not answer, but the sale cannot die here: WhatsApp
+        // still carries the full order for staff to enter by hand.
         openWhatsApp(null, null)
         toast.warning(`${created.error} Enviamos sua reserva pelo WhatsApp.`)
+      } else {
+        // The server said no (a CPF the acquirer refused, reservations closed):
+        // the buyer fixes the field and tries again.
+        toast.error(created.error)
       }
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (result?.confirmed) {
+    return (
+      <div
+        id="ingressos"
+        className="scroll-mt-28 rounded-2xl border border-green-500/40 bg-card p-6 md:p-8"
+      >
+        <div className="mb-4 flex items-start gap-3">
+          <div className="rounded-xl bg-green-500/15 p-2.5 text-green-500">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="font-heading text-xl font-bold md:text-2xl">
+              Pagamento confirmado!
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Reserva <span className="font-mono font-bold text-foreground">{result.code}</span>.
+              Cada pessoa já tem o QR Code de entrada — também mandamos tudo por e-mail.
+            </p>
+          </div>
+        </div>
+        <Button asChild size="lg" className="gap-2">
+          <Link to={result.ticketsPath}>
+            <Ticket className="h-5 w-5" />
+            Abrir meus ingressos
+          </Link>
+        </Button>
+      </div>
+    )
   }
 
   if (result) {
@@ -173,12 +246,23 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         </div>
 
         {result.pix ? (
-          <ReservationPixPanel
-            code={result.code}
-            pix={result.pix}
-            totalCents={result.totalCents}
-            className="mt-1"
-          />
+          <>
+            <ReservationPixPanel
+              code={result.code}
+              pix={result.pix}
+              totalCents={result.totalCents}
+              className="mt-1"
+            />
+            {result.pix.provider === 'pagarme' && (
+              <p
+                role="status"
+                className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Aguardando o pagamento — esta tela atualiza sozinha.
+              </p>
+            )}
+          </>
         ) : (
           <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm leading-relaxed">
             Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o
@@ -282,6 +366,25 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
           />
         </div>
 
+        {needsDocument && (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="evt-document">CPF de quem paga</Label>
+            <Input
+              id="evt-document"
+              required
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={14}
+              value={buyer.document}
+              onChange={(e) => setBuyer({ ...buyer, document: maskCPF(e.target.value) })}
+              placeholder="000.000.000-00"
+            />
+            <p className="text-xs text-muted-foreground">
+              Exigido pela operadora para emitir o PIX.
+            </p>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label htmlFor="evt-qty">Quantas pessoas</Label>
           <Input
@@ -372,18 +475,17 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         </div>
 
         <div className="flex flex-col gap-3 pt-1 sm:col-span-2 sm:flex-row sm:items-center">
-          <Button
-            type="submit"
-            disabled={submitting}
-            className="bg-[#25D366] text-white hover:bg-[#20ba5a] gap-2"
-            size="lg"
-          >
+          <Button type="submit" disabled={submitting} className="gap-2" size="lg">
             {submitting ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <MessageCircle className="h-5 w-5" />
+              <Ticket className="h-5 w-5" />
             )}
-            {submitting ? 'Registrando…' : 'Reservar e enviar no WhatsApp'}
+            {submitting
+              ? 'Gerando o PIX…'
+              : needsDocument
+                ? 'Reservar e pagar com PIX'
+                : 'Reservar ingresso'}
           </Button>
           {event.ticketReservation.notes && (
             <p className="max-w-md text-xs leading-relaxed text-muted-foreground">

@@ -144,3 +144,74 @@ export function linksToPayload(links: EventLink[]): EventLink[] | { error: strin
   }
   return out
 }
+
+// ─── Form validation ─────────────────────────────────────────────────────────
+
+/**
+ * `20`, `20,00`, `20.00`, `1.234,56` → cents. Empty → `null` (free / to be
+ * agreed). Anything else is `'invalid'` — the old parser turned a typo into
+ * `null`, and a typo in the price silently made the event free.
+ */
+export function parsePriceInput(value: string): number | null | 'invalid' {
+  const raw = value.trim().replace(/^R\$\s*/i, '')
+  if (!raw) return null
+  if (!/^\d{1,3}(\.\d{3})*(,\d{1,2})?$|^\d+([.,]\d{1,2})?$/.test(raw)) return 'invalid'
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 10_000) return 'invalid'
+  return Math.round(parsed * 100)
+}
+
+function formatCentsBRL(cents: number): string {
+  const reais = cents / 100
+  return Number.isInteger(reais) ? String(reais) : reais.toFixed(2).replace('.', ',')
+}
+
+/** Every `R$ 22` / `R$22,00` in a text, in cents. */
+function priceMentions(text: string): number[] {
+  const out: number[] = []
+  for (const match of text.matchAll(/R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/g)) {
+    const cents = parsePriceInput(match[1]!)
+    if (typeof cents === 'number') out.push(cents)
+  }
+  return out
+}
+
+/**
+ * Texts that quote an entry price other than the one being charged.
+ *
+ * The price lives in one field and is repeated by hand in the banner, the
+ * member perk, the reservation notes, the description and the highlights. On
+ * 28/09/2026 the field said R$ 22 while the owner meant R$ 20, and the old
+ * value sat in five places. The caller passes whole texts where every amount
+ * is a price, and only the entry-related lines of the description — a line
+ * about the prize (R$ 200 for first place) is not a price.
+ *
+ * Accepted values: the full price, the member price (half) and zero.
+ */
+export function findPriceMismatches(
+  priceCents: number | null,
+  texts: { label: string; text: string }[]
+): string[] {
+  if (priceCents == null) return []
+  const allowed = new Set([priceCents, Math.round(priceCents / 2), 0])
+  const problems: string[] = []
+  for (const { label, text } of texts) {
+    const wrong = priceMentions(text).filter((cents) => !allowed.has(cents))
+    if (wrong.length > 0) {
+      problems.push(`${label}: R$ ${wrong.map(formatCentsBRL).join(' e R$ ')}`)
+    }
+  }
+  return problems
+}
+
+/** Lines that talk about getting in, where an amount is the ticket price. */
+export function entryPriceLines(lines: string[]): string[] {
+  return lines.filter((line) => /entrada|ingresso/i.test(line))
+}
+
+/** WhatsApp as stored: digits with country code, 12–13 of them for Brazil. */
+export function isValidWhatsappNumber(value: string): boolean {
+  const digits = value.replace(/\D/g, '')
+  return digits.length >= 12 && digits.length <= 13 && digits.startsWith('55')
+}

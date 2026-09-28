@@ -133,7 +133,15 @@ describe('public', () => {
     await api.post(`/${EVENT_ID}/reservations`, { body, as: 'member' });
     expect(events.createReservation).toHaveBeenLastCalledWith(EVENT_ID, expect.objectContaining({ userId: 'user-member' }));
 
+    // The CPF reaches the service, masked as typed: the service normalises it.
+    await api.post(`/${EVENT_ID}/reservations`, { body: { ...body, buyerDocument: '529.982.247-25' } });
+    expect(events.createReservation).toHaveBeenLastCalledWith(
+      EVENT_ID,
+      expect.objectContaining({ buyerDocument: '529.982.247-25' })
+    );
+
     for (const bad of [
+      { ...body, buyerDocument: '1'.repeat(21) },
       { ...body, attendees: [] },
       { ...body, buyerEmail: 'not-an-email' },
       { ...body, attendees: Array.from({ length: 51 }, () => ({ name: 'Fulano' })) },

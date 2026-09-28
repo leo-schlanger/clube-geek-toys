@@ -95,6 +95,49 @@ cliente paga no app do banco
           → confere a cobrança na API, marca pago, baixa estoque, manda e-mail
 ```
 
+### PIX de ingresso de evento (desde 28/09/2026)
+
+Até 28/09 a reserva de ingresso ainda gerava o BR Code **estático** de antes da
+migração: o cliente pagava e os ingressos ficavam "aguardando confirmação" até
+alguém conferir o extrato e clicar em **Confirmar** na aba **Ingressos**. Agora
+a reserva segue o mesmo caminho do pedido da loja:
+
+```
+POST /events/:id/reservations  (com o CPF de quem paga)
+          → grava a reserva e um ingresso por pessoa, todos pending
+          → cria order na Pagar.me, pix com expires_in de 24 h,
+            metadata { kind: 'event_reservation', reservationId }
+          → guarda qr_code / qr_code_url / pix_expires_at na reserva
+
+cliente paga → charge.paid → webhook
+          → metadata.kind = event_reservation → reserva confirmed,
+            ingressos valid, e-mail "Ingressos liberados" com os QR Codes
+```
+
+- **O `kind` é o que separa ingresso de pedido.** O desvio vem antes do ramo da
+  loja: a cobrança de ingresso não tem `orderId`, e sem o desvio o webhook iria
+  procurar um pagamento do clube que não existe.
+- **Três caminhos confirmam, uma vez só.** O webhook; a página
+  `/ingressos/:código`, que consulta a cobrança enquanto o cliente olha o QR e,
+  se já está paga, passa a cobrança ao mesmo processador com a chave
+  `reconcile_<charge>`; e a conciliação de 10 min, que também varre
+  `event_reservations`. A trava de `processed_webhooks` impede liquidar duas vezes.
+- **Falha ao criar a cobrança cancela a reserva** e devolve a mensagem da
+  Pagar.me ao cliente — não sobra reserva impagável nem e-mail com código morto.
+- **PIX vencido**: a conciliação cancela a reserva 1 h depois do `expires_at`, e
+  a página mostra "O PIX desta reserva expirou" com o botão de nova reserva.
+  Pagamento que cair depois disso ainda confirma: o webhook aceita reserva
+  `cancelled` pelo mesmo motivo do pedido — dinheiro capturado tem de achar dono.
+- **Cancelar reserva paga no painel estorna antes**. Se o estorno falhar, a
+  reserva **não** é cancelada. Reserva pendente tenta anular o PIX e cancela de
+  qualquer jeito.
+- **Estorno feito no painel da Pagar.me** (`charge.refunded`) cancela os
+  ingressos que ainda não entraram.
+- **Sem chave da Pagar.me** a reserva volta ao BR Code estático
+  (`payment_provider = 'local'`), que a equipe confirma à mão. Degrada, não
+  derruba — mesma regra do checkout.
+- Reserva **só de isentos** não pede CPF nem cria cobrança.
+
 O QR é **guardado**, não regenerado: um código da Pagar.me é dinâmico e carrega
 o txid deles, ao contrário do BR Code estático que dava para reconstruir a
 partir do valor e da chave. Perder a string é perder o código.

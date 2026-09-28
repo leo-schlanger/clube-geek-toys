@@ -25,6 +25,7 @@ import { query } from '../config/database.js';
 import * as pagarme from '../utils/pagarme.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
 import { updateOrderStatus } from './order.service.js';
+import { expireReservation } from './event.service.js';
 
 /**
  * How far back to look.
@@ -72,22 +73,39 @@ function isDeadPix(charge: pagarme.PagarmeCharge): boolean {
   return Number.isFinite(at) && Date.now() - at > EXPIRY_GRACE_MS;
 }
 
+interface PendingCharge {
+  chargeId: string;
+  ref: string;
+  orderId: string | null;
+  reservationId: string | null;
+}
+
 /**
  * A row worth asking the provider about: still open on our side, with a charge.
  *
- * Orders and club payments are swept together because they settle through the
- * same event — `processPagarmeEvent` routes on the charge's own metadata.
+ * Orders, club payments and ticket reservations are swept together because they
+ * settle through the same event — `processPagarmeEvent` routes on the charge's
+ * own metadata.
  */
-async function pendingCharges(): Promise<{ chargeId: string; ref: string; orderId: string | null }[]> {
+async function pendingCharges(): Promise<PendingCharge[]> {
   const result = await query(
-    `SELECT pagarme_charge_id AS charge_id, 'pedido #' || order_number AS ref, id AS order_id
+    `SELECT pagarme_charge_id AS charge_id, 'pedido #' || order_number AS ref,
+            id AS order_id, NULL::uuid AS reservation_id
        FROM orders
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
         AND created_at > NOW() - ($1::int * INTERVAL '1 day')
       UNION ALL
-     SELECT pagarme_charge_id AS charge_id, 'pagamento ' || id::text AS ref, NULL AS order_id
+     SELECT pagarme_charge_id AS charge_id, 'pagamento ' || id::text AS ref,
+            NULL::uuid AS order_id, NULL::uuid AS reservation_id
        FROM payments
+      WHERE status = 'pending'
+        AND pagarme_charge_id IS NOT NULL
+        AND created_at > NOW() - ($1::int * INTERVAL '1 day')
+      UNION ALL
+     SELECT pagarme_charge_id AS charge_id, 'reserva ' || code AS ref,
+            NULL::uuid AS order_id, id AS reservation_id
+       FROM event_reservations
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
         AND created_at > NOW() - ($1::int * INTERVAL '1 day')
@@ -98,6 +116,7 @@ async function pendingCharges(): Promise<{ chargeId: string; ref: string; orderI
     chargeId: r.charge_id as string,
     ref: r.ref as string,
     orderId: (r.order_id as string) ?? null,
+    reservationId: (r.reservation_id as string) ?? null,
   }));
 }
 
@@ -115,12 +134,7 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
   const rows = await pendingCharges();
   const result: ReconcileResult = { checked: 0, settled: 0, expired: 0, failed: 0 };
 
-  // Charge → order, so a dead PIX can be closed on the right row.
-  const orderIdByCharge = new Map(
-    rows.filter((r) => r.orderId).map((r) => [r.chargeId, r.orderId as string]),
-  );
-
-  for (const { chargeId, ref } of rows) {
+  for (const { chargeId, ref, orderId, reservationId } of rows) {
     result.checked += 1;
     try {
       // Deliberately the uncached lookup: settling money must never act on a
@@ -133,12 +147,14 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
         // `updateOrderStatus`, which is what releases the stock hold, returns
         // store credit and tells the customer — doing it with a bare UPDATE
         // here would skip all three.
-        if (isDeadPix(charge) && ref.startsWith('pedido ')) {
-          const orderId = orderIdByCharge.get(chargeId);
-          if (orderId) {
-            await updateOrderStatus(orderId, 'cancelled', 'system-reconcile');
+        if (isDeadPix(charge) && orderId) {
+          await updateOrderStatus(orderId, 'cancelled', 'system-reconcile');
+          result.expired += 1;
+          console.log(`[RECONCILE] ${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pedido cancelado`);
+        } else if (isDeadPix(charge) && reservationId) {
+          if (await expireReservation(reservationId)) {
             result.expired += 1;
-            console.log(`[RECONCILE] ${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pedido cancelado`);
+            console.log(`[RECONCILE] ${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — reserva cancelada`);
           }
         }
         continue;

@@ -373,7 +373,7 @@ export default function MyOrderDetail() {
             {order.status === 'pending' && order.pixData && (
               <PixPaymentPanel
                 emvCode={order.pixData.emvCode}
-                pixKey={order.pixData.pixKey}
+                pixKey={order.pixData.provider === 'pagarme' ? '' : order.pixData.pixKey}
                 amount={order.pixData.amount}
                 reference={`#${order.orderNumber}`}
                 title="Pague por PIX para concluir"

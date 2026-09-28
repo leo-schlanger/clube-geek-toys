@@ -15,7 +15,7 @@
 
 import pg from 'pg';
 import { getClient } from '../config/database.js';
-import { env } from '../config/env.js';
+import { env, SHOP_CANONICAL_URL } from '../config/env.js';
 import * as pagarme from '../utils/pagarme.js';
 import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
@@ -304,6 +304,12 @@ async function handlePaid(
   }
 
   const metadata = trustedMetadata(charge);
+  // Before the shop branch: a ticket charge carries no `orderId`, and falling
+  // through to the club branch would look for a member payment that is not there.
+  if (metadata.kind === 'event_reservation') {
+    await settleEventReservation(client, charge, metadata, deferred);
+    return;
+  }
   if (metadata.kind === 'shop_order' || metadata.orderId) {
     await settleShopOrder(client, charge, metadata, deferred);
     return;
@@ -380,6 +386,104 @@ async function settleShopOrder(
   });
 }
 
+/**
+ * A paid ticket PIX: the reservation is confirmed and its tickets go valid.
+ *
+ * `cancelled` is accepted for the same reason as on a shop order — captured
+ * money must land on the purchase. A reservation closed by the expiry sweep a
+ * minute before the payment arrived comes back to life with its tickets.
+ */
+async function settleEventReservation(
+  client: pg.PoolClient,
+  charge: pagarme.PagarmeCharge,
+  metadata: Record<string, string>,
+  deferred: Deferred,
+): Promise<void> {
+  // `$1` twice is safe: both are `pagarme_charge_id` (VARCHAR(64)).
+  const updated = await client.query(
+    `UPDATE event_reservations
+        SET status = 'confirmed', confirmed_at = NOW(), paid_at = NOW(), cancelled_at = NULL,
+            pagarme_charge_id = COALESCE(pagarme_charge_id, $1), payment_provider = 'pagarme',
+            updated_at = NOW()
+      WHERE (pagarme_charge_id = $1 OR id = $2::uuid)
+        AND status IN ('pending', 'cancelled')
+      RETURNING id, code, event_id, buyer_name, buyer_email, quantity, total_cents`,
+    [charge.id, metadata.reservationId ?? null]
+  );
+  const reservation = updated.rows[0];
+  if (!reservation) {
+    console.log(`[PAGARME-HOOK] charge ${charge.id}: no pending reservation to settle`);
+    return;
+  }
+
+  // `used` is left alone: a ticket that already entered keeps its audit trail.
+  await client.query(
+    `UPDATE event_tickets SET status = 'valid', updated_at = NOW()
+      WHERE reservation_id = $1 AND status IN ('pending', 'cancelled')`,
+    [reservation.id]
+  );
+
+  const eventRow = await client.query(`SELECT title FROM events WHERE id = $1`, [
+    reservation.event_id,
+  ]);
+  const eventTitle = (eventRow.rows[0]?.title as string) ?? 'Evento GeekPop & Toys';
+  const code = reservation.code as string;
+
+  deferred.emails.push({
+    template: 'event-tickets-ready',
+    to: reservation.buyer_email as string,
+    variables: {
+      name: reservation.buyer_name as string,
+      event_title: eventTitle,
+      reservation_code: code,
+      quantity: String(reservation.quantity),
+      tickets_url: `${SHOP_CANONICAL_URL}/ingressos/${code}`,
+    },
+  });
+
+  deferred.adminNotices.push({
+    event: 'payment_received',
+    subject: `Ingressos — reserva ${code}`,
+    amount: pagarme.fromCents(Number(reservation.total_cents)),
+    method: charge.payment_method ?? null,
+    customerName: reservation.buyer_name as string,
+    customerEmail: reservation.buyer_email as string,
+    link: '/admin?tab=events',
+    chargeId: charge.id,
+  });
+
+  await auditLog('event.reservation_paid', null, {
+    reservationId: reservation.id,
+    code,
+    pagarmeChargeId: charge.id,
+    amount: pagarme.fromCents(charge.paid_amount ?? charge.amount),
+    provider: 'pagarme',
+  });
+}
+
+/** Cancels a ticket purchase and the tickets that have not entered yet. */
+async function cancelEventReservation(
+  client: pg.PoolClient,
+  where: string,
+  params: unknown[],
+): Promise<pg.QueryResultRow | null> {
+  const cancelled = await client.query(
+    `UPDATE event_reservations
+        SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW()
+      WHERE ${where}
+      RETURNING id, code, buyer_name, buyer_email, total_cents`,
+    params
+  );
+  const row = cancelled.rows[0];
+  if (!row) return null;
+  await client.query(
+    `UPDATE event_tickets SET status = 'cancelled', updated_at = NOW()
+      WHERE reservation_id = $1 AND status IN ('pending', 'valid')`,
+    [row.id]
+  );
+  return row;
+}
+
 async function settleClubPayment(
   client: pg.PoolClient,
   charge: pagarme.PagarmeCharge,
@@ -437,6 +541,17 @@ async function handlePaymentFailed(
   const charge = extractCharge(event);
   if (!charge?.id) return;
   const metadata = metadataOf(event, charge);
+
+  // A ticket PIX that failed leaves the reservation pending: the expiry sweep
+  // closes it, and a retry is a new reservation.
+  if (metadata.kind === 'event_reservation') {
+    await auditLog('event.reservation_payment_failed', null, {
+      reservationId: metadata.reservationId ?? null,
+      pagarmeChargeId: charge.id,
+      providerStatus: charge.status,
+    });
+    return;
+  }
 
   // A shop order records the decline but is **not** cancelled.
   //
@@ -554,7 +669,34 @@ async function handleRefunded(
     return;
   }
 
-  // Not a shop order — a club payment then.
+  // A ticket purchase: refunded money voids the tickets that have not entered.
+  // A cancel made in our panel refunds first and finds nothing left to do here.
+  const reservation = await cancelEventReservation(
+    client,
+    `pagarme_charge_id = $1 AND status <> 'cancelled'`,
+    [charge.id]
+  );
+  if (reservation) {
+    deferred.adminNotices.push({
+      event: 'payment_refunded',
+      subject: `Ingressos — reserva ${reservation.code}`,
+      amount: pagarme.fromCents(Number(reservation.total_cents)),
+      method: charge.payment_method ?? null,
+      customerName: reservation.buyer_name as string,
+      customerEmail: reservation.buyer_email as string,
+      link: '/admin?tab=events',
+      chargeId: charge.id,
+    });
+    await auditLog('event.reservation_refunded_via_provider', null, {
+      reservationId: reservation.id,
+      code: reservation.code,
+      pagarmeChargeId: charge.id,
+      provider: 'pagarme',
+    });
+    return;
+  }
+
+  // Not a shop order nor a ticket — a club payment then.
   const payment = await client.query(
     `UPDATE payments SET status = 'refunded', updated_at = NOW()
       WHERE pagarme_charge_id = $1 AND status <> 'refunded'
@@ -598,7 +740,21 @@ async function handleOrderCanceled(
     [pagarmeOrderId, charge?.id ?? null, orderIdFromMeta]
   );
   const row = cancelled.rows[0];
-  if (!row) return;
+  if (!row) {
+    const reservation = await cancelEventReservation(
+      client,
+      `status = 'pending' AND (pagarme_order_id = $1 OR pagarme_charge_id = $2)`,
+      [pagarmeOrderId, charge?.id ?? null]
+    );
+    if (reservation) {
+      await auditLog('event.reservation_payment_cancelled', null, {
+        reservationId: reservation.id,
+        pagarmeOrderId,
+        provider: 'pagarme',
+      });
+    }
+    return;
+  }
 
   // The hold outlives the order otherwise: the TTL sweep only visits `pending`.
   await releaseReservation(client, row.id as string);
