@@ -209,11 +209,11 @@ export default function PDV() {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Mode Toggle */}
-        <div className="flex gap-2 mb-6">
+        <div className="mb-6 grid grid-cols-3 gap-2">
           <Button
             variant={mode === 'search' ? 'default' : 'outline'}
             onClick={() => { setMode('search'); setShowScanner(false); setResult(null) }}
-            className="flex-1"
+            className="h-auto min-w-0 flex-col gap-1 px-1 py-2 text-xs sm:flex-row sm:gap-2 sm:text-sm"
           >
             <Search className="h-4 w-4" />
             Buscar CPF
@@ -221,7 +221,7 @@ export default function PDV() {
           <Button
             variant={mode === 'scanner' ? 'default' : 'outline'}
             onClick={() => { setMode('scanner'); setShowScanner(true); setResult(null) }}
-            className="flex-1"
+            className="h-auto min-w-0 flex-col gap-1 px-1 py-2 text-xs sm:flex-row sm:gap-2 sm:text-sm"
           >
             <Camera className="h-4 w-4" />
             Scanner QR
@@ -229,7 +229,7 @@ export default function PDV() {
           <Button
             variant={mode === 'door' ? 'default' : 'outline'}
             onClick={() => { setMode('door'); setShowScanner(false); setResult(null) }}
-            className="flex-1"
+            className="h-auto min-w-0 flex-col gap-1 px-1 py-2 text-xs sm:flex-row sm:gap-2 sm:text-sm"
           >
             <Ticket className="h-4 w-4" />
             Portaria
