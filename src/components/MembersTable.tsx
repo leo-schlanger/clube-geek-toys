@@ -115,10 +115,6 @@ export function MembersTable({
     [selectedIds, confirm, onRefetch]
   )
 
-  const handleBulkEmail = useCallback(() => {
-    toast.info('Funcionalidade em desenvolvimento')
-  }, [])
-
   // Table columns configuration
   const columns: Column<Member>[] = useMemo(
     () => [
@@ -417,16 +413,6 @@ export function MembersTable({
               >
                 <PowerOff className="h-3.5 w-3.5" />
                 Desativar
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={bulkLoading}
-                onClick={handleBulkEmail}
-                className="gap-1.5"
-              >
-                <Mail className="h-3.5 w-3.5" />
-                Email
               </Button>
             </div>
           )}

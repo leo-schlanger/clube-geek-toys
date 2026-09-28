@@ -262,6 +262,16 @@ describe('MembersTable', () => {
       expect(screen.getByText(/1 selecionado/)).toBeInTheDocument()
     })
 
+    // The bulk "Email" only answered "Funcionalidade em desenvolvimento".
+    it('does not offer a bulk email action that does nothing', async () => {
+      const user = userEvent.setup()
+      render(<MembersTable {...defaultProps} />)
+
+      await user.click(screen.getByLabelText('Selecionar Maria Santos'))
+
+      expect(screen.queryByRole('button', { name: /^Email$/ })).toBeNull()
+    })
+
     it('does not show bulk actions bar by default', () => {
       render(<MembersTable {...defaultProps} />)
       expect(screen.queryByText(/selecionado\(s\)/)).not.toBeInTheDocument()
