@@ -8,6 +8,7 @@ import { Save, RotateCcw, AlertTriangle, Loader2, Database, Palette, Building2 }
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 import { ThemeToggle } from '../ThemeToggle'
 import { MelhorEnvioCard } from './MelhorEnvioCard'
+import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 
 interface SettingsState {
   values: Record<string, unknown>
@@ -134,7 +135,7 @@ export function SettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Configuração do Plano</CardTitle>
-          <CardDescription>Defina o preço mensal e o desconto do clube</CardDescription>
+          <CardDescription>Preço mensal do clube e o desconto que o membro tem na loja</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6 max-w-xl">
@@ -149,13 +150,14 @@ export function SettingsTab() {
               />
             </div>
             <div>
-              <Label className="text-xs">Desconto em Produtos (%)</Label>
-              <Input
-                type="number"
-                value={num('plan.club.discount_products')}
-                onChange={(e) => setValue('plan.club.discount_products', parseInt(e.target.value) || 0)}
-                className="mt-1"
-              />
+              <Label className="text-xs">Desconto do membro na loja</Label>
+              {/* Fixed in the Terms of Use; changing it is a deploy, not a setting. */}
+              <p className="mt-1 flex h-10 items-center text-sm font-semibold">
+                {MEMBER_DISCOUNT_PERCENT}%
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Fixo — está nos Termos de Uso. Para mudar, fale com o desenvolvedor.
+              </p>
             </div>
           </div>
         </CardContent>

@@ -50,7 +50,6 @@ vi.mock('lucide-react', () => {
 const fakeSettings = {
   values: {
     'pricing.club_annual': 12.5,
-    'plan.club.discount_products': 15,
     'payment.duplicate_window_days': 3,
   },
   catalogue: [
@@ -259,7 +258,7 @@ describe('SettingsTab', () => {
 
   // ── Input types / fields ──
 
-  it('renders monthly price and product discount inputs', async () => {
+  it('renders the monthly price input and the fixed member discount', async () => {
     mockGetSettings.mockResolvedValue(fakeSettings)
     render(<SettingsTab />)
 
@@ -268,9 +267,11 @@ describe('SettingsTab', () => {
     })
 
     expect(screen.getByText('Preço Mensal (R$)')).toBeInTheDocument()
-    expect(screen.getByText('Desconto em Produtos (%)')).toBeInTheDocument()
     expect(screen.getByDisplayValue('12.5')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('15')).toBeInTheDocument()
+    // The discount is not a setting: nothing reads one, and the Terms fix 10%.
+    expect(screen.getByText('Desconto do membro na loja')).toBeInTheDocument()
+    expect(screen.getByText('10%')).toBeInTheDocument()
+    expect(screen.queryByText('Desconto em Produtos (%)')).not.toBeInTheDocument()
   })
 
   it('renders duplicate window days input', async () => {
