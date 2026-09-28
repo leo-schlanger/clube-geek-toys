@@ -326,3 +326,19 @@ export async function checkInTicket(code: string): Promise<CheckInResponse> {
     }
   )
 }
+
+export interface EventDoorStats {
+  eventId: string
+  pending: number
+  valid: number
+  used: number
+  cancelled: number
+}
+
+/** Door counters for one event; open to sellers, unlike the reservation list. */
+export async function getEventDoorStats(eventId: string): Promise<EventDoorStats | null> {
+  const result = await api.get<EventDoorStats>(
+    `/events/admin/${encodeURIComponent(eventId)}/stats`
+  )
+  return result.data ?? null
+}

@@ -6,11 +6,8 @@ import {
   CheckCircle2,
   ExternalLink,
   History,
-  QrCode,
-  ScanLine,
   Search,
   Ticket,
-  XCircle,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
@@ -18,8 +15,8 @@ import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
 import { Loading } from '../ui/loading'
 import { Pagination } from '../ui/pagination'
-import { QRScanner } from '../QRScanner'
 import { logger } from '../../lib/logger'
+import { TicketCheckIn } from '../TicketCheckIn'
 import {
   formatEventDay,
   isEventOver,
@@ -31,12 +28,9 @@ import { listEvents } from '../../lib/events'
 import {
   adminListReservations,
   cancelReservation,
-  checkInTicket,
   confirmReservation,
   dayAndTime,
-  extractTicketCode,
   ticketSituation,
-  type CheckInResponse,
   type EventReservation,
   type ReservationStatus,
 } from '../../lib/event-tickets'
@@ -91,10 +85,6 @@ export function EventTicketsTab() {
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const [scannerOpen, setScannerOpen] = useState(false)
-  const [manualCode, setManualCode] = useState('')
-  const [checking, setChecking] = useState(false)
-  const [lastCheckIn, setLastCheckIn] = useState<CheckInResponse | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -211,23 +201,6 @@ export function EventTicketsTab() {
     }
   }, [])
 
-  const runCheckIn = useCallback(async (rawCode: string) => {
-    const code = extractTicketCode(rawCode)
-    if (!code) return
-    setChecking(true)
-    try {
-      const result = await checkInTicket(code)
-      setLastCheckIn(result)
-      if (result.ok) toast.success(`Entrada liberada — ${result.ticket.attendeeName}`)
-      else toast.error(result.message)
-    } catch (error) {
-      logger.error('Error checking in ticket:', error)
-      toast.error('Erro ao validar o ingresso')
-    } finally {
-      setChecking(false)
-    }
-  }, [])
-
   const ticketsPaid = summary.ticketsValid + summary.ticketsUsed
   const filterCount: Partial<Record<FilterId, number>> = {
     confirmed: summary.confirmed,
@@ -263,7 +236,6 @@ export function EventTicketsTab() {
               onChange={(e) => {
                 setEventId(e.target.value)
                 setPage(1)
-                setLastCheckIn(null)
               }}
               className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-md"
             >
@@ -313,98 +285,8 @@ export function EventTicketsTab() {
         </CardContent>
       </Card>
 
-      {!selectedOver && (
-        <Card className="border-primary/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ScanLine className="h-5 w-5 text-primary" />
-              Portaria — check-in
-            </CardTitle>
-            <CardDescription>
-              Leia o QR do ingresso ou digite o código. Cada código vale{' '}
-              <strong>uma única entrada</strong>: na segunda leitura ele aparece como já utilizado.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {scannerOpen ? (
-              <QRScanner
-                onScan={(data) => {
-                  setScannerOpen(false)
-                  void runCheckIn(data)
-                }}
-                onClose={() => setScannerOpen(false)}
-              />
-            ) : (
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button className="gap-2" onClick={() => setScannerOpen(true)}>
-                  <QrCode className="h-4 w-4" />
-                  Abrir leitor de QR
-                </Button>
-                <form
-                  className="flex flex-1 gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    void runCheckIn(manualCode)
-                    setManualCode('')
-                  }}
-                >
-                  <Input
-                    value={manualCode}
-                    onChange={(e) => setManualCode(e.target.value)}
-                    placeholder="T-XXXX-XXXX-XXXX"
-                    className="font-mono uppercase"
-                  />
-                  <Button type="submit" variant="outline" disabled={checking || !manualCode.trim()}>
-                    Validar
-                  </Button>
-                </form>
-              </div>
-            )}
-
-            {lastCheckIn && (
-              <div
-                className={`rounded-xl border-2 p-4 ${
-                  lastCheckIn.ok
-                    ? 'border-green-500 bg-green-500/10'
-                    : 'border-destructive bg-destructive/10'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {lastCheckIn.ok ? (
-                    <CheckCircle2 className="h-8 w-8 shrink-0 text-green-500" />
-                  ) : (
-                    <XCircle className="h-8 w-8 shrink-0 text-destructive" />
-                  )}
-                  <div>
-                    <p
-                      className={`font-heading text-lg font-bold ${
-                        lastCheckIn.ok ? 'text-green-500' : 'text-destructive'
-                      }`}
-                    >
-                      {lastCheckIn.ok ? 'ENTRADA LIBERADA' : 'ENTRADA NEGADA'}
-                    </p>
-                    <p className="text-sm font-semibold">
-                      {lastCheckIn.ok
-                        ? lastCheckIn.ticket.attendeeName
-                        : (lastCheckIn.ticket?.attendeeName ?? '—')}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {lastCheckIn.ok
-                        ? [
-                            lastCheckIn.eventTitle,
-                            TICKET_KIND_LABEL[lastCheckIn.ticket.kind],
-                            `reserva de ${lastCheckIn.buyerName}`,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')
-                        : lastCheckIn.message}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {eventId && !selectedOver && (
+        <TicketCheckIn key={eventId} onChecked={() => void fetchReservations()} />
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

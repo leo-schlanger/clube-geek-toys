@@ -107,6 +107,19 @@ queimado. A janela está no próprio `UPDATE` (relógio do banco, uma instruçã
 só). Um ingresso já usado em evento passado diz o dia e o evento. Entrada
 liberada mostra também o nome do evento.
 
+### Portaria no PDV (28/09/2026)
+
+O vendedor faz a portaria pelo **PDV** (`/pdv`, botão **Portaria**), sem conta
+de admin. É o mesmo componente da aba Ingressos (`TicketCheckIn`), então as
+duas telas respondem igual: leitor de QR, código digitado, ENTRADA LIBERADA /
+NEGADA com o motivo. Em cima, o evento publicado (`GET /events/active`) e três
+contadores — já entraram, ainda vão entrar, aguardando pagamento — de
+`GET /events/admin/:eventId/stats`, que já aceitava `seller`; atualizam a cada
+leitura. Sem evento publicado e em andamento/futuro, o PDV diz isso em vez de
+mostrar números de um evento velho (o `FALLBACK_EVENT` embutido é passado). O
+vendedor não vê a lista de compradores: `GET /events/admin/reservations`
+continua só de admin, porque traz CPF, e-mail e telefone.
+
 ### Validação do cadastro (28/09/2026)
 
 O valor da entrada é o que o PIX cobra, então o painel passou a recusar o que
@@ -365,8 +378,7 @@ uma família barrada na porta no domingo.
   > conseguia pagar nem confirmar. Foi lançada à mão (`R-PWW2-ZVLZ`). Antes
   > dela, o sistema inteiro tinha **uma** reserva registrada.
 
-- A API aceita check-in de `seller`, mas a tela vive no painel admin, que só
-  abre para `admin`. Na prática a portaria roda com a conta da Laura; para o
-  vendedor operar sozinho, a tela precisa de um atalho no PDV.
+- ~~A API aceita check-in de `seller`, mas a tela vive no painel admin~~ —
+  resolvido em 28/09/2026: o PDV ganhou o modo **Portaria** (ver abaixo).
 - Não há limite de capacidade do evento (lotação). Se precisar, o lugar é uma
   contagem por `event_id` em `event_tickets` antes do INSERT.

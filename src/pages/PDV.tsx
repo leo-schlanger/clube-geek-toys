@@ -11,6 +11,7 @@ import { QRScanner } from '../components/QRScanner'
 import { CLUB_PLAN, type Member } from '../types'
 import { formatCPF, getStatusLabel } from '../lib/utils'
 import { getMemberByCPF, getMemberById, isMemberActive } from '../lib/members'
+import { PDVDoor } from '../components/PDVDoor'
 
 // Validation schema for the member QR code
 const qrCodeSchema = z.object({
@@ -31,6 +32,7 @@ import {
   RefreshCw,
   LogOut,
   Percent,
+  Ticket,
 } from 'lucide-react'
 import { ThemeToggle } from '../components/ThemeToggle'
 
@@ -42,7 +44,7 @@ interface VerificationResult {
 
 export default function PDV() {
   const { signOut } = useAuth()
-  const [mode, setMode] = useState<'scanner' | 'search'>('search')
+  const [mode, setMode] = useState<'scanner' | 'search' | 'door'>('search')
   const [showScanner, setShowScanner] = useState(false)
   const [cpfSearch, setCpfSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -193,7 +195,7 @@ export default function PDV() {
             <img src="/logo.jpg" alt="GeekPop & Toys" className="h-10 rounded" />
             <div>
               <h1 className="font-heading font-bold">PDV - Clube GeekPop & Toys</h1>
-              <p className="text-xs text-muted-foreground">Verificação de membros</p>
+              <p className="text-xs text-muted-foreground">Verificação de membros e portaria</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -210,7 +212,7 @@ export default function PDV() {
         <div className="flex gap-2 mb-6">
           <Button
             variant={mode === 'search' ? 'default' : 'outline'}
-            onClick={() => { setMode('search'); setShowScanner(false) }}
+            onClick={() => { setMode('search'); setShowScanner(false); setResult(null) }}
             className="flex-1"
           >
             <Search className="h-4 w-4" />
@@ -218,13 +220,23 @@ export default function PDV() {
           </Button>
           <Button
             variant={mode === 'scanner' ? 'default' : 'outline'}
-            onClick={() => { setMode('scanner'); setShowScanner(true) }}
+            onClick={() => { setMode('scanner'); setShowScanner(true); setResult(null) }}
             className="flex-1"
           >
             <Camera className="h-4 w-4" />
             Scanner QR
           </Button>
+          <Button
+            variant={mode === 'door' ? 'default' : 'outline'}
+            onClick={() => { setMode('door'); setShowScanner(false); setResult(null) }}
+            className="flex-1"
+          >
+            <Ticket className="h-4 w-4" />
+            Portaria
+          </Button>
         </div>
+
+        {mode === 'door' && <PDVDoor />}
 
         {/* Search Mode */}
         {mode === 'search' && (

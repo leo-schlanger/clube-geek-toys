@@ -58,6 +58,11 @@ vi.mock('lucide-react', () => {
     RefreshCw: icon,
     LogOut: icon,
     Percent: icon,
+    Ticket: icon,
+    CalendarDays: icon,
+    CheckCircle2: icon,
+    QrCode: icon,
+    ScanLine: icon,
     Moon: icon,
     Sun: icon,
     Monitor: icon,
@@ -81,6 +86,19 @@ vi.mock('../components/QRScanner', () => ({
       <button data-testid="qr-close" onClick={onClose}>Close</button>
     </div>
   ),
+}))
+
+const door = vi.hoisted(() => ({
+  getActiveEvent: vi.fn(),
+  getEventDoorStats: vi.fn(),
+  checkInTicket: vi.fn(),
+}))
+
+vi.mock('../lib/events', () => ({ getActiveEvent: door.getActiveEvent }))
+vi.mock('../lib/event-tickets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/event-tickets')>()),
+  getEventDoorStats: door.getEventDoorStats,
+  checkInTicket: door.checkInTicket,
 }))
 
 // Import after all mocks
@@ -123,7 +141,7 @@ describe('PDV', () => {
   it('renders the PDV header', () => {
     render(<PDV />)
     expect(screen.getByText('PDV - Clube GeekPop & Toys')).toBeInTheDocument()
-    expect(screen.getByText('Verificação de membros')).toBeInTheDocument()
+    expect(screen.getByText('Verificação de membros e portaria')).toBeInTheDocument()
   })
 
   // ─── Mode Toggle ──────────────────────────────────────────
@@ -297,3 +315,78 @@ describe('PDV', () => {
     })
   })
 })
+
+describe('PDV — portaria', () => {
+  const EVENT = {
+    id: 'evento-geekpop',
+    status: 'published',
+    title: 'Evento GeeKpop!',
+    startsAt: '2099-10-11T14:00:00-03:00',
+    endsAt: '2099-10-11T18:00:00-03:00',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    door.getActiveEvent.mockResolvedValue(EVENT)
+    door.getEventDoorStats.mockResolvedValue({
+      eventId: EVENT.id,
+      pending: 1,
+      valid: 12,
+      used: 5,
+      cancelled: 0,
+    })
+  })
+
+  it('o vendedor valida ingresso pelo PDV e os contadores se atualizam', async () => {
+    door.checkInTicket.mockResolvedValue({
+      ok: true,
+      ticket: { attendeeName: 'Ana Souza', kind: 'full' },
+      buyerName: 'Ana Souza',
+      eventTitle: 'Evento GeeKpop!',
+    })
+    const user = userEvent.setup()
+    render(<PDV />)
+
+    await user.click(screen.getByRole('button', { name: /Portaria/ }))
+
+    expect(await screen.findByText('Evento GeeKpop!')).toBeInTheDocument()
+    expect(await screen.findByText('12')).toBeInTheDocument()
+    expect(door.getEventDoorStats).toHaveBeenCalledWith('evento-geekpop')
+
+    await user.type(screen.getByLabelText('Código do ingresso'), 't-aaaa-bbbb-cccc')
+    await user.click(screen.getByRole('button', { name: 'Validar' }))
+
+    expect(await screen.findByText('ENTRADA LIBERADA')).toBeInTheDocument()
+    expect(door.checkInTicket).toHaveBeenCalledWith('T-AAAA-BBBB-CCCC')
+    await waitFor(() => expect(door.getEventDoorStats).toHaveBeenCalledTimes(2))
+  })
+
+  it('mostra o motivo quando a portaria nega', async () => {
+    door.checkInTicket.mockResolvedValue({
+      ok: false,
+      reason: 'wrong_event',
+      message: 'Este ingresso é de outro evento: Photocard Trading (20/09). Não vale para hoje.',
+    })
+    const user = userEvent.setup()
+    render(<PDV />)
+
+    await user.click(screen.getByRole('button', { name: /Portaria/ }))
+    await user.type(await screen.findByLabelText('Código do ingresso'), 'T-1')
+    await user.click(screen.getByRole('button', { name: 'Validar' }))
+
+    expect(await screen.findByText('ENTRADA NEGADA')).toBeInTheDocument()
+    expect(screen.getByText(/de outro evento/)).toBeInTheDocument()
+  })
+
+  it('sem evento publicado, avisa em vez de mostrar números de um evento velho', async () => {
+    door.getActiveEvent.mockResolvedValue({ ...EVENT, startsAt: '2020-01-01T14:00:00-03:00', endsAt: '2020-01-01T18:00:00-03:00' })
+    const user = userEvent.setup()
+    render(<PDV />)
+
+    await user.click(screen.getByRole('button', { name: /Portaria/ }))
+
+    expect(await screen.findByText(/Nenhum evento publicado no momento/)).toBeInTheDocument()
+    expect(door.getEventDoorStats).not.toHaveBeenCalled()
+  })
+})
+

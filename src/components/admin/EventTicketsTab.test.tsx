@@ -222,6 +222,7 @@ describe('EventTicketsTab', () => {
     const user = userEvent.setup()
     render(<EventTicketsTab />)
 
+    await screen.findByText('Próximo evento')
     await user.type(await screen.findByPlaceholderText('T-XXXX-XXXX-XXXX'), 'T-1')
     await user.click(screen.getByRole('button', { name: 'Validar' }))
 
