@@ -39,6 +39,8 @@ vi.mock('lucide-react', () => {
     Database: icon,
     Palette: icon,
     Building2: icon,
+    BadgePercent: icon,
+    Bell: icon,
     Moon: icon,
     Sun: icon,
     Monitor: icon,
@@ -51,6 +53,13 @@ const fakeSettings = {
   values: {
     'pricing.club_annual': 12.5,
     'payment.duplicate_window_days': 3,
+    'shop.online_discount_enabled': true,
+    'shop.online_discount_percent': 5,
+    'shop.online_discount_banner_enabled': true,
+    'shop.online_discount_banner_text': 'No site é 5% mais barato',
+    'notifications.admin_payment_inapp': true,
+    'notifications.admin_payment_email': false,
+    'notifications.admin_payment_min_amount': 50,
   },
   catalogue: [
     { key: 'pricing.club_annual', default: 12.5, type: 'number' as const, description: 'Club monthly price' },
@@ -282,5 +291,36 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Dias da janela')).toBeInTheDocument()
     })
     expect(screen.getByDisplayValue('3')).toBeInTheDocument()
+  })
+
+  // The Coupons tab sends staff here for the site promotion; the card has to exist.
+  it('mostra a promoção da loja online com os valores salvos', async () => {
+    mockGetSettings.mockResolvedValue(fakeSettings)
+    render(<SettingsTab />)
+
+    expect(await screen.findByText('Promoção da loja online')).toBeInTheDocument()
+    expect(screen.getByLabelText('Desconto (%)')).toHaveValue(5)
+    expect(screen.getByLabelText('Texto do aviso')).toHaveValue('No site é 5% mais barato')
+    expect(screen.getByRole('checkbox', { name: 'Promoção ligada' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Mandar e-mail' })).not.toBeChecked()
+    expect(screen.getByLabelText('Só mandar e-mail a partir de (R$)')).toHaveValue(50)
+  })
+
+  it('salva só a chave da promoção que mudou', async () => {
+    const user = userEvent.setup()
+    mockGetSettings.mockResolvedValue(fakeSettings)
+    mockUpdateSettings.mockResolvedValue({
+      values: { ...fakeSettings.values, 'shop.online_discount_percent': 8 },
+    })
+    render(<SettingsTab />)
+
+    const percent = await screen.findByLabelText('Desconto (%)')
+    await user.clear(percent)
+    await user.type(percent, '8')
+    await user.click(screen.getByText('Salvar Configurações'))
+
+    await waitFor(() =>
+      expect(mockUpdateSettings).toHaveBeenCalledWith({ 'shop.online_discount_percent': 8 })
+    )
   })
 })

@@ -441,6 +441,7 @@ export default function AdminDashboard() {
                 {activeTab === 'stock' && 'Estoque'}
                 {activeTab === 'orders' && 'Pedidos'}
                 {activeTab === 'wholesale' && 'Atacado'}
+                {activeTab === 'coupons' && 'Cupons'}
                 {activeTab === 'reviews' && 'Avaliações'}
                 {activeTab === 'questions' && 'Perguntas'}
                 {activeTab === 'event-config' && 'Eventos'}
@@ -459,6 +460,7 @@ export default function AdminDashboard() {
                 {activeTab === 'stock' && 'Ajuste estoque e acompanhe a movimentação'}
                 {activeTab === 'orders' && 'Acompanhe e gerencie os pedidos'}
                 {activeTab === 'wholesale' && 'Aprove CNPJ e gerencie atacadistas (−25%)'}
+                {activeTab === 'coupons' && 'Códigos de desconto para campanhas'}
                 {activeTab === 'reviews' && 'Modere avaliações da loja'}
                 {activeTab === 'questions' && 'Responda as perguntas dos clientes'}
                 {activeTab === 'event-config' && 'Crie, publique e encerre os eventos da loja e do site'}

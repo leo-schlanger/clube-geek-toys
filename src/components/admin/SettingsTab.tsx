@@ -4,7 +4,17 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { toast } from 'sonner'
-import { Save, RotateCcw, AlertTriangle, Loader2, Database, Palette, Building2 } from 'lucide-react'
+import {
+  Save,
+  RotateCcw,
+  AlertTriangle,
+  Loader2,
+  Database,
+  Palette,
+  Building2,
+  BadgePercent,
+  Bell,
+} from 'lucide-react'
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 import { ThemeToggle } from '../ThemeToggle'
 import { MelhorEnvioCard } from './MelhorEnvioCard'
@@ -211,6 +221,114 @@ export function SettingsTab() {
               </span>
             </span>
           </label>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BadgePercent className="h-5 w-5 text-primary" />
+            Promoção da loja online
+          </CardTitle>
+          <CardDescription>
+            Desconto que vale para todo mundo que compra pelo site. Só um desconto vale por
+            pedido: o maior entre esta promoção, o cupom e o desconto de membro.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex max-w-xl cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-primary"
+              checked={bool('shop.online_discount_enabled')}
+              onChange={(e) => setValue('shop.online_discount_enabled', e.target.checked)}
+            />
+            <span className="text-sm font-medium">Promoção ligada</span>
+          </label>
+          <div className="max-w-xs">
+            <Label className="text-xs" htmlFor="promo-percent">
+              Desconto (%)
+            </Label>
+            <Input
+              id="promo-percent"
+              type="number"
+              min={0}
+              max={90}
+              value={num('shop.online_discount_percent')}
+              onChange={(e) =>
+                setValue('shop.online_discount_percent', parseFloat(e.target.value) || 0)
+              }
+              className="mt-1"
+            />
+          </div>
+          <label className="flex max-w-xl cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-primary"
+              checked={bool('shop.online_discount_banner_enabled')}
+              onChange={(e) => setValue('shop.online_discount_banner_enabled', e.target.checked)}
+            />
+            <span className="text-sm font-medium">Mostrar aviso no topo da loja</span>
+          </label>
+          <div className="max-w-xl">
+            <Label className="text-xs" htmlFor="promo-banner">
+              Texto do aviso
+            </Label>
+            <Input
+              id="promo-banner"
+              maxLength={160}
+              value={typeof draft['shop.online_discount_banner_text'] === 'string' ? (draft['shop.online_discount_banner_text'] as string) : ''}
+              onChange={(e) => setValue('shop.online_discount_banner_text', e.target.value)}
+              className="mt-1"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-primary" />
+            Avisos de pagamento para a equipe
+          </CardTitle>
+          <CardDescription>Como a equipe fica sabendo quando entra um pagamento.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex max-w-xl cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-primary"
+              checked={bool('notifications.admin_payment_inapp')}
+              onChange={(e) => setValue('notifications.admin_payment_inapp', e.target.checked)}
+            />
+            <span className="text-sm font-medium">Avisar no sino do painel</span>
+          </label>
+          <label className="flex max-w-xl cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-primary"
+              checked={bool('notifications.admin_payment_email')}
+              onChange={(e) => setValue('notifications.admin_payment_email', e.target.checked)}
+            />
+            <span className="text-sm font-medium">Mandar e-mail</span>
+          </label>
+          <div className="max-w-xs">
+            <Label className="text-xs" htmlFor="notify-min">
+              Só mandar e-mail a partir de (R$)
+            </Label>
+            <Input
+              id="notify-min"
+              type="number"
+              min={0}
+              step="0.01"
+              value={num('notifications.admin_payment_min_amount')}
+              onChange={(e) =>
+                setValue('notifications.admin_payment_min_amount', parseFloat(e.target.value) || 0)
+              }
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">0 = todo pagamento manda e-mail.</p>
+          </div>
         </CardContent>
       </Card>
 
