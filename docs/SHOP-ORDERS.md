@@ -144,6 +144,14 @@ Quatro chaves no `SETTINGS_CATALOGUE`, editáveis na aba **Configurações**:
 | `shop.online_discount_banner_enabled` | `true` | Mostra o aviso no topo da loja |
 | `shop.online_discount_banner_text`    | —      | Texto do aviso                 |
 
+Até 28/09/2026 "editáveis na aba Configurações" era só verdade no catálogo:
+a aba é escrita à mão e nunca desenhou essas chaves, e a aba **Cupons** mandava a
+equipe para lá procurar um controle que não existia. Agora há o cartão
+**Promoção da loja online** (liga/desliga, %, aviso e texto) e, ao lado, **Avisos
+de pagamento para a equipe** (`notifications.admin_payment_*`), que tinham o
+mesmo problema. Chave nova no catálogo precisa de campo em `SettingsTab.tsx`
+também.
+
 `GET /promo` é público (Cache-Control 60s) porque o aviso pinta antes de
 qualquer login. O aviso é dispensável e a dispensa é **por percentual**: quem
 fechou "5% mais barato" ainda vê "20% mais barato" na campanha seguinte.

@@ -48,6 +48,11 @@ o texto.
 
 ### A armadilha que existia
 
+> Resto encontrado em 28/09/2026: a chave saiu do servidor, mas o campo
+> **"Desconto em Produtos (%)"** continuava na aba Configurações, lendo **0%**.
+> Agora a aba mostra o desconto fixo (10%, de `MEMBER_DISCOUNT_PERCENT`) como
+> texto, sem campo editável.
+
 Havia no catálogo de configurações a chave **`plan.club.discount_products`**,
 com padrão **15**, descrita como _"Desconto do membro em produtos (%)"_,
 editável e salvável na aba Configurações — e **nada no código lia esse valor**.
