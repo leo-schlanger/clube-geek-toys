@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import {
   CalendarCheck,
+  CalendarDays,
   CheckCircle2,
   ExternalLink,
+  History,
   QrCode,
   ScanLine,
   Search,
@@ -18,14 +20,22 @@ import { Loading } from '../ui/loading'
 import { Pagination } from '../ui/pagination'
 import { QRScanner } from '../QRScanner'
 import { logger } from '../../lib/logger'
-import { TICKET_KIND_LABEL } from '../../data/event'
+import {
+  formatEventDay,
+  isEventOver,
+  pickCurrentEvent,
+  TICKET_KIND_LABEL,
+  type EventConfig,
+} from '../../data/event'
+import { listEvents } from '../../lib/events'
 import {
   adminListReservations,
   cancelReservation,
   checkInTicket,
   confirmReservation,
+  dayAndTime,
   extractTicketCode,
-  TICKET_STATUS_LABEL,
+  ticketSituation,
   type CheckInResponse,
   type EventReservation,
   type ReservationStatus,
@@ -37,14 +47,28 @@ const PAGE_SIZE = 20
 type FilterId = ReservationStatus | 'all'
 
 const FILTERS: { id: FilterId; label: string }[] = [
+  { id: 'confirmed', label: 'Pagas' },
   { id: 'pending', label: 'Aguardando pagamento' },
-  { id: 'confirmed', label: 'Confirmadas' },
   { id: 'cancelled', label: 'Canceladas' },
   { id: 'all', label: 'Todas' },
 ]
 
+/** `eventId` value that lists every event together. */
+const ALL_EVENTS = '__all__'
+
+const RIO = 'America/Sao_Paulo'
+
 function brl(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function shortDay(iso: string): string {
+  return new Date(iso).toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: RIO,
+  })
 }
 
 export function EventTicketsTab() {
@@ -59,7 +83,9 @@ export function EventTicketsTab() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
-  const [filter, setFilter] = useState<FilterId>('pending')
+  const [filter, setFilter] = useState<FilterId>('confirmed')
+  const [events, setEvents] = useState<EventConfig[] | null>(null)
+  const [eventId, setEventId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -70,11 +96,41 @@ export function EventTicketsTab() {
   const [checking, setChecking] = useState(false)
   const [lastCheckIn, setLastCheckIn] = useState<CheckInResponse | null>(null)
 
+  useEffect(() => {
+    let cancelled = false
+    listEvents()
+      .then((list) => {
+        if (cancelled) return
+        setEvents(list)
+        setEventId(pickCurrentEvent(list)?.id ?? ALL_EVENTS)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        logger.error('Error fetching events:', error)
+        setEvents([])
+        setEventId(ALL_EVENTS)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const selectedEvent = events?.find((e) => e.id === eventId) ?? null
+  const selectedOver = selectedEvent ? isEventOver(selectedEvent) : false
+  const upcomingEvents = (events ?? [])
+    .filter((e) => !isEventOver(e))
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+  const pastEvents = (events ?? [])
+    .filter((e) => isEventOver(e))
+    .sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))
+
   const fetchReservations = useCallback(async () => {
+    if (!eventId) return
     setLoading(true)
     try {
       const result = await adminListReservations({
         status: filter === 'all' ? undefined : filter,
+        eventId: eventId === ALL_EVENTS ? undefined : eventId,
         search: appliedSearch || undefined,
         page,
         limit: pageSize,
@@ -87,7 +143,7 @@ export function EventTicketsTab() {
       toast.error('Erro ao carregar as reservas')
     }
     setLoading(false)
-  }, [filter, appliedSearch, page, pageSize])
+  }, [eventId, filter, appliedSearch, page, pageSize])
 
   useEffect(() => {
     fetchReservations()
@@ -172,100 +228,218 @@ export function EventTicketsTab() {
     }
   }, [])
 
+  const ticketsPaid = summary.ticketsValid + summary.ticketsUsed
+  const filterCount: Partial<Record<FilterId, number>> = {
+    confirmed: summary.confirmed,
+    pending: summary.pending,
+    cancelled: summary.cancelled,
+  }
+  const overFor = (id: string): boolean => {
+    if (eventId !== ALL_EVENTS) return selectedOver
+    const event = events?.find((e) => e.id === id)
+    return event ? isEventOver(event) : false
+  }
+
   return (
     <div className="space-y-6">
-      <Card className="border-primary/30">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ScanLine className="h-5 w-5 text-primary" />
-            Portaria — check-in
+            <CalendarDays className="h-5 w-5 text-primary" />
+            Qual evento?
           </CardTitle>
           <CardDescription>
-            Leia o QR do ingresso ou digite o código. Cada código vale{' '}
-            <strong>uma única entrada</strong>: na segunda leitura ele aparece como já utilizado.
+            Tudo nesta tela — números, compras e ingressos — é do evento escolhido aqui. Eventos
+            que já aconteceram ficam no <strong>Histórico</strong>.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {scannerOpen ? (
-            <QRScanner
-              onScan={(data) => {
-                setScannerOpen(false)
-                void runCheckIn(data)
-              }}
-              onClose={() => setScannerOpen(false)}
-            />
+        <CardContent className="space-y-3">
+          {events === null ? (
+            <Loading />
           ) : (
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button className="gap-2" onClick={() => setScannerOpen(true)}>
-                <QrCode className="h-4 w-4" />
-                Abrir leitor de QR
-              </Button>
-              <form
-                className="flex flex-1 gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void runCheckIn(manualCode)
-                  setManualCode('')
-                }}
-              >
-                <Input
-                  value={manualCode}
-                  onChange={(e) => setManualCode(e.target.value)}
-                  placeholder="T-XXXX-XXXX-XXXX"
-                  className="font-mono uppercase"
-                />
-                <Button type="submit" variant="outline" disabled={checking || !manualCode.trim()}>
-                  Validar
-                </Button>
-              </form>
-            </div>
+            <select
+              aria-label="Evento"
+              value={eventId}
+              onChange={(e) => {
+                setEventId(e.target.value)
+                setPage(1)
+                setLastCheckIn(null)
+              }}
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm sm:max-w-md"
+            >
+              {upcomingEvents.length > 0 && (
+                <optgroup label="Próximos eventos">
+                  {upcomingEvents.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.title} — {shortDay(e.startsAt)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {pastEvents.length > 0 && (
+                <optgroup label="Histórico — eventos que já aconteceram">
+                  {pastEvents.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.title} — {shortDay(e.startsAt)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              <option value={ALL_EVENTS}>Todos os eventos juntos</option>
+            </select>
           )}
 
-          {lastCheckIn && (
-            <div
-              className={`rounded-xl border-2 p-4 ${
-                lastCheckIn.ok
-                  ? 'border-green-500 bg-green-500/10'
-                  : 'border-destructive bg-destructive/10'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                {lastCheckIn.ok ? (
-                  <CheckCircle2 className="h-8 w-8 shrink-0 text-green-500" />
-                ) : (
-                  <XCircle className="h-8 w-8 shrink-0 text-destructive" />
-                )}
-                <div>
-                  <p
-                    className={`font-heading text-lg font-bold ${
-                      lastCheckIn.ok ? 'text-green-500' : 'text-destructive'
-                    }`}
-                  >
-                    {lastCheckIn.ok ? 'ENTRADA LIBERADA' : 'ENTRADA NEGADA'}
-                  </p>
-                  <p className="text-sm font-semibold">
-                    {lastCheckIn.ok
-                      ? lastCheckIn.ticket.attendeeName
-                      : (lastCheckIn.ticket?.attendeeName ?? '—')}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {lastCheckIn.ok
-                      ? `${TICKET_KIND_LABEL[lastCheckIn.ticket.kind]} · reserva de ${lastCheckIn.buyerName}`
-                      : lastCheckIn.message}
-                  </p>
-                </div>
+          {selectedEvent &&
+            (selectedOver ? (
+              <div
+                role="status"
+                className="flex items-start gap-3 rounded-xl border-2 border-amber-500/60 bg-amber-500/10 p-3 text-sm"
+              >
+                <History className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                <p>
+                  <strong>Histórico.</strong> Este evento já aconteceu (
+                  {formatEventDay(selectedEvent.startsAt)}). Os ingressos dele não valem para
+                  nenhum outro evento — a portaria recusa.
+                </p>
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                <span className="mr-2 rounded bg-green-500/15 px-2 py-0.5 text-xs font-semibold text-green-500">
+                  Próximo evento
+                </span>
+                {formatEventDay(selectedEvent.startsAt)}
+              </p>
+            ))}
         </CardContent>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {!selectedOver && (
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ScanLine className="h-5 w-5 text-primary" />
+              Portaria — check-in
+            </CardTitle>
+            <CardDescription>
+              Leia o QR do ingresso ou digite o código. Cada código vale{' '}
+              <strong>uma única entrada</strong>: na segunda leitura ele aparece como já utilizado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {scannerOpen ? (
+              <QRScanner
+                onScan={(data) => {
+                  setScannerOpen(false)
+                  void runCheckIn(data)
+                }}
+                onClose={() => setScannerOpen(false)}
+              />
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button className="gap-2" onClick={() => setScannerOpen(true)}>
+                  <QrCode className="h-4 w-4" />
+                  Abrir leitor de QR
+                </Button>
+                <form
+                  className="flex flex-1 gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void runCheckIn(manualCode)
+                    setManualCode('')
+                  }}
+                >
+                  <Input
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    placeholder="T-XXXX-XXXX-XXXX"
+                    className="font-mono uppercase"
+                  />
+                  <Button type="submit" variant="outline" disabled={checking || !manualCode.trim()}>
+                    Validar
+                  </Button>
+                </form>
+              </div>
+            )}
+
+            {lastCheckIn && (
+              <div
+                className={`rounded-xl border-2 p-4 ${
+                  lastCheckIn.ok
+                    ? 'border-green-500 bg-green-500/10'
+                    : 'border-destructive bg-destructive/10'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {lastCheckIn.ok ? (
+                    <CheckCircle2 className="h-8 w-8 shrink-0 text-green-500" />
+                  ) : (
+                    <XCircle className="h-8 w-8 shrink-0 text-destructive" />
+                  )}
+                  <div>
+                    <p
+                      className={`font-heading text-lg font-bold ${
+                        lastCheckIn.ok ? 'text-green-500' : 'text-destructive'
+                      }`}
+                    >
+                      {lastCheckIn.ok ? 'ENTRADA LIBERADA' : 'ENTRADA NEGADA'}
+                    </p>
+                    <p className="text-sm font-semibold">
+                      {lastCheckIn.ok
+                        ? lastCheckIn.ticket.attendeeName
+                        : (lastCheckIn.ticket?.attendeeName ?? '—')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {lastCheckIn.ok
+                        ? [
+                            lastCheckIn.eventTitle,
+                            TICKET_KIND_LABEL[lastCheckIn.ticket.kind],
+                            `reserva de ${lastCheckIn.buyerName}`,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')
+                        : lastCheckIn.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: 'Aguardando pagamento', value: summary.pending, tone: 'text-amber-500' },
-          { label: 'Reservas confirmadas', value: summary.confirmed, tone: 'text-green-500' },
-          { label: 'Ingressos válidos', value: summary.ticketsValid, tone: 'text-primary' },
-          { label: 'Já entraram', value: summary.ticketsUsed, tone: 'text-blue-400' },
+          {
+            label: 'Ingressos pagos',
+            hint: `em ${summary.confirmed} compra(s)`,
+            value: ticketsPaid,
+            tone: 'text-primary',
+          },
+          {
+            label: 'Já entraram',
+            hint: 'passaram pela portaria',
+            value: summary.ticketsUsed,
+            tone: 'text-blue-400',
+          },
+          selectedOver
+            ? {
+                label: 'Não compareceram',
+                hint: 'pagaram e não vieram',
+                value: summary.ticketsValid,
+                tone: 'text-muted-foreground',
+              }
+            : {
+                label: 'Ainda vão entrar',
+                hint: 'pagos, esperando o dia',
+                value: summary.ticketsValid,
+                tone: 'text-green-500',
+              },
+          {
+            label: 'Aguardando pagamento',
+            hint: 'PIX gerado, ainda não pago',
+            value: summary.pending,
+            tone: 'text-amber-500',
+          },
         ].map((item) => (
           <Card key={item.label}>
             <CardContent className="p-4">
@@ -273,6 +447,7 @@ export function EventTicketsTab() {
               <p className={`mt-1 font-heading text-2xl font-extrabold ${item.tone}`}>
                 {item.value}
               </p>
+              <p className="text-xs text-muted-foreground">{item.hint}</p>
             </CardContent>
           </Card>
         ))}
@@ -282,11 +457,11 @@ export function EventTicketsTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarCheck className="h-5 w-5" />
-            Reservas de ingresso
+            Quem comprou
           </CardTitle>
           <CardDescription>
-            Confirme o pagamento para liberar os ingressos. Antes disso, a portaria recusa a
-            entrada.
+            Cada compra mostra quem pagou e, embaixo, cada ingresso: se a pessoa já entrou e a
+            que horas. O PIX se confirma sozinho — não precisa conferir extrato.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -303,6 +478,7 @@ export function EventTicketsTab() {
                   }}
                 >
                   {f.label}
+                  {filterCount[f.id] !== undefined && ` (${filterCount[f.id]})`}
                 </Button>
               ))}
             </div>
@@ -330,7 +506,9 @@ export function EventTicketsTab() {
             <Loading />
           ) : reservations.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Nenhuma reserva por aqui.
+              {filter === 'confirmed'
+                ? 'Ninguém comprou ingresso para este evento ainda.'
+                : 'Nenhuma compra nesta lista.'}
             </p>
           ) : (
             <div className="space-y-3">
@@ -350,7 +528,7 @@ export function EventTicketsTab() {
                           }
                         >
                           {reservation.status === 'confirmed'
-                            ? 'Confirmada'
+                            ? 'Paga'
                             : reservation.status === 'cancelled'
                               ? 'Cancelada'
                               : 'Aguardando pagamento'}
@@ -370,12 +548,16 @@ export function EventTicketsTab() {
                       </p>
                       <p className="mt-0.5 text-sm">
                         {reservation.quantity} ingresso(s) ·{' '}
-                        <strong>{brl(reservation.totalCents)}</strong> ·{' '}
-                        {new Date(reservation.createdAt).toLocaleString('pt-BR', {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
-                        })}
+                        <strong>{brl(reservation.totalCents)}</strong> · comprou{' '}
+                        {dayAndTime(reservation.createdAt)}
                       </p>
+                      {eventId === ALL_EVENTS && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Evento:{' '}
+                          {events?.find((e) => e.id === reservation.eventId)?.title ??
+                            reservation.eventId}
+                        </p>
+                      )}
                       {reservation.notes && (
                         <p className="mt-1 text-sm italic text-muted-foreground">
                           “{reservation.notes}”
@@ -384,7 +566,7 @@ export function EventTicketsTab() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {reservation.status === 'pending' && (
+                      {reservation.status === 'pending' && !overFor(reservation.eventId) && (
                         <Button
                           size="sm"
                           className="gap-1.5"
@@ -452,14 +634,10 @@ export function EventTicketsTab() {
                           </span>
                           <span
                             className={`shrink-0 text-xs font-semibold ${
-                              ticket.status === 'used'
-                                ? 'text-blue-400'
-                                : ticket.status === 'valid'
-                                  ? 'text-green-500'
-                                  : 'text-muted-foreground'
+                              ticketSituation(ticket, overFor(ticket.eventId)).tone
                             }`}
                           >
-                            {TICKET_STATUS_LABEL[ticket.status]}
+                            {ticketSituation(ticket, overFor(ticket.eventId)).label}
                           </span>
                         </div>
                       ))}

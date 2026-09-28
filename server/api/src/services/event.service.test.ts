@@ -342,7 +342,7 @@ describe('checkInTicket', () => {
   it('libera a entrada na primeira leitura', async () => {
     clientQueryMock.mockImplementation(async (sql: string) => {
       if (sql.startsWith('UPDATE event_tickets')) return { rows: [ticketRow({ status: 'used' })] };
-      if (sql.startsWith('SELECT buyer_name')) return { rows: [{ buyer_name: 'Ana Souza' }] };
+      if (sql.startsWith('SELECT r.buyer_name')) return { rows: [{ buyer_name: 'Ana Souza', event_title: 'Evento GeeKpop!' }] };
       return { rows: [] };
     });
 
@@ -359,7 +359,7 @@ describe('checkInTicket', () => {
     clientQueryMock.mockImplementation(async (sql: string) => {
       // UPDATE matches nothing: the row is no longer `valid`.
       if (sql.startsWith('UPDATE event_tickets')) return { rows: [] };
-      if (sql.startsWith('SELECT * FROM event_tickets')) {
+      if (sql.startsWith('SELECT t.*')) {
         return { rows: [ticketRow({ status: 'used', used_at: '2026-09-06T17:32:00.000Z' })] };
       }
       return { rows: [] };
@@ -380,7 +380,7 @@ describe('checkInTicket', () => {
   it('nega ingresso de reserva ainda não paga', async () => {
     clientQueryMock.mockImplementation(async (sql: string) => {
       if (sql.startsWith('UPDATE event_tickets')) return { rows: [] };
-      if (sql.startsWith('SELECT * FROM event_tickets')) {
+      if (sql.startsWith('SELECT t.*')) {
         return { rows: [ticketRow({ status: 'pending' })] };
       }
       return { rows: [] };
@@ -391,6 +391,86 @@ describe('checkInTicket', () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('not_confirmed');
+  });
+
+  it('só queima o código dentro da janela do próprio evento', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('UPDATE event_tickets')) return { rows: [ticketRow({ status: 'used' })] };
+      if (sql.startsWith('SELECT r.buyer_name')) return { rows: [{ buyer_name: 'Ana Souza', event_title: 'Evento GeeKpop!' }] };
+      return { rows: [] };
+    });
+
+    const result = await eventService.checkInTicket('T-AAAA-BBBB-CCCC', 'seller-1');
+
+    const update = String(
+      clientQueryMock.mock.calls.find(([sql]) => String(sql).startsWith('UPDATE event_tickets'))![0]
+    );
+    expect(update).toContain('NOT EXISTS');
+    expect(update).toContain("e.starts_at - INTERVAL '12 hours'");
+    expect(update).toContain("COALESCE(e.ends_at, e.starts_at + INTERVAL '24 hours') + INTERVAL '6 hours'");
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.eventTitle).toBe('Evento GeeKpop!');
+  });
+
+  it('nega ingresso válido de outro evento sem queimar e diz de qual evento é', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('UPDATE event_tickets')) return { rows: [] };
+      if (sql.startsWith('SELECT t.*')) {
+        return {
+          rows: [
+            {
+              ...ticketRow({ status: 'valid' }),
+              event_title: 'Photocard Trading',
+              event_starts_at: '2026-09-20T17:00:00.000Z',
+              outside_window: true,
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    });
+    queryMock.mockResolvedValue({ rows: [{ buyer_name: 'Ana Souza' }] });
+
+    const result = await eventService.checkInTicket('T-AAAA-BBBB-CCCC', 'seller-1');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('wrong_event');
+      expect(result.message).toBe(
+        'Este ingresso é de outro evento: Photocard Trading (20/09). Não vale para hoje.'
+      );
+      expect(result.eventTitle).toBe('Photocard Trading');
+    }
+  });
+
+  it('ingresso usado em evento passado diz o dia e o evento', async () => {
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('UPDATE event_tickets')) return { rows: [] };
+      if (sql.startsWith('SELECT t.*')) {
+        return {
+          rows: [
+            {
+              ...ticketRow({ status: 'used', used_at: '2026-09-20T17:32:00.000Z' }),
+              event_title: 'Photocard Trading',
+              event_starts_at: '2026-09-20T17:00:00.000Z',
+              outside_window: true,
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    });
+    queryMock.mockResolvedValue({ rows: [{ buyer_name: 'Ana Souza' }] });
+
+    const result = await eventService.checkInTicket('T-AAAA-BBBB-CCCC', 'seller-1');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('already_used');
+      expect(result.message).toBe(
+        'Ingresso já utilizado às 14:32 em 20/09, no evento Photocard Trading.'
+      );
+    }
   });
 
   it('nega código inexistente', async () => {
@@ -405,7 +485,7 @@ describe('checkInTicket', () => {
   it('aceita o código digitado sem hífen e em minúsculas', async () => {
     clientQueryMock.mockImplementation(async (sql: string) => {
       if (sql.startsWith('UPDATE event_tickets')) return { rows: [ticketRow({ status: 'used' })] };
-      if (sql.startsWith('SELECT buyer_name')) return { rows: [{ buyer_name: 'Ana Souza' }] };
+      if (sql.startsWith('SELECT r.buyer_name')) return { rows: [{ buyer_name: 'Ana Souza', event_title: 'Evento GeeKpop!' }] };
       return { rows: [] };
     });
 
@@ -445,5 +525,48 @@ describe('cancelReservation', () => {
     )!;
     // Already admitted stays `used`: clearing that would wipe the door log.
     expect(String(ticketUpdate[0])).toContain("status IN ('pending', 'valid')");
+  });
+});
+
+describe('adminListReservations', () => {
+  it('conta só o evento escolhido, sem deixar busca e status mexerem nos totais', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql.includes('AS pending')) return { rows: [{ pending: 1, confirmed: 2, cancelled: 0 }] };
+      if (sql.includes('AS tickets_valid')) return { rows: [{ tickets_valid: 3, tickets_used: 1 }] };
+      if (sql.includes('COUNT(*)::int AS total')) return { rows: [{ total: 0 }] };
+      return { rows: [] };
+    });
+
+    const result = await eventService.adminListReservations({
+      eventId: 'evento-geekpop',
+      status: 'confirmed',
+      search: 'ana',
+    });
+
+    const summaryCalls = queryMock.mock.calls.filter(
+      ([sql]) => String(sql).includes('AS pending') || String(sql).includes('AS tickets_valid')
+    );
+    expect(summaryCalls).toHaveLength(2);
+    for (const [sql, params] of summaryCalls) {
+      expect(String(sql)).toContain('WHERE event_id = $1');
+      expect(params).toEqual(['evento-geekpop']);
+    }
+    expect(result.summary).toEqual({
+      pending: 1,
+      confirmed: 2,
+      cancelled: 0,
+      ticketsValid: 3,
+      ticketsUsed: 1,
+    });
+  });
+
+  it('sem evento escolhido, os totais cobrem tudo', async () => {
+    queryMock.mockResolvedValue({ rows: [] });
+
+    await eventService.adminListReservations();
+
+    const summary = queryMock.mock.calls.find(([sql]) => String(sql).includes('AS tickets_valid'))!;
+    expect(String(summary[0])).not.toContain('event_id');
+    expect(summary[1]).toEqual([]);
   });
 });

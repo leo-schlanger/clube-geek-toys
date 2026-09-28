@@ -9,6 +9,7 @@ import {
   createReservation,
   extractTicketCode,
   getPublicTicket,
+  ticketSituation,
 } from './event-tickets'
 
 beforeEach(() => vi.clearAllMocks())
@@ -103,5 +104,27 @@ describe('checkInTicket', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('request_failed')
+  })
+})
+
+describe('ticketSituation', () => {
+  it('ingresso usado diz o dia e a hora da entrada, no horário do Rio', () => {
+    expect(ticketSituation({ status: 'used', usedAt: '2026-09-20T17:32:00Z' }, true).label).toBe(
+      'Entrou 20/09 às 14:32'
+    )
+  })
+
+  it('ingresso pago vira "não compareceu" depois que o evento acaba', () => {
+    expect(ticketSituation({ status: 'valid', usedAt: null }, false).label).toBe(
+      'Pago — ainda não entrou'
+    )
+    expect(ticketSituation({ status: 'valid', usedAt: null }, true).label).toBe('Não compareceu')
+  })
+
+  it('pendente e cancelado', () => {
+    expect(ticketSituation({ status: 'pending', usedAt: null }, false).label).toBe(
+      'Aguardando pagamento'
+    )
+    expect(ticketSituation({ status: 'cancelled', usedAt: null }, false).label).toBe('Cancelado')
   })
 })

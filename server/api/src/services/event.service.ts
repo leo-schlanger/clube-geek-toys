@@ -860,6 +860,11 @@ export async function adminListReservations(
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
+  // Counters follow the chosen event only: status and search narrow the list,
+  // not the totals the door works from.
+  const summaryParams = opts.eventId ? [opts.eventId] : [];
+  const summaryWhere = opts.eventId ? 'WHERE event_id = $1' : '';
+
   const [rows, countResult, summaryResult] = await Promise.all([
     query(
       `SELECT r.* FROM event_reservations r
@@ -874,7 +879,8 @@ export async function adminListReservations(
          COUNT(*) FILTER (WHERE status = 'pending')::int   AS pending,
          COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
          COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled
-       FROM event_reservations`
+       FROM event_reservations ${summaryWhere}`,
+      summaryParams
     ),
   ]);
 
@@ -882,7 +888,8 @@ export async function adminListReservations(
     `SELECT
        COUNT(*) FILTER (WHERE status = 'valid')::int AS tickets_valid,
        COUNT(*) FILTER (WHERE status = 'used')::int  AS tickets_used
-     FROM event_tickets`
+     FROM event_tickets ${summaryWhere}`,
+    summaryParams
   );
 
   const reservations = rows.rows.map(mapReservation);
@@ -1058,14 +1065,30 @@ export async function cancelReservation(
 }
 
 export type CheckInResult =
-  | { ok: true; ticket: EventTicket; buyerName: string }
+  | { ok: true; ticket: EventTicket; buyerName: string; eventTitle: string | null }
   | {
       ok: false;
-      reason: 'not_found' | 'already_used' | 'not_confirmed' | 'cancelled';
+      reason: 'not_found' | 'already_used' | 'not_confirmed' | 'cancelled' | 'wrong_event';
       message: string;
       ticket?: EventTicket;
       buyerName?: string;
+      eventTitle?: string | null;
     };
+
+/**
+ * A ticket only enters on its own event's day: from 12h before the start until
+ * 6h after the end (24h after the start when there is no end). Kept in SQL so
+ * the window and the burn are one statement, on the database clock.
+ */
+const OUTSIDE_EVENT_WINDOW_SQL = `(
+  NOW() < e.starts_at - INTERVAL '12 hours'
+  OR NOW() > COALESCE(e.ends_at, e.starts_at + INTERVAL '24 hours') + INTERVAL '6 hours'
+)`;
+
+function formatEventDate(value: unknown): string {
+  const date = value instanceof Date ? value : new Date(String(value));
+  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: EVENT_TIME_ZONE });
+}
 
 /**
  * Door entry: validates and **burns** the code.
@@ -1080,25 +1103,41 @@ export async function checkInTicket(code: string, actorUserId: string): Promise<
   try {
     await client.query('BEGIN');
     const burned = await client.query(
-      `UPDATE event_tickets
+      `UPDATE event_tickets t
          SET status = 'used', used_at = NOW(), used_by = $2, updated_at = NOW()
-       WHERE code = $1 AND status = 'valid'
-       RETURNING *`,
+       WHERE t.code = $1 AND t.status = 'valid'
+         AND NOT EXISTS (
+           SELECT 1 FROM events e WHERE e.id = t.event_id AND ${OUTSIDE_EVENT_WINDOW_SQL}
+         )
+       RETURNING t.*`,
       [normalized, actorUserId]
     );
 
     if (burned.rows.length > 0) {
       const ticket = mapTicket(burned.rows[0]!);
       const buyer = await client.query(
-        `SELECT buyer_name FROM event_reservations WHERE id = $1`,
+        `SELECT r.buyer_name, e.title AS event_title
+           FROM event_reservations r LEFT JOIN events e ON e.id = r.event_id
+          WHERE r.id = $1`,
         [ticket.reservationId]
       );
       await client.query('COMMIT');
       void auditLog('event.ticket_checked_in', actorUserId, { code: ticket.code, ticketId: ticket.id });
-      return { ok: true, ticket, buyerName: buyer.rows[0]?.buyer_name ?? '' };
+      return {
+        ok: true,
+        ticket,
+        buyerName: buyer.rows[0]?.buyer_name ?? '',
+        eventTitle: buyer.rows[0]?.event_title ?? null,
+      };
     }
 
-    const existing = await client.query(`SELECT * FROM event_tickets WHERE code = $1`, [normalized]);
+    const existing = await client.query(
+      `SELECT t.*, e.title AS event_title, e.starts_at AS event_starts_at,
+              (e.id IS NOT NULL AND ${OUTSIDE_EVENT_WINDOW_SQL}) AS outside_window
+         FROM event_tickets t LEFT JOIN events e ON e.id = t.event_id
+        WHERE t.code = $1`,
+      [normalized]
+    );
     await client.query('COMMIT');
 
     if (existing.rows.length === 0) {
@@ -1106,11 +1145,28 @@ export async function checkInTicket(code: string, actorUserId: string): Promise<
       return { ok: false, reason: 'not_found', message: 'Ingresso não encontrado.' };
     }
 
-    const ticket = mapTicket(existing.rows[0]!);
+    const row = existing.rows[0]!;
+    const ticket = mapTicket(row);
+    const eventTitle: string | null = row.event_title ?? null;
     const buyer = await query(`SELECT buyer_name FROM event_reservations WHERE id = $1`, [
       ticket.reservationId,
     ]);
     const buyerName = buyer.rows[0]?.buyer_name ?? '';
+
+    if (ticket.status === 'valid' && row.outside_window) {
+      void auditLog('event.ticket_checkin_failed', actorUserId, {
+        code: normalized,
+        reason: 'wrong_event',
+      });
+      return {
+        ok: false,
+        reason: 'wrong_event',
+        message: `Este ingresso é de outro evento: ${eventTitle ?? 'evento'} (${formatEventDate(row.event_starts_at)}). Não vale para hoje.`,
+        ticket,
+        buyerName,
+        eventTitle,
+      };
+    }
 
     if (ticket.status === 'used') {
       // The container runs in UTC. Without pinning the zone, door staff would
@@ -1127,12 +1183,16 @@ export async function checkInTicket(code: string, actorUserId: string): Promise<
         code: normalized,
         reason: 'already_used',
       });
+      const usedMessage = when ? `Ingresso já utilizado às ${when}.` : 'Ingresso já utilizado.';
       return {
         ok: false,
         reason: 'already_used',
-        message: when ? `Ingresso já utilizado às ${when}.` : 'Ingresso já utilizado.',
+        message: row.outside_window
+          ? `${usedMessage.slice(0, -1)} em ${formatEventDate(ticket.usedAt ?? row.event_starts_at)}, no evento ${eventTitle ?? 'anterior'}.`
+          : usedMessage,
         ticket,
         buyerName,
+        eventTitle,
       };
     }
     if (ticket.status === 'cancelled') {

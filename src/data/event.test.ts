@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   FALLBACK_EVENT,
   isEventVisible,
+  isEventOver,
+  pickCurrentEvent,
   formatEventDateRange,
   formatEventDay,
   formatEventTime,
@@ -105,5 +107,55 @@ describe('event data', () => {
     expect(url).toMatch(/^https:\/\/wa\.me\//)
     expect(url).toContain(FALLBACK_EVENT.ticketReservation.whatsappNumber)
     expect(decodeURIComponent(url)).toMatch(/Leo|ingresso|obs/i)
+  })
+
+  describe('isEventOver', () => {
+    it('acaba no fim marcado', () => {
+      const e = { startsAt: '2026-10-11T14:00:00-03:00', endsAt: '2026-10-11T18:00:00-03:00' }
+      expect(isEventOver(e, Date.parse('2026-10-11T17:59:00-03:00'))).toBe(false)
+      expect(isEventOver(e, Date.parse('2026-10-11T18:01:00-03:00'))).toBe(true)
+    })
+
+    it('sem fim, vale um dia depois do início', () => {
+      const e = { startsAt: '2026-10-11T14:00:00-03:00', endsAt: null }
+      expect(isEventOver(e, Date.parse('2026-10-12T13:00:00-03:00'))).toBe(false)
+      expect(isEventOver(e, Date.parse('2026-10-12T15:00:00-03:00'))).toBe(true)
+    })
+  })
+
+  describe('pickCurrentEvent', () => {
+    const past = {
+      id: 'kpop',
+      status: 'archived' as const,
+      startsAt: '2026-09-20T14:00:00-03:00',
+      endsAt: '2026-09-20T18:00:00-03:00',
+    }
+    const next = {
+      id: 'geekpop',
+      status: 'published' as const,
+      startsAt: '2026-10-11T14:00:00-03:00',
+      endsAt: '2026-10-11T18:00:00-03:00',
+    }
+    const later = { ...next, id: 'later', startsAt: '2026-11-15T14:00:00-03:00', endsAt: null }
+    const now = Date.parse('2026-09-28T12:00:00-03:00')
+
+    it('abre no próximo evento que ainda vai acontecer', () => {
+      expect(pickCurrentEvent([later, past, next], now)?.id).toBe('geekpop')
+    })
+
+    it('evento arquivado não vira o atual mesmo com data futura', () => {
+      expect(pickCurrentEvent([{ ...next, status: 'archived' as const }, later], now)?.id).toBe(
+        'later'
+      )
+    })
+
+    it('sem evento futuro, abre no último que aconteceu', () => {
+      const older = { ...past, id: 'older', startsAt: '2026-08-01T14:00:00-03:00' }
+      expect(pickCurrentEvent([older, past], now)?.id).toBe('kpop')
+    })
+
+    it('lista vazia dá null', () => {
+      expect(pickCurrentEvent([], now)).toBeNull()
+    })
   })
 })

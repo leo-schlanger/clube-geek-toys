@@ -113,6 +113,46 @@ export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
   cancelled: 'Cancelado',
 }
 
+const EVENT_TIME_ZONE = 'America/Sao_Paulo'
+
+/** `20/09 às 14:32`, in Rio time. */
+export function dayAndTime(iso: string): string {
+  const d = new Date(iso)
+  const day = d.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: EVENT_TIME_ZONE,
+  })
+  const time = d.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: EVENT_TIME_ZONE,
+  })
+  return `${day} às ${time}`
+}
+
+/** What happened to one ticket, in the words the door uses. */
+export function ticketSituation(
+  ticket: Pick<EventTicket, 'status' | 'usedAt'>,
+  eventOver: boolean
+): { label: string; tone: string } {
+  switch (ticket.status) {
+    case 'used':
+      return {
+        label: ticket.usedAt ? `Entrou ${dayAndTime(ticket.usedAt)}` : 'Já entrou',
+        tone: 'text-blue-400',
+      }
+    case 'valid':
+      return eventOver
+        ? { label: 'Não compareceu', tone: 'text-muted-foreground' }
+        : { label: 'Pago — ainda não entrou', tone: 'text-green-500' }
+    case 'pending':
+      return { label: 'Aguardando pagamento', tone: 'text-amber-500' }
+    default:
+      return { label: 'Cancelado', tone: 'text-muted-foreground line-through' }
+  }
+}
+
 export type CreateReservationResult =
   | { ok: true; reservation: EventReservation; ticketsUrl: string }
   /**
@@ -209,10 +249,17 @@ const EMPTY_LIST: ReservationListResult = {
 }
 
 export async function adminListReservations(
-  params: { status?: ReservationStatus; search?: string; page?: number; limit?: number } = {}
+  params: {
+    status?: ReservationStatus
+    eventId?: string
+    search?: string
+    page?: number
+    limit?: number
+  } = {}
 ): Promise<ReservationListResult> {
   const qs = new URLSearchParams()
   if (params.status) qs.set('status', params.status)
+  if (params.eventId) qs.set('eventId', params.eventId)
   if (params.search) qs.set('search', params.search)
   if (params.page) qs.set('page', String(params.page))
   if (params.limit) qs.set('limit', String(params.limit))
@@ -242,13 +289,20 @@ export async function cancelReservation(
 }
 
 export type CheckInResponse =
-  | { ok: true; ticket: EventTicket; buyerName: string }
+  | { ok: true; ticket: EventTicket; buyerName: string; eventTitle?: string | null }
   | {
       ok: false
-      reason: 'not_found' | 'already_used' | 'not_confirmed' | 'cancelled' | 'request_failed'
+      reason:
+        | 'not_found'
+        | 'already_used'
+        | 'not_confirmed'
+        | 'cancelled'
+        | 'wrong_event'
+        | 'request_failed'
       message: string
       ticket?: EventTicket
       buyerName?: string
+      eventTitle?: string | null
     }
 
 /**

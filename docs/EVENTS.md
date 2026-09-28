@@ -73,6 +73,40 @@ Na aba **Ingressos** do painel, a reserva pendente mostra **PIX automático**.
 pede confirmação. **Cancelar uma reserva paga estorna o valor** pela Pagar.me.
 Detalhes técnicos em [`PAGARME.md`](PAGARME.md#pix-de-ingresso-de-evento-desde-28092026).
 
+### Aba Ingressos: um evento por vez (28/09/2026)
+
+Pedido da Laura: _"como vou saber quais ingressos são novos e quais são os
+antigos? Não entendi se alguém comprou ou se já usou. Evento que acabou vira
+histórico, senão eu me perco."_ Os números do topo somavam **todos** os
+eventos: com o evento de 11/10 sem nenhuma venda paga, a aba dizia "8 válidos,
+18 já entraram" — tudo do evento de 20/09. E a lista não dizia de qual evento
+era cada compra.
+
+- **Seletor "Qual evento?"** no topo. Abre no próximo evento que ainda não
+  acabou (arquivado não conta); os que já aconteceram ficam no grupo
+  **Histórico**. Existe também "Todos os eventos juntos", que mostra o nome do
+  evento em cada compra. Regra em `pickCurrentEvent()` / `isEventOver()`
+  (`src/data/event.ts`).
+- **Números do evento escolhido**: _Ingressos pagos_, _Já entraram_, _Ainda vão
+  entrar_ (no histórico: _Não compareceram_) e _Aguardando pagamento_. A API
+  filtra o resumo por `eventId`; status e busca mexem só na lista.
+- **Cada ingresso diz o que aconteceu**: "Entrou 20/09 às 14:32", "Pago — ainda
+  não entrou", "Não compareceu" (evento passado), "Aguardando pagamento",
+  "Cancelado" — `ticketSituation()` em `src/lib/event-tickets.ts`. A lista abre
+  em **Pagas**, que é o que responde "quem comprou".
+- **No histórico** a portaria some da tela e aparece o aviso de que aqueles
+  ingressos não valem para outro evento.
+
+**A portaria agora confere o evento.** Até aqui o check-in queimava qualquer
+ingresso `valid`, de qualquer evento: os 8 ingressos pagos de 20/09 que não
+foram usados entrariam em 11/10. O código só é aceito de **12h antes do início
+até 6h depois do fim** do próprio evento (sem fim cadastrado, 24h depois do
+início). Fora disso: _ENTRADA NEGADA — "Este ingresso é de outro evento:
+Photocard Trading (20/09). Não vale para hoje."_, e o código **não** é
+queimado. A janela está no próprio `UPDATE` (relógio do banco, uma instrução
+só). Um ingresso já usado em evento passado diz o dia e o evento. Entrada
+liberada mostra também o nome do evento.
+
 ### Validação do cadastro (28/09/2026)
 
 O valor da entrada é o que o PIX cobra, então o painel passou a recusar o que
@@ -192,6 +226,8 @@ Arquivos de foto (para a galeria do home):
 2. **Publicar** — loja e site atualizam em até 1 minuto (cache curto do `/events/active`)
 3. Fotos do evento: aba **Galeria** → aparecem em `geeketoys.com.br#galeria`
 4. Ao encerrar: **Encerrar** (arquiva) e publicar o próximo
+5. Aba **Ingressos**: abre sozinha no próximo evento; o que já passou fica em
+   **Histórico** no seletor "Qual evento?"
 
 Status `draft`/`archived` esconde banner/card/link e redireciona `/evento` → home
 da loja. Para parar de vender sem esconder o evento, desmarque **Aceitar novas
@@ -269,8 +305,9 @@ no teto de 6 por reserva. As duas coisas foram resolvidas juntas.
    exatamente o print que a portaria não deveria aceitar.
 5. **Portaria** — aba **Ingressos** → _Portaria_: leitor de QR (ou código
    digitado). A leitura **queima** o código (`valid` → `used`). A segunda leitura
-   do mesmo QR mostra _ENTRADA NEGADA_ com a hora da primeira. `seller` também
-   tem acesso: quem fica na porta é quem opera o PDV.
+   do mesmo QR mostra _ENTRADA NEGADA_ com a hora da primeira. Ingresso de
+   outro evento (fora da janela de 12h antes a 6h depois) é negado sem ser
+   queimado. `seller` também tem acesso: quem fica na porta é quem opera o PDV.
 
 ### Estados
 

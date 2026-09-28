@@ -123,6 +123,33 @@ export function isEventVisible(
   return Number.isNaN(end) || end >= now
 }
 
+/** Past its end (or a day past its start), whatever the status says. */
+export function isEventOver(
+  event: Pick<EventConfig, 'startsAt' | 'endsAt'>,
+  now: number = Date.now()
+): boolean {
+  const end = event.endsAt
+    ? Date.parse(event.endsAt)
+    : Date.parse(event.startsAt) + DEFAULT_EVENT_SPAN_MS
+  return !Number.isNaN(end) && end < now
+}
+
+/**
+ * The event the ticket desk opens on: the next one not over and not archived,
+ * else the latest past one.
+ */
+export function pickCurrentEvent<T extends Pick<EventConfig, 'startsAt' | 'endsAt' | 'status'>>(
+  events: T[],
+  now: number = Date.now()
+): T | null {
+  const upcoming = events
+    .filter((e) => e.status !== 'archived' && !isEventOver(e, now))
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+  if (upcoming.length > 0) return upcoming[0]!
+  const past = [...events].sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt))
+  return past[0] ?? null
+}
+
 /**
  * Events happen in Rio: their time is Rio time wherever the visitor is. With
  * the browser's zone, a phone set to another zone showed 14h–18h as 18h–22h.
