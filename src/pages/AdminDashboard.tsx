@@ -71,8 +71,9 @@ function TabLoadingFallback() {
 }
 
 // Must list every AdminTab: this is what lets a reload on ?tab=... land on the
-// same tab instead of bouncing back to the dashboard.
-const VALID_TABS: AdminTab[] = [
+// same tab instead of bouncing back to the dashboard. `AllTabsListed` fails the
+// build when a tab is missing.
+const VALID_TABS = [
   'dashboard',
   'members',
   'products',
@@ -80,6 +81,7 @@ const VALID_TABS: AdminTab[] = [
   'stock',
   'orders',
   'wholesale',
+  'coupons',
   'reviews',
   'questions',
   'events',
@@ -89,10 +91,14 @@ const VALID_TABS: AdminTab[] = [
   'reports',
   'logs',
   'settings',
-]
+] as const satisfies readonly AdminTab[]
+
+type AllTabsListed = Exclude<AdminTab, (typeof VALID_TABS)[number]> extends never ? true : never
+const allTabsListed: AllTabsListed = true
+void allTabsListed
 
 function isValidTab(t: string | null): t is AdminTab {
-  return !!t && (VALID_TABS as string[]).includes(t)
+  return !!t && (VALID_TABS as readonly string[]).includes(t)
 }
 
 export default function AdminDashboard() {
