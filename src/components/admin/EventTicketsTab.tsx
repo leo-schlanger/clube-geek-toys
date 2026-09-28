@@ -612,7 +612,7 @@ export function EventTicketsTab() {
                       {reservation.tickets.map((ticket) => (
                         <div
                           key={ticket.code}
-                          className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-3 py-2 text-sm"
+                          className="flex flex-col gap-0.5 rounded-lg bg-muted/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
                         >
                           <span className="flex items-center gap-2 truncate">
                             <Ticket className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -633,7 +633,7 @@ export function EventTicketsTab() {
                             )}
                           </span>
                           <span
-                            className={`shrink-0 text-xs font-semibold ${
+                            className={`shrink-0 pl-[22px] text-xs font-semibold sm:pl-0 ${
                               ticketSituation(ticket, overFor(ticket.eventId)).tone
                             }`}
                           >
