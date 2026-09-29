@@ -486,8 +486,8 @@ export async function getActionItems(): Promise<ActionItemsReport> {
       )
     ),
     queueStat('questions_unanswered', queueSql('product_questions', `answered_at IS NULL AND status = 'published'`)),
-    // A pending ticket reservation is money waiting **and** a family that
-    // will be turned away at the door: the ticket is valid only after confirmation.
+    // A pending reservation is a PIX the buyer has not paid yet. Pagar.me
+    // confirms it; the queue is there so a code that sits for hours is visible.
     queueStat('event_tickets_pending', queueSql('event_reservations', `status = 'pending'`)),
     queueStat('reviews_pending', queueSql('product_reviews', `status = 'pending'`)),
     queueStat('wholesale_pending', queueSql('wholesale_accounts', `status = 'pending'`)),

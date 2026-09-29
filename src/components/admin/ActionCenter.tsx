@@ -88,11 +88,14 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     age: 'waiting',
   },
   event_tickets_pending: {
-    label: 'Ingressos a confirmar',
-    hint: 'Confirme o pagamento — sem isso a portaria barra a entrada',
+    label: 'Ingressos aguardando',
+    // Same shift as shop PIX: Pagar.me settles the charge, and a card that
+    // says "confirm or the door turns them away" is how an unpaid reservation
+    // gets marked paid. What remains is a queue to watch.
+    hint: 'O PIX confirma sozinho. Quem fica aqui gerou o código e ainda não pagou',
     tab: 'events',
     icon: <Ticket className="h-5 w-5" />,
-    severity: 'urgent',
+    severity: 'routine',
     age: 'waiting',
   },
   reviews_pending: {

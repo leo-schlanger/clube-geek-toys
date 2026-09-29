@@ -78,6 +78,14 @@ describe('ActionCenter', () => {
    * bank statement and confirm by hand — work that no longer exists, and that
    * someone following it would do on a payment already settled.
    */
+  it('não manda confirmar ingresso à mão — o PIX quita sozinho', async () => {
+    await renderPanel(report([{ key: 'event_tickets_pending', count: 2, oldestDays: 1 }]))
+
+    expect(await screen.findByText('Ingressos aguardando')).toBeInTheDocument()
+    expect(screen.getByText(/O PIX confirma sozinho/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Confirme o pagamento/i)).not.toBeInTheDocument()
+  })
+
   it('não manda mais conferir o extrato para um PIX pendente', async () => {
     await renderPanel(report([{ key: 'pix_pending', count: 2, oldestDays: 1 }]))
 

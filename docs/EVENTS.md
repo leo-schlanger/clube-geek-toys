@@ -359,10 +359,11 @@ compra sem falar com a loja.
 
 ### Onde a pendência aparece
 
-Reserva `pending` entra no **Painel do dia** (`ActionCenter`, card _Ingressos a
-confirmar_, severidade urgente) e na fila `event_tickets_pending` do digest
-diário por e-mail. Motivo: uma reserva esquecida não é só dinheiro parado — é
-uma família barrada na porta no domingo.
+Reserva `pending` entra no **Painel do dia** (`ActionCenter`, card _Ingressos
+aguardando_, rotina) e na fila `event_tickets_pending` do digest diário. Desde
+28/09/2026 a Pagar.me confirma o PIX sozinha; quem permanece na fila gerou o
+código e não pagou. Confirmar à mão continua existindo para o caso em que o
+valor caiu e o webhook não chegou — e só depois disso.
 
 ### Pendências conhecidas
 

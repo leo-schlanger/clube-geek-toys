@@ -697,18 +697,18 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Resumo das filas do painel admin nesta manhã.</p>
         ${dataTable(
           [
-            ['💰 PIX aguardando confirmação', v.pix_pending, '#f59e0b'],
+            ['💰 PIX aguardando (confirma sozinho)', v.pix_pending, '#f59e0b'],
             ['📦 Pedidos pagos a separar', v.to_separate, '#4ade80'],
             ['🚚 Pedidos a postar', v.to_ship, '#4ade80'],
             [`🕐 Enviados há +10 dias sem entrega`, v.shipped_stale, '#f87171'],
-            ['🎫 Ingressos a confirmar', v.event_tickets_pending, '#f59e0b'],
+            ['🎫 Ingressos aguardando', v.event_tickets_pending, '#f59e0b'],
             ['❓ Perguntas sem resposta', v.questions_unanswered, '#3b82f6'],
             ['⭐ Avaliações a moderar', v.reviews_pending, '#3b82f6'],
             ['🏢 Contas atacado a aprovar', v.wholesale_pending, '#f59e0b'],
             ['🔴 SKUs esgotados', v.stock_out, '#f87171'],
             ['🟡 SKUs no estoque mínimo', v.stock_low, '#f59e0b'],
             ['📅 Assinaturas vencendo em 7 dias', v.members_expiring, '#f59e0b'],
-            ['⏳ Membros aguardando pagamento', v.members_pending, '#94a3b8'],
+            ['⏳ Membros sem pagamento', v.members_pending, '#94a3b8'],
           ]
             .filter(([, count]) => Number(count) > 0)
             .map(([label, count, color]) => [

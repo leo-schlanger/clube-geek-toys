@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, Suspense, lazy } from 'react'
-import { api } from '../lib/api-client'
+import { api, errorMessage } from '../lib/api-client'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
@@ -301,7 +301,7 @@ export default function AdminDashboard() {
       fetchData(true)
     } catch (error) {
       logger.error('Error activating member:', error)
-      toast.error('Erro ao ativar membro')
+      toast.error(errorMessage(error, 'Erro ao ativar membro'))
     }
   }, [fetchData])
 
@@ -484,12 +484,12 @@ export default function AdminDashboard() {
                 <Card className="border-2 border-yellow-500/60 bg-yellow-500/10">
                   <CardContent className="p-4 lg:p-6 space-y-4">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
+                      <AlertCircle className="h-6 w-6 text-yellow-700 dark:text-yellow-300 shrink-0 mt-0.5" />
                       <div>
-                        <h3 className="font-bold text-lg text-yellow-200">
+                        <h3 className="font-bold text-lg text-yellow-950 dark:text-yellow-50">
                           {unpaidSignups.length} cadastro{unpaidSignups.length > 1 ? 's' : ''} sem pagamento
                         </h3>
-                        <p className="text-sm text-yellow-200/80 mt-1">
+                        <p className="text-sm text-yellow-900 dark:text-yellow-100 mt-1">
                           O cadastro foi criado e nenhuma cobrança existe na Pagar.me. Não há PIX para conferir no extrato — o clube continua pendente até um pagamento ser gerado e cair.
                         </p>
                       </div>
@@ -498,14 +498,14 @@ export default function AdminDashboard() {
                       {unpaidSignups.map(m => {
                         const planData = PLANS[m.plan as PlanType]
                         return (
-                          <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-yellow-500/10 rounded-lg">
+                          <div key={m.id} className="flex flex-col items-start gap-2 rounded-lg bg-yellow-500/15 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                             <div className="min-w-0">
-                              <p className="font-semibold truncate">{m.fullName}</p>
+                              <p className="font-semibold leading-snug text-foreground">{m.fullName}</p>
                               <p className="text-sm text-muted-foreground">
                                 {planData.name} · {formatCurrency(CLUB_PLAN.price)}
                               </p>
                             </div>
-                            <span className="shrink-0 text-sm font-medium text-yellow-200">Sem cobrança</span>
+                            <span className="shrink-0 text-sm font-medium text-yellow-950 dark:text-yellow-50">Sem cobrança</span>
                           </div>
                         )
                       })}
@@ -518,13 +518,13 @@ export default function AdminDashboard() {
                 <Card className="border-2 border-yellow-500/60 bg-yellow-500/10">
                   <CardContent className="p-4 lg:p-6 space-y-4">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
+                      <AlertCircle className="h-6 w-6 text-yellow-700 dark:text-yellow-300 shrink-0 mt-0.5" />
                       <div>
-                        <h3 className="font-bold text-lg text-yellow-200">
+                        <h3 className="font-bold text-lg text-yellow-950 dark:text-yellow-50">
                           {awaitingPix.length} pagamento{awaitingPix.length > 1 ? 's' : ''} aguardando confirmação
                         </h3>
-                        <p className="text-sm text-yellow-200/80 mt-1">
-                          A Pagar.me confirma o PIX sozinha em segundos. Se algum ficou para trás, confira o extrato e use <strong>Confirmar Pagamento</strong> — só depois que o valor tiver caído.
+                        <p className="text-sm text-yellow-900 dark:text-yellow-100 mt-1">
+                          A Pagar.me confirma o PIX sozinha, em segundos. Use <strong>Confirmar Pagamento</strong> só se o valor já caiu na conta da loja e o membro continuou pendente.
                         </p>
                       </div>
                     </div>
@@ -534,9 +534,9 @@ export default function AdminDashboard() {
                         const planData = PLANS[m.plan as PlanType]
                         const expectedAmount = CLUB_PLAN.price
                         return (
-                          <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-yellow-500/10 rounded-lg">
+                          <div key={m.id} className="flex flex-col items-start gap-2 rounded-lg bg-yellow-500/15 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                             <div className="min-w-0">
-                              <p className="font-semibold truncate">{m.fullName}</p>
+                              <p className="font-semibold leading-snug text-foreground">{m.fullName}</p>
                               <p className="text-sm text-muted-foreground">
                                 {planData.name} · {formatCurrency(expectedAmount)}
                               </p>
