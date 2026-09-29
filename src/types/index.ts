@@ -65,6 +65,8 @@ export interface Member {
   /** PIX awaiting confirmation. `null` clears it; the PATCH accepts nullable. */
   pendingPayment?: PendingPaymentInfo | null
   paymentCount: number
+  /** Oldest pending PIX, from the member list. Empty when no charge was created. */
+  pendingPixPaymentId?: string | null
   /**
    * Manual activation by an admin. The backend schema accepted both fields
    * long before this type did: `activateMember()` only compiled because

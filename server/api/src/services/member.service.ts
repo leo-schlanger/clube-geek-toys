@@ -31,6 +31,7 @@ function mapMemberRow(row: pg.QueryResultRow): Member {
     activatedAt: row.activated_at,
     activatedByPayment: row.activated_by_payment,
     paymentCount: row.payment_count ?? 0,
+    pendingPixPaymentId: row.pending_pix_payment_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -79,7 +80,14 @@ export async function listMembers(opts: {
 
   const [dataResult, countResult] = await Promise.all([
     query(
-      `SELECT * FROM members ${where} ORDER BY ${sortColumn} ${sortOrder} LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+      `SELECT members.*,
+         (SELECT p.id FROM payments p
+           WHERE p.member_id = members.id
+             AND p.status = 'pending'
+             AND p.method = 'pix'
+           ORDER BY p.created_at ASC
+           LIMIT 1) AS pending_pix_payment_id
+       FROM members ${where} ORDER BY ${sortColumn} ${sortOrder} LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
       [...params, limit, offset]
     ),
     query(`SELECT COUNT(*)::int as total FROM members ${where}`, params),
@@ -99,7 +107,17 @@ export async function getMemberByUserId(userId: string): Promise<Member | null> 
 }
 
 export async function getMemberById(id: string): Promise<Member | null> {
-  const result = await query('SELECT * FROM members WHERE id = $1', [id]);
+  const result = await query(
+    `SELECT members.*,
+       (SELECT p.id FROM payments p
+         WHERE p.member_id = members.id
+           AND p.status = 'pending'
+           AND p.method = 'pix'
+         ORDER BY p.created_at ASC
+         LIMIT 1) AS pending_pix_payment_id
+     FROM members WHERE members.id = $1`,
+    [id],
+  );
   return result.rows.length > 0 ? mapMemberRow(result.rows[0]) : null;
 }
 

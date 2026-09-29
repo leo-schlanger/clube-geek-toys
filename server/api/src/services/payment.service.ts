@@ -48,6 +48,8 @@ function mapPaymentRow(row: Record<string, unknown>) {
     reference: row.reference,
     paidAt: row.paid_at,
     createdAt: row.created_at,
+    provider: (row.provider as string) || null,
+    pagarmeChargeId: (row.pagarme_charge_id as string) || null,
   };
 }
 
@@ -356,7 +358,9 @@ export async function createPixPayment(data: {
  * With Pagar.me issuing the QR this is no longer the normal path — the webhook
  * marks the charge paid on its own, usually within seconds. It survives for two
  * cases: the static codes generated before the migration, which nothing watches,
- * and the rare charge whose webhook never lands.
+ * and the rare charge whose webhook never lands. A Pagar.me charge is re-read
+ * first: confirming it locally while the provider still says unpaid would
+ * activate the member for money that never arrived.
  */
 export async function confirmPixPayment(opts: {
   paymentId: string;
@@ -371,6 +375,26 @@ export async function confirmPixPayment(opts: {
   }
   if (payment.method !== 'pix') {
     throw new AppError(400, 'Apenas pagamentos PIX podem ser confirmados manualmente.', 'NOT_PIX_PAYMENT');
+  }
+
+  // Static codes from before the migration have no charge to ask about.
+  // Anything Pagar.me issued has to be paid there before we settle it here.
+  if (payment.provider === 'pagarme') {
+    if (!payment.pagarmeChargeId) {
+      throw new AppError(
+        409,
+        'Esta cobrança da Pagar.me não tem id para conferir. O pagamento não foi confirmado.',
+        'CHARGE_NOT_VERIFIED',
+      );
+    }
+    const charge = await pagarme.getCharge(payment.pagarmeChargeId);
+    if (charge.status !== 'paid' && charge.status !== 'overpaid') {
+      throw new AppError(
+        409,
+        'A Pagar.me ainda não recebeu este PIX. O pagamento não foi confirmado.',
+        'CHARGE_NOT_PAID',
+      );
+    }
   }
 
   // Claim the payment: the read above is not a guard, it is a hint. Two clicks

@@ -40,6 +40,11 @@ export interface Member {
   activatedAt: string | null;
   activatedByPayment: string | null;
   paymentCount: number;
+  /**
+   * Oldest pending PIX for this member, when the list query attached it.
+   * Absent means the caller did not ask; null means there is no open PIX.
+   */
+  pendingPixPaymentId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

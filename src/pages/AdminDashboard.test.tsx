@@ -308,11 +308,13 @@ describe('AdminDashboard', () => {
 
     render(<AdminDashboard />)
     await waitFor(() => {
-      expect(screen.getByText(/1 pagamento aguardando confirmação/)).toBeInTheDocument()
+      expect(screen.getByText(/1 cadastro sem pagamento/)).toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: 'Confirmar Pagamento' })).not.toBeInTheDocument()
+    expect(screen.getByText('Sem cobrança')).toBeInTheDocument()
   })
 
-  it('shows Confirmar Pagamento button for pending members', async () => {
+  it('shows Confirmar Pagamento button only when a PIX is open', async () => {
     mockGetAllMembers.mockResolvedValue([
       {
         id: 'm1',
@@ -326,6 +328,7 @@ describe('AdminDashboard', () => {
         startDate: '2026-01-01',
         expiryDate: '2026-12-31',
         paymentCount: 0,
+        pendingPixPaymentId: 'pay1',
         createdAt: '2026-01-01',
         updatedAt: '2026-01-01',
         userId: 'u1',
@@ -557,8 +560,9 @@ describe('AdminDashboard', () => {
 
     render(<AdminDashboard />)
     await waitFor(() => {
-      expect(screen.getByText(/2 pagamentos aguardando confirmação/)).toBeInTheDocument()
+      expect(screen.getByText(/2 cadastros sem pagamento/)).toBeInTheDocument()
     })
+    expect(screen.queryByRole('button', { name: 'Confirmar Pagamento' })).not.toBeInTheDocument()
   })
 
   it('displays pending member name and plan info in alert', async () => {
@@ -633,6 +637,7 @@ describe('AdminDashboard', () => {
         startDate: '2026-01-01',
         expiryDate: '2026-12-31',
         paymentCount: 0,
+        pendingPixPaymentId: 'pay1',
         createdAt: '2026-01-01',
         updatedAt: '2026-01-01',
         userId: 'u1',
@@ -667,6 +672,7 @@ describe('AdminDashboard', () => {
         startDate: '2026-01-01',
         expiryDate: '2026-12-31',
         paymentCount: 0,
+        pendingPixPaymentId: 'pay1',
         createdAt: '2026-01-01',
         updatedAt: '2026-01-01',
         userId: 'u1',
@@ -684,11 +690,8 @@ describe('AdminDashboard', () => {
     confirmSpy.mockRestore()
   })
 
-  it('activates member manually when no pending PIX payment exists', async () => {
-    const { api } = await import('../lib/api-client')
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    vi.mocked(api.get).mockResolvedValue({ data: [] })
-
+  it('does not activate a pending member who has no PIX', async () => {
+    const { toast } = await import('sonner')
     mockGetAllMembers.mockResolvedValue([
       {
         id: 'm1',
@@ -710,21 +713,11 @@ describe('AdminDashboard', () => {
 
     render(<AdminDashboard />)
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Confirmar Pagamento' })).toBeInTheDocument()
+      expect(screen.getByText('Sem cobrança')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar Pagamento' }))
-    await waitFor(() => {
-      expect(mockUpdateMember).toHaveBeenCalledWith(
-        'm1',
-        expect.objectContaining({
-          status: 'active',
-          startDate: expect.any(String),
-          expiryDate: expect.any(String),
-          activatedByPayment: 'admin_manual',
-        })
-      )
-    })
-    confirmSpy.mockRestore()
+    expect(screen.queryByRole('button', { name: 'Confirmar Pagamento' })).not.toBeInTheDocument()
+    expect(mockUpdateMember).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
   // ─── Sign out via sidebar ─────────────────────────────────

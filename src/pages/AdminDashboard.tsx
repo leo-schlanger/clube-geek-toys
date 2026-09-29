@@ -283,12 +283,8 @@ export default function AdminDashboard() {
     if (!confirmed) return
 
     try {
-      // Confirm the pending PIX when it exists; otherwise stamp an admin
-      // override so PDV and the shop discount work.
-      // `limit=1` + newest-first meant an abandoned card attempt could be the
-      // only row returned — the PIX line then stayed `pending` forever, with no
-      // payment-confirmed e-mail and the revenue missing from the reports.
-      // Widen the window and pick the oldest PIX, which is the one being paid.
+      // Oldest pending PIX. A newer abandoned attempt must not hide the one
+      // being paid. No PIX row means there is nothing to settle.
       const payments = await api.get<{ id: string; status: string; method: string }[]>(
         `/payments?member_id=${member.id}&status=pending&limit=20`
       )
@@ -299,24 +295,8 @@ export default function AdminDashboard() {
         if (result.error) throw new Error(result.error)
         toast.success('Pagamento PIX confirmado e membro ativado!')
       } else {
-        const start = new Date()
-        const expiry = new Date(start)
-        if (member.paymentType === 'annual') {
-          expiry.setFullYear(expiry.getFullYear() + 1)
-        } else {
-          expiry.setMonth(expiry.getMonth() + 1)
-        }
-        const startDate = start.toISOString().slice(0, 10)
-        const expiryDate = expiry.toISOString().slice(0, 10)
-        await updateMember(member.id, {
-          status: 'active',
-          startDate,
-          expiryDate,
-          activatedAt: start.toISOString(),
-          activatedByPayment: 'admin_manual',
-          pendingPayment: null,
-        } as Partial<Member>)
-        toast.success(`Membro ativado até ${expiry.toLocaleDateString('pt-BR')}`)
+        toast.error('Não há PIX pendente para confirmar. Ativar agora liberaria o clube sem pagamento.')
+        return
       }
       fetchData(true)
     } catch (error) {
@@ -493,17 +473,55 @@ export default function AdminDashboard() {
           {/* Dashboard Content */}
           {activeTab === 'dashboard' && (() => {
             const pendingMembers = members.filter(m => m.status === 'pending')
+            const awaitingPix = pendingMembers.filter(m => m.pendingPixPaymentId)
+            const unpaidSignups = pendingMembers.filter(m => !m.pendingPixPaymentId)
             return (
             <div className="space-y-6">
-              {/* Pending PIX Payments Alert */}
-              {pendingMembers.length > 0 && (
+              {/* A pending member is not a payment. The confirm button only
+                  appears when a PIX row exists; otherwise the click used to
+                  activate the club with no charge behind it. */}
+              {unpaidSignups.length > 0 && (
                 <Card className="border-2 border-yellow-500/60 bg-yellow-500/10">
                   <CardContent className="p-4 lg:p-6 space-y-4">
                     <div className="flex items-start gap-3">
                       <AlertCircle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
                       <div>
                         <h3 className="font-bold text-lg text-yellow-200">
-                          {pendingMembers.length} pagamento{pendingMembers.length > 1 ? 's' : ''} aguardando confirmação
+                          {unpaidSignups.length} cadastro{unpaidSignups.length > 1 ? 's' : ''} sem pagamento
+                        </h3>
+                        <p className="text-sm text-yellow-200/80 mt-1">
+                          O cadastro foi criado e nenhuma cobrança existe na Pagar.me. Não há PIX para conferir no extrato — o clube continua pendente até um pagamento ser gerado e cair.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {unpaidSignups.map(m => {
+                        const planData = PLANS[m.plan as PlanType]
+                        return (
+                          <div key={m.id} className="flex items-center justify-between gap-3 p-3 bg-yellow-500/10 rounded-lg">
+                            <div className="min-w-0">
+                              <p className="font-semibold truncate">{m.fullName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {planData.name} · {formatCurrency(CLUB_PLAN.price)}
+                              </p>
+                            </div>
+                            <span className="shrink-0 text-sm font-medium text-yellow-200">Sem cobrança</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {awaitingPix.length > 0 && (
+                <Card className="border-2 border-yellow-500/60 bg-yellow-500/10">
+                  <CardContent className="p-4 lg:p-6 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
+                      <div>
+                        <h3 className="font-bold text-lg text-yellow-200">
+                          {awaitingPix.length} pagamento{awaitingPix.length > 1 ? 's' : ''} aguardando confirmação
                         </h3>
                         <p className="text-sm text-yellow-200/80 mt-1">
                           A Pagar.me confirma o PIX sozinha em segundos. Se algum ficou para trás, confira o extrato e use <strong>Confirmar Pagamento</strong> — só depois que o valor tiver caído.
@@ -511,9 +529,8 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* Direct activation buttons for each pending member */}
                     <div className="space-y-2">
-                      {pendingMembers.map(m => {
+                      {awaitingPix.map(m => {
                         const planData = PLANS[m.plan as PlanType]
                         const expectedAmount = CLUB_PLAN.price
                         return (

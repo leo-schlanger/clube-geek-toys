@@ -298,11 +298,18 @@ describe('MemberModal', () => {
   // ── Pending payment alert ──────────────────────────────────
 
   describe('pending payment', () => {
-    it('shows pending payment alert when status is pending', () => {
+    it('shows an unpaid signup as a charge-less activation', () => {
       const pendingMember = makeMember({ status: 'pending' })
       render(<MemberModal mode="view" member={pendingMember} {...defaultProps} />)
+      expect(screen.getByText('Cadastro sem cobrança')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ativar sem cobrança' })).toBeInTheDocument()
+    })
+
+    it('shows the open PIX when one exists', () => {
+      const pendingMember = makeMember({ status: 'pending', pendingPixPaymentId: 'pay-1' })
+      render(<MemberModal mode="view" member={pendingMember} {...defaultProps} />)
       expect(screen.getByText('Pagamento pendente')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /ativar/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ativar' })).toBeInTheDocument()
     })
 
     it('does not show pending alert for active member', () => {

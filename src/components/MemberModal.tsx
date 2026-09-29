@@ -861,10 +861,12 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
                 <div className="flex-1">
                   <p className="font-medium text-yellow-700 dark:text-yellow-300">
-                    Pagamento pendente
+                    {member.pendingPixPaymentId ? 'Pagamento pendente' : 'Cadastro sem cobrança'}
                   </p>
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    Este membro ainda não teve o pagamento confirmado.
+                    {member.pendingPixPaymentId
+                      ? 'Há um PIX em aberto. Confirme só depois que o valor tiver caído.'
+                      : 'Nenhuma cobrança foi criada. Ativar libera o clube sem pagamento — só se o dinheiro entrou no caixa.'}
                   </p>
                 </div>
                 <Button
@@ -874,7 +876,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                   onClick={handleActivate}
                   disabled={loading}
                 >
-                  {loading ? <Loading size="sm" /> : 'Ativar'}
+                  {loading ? <Loading size="sm" /> : member.pendingPixPaymentId ? 'Ativar' : 'Ativar sem cobrança'}
                 </Button>
               </div>
             )}

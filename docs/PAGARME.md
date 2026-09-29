@@ -95,6 +95,14 @@ cliente paga no app do banco
           → confere a cobrança na API, marca pago, baixa estoque, manda e-mail
 ```
 
+No clube, membro `pending` **não** é pagamento esperando confirmação. O
+cartão do dashboard só oferece **Confirmar Pagamento** quando existe um PIX
+`pending`; cadastro sem cobrança (cartão recusado, saiu antes do QR) aparece
+como **Sem cobrança** e o botão não está lá — o clique antigo ativava o mês
+sem valor nenhum. Confirmar um PIX da Pagar.me à mão relê a cobrança e recusa
+se ela não estiver `paid`: o código estático de antes da migração continua
+sendo o único que se quita olhando o extrato.
+
 ### PIX de ingresso de evento (desde 28/09/2026)
 
 Até 28/09 a reserva de ingresso ainda gerava o BR Code **estático** de antes da

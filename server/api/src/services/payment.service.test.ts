@@ -479,6 +479,46 @@ describe('confirmPixPayment', () => {
       confirmPixPayment({ paymentId: 'ghost', adminUserId: 'admin-1' })
     ).rejects.toThrow('Pagamento não encontrado');
   });
+
+  it('recusa confirmar PIX da Pagar.me que ela ainda não recebeu', async () => {
+    route('FROM payments p', {
+      rows: [{ ...pendingPix, provider: 'pagarme', pagarme_charge_id: 'ch_open' }],
+    });
+    getChargeMock.mockResolvedValue({ id: 'ch_open', status: 'pending', amount: 1250 });
+
+    await expect(
+      confirmPixPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' })
+    ).rejects.toThrow('ainda não recebeu');
+    expect(ran("UPDATE payments SET status = 'paid'")).toBe(false);
+    expect(ran('UPDATE members')).toBe(false);
+  });
+
+  it('recusa confirmar PIX da Pagar.me sem id de cobrança', async () => {
+    route('FROM payments p', { rows: [{ ...pendingPix, provider: 'pagarme' }] });
+
+    await expect(
+      confirmPixPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' })
+    ).rejects.toThrow('não tem id para conferir');
+    expect(getChargeMock).not.toHaveBeenCalled();
+    expect(ran("UPDATE payments SET status = 'paid'")).toBe(false);
+  });
+
+  it('confirma PIX da Pagar.me só depois de reler a cobrança paga', async () => {
+    route('FROM payments p', {
+      rows: [{ ...pendingPix, provider: 'pagarme', pagarme_charge_id: 'ch_paid' }],
+    });
+    route("UPDATE payments SET status = 'paid'", { rows: [{ id: 'pay-1' }] });
+    route('SELECT id, payment_type, status, expiry_date FROM members', {
+      rows: [{ id: 'member-1', payment_type: 'monthly', status: 'pending', expiry_date: null }],
+    });
+    route('SELECT full_name, email, plan FROM members', { rows: [memberRow] });
+    getChargeMock.mockResolvedValue({ id: 'ch_paid', status: 'paid', amount: 1250 });
+
+    await confirmPixPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' });
+
+    expect(getChargeMock).toHaveBeenCalledWith('ch_paid');
+    expect(ran('UPDATE members', "status = 'active'")).toBe(true);
+  });
 });
 
 // ─── Ownership ───────────────────────────────────────────────────────────────

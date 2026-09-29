@@ -177,7 +177,7 @@ export function MembersTable({
             >
               {getStatusLabel(member.status)}
             </Badge>
-            {member.status === 'pending' && (
+            {member.status === 'pending' && member.pendingPixPaymentId && (
               <Button
                 variant="success"
                 size="sm"

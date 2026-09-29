@@ -61,7 +61,7 @@ function makeMember(overrides?: Partial<Member>): Member {
 
 const members: Member[] = [
   makeMember({ id: 'm1', fullName: 'Maria Santos', status: 'active' }),
-  makeMember({ id: 'm2', fullName: 'Pedro Costa', status: 'pending', email: 'pedro@test.com' }),
+  makeMember({ id: 'm2', fullName: 'Pedro Costa', status: 'pending', email: 'pedro@test.com', pendingPixPaymentId: 'pix-pedro' }),
   makeMember({ id: 'm3', fullName: 'Ana Lima', status: 'inactive', email: 'ana@test.com' }),
 ]
 
@@ -124,11 +124,20 @@ describe('MembersTable', () => {
       expect(screen.getByText('Inativo')).toBeInTheDocument()
     })
 
-    it('renders activate button for pending members', () => {
+    it('renders activate button for a pending member who has an open PIX', () => {
       render(<MembersTable {...defaultProps} />)
-      // Pedro is pending, so there should be an Ativar button
       const activateButtons = screen.getAllByRole('button', { name: /ativar/i })
       expect(activateButtons.length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('hides Ativar when the pending member has no charge', () => {
+      render(
+        <MembersTable
+          {...defaultProps}
+          members={[makeMember({ id: 'm9', fullName: 'Sem Pix', status: 'pending', email: 'sem@test.com' })]}
+        />
+      )
+      expect(screen.queryByRole('button', { name: /ativar/i })).not.toBeInTheDocument()
     })
 
     it('does not render a points column', () => {
