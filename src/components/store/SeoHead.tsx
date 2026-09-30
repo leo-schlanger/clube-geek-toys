@@ -9,7 +9,12 @@ export interface SeoHeadProps {
   image?: string
   type?: 'website' | 'product'
   noIndex?: boolean
+  /** schema.org blocks for this page (Product, Event, BreadcrumbList…). */
+  jsonLd?: Record<string, unknown>[]
 }
+
+/** Marks the blocks this component owns, so the shell's Store/WebSite stay. */
+const JSON_LD_ATTR = 'data-seo-page'
 
 /**
  * Client-side SEO tags for shop/club SPAs.
@@ -25,7 +30,25 @@ export function SeoHead({
   image,
   type = 'website',
   noIndex = false,
+  jsonLd,
 }: SeoHeadProps) {
+  // Serialised so a new array with the same content does not rewrite the head.
+  const jsonLdText = jsonLd?.length ? JSON.stringify(jsonLd) : ''
+
+  useEffect(() => {
+    if (!jsonLdText) return
+    const blocks = (JSON.parse(jsonLdText) as Record<string, unknown>[]).map((block) => {
+      const el = document.createElement('script')
+      el.type = 'application/ld+json'
+      el.setAttribute(JSON_LD_ATTR, '')
+      el.textContent = JSON.stringify(block)
+      document.head.appendChild(el)
+      return el
+    })
+    // Leaving a product must not leave its Product block on the next page.
+    return () => blocks.forEach((el) => el.remove())
+  }, [jsonLdText])
+
   useEffect(() => {
     // The **canonical** origin, not the one in use. With two mirrors serving
     // the same content, deriving from window.location.origin made each declare

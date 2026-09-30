@@ -27,6 +27,8 @@ import {
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { CreatorCredit } from '../../components/CreatorCredit'
 import { SeoHead } from '../../components/store/SeoHead'
+import { getCanonicalOrigin } from '../../lib/subdomain'
+import { breadcrumbJsonLd, eventJsonLd } from '../../lib/structured-data'
 
 /**
  * Event page in the shop.
@@ -60,6 +62,15 @@ export default function EventPage() {
         description={eventSeoDescription(event)}
         path="/evento"
         image={art[0]}
+        // Not from the bundled fallback: it is always a past event.
+        jsonLd={
+          isPlaceholder
+            ? undefined
+            : [
+                eventJsonLd(event, getCanonicalOrigin()),
+                breadcrumbJsonLd([{ name: event.title, path: '/evento' }], getCanonicalOrigin()),
+              ]
+        }
       />
       <ShopHeader isMember={isMember} />
 

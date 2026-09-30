@@ -18,6 +18,8 @@ import { CatalogPager } from '../../components/store/CatalogPager'
 import { EventPromoCard } from '../../components/store/EventPromoCard'
 import { useShopMember } from '../../components/store/useShopMember'
 import { SeoHead, SHOP_DEFAULT_SEO } from '../../components/store/SeoHead'
+import { getCanonicalOrigin } from '../../lib/subdomain'
+import { breadcrumbJsonLd } from '../../lib/structured-data'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { CreatorCredit } from '../../components/CreatorCredit'
 import { Button } from '../../components/ui/button'
@@ -160,15 +162,25 @@ export default function ShopHome() {
               : SHOP_DEFAULT_SEO.title
         }
         description={
-          activeCategory?.description ||
-          SHOP_DEFAULT_SEO.description
+          activeCategory
+            ? activeCategory.description?.trim() ||
+              `${activeCategory.name} na GeekPop & Toys, loja de K-pop em Copacabana (RJ). Envio pelos Correios para todo o Brasil, PIX ou cartão.`
+            : SHOP_DEFAULT_SEO.description
         }
-        path={
-          categorySlug
-            ? `/categoria/${categorySlug}`
-            : search
-              ? `/?search=${encodeURIComponent(search)}`
-              : '/'
+        // Each results page is its own page to Google; page 2 pointing at
+        // page 1 would hide every product past the first screen.
+        path={`${categorySlug ? `/categoria/${categorySlug}` : '/'}${page > 1 ? `?page=${page}` : ''}`}
+        // Search results are endless near-duplicates of the catalogue.
+        noIndex={!!search}
+        jsonLd={
+          activeCategory && !search
+            ? [
+                breadcrumbJsonLd(
+                  [{ name: activeCategory.name, path: `/categoria/${activeCategory.slug}` }],
+                  getCanonicalOrigin()
+                ),
+              ]
+            : undefined
         }
       />
       <ShopHeader isMember={isMember} />

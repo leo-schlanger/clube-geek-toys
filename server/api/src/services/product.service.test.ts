@@ -21,6 +21,9 @@ const {
   bulkSetProductCategories,
   createCategory,
   updateCategory,
+  buildProductShareHtml,
+  buildStoreShareHtml,
+  buildCategoryShareHtml,
   MAX_PRODUCT_IMAGES,
   MAX_PRODUCT_VIDEOS,
 } = await import('./product.service.js');
@@ -363,5 +366,78 @@ describe('listProducts — o que a vitrine esconde e o que o painel precisa ver'
   it('só quem pede explicitamente recebe as linhas de QA', async () => {
     const sql = await whereOf({ includeInactive: true, includeSeed: true });
     expect(sql).not.toContain("checkup%");
+  });
+});
+
+describe('link previews — what WhatsApp shows for a shared link', () => {
+  const SHOP = 'https://shop.geekpoptoys.com.br';
+
+  /** Answers each query by the table it reads. */
+  function routeSql(product: Record<string, unknown> | null, categoryProducts: unknown[] = []) {
+    query.mockReset();
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM categories') && !sql.includes('FROM products'))
+        return {
+          rows: [
+            { id: 'c1', name: 'Photocards', slug: 'photocards', description: null, active: true, sort_order: 0 },
+          ],
+        };
+      if (sql.includes('COUNT(*)')) return { rows: [{ total: categoryProducts.length }] };
+      if (sql.includes('WHERE p.slug = $1')) return { rows: product ? [product] : [] };
+      return { rows: categoryProducts };
+    });
+  }
+
+  function metaOf(html: string, property: string): string | undefined {
+    return html.match(new RegExp(`<meta (?:property|name)="${property}" content="([^"]*)"`))?.[1];
+  }
+
+  it('a product leads with its own photo and the price', async () => {
+    routeSql({
+      ...productRow(['https://api.test/uploads/products/p1/foto.jpg']),
+      description: 'Camiseta oficial.\n\n- 100% algodão\n- Tamanho único',
+    });
+    const html = (await buildProductShareHtml('camiseta-bts', SHOP))!;
+
+    expect(metaOf(html, 'og:image')).toBe('https://api.test/uploads/products/p1/foto.jpg');
+    expect(metaOf(html, 'og:url')).toBe(`${SHOP}/produto/camiseta-bts`);
+    expect(metaOf(html, 'og:type')).toBe('product');
+    expect(metaOf(html, 'og:description')).toMatch(/^R\$\s?79,90 · Camiseta oficial\. - 100% algodão/);
+    expect(metaOf(html, 'product:price:amount')).toBe('79.90');
+    expect(metaOf(html, 'product:availability')).toBe('in stock');
+  });
+
+  it('a relative photo becomes absolute, and sold out is said up front', async () => {
+    routeSql({ ...productRow(['/uploads/products/p1/foto.jpg']), stock: 0 });
+    const html = (await buildProductShareHtml('camiseta-bts', SHOP))!;
+    expect(metaOf(html, 'og:image')).toBe(`${SHOP}/uploads/products/p1/foto.jpg`);
+    expect(metaOf(html, 'og:description')).toContain('· Esgotado ·');
+    expect(metaOf(html, 'product:availability')).toBe('out of stock');
+  });
+
+  it('an unknown product returns null so the route can fall back to the store', async () => {
+    routeSql(null);
+    expect(await buildProductShareHtml('sumiu', SHOP)).toBeNull();
+  });
+
+  it('the store card has the 1200x630 image with its size declared', () => {
+    const html = buildStoreShareHtml(`${SHOP}/`);
+    expect(metaOf(html, 'og:image')).toBe(`${SHOP}/og-image.png`);
+    expect(metaOf(html, 'og:image:width')).toBe('1200');
+    expect(metaOf(html, 'og:url')).toBe(`${SHOP}/`);
+  });
+
+  it('a category previews with the photo of its first product', async () => {
+    routeSql(null, [productRow([]), productRow(['https://api.test/uploads/pc.jpg'])]);
+    const html = (await buildCategoryShareHtml('photocards', SHOP))!;
+    expect(metaOf(html, 'og:title')).toBe('Photocards | Loja GeekPop &amp; Toys');
+    expect(metaOf(html, 'og:image')).toBe('https://api.test/uploads/pc.jpg');
+    expect(metaOf(html, 'og:description')).toMatch(/^2 produtos · /);
+    expect(metaOf(html, 'og:url')).toBe(`${SHOP}/categoria/photocards`);
+  });
+
+  it('an unknown category returns null', async () => {
+    routeSql(null);
+    expect(await buildCategoryShareHtml('nao-existe', SHOP)).toBeNull();
   });
 });

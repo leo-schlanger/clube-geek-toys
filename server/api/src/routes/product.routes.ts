@@ -79,6 +79,32 @@ productRouter.get('/sitemap.xml', async (_req, res, next) => {
   }
 });
 
+// ─── Public: link previews (HTML for crawlers, routed by nginx) ──────────────
+// Before /:slug so "share" and "categories" are not treated as slugs.
+
+// Short cache: the WhatsApp crawler refetches the same link several times in
+// a row, and photo and price still track the catalogue.
+const SHARE_CACHE = 'public, max-age=300';
+
+productRouter.get('/share', (_req, res) => {
+  res.set('Cache-Control', SHARE_CACHE);
+  res.type('html').send(productService.buildStoreShareHtml(SHOP_CANONICAL_URL));
+});
+
+productRouter.get('/categories/:slug/share', async (req, res, next) => {
+  try {
+    const html = await productService.buildCategoryShareHtml(
+      req.params.slug as string,
+      SHOP_CANONICAL_URL
+    );
+    // An unknown category still deserves the store card, not an empty preview.
+    res.set('Cache-Control', SHARE_CACHE);
+    res.type('html').send(html ?? productService.buildStoreShareHtml(SHOP_CANONICAL_URL));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Public: products ────────────────────────────────────────────────────────
 
 productRouter.get('/', async (req, res, next) => {
@@ -108,14 +134,9 @@ productRouter.get('/:slug/share', async (req, res, next) => {
       req.params.slug as string,
       SHOP_CANONICAL_URL
     );
-    if (!html) {
-      res.status(404).type('html').send('<!DOCTYPE html><title>Produto não encontrado</title>');
-      return;
-    }
-    // Short cache: photo and price track the catalogue, but the WhatsApp
-    // crawler refetches the same link several times in a row.
-    res.set('Cache-Control', 'public, max-age=300');
-    res.type('html').send(html);
+    // A product taken down still previews as the store, not as a bare link.
+    res.set('Cache-Control', SHARE_CACHE);
+    res.type('html').send(html ?? productService.buildStoreShareHtml(SHOP_CANONICAL_URL));
   } catch (err) {
     next(err);
   }

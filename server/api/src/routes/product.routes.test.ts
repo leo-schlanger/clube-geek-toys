@@ -32,6 +32,8 @@ const svc = vi.hoisted(() => ({
   parseProductSort: vi.fn((s: unknown) => s ?? 'recent'),
   buildProductSitemapXml: vi.fn(),
   buildProductShareHtml: vi.fn(),
+  buildStoreShareHtml: vi.fn(() => '<html>store</html>'),
+  buildCategoryShareHtml: vi.fn(),
   listRelatedProducts: vi.fn(),
   listAlsoBoughtProducts: vi.fn(),
   getProductBySlug: vi.fn(),
@@ -129,13 +131,32 @@ describe('public reads', () => {
     expect(svc.getProductBySlug).not.toHaveBeenCalled();
   });
 
-  it('serves the link preview, 404 when the product is gone', async () => {
+  it('serves the link preview, and the store card when the product is gone', async () => {
     svc.buildProductShareHtml.mockResolvedValue('<html>preview</html>');
     const ok = await api.get('/holder/share');
     expect(ok.status).toBe(200);
+    expect(ok.text).toBe('<html>preview</html>');
     expect(ok.headers.get('cache-control')).toBe('public, max-age=300');
     svc.buildProductShareHtml.mockResolvedValue(null);
-    expect((await api.get('/gone/share')).status).toBe(404);
+    const gone = await api.get('/gone/share');
+    expect(gone.status).toBe(200);
+    expect(gone.text).toBe('<html>store</html>');
+  });
+
+  it('previews the store and its categories, never as a product slug', async () => {
+    const store = await api.get('/share');
+    expect(store.status).toBe(200);
+    expect(store.headers.get('content-type')).toContain('text/html');
+    expect(store.text).toBe('<html>store</html>');
+
+    svc.buildCategoryShareHtml.mockResolvedValue('<html>kpop</html>');
+    expect((await api.get('/categories/kpop/share')).text).toBe('<html>kpop</html>');
+    expect(svc.buildCategoryShareHtml).toHaveBeenCalledWith('kpop', 'https://shop.geekpoptoys.com.br');
+
+    svc.buildCategoryShareHtml.mockResolvedValue(null);
+    expect((await api.get('/categories/nope/share')).text).toBe('<html>store</html>');
+    expect(svc.getProductBySlug).not.toHaveBeenCalled();
+    expect(svc.buildProductShareHtml).not.toHaveBeenCalled();
   });
 
   it('lists related, also-bought and variants', async () => {

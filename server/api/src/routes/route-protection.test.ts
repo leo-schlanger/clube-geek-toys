@@ -199,6 +199,8 @@ const PUBLIC = new Set([
   'GET /products/:slug/related',
   'GET /products/:slug/also-bought',
   'GET /products/:slug/share',
+  'GET /products/share',
+  'GET /products/categories/:slug/share',
   'GET /products/categories',
   'GET /products/sitemap.xml',
   'GET /reviews/product/:slugOrId',
@@ -294,6 +296,8 @@ const PUBLIC_WITHOUT_THROTTLE = new Set([
   'GET /products/:slug/related',
   'GET /products/:slug/also-bought',
   'GET /products/:slug/share',
+  'GET /products/share',
+  'GET /products/categories/:slug/share',
   'GET /products/categories',
   'GET /products/sitemap.xml',
   'GET /events/active', // Cache-Control de 60s

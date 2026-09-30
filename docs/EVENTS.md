@@ -164,8 +164,11 @@ Agora o nginx manda crawler (`$is_link_crawler`) de `/evento` para
 - `og:image` = o cartaz (banner, ou a primeira arte extra)
 - título com a data (`Evento GeeKpop! — Domingo, 11 de outubro, 14h às 18h`) e
   descrição com local e preço (e o de membro)
-- JSON-LD `schema.org/Event` com local, horário e oferta — é o que o Google lê
-  para resultado de evento
+- JSON-LD `schema.org/Event` com local, horário e oferta
+
+Desde 30/09/2026 o Google **não** passa mais por aqui: buscador recebe a SPA, e
+o `Event` que ele lê sai do `EventPage` (`src/lib/structured-data.ts`). Ver
+`docs/SEO.md`.
 
 Mesma regra da vitrine: evento que já terminou responde 404. Cache de 5 min. O
 WhatsApp guarda o preview do link por dias — para ver o novo, compartilhe o link

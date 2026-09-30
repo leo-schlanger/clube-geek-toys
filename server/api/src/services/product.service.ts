@@ -8,6 +8,7 @@ import type {
   VariantAxis,
   ProductVideo,
 } from '../types/index.js';
+import { renderShareHtml, toDescription } from '../utils/share-html.js';
 
 // ─── Image caps ──────────────────────────────────────────────────────────────
 
@@ -987,24 +988,33 @@ export async function deactivateProduct(id: string): Promise<void> {
   if (result.rows.length === 0) throw new AppError(404, 'Produto não encontrado.', 'PRODUCT_NOT_FOUND');
 }
 
-/** Escapes for use inside an HTML attribute. */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function brl(value: number): string {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+/** Absolute URL for an image stored relative ("/uploads/…"); OG needs absolute. */
+function absoluteImage(src: string | undefined, base: string): string | undefined {
+  if (!src) return undefined;
+  if (/^https?:\/\//i.test(src)) return src;
+  return `${base}${src.startsWith('/') ? '' : '/'}${src}`;
+}
+
+/** The store-wide card: shop.html carries the same copy for everyone else. */
+const STORE_SHARE = {
+  title: 'Loja GeekPop & Toys — K-pop, photocards e colecionáveis',
+  description:
+    'Photocards, álbuns, lightsticks e colecionáveis de K-pop. Loja física em Copacabana (RJ) e envio pelos Correios para todo o Brasil. PIX ou cartão.',
+  image: '/og-image.png',
+  imageWidth: 1200,
+  imageHeight: 630,
+} as const;
+
 /**
- * Minimal HTML carrying the product's meta tags, for link previews.
+ * Link preview of a product: its own photo, name and price.
  *
  * WhatsApp, Facebook and Telegram do not run JavaScript: they read the static
  * shell, which describes the whole store. Without this every shared product
  * previewed with the same generic image instead of its own photo.
- *
- * Only crawlers reach this (nginx routes by user-agent); the redirect below
- * covers anyone landing here by mistake.
  */
 export async function buildProductShareHtml(
   slug: string,
@@ -1015,46 +1025,83 @@ export async function buildProductShareHtml(
 
   const base = shopBaseUrl.replace(/\/$/, '');
   const url = `${base}/produto/${product.slug}`;
-  const title = `${product.name} — GeekPop & Toys`;
-  const price = product.price.toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  });
-  const description =
-    (product.description?.trim().slice(0, 200) ||
-      `${product.name} na GeekPop & Toys, loja de K-pop em Copacabana.`) + ` A partir de ${price}.`;
-  // The product's first photo is the entire point of this endpoint.
-  const image = product.images[0] || `${base}/og-image.png`;
+  const price = product.priceFrom ?? product.price;
+  const priceText = `${product.hasVariants ? 'A partir de ' : ''}${brl(price)}`;
+  const inStock = (product.available ?? product.stock) > 0;
+  // Price first: it is what the chat reads before tapping.
+  const about = product.description?.trim()
+    ? toDescription(product.description, 150)
+    : `${product.name} na GeekPop & Toys, loja de K-pop em Copacabana.`;
+  const description = `${priceText}${inStock ? '' : ' · Esgotado'} · ${about}`;
+  const image =
+    absoluteImage(product.images[0], base) ?? `${base}${STORE_SHARE.image}`;
 
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8" />
-<title>${escapeHtml(title)}</title>
-<link rel="canonical" href="${escapeHtml(url)}" />
-<meta name="description" content="${escapeHtml(description)}" />
-<meta property="og:type" content="product" />
-<meta property="og:site_name" content="Loja GeekPop & Toys" />
-<meta property="og:locale" content="pt_BR" />
-<meta property="og:url" content="${escapeHtml(url)}" />
-<meta property="og:title" content="${escapeHtml(title)}" />
-<meta property="og:description" content="${escapeHtml(description)}" />
-<meta property="og:image" content="${escapeHtml(image)}" />
-<meta property="og:image:alt" content="${escapeHtml(product.name)}" />
-<meta property="product:price:amount" content="${product.price.toFixed(2)}" />
-<meta property="product:price:currency" content="BRL" />
-<meta property="product:availability" content="${product.stock > 0 ? 'in stock' : 'out of stock'}" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="${escapeHtml(title)}" />
-<meta name="twitter:description" content="${escapeHtml(description)}" />
-<meta name="twitter:image" content="${escapeHtml(image)}" />
-<meta http-equiv="refresh" content="0; url=${escapeHtml(url)}" />
-</head>
-<body>
-<a href="${escapeHtml(url)}">${escapeHtml(product.name)}</a>
-</body>
-</html>
-`;
+  return renderShareHtml({
+    url,
+    title: `${product.name} | GeekPop & Toys`,
+    description,
+    image,
+    imageAlt: product.name,
+    ...(product.images[0]
+      ? {}
+      : { imageWidth: STORE_SHARE.imageWidth, imageHeight: STORE_SHARE.imageHeight }),
+    type: 'product',
+    extra: [
+      ['product:price:amount', price.toFixed(2)],
+      ['product:price:currency', 'BRL'],
+      ['product:availability', inStock ? 'in stock' : 'out of stock'],
+      ['product:condition', 'new'],
+    ],
+    heading: product.name,
+    linkLabel: 'Ver o produto na loja',
+  });
+}
+
+/** Link preview of the store itself (`/`). */
+export function buildStoreShareHtml(shopBaseUrl: string): string {
+  const base = shopBaseUrl.replace(/\/$/, '');
+  return renderShareHtml({
+    url: `${base}/`,
+    title: STORE_SHARE.title,
+    description: STORE_SHARE.description,
+    image: `${base}${STORE_SHARE.image}`,
+    imageWidth: STORE_SHARE.imageWidth,
+    imageHeight: STORE_SHARE.imageHeight,
+    imageAlt: 'Loja GeekPop & Toys — K-pop, photocards e colecionáveis',
+    heading: 'GeekPop & Toys',
+    linkLabel: 'Entrar na loja',
+  });
+}
+
+/**
+ * Link preview of a category page: the category name and the photo of its
+ * first product, so "olha os photocards" shows photocards and not the logo.
+ */
+export async function buildCategoryShareHtml(
+  slug: string,
+  shopBaseUrl: string
+): Promise<string | null> {
+  const category = (await listCategories(false)).find((c) => c.slug === slug);
+  if (!category) return null;
+
+  const base = shopBaseUrl.replace(/\/$/, '');
+  const { products, total } = await listProducts({ category: slug, limit: 12 });
+  const photo = products.find((p) => p.images.length > 0)?.images[0];
+  const count = total > 0 ? `${total} ${total === 1 ? 'produto' : 'produtos'} · ` : '';
+  const about = category.description?.trim()
+    ? toDescription(category.description, 150)
+    : `${category.name} na GeekPop & Toys, loja de K-pop em Copacabana. Envio pelos Correios para todo o Brasil.`;
+
+  return renderShareHtml({
+    url: `${base}/categoria/${category.slug}`,
+    title: `${category.name} | Loja GeekPop & Toys`,
+    description: `${count}${about}`,
+    image: absoluteImage(photo, base) ?? `${base}${STORE_SHARE.image}`,
+    ...(photo ? {} : { imageWidth: STORE_SHARE.imageWidth, imageHeight: STORE_SHARE.imageHeight }),
+    imageAlt: category.name,
+    heading: category.name,
+    linkLabel: `Ver ${category.name} na loja`,
+  });
 }
 
 /** Absolute product and category URLs for search engines (shop host). */

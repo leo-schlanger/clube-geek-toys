@@ -3,9 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <!-- SEO: Primary Meta Tags -->
+    <title>Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ</title>
+    <meta name="description" content="Loja de K-pop e cultura pop no Rio de Janeiro. Photocards, álbuns, lightsticks e colecionáveis com envio pelos Correios para todo o Brasil. Pague com PIX ou cartão." />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://shop.geekpoptoys.com.br/" />
+
+    <!-- Open Graph / Facebook / WhatsApp / Telegram -->
+    <meta property="og:title" content="Loja GeekPop & Toys — K-pop, photocards e colecionáveis" />
+    <meta property="og:description" content="Photocards, álbuns, lightsticks e colecionáveis de K-pop. Loja física em Copacabana (RJ) e envio pelos Correios para todo o Brasil. PIX ou cartão." />
+    <meta property="og:image" content="https://shop.geekpoptoys.com.br/og-image.png" />
+    <meta property="og:image:secure_url" content="https://shop.geekpoptoys.com.br/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Loja GeekPop & Toys — K-pop, photocards e colecionáveis" />
+    <meta property="og:url" content="https://shop.geekpoptoys.com.br/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Loja GeekPop & Toys" />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Loja GeekPop & Toys — K-pop, photocards e colecionáveis" />
+    <meta name="twitter:description" content="Photocards, álbuns e colecionáveis de K-pop com envio pelos Correios. PIX ou cartão." />
+    <meta name="twitter:image" content="https://shop.geekpoptoys.com.br/og-image.png" />
+    <meta name="twitter:image:alt" content="Loja GeekPop & Toys" />
 
     <!--
+      As tags acima vêm antes de qualquer script ou comentário longo de
+      propósito: leitor de preview (WhatsApp) lê só o começo da página e
+      desiste se não achar og:image cedo. Não mova nada para cima delas.
+      Os robôs de preview conhecidos nem chegam aqui — o nginx os manda para
+      um HTML curto da API (ver server/nginx/conf.d/default.conf); este shell
+      é o que vale para os demais.
+
       Shell da LOJA. Carrega o mesmo bundle do clube — a SPA decide o modo por
       subdomínio (src/lib/subdomain.ts) — mas com meta e dados estruturados
       próprios.
@@ -38,51 +71,24 @@
     <meta name="theme-color" content="#F04080" />
     <meta name="msapplication-TileColor" content="#F04080" />
 
-    <!-- SEO: Primary Meta Tags -->
-    <title>Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ</title>
-    <meta name="title" content="Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ" />
-    <meta name="description" content="Loja de K-pop e cultura pop no Rio de Janeiro. Photocards, álbuns, chaveiros e colecionáveis com envio pelos Correios para todo o Brasil. Pague com PIX ou cartão." />
-    <meta name="keywords" content="loja k-pop, photocards, comprar photocard, álbum kpop, colecionáveis, geekpop toys, loja kpop rio de janeiro, copacabana, k-pop brasil, merch kpop, funko pop" />
-    <meta name="author" content="GeekPop & Toys LTDA" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
-    <link rel="canonical" href="https://shop.geekpoptoys.com.br" />
-
-    <!-- Open Graph / Facebook / WhatsApp / Telegram -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://shop.geekpoptoys.com.br" />
-    <meta property="og:site_name" content="Loja GeekPop & Toys" />
-    <meta property="og:title" content="Loja GeekPop & Toys — K-pop e Colecionáveis" />
-    <meta property="og:description" content="Photocards, álbuns e colecionáveis de K-pop com envio pelos Correios para todo o Brasil. PIX ou cartão." />
-    <meta property="og:image" content="https://shop.geekpoptoys.com.br/og-image.png" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Loja GeekPop & Toys — K-pop, photocards e colecionáveis" />
-    <meta property="og:locale" content="pt_BR" />
-
-    <!-- Twitter / X -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://shop.geekpoptoys.com.br" />
-    <meta name="twitter:title" content="Loja GeekPop & Toys — K-pop e Colecionáveis" />
-    <meta name="twitter:description" content="Photocards, álbuns e colecionáveis de K-pop com envio pelos Correios. PIX ou cartão." />
-    <meta name="twitter:image" content="https://shop.geekpoptoys.com.br/og-image.png" />
-    <meta name="twitter:image:alt" content="Loja GeekPop & Toys" />
-
     <!-- Schema.org / JSON-LD: Store.
          É uma loja física com e-commerce, não uma Organization genérica nem o
-         Product da assinatura — este último é do clube e não pertence aqui. -->
+         Product da assinatura — este último é do clube e não pertence aqui.
+         O @id é o que os Product/BreadcrumbList da SPA citam como vendedor. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Store",
+      "@id": "https://shop.geekpoptoys.com.br/#store",
       "name": "GeekPop & Toys",
-      "description": "Loja de K-pop e cultura pop no Rio de Janeiro. Photocards, álbuns, chaveiros e colecionáveis, com envio pelos Correios para todo o Brasil.",
-      "url": "https://shop.geekpoptoys.com.br",
+      "description": "Loja de K-pop e cultura pop no Rio de Janeiro. Photocards, álbuns, lightsticks e colecionáveis, com envio pelos Correios para todo o Brasil.",
+      "url": "https://shop.geekpoptoys.com.br/",
       "logo": "https://shop.geekpoptoys.com.br/logo-vip.png",
       "image": "https://shop.geekpoptoys.com.br/og-image.png",
       "priceRange": "R$",
       "currenciesAccepted": "BRL",
       "paymentAccepted": "PIX, Cartão de crédito",
+      "areaServed": "BR",
       "sameAs": [
         "https://www.instagram.com/geeketoys",
         "https://www.facebook.com/geeketoys",
@@ -105,23 +111,19 @@
     }
     </script>
 
-    <!-- Schema.org / JSON-LD: WebSite + busca interna.
-         Permite ao Google oferecer a caixa de busca da loja no resultado. -->
+    <!-- Schema.org / JSON-LD: WebSite — é o que dá ao Google o nome do site no
+         resultado. Sem SearchAction: a caixa de busca de sitelinks foi
+         aposentada pelo Google em novembro de 2024. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
+      "@id": "https://shop.geekpoptoys.com.br/#website",
       "name": "Loja GeekPop & Toys",
-      "url": "https://shop.geekpoptoys.com.br",
+      "alternateName": ["GeekPop & Toys", "GeekPop Toys"],
+      "url": "https://shop.geekpoptoys.com.br/",
       "inLanguage": "pt-BR",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": {
-          "@type": "EntryPoint",
-          "urlTemplate": "https://shop.geekpoptoys.com.br/?search={search_term_string}"
-        },
-        "query-input": "required name=search_term_string"
-      }
+      "publisher": { "@id": "https://shop.geekpoptoys.com.br/#store" }
     }
     </script>
 

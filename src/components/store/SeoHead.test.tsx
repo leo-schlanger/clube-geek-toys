@@ -140,6 +140,41 @@ describe('SeoHead — stale meta across navigations', () => {
   })
 })
 
+describe('SeoHead — structured data', () => {
+  function pageBlocks() {
+    return [...document.head.querySelectorAll('script[type="application/ld+json"][data-seo-page]')].map(
+      (el) => JSON.parse(el.textContent ?? '{}')
+    )
+  }
+
+  it('writes one block per item', () => {
+    render(<SeoHead title="P" jsonLd={[{ '@type': 'Product' }, { '@type': 'BreadcrumbList' }]} />)
+    expect(pageBlocks().map((b) => b['@type'])).toEqual(['Product', 'BreadcrumbList'])
+  })
+
+  // Leaving a product must not leave its Product block for the next page.
+  it('removes its blocks on navigation, and leaves the shell ones alone', () => {
+    const shell = document.createElement('script')
+    shell.type = 'application/ld+json'
+    shell.textContent = '{"@type":"Store"}'
+    document.head.appendChild(shell)
+
+    const { unmount } = render(<SeoHead title="P" jsonLd={[{ '@type': 'Product' }]} />)
+    unmount()
+    render(<SeoHead title="Carrinho" />)
+
+    expect(pageBlocks()).toEqual([])
+    expect(document.head.contains(shell)).toBe(true)
+    shell.remove()
+  })
+
+  it('does not duplicate on re-render with equal content', () => {
+    const { rerender } = render(<SeoHead title="P" jsonLd={[{ '@type': 'Product' }]} />)
+    rerender(<SeoHead title="P" jsonLd={[{ '@type': 'Product' }]} />)
+    expect(pageBlocks()).toHaveLength(1)
+  })
+})
+
 describe('SeoHead — canonical domain', () => {
   // Regression: the canonical came from window.location.origin, so each mirror
   // declared itself canonical. Google reads that as duplicate content and

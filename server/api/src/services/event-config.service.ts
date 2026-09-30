@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { auditLog } from '../utils/audit.js';
 import { FALLBACK_EVENT, type EventDefinition } from '../config/events.js';
+import { renderShareHtml } from '../utils/share-html.js';
 
 /**
  * Event CRUD.
@@ -487,14 +488,6 @@ export async function deleteEvent(id: string, actorUserId?: string): Promise<voi
 
 const EVENT_TIME_ZONE = 'America/Sao_Paulo';
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 /** `Domingo, 11 de outubro` — the event happens in Rio, so Rio time. */
 function eventDayLabel(iso: string): string {
   const label = new Intl.DateTimeFormat('pt-BR', {
@@ -591,36 +584,14 @@ export function buildEventShareHtml(event: EventRecord, shopBaseUrl: string): st
         }
       : {}),
   };
-  // `</` inside JSON would close the script tag early.
-  const jsonLdText = JSON.stringify(jsonLd).replace(/</g, '\\u003c');
-
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8" />
-<title>${escapeHtml(title)}</title>
-<link rel="canonical" href="${escapeHtml(url)}" />
-<meta name="description" content="${escapeHtml(description)}" />
-<meta property="og:type" content="website" />
-<meta property="og:site_name" content="Loja GeekPop & Toys" />
-<meta property="og:locale" content="pt_BR" />
-<meta property="og:url" content="${escapeHtml(url)}" />
-<meta property="og:title" content="${escapeHtml(title)}" />
-<meta property="og:description" content="${escapeHtml(description)}" />
-<meta property="og:image" content="${escapeHtml(image)}" />
-<meta property="og:image:alt" content="${escapeHtml(`Cartaz: ${event.title}`)}" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="${escapeHtml(title)}" />
-<meta name="twitter:description" content="${escapeHtml(description)}" />
-<meta name="twitter:image" content="${escapeHtml(image)}" />
-<script type="application/ld+json">${jsonLdText}</script>
-<meta http-equiv="refresh" content="0; url=${escapeHtml(url)}" />
-</head>
-<body>
-<h1>${escapeHtml(event.title)}</h1>
-<p>${escapeHtml(description)}</p>
-<a href="${escapeHtml(url)}">Ver o evento e reservar ingresso</a>
-</body>
-</html>
-`;
+  return renderShareHtml({
+    url,
+    title,
+    description,
+    image,
+    imageAlt: `Cartaz: ${event.title}`,
+    jsonLd,
+    heading: event.title,
+    linkLabel: 'Ver o evento e reservar ingresso',
+  });
 }

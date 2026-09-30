@@ -48,6 +48,8 @@ import { ProductImageViewer, HoverZoom, ZoomHint } from '../../components/store/
 import { ProductQuestions } from '../../components/store/ProductQuestions'
 import { StarRating } from '../../components/store/StarRating'
 import { SeoHead } from '../../components/store/SeoHead'
+import { getCanonicalOrigin } from '../../lib/subdomain'
+import { breadcrumbJsonLd, productJsonLd } from '../../lib/structured-data'
 import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Skeleton } from '../../components/ui/skeleton'
@@ -245,13 +247,13 @@ export default function ProductDetail() {
       {product && (
         <SeoHead
           title={product.name}
-          description={
-            product.description?.slice(0, 160) ||
-            `${product.name} na loja GeekPop & Toys — K-pop e colecionáveis com frete Correios.`
-          }
-          path={isWholesale ? `/atacado/produto/${product.slug}` : `/produto/${product.slug}`}
-          image={displayImages[0] || product.images[0]}
+          description={productSeoDescription(product)}
+          // The wholesale page is the same product at another price: one
+          // canonical keeps Google from splitting it into two thin pages.
+          path={`/produto/${product.slug}`}
+          image={product.images[0]}
           type="product"
+          jsonLd={isWholesale ? undefined : productSeoJsonLd(product)}
         />
       )}
       <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
@@ -665,6 +667,27 @@ export default function ProductDetail() {
       </main>
     </div>
   )
+}
+
+/** Plain text, cut at a word: the product form keeps the admin's line breaks. */
+function productSeoDescription(product: Product): string {
+  const text = product.description?.replace(/\s+/g, ' ').trim()
+  if (!text) {
+    return `${product.name} na loja GeekPop & Toys — K-pop e colecionáveis com envio pelos Correios para todo o Brasil.`
+  }
+  if (text.length <= 160) return text
+  const cut = text.slice(0, 159)
+  const space = cut.lastIndexOf(' ')
+  return `${space > 100 ? cut.slice(0, space) : cut}…`
+}
+
+function productSeoJsonLd(product: Product) {
+  const origin = getCanonicalOrigin()
+  const data = productJsonLd(product, origin)
+  return [
+    ...(data ? [data] : []),
+    breadcrumbJsonLd([{ name: product.name, path: `/produto/${product.slug}` }], origin),
+  ]
 }
 
 function ProductDetailSkeleton() {
