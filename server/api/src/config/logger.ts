@@ -20,7 +20,20 @@ import pino from 'pino';
  * Read from `process.env` directly, not `config/env.ts`: the logger has to load
  * before — and independently of — the schema that validates everything else.
  */
-const level = process.env.LOG_LEVEL ?? (process.env.VITEST ? 'silent' : 'info');
+const LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'];
+
+/**
+ * Compose expands an unset `${LOG_LEVEL:-}` to an empty string, and pino
+ * refuses to start on a level it does not know — on 02/10/2026 that took the
+ * API down at boot. Anything empty or unknown falls back to the default.
+ */
+export function resolveLogLevel(raw: string | undefined, isTest: boolean): string {
+  const wanted = raw?.trim().toLowerCase();
+  if (wanted && LEVELS.includes(wanted)) return wanted;
+  return isTest ? 'silent' : 'info';
+}
+
+const level = resolveLogLevel(process.env.LOG_LEVEL, Boolean(process.env.VITEST));
 
 export const logger = pino({
   level,
