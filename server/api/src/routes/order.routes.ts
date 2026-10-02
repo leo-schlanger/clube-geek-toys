@@ -181,6 +181,29 @@ orderRouter.post(
   },
 );
 
+/**
+ * POST /orders/:id/abandon — the buyer left the card step without paying.
+ *
+ * "Voltar" on the card form used to drop the order on the floor and the next
+ * "Continuar" created another, so every change of mind left a `pending` order
+ * holding stock. Public on the same terms as `/pay-card` (the UUID is the
+ * key), and harmless by construction: the service only closes a card order
+ * with nothing live at the provider — what the buyer could not pay anyway.
+ */
+orderRouter.post('/:id/abandon', optionalAuth, paymentLimiter, async (req, res, next) => {
+  try {
+    const id = req.params.id as string;
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      res.status(404).json({ error: 'Pedido não encontrado.' });
+      return;
+    }
+    const abandoned = await orderService.abandonCardOrder(id, req.user?.userId ?? 'checkout-abandon');
+    res.json({ abandoned });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Admin ───────────────────────────────────────────────────────────────────
 
 orderRouter.get('/', authenticate, requireRole('admin'), async (req, res, next) => {

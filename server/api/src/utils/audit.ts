@@ -1,5 +1,7 @@
 import { query } from '../config/database.js';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Centralized audit log helper.
  * Use for security-sensitive events: auth, payments, role changes, refunds, etc.
@@ -12,10 +14,15 @@ export async function auditLog(
   details: Record<string, unknown> = {},
   memberId?: string | null
 ): Promise<void> {
+  // `user_id` is a uuid column, and system actors ("system-reconcile") are not
+  // users: inserting one failed the whole row, so automatic cancellations left
+  // no trail at all. They go into the details instead.
+  const isUser = userId != null && UUID_RE.test(userId);
+  const row = isUser || userId == null ? details : { ...details, actor: userId };
   try {
     await query(
       'INSERT INTO audit_logs (action, user_id, member_id, details) VALUES ($1, $2, $3, $4)',
-      [action, userId, memberId ?? null, JSON.stringify(details)]
+      [action, isUser ? userId : null, memberId ?? null, JSON.stringify(row)]
     );
   } catch (err) {
     console.error('[AUDIT] Failed to write audit log:', err);

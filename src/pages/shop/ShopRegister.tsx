@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { EmailSuggestion } from '../../components/EmailSuggestion'
 import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
@@ -142,6 +143,7 @@ export default function ShopRegister() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
+                  <EmailSuggestion email={email} onAccept={setEmail} />
                 </div>
 
                 <div className="space-y-2">

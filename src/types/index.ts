@@ -334,6 +334,11 @@ export interface Order {
   cardBrand?: string | null
   cardLastFour?: string | null
   installments?: number | null
+  /** Last card refusal, as the buyer read it; null once an attempt goes through. */
+  paymentError?: string | null
+  paymentErrorKind?: string | null
+  paymentFailedAt?: string | null
+  paymentAttempts?: number
   /** Pending order PIX, so the QR can be recovered after a closed tab. */
   pixData?: PixQRData
   paidAt: string | null

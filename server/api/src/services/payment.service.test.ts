@@ -61,6 +61,10 @@ vi.mock('../utils/stripe.js', () => ({
   getStripe: stripeMock,
   mapStripePaymentStatus: (s: string) => (s === 'succeeded' ? 'paid' : 'pending'),
 }));
+const { processEventMock } = vi.hoisted(() => ({
+  processEventMock: vi.fn(async (..._args: unknown[]) => {}),
+}));
+vi.mock('./pagarme-webhook.service.js', () => ({ processPagarmeEvent: processEventMock }));
 vi.mock('../utils/pagarme.js', async () => {
   const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
   return {
@@ -105,6 +109,7 @@ import {
   refundPayment,
   calculateUpgradeCharge,
   findRecentPayment,
+  getPaymentStatus,
 } from './payment.service.js';
 
 const PLAN_PRICE = 12.5;
@@ -836,5 +841,44 @@ describe('findRecentPayment', () => {
   it('devolve null quando não há nada recente', async () => {
     route('FROM payments', { rows: [] });
     await expect(findRecentPayment('member-1')).resolves.toBeNull();
+  });
+});
+
+/**
+ * The Pagar.me webhook was never registered (found 02/10/2026), so a member
+ * who paid stayed inactive until the 10-minute sweep while the PIX screen
+ * already said "pago". The poll settles the charge itself.
+ */
+describe('getPaymentStatus — liquida na consulta', () => {
+  it('liquida a cobrança paga da linha pendente', async () => {
+    route('FROM payments WHERE id', {
+      rows: [{ id: 'p1', amount: '12.50', status: 'pending', method: 'pix', pagarme_charge_id: 'ch_9' }],
+    });
+    const charge = { id: 'ch_9', status: 'paid', amount: 1250, payment_method: 'pix' };
+    getChargeMock.mockResolvedValue(charge);
+
+    const out = await getPaymentStatus('p1');
+
+    expect(out.mapped_status).toBe('paid');
+    expect(processEventMock).toHaveBeenCalledWith({
+      id: 'reconcile_ch_9',
+      type: 'charge.paid',
+      data: charge,
+    });
+  });
+
+  it('não liquida o que ainda está pendente', async () => {
+    route('FROM payments WHERE id', {
+      rows: [{ id: 'p1', amount: '12.50', status: 'pending', method: 'pix', pagarme_charge_id: 'ch_9' }],
+    });
+    getChargeMock.mockResolvedValue({ id: 'ch_9', status: 'pending', amount: 1250 });
+    await getPaymentStatus('p1');
+    expect(processEventMock).not.toHaveBeenCalled();
+  });
+
+  it('uma falha ao liquidar não derruba a consulta', async () => {
+    getChargeMock.mockResolvedValue({ id: 'ch_9', status: 'paid', amount: 1250, payment_method: 'pix' });
+    processEventMock.mockRejectedValueOnce(new Error('db down'));
+    expect((await getPaymentStatus('ch_9')).mapped_status).toBe('paid');
   });
 });

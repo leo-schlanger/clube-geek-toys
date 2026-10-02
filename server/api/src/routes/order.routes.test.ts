@@ -25,6 +25,7 @@ const { orders, labels } = vi.hoisted(() => ({
     getOrderStatus: vi.fn(),
     getPublicOrderPix: vi.fn(),
     payOrderWithCard: vi.fn(),
+    abandonCardOrder: vi.fn(),
     listOrders: vi.fn(),
     getOrderById: vi.fn(),
     updateOrderStatus: vi.fn(),
@@ -97,6 +98,17 @@ describe('checkout', () => {
     await api.post(`/${ORDER}/pay-card`, { body: { card_token: 'card_x' }, as: 'member' });
     expect(orders.payOrderWithCard).toHaveBeenLastCalledWith(ORDER, expect.any(Object), 'user-member');
     expect((await api.post(`/${ORDER}/pay-card`, { body: { card_token: 'card_x', installments: 13 } })).status).toBe(400);
+  });
+
+  it('lets the buyer abandon the card step, and answers 404 for a malformed id', async () => {
+    orders.abandonCardOrder.mockResolvedValue(true);
+    const res = await api.post(`/${ORDER}/abandon`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ abandoned: true });
+    expect(orders.abandonCardOrder).toHaveBeenCalledWith(ORDER, 'checkout-abandon');
+
+    expect((await api.post('/not-an-id/abandon')).status).toBe(404);
+    expect(orders.abandonCardOrder).toHaveBeenCalledTimes(1);
   });
 });
 

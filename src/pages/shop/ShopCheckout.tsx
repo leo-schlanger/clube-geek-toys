@@ -15,9 +15,15 @@ import {
   Store,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { EmailSuggestion } from '../../components/EmailSuggestion'
 import { QRCodeSVG } from 'qrcode.react'
 import type { CreateOrderResult } from '../../lib/orders'
-import { createOrder, cartToOrderItems, payOrderWithCard } from '../../lib/orders'
+import {
+  abandonCardOrder,
+  createOrder,
+  cartToOrderItems,
+  payOrderWithCard,
+} from '../../lib/orders'
 import {
   lookupCep,
   quoteShipping,
@@ -225,6 +231,10 @@ export default function ShopCheckout() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    await placeOrder(paymentMethod)
+  }
+
+  async function placeOrder(method: PaymentChoice) {
     if (submitting) return
 
     if (!name.trim() || !email.trim()) {
@@ -315,7 +325,7 @@ export default function ShopCheckout() {
                 serviceId: selectedServiceId!,
               },
             }),
-        paymentMethod,
+        paymentMethod: method,
         applyStoreCredit: Boolean(user && applyStoreCredit && storeCreditBalance > 0),
         channel: isWholesale ? 'wholesale' : 'retail',
         couponCode: appliedCoupon?.code,
@@ -405,6 +415,7 @@ export default function ShopCheckout() {
                         required
                         disabled={submitting}
                       />
+                      <EmailSuggestion email={email} onAccept={setEmail} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Telefone / WhatsApp</Label>
@@ -765,7 +776,19 @@ export default function ShopCheckout() {
                       // the confirmation e-mail, say — must not touch a new cart.
                       navigate(`/pedido/${order.id}`, { state: { fromCheckout: true } })
                     }}
-                    onCancel={() => setResult(null)}
+                    // Going back must not leave this order behind: the next
+                    // "Continuar" creates a new one, and the old one would hold
+                    // the same stock while reading "Pendente" in the panel.
+                    onCancel={() => {
+                      void abandonCardOrder(order.id)
+                      setResult(null)
+                    }}
+                    onSwitchToPix={async () => {
+                      await abandonCardOrder(order.id)
+                      setPaymentMethod('pix')
+                      setResult(null)
+                      await placeOrder('pix')
+                    }}
                   />
                 </CardContent>
               </Card>

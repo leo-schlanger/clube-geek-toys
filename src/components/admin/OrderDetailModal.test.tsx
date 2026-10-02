@@ -24,7 +24,8 @@ const { getOrderMock, refundOrderMock, labelStateMock } = vi.hoisted(() => ({
   labelStateMock: vi.fn(async () => null as unknown),
 }))
 
-vi.mock('../../lib/orders', () => ({
+vi.mock('../../lib/orders', async (importOriginal) => ({
+  cardRefusal: (await importOriginal<typeof import('../../lib/orders')>()).cardRefusal,
   getOrder: getOrderMock,
   updateOrderStatus: vi.fn(),
   confirmPixOrder: vi.fn(),
@@ -271,5 +272,30 @@ describe('OrderDetailModal — etiqueta', () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled())
     expect(getOrderMock).toHaveBeenCalledTimes(2)
     expect(screen.getByDisplayValue('AD929173832BR')).toBeInTheDocument()
+  })
+})
+
+/**
+ * On 01/10/2026 the shop read eight "Pendente" rows for one buyer as a broken
+ * payment system; every attempt had been refused. The modal says which.
+ */
+describe('OrderDetailModal — cartão recusado', () => {
+  it('mostra o motivo que o cliente viu e que nada foi cobrado', async () => {
+    await open(
+      order({
+        status: 'pending',
+        paymentMethod: 'credit_card',
+        paymentError: 'O banco do cartão não autorizou a compra.',
+        paymentAttempts: 6,
+      })
+    )
+    expect(await screen.findByText(/Cartão recusado · 6 tentativas — nenhum valor foi cobrado/)).toBeInTheDocument()
+    expect(screen.getByText(/O banco do cartão não autorizou a compra/)).toBeInTheDocument()
+  })
+
+  it('não mostra nada num cartão pendente sem recusa (autorizado, liquidando)', async () => {
+    await open(order({ status: 'pending', paymentMethod: 'credit_card', paymentError: null }))
+    await screen.findByText(/Status/)
+    expect(screen.queryByText(/Cartão recusado/)).not.toBeInTheDocument()
   })
 })

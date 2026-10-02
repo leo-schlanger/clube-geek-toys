@@ -5,11 +5,17 @@ import { Badge } from '../ui/badge'
 import { Loading } from '../ui/loading'
 import { OrderDetailModal, ORDER_STATUS_META, ORDER_STATUSES } from './OrderDetailModal'
 import type { Order, OrderStatus } from '../../types'
-import { adminListOrders, awaitingPosting, needsShippingLabel, refundOrder } from '../../lib/orders'
+import {
+  adminListOrders,
+  awaitingPosting,
+  cardRefusal,
+  needsShippingLabel,
+  refundOrder,
+} from '../../lib/orders'
 import { formatCurrency } from '../../lib/utils'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
-import { ClipboardList, Eye, RotateCcw, Store, Tag } from 'lucide-react'
+import { ClipboardList, CreditCard, Eye, RotateCcw, Store, Tag } from 'lucide-react'
 
 export function OrdersTab() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -131,6 +137,12 @@ export function OrdersTab() {
                           Etiqueta pronta · levar aos Correios
                         </span>
                       )}
+                      {cardRefusal(order) && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-red-500">
+                          <CreditCard className="h-3 w-3" />
+                          {cardRefusal(order)}
+                        </span>
+                      )}
                       <p className="truncate font-medium">{order.customerName}</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {order.customerEmail}
@@ -191,6 +203,14 @@ export function OrdersTab() {
                         <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
                           <Tag className="h-3 w-3" />
                           Etiqueta pronta · levar aos Correios
+                        </span>
+                      )}
+                      {/* Pending because the buyer may retry, not because money
+                          is on the way — say which. */}
+                      {cardRefusal(order) && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-red-500">
+                          <CreditCard className="h-3 w-3" />
+                          {cardRefusal(order)}
                         </span>
                       )}
                     </td>

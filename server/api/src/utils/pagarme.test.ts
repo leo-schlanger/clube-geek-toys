@@ -32,6 +32,7 @@ import {
   maxInstallmentsFor,
   mapChargeStatus,
   describeChargeFailure,
+  classifyChargeFailure,
   toCents,
   fromCents,
   idempotencyKeyFor,
@@ -121,26 +122,65 @@ describe('mapChargeStatus', () => {
 });
 
 describe('describeChargeFailure', () => {
+  const charge = (tx: Record<string, unknown>, status = 'failed') =>
+    ({ id: 'ch_1', status, amount: 100, last_transaction: tx }) as never;
+
   it('traduz o código do adquirente', () => {
-    expect(
-      describeChargeFailure({
-        id: 'ch_1',
+    expect(describeChargeFailure(charge({ acquirer_return_code: '51' }))).toMatch(
+      /saldo ou limite insuficiente/
+    );
+  });
+
+  /**
+   * The real decline of 01/10/2026: Stone code 1007 was unmapped, the buyer
+   * read "tente novamente" and tried eight times.
+   */
+  it('recusa do emissor (Stone 1007) não manda tentar de novo', () => {
+    const message = describeChargeFailure(
+      charge({ status: 'not_authorized', acquirer_return_code: '1007' })
+    );
+    expect(message).toMatch(/banco do cartão não autorizou/);
+    expect(message).toMatch(/PIX/);
+    expect(message).not.toMatch(/tente novamente/i);
+  });
+
+  it('antifraude reprovado vence o código aprovado do adquirente', () => {
+    const failure = classifyChargeFailure(
+      charge({
         status: 'not_authorized',
-        amount: 100,
-        last_transaction: { acquirer_return_code: '51' },
-      } as never)
-    ).toMatch(/saldo ou limite insuficiente/);
+        acquirer_return_code: '0000',
+        antifraud_response: { status: 'reproved', score: 'very_high' },
+      })
+    );
+    expect(failure.kind).toBe('antifraud');
+    expect(failure.message).toMatch(/análise de segurança/);
+  });
+
+  it.each([
+    ['1016', 'funds'],
+    ['1045', 'card_data'],
+    ['1011', 'card_data'],
+    ['1001', 'card_data'],
+    ['1025', 'issuer'],
+    ['9112', 'temporary'],
+  ])('código Stone %s é %s', (code, kind) => {
+    expect(classifyChargeFailure(charge({ acquirer_return_code: code })).kind).toBe(kind);
+  });
+
+  it('código Stone fora da tabela cai pela faixa', () => {
+    expect(classifyChargeFailure(charge({ acquirer_return_code: '1099' })).kind).toBe('issuer');
+    expect(classifyChargeFailure(charge({ acquirer_return_code: '9500' })).kind).toBe('temporary');
   });
 
   it('cai no status quando não há código', () => {
     expect(
       describeChargeFailure({ id: 'ch_1', status: 'not_authorized', amount: 100 } as never)
-    ).toMatch(/não autorizado/i);
+    ).toMatch(/não autorizou/i);
   });
 
   /** Never leave the customer without an instruction. */
   it('sempre devolve uma frase acionável', () => {
-    expect(describeChargeFailure(undefined)).toMatch(/tente outro cartão|use PIX/i);
+    expect(describeChargeFailure(undefined)).toMatch(/outro cartão|PIX/i);
   });
 });
 

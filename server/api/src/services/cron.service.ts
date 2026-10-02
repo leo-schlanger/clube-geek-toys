@@ -155,8 +155,10 @@ async function purgeOldRows(): Promise<void> {
     { table: 'error_logs', column: 'created_at', keep: '90 days' },
     // Read back by the digest and the reminders — a year is well past both.
     { table: 'email_logs', column: 'sent_at', keep: '1 year' },
-    // Stripe never re-delivers anything this old.
-    { table: 'processed_webhooks', column: 'created_at', keep: '90 days' },
+    // Neither provider re-delivers anything this old, and the reconciliation
+    // looks back seven days. The column is `processed_at`: `created_at` failed
+    // this purge every night without anyone seeing it.
+    { table: 'processed_webhooks', column: 'processed_at', keep: '90 days' },
   ];
 
   for (const t of targets) {

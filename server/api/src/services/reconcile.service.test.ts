@@ -14,9 +14,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *     provider hiccup on the first row must not hide the paid one behind it.
  */
 
-const { queryMock, getChargeMock, processEventMock, updateStatusMock, expireReservationMock } =
-  vi.hoisted(() => ({
+const {
+  queryMock,
+  getChargeMock,
+  processEventMock,
+  updateStatusMock,
+  expireReservationMock,
+  abandonMock,
+} = vi.hoisted(() => ({
     queryMock: vi.fn(),
+    abandonMock: vi.fn(async (..._args: unknown[]) => true),
     getChargeMock: vi.fn(),
     processEventMock: vi.fn(async (..._args: unknown[]) => {}),
     updateStatusMock: vi.fn(async () => ({})),
@@ -27,7 +34,10 @@ vi.mock('../config/database.js', () => ({ query: queryMock }));
 vi.mock('./pagarme-webhook.service.js', () => ({ processPagarmeEvent: processEventMock }));
 // Also keeps `bcrypt` out of this suite: order.service pulls it in transitively
 // and its native binding does not load here.
-vi.mock('./order.service.js', () => ({ updateOrderStatus: updateStatusMock }));
+vi.mock('./order.service.js', () => ({
+  updateOrderStatus: updateStatusMock,
+  abandonCardOrder: abandonMock,
+}));
 vi.mock('./event.service.js', () => ({ expireReservation: expireReservationMock }));
 vi.mock('../utils/pagarme.js', async () => {
   const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
@@ -43,12 +53,19 @@ vi.mock('../config/env.js', () => ({
   },
 }));
 
-import { reconcilePendingCharges } from './reconcile.service.js';
+import { closeAbandonedCardOrders, reconcilePendingCharges } from './reconcile.service.js';
+
+/** Abandoned card orders the sweep finds; none unless a test says so. */
+let abandonedRows: { id: string; order_number: number }[] = [];
 
 function pending(
   ...rows: { charge_id: string; ref: string; order_id?: string; reservation_id?: string }[]
 ) {
-  queryMock.mockResolvedValue({ rows, rowCount: rows.length });
+  queryMock.mockImplementation(async (sql: string) =>
+    sql.includes("payment_method = 'credit_card'")
+      ? { rows: abandonedRows, rowCount: abandonedRows.length }
+      : { rows, rowCount: rows.length },
+  );
 }
 
 function charge(id: string, status: string) {
@@ -72,6 +89,7 @@ function expiredPix(id: string, hoursAgo: number) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  abandonedRows = [];
 });
 
 describe('reconcilePendingCharges', () => {
@@ -81,7 +99,7 @@ describe('reconcilePendingCharges', () => {
 
     const out = await reconcilePendingCharges();
 
-    expect(out).toEqual({ checked: 1, settled: 1, expired: 0, failed: 0 });
+    expect(out).toEqual({ checked: 1, settled: 1, expired: 0, abandoned: 0, failed: 0 });
     expect(processEventMock).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'charge.paid', id: 'reconcile_ch_1' })
     );
@@ -94,7 +112,7 @@ describe('reconcilePendingCharges', () => {
 
     const out = await reconcilePendingCharges();
 
-    expect(out).toEqual({ checked: 1, settled: 0, expired: 0, failed: 0 });
+    expect(out).toEqual({ checked: 1, settled: 0, expired: 0, abandoned: 0, failed: 0 });
     expect(processEventMock).not.toHaveBeenCalled();
   });
 
@@ -138,7 +156,7 @@ describe('reconcilePendingCharges', () => {
 
     const out = await reconcilePendingCharges();
 
-    expect(out).toEqual({ checked: 2, settled: 1, expired: 0, failed: 1 });
+    expect(out).toEqual({ checked: 2, settled: 1, expired: 0, abandoned: 0, failed: 1 });
     expect(processEventMock).toHaveBeenCalledTimes(1);
   });
 
@@ -149,7 +167,7 @@ describe('reconcilePendingCharges', () => {
 
     const out = await reconcilePendingCharges();
 
-    expect(out).toEqual({ checked: 1, settled: 0, expired: 0, failed: 1 });
+    expect(out).toEqual({ checked: 1, settled: 0, expired: 0, abandoned: 0, failed: 1 });
   });
 
   it('não faz nada quando não há cobrança aberta', async () => {
@@ -157,7 +175,7 @@ describe('reconcilePendingCharges', () => {
 
     const out = await reconcilePendingCharges();
 
-    expect(out).toEqual({ checked: 0, settled: 0, expired: 0, failed: 0 });
+    expect(out).toEqual({ checked: 0, settled: 0, expired: 0, abandoned: 0, failed: 0 });
     expect(getChargeMock).not.toHaveBeenCalled();
   });
 
@@ -336,5 +354,52 @@ describe('reservas de ingresso', () => {
     await reconcilePendingCharges();
 
     expect(expireReservationMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A card order can only be paid from the checkout that created it; one the
+ * buyer left must not sit `pending` for ever. On 01/10/2026 one buyer left
+ * eight of them, each holding a unit of stock.
+ */
+describe('closeAbandonedCardOrders', () => {
+  it('passa cada pedido de cartão parado para abandonCardOrder', async () => {
+    abandonedRows = [
+      { id: 'o1', order_number: 25 },
+      { id: 'o2', order_number: 26 },
+    ];
+    pending();
+    abandonMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    expect(await closeAbandonedCardOrders()).toBe(1);
+    expect(abandonMock).toHaveBeenCalledWith('o1', 'system-reconcile');
+    expect(abandonMock).toHaveBeenCalledWith('o2', 'system-reconcile');
+  });
+
+  it('só olha cartão, sem Stripe, parado há mais de uma hora', async () => {
+    pending();
+    await closeAbandonedCardOrders();
+    const [sql, params] = queryMock.mock.calls[0] as [string, unknown[]];
+    expect(sql).toMatch(/status = 'pending'/);
+    expect(sql).toMatch(/stripe_payment_intent_id IS NULL/);
+    expect(sql).toMatch(/payment_failed_at IS NULL\s+OR payment_failed_at < NOW\(\)/);
+    expect(params[0]).toBe(60);
+  });
+
+  it('um pedido com erro não para os seguintes', async () => {
+    abandonedRows = [
+      { id: 'o1', order_number: 25 },
+      { id: 'o2', order_number: 26 },
+    ];
+    pending();
+    abandonMock.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(true);
+    expect(await closeAbandonedCardOrders()).toBe(1);
+  });
+
+  it('roda junto da conciliação e entra no resultado', async () => {
+    abandonedRows = [{ id: 'o1', order_number: 25 }];
+    pending();
+    const out = await reconcilePendingCharges();
+    expect(out.abandoned).toBe(1);
   });
 });

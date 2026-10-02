@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { getStripe, mapStripePaymentStatus } from '../utils/stripe.js';
 import { type PixQRData } from '../utils/pix.js';
 import * as pagarme from '../utils/pagarme.js';
+import { processPagarmeEvent } from './pagarme-webhook.service.js';
 import { sendTemplateEmail } from './email.service.js';
 import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { AppError } from '../middleware/error-handler.js';
@@ -709,6 +710,27 @@ export async function userOwnsPayment(userId: string, paymentId: string): Promis
   return result.rows.length > 0;
 }
 
+/**
+ * Apply a paid charge now, through the webhook processor.
+ *
+ * Same event and same key as the reconciliation (`reconcile_<charge>`), so the
+ * webhook, the sweep and this poll settle a charge once between them; the
+ * processor re-reads the charge uncached before it moves anything. Never
+ * throws — a status poll must not fail because settling did.
+ */
+async function settleIfPaid(charge: pagarme.PagarmeCharge): Promise<void> {
+  if (pagarme.mapChargeStatus(charge.status) !== 'paid') return;
+  try {
+    await processPagarmeEvent({
+      id: `reconcile_${charge.id}`,
+      type: 'charge.paid',
+      data: charge as unknown as Record<string, unknown>,
+    });
+  } catch (err) {
+    console.error(`[PAYMENT] settle on status poll failed (${charge.id}):`, err);
+  }
+}
+
 export async function getPaymentStatus(paymentId: string): Promise<{
   id: string;
   status: string;
@@ -721,6 +743,7 @@ export async function getPaymentStatus(paymentId: string): Promise<{
   // webhook is still in flight. This is what the PIX screen polls.
   if (paymentId.startsWith('ch_')) {
     const charge = await pagarme.getCharge(paymentId);
+    await settleIfPaid(charge);
     return {
       id: charge.id,
       status: charge.status,
@@ -773,16 +796,17 @@ export async function getPaymentStatus(paymentId: string): Promise<{
 
   // A pending Pagar.me row is worth a question to the provider.
   //
-  // The webhook is what activates the member, and it is quick — but the person
-  // is looking at the QR code with their bank app still open, and "aguardando"
-  // for the extra second or two it takes to arrive reads as a failed payment.
-  // Asking the charge directly makes the screen flip the moment the money
-  // lands. The webhook stays the thing that applies the effects; this only
-  // reports, so a lost webhook still cannot activate anyone by itself.
+  // The person is looking at the QR code with their bank app still open, and
+  // "aguardando" reads as a failed payment. Asking the charge directly makes
+  // the screen flip the moment the money lands — and a paid charge is settled
+  // here too, because the webhook was never registered at the provider (found
+  // 02/10/2026) and the 10-minute sweep left a member who had paid still
+  // inactive while the screen said "pago".
   if (row.status === 'pending' && row.pagarme_charge_id) {
     try {
       const charge = await pagarme.getChargeThrottled(row.pagarme_charge_id as string);
       const mapped = pagarme.mapChargeStatus(charge.status);
+      await settleIfPaid(charge);
       return {
         id: row.id,
         status: charge.status,

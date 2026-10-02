@@ -44,6 +44,8 @@ export interface PagarmeLastTransaction {
   acquirer_message?: string;
   acquirer_return_code?: string;
   gateway_response?: { code?: string; errors?: { message?: string }[] };
+  /** Present when the account runs antifraud; `reproved` voids an issuer approval. */
+  antifraud_response?: { status?: string; score?: string; provider_name?: string };
   card?: { brand?: string; last_four_digits?: string; holder_name?: string };
 }
 
@@ -146,51 +148,139 @@ export class PagarmeError extends Error {
 }
 
 /**
- * Acquirer return codes, mapped to something a buyer can act on.
+ * Why a card charge did not go through, in the terms the buyer can act on.
  *
- * The provider's own text is a mix of English and bank jargon ("Do not honor"),
- * which in a checkout reads as a bug rather than a declined card.
+ * `retry` is the point: "tente novamente" on a refusal that repeats itself sent
+ * a buyer through eight identical attempts on 01/10/2026 — each one raising the
+ * antifraud score until it refused the card on its own.
  */
-const ACQUIRER_MESSAGE_MAP: Record<string, string> = {
-  '51': 'Cartão recusado: saldo ou limite insuficiente.',
-  '05': 'Cartão recusado pelo banco emissor. Tente outro cartão.',
-  '57': 'Cartão não autorizado para esta compra. Fale com seu banco.',
-  '54': 'Cartão expirado. Confira a validade.',
-  '82': 'Código de segurança (CVV) incorreto.',
-  '14': 'Número do cartão incorreto.',
-  '41': 'Cartão bloqueado pelo banco. Use outro cartão.',
-  '43': 'Cartão bloqueado pelo banco. Use outro cartão.',
-  '62': 'Cartão restrito para este tipo de compra.',
-  '78': 'Cartão ainda não desbloqueado. Ative-o no app do banco.',
-  '91': 'Banco emissor indisponível no momento. Tente em alguns minutos.',
-  '96': 'Falha temporária no processamento. Tente novamente.',
-};
+export type ChargeFailureKind =
+  | 'issuer' // the bank said no: retrying the same card will not change it
+  | 'antifraud' // the provider's risk check said no
+  | 'card_data' // number, expiry or CVV wrong: fixable by retyping
+  | 'funds' // limit or balance
+  | 'temporary' // network or issuer offline: retrying later can work
+  | 'unknown';
 
-/** Antifraude and gateway-level refusals, which carry no acquirer code. */
-const STATUS_MESSAGE_MAP: Record<string, string> = {
-  not_authorized: 'Pagamento não autorizado pelo banco emissor. Tente outro cartão.',
-  failed: 'Não foi possível processar o pagamento. Tente novamente ou use outro cartão.',
-  with_error: 'Erro ao processar o pagamento. Tente novamente em alguns minutos.',
-  canceled: 'Pagamento cancelado.',
-};
+export interface ChargeFailure {
+  kind: ChargeFailureKind;
+  message: string;
+  /** The acquirer code as received, for the panel and the logs. */
+  code: string | null;
+}
+
+const MSG = {
+  issuer:
+    'O banco do cartão não autorizou a compra. Tentar de novo com o mesmo cartão não muda a resposta: fale com o banco, use outro cartão ou pague com PIX.',
+  antifraud:
+    'A compra não foi aprovada na análise de segurança do pagamento. Repetir com o mesmo cartão não muda o resultado — pague com PIX ou use outro cartão.',
+  funds: 'Cartão recusado por saldo ou limite insuficiente. Use outro cartão ou pague com PIX.',
+  expired: 'Cartão vencido. Confira a validade ou use outro cartão.',
+  number: 'Número do cartão inválido. Confira os dígitos ou use outro cartão.',
+  cvv: 'Código de segurança (CVV) incorreto. Confira o verso do cartão.',
+  blocked: 'Cartão bloqueado ou ainda não desbloqueado. Ative-o no app do banco ou use outro cartão.',
+  restricted:
+    'Este cartão não permite esse tipo de compra (online). Libere compras online no app do banco, use outro cartão ou pague com PIX.',
+  installments: 'O cartão não aceitou o parcelamento. Tente à vista ou use outro cartão.',
+  temporary: 'O banco do cartão não respondeu agora. Aguarde alguns minutos e tente de novo, ou pague com PIX.',
+  generic: 'O pagamento não foi autorizado. Use outro cartão ou pague com PIX.',
+} as const;
+
+type Mapped = { kind: ChargeFailureKind; message: string };
+const issuer: Mapped = { kind: 'issuer', message: MSG.issuer };
+const cardData = (message: string): Mapped => ({ kind: 'card_data', message });
+const temporary: Mapped = { kind: 'temporary', message: MSG.temporary };
 
 /**
- * The message the customer sees for a charge that did not go through.
+ * Acquirer return codes.
  *
- * Order of preference: acquirer code (most specific), the charge status, then a
- * generic fallback. The raw `acquirer_message` is never shown — it is English.
+ * Two families arrive: the two-digit ABECS codes of the older acquirers, and
+ * the four-digit Stone codes the PSP account actually returns. Only the second
+ * reached production, and none of them was mapped — every decline fell through
+ * to a generic "tente novamente".
  */
-export function describeChargeFailure(charge: PagarmeCharge | undefined): string {
-  const tx = charge?.last_transaction;
-  const code = tx?.acquirer_return_code;
-  if (code && ACQUIRER_MESSAGE_MAP[code]) return ACQUIRER_MESSAGE_MAP[code];
+const ACQUIRER_CODES: Record<string, Mapped> = {
+  // ABECS
+  '05': issuer,
+  '51': { kind: 'funds', message: MSG.funds },
+  '54': cardData(MSG.expired),
+  '57': { kind: 'issuer', message: MSG.restricted },
+  '62': { kind: 'issuer', message: MSG.restricted },
+  '14': cardData(MSG.number),
+  '82': cardData(MSG.cvv),
+  '41': { kind: 'issuer', message: MSG.blocked },
+  '43': { kind: 'issuer', message: MSG.blocked },
+  '78': { kind: 'issuer', message: MSG.blocked },
+  '91': temporary,
+  '96': temporary,
+  // Stone — https://online.stone.com.br/docs/códigos-de-retorno-do-autorizador-stone
+  '1001': cardData(MSG.expired),
+  '1819': cardData(MSG.expired),
+  '2001': cardData(MSG.expired),
+  '1011': cardData(MSG.number),
+  '1816': cardData(MSG.number),
+  '1838': cardData(MSG.number),
+  '1045': cardData(MSG.cvv),
+  '1817': cardData(MSG.cvv),
+  '9124': cardData(MSG.cvv),
+  '1016': { kind: 'funds', message: MSG.funds },
+  '1025': { kind: 'issuer', message: MSG.blocked },
+  '2004': { kind: 'issuer', message: MSG.blocked },
+  '1019': { kind: 'issuer', message: MSG.restricted },
+  '1020': { kind: 'issuer', message: MSG.restricted },
+  '1024': { kind: 'issuer', message: MSG.restricted },
+  '1813': { kind: 'issuer', message: MSG.restricted },
+  '1825': { kind: 'issuer', message: MSG.restricted },
+  '1836': { kind: 'issuer', message: MSG.restricted },
+  '1805': { kind: 'issuer', message: MSG.installments },
+  '1829': temporary,
+  '1831': temporary,
+  '1834': temporary,
+  '1841': temporary,
+  '9103': temporary,
+  '9109': temporary,
+  '9110': temporary,
+  '9111': temporary,
+  '9112': temporary,
+  '9999': temporary,
+};
 
-  const gatewayError = tx?.gateway_response?.errors?.[0]?.message;
-  if (charge?.status && STATUS_MESSAGE_MAP[charge.status]) {
-    return STATUS_MESSAGE_MAP[charge.status];
+/** A code outside the table still says which side refused, by its range. */
+function byRange(code: string): Mapped | null {
+  if (!/^\d{4}$/.test(code)) return null;
+  if (code.startsWith('9')) return temporary;
+  if (/^[123]/.test(code)) return issuer;
+  return null;
+}
+
+/**
+ * Classify a charge that did not go through.
+ *
+ * Order of preference: antifraud (it overrides an issuer approval — the
+ * reproved charge on 01/10/2026 carried acquirer code `0000`), the acquirer
+ * code, its range, then a generic sentence. The provider's own text is never
+ * shown: it is addressed to the merchant ("oriente o portador…").
+ */
+export function classifyChargeFailure(charge: PagarmeCharge | undefined): ChargeFailure {
+  const tx = charge?.last_transaction;
+  const code = tx?.acquirer_return_code ?? null;
+
+  if (tx?.antifraud_response?.status === 'reproved') {
+    return { kind: 'antifraud', message: MSG.antifraud, code };
   }
-  if (gatewayError) return 'Pagamento recusado. Tente outro cartão ou use PIX.';
-  return 'Pagamento recusado. Tente outro cartão ou use PIX.';
+  const mapped = code ? (ACQUIRER_CODES[code] ?? byRange(code)) : null;
+  if (mapped) return { ...mapped, code };
+  if (charge?.status === 'with_error') return { ...temporary, code };
+  if (charge?.status === 'canceled') return { kind: 'unknown', message: 'Pagamento cancelado.', code };
+  if (tx?.status === 'not_authorized' || charge?.status === 'not_authorized') {
+    return { ...issuer, code };
+  }
+  return { kind: 'unknown', message: MSG.generic, code };
+}
+
+/** The message the customer sees for a charge that did not go through. */
+export function describeChargeFailure(charge: PagarmeCharge | undefined): string {
+  return classifyChargeFailure(charge).message;
 }
 
 /** Turns a Pagar.me error body into one PT-BR sentence. */

@@ -125,6 +125,10 @@ vi.mock('./admin-notification.service.js', () => ({
   notifyAdminsOfPayment: notifyAdminsMock,
 }));
 vi.mock('../utils/stripe.js', () => ({ getStripe: stripeMock }));
+const { processEventMock } = vi.hoisted(() => ({
+  processEventMock: vi.fn(async (..._args: unknown[]) => {}),
+}));
+vi.mock('./pagarme-webhook.service.js', () => ({ processPagarmeEvent: processEventMock }));
 // Only the network calls are stubbed; the money maths in `utils/pagarme`
 // (reais to centavos, status mapping, the instalment ceiling) stays real.
 vi.mock('../utils/pagarme.js', async () => {
@@ -171,7 +175,9 @@ import {
   updateOrderStatus,
   refundOrder,
   payOrderWithCard,
+  abandonCardOrder,
   buildOrderPix,
+  getOrderStatus,
 } from './order.service.js';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -1850,6 +1856,150 @@ describe('payOrderWithCard', () => {
     );
     expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
   });
+
+  /**
+   * The refusal of 01/10/2026: Stone code 1007 had no translation and the
+   * buyer read "tente novamente" eight times. It must say retrying the same
+   * card is pointless, and be kept on the order for the panel.
+   */
+  it('grava a recusa no pedido e não manda repetir o mesmo cartão', async () => {
+    pagarmeCreateOrderMock.mockResolvedValueOnce({
+      id: 'or_x',
+      status: 'failed',
+      charges: [
+        {
+          id: 'ch_x',
+          status: 'failed',
+          amount: 12400,
+          payment_method: 'credit_card',
+          last_transaction: { status: 'not_authorized', acquirer_return_code: '1007' },
+        },
+      ],
+    });
+
+    const err = await payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1').catch((e) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.statusCode).toBe(402);
+    expect(err.message).toMatch(/banco do cartão não autorizou/);
+    expect(err.message).not.toMatch(/tente novamente/i);
+
+    const save = queryMock.mock.calls.find((c) => sqlOf2(c[0]).includes('payment_attempts = payment_attempts + 1'));
+    expect(save).toBeDefined();
+    const params = save![1] as unknown[];
+    expect(params[6]).toMatch(/banco do cartão/);
+    expect(params[7]).toBe('issuer');
+  });
+
+  it('uma tentativa que passa limpa a recusa anterior', async () => {
+    approvedCharge();
+    await payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1');
+    const save = queryMock.mock.calls.find((c) => sqlOf2(c[0]).includes('payment_attempts = payment_attempts + 1'));
+    expect((save![1] as unknown[])[6]).toBeNull();
+  });
+
+  /**
+   * The issuer refusing to save the card (412) happens before any charge, so
+   * the claim must go at once — or the corrected card hears "pagamento em
+   * andamento" for two minutes.
+   */
+  it('libera a trava quando o cartão não é validado', async () => {
+    const providerError = Object.assign(new Error('412'), {
+      name: 'PagarmeError',
+      httpStatus: 412,
+      userMessage: 'Não foi possível validar o cartão.',
+    });
+    pagarmeCreateCardMock.mockRejectedValueOnce(providerError);
+
+    await expect(payOrderWithCard('o1', { cardToken: 'token_abc' }, 'u1')).rejects.toBe(providerError);
+
+    const release = queryMock.mock.calls.find((c) => sqlOf2(c[0]).includes('card_payment_started_at = NULL'));
+    expect(release).toBeDefined();
+    expect(sqlOf2(release![0])).toContain("payment_error_kind = 'card_data'");
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A card order can only be paid from the checkout that made it. One the buyer
+ * left must close — but never one with something live at the provider.
+ */
+describe('abandonCardOrder', () => {
+  const sqlOf3 = (a: unknown) => (typeof a === 'string' ? a.replace(/\s+/g, ' ').trim() : '');
+
+  function cardOrder(over: Record<string, unknown> = {}) {
+    return {
+      id: 'o1',
+      order_number: 25,
+      customer_name: 'Lucas',
+      customer_email: 'lucas@example.com',
+      status: 'pending',
+      payment_method: 'credit_card',
+      subtotal: '1150.00',
+      discount: '57.50',
+      shipping_cost: '0',
+      store_credit_applied: '0',
+      total: '1092.50',
+      ...over,
+    };
+  }
+
+  /** Route by statement: the order read, the in-flight probe, the cancel. */
+  function db(order: Record<string, unknown>, inFlight = false) {
+    queryMock.mockImplementation(async (sql: string) => {
+      const q = sqlOf3(sql);
+      if (q.includes("card_payment_started_at > NOW()")) return { rows: inFlight ? [{ '?column?': 1 }] : [] };
+      if (q.startsWith('UPDATE orders SET status = $1')) return { rows: [{ ...order, status: 'cancelled' }] };
+      return { rows: [order] };
+    });
+  }
+
+  const cancelled = () =>
+    queryMock.mock.calls.some((c) => sqlOf3(c[0]).startsWith('UPDATE orders SET status = $1'));
+
+  it('fecha o pedido que nunca chegou a cobrar, sem e-mail ao cliente', async () => {
+    db(cardOrder());
+    expect(await abandonCardOrder('o1', 'system-reconcile')).toBe(true);
+    expect(cancelled()).toBe(true);
+    expect(sendEmailMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'order-cancelled-customer' })
+    );
+  });
+
+  it('fecha o pedido cuja cobrança a operadora diz ter falhado', async () => {
+    db(cardOrder({ pagarme_charge_id: 'ch_x' }));
+    pagarmeGetChargeMock.mockResolvedValue({ id: 'ch_x', status: 'failed', amount: 109250 });
+    expect(await abandonCardOrder('o1', 'system-reconcile')).toBe(true);
+  });
+
+  it.each(['paid', 'pending', 'processing'])('não toca em cobrança %s', async (status) => {
+    db(cardOrder({ pagarme_charge_id: 'ch_x' }));
+    pagarmeGetChargeMock.mockResolvedValue({ id: 'ch_x', status, amount: 109250 });
+    expect(await abandonCardOrder('o1', 'system-reconcile')).toBe(false);
+    expect(cancelled()).toBe(false);
+  });
+
+  it('não fecha quando a operadora não responde', async () => {
+    db(cardOrder({ pagarme_charge_id: 'ch_x' }));
+    pagarmeGetChargeMock.mockRejectedValue(new Error('502'));
+    expect(await abandonCardOrder('o1', 'system-reconcile')).toBe(false);
+    expect(cancelled()).toBe(false);
+  });
+
+  it('não fecha com uma tentativa de cartão em andamento', async () => {
+    db(cardOrder(), true);
+    expect(await abandonCardOrder('o1', 'system-reconcile')).toBe(false);
+    expect(cancelled()).toBe(false);
+  });
+
+  it.each([
+    ['PIX', { payment_method: 'pix' }],
+    ['pago', { status: 'paid' }],
+    ['Stripe', { stripe_payment_intent_id: 'pi_1' }],
+  ])('ignora pedido %s', async (_label, over) => {
+    db(cardOrder(over));
+    expect(await abandonCardOrder('o1', 'system-reconcile')).toBe(false);
+    expect(cancelled()).toBe(false);
+  });
 });
 
 // ─── Recuperar o PIX de um pedido ────────────────────────────────────────────
@@ -1934,5 +2084,44 @@ describe('buildOrderPix', () => {
     queryMock.mockResolvedValue({ rows: [{ pix_qr_code: '00020101-PAGARME' }] });
 
     await expect(buildOrderPix(order({ total: 0 }))).resolves.toBeNull();
+  });
+});
+
+/**
+ * The webhook was never registered at the provider (found 02/10/2026): every
+ * shop payment so far settled through the 10-minute sweep, while the buyer's
+ * page already said "pago". The status poll settles it on the spot.
+ */
+describe('getOrderStatus', () => {
+  beforeEach(() => {
+    queryMock.mockResolvedValue({
+      rows: [{ id: 'o1', status: 'pending', order_number: 40, pagarme_charge_id: 'ch_pix' }],
+    });
+  });
+
+  it('liquida na hora a cobrança que a operadora diz estar paga', async () => {
+    const charge = { id: 'ch_pix', status: 'paid', amount: 12400 };
+    pagarmeGetChargeMock.mockResolvedValue(charge);
+
+    const out = await getOrderStatus('o1');
+
+    expect(out?.status).toBe('paid');
+    expect(processEventMock).toHaveBeenCalledWith({
+      id: 'reconcile_ch_pix',
+      type: 'charge.paid',
+      data: charge,
+    });
+  });
+
+  it('não liquida o que ainda está pendente', async () => {
+    pagarmeGetChargeMock.mockResolvedValue({ id: 'ch_pix', status: 'pending', amount: 12400 });
+    expect((await getOrderStatus('o1'))?.status).toBe('pending');
+    expect(processEventMock).not.toHaveBeenCalled();
+  });
+
+  it('responde pago mesmo se a liquidação falhar, e não derruba a página', async () => {
+    pagarmeGetChargeMock.mockResolvedValue({ id: 'ch_pix', status: 'paid', amount: 12400 });
+    processEventMock.mockRejectedValueOnce(new Error('db down'));
+    expect((await getOrderStatus('o1'))?.status).toBe('paid');
   });
 });

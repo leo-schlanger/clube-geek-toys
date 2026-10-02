@@ -85,6 +85,16 @@ export async function payOrderWithCard(
   return result.data
 }
 
+/**
+ * The buyer left the card step. Closes the order when nothing is live at the
+ * provider, so going back and continuing does not leave a second order holding
+ * the same stock. Best effort: the reconciliation closes it within the hour if
+ * this request never arrives.
+ */
+export async function abandonCardOrder(orderId: string): Promise<void> {
+  await api.post(`/orders/${orderId}/abandon`, {}).catch(() => {})
+}
+
 // ─── Etiqueta de envio (Melhor Envio) ────────────────────────────────────────
 
 export interface LabelState {
@@ -112,6 +122,23 @@ export interface LabelState {
  * A fallback quote (`fallback-pac`) has no Melhor Envio service behind it, so
  * it is not a queue item; the order detail explains that case on its own.
  */
+/**
+ * A card order whose last attempt was refused, as the panel should name it.
+ *
+ * Such an order stays `pending` so the buyer can retry, and in the list it read
+ * exactly like a sale about to land: on 01/10/2026 the shop saw eight
+ * "Pendente" rows for one buyer and asked whether payments were broken, when
+ * every attempt had been refused by the bank or the antifraud. Null when the
+ * order is not in that state.
+ */
+export function cardRefusal(order: Order): string | null {
+  if (order.status !== 'pending' || order.paymentMethod !== 'credit_card' || !order.paymentError) {
+    return null
+  }
+  const attempts = order.paymentAttempts ?? 0
+  return attempts > 1 ? `Cartão recusado · ${attempts} tentativas` : 'Cartão recusado'
+}
+
 export function needsShippingLabel(order: Order): boolean {
   return (
     order.deliveryMethod !== 'pickup' &&

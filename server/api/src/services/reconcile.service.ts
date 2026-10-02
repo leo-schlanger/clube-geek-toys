@@ -24,7 +24,7 @@
 import { query } from '../config/database.js';
 import * as pagarme from '../utils/pagarme.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
-import { updateOrderStatus } from './order.service.js';
+import { abandonCardOrder, updateOrderStatus } from './order.service.js';
 import { expireReservation } from './event.service.js';
 
 /**
@@ -45,6 +45,8 @@ export interface ReconcileResult {
   settled: number;
   /** Orders closed because their PIX code can no longer be paid. */
   expired: number;
+  /** Card orders closed because nobody can pay them any more. */
+  abandoned: number;
   failed: number;
 }
 
@@ -128,11 +130,11 @@ async function pendingCharges(): Promise<PendingCharge[]> {
  */
 export async function reconcilePendingCharges(): Promise<ReconcileResult> {
   if (!pagarme.isPagarmeConfigured()) {
-    return { checked: 0, settled: 0, expired: 0, failed: 0 };
+    return { checked: 0, settled: 0, expired: 0, abandoned: 0, failed: 0 };
   }
 
   const rows = await pendingCharges();
-  const result: ReconcileResult = { checked: 0, settled: 0, expired: 0, failed: 0 };
+  const result: ReconcileResult = { checked: 0, settled: 0, expired: 0, abandoned: 0, failed: 0 };
 
   for (const { chargeId, ref, orderId, reservationId } of rows) {
     result.checked += 1;
@@ -179,10 +181,13 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
     }
   }
 
-  if (result.settled > 0 || result.expired > 0 || result.failed > 0) {
+  result.abandoned = await closeAbandonedCardOrders();
+
+  if (result.settled > 0 || result.expired > 0 || result.abandoned > 0 || result.failed > 0) {
     console.log(
       `[RECONCILE] ${result.checked} verificada(s), ${result.settled} liquidada(s), ` +
-        `${result.expired} expirada(s), ${result.failed} com erro`,
+        `${result.expired} expirada(s), ${result.abandoned} cartão abandonado(s), ` +
+        `${result.failed} com erro`,
     );
   }
 
@@ -200,6 +205,53 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
   ).catch((err) => console.error('[RECONCILE] heartbeat falhou:', err));
 
   return result;
+}
+
+/**
+ * How long a card order may sit unpaid after its last attempt.
+ *
+ * The buyer either tries again within minutes or has left the checkout; an
+ * hour is long past the first and keeps a slow second attempt safe.
+ */
+const CARD_ABANDON_AFTER_MINUTES = 60;
+
+/**
+ * Close card orders that can no longer be paid.
+ *
+ * Only the checkout screen can charge a card order, so one the buyer walked
+ * away from would otherwise sit `pending` forever, holding its stock and
+ * reading in the panel like a sale about to happen. `abandonCardOrder` asks the
+ * provider before closing anything that has a charge.
+ */
+export async function closeAbandonedCardOrders(): Promise<number> {
+  const rows = await query(
+    `SELECT id, order_number FROM orders
+      WHERE status = 'pending'
+        AND payment_method = 'credit_card'
+        AND stripe_payment_intent_id IS NULL
+        AND created_at < NOW() - ($1::int * INTERVAL '1 minute')
+        AND (payment_failed_at IS NULL
+             OR payment_failed_at < NOW() - ($1::int * INTERVAL '1 minute'))
+      ORDER BY created_at
+      LIMIT $2`,
+    [CARD_ABANDON_AFTER_MINUTES, MAX_PER_RUN],
+  ).catch((err) => {
+    console.error('[RECONCILE] busca de cartões abandonados falhou:', err);
+    return { rows: [] as Record<string, unknown>[] };
+  });
+
+  let closed = 0;
+  for (const row of rows.rows) {
+    try {
+      if (await abandonCardOrder(row.id as string, 'system-reconcile')) {
+        closed += 1;
+        console.log(`[RECONCILE] pedido #${row.order_number}: cartão não concluído — pedido cancelado`);
+      }
+    } catch (err) {
+      console.error(`[RECONCILE] pedido #${row.order_number}: falha ao fechar cartão abandonado:`, err);
+    }
+  }
+  return closed;
 }
 
 /**

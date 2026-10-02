@@ -5,6 +5,7 @@ import { Loading } from '../ui/loading'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
 import type { Order, OrderStatus } from '../../types'
 import {
+  cardRefusal,
   getOrder,
   updateOrderStatus,
   confirmPixOrder,
@@ -366,6 +367,21 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                   )}
                 </div>
               </div>
+
+              {cardRefusal(order) && (
+                <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm">
+                  <p className="font-semibold text-red-600 dark:text-red-400">
+                    {cardRefusal(order)} — nenhum valor foi cobrado
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    O cliente viu: “{order.paymentError}”
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    O pedido fica aberto para ele tentar outro cartão e se fecha sozinho uma hora
+                    depois da última tentativa. Se ele quiser pagar, o caminho é PIX.
+                  </p>
+                </div>
+              )}
 
               {/*
                 The charge id, so "o cliente diz que pagou, cadê?" can be

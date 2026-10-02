@@ -1248,6 +1248,17 @@ const STEPS: SchemaStep[] = [
         WHERE payment_provider IS NULL AND pix_txid IS NOT NULL AND total_cents > 0`);
     },
   },
+  {
+    name: 'Card refusal kept on the order (migration 038)',
+    run: async () => {
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_error TEXT`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_error_kind VARCHAR(20)`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_failed_at TIMESTAMPTZ`);
+      await query(
+        `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_attempts INTEGER NOT NULL DEFAULT 0`
+      );
+    },
+  },
 ];
 
 let state: SchemaState = {

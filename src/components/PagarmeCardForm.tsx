@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { CreditCard, Loader2, Lock } from 'lucide-react'
+import { CreditCard, Loader2, Lock, QrCode } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
@@ -46,6 +46,12 @@ interface PagarmeCardFormProps {
    */
   onToken: (token: string, installments: number) => Promise<void> | void
   onCancel?: () => void
+  /**
+   * Offered once a charge has been refused. Most refusals repeat themselves on
+   * the same card, and a buyer told only "recusado" keeps retrying it — on
+   * 01/10/2026 one tried eight times. PIX is the way out that always works.
+   */
+  onSwitchToPix?: () => void | Promise<void>
   submitLabel?: string
   /** Hide the instalment picker where splitting makes no sense (the R$12,50 plan). */
   allowInstallments?: boolean
@@ -75,6 +81,7 @@ export function PagarmeCardForm({
   amount,
   onToken,
   onCancel,
+  onSwitchToPix,
   submitLabel,
   allowInstallments = true,
   defaultDocument = '',
@@ -90,6 +97,8 @@ export function PagarmeCardForm({
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Set only by a refusal from the parent's charge, not by a typo caught here.
+  const [declined, setDeclined] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -152,6 +161,7 @@ export function PagarmeCardForm({
     }
 
     setSubmitting(true)
+    let tokenized = false
     try {
       const [month = '', year = ''] = expiry.split('/')
       const token = await createCardToken(
@@ -173,10 +183,12 @@ export function PagarmeCardForm({
       setCvv('')
       setExpiry('')
 
+      tokenized = true
       await onToken(token, installments)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Não foi possível processar o cartão.'
       setFormError(message)
+      if (tokenized) setDeclined(true)
       // The parent charge failed after tokenization: let them try again.
       setSubmitting(false)
       return
@@ -302,6 +314,26 @@ export function PagarmeCardForm({
         >
           {formError}
         </div>
+      )}
+
+      {declined && onSwitchToPix && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full"
+          disabled={submitting}
+          onClick={async () => {
+            setSubmitting(true)
+            try {
+              await onSwitchToPix()
+            } finally {
+              setSubmitting(false)
+            }
+          }}
+        >
+          <QrCode className="h-4 w-4" />
+          Pagar com PIX — aprovação na hora
+        </Button>
       )}
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground">

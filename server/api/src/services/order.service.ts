@@ -94,6 +94,10 @@ function mapOrder(row: pg.QueryResultRow): Order {
     cardBrand: row.card_brand ?? null,
     cardLastFour: row.card_last_four ?? null,
     installments: row.installments != null ? Number(row.installments) : null,
+    paymentError: row.payment_error ?? null,
+    paymentErrorKind: row.payment_error_kind ?? null,
+    paymentFailedAt: row.payment_failed_at ?? null,
+    paymentAttempts: row.payment_attempts != null ? Number(row.payment_attempts) : 0,
     customerDocument: row.customer_document ?? null,
     pagarmeCustomerId: row.pagarme_customer_id ?? null,
     melhorEnvioOrderId: row.melhor_envio_order_id ?? null,
@@ -1073,13 +1077,30 @@ export async function payOrderWithCard(
 
   // PSP charges a saved card, not a raw token: the token becomes a `card_id` on
   // the customer first. See `createCardForCustomer` for why this step exists.
-  const customerId = await getOrCreateOrderCustomer(order, order.customerDocument);
-  const billingAddress = orderToPagarmeCustomer(order, order.customerDocument).address;
-  const savedCard = await pagarme.createCardForCustomer(
-    customerId,
-    input.cardToken,
-    billingAddress,
-  );
+  let customerId: string;
+  let savedCard: Awaited<ReturnType<typeof pagarme.createCardForCustomer>>;
+  try {
+    customerId = await getOrCreateOrderCustomer(order, order.customerDocument);
+    const billingAddress = orderToPagarmeCustomer(order, order.customerDocument).address;
+    savedCard = await pagarme.createCardForCustomer(customerId, input.cardToken, billingAddress);
+  } catch (err) {
+    // Nothing has been charged yet, so the claim protects nothing: holding it
+    // would answer the corrected card with "pagamento em andamento" for two
+    // minutes. The issuer's refusal to save the card (412) is a refusal like
+    // any other, and the panel should show it as one.
+    const providerErr = err as { name?: string; httpStatus?: number; userMessage?: string };
+    const refused = providerErr.name === 'PagarmeError' && providerErr.httpStatus === 412;
+    await query(
+      refused
+        ? `UPDATE orders SET card_payment_started_at = NULL,
+                  payment_attempts = payment_attempts + 1,
+                  payment_error = $2, payment_error_kind = 'card_data', payment_failed_at = NOW()
+            WHERE id = $1`
+        : `UPDATE orders SET card_payment_started_at = NULL WHERE id = $1`,
+      refused ? [order.id, providerErr.userMessage] : [order.id],
+    ).catch(() => {});
+    throw err;
+  }
 
   const created = await pagarme.createOrder(
     {
@@ -1121,15 +1142,30 @@ export async function payOrderWithCard(
   const lastFour =
     charge.last_transaction?.card?.last_four_digits ?? savedCard.last_four_digits ?? null;
 
+  // A refusal is kept on the order so the panel can tell "cartão recusado"
+  // from "aguardando pagamento"; any attempt that is not refused clears it.
+  const failure = mapped === 'failed' ? pagarme.classifyChargeFailure(charge) : null;
   await query(
     `UPDATE orders
         SET pagarme_order_id = $1, pagarme_charge_id = $2, payment_provider = 'pagarme',
-            card_brand = $3, card_last_four = $4, installments = $5
+            card_brand = $3, card_last_four = $4, installments = $5,
+            payment_attempts = payment_attempts + 1,
+            payment_error = $7, payment_error_kind = $8,
+            payment_failed_at = CASE WHEN $7::text IS NULL THEN NULL ELSE NOW() END
       WHERE id = $6`,
-    [created.id, charge.id, brand, lastFour, installments, order.id],
+    [
+      created.id,
+      charge.id,
+      brand,
+      lastFour,
+      installments,
+      order.id,
+      failure?.message ?? null,
+      failure?.kind ?? null,
+    ],
   );
 
-  if (mapped === 'failed') {
+  if (failure) {
     // The order stays `pending` and keeps its hold: the buyer is looking at the
     // form and will very likely try another card. The TTL sweep is what closes
     // it if they walk away, exactly as it does for an abandoned PIX.
@@ -1138,7 +1174,8 @@ export async function payOrderWithCard(
       orderNumber: order.orderNumber,
       pagarmeChargeId: charge.id,
       providerStatus: charge.status,
-      acquirerCode: charge.last_transaction?.acquirer_return_code ?? null,
+      acquirerCode: failure.code,
+      kind: failure.kind,
     });
     notifyAdminsOfPaymentAsync({
       event: 'payment_failed',
@@ -1148,7 +1185,7 @@ export async function payOrderWithCard(
       customerName: order.customerName,
       customerEmail: order.customerEmail,
       link: '/admin?tab=orders',
-      detail: pagarme.describeChargeFailure(charge),
+      detail: failure.message,
       chargeId: charge.id,
     });
     // Free the claim at once: "cartão recusado, tenta outro" is the whole
@@ -1157,7 +1194,7 @@ export async function payOrderWithCard(
     await query(`UPDATE orders SET card_payment_started_at = NULL WHERE id = $1`, [
       order.id,
     ]).catch(() => {});
-    throw new AppError(402, pagarme.describeChargeFailure(charge), 'CARD_DECLINED');
+    throw new AppError(402, failure.message, 'CARD_DECLINED');
   }
 
   // Settling the order — decrementing stock, e-mailing the customer — is the
@@ -1182,6 +1219,60 @@ export async function payOrderWithCard(
     cardBrand: brand,
     cardLastFour: lastFour,
   };
+}
+
+/**
+ * Close a card order nobody is going to pay.
+ *
+ * A card order can only be paid from the checkout screen that created it — the
+ * order page has no card form — so once the buyer leaves, the order is dead.
+ * It used to stay `pending` forever: the "Voltar" button on the card step
+ * dropped it and the next "Continuar" created another, and on 01/10/2026 one
+ * buyer left eight of them, each holding a unit of the same lightstick.
+ *
+ * Only an order with nothing live at the provider is closed: no charge, or a
+ * charge the provider calls failed. An authorised charge still waiting for its
+ * webhook is left for the reconciliation to settle, and a provider that cannot
+ * be reached leaves the order alone — closing a paid order is the worse error.
+ * The buyer is not e-mailed: they saw the refusal on screen and paid nothing.
+ *
+ * Returns whether the order was closed.
+ */
+export async function abandonCardOrder(
+  orderId: string,
+  actorUserId: string,
+): Promise<boolean> {
+  const order = await getOrderById(orderId, false);
+  if (!order || order.status !== 'pending') return false;
+  if (order.paymentMethod !== 'credit_card' || order.stripePaymentIntentId) return false;
+
+  // A card round-trip in flight decides for itself.
+  const inFlight = await query(
+    `SELECT 1 FROM orders
+      WHERE id = $1 AND card_payment_started_at > NOW() - INTERVAL '2 minutes'`,
+    [orderId],
+  );
+  if (inFlight.rows.length > 0) return false;
+
+  if (order.pagarmeChargeId) {
+    const charge = await pagarme.getCharge(order.pagarmeChargeId).catch(() => null);
+    if (!charge || pagarme.mapChargeStatus(charge.status) !== 'failed') return false;
+  }
+
+  try {
+    await updateOrderStatus(orderId, 'cancelled', actorUserId, { notifyCustomer: false });
+  } catch (err) {
+    // Another writer got there first (the buyer paid, an admin cancelled).
+    if (err instanceof AppError && err.statusCode === 409) return false;
+    throw err;
+  }
+  await auditLog('order.card_abandoned', actorUserId, {
+    orderId,
+    orderNumber: order.orderNumber,
+    attempts: order.paymentAttempts ?? 0,
+    lastError: order.paymentErrorKind ?? null,
+  });
+  return true;
 }
 
 // ─── Reads ───────────────────────────────────────────────────────────────────
@@ -1293,10 +1384,24 @@ export async function getOrderStatus(
     try {
       const charge = await pagarme.getChargeThrottled(row.pagarme_charge_id as string);
       const mapped = pagarme.mapChargeStatus(charge.status);
+      if (mapped === 'paid') {
+        // Settle now rather than waiting for the webhook or the 10-minute
+        // sweep: the buyer is watching this page, and until settlement the
+        // stock, the confirmation e-mail and the panel all still say
+        // "pendente". Same processor and key as the reconciliation, so the
+        // paths settle a charge once; the processor re-reads it uncached.
+        // Imported here because the webhook processor imports this module.
+        const { processPagarmeEvent } = await import('./pagarme-webhook.service.js');
+        await processPagarmeEvent({
+          id: `reconcile_${charge.id}`,
+          type: 'charge.paid',
+          data: charge as unknown as Record<string, unknown>,
+        }).catch((err) => console.error('[order] settle on status poll failed:', err));
+      }
       return {
         id: row.id,
-        // 'paid' at the provider with the webhook still in flight is reported
-        // as paid: the money is there, and the page may stop waiting.
+        // 'paid' at the provider is reported as paid even if settling above
+        // failed: the money is there, and the page may stop waiting.
         status: mapped === 'paid' ? 'paid' : row.status,
         orderNumber: row.order_number,
         providerStatus: charge.status,
@@ -1652,7 +1757,12 @@ export function notifyOrderDelivered(order: Order): void {
 
 const VALID_STATUS = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
-export async function updateOrderStatus(id: string, status: string, actorUserId: string): Promise<Order> {
+export async function updateOrderStatus(
+  id: string,
+  status: string,
+  actorUserId: string,
+  opts: { notifyCustomer?: boolean } = {},
+): Promise<Order> {
   if (!VALID_STATUS.includes(status)) {
     throw new AppError(400, 'Status inválido.', 'INVALID_STATUS');
   }
@@ -1752,7 +1862,7 @@ export async function updateOrderStatus(id: string, status: string, actorUserId:
   // Cancelling from the panel used to be silent. The buyer had an order that
   // simply stopped existing — no e-mail, nothing on the order page beyond a
   // status word. `closing` is false for a repeat, so this cannot double-send.
-  if (closing && status === 'cancelled') {
+  if (closing && status === 'cancelled' && opts.notifyCustomer !== false) {
     sendTemplateEmail({
       template: 'order-cancelled-customer',
       to: order.customerEmail,

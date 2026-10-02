@@ -301,6 +301,11 @@ export interface Order {
   cardBrand?: string | null;
   cardLastFour?: string | null;
   installments?: number | null;
+  /** Last card refusal, in the buyer's words; cleared when a later attempt goes through. */
+  paymentError?: string | null;
+  paymentErrorKind?: string | null;
+  paymentFailedAt?: string | null;
+  paymentAttempts?: number;
   /** CPF/CNPJ of the buyer, required by the acquirer. Digits only. */
   customerDocument?: string | null;
   /** Melhor Envio shipment id — exists from the moment the label is carted. */

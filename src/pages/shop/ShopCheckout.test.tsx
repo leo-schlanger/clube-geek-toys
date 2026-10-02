@@ -60,7 +60,16 @@ vi.mock('../../components/store/PaymentTrustBadges', () => ({
 }))
 
 vi.mock('../../components/PagarmeCardForm', () => ({
-  PagarmeCardForm: () => <div data-testid="card-form" />,
+  PagarmeCardForm: (props: { onCancel?: () => void; onSwitchToPix?: () => void }) => (
+    <div data-testid="card-form">
+      <button type="button" onClick={props.onCancel}>
+        mock-voltar
+      </button>
+      <button type="button" onClick={props.onSwitchToPix}>
+        mock-pix
+      </button>
+    </div>
+  ),
 }))
 
 vi.mock('../../lib/reviews', () => ({
@@ -83,6 +92,8 @@ vi.mock('../../lib/shipping', () => ({
 
 vi.mock('../../lib/orders', () => ({
   createOrder: vi.fn(),
+  payOrderWithCard: vi.fn(),
+  abandonCardOrder: vi.fn(async () => {}),
   cartToOrderItems: (items: unknown[]) => items,
 }))
 
@@ -99,12 +110,13 @@ vi.mock('qrcode.react', () => ({
 }))
 
 import { lookupCep, quoteShipping } from '../../lib/shipping'
-import { createOrder } from '../../lib/orders'
+import { abandonCardOrder, createOrder } from '../../lib/orders'
 import ShopCheckout from './ShopCheckout'
 
 const mockedLookup = vi.mocked(lookupCep)
 const mockedQuote = vi.mocked(quoteShipping)
 const mockedCreate = vi.mocked(createOrder)
+const mockedAbandon = vi.mocked(abandonCardOrder)
 
 const cartItem = {
   productId: 'p1',
@@ -332,5 +344,68 @@ describe('ShopCheckout', () => {
       // No quote is requested: pickup does not depend on a CEP.
       expect(mockedQuote).not.toHaveBeenCalled()
     })
+  })
+
+  /**
+   * The checkout of 01/10/2026: every "Voltar" on the card step dropped the
+   * order and the next "Continuar" made another — eight pending orders for one
+   * buyer. And a refused buyer had no way to PIX but to start over.
+   */
+  describe('passo do cartão', () => {
+    async function reachCardStep() {
+      const user = userEvent.setup()
+      mockedCreate.mockResolvedValueOnce({
+        order: { id: 'ord-card', orderNumber: 32, status: 'pending', total: 100 },
+        requiresCard: true,
+      } as never)
+      render(
+        <MemoryRouter>
+          <ShopCheckout />
+        </MemoryRouter>
+      )
+      await user.type(screen.getByLabelText(/Nome completo/i), 'Lucas Lima')
+      await user.type(screen.getByLabelText(/^Email/i), 'lucas@test.com')
+      await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
+      await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
+      await user.click(screen.getByRole('button', { name: /Cartão de crédito/i }))
+      await user.click(screen.getByRole('button', { name: /Continuar/i }))
+      await screen.findByTestId('card-form')
+      return user
+    }
+
+    it('Voltar fecha o pedido em vez de deixá-lo pendente', async () => {
+      const user = await reachCardStep()
+      await user.click(screen.getByRole('button', { name: 'mock-voltar' }))
+      expect(mockedAbandon).toHaveBeenCalledWith('ord-card')
+      expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
+    })
+
+    it('depois de uma recusa, troca para PIX sem refazer o checkout', async () => {
+      const user = await reachCardStep()
+      mockedCreate.mockResolvedValueOnce({
+        order: { id: 'ord-pix', orderNumber: 33, status: 'pending', total: 100 },
+        pixData: { emvCode: '00020126PIXCODE', txId: 'ch_3', provider: 'pagarme' },
+      } as never)
+
+      await user.click(screen.getByRole('button', { name: 'mock-pix' }))
+
+      expect(mockedAbandon).toHaveBeenCalledWith('ord-card')
+      await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(2))
+      expect(mockedCreate.mock.calls[1][0].paymentMethod).toBe('pix')
+      expect(await screen.findByTestId('qr')).toBeInTheDocument()
+    })
+  })
+
+  it('sugere o e-mail certo quando o domínio parece digitado errado', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <ShopCheckout />
+      </MemoryRouter>
+    )
+    await user.type(screen.getByLabelText(/^Email/i), 'lucas@gamil.com')
+    await user.click(screen.getByRole('button', { name: 'lucas@gmail.com' }))
+    expect(screen.getByLabelText(/^Email/i)).toHaveValue('lucas@gmail.com')
+    expect(screen.queryByText(/Você quis dizer/i)).not.toBeInTheDocument()
   })
 })

@@ -221,6 +221,9 @@ const PUBLIC = new Set([
   // credencial e nada aqui devolve dado de cliente — cobra um cartão de que
   // quem chama já tem o token. O serviço só aceita pedido `pending`.
   'POST /orders/:id/pay-card',
+  // "Voltar" no passo do cartão. Só fecha pedido de cartão sem nada vivo na
+  // operadora — o que quem chama não conseguiria pagar de qualquer jeito.
+  'POST /orders/:id/abandon',
 
   // ── Configuração do checkout ──
   // A chave pública é pública por definição (identifica a loja na tokenização)

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { EmailSuggestion } from '../EmailSuggestion'
 import { CheckCircle2, Loader2, MessageCircle, Plus, Ticket, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -364,6 +365,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
             onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}
             placeholder="voce@email.com"
           />
+          <EmailSuggestion email={buyer.email} onAccept={(fixed) => setBuyer({ ...buyer, email: fixed })} />
         </div>
 
         {needsDocument && (

@@ -171,8 +171,15 @@ token, então não há nada para preparar antes — e separar as etapas é o que
 "cartão recusado, tenta outro" ser uma **retentativa no mesmo pedido**, com o
 mesmo estoque segurado e o mesmo cupom, em vez de um pedido novo.
 
-Uma recusa volta como **402** com o motivo do banco já em português
-(`describeChargeFailure` traduz o `acquirer_return_code`).
+Uma recusa volta como **402** com o motivo do banco já em português.
+`classifyChargeFailure` (`utils/pagarme.ts`) lê, nesta ordem: antifraude
+reprovado, o `acquirer_return_code` (tabela Stone de 4 dígitos — é o que a conta
+PSP devolve — e os códigos ABECS de 2), a faixa do código, e só então o status.
+A mensagem diz **se repetir adianta**: recusa do emissor e do antifraude mandam
+para outro cartão ou PIX, nunca "tente novamente". A recusa fica gravada no
+pedido (`payment_error`, `payment_error_kind`, `payment_attempts` — migration
+038), e o painel mostra **Cartão recusado · N tentativas** em vez de "Pendente".
+Ver §8.6.
 
 ### Assinatura
 
@@ -603,6 +610,29 @@ pagamento que caia no mesmo minuto). O cancelamento passa por
 `updateOrderStatus`, que é o que devolve a reserva, restitui o crédito e avisa o
 cliente — um `UPDATE` cru pularia os três. Cartão não é cancelado: cartão se
 retenta.
+
+## 8.6 "Pendente, pendente, pendente" (01–02/10/2026)
+
+Um cliente tentou comprar um lightstick de R$ 1.092,50 **dez vezes** no cartão,
+em oito pedidos. A loja perguntou se o pagamento estava quebrado. Não estava —
+mas quase tudo em volta da recusa estava errado:
+
+| Achado                       | O que acontecia                                                                                                                                                                                                                                                                               | Correção                                                                                                                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Código Stone sem tradução    | A conta PSP devolve código de 4 dígitos (`1007` = "consulte o emissor"); o mapa só tinha os de 2. Toda recusa caía no genérico _"Não foi possível processar o pagamento. **Tente novamente** ou use outro cartão."_ — e ele tentou de novo, até o **antifraude** reprovar (score `very_high`) | `classifyChargeFailure`: tabela Stone + faixas + antifraude; recusa do emissor diz que repetir não muda nada                                                                                                                |
+| Antifraude invisível         | A cobrança reprovada pelo antifraude vem com `acquirer_return_code = 0000` ("aprovada")                                                                                                                                                                                                       | `antifraud_response.status = 'reproved'` é lido **antes** do código                                                                                                                                                         |
+| "Voltar" criava pedido novo  | O botão do passo do cartão descartava o pedido; "Continuar" criava outro. Oito pedidos `pending`, cada um segurando uma unidade                                                                                                                                                               | `POST /orders/:id/abandon` no "Voltar"; e a conciliação fecha cartão parado há 1 h sem nada vivo na operadora (`closeAbandonedCardOrders`), **sem e-mail** ao cliente                                                       |
+| Sem saída depois da recusa   | Para pagar com PIX era preciso refazer o checkout                                                                                                                                                                                                                                             | Depois de uma recusa o formulário oferece **Pagar com PIX — aprovação na hora**, no mesmo carrinho                                                                                                                          |
+| Painel dizia "Pendente"      | Recusa e "aguardando liquidar" eram a mesma palavra                                                                                                                                                                                                                                           | Motivo e tentativas gravados no pedido; lista e detalhe mostram **Cartão recusado**                                                                                                                                         |
+| Trava presa no 412           | Se a Pagar.me recusava salvar o cartão, a trava de 2 min não era solta: o cartão corrigido ouvia "pagamento em andamento"                                                                                                                                                                     | A trava cai na hora quando nada foi cobrado                                                                                                                                                                                 |
+| E-mail `@gamil.com`          | Nada chegava ao cliente, e e-mail inválido pesa no antifraude                                                                                                                                                                                                                                 | `EmailSuggestion` no checkout, no ingresso e no cadastro da loja                                                                                                                                                            |
+| **Webhook nunca cadastrado** | `GET /hooks` da Pagar.me: **zero** entregas. Todas as baixas desde 01/09 vieram da conciliação, com até 10 min de atraso — o cliente via "pago" e o pedido seguia pendente no painel                                                                                                          | Consultar o status (`/orders/:id/status`, `/payments/:id/status`) agora **liquida** a cobrança paga, como os ingressos já faziam. O cadastro no painel continua necessário — é o que a renovação de assinatura vai precisar |
+| Auditoria de sistema perdida | `audit_logs.user_id` é UUID e `"system-reconcile"` não é: todo cancelamento automático falhava ao registrar                                                                                                                                                                                   | `auditLog` move ator de sistema para `details.actor`                                                                                                                                                                        |
+| Limpeza diária falhando      | `processed_webhooks` não tem `created_at`                                                                                                                                                                                                                                                     | Usa `processed_at`                                                                                                                                                                                                          |
+
+Conferido em produção (02/10/2026): todas as cobranças da Pagar.me dos últimos
+31 dias batem com o estado local — nenhuma paga lá e pendente aqui, nem o
+contrário.
 
 ---
 
