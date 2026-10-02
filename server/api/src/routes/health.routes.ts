@@ -10,6 +10,35 @@ import { env } from '../config/env.js';
 export const healthRouter = Router();
 
 /**
+ * Host cron jobs and how old their last success may get before it is news.
+ * Written by `scripts/job-status.sh` (`job_ok`); a job with no row yet has
+ * never reported — `stale: null`, not an alarm, until its first run.
+ */
+const JOB_MAX_AGE_HOURS: Record<string, number> = {
+  backup_daily: 26,
+  offsite_dump: 26,
+  offsite_uploads: 26,
+  backup_weekly: 8 * 24 + 2,
+  restore_drill: 32 * 24,
+};
+
+async function jobHeartbeats(): Promise<Record<string, { lastOk: string | null; stale: boolean | null }>> {
+  const result = await pool.query(
+    `SELECT key, value #>> '{}' AS at FROM config WHERE key LIKE 'job_ok_%'`,
+  );
+  const seen = new Map(result.rows.map((r) => [String(r.key).slice('job_ok_'.length), r.at as string]));
+  const out: Record<string, { lastOk: string | null; stale: boolean | null }> = {};
+  for (const [job, maxHours] of Object.entries(JOB_MAX_AGE_HOURS)) {
+    const at = seen.get(job) ?? null;
+    out[job] = {
+      lastOk: at,
+      stale: at ? Date.now() - new Date(at).getTime() > maxHours * 3600 * 1000 : null,
+    };
+  }
+  return out;
+}
+
+/**
  * Public health check, consumed by the docker healthcheck and by the final
  * step of `deploy.yml`.
  *
@@ -27,6 +56,7 @@ healthRouter.get('/', async (_req, res) => {
   const shipping = getMelhorEnvioHealth();
   // Never let a health probe fail over a bookkeeping read.
   const reconciledAt = await lastReconcileRun().catch(() => null);
+  const jobs = await jobHeartbeats().catch(() => null);
   try {
     await pool.query('SELECT 1');
     res.json({
@@ -60,6 +90,12 @@ healthRouter.get('/', async (_req, res) => {
             ? 'webhook_unauthenticated'
             : 'ok',
       },
+      // Backups, off-site copies and the restore drill run from the host's
+      // crontab. A job that stopped running is silent; its age here is not.
+      // `status` above deliberately ignores this block: the deploy gate reads
+      // it, and a late backup must not block a deploy. The external monitor
+      // reads `jobs` itself.
+      jobs,
       shipping: {
         // 'live' requires an observed success, not merely a credential:
         // claiming live before any quote is the same misleading signal this

@@ -9,6 +9,9 @@ import { isDisposableEmail } from '../utils/disposable-emails.js';
 import { claimGuestOrders } from './order.service.js';
 import { auditLog as sharedAuditLog } from '../utils/audit.js';
 import crypto from 'crypto';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('auth');
 
 /**
  * Hands the account any order it made as a guest before signing up.
@@ -23,7 +26,7 @@ async function linkGuestOrders(userId: string): Promise<void> {
   try {
     await claimGuestOrders(userId);
   } catch (err) {
-    console.error('[AUTH] Failed to claim guest orders:', err);
+    log.error({ err }, 'Failed to claim guest orders');
   }
 }
 
@@ -146,7 +149,7 @@ async function verifyTurnstileToken(token: string, ip?: string): Promise<boolean
     const result = await response.json() as { success: boolean };
     return result.success;
   } catch (err) {
-    console.error('[AUTH] Turnstile verification failed:', err);
+    log.error({ err }, 'Turnstile verification failed');
     return false;
   }
 }
@@ -201,7 +204,7 @@ export async function register(data: { email: string; password: string; name?: s
       name: data.name,
     });
   } catch (err) {
-    console.error('[AUTH] Failed to send verification email:', err);
+    log.error({ err }, 'Failed to send verification email');
   }
 
   await auditLog('auth.register', user.id, { email: user.email, ip: data.ip || null });
@@ -218,9 +221,136 @@ export async function register(data: { email: string; password: string; name?: s
   };
 }
 
+// ─── Per-account lockout ─────────────────────────────────────────────────────
+
+/** Wrong passwords before the account locks; each further one doubles the wait. */
+export const LOGIN_LOCK_AFTER = 5;
+
+interface LockableUser {
+  id: string;
+  email: string;
+  failed_logins?: number | null;
+  locked_until?: string | Date | null;
+}
+
+/**
+ * Refuse a login while the account is locked.
+ *
+ * The per-IP limit alone let someone spread guesses across addresses and try
+ * passwords on an admin account without end. The wording is the same whether
+ * the password would have been right or not: a locked account answers nothing
+ * about the password.
+ */
+export async function assertLoginAllowed(user: LockableUser, ip?: string): Promise<void> {
+  if (!user.locked_until || new Date(user.locked_until).getTime() <= Date.now()) return;
+  const minutes = Math.max(1, Math.ceil((new Date(user.locked_until).getTime() - Date.now()) / 60000));
+  await auditLog('auth.login_failed', user.id, { reason: 'locked', ip: ip || null });
+  throw new AppError(
+    429,
+    `Muitas tentativas com senha errada. Tente de novo em ${minutes} min, ou use "Esqueci minha senha".`,
+    'LOGIN_LOCKED',
+  );
+}
+
+/**
+ * Count a wrong password; lock from the fifth on (1, 2, 4… up to 64 min).
+ * One UPDATE decides, so parallel guesses cannot slip under the count. The
+ * owner is e-mailed the moment the lock first engages.
+ */
+export async function registerLoginFailure(user: LockableUser, ip?: string): Promise<void> {
+  const result = await query<{ failed_logins: number; locked_until: string | null }>(
+    `UPDATE users
+        SET failed_logins = failed_logins + 1,
+            locked_until = CASE
+              WHEN failed_logins + 1 >= $2
+              THEN NOW() + make_interval(mins => power(2, LEAST(failed_logins + 1 - $2, 6))::int)
+              ELSE locked_until END
+      WHERE id = $1
+      RETURNING failed_logins, locked_until`,
+    [user.id, LOGIN_LOCK_AFTER],
+  ).catch((err) => {
+    // Before migration 039 lands the columns are missing; never turn a wrong
+    // password into a 500.
+    log.error({ err }, 'could not record login failure');
+    return null;
+  });
+  const failed = result?.rows[0]?.failed_logins ?? 0;
+  if (failed === LOGIN_LOCK_AFTER) {
+    await auditLog('auth.account_locked', user.id, { ip: ip || null, attempts: failed });
+    sendTemplateEmail({
+      template: 'account-locked',
+      to: user.email,
+      variables: { attempts: String(failed) },
+    }).catch((err) => log.error({ err, userId: user.id }, 'account-locked e-mail failed'));
+  }
+}
+
+async function clearLoginFailures(user: LockableUser): Promise<void> {
+  if (!user.failed_logins && !user.locked_until) return;
+  await query(`UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = $1`, [user.id]).catch(
+    (err) => log.error({ err }, 'could not clear login failures'),
+  );
+}
+
+/** "Chrome 141 on Android 16" and "Chrome 142 on Android 16" are one device. */
+function deviceFamily(userAgent: string): string {
+  return userAgent.replace(/[\d._]+/g, '');
+}
+
+/** A short, human label for the e-mail ("Chrome · Android"). */
+function describeDevice(userAgent: string | undefined): string {
+  if (!userAgent) return 'desconhecido';
+  const browser = /Edg\//.test(userAgent) ? 'Edge'
+    : /Chrome\//.test(userAgent) ? 'Chrome'
+    : /Firefox\//.test(userAgent) ? 'Firefox'
+    : /Safari\//.test(userAgent) ? 'Safari' : 'navegador';
+  const os = /Android/.test(userAgent) ? 'Android'
+    : /iPhone|iPad/.test(userAgent) ? 'iPhone/iPad'
+    : /Windows/.test(userAgent) ? 'Windows'
+    : /Mac OS X/.test(userAgent) ? 'Mac' : /Linux/.test(userAgent) ? 'Linux' : 'sistema desconhecido';
+  return `${browser} · ${os}`;
+}
+
+/**
+ * Tell an admin their account just logged in from a device it has not used.
+ *
+ * An admin can refund payments and read every customer's CPF; a stolen
+ * password should not be able to use that quietly. Compared by browser family
+ * (version numbers stripped) against this user's sessions — which expire in
+ * 30 days, so a device unused for a month counts as new again. The very first
+ * login of an account is not news.
+ */
+async function noticeNewAdminDevice(
+  user: { id: string; email: string; role: string },
+  userAgent: string | undefined,
+  ip: string | undefined,
+): Promise<void> {
+  if (user.role !== 'admin' || !userAgent) return;
+  const seen = await query<{ known: boolean; any: boolean }>(
+    `SELECT bool_or(regexp_replace(COALESCE(user_agent, ''), '[0-9._]+', '', 'g') = $2) AS known,
+            count(*) > 0 AS any
+       FROM refresh_sessions WHERE user_id = $1`,
+    [user.id, deviceFamily(userAgent)],
+  );
+  const row = seen.rows[0];
+  if (!row?.any || row.known) return;
+  await auditLog('auth.admin_new_device', user.id, { ip: ip || null, device: describeDevice(userAgent) });
+  sendTemplateEmail({
+    template: 'admin-new-login',
+    to: user.email,
+    variables: {
+      when: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+      device: describeDevice(userAgent),
+      ip: ip || 'desconhecido',
+    },
+  }).catch((err) => log.error({ err, userId: user.id }, 'admin-new-login e-mail failed'));
+}
+
 export async function login(data: { email: string; password: string; ip?: string; userAgent?: string }) {
-  const result = await query<UserRow>(
-    'SELECT id, email, password_hash, role, email_verified FROM users WHERE email = $1',
+  // `*`, not a column list: the lockout columns arrive with migration 039, and
+  // a login in the seconds before `ensureSchema` adds them must still work.
+  const result = await query<UserRow & LockableUser>(
+    'SELECT * FROM users WHERE email = $1',
     [data.email.toLowerCase()]
   );
 
@@ -236,11 +366,20 @@ export async function login(data: { email: string; password: string; ip?: string
     throw new AppError(403, 'Conta desativada');
   }
 
+  await assertLoginAllowed(user, data.ip);
+
   const passwordMatch = await bcrypt.compare(data.password, user.password_hash);
   if (!passwordMatch) {
     await auditLog('auth.login_failed', user.id, { email: data.email, reason: 'wrong_password', ip: data.ip || null });
+    await registerLoginFailure(user, data.ip);
     throw new AppError(401, 'Email ou senha inválidos');
   }
+
+  await clearLoginFailures(user);
+  // Before the new session exists, or it would always look known.
+  await noticeNewAdminDevice(user, data.userAgent, data.ip).catch((err) =>
+    log.error({ err }, 'new-device check failed'),
+  );
 
   const { accessToken, refreshToken } = generateTokens(user);
   await openRefreshSession(user.id, refreshToken, data.userAgent);

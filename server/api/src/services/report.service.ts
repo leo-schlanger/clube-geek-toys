@@ -1,4 +1,7 @@
 import { query } from '../config/database.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('report');
 
 /**
  * Reports service — real aggregates from members, payments and shop orders.
@@ -431,7 +434,7 @@ async function queueStat(key: ActionItemKey, sql: string, params: unknown[] = []
     const oldest = row.oldest_days === null || row.oldest_days === undefined ? null : Number(row.oldest_days);
     return { key, count, oldestDays: count > 0 && Number.isFinite(oldest as number) ? (oldest as number) : null };
   } catch (err) {
-    console.error(`[REPORTS] action item "${key}" failed:`, err);
+    log.error({ err }, `action item "${key}" failed`);
     return { key, count: 0, oldestDays: null };
   }
 }

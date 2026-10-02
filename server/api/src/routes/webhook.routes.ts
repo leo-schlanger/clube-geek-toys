@@ -10,6 +10,9 @@ import {
   type PagarmeWebhookEvent,
 } from '../services/pagarme-webhook.service.js';
 import { env } from '../config/env.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('webhook-routes');
 
 export const webhookRouter = Router();
 
@@ -34,7 +37,7 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
     if (webhookSecret) {
       // Production: verify signature using Stripe SDK (HMAC-SHA256)
       if (!signature) {
-        console.warn('[WEBHOOK] Missing stripe-signature header');
+        log.warn('Missing stripe-signature header');
         res.status(400).json({ error: 'Missing stripe-signature header', code: 'WEBHOOK_MISSING_SIGNATURE' });
         return;
       }
@@ -42,18 +45,18 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
       try {
         event = verifyWebhookEvent(rawBody, signature, webhookSecret);
       } catch (err) {
-        console.warn('[WEBHOOK] Invalid Stripe signature:', (err as Error).message);
+        log.warn({ err }, 'Invalid Stripe signature');
         res.status(401).json({ error: 'Invalid webhook signature', code: 'WEBHOOK_INVALID_SIGNATURE' });
         return;
       }
     } else if (env.NODE_ENV === 'production') {
       // Production MUST have webhook secret — reject all events without it
-      console.error('[WEBHOOK] STRIPE_WEBHOOK_SECRET not set in production — rejecting event');
+      log.error('STRIPE_WEBHOOK_SECRET not set in production — rejecting event');
       res.status(500).json({ error: 'Webhook secret not configured', code: 'WEBHOOK_MISCONFIGURED' });
       return;
     } else {
       // Development: no secret configured, parse raw body directly
-      console.warn('[WEBHOOK] STRIPE_WEBHOOK_SECRET not set — skipping signature verification (dev only)');
+      log.warn('STRIPE_WEBHOOK_SECRET not set — skipping signature verification (dev only)');
       try {
         event = JSON.parse(rawBody.toString()) as Stripe.Event;
       } catch {
@@ -62,7 +65,7 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
       }
     }
 
-    console.log(`[WEBHOOK] Processing Stripe event: ${event.type} (${event.id})`);
+    log.info(`Processing Stripe event: ${event.type} (${event.id})`);
 
     await processStripeEvent(event);
 
@@ -74,7 +77,7 @@ webhookRouter.post('/stripe', webhookLimiter, async (req: Request, res: Response
     // processed. Idempotency is what makes a retry *safe*, not what makes one
     // unnecessary — answering 200 just told Stripe to forget a payment that was
     // captured but never applied, leaving the order `pending` forever.
-    console.error('[WEBHOOK] Processing error:', err);
+    log.error({ err }, 'Processing error');
     res.status(500).json({ status: 'processing_error' });
   }
 });
@@ -113,7 +116,7 @@ webhookRouter.get('/pagarme', webhookLimiter, (_req: Request, res: Response) => 
 webhookRouter.post('/pagarme', webhookLimiter, async (req: Request, res: Response) => {
   try {
     if (!verifyWebhookAuth(req.headers.authorization)) {
-      console.warn('[PAGARME-HOOK] rejected: bad or missing Basic credentials');
+      log.warn('rejected: bad or missing Basic credentials');
       // 401 without a WWW-Authenticate challenge: this endpoint is for one
       // configured caller, not for a browser to negotiate with.
       res.status(401).json({ error: 'Unauthorized', code: 'WEBHOOK_UNAUTHORIZED' });
@@ -134,7 +137,7 @@ webhookRouter.post('/pagarme', webhookLimiter, async (req: Request, res: Respons
       return;
     }
 
-    console.log(`[PAGARME-HOOK] Processing ${event.type} (${event.id})`);
+    log.info(`Processing ${event.type} (${event.id})`);
     await processPagarmeEvent(event);
 
     res.status(200).json({ status: 'ok' });
@@ -144,7 +147,7 @@ webhookRouter.post('/pagarme', webhookLimiter, async (req: Request, res: Respons
     // and the event is NOT recorded as processed — idempotency is what makes
     // the retry *safe*, not what makes it unnecessary. Answering 200 here would
     // tell Pagar.me to forget a payment that was captured but never applied.
-    console.error('[PAGARME-HOOK] Processing error:', err);
+    log.error({ err }, 'Processing error');
     res.status(500).json({ status: 'processing_error' });
   }
 });

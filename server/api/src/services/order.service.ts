@@ -43,6 +43,9 @@ import {
   releaseCoupon,
   retailDiscountCandidates,
 } from './promo.service.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('order');
 
 // Still needed after the migration: orders created before it carry a static BR
 // Code, and `buildOrderPix` rebuilds those from the shop's own key so the
@@ -154,9 +157,9 @@ function notifyAdminOfPendingPix(order: Order, txId: string): void {
         customer_note: order.customerNote ?? '',
         admin_url: adminUrl('/admin?tab=orders'),
       },
-    }).catch((err) => console.error('[PIX] admin-pix-order-pending failed', err));
+    }).catch((err) => log.error({ err }, 'admin-pix-order-pending failed'));
   } catch (err) {
-    console.error('[PIX] admin-pix-order-pending skipped', err);
+    log.error({ err }, 'admin-pix-order-pending skipped');
   }
 }
 
@@ -184,9 +187,9 @@ function notifyCustomerOfPendingPix(order: Order, pix: PixQRData): void {
         pix_code: pix.emvCode,
         pix_key: pix.pixKey,
       },
-    }).catch((err) => console.error('[PIX] order-pending-pix failed', err));
+    }).catch((err) => log.error({ err }, 'order-pending-pix failed'));
   } catch (err) {
-    console.error('[PIX] order-pending-pix skipped', err);
+    log.error({ err }, 'order-pending-pix skipped');
   }
 }
 
@@ -805,17 +808,17 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     // Without this, stock would stay locked until the TTL over a sale that
     // never existed.
     await releaseReservationById(orderId).catch((e) =>
-      console.error('[order] release reservation after charge fail', e)
+      log.error({ err: e }, 'release reservation after charge fail')
     );
     await restoreCreditForOrder(orderId, {
       note: 'Crédito devolvido (falha ao criar cobrança)',
-    }).catch((e) => console.error('[order] credit restore after charge fail', e));
+    }).catch((e) => log.error({ err: e }, 'credit restore after charge fail'));
     // The use was taken inside the committed transaction, so a charge that
     // never came into being would otherwise burn a single-use coupon on an
     // order the customer never got to pay.
     if (couponClaimedId) {
       await releaseCoupon(couponClaimedId).catch((e) =>
-        console.error('[order] coupon release after charge fail', e)
+        log.error({ err: e }, 'coupon release after charge fail')
       );
     }
     await auditLog('order.create_failed', orderUserId, {
@@ -910,7 +913,7 @@ async function createPagarmePixCharge(order: Order, document: string): Promise<P
   const charge = created.charges?.[0];
   const tx = charge?.last_transaction;
   if (!charge || !tx?.qr_code) {
-    console.error('[PIX] Pagar.me order without qr_code:', JSON.stringify(created).slice(0, 800));
+    log.error({ detail: JSON.stringify(created).slice(0, 800) }, 'Pagar.me order without qr_code');
     throw new AppError(
       502,
       'Não foi possível gerar o QR Code PIX agora. Tente novamente em instantes.',
@@ -1396,7 +1399,7 @@ export async function getOrderStatus(
           id: `reconcile_${charge.id}`,
           type: 'charge.paid',
           data: charge as unknown as Record<string, unknown>,
-        }).catch((err) => console.error('[order] settle on status poll failed:', err));
+        }).catch((err) => log.error({ err }, 'settle on status poll failed'));
       }
       return {
         id: row.id,
@@ -1407,7 +1410,7 @@ export async function getOrderStatus(
         providerStatus: charge.status,
       };
     } catch (err) {
-      console.error('[order] live charge lookup failed, falling back to DB:', err);
+      log.error({ err }, 'live charge lookup failed, falling back to DB');
     }
   }
 
@@ -1474,7 +1477,7 @@ export async function claimGuestOrders(userId: string): Promise<number> {
   );
   const claimed = result.rowCount ?? 0;
   if (claimed > 0) {
-    console.log(`[ORDERS] ${claimed} pedido(s) de convidado vinculados ao usuário ${userId}`);
+    log.info(`${claimed} pedido(s) de convidado vinculados ao usuário ${userId}`);
   }
   return claimed;
 }
@@ -1510,7 +1513,7 @@ export async function listMyOrders(
   // Never fatal: an order that stays orphaned is a support ticket, but an
   // exception here would take the whole order history down with it.
   await claimGuestOrders(userId).catch((err) =>
-    console.error('[ORDERS] claimGuestOrders falhou em listMyOrders:', err)
+    log.error({ err }, 'claimGuestOrders falhou em listMyOrders')
   );
 
   const memberId = await getMemberIdForUser(userId);
@@ -1613,7 +1616,7 @@ export async function cancelMyOrder(userId: string, orderId: string): Promise<Or
   // point, so the hold never became a decrement: there is no stock to restore,
   // there is a hold to release.
   await releaseReservationById(orderId).catch((err) =>
-    console.error('[order] release reservation after customer cancel', err)
+    log.error({ err }, 'release reservation after customer cancel')
   );
 
   if ((order.storeCreditApplied ?? 0) > 0) {
@@ -1648,9 +1651,9 @@ function notifyAdminOfCustomerCancellation(order: Order): void {
         total: order.total.toFixed(2).replace('.', ','),
         admin_url: adminUrl('/admin?tab=orders'),
       },
-    }).catch((err) => console.error('[order] admin-order-cancelled failed', err));
+    }).catch((err) => log.error({ err }, 'admin-order-cancelled failed'));
   } catch (err) {
-    console.error('[order] admin-order-cancelled skipped', err);
+    log.error({ err }, 'admin-order-cancelled skipped');
   }
 }
 
@@ -1724,7 +1727,7 @@ export function notifyOrderShipped(order: Order): void {
       tracking_url: order.trackingUrl || trackingUrlForCode(code),
       shipping_service: order.shippingService || '',
     },
-  }).catch((err) => console.error('[email] order-shipped failed', err));
+  }).catch((err) => log.error({ err }, 'order-shipped failed'));
 
   // The bell in the shop header never showed a shipment. `order_shipped` was
   // declared as a notification kind and nothing ever wrote one, so the only
@@ -1737,7 +1740,7 @@ export function notifyOrderShipped(order: Order): void {
       title: `Pedido #${order.orderNumber} a caminho`,
       body: code ? `Código de rastreio: ${code}` : null,
       link: `/pedido/${order.id}`,
-    }).catch((err) => console.error('[notify] order_shipped failed', err));
+    }).catch((err) => log.error({ err }, 'order_shipped failed'));
   }
 }
 
@@ -1750,7 +1753,7 @@ export function notifyOrderDelivered(order: Order): void {
     title: `Pedido #${order.orderNumber} entregue`,
     body: 'Conta pra gente o que achou — dá para avaliar a compra na página do pedido.',
     link: `/minhas-compras/${order.id}`,
-  }).catch((err) => console.error('[notify] order_delivered failed', err));
+  }).catch((err) => log.error({ err }, 'order_delivered failed'));
 }
 
 // ─── Admin mutations ─────────────────────────────────────────────────────────
@@ -1832,7 +1835,7 @@ export async function updateOrderStatus(
   // unconditionally is safe: the `stock_reserved` flag decides which case it is.
   if (closing) {
     await releaseReservationById(id).catch((err) =>
-      console.error('[order] release reservation on status change', err)
+      log.error({ err }, 'release reservation on status change')
     );
   }
 
@@ -1871,7 +1874,7 @@ export async function updateOrderStatus(
         order_number: String(order.orderNumber),
         total: order.total.toFixed(2).replace('.', ','),
       },
-    }).catch((err) => console.error('[email] order-cancelled-customer failed', err));
+    }).catch((err) => log.error({ err }, 'order-cancelled-customer failed'));
   }
 
   await auditLog('order.status_changed', actorUserId, {
@@ -1894,7 +1897,7 @@ function notifyPickupReady(order: Order): void {
       store_address: formatPickupAddress(),
       store_hours: STORE_PICKUP_LOCATION.hours,
     },
-  }).catch((err) => console.error('[email] order-ready-for-pickup failed', err));
+  }).catch((err) => log.error({ err }, 'order-ready-for-pickup failed'));
 }
 
 export function formatPickupAddress(): string {
@@ -1939,7 +1942,7 @@ export async function confirmPixOrder(id: string, actorUserId: string): Promise<
         order_id: order.id,
         delivery_method: order.deliveryMethod,
       },
-    }).catch((err) => console.error('[email] order-confirmed (pix) failed', err));
+    }).catch((err) => log.error({ err }, 'order-confirmed (pix) failed'));
 
     notifyAdminsOfPaymentAsync({
       event: 'payment_received',
@@ -2013,7 +2016,7 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
     await query(`UPDATE orders SET status = $1 WHERE id = $2 AND status = 'refunded'`, [
       order.status,
       id,
-    ]).catch((e) => console.error('[order] failed to revert status after refund error', e));
+    ]).catch((e) => log.error({ err: e }, 'failed to revert status after refund error'));
     await auditLog('order.refund_failed', actorUserId, {
       orderId: id,
       error: err instanceof Error ? err.message : String(err),
@@ -2057,7 +2060,7 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
       total: order.total.toFixed(2).replace('.', ','),
       payment_method: order.paymentMethod === 'pix' ? 'PIX' : 'Cartão de crédito',
     },
-  }).catch((err) => console.error('[email] order-refunded failed', err));
+  }).catch((err) => log.error({ err }, 'order-refunded failed'));
 
   notifyAdminsOfPaymentAsync({
     event: 'payment_refunded',
@@ -2217,9 +2220,7 @@ export async function decrementStockForOrder(client: pg.PoolClient, orderId: str
       stockAfter: 0,
       note: `Venda a descoberto: ${missing} unidade(s) vendida(s) sem estoque`,
     });
-    console.error(
-      `[stock] oversold order=${orderId} product="${row.product_name}" missing=${missing}`
-    );
+    log.error(`oversold order=${orderId} product="${row.product_name}" missing=${missing}`);
   }
   if (shortfall.rows.length > 0) {
     await auditLog('order.oversold', null, {

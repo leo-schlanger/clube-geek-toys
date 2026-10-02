@@ -4,7 +4,12 @@ import { query } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 import { auditLog } from '../utils/audit.js';
-import { openRefreshSession, ACCESS_TOKEN_EXPIRY } from './auth.service.js';
+import {
+  assertLoginAllowed,
+  registerLoginFailure,
+  openRefreshSession,
+  ACCESS_TOKEN_EXPIRY,
+} from './auth.service.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
@@ -210,19 +215,29 @@ export async function loginWholesale(data: {
     throw new AppError(400, 'CNPJ inválido.', 'INVALID_CNPJ');
   }
 
-  const userResult = await query(
-    `SELECT id, email, role, password_hash FROM users WHERE email = $1`,
-    [email]
-  );
+  // `*`: the lockout columns (migration 039) may not exist for a few seconds
+  // after a deploy.
+  const userResult = await query(`SELECT * FROM users WHERE email = $1`, [email]);
   if (userResult.rows.length === 0) {
     throw new AppError(401, 'E-mail, senha ou CNPJ incorretos.', 'INVALID_CREDENTIALS');
   }
-  const user = userResult.rows[0];
+  const user = userResult.rows[0] as {
+    id: string;
+    email: string;
+    role: string;
+    password_hash: string;
+    failed_logins?: number | null;
+    locked_until?: string | null;
+  };
   if (user.role === 'disabled') {
     throw new AppError(403, 'Conta desativada.', 'ACCOUNT_DISABLED');
   }
+  // Same account, same lock as the main login — otherwise this door would be
+  // the way around it.
+  await assertLoginAllowed(user);
   const ok = await bcrypt.compare(data.password, user.password_hash);
   if (!ok) {
+    await registerLoginFailure(user);
     throw new AppError(401, 'E-mail, senha ou CNPJ incorretos.', 'INVALID_CREDENTIALS');
   }
 

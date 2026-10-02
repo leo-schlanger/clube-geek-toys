@@ -645,6 +645,12 @@ ssh $VPS_HOST "docker cp clube-geek-api:/app/uploads/contracts/ /opt/clube-geek-
 
 ## 11. Monitoramento
 
+> Desde 02/10/2026: logs em journald, alertas de operação, monitor externo
+> (`.github/workflows/uptime.yml`) e defesas de borda — ver
+> [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md). Em VPS nova, instalar os
+> arquivos de `server/ops/` (journald, logrotate, fail2ban) conforme o
+> cabeçalho de cada um.
+
 ### Endpoints e tabelas
 
 | Recurso           | Onde verificar                               |

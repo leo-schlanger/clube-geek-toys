@@ -1,4 +1,7 @@
 import { query } from '../config/database.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('audit');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -25,7 +28,7 @@ export async function auditLog(
       [action, isUser ? userId : null, memberId ?? null, JSON.stringify(row)]
     );
   } catch (err) {
-    console.error('[AUDIT] Failed to write audit log:', err);
+    log.error({ err }, 'Failed to write audit log');
   }
 }
 

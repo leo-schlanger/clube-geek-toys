@@ -34,6 +34,9 @@ import {
 } from './shipping.service.js';
 import { getOrderById, notifyOrderDelivered, notifyOrderShipped } from './order.service.js';
 import type { Order } from '../types/index.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('label');
 
 const USER_AGENT = 'GeekPopToys Loja (contato@geeketoys.com.br)';
 const TIMEOUT_MS = 20_000;
@@ -106,7 +109,7 @@ async function meRequest<T>(path: string, body?: unknown, method = 'POST'): Prom
   }
 
   if (!res.ok) {
-    console.error(`[LABEL] ${method} ${path} → ${res.status}: ${text.slice(0, 600)}`);
+    log.error(`${method} ${path} → ${res.status}: ${text.slice(0, 600)}`);
 
     if (res.status === 401 || res.status === 403) {
       throw new AppError(
@@ -498,7 +501,7 @@ export async function syncShipments(): Promise<number> {
       if (changed) touched++;
     } catch (err) {
       // One order must not stop the rest.
-      console.error(`[LABEL] shipment sync failed for order ${row.id}:`, err);
+      log.error({ err }, `shipment sync failed for order ${row.id}`);
     }
   }
   return touched;
@@ -532,7 +535,7 @@ export async function getLabelState(orderId: string): Promise<LabelState> {
     // Opening the order is also a moment to catch up, so the panel never shows
     // a state older than the timer's last run.
     await applyShipment(order, shipment).catch((err) =>
-      console.error('[LABEL] shipment sync on open failed:', err),
+      log.error({ err }, 'shipment sync on open failed'),
     );
     return {
       melhorEnvioOrderId: order.melhorEnvioOrderId,
@@ -544,7 +547,7 @@ export async function getLabelState(orderId: string): Promise<LabelState> {
     };
   } catch (err) {
     // The panel must still render if Melhor Envio is having a bad minute.
-    console.error('[LABEL] status lookup failed:', err);
+    log.error({ err }, 'status lookup failed');
     return {
       melhorEnvioOrderId: order.melhorEnvioOrderId,
       purchased: false,

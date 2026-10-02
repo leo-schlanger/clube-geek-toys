@@ -1,5 +1,8 @@
 import pg from 'pg';
 import { env } from './env.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('database');
 
 const { Pool } = pg;
 
@@ -11,7 +14,7 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[DB] Unexpected pool error:', err.message);
+  log.error({ err }, 'Unexpected pool error');
 });
 
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
@@ -22,7 +25,7 @@ export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   const result = await pool.query<T>(text, params);
   const duration = Date.now() - start;
   if (env.NODE_ENV === 'development') {
-    console.log(`[DB] Query (${duration}ms): ${text.substring(0, 80)}...`);
+    log.info(`Query (${duration}ms): ${text.substring(0, 80)}...`);
   }
   return result;
 }

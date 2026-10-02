@@ -26,6 +26,10 @@ import * as pagarme from '../utils/pagarme.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
 import { abandonCardOrder, updateOrderStatus } from './order.service.js';
 import { expireReservation } from './event.service.js';
+import { moduleLogger } from '../config/logger.js';
+import { alertOpsAsync } from './ops-alert.service.js';
+
+const log = moduleLogger('reconcile');
 
 /**
  * How far back to look.
@@ -39,6 +43,8 @@ const LOOKBACK_DAYS = 7;
 
 /** Ceiling per run, so one sweep cannot spend minutes hammering the provider. */
 const MAX_PER_RUN = 100;
+
+let consecutiveFailedRuns = 0;
 
 export interface ReconcileResult {
   checked: number;
@@ -152,11 +158,11 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
         if (isDeadPix(charge) && orderId) {
           await updateOrderStatus(orderId, 'cancelled', 'system-reconcile');
           result.expired += 1;
-          console.log(`[RECONCILE] ${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pedido cancelado`);
+          log.info(`${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pedido cancelado`);
         } else if (isDeadPix(charge) && reservationId) {
           if (await expireReservation(reservationId)) {
             result.expired += 1;
-            console.log(`[RECONCILE] ${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — reserva cancelada`);
+            log.info(`${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — reserva cancelada`);
           }
         }
         continue;
@@ -174,21 +180,36 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
       });
 
       result.settled += 1;
-      console.log(`[RECONCILE] ${ref}: cobrança ${chargeId} estava paga — liquidada`);
+      log.info(`${ref}: cobrança ${chargeId} estava paga — liquidada`);
     } catch (err) {
       result.failed += 1;
-      console.error(`[RECONCILE] ${ref}: falha ao conciliar ${chargeId}:`, err);
+      log.error({ err }, `${ref}: falha ao conciliar ${chargeId}`);
     }
   }
 
   result.abandoned = await closeAbandonedCardOrders();
 
+  // One provider hiccup is noise; the same sweep failing twice in a row (20
+  // minutes) means payments may be sitting unsettled.
+  consecutiveFailedRuns = result.failed > 0 ? consecutiveFailedRuns + 1 : 0;
+  if (consecutiveFailedRuns >= 2) {
+    alertOpsAsync({
+      kind: 'reconcile_failing',
+      subject: `Conciliação de pagamentos falhando (${result.failed} cobrança(s))`,
+      body:
+        `A conciliação falhou em ${consecutiveFailedRuns} rodadas seguidas; na última, ` +
+        `${result.failed} de ${result.checked} cobrança(s) deram erro. Pagamentos podem estar ` +
+        `pagos na Pagar.me e pendentes aqui.\n\n` +
+        `Onde olhar:\n  journalctl CONTAINER_NAME=clube-geek-api --since -1h -o cat | jq 'select(.module=="reconcile")'\n` +
+        `  GET /health → payments`,
+      cooldownMin: 120,
+    });
+  }
+
   if (result.settled > 0 || result.expired > 0 || result.abandoned > 0 || result.failed > 0) {
-    console.log(
-      `[RECONCILE] ${result.checked} verificada(s), ${result.settled} liquidada(s), ` +
+    log.info(`${result.checked} verificada(s), ${result.settled} liquidada(s), ` +
         `${result.expired} expirada(s), ${result.abandoned} cartão abandonado(s), ` +
-        `${result.failed} com erro`,
-    );
+        `${result.failed} com erro`);
   }
 
   // Leave a heartbeat even on a quiet run.
@@ -202,7 +223,7 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
     `INSERT INTO config (key, value)
      VALUES ('last_reconcile_run', to_jsonb(NOW()::text))
      ON CONFLICT (key) DO UPDATE SET value = to_jsonb(NOW()::text), updated_at = NOW()`,
-  ).catch((err) => console.error('[RECONCILE] heartbeat falhou:', err));
+  ).catch((err) => log.error({ err }, 'heartbeat falhou'));
 
   return result;
 }
@@ -236,7 +257,7 @@ export async function closeAbandonedCardOrders(): Promise<number> {
       LIMIT $2`,
     [CARD_ABANDON_AFTER_MINUTES, MAX_PER_RUN],
   ).catch((err) => {
-    console.error('[RECONCILE] busca de cartões abandonados falhou:', err);
+    log.error({ err }, 'busca de cartões abandonados falhou');
     return { rows: [] as Record<string, unknown>[] };
   });
 
@@ -245,10 +266,10 @@ export async function closeAbandonedCardOrders(): Promise<number> {
     try {
       if (await abandonCardOrder(row.id as string, 'system-reconcile')) {
         closed += 1;
-        console.log(`[RECONCILE] pedido #${row.order_number}: cartão não concluído — pedido cancelado`);
+        log.info(`pedido #${row.order_number}: cartão não concluído — pedido cancelado`);
       }
     } catch (err) {
-      console.error(`[RECONCILE] pedido #${row.order_number}: falha ao fechar cartão abandonado:`, err);
+      log.error({ err }, `pedido #${row.order_number}: falha ao fechar cartão abandonado`);
     }
   }
   return closed;

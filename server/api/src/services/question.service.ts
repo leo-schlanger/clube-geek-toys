@@ -6,6 +6,9 @@ import { SHOP_CANONICAL_URL } from '../config/env.js';
 import { auditLog } from '../utils/audit.js';
 import { notify } from './notification.service.js';
 import { sendTemplateEmail } from './email.service.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('question');
 
 /**
  * Product questions and answers.
@@ -270,7 +273,7 @@ export async function answerQuestion(
   // Email is sent outside the transaction and non-blocking: the in-app
   // notification is the guaranteed channel, email is reinforcement.
   void sendAnswerEmail(question).catch((err) =>
-    console.error('[QUESTION] answer email error:', err)
+    log.error({ err }, 'answer email error')
   );
 
   return question;

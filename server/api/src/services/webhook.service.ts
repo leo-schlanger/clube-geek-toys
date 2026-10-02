@@ -7,6 +7,9 @@ import { decrementStockForOrder, restoreStockForOrder, releaseReservation } from
 import { restoreCreditForOrder } from './store-credit.service.js';
 import { env } from '../config/env.js';
 import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
+import { maskEmail, moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('webhook');
 
 /**
  * Email job collected during transaction processing — sent AFTER commit.
@@ -47,7 +50,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
       [webhookKey, 'stripe', event.type, event.id, '']
     );
     if (claim.rowCount === 0) {
-      console.log(`[WEBHOOK] Already processed: ${webhookKey}`);
+      log.info(`Already processed: ${webhookKey}`);
       await client.query('ROLLBACK');
       return;
     }
@@ -106,7 +109,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         break;
 
       default:
-        console.log(`[WEBHOOK] Unhandled Stripe event type: ${event.type}`);
+        log.info(`Unhandled Stripe event type: ${event.type}`);
     }
 
     await client.query('COMMIT');
@@ -129,7 +132,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
         await auditLog('order.credit_restored', null, { orderId, amount, reason: 'order_closed' });
       }
     } catch (err) {
-      console.error(`[WEBHOOK] Credit restore failed (order=${orderId}):`, err);
+      log.error({ err }, `Credit restore failed (order=${orderId})`);
     }
   }
 
@@ -137,7 +140,7 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
     try {
       await sendTemplateEmail(job);
     } catch (err) {
-      console.error(`[WEBHOOK] Email send failed (template=${job.template}, to=${job.to}):`, err);
+      log.error({ err, template: job.template, to: maskEmail(job.to) }, 'email send failed');
     }
   }
 }
@@ -166,7 +169,7 @@ async function handlePaymentIntentSucceeded(
   );
 
   if (!memberId) {
-    console.warn(`[WEBHOOK] payment_intent.succeeded without memberId metadata: ${paymentIntent.id}`);
+    log.warn(`payment_intent.succeeded without memberId metadata: ${paymentIntent.id}`);
     return;
   }
 
@@ -411,7 +414,7 @@ async function handlePaymentIntentFailed(
   );
 
   if (!memberId) {
-    console.warn(`[WEBHOOK] payment_intent.payment_failed without memberId metadata: ${paymentIntent.id}`);
+    log.warn(`payment_intent.payment_failed without memberId metadata: ${paymentIntent.id}`);
     return;
   }
 
@@ -455,7 +458,7 @@ async function handleInvoicePaid(
     : (sub as { id?: string } | null)?.id;
 
   if (!subscriptionId) {
-    console.log('[WEBHOOK] invoice.paid without subscription — ignoring');
+    log.info('invoice.paid without subscription — ignoring');
     return;
   }
 
@@ -514,7 +517,7 @@ async function handleInvoicePaid(
   );
 
   if (memberResult.rows.length === 0) {
-    console.warn(`[WEBHOOK] invoice.paid — no member found for subscription ${subscriptionId}`);
+    log.warn(`invoice.paid — no member found for subscription ${subscriptionId}`);
     return;
   }
 
@@ -582,7 +585,7 @@ async function handleInvoicePaymentFailed(
     : (sub as { id?: string } | null)?.id;
 
   if (!subscriptionId) {
-    console.log('[WEBHOOK] invoice.payment_failed without subscription — ignoring');
+    log.info('invoice.payment_failed without subscription — ignoring');
     return;
   }
 
@@ -597,7 +600,7 @@ async function handleInvoicePaymentFailed(
   );
 
   if (result.rows.length === 0) {
-    console.warn(`[WEBHOOK] invoice.payment_failed — no subscription found for ${subscriptionId}`);
+    log.warn(`invoice.payment_failed — no subscription found for ${subscriptionId}`);
     return;
   }
 

@@ -1,0 +1,14 @@
+# /etc/logrotate.d/clube — output of the host cron jobs (backup, health, drill).
+# They grew forever; clube-backup.log alone passed 190 KB.
+#
+# Install: cp ops/logrotate/clube /etc/logrotate.d/clube && logrotate -d /etc/logrotate.d/clube
+/var/log/clube-*.log {
+    su root syslog
+    weekly
+    rotate 12
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

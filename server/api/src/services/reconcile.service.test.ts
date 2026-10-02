@@ -39,6 +39,8 @@ vi.mock('./order.service.js', () => ({
   abandonCardOrder: abandonMock,
 }));
 vi.mock('./event.service.js', () => ({ expireReservation: expireReservationMock }));
+const { alertMock } = vi.hoisted(() => ({ alertMock: vi.fn() }));
+vi.mock('./ops-alert.service.js', () => ({ alertOpsAsync: alertMock }));
 vi.mock('../utils/pagarme.js', async () => {
   const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
   return { ...actual, getCharge: getChargeMock, isPagarmeConfigured: () => true };
@@ -401,5 +403,26 @@ describe('closeAbandonedCardOrders', () => {
     pending();
     const out = await reconcilePendingCharges();
     expect(out.abandoned).toBe(1);
+  });
+});
+
+/** One provider hiccup is noise; the same sweep failing twice is an alert. */
+describe('alerta de conciliação', () => {
+  it('avisa só na segunda rodada seguida com falha, e zera quando volta', async () => {
+    pending({ charge_id: 'ch_1', ref: 'pedido #8' });
+    getChargeMock.mockRejectedValue(new Error('502'));
+
+    await reconcilePendingCharges();
+    expect(alertMock).not.toHaveBeenCalled();
+
+    await reconcilePendingCharges();
+    expect(alertMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'reconcile_failing' }));
+
+    alertMock.mockClear();
+    getChargeMock.mockResolvedValue(charge('ch_1', 'pending'));
+    await reconcilePendingCharges();
+    getChargeMock.mockRejectedValue(new Error('502'));
+    await reconcilePendingCharges();
+    expect(alertMock).not.toHaveBeenCalled();
   });
 });

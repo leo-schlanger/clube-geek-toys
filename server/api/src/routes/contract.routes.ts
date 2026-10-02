@@ -9,6 +9,9 @@ import * as contractService from '../services/contract.service.js';
 import { query } from '../config/database.js';
 import { uploadDir } from '../utils/upload-path.js';
 import { AppError } from '../middleware/error-handler.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('contract-routes');
 
 const contractBodySchema = z.object({
   memberId: z.string().uuid(),
@@ -93,7 +96,7 @@ contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
           return;
         }
       } catch (err) {
-        console.error('[CONTRACT] Failed to validate PDF magic bytes:', err);
+        log.error({ err }, 'Failed to validate PDF magic bytes');
         res.status(400).json({ error: 'Não foi possível validar o arquivo enviado.', code: 'PDF_VALIDATION_FAILED' });
         return;
       }

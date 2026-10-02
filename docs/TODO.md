@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 01 de Setembro de 2026
+> **Ultima atualizacao:** 02 de Outubro de 2026
 
 ## Entregue em 01/09/2026
 
@@ -664,7 +664,21 @@ Detalhes e evidências em [`CHECKUP-2026-08-15.md`](CHECKUP-2026-08-15.md).
 
 - [ ] **Redis** - Cache para consultas frequentes + rate limiting cross-instance
 - [ ] **Replica PostgreSQL** - Read replica para relatorios
-- [ ] **Monitoring stack** - Prometheus + Grafana
+- [ ] **Monitoring stack** - Prometheus + Grafana. Desde 02/10/2026 os logs já
+      saem em JSON (pino) para o journald, então o passo natural é Loki +
+      Grafana lendo o journald — busca por campo e painel, sem mudar o código.
+
+### Segurança
+
+- [ ] **Código no celular (TOTP) para entrar no painel admin** — decidido em
+      02/10/2026 deixar para depois. Desenho combinado: `otplib`, segredo
+      cifrado na tabela `users`, QR na primeira entrada depois de ligado,
+      10 códigos de recuperação de uso único, obrigatório para `role=admin` e
+      opcional para vendedor. O fluxo inteiro precisa funcionar **no celular**
+      (a Laura opera o admin por ele — o app autenticador fica no mesmo
+      aparelho), com "lembrar este aparelho por 30 dias" para não pedir o
+      código a cada login. Já entregue no lugar, enquanto isso: bloqueio por
+      conta após senhas erradas e e-mail ao admin quando entra de aparelho novo.
 
 ---
 

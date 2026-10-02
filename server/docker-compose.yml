@@ -29,11 +29,14 @@ services:
           memory: 2G
 
   api:
+    # journald, not json-file: the deploy recreates this container, and the
+    # json-file log went with it. journald on the host keeps 30 days (see
+    # ops/journald/clube.conf). `docker compose logs` still works.
+    #   journalctl CONTAINER_NAME=clube-geek-api --since -1d -o cat | jq
     logging:
-      driver: json-file
+      driver: journald
       options:
-        max-size: "10m"
-        max-file: "3"
+        tag: "{{.Name}}"
     build:
       context: ./api
       dockerfile: Dockerfile
@@ -71,6 +74,8 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY}
       FROM_EMAIL: ${FROM_EMAIL}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
+      OPS_ALERT_EMAIL: ${OPS_ALERT_EMAIL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
       FRONTEND_URL: ${FRONTEND_URL}
       API_URL: ${API_URL}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
@@ -116,11 +121,14 @@ services:
     # garantia — semana sem deploy é normal.
     command: >-
       /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+    # journald, not json-file: the deploy recreates this container, and the
+    # json-file log went with it. journald on the host keeps 30 days (see
+    # ops/journald/clube.conf). `docker compose logs` still works.
+    #   journalctl CONTAINER_NAME=clube-geek-nginx --since -1d -o cat | jq
     logging:
-      driver: json-file
+      driver: journald
       options:
-        max-size: "10m"
-        max-file: "3"
+        tag: "{{.Name}}"
     depends_on:
       api:
         condition: service_healthy

@@ -29,7 +29,8 @@ vi.mock('../config/database.js', () => ({
   getClient: async () => ({ query: clientQuery, release: vi.fn() }),
 }));
 
-vi.mock('./email.service.js', () => ({ sendTemplateEmail: vi.fn() }));
+const sendEmail = vi.fn(async (..._args: unknown[]) => ({}));
+vi.mock('./email.service.js', () => ({ sendTemplateEmail: (...a: unknown[]) => sendEmail(...a) }));
 vi.mock('../utils/audit.js', () => ({ auditLog: vi.fn() }));
 vi.mock('./order.service.js', () => ({ claimGuestOrders: vi.fn(async () => 0) }));
 vi.mock('../utils/disposable-emails.js', () => ({ isDisposableEmail: () => false }));
@@ -192,5 +193,111 @@ describe('sessões de refresh', () => {
     await revokeAllRefreshSessions('u1');
 
     expect(query.mock.calls[0][1]).toEqual(['u1']);
+  });
+});
+
+/**
+ * Per-account lockout (migration 039). The per-IP limit alone let someone
+ * spread guesses over many addresses against one admin account.
+ */
+describe('bloqueio por conta', () => {
+  beforeEach(() => {
+    query.mockReset();
+    sendEmail.mockClear();
+  });
+
+  /** Route by statement; `failedAfter` is what the counter UPDATE returns. */
+  function db(user: Record<string, unknown>, failedAfter = 1) {
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes('SELECT * FROM users')) return { rows: [user] };
+      if (sql.includes('failed_logins = failed_logins + 1'))
+        return { rows: [{ failed_logins: failedAfter, locked_until: null }] };
+      if (sql.includes('FROM refresh_sessions')) return { rows: [{ known: true, any: true }] };
+      return { rows: [] };
+    });
+  }
+
+  it('recusa com 429 enquanto a conta está bloqueada, sem nem conferir a senha', async () => {
+    db(userRow({ locked_until: new Date(Date.now() + 3 * 60000).toISOString() }));
+    const err = await login({ email: 'laura@example.com', password: 'certa' }).catch((e) => e);
+    expect(err.statusCode).toBe(429);
+    expect(err.message).toMatch(/Tente de novo em 3 min/);
+    expect(bcryptCompare).not.toHaveBeenCalledWith('certa', expect.anything());
+  });
+
+  it('senha errada conta a falha numa instrução só, com espera dobrando', async () => {
+    bcryptCompare.mockResolvedValue(false as never);
+    db(userRow());
+    await expect(login({ email: 'laura@example.com', password: 'x' })).rejects.toThrow('Email ou senha inválidos');
+    const upd = query.mock.calls.find((c) => String(c[0]).includes('failed_logins = failed_logins + 1'))!;
+    expect(String(upd[0])).toMatch(/power\(2, LEAST\(failed_logins \+ 1 - \$2, 6\)\)/);
+    expect(upd[1]).toEqual(['u1', 5]);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('avisa o dono por e-mail na quinta falha', async () => {
+    bcryptCompare.mockResolvedValue(false as never);
+    db(userRow(), 5);
+    await login({ email: 'laura@example.com', password: 'x' }).catch(() => {});
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ template: 'account-locked', to: 'laura@example.com' })
+    );
+  });
+
+  it('senha certa zera o contador', async () => {
+    bcryptCompare.mockResolvedValue(true as never);
+    db(userRow({ failed_logins: 3 }));
+    await login({ email: 'laura@example.com', password: 'certa' });
+    expect(statements().some((q) => q.includes('SET failed_logins = 0, locked_until = NULL'))).toBe(true);
+  });
+
+  it('bloqueio vencido não impede o login', async () => {
+    bcryptCompare.mockResolvedValue(true as never);
+    db(userRow({ locked_until: new Date(Date.now() - 1000).toISOString(), failed_logins: 5 }));
+    await expect(login({ email: 'laura@example.com', password: 'certa' })).resolves.toBeTruthy();
+  });
+});
+
+describe('aviso de aparelho novo no admin', () => {
+  beforeEach(() => {
+    query.mockReset();
+    sendEmail.mockClear();
+    bcryptCompare.mockResolvedValue(true as never);
+  });
+
+  function db(role: string, seen: { known: boolean; any: boolean }) {
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes('SELECT * FROM users')) return { rows: [userRow({ role })] };
+      if (sql.includes('FROM refresh_sessions')) return { rows: [seen] };
+      return { rows: [] };
+    });
+  }
+  const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/141.0.0.0 Mobile Safari/537.36';
+
+  it('avisa o admin que entrou de um aparelho que a conta nunca usou', async () => {
+    db('admin', { known: false, any: true });
+    await login({ email: 'laura@example.com', password: 'certa', userAgent: UA, ip: '1.2.3.4' });
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: 'admin-new-login',
+        variables: expect.objectContaining({ device: 'Chrome · Android', ip: '1.2.3.4' }),
+      })
+    );
+  });
+
+  it('compara pela família do navegador, sem número de versão', async () => {
+    db('admin', { known: true, any: true });
+    await login({ email: 'laura@example.com', password: 'certa', userAgent: UA });
+    const check = query.mock.calls.find((c) => String(c[0]).includes('FROM refresh_sessions'))!;
+    expect((check[1] as unknown[])[1]).not.toMatch(/\d/);
+    expect(sendEmail).not.toHaveBeenCalledWith(expect.objectContaining({ template: 'admin-new-login' }));
+  });
+
+  it('não avisa no primeiro login da conta, nem para membro', async () => {
+    db('admin', { known: false, any: false });
+    await login({ email: 'laura@example.com', password: 'certa', userAgent: UA });
+    db('member', { known: false, any: true });
+    await login({ email: 'laura@example.com', password: 'certa', userAgent: UA });
+    expect(sendEmail).not.toHaveBeenCalledWith(expect.objectContaining({ template: 'admin-new-login' }));
   });
 });

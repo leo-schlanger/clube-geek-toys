@@ -73,6 +73,8 @@ beforeEach(() => {
 /** Templates addressed to `env.ADMIN_EMAIL`, from the call sites in services. */
 const ADMIN_TEMPLATES = [
   'admin-new-member',
+  // Security notice to the admin who just logged in from a new device.
+  'admin-new-login',
   'admin-pix-order-pending',
   'admin-order-cancelled',
   'admin-daily-digest',
@@ -97,6 +99,8 @@ const SHOP_TEMPLATES = [
 /** Templates addressed to a club member. */
 const MEMBER_TEMPLATES = [
   'welcome',
+  // Login locked after wrong passwords: the way out is the reset page.
+  'account-locked',
   'payment-confirmed',
   // The club's mirror of `order-refunded`: money coming back, said out loud.
   'payment-refunded',

@@ -118,3 +118,4 @@ graphify-out/
 
 # Inventário do que ainda está aberto em segurança — o repo é público.
 docs/SECURITY-PRIVATE.md
+docs/*-PRIVATE.md

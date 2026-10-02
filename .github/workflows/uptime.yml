@@ -1,0 +1,88 @@
+# External monitor — runs on GitHub's machines, not on the VPS.
+#
+# The health check in the VPS crontab cannot see the VPS go down: if the host
+# dies, freezes or loses its network, the monitor dies with it and nothing is
+# sent. This one runs elsewhere. A failed run is e-mailed by GitHub to whoever
+# last edited this file's schedule.
+#
+# What fails the run:
+#   - /health not answering, or status != ok, or payments not ok, or the
+#     reconciliation sweep stale (it is what settles payments without webhook)
+#   - a host cron (backup, off-site copy, restore drill) whose last success is
+#     older than its window (`jobs.*.stale == true`, see health.routes.ts)
+#   - the shop, club or admin SPA not answering 200
+#   - the TLS certificate expiring in under 14 days
+#
+# GitHub delays scheduled runs under load (minutes, sometimes more); this is a
+# safety net for "the site is down and nobody noticed", not a pager.
+name: Uptime
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Health, payments and host jobs
+        run: |
+          set -u
+          # Three tries a minute apart: a deploy recreates the API, and that
+          # minute is not an outage.
+          for attempt in 1 2 3; do
+            body=$(curl -fsS --max-time 15 https://api.geeketoys.com.br/health) && ok=1 || ok=0
+            if [ "$ok" = 1 ] && echo "$body" | python3 -c '
+          import json, sys
+          h = json.load(sys.stdin)
+          problems = []
+          if h.get("status") != "ok": problems.append("status=%s" % h.get("status"))
+          p = h.get("payments") or {}
+          if p.get("status") != "ok": problems.append("payments=%s" % p.get("status"))
+          if p.get("reconcileStale"): problems.append("conciliação parada desde %s" % p.get("lastReconcile"))
+          for job, s in (h.get("jobs") or {}).items():
+              if s.get("stale") is True: problems.append("tarefa %s sem sucesso desde %s" % (job, s.get("lastOk")))
+          if problems:
+              print("; ".join(problems)); sys.exit(1)
+          print("ok")
+          '; then exit 0; fi
+            echo "attempt $attempt failed"
+            [ "$attempt" = 3 ] || sleep 60
+          done
+          echo "::error::API unhealthy after 3 attempts: ${body:-no response}"
+          exit 1
+
+      - name: Shop, club and admin answer
+        run: |
+          fail=0
+          for url in https://shop.geeketoys.com.br/ https://club.geeketoys.com.br/ https://adm.geeketoys.com.br/; do
+            code=000
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$url" || true)
+              [ "$code" = 200 ] && break
+              sleep 30
+            done
+            echo "$url → $code"
+            [ "$code" = 200 ] || { echo "::error::$url answered $code"; fail=1; }
+          done
+          exit $fail
+
+      - name: Certificate valid for 14+ days
+        run: |
+          end=$(echo | openssl s_client -connect api.geeketoys.com.br:443 -servername api.geeketoys.com.br 2>/dev/null \
+            | openssl x509 -noout -enddate | cut -d= -f2)
+          days=$(( ($(date -d "$end" +%s) - $(date +%s)) / 86400 ))
+          echo "certificate expires $end ($days days)"
+          if [ "$days" -lt 14 ]; then
+            echo "::error::TLS certificate expires in $days days — certbot renewal is failing"
+            exit 1
+          fi

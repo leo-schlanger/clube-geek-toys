@@ -60,6 +60,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Production dependencies only, and only `high` or worse: a moderate
+      # advisory in a dev tool must not block a fix from shipping. Dependabot
+      # (.github/dependabot.yml) opens the upgrade PRs; this is the gate.
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --prefix server/api --omit=dev --audit-level=high
+
       # No provider key is baked in any more: the checkout reads the Pagar.me
       # public key from `GET /payments/config` at runtime, so a key rotated on
       # the VPS takes effect without a frontend deploy. `VITE_STRIPE_*` is gone

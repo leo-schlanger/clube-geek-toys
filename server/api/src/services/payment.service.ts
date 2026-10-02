@@ -12,6 +12,9 @@ import { isValidCnpj } from '../utils/cnpj.js';
 import { CLUB_PLAN_PRICE } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
 import crypto from 'crypto';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('payment');
 
 const MIN_AMOUNT = 1.00;
 /** Generous ceiling so admin and shop never hit an artificial low limit. */
@@ -221,7 +224,7 @@ function requirePixTransaction(order: pagarme.PagarmeOrder): {
   const charge = order.charges?.[0];
   const tx = charge?.last_transaction;
   if (!charge || !tx?.qr_code) {
-    console.error('[PIX] Pagar.me order without qr_code:', JSON.stringify(order).slice(0, 800));
+    log.error({ detail: JSON.stringify(order).slice(0, 800) }, 'Pagar.me order without qr_code');
     throw new AppError(
       502,
       'Não foi possível gerar o QR Code PIX agora. Tente novamente em instantes.',
@@ -463,7 +466,7 @@ export async function confirmPixPayment(opts: {
             expiry_date: expiryDate.toLocaleDateString('pt-BR'),
           },
           member_id: payment.memberId as string,
-        }).catch((err: unknown) => console.error('[PIX] Confirmation email error:', err));
+        }).catch((err: unknown) => log.error({ err }, 'Confirmation email error'));
 
         // Welcome email on first activation
         if (member.status !== 'active') {
@@ -472,7 +475,7 @@ export async function confirmPixPayment(opts: {
             to: m.email as string,
             variables: { name: m.full_name as string, plan: m.plan as string },
             member_id: payment.memberId as string,
-          }).catch((err: unknown) => console.error('[PIX] Welcome email error:', err));
+          }).catch((err: unknown) => log.error({ err }, 'Welcome email error'));
         }
       }
     }
@@ -727,7 +730,7 @@ async function settleIfPaid(charge: pagarme.PagarmeCharge): Promise<void> {
       data: charge as unknown as Record<string, unknown>,
     });
   } catch (err) {
-    console.error(`[PAYMENT] settle on status poll failed (${charge.id}):`, err);
+    log.error({ err }, `settle on status poll failed (${charge.id})`);
   }
 }
 
@@ -817,7 +820,7 @@ export async function getPaymentStatus(paymentId: string): Promise<{
       };
     } catch (err) {
       // The stored status is still a truthful answer; polling must not 500.
-      console.error('[PAYMENT] live charge lookup failed, falling back to DB:', err);
+      log.error({ err }, 'live charge lookup failed, falling back to DB');
     }
   }
 
@@ -888,7 +891,7 @@ export async function refundPayment(opts: {
       await pagarme.refundCharge(providerId);
     }
   } catch (err) {
-    console.error(`[REFUND] ${viaStripe ? 'Stripe' : 'Pagar.me'} refund call failed:`, err);
+    log.error({ err }, `${viaStripe ? 'Stripe' : 'Pagar.me'} refund call failed`);
     throw new AppError(
       502,
       'Falha ao solicitar reembolso na operadora. Tente novamente em alguns minutos.',
@@ -929,7 +932,7 @@ export async function refundPayment(opts: {
         reason: opts.reason || '',
       },
       member_id: payment.memberId as string,
-    }).catch((err) => console.error('[email] payment-refunded failed', err));
+    }).catch((err) => log.error({ err }, 'payment-refunded failed'));
   }
 
   notifyAdminsOfPaymentAsync({

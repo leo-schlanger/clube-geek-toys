@@ -35,7 +35,9 @@ const EXTENSION_STACK = /(chrome|moz|safari-web|ms-browser)-extension:\/\//i;
  * earlier. None of that is something a person saw, and it buried what was.
  */
 const CRAWLER_UA =
-  /bot\b|bot\/|spider|crawl|slurp|facebookexternalhit|HeadlessChrome|Lighthouse|Google-InspectionTool/i;
+  // `GoogleOther` and `Google-Extended` carry no "bot" in the UA and kept
+  // landing in `error_logs` after the first version of this filter.
+  /bot\b|bot\/|spider|crawl|slurp|facebookexternalhit|HeadlessChrome|Lighthouse|Google-InspectionTool|GoogleOther|Google-Extended/i;
 
 export function isCrawlerReport(userAgent: string | undefined, stack: string | undefined): boolean {
   return (!!userAgent && CRAWLER_UA.test(userAgent)) || (!!stack && stack.includes('wrsParams'));

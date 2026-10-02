@@ -13,6 +13,8 @@ const { createErrorLogMock } = vi.hoisted(() => ({
 
 vi.mock('../config/env.js', () => ({ env: { NODE_ENV: 'test' } }));
 vi.mock('../services/log.service.js', () => ({ createErrorLog: createErrorLogMock }));
+const { record5xxMock } = vi.hoisted(() => ({ record5xxMock: vi.fn() }));
+vi.mock('../services/ops-alert.service.js', () => ({ record5xx: record5xxMock }));
 
 import { errorHandler, AppError } from './error-handler.js';
 import { PagarmeError } from '../utils/pagarme.js';
@@ -81,5 +83,60 @@ describe('errorHandler — Pagar.me', () => {
     const res = run(new Error('segredo interno'));
     expect(res.statusCode).toBe(500);
     expect(JSON.stringify(res.body)).not.toContain('segredo');
+  });
+});
+
+/**
+ * The request id ties what the customer reads on screen to the exact log line
+ * and `error_logs` row. It was generated and thrown away before 02/10/2026.
+ */
+describe('errorHandler — request id e severidade', () => {
+  function runWith(err: Error, id: string) {
+    const res = {
+      statusCode: 0,
+      body: undefined as unknown,
+      status(code: number) {
+        this.statusCode = code;
+        return this;
+      },
+      json(body: unknown) {
+        this.body = body;
+        return this;
+      },
+    };
+    const req = { id, path: '/orders', method: 'POST', headers: {}, ip: '1.1.1.1' };
+    errorHandler(err, req as unknown as Request, res as unknown as Response, () => {});
+    return res;
+  }
+
+  it('500 devolve o requestId e grava junto no error_logs', () => {
+    const res = runWith(new Error('boom'), 'req-123456');
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toMatchObject({ code: 'INTERNAL_ERROR', requestId: 'req-123456' });
+    expect(createErrorLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ requestId: 'req-123456' }) })
+    );
+  });
+
+  it('recusa da operadora (412) entra como aviso, não como erro', () => {
+    runWith(new PagarmeError(412, 'card refused', 'Não foi possível validar o cartão.'), 'req-abcdefgh');
+    expect(createErrorLogMock).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
+  });
+
+  it('operadora fora do ar continua erro', () => {
+    runWith(new PagarmeError(503, 'down', 'Instável.'), 'req-abcdefgh');
+    expect(createErrorLogMock).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+  });
+});
+
+describe('errorHandler — rajada de 500', () => {
+  it('conta o 500 para o alerta de rajada', () => {
+    run(new Error('boom'));
+    expect(record5xxMock).toHaveBeenCalledWith('/events/x/reservations');
+  });
+
+  it('não conta erro do cliente (4xx)', () => {
+    run(new AppError(404, 'Pedido não encontrado.'));
+    expect(record5xxMock).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,9 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog, diffObjects } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
 import type { Member } from '../types/index.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('member');
 
 const BCRYPT_ROUNDS = 12;
 
@@ -155,7 +158,7 @@ function notifyAdminNewMember(data: CreateMemberData): void {
       payment_type: paymentLabel,
       admin_url: adminUrl('/admin?tab=members'),
     },
-  }).catch((err) => console.error('[MEMBER] Admin notification error:', err));
+  }).catch((err) => log.error({ err }, 'Admin notification error'));
 }
 
 /** Self-service: member creates their own profile bound to their JWT user. */

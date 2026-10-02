@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('env');
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -43,6 +46,9 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1),
   FROM_EMAIL: z.string().default('Clube GeekPop & Toys <contato@geeketoys.com.br>'),
   ADMIN_EMAIL: z.string().email().default('admin@geeketoys.com.br'),
+  // Infrastructure alerts (backup, reconciliation, 5xx, schema). Falls back to
+  // ADMIN_EMAIL; set it apart so outages do not drown in sale notifications.
+  OPS_ALERT_EMAIL: z.string().email().optional(),
 
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -135,8 +141,7 @@ function warnAboutPayments(e: Env): void {
   }
   if (missing.length === 0) return;
 
-  console.error(
-    '\n' +
+  log.error('\n' +
       '='.repeat(72) +
       '\n[PAGAMENTOS] DEGRADADO — faltam variáveis em produção: ' +
       missing.join(', ') +
@@ -144,8 +149,7 @@ function warnAboutPayments(e: Env): void {
       '\n[PAGAMENTOS] webhook recusa tudo, então nenhum PIX confirma sozinho.' +
       '\n[PAGAMENTOS] Ver docs/PAGARME.md e GET /health → payments.status\n' +
       '='.repeat(72) +
-      '\n',
-  );
+      '\n');
 }
 
 export type Env = z.infer<typeof envSchema>;
@@ -160,9 +164,9 @@ function loadEnv(): Env {
   }
   const result = envSchemaRefined.safeParse(cleaned);
   if (!result.success) {
-    console.error('Invalid environment variables:');
+    log.error('Invalid environment variables');
     for (const issue of result.error.issues) {
-      console.error(`  ${issue.path.join('.')}: ${issue.message}`);
+      log.error(`  ${issue.path.join('.')}: ${issue.message}`);
     }
     process.exit(1);
   }

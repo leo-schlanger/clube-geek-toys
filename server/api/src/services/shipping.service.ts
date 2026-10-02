@@ -6,6 +6,9 @@ import { query } from '../config/database.js';
 // a token from one environment be used against the other, and the resulting
 // 401 would vanish into the fallback.
 import { getAccessToken, melhorEnvioBaseUrl } from './melhor-envio-oauth.service.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('shipping');
 
 // ─── Defaults (photocard / small K-pop package) ──────────────────────────────
 export const DEFAULT_WEIGHT_G = 300;
@@ -352,15 +355,13 @@ function recordMelhorEnvioFailure(status: number, body: string): void {
   if (kind === 'auth') {
     // Deliberately loud: as a plain warning this line gets lost and quotes
     // keep coming from the fallback table for weeks.
-    console.error(
-      `[shipping] CREDENCIAL DO MELHOR ENVIO RECUSADA (HTTP ${status}) — ` +
+    log.error(`CREDENCIAL DO MELHOR ENVIO RECUSADA (HTTP ${status}) — ` +
         `ambiente=${env.MELHOR_ENVIO_SANDBOX ? 'sandbox' : 'producao'}. ` +
         `O frete está saindo da TABELA DE FALLBACK, não da cotação real. ` +
-        `Confira MELHOR_ENVIO_TOKEN e se MELHOR_ENVIO_SANDBOX bate com o ambiente do token.`
-    );
+        `Confira MELHOR_ENVIO_TOKEN e se MELHOR_ENVIO_SANDBOX bate com o ambiente do token.`);
     return;
   }
-  console.warn('[shipping] Melhor Envio error', status, body.slice(0, 300));
+  log.warn({ status, body: body.slice(0, 300) }, 'Melhor Envio error');
 }
 
 async function quoteMelhorEnvio(
@@ -457,7 +458,7 @@ async function quoteMelhorEnvio(
     const correios = options.filter((o) => /correios/i.test(o.company) || /pac|sedex/i.test(o.name));
     return (correios.length ? correios : options).slice(0, 6);
   } catch (err) {
-    console.warn('[shipping] Melhor Envio fetch failed', err);
+    log.warn({ err }, 'Melhor Envio fetch failed');
     return null;
   }
 }

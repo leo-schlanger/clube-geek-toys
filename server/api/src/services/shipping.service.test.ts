@@ -11,6 +11,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock, getClient: vi.fn() }));
+const { logMock } = vi.hoisted(() => ({
+  logMock: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('../config/logger.js', () => ({
+  moduleLogger: () => logMock,
+  logger: logMock,
+  maskEmail: (e: string) => e,
+}));
+/** Did any `log.error` call carry this text, in the message or the fields? */
+const loggedError = (text: string) =>
+  logMock.error.mock.calls.some((call: unknown[]) => JSON.stringify(call).includes(text));
 vi.mock('../config/env.js', () => ({
   env: {
     NODE_ENV: 'test',
@@ -129,17 +140,14 @@ describe('getMelhorEnvioHealth — o sinal que faltava', () => {
   });
 
   it('logs loudly when the credential is refused', async () => {
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    logMock.error.mockClear();
     vi.stubGlobal('fetch', mockFetch(401, { message: 'Unauthenticated.' }));
 
     await quoteShipping('01001000', [{ productId: 'p1', quantity: 1 }]);
 
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining('CREDENCIAL DO MELHOR ENVIO RECUSADA')
-    );
+    expect(loggedError('CREDENCIAL DO MELHOR ENVIO RECUSADA')).toBe(true);
     // The message has to say what is happening to the money.
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('TABELA DE FALLBACK'));
-    error.mockRestore();
+    expect(loggedError('TABELA DE FALLBACK')).toBe(true);
   });
 
   it('clears the failure once a real quote succeeds again', async () => {

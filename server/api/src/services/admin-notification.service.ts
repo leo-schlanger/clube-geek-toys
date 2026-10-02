@@ -14,10 +14,14 @@
  * swallows its own errors and logs them.
  */
 
+import { claimCooldown } from '../utils/cooldown.js';
 import { query } from '../config/database.js';
 import { env, adminUrl } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
 import { getSetting } from './settings.service.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('admin-notification');
 
 export type AdminPaymentEvent =
   | 'payment_received'
@@ -133,13 +137,21 @@ async function shouldEmail(notice: AdminPaymentNotice): Promise<boolean> {
  * already outside a transaction.
  */
 export async function notifyAdminsOfPayment(notice: AdminPaymentNotice): Promise<void> {
+  // A buyer retrying a refused card used to raise one bell and one e-mail per
+  // attempt — ten in an hour on 01/10/2026. The order already shows "Cartão
+  // recusado · N tentativas"; one notice per order per half hour is enough.
+  if (notice.event === 'payment_failed') {
+    const first = await claimCooldown(`notify_failed_${notice.subject}`, 30).catch(() => true);
+    if (!first) return;
+  }
+
   try {
     const inApp = await getSetting<boolean>('notifications.admin_payment_inapp').catch(() => true);
     if (inApp !== false) {
       await insertInApp(notice);
     }
   } catch (err) {
-    console.error(`[ADMIN-NOTIFY] in-app failed (${notice.event}):`, err);
+    log.error({ err }, `in-app failed (${notice.event})`);
   }
 
   try {
@@ -171,13 +183,13 @@ export async function notifyAdminsOfPayment(notice: AdminPaymentNotice): Promise
       },
     });
   } catch (err) {
-    console.error(`[ADMIN-NOTIFY] email failed (${notice.event}):`, err);
+    log.error({ err }, `email failed (${notice.event})`);
   }
 }
 
 /** Same thing, but never awaited — for use inside request handlers. */
 export function notifyAdminsOfPaymentAsync(notice: AdminPaymentNotice): void {
   void notifyAdminsOfPayment(notice).catch((err) =>
-    console.error('[ADMIN-NOTIFY] unexpected:', err),
+    log.error({ err }, 'unexpected'),
   );
 }

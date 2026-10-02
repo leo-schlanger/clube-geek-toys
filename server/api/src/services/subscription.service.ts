@@ -14,6 +14,9 @@ import {
   CLUB_PLAN_FREQUENCY_TYPE,
   CLUB_PLAN_INTERVAL,
 } from '../types/index.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('subscription');
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -233,7 +236,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
       card_last_four: remote.card?.last_four_digits ?? savedCard.last_four_digits ?? '****',
     },
     member_id: data.member_id,
-  }).catch((err: unknown) => console.error('[SUBSCRIPTION] Email error:', err));
+  }).catch((err: unknown) => log.error({ err }, 'Email error'));
 
   notifyAdminsOfPaymentAsync({
     event: status === 'authorized' ? 'payment_received' : 'payment_pending',
@@ -333,7 +336,7 @@ export async function pauseSubscription(id: string) {
       to: member.email,
       variables: { name: member.full_name },
       member_id: member.id,
-    }).catch((err: unknown) => console.error('[SUBSCRIPTION] Email error:', err));
+    }).catch((err: unknown) => log.error({ err }, 'Email error'));
   }
 
   return mapSubscriptionRow(resultRow);
@@ -411,7 +414,7 @@ export async function resumeSubscription(id: string) {
       to: member.email,
       variables: { name: member.full_name },
       member_id: member.id,
-    }).catch((err: unknown) => console.error('[SUBSCRIPTION] Email error:', err));
+    }).catch((err: unknown) => log.error({ err }, 'Email error'));
   }
 
   return mapSubscriptionRow(resultRow);
@@ -473,7 +476,7 @@ export async function cancelSubscription(id: string) {
       to: member.email,
       variables: { name: member.full_name },
       member_id: member.id,
-    }).catch((err: unknown) => console.error('[SUBSCRIPTION] Email error:', err));
+    }).catch((err: unknown) => log.error({ err }, 'Email error'));
   }
 
   return mapSubscriptionRow(resultRow);

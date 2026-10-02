@@ -241,6 +241,16 @@ export function unwrapApiVoid(result: ApiResponse<unknown>, fallback: string): v
  * Message to show a person for any thrown error, without leaking a stack or a
  * bare "[object Object]" into a toast.
  */
+/**
+ * A server failure (500) carries the id of the request; the customer reads it
+ * off the screen and support finds the exact log line with it. Only the API's
+ * 500 sends one — a refused card or a typo gets its message untouched.
+ */
+export function withRequestId(message: string, requestId: unknown): string {
+  if (typeof requestId !== 'string' || !requestId) return message
+  return `${message} (código ${requestId.slice(0, 8)})`
+}
+
 export function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) return error.message
   if (error instanceof Error && error.message) return error.message
@@ -296,7 +306,7 @@ export async function apiRequest<T = unknown>(
 
         if (!retryResponse.ok) {
           return {
-            error: retryData?.error || 'Erro na requisição',
+            error: withRequestId(retryData?.error || 'Erro na requisição', retryData?.requestId),
             code: retryData?.code,
             details: retryData?.details,
             status: retryResponse.status,
@@ -319,7 +329,7 @@ export async function apiRequest<T = unknown>(
 
     if (!response.ok) {
       return {
-        error: data?.error || `Erro: ${response.status}`,
+        error: withRequestId(data?.error || `Erro: ${response.status}`, data?.requestId),
         code: data?.code,
         details: data?.details,
         status: response.status,

@@ -1,4 +1,7 @@
 import { query } from '../config/database.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('schema');
 
 /**
  * Idempotent schema migrations applied at API startup.
@@ -116,7 +119,7 @@ const STEPS: SchemaStep[] = [
       // payment_type default + CHECK live in step 032 (monthly). Do not force
       // `annual` here: this block runs on every boot.
     } catch (err) {
-      console.error('[SCHEMA] single-plan migration block failed (non-fatal):', err);
+      log.error({ err }, 'single-plan migration block failed (non-fatal)');
     }
     },
   },
@@ -1259,6 +1262,13 @@ const STEPS: SchemaStep[] = [
       );
     },
   },
+  {
+    name: 'Per-account login lockout (migration 039)',
+    run: async () => {
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0`);
+      await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ`);
+    },
+  },
 ];
 
 let state: SchemaState = {
@@ -1286,7 +1296,7 @@ export async function ensureSchema(): Promise<SchemaState> {
       // practice, and aborting everything was the old silent-failure mode.
       const message = err instanceof Error ? err.message : String(err);
       failed.push({ step: step.name, error: message });
-      console.error(`[SCHEMA] ✗ step failed: ${step.name} — ${message}`);
+      log.error(`✗ step failed: ${step.name} — ${message}`);
     }
   }
 
@@ -1299,12 +1309,10 @@ export async function ensureSchema(): Promise<SchemaState> {
   };
 
   if (failed.length) {
-    console.error(
-      `[SCHEMA] ⚠ ${failed.length} of ${STEPS.length} steps failed in ${state.durationMs}ms — ` +
-        `schema is DEGRADED. Steps: ${failed.map((f) => f.step).join(' | ')}`
-    );
+    log.error(`⚠ ${failed.length} of ${STEPS.length} steps failed in ${state.durationMs}ms — ` +
+        `schema is DEGRADED. Steps: ${failed.map((f) => f.step).join(' | ')}`);
   } else {
-    console.log(`[SCHEMA] ✓ ${STEPS.length} steps in ${state.durationMs}ms`);
+    log.info(`✓ ${STEPS.length} steps in ${state.durationMs}ms`);
   }
 
   return state;

@@ -2,6 +2,9 @@ import { query } from '../config/database.js';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { createHmacToken, verifyHmacToken } from '../utils/hmac.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('melhor-envio-oauth');
 
 /**
  * Melhor Envio OAuth2.
@@ -161,7 +164,7 @@ export async function exchangeCodeForToken(code: string): Promise<void> {
     code,
   });
   await saveToken(token);
-  console.log('[shipping] Melhor Envio: token obtido e salvo');
+  log.info('Melhor Envio: token obtido e salvo');
 }
 
 async function refresh(stored: StoredToken): Promise<StoredToken | null> {
@@ -180,15 +183,12 @@ async function refresh(stored: StoredToken): Promise<StoredToken | null> {
       refresh_token: stored.refreshToken,
     });
     await saveToken(token);
-    console.log('[shipping] Melhor Envio: token renovado');
+    log.info('Melhor Envio: token renovado');
     return token;
   } catch (err) {
-    console.error(
-      '[shipping] Melhor Envio: FALHA AO RENOVAR O TOKEN — o frete vai cair na ' +
+    log.error({ err }, 'Melhor Envio: FALHA AO RENOVAR O TOKEN — o frete vai cair na ' +
         'tabela de fallback quando o atual expirar. Refaça a autorização em ' +
-        '/shipping/melhor-envio/authorize.',
-      err instanceof Error ? err.message : err
-    );
+        '/shipping/melhor-envio/authorize.');
     return null;
   }
 }
@@ -206,10 +206,8 @@ export async function getAccessToken(): Promise<string | null> {
   // A token from the other environment only yields 401s, which the fallback
   // would hide, so treat it as absent.
   if (stored.sandbox !== Boolean(env.MELHOR_ENVIO_SANDBOX)) {
-    console.error(
-      `[shipping] Melhor Envio: token guardado é de ${stored.sandbox ? 'sandbox' : 'produção'} ` +
-        `mas a API está em ${env.MELHOR_ENVIO_SANDBOX ? 'sandbox' : 'produção'}. Ignorando.`
-    );
+    log.error(`Melhor Envio: token guardado é de ${stored.sandbox ? 'sandbox' : 'produção'} ` +
+        `mas a API está em ${env.MELHOR_ENVIO_SANDBOX ? 'sandbox' : 'produção'}. Ignorando.`);
     return null;
   }
 

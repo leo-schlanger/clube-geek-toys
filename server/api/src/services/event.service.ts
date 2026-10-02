@@ -18,6 +18,9 @@ import { isValidCPF } from '../utils/cpf.js';
 import { isValidCnpj } from '../utils/cnpj.js';
 import { STORE_PICKUP_LOCATION } from './shipping.service.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('event');
 
 /**
  * Event tickets.
@@ -386,7 +389,7 @@ export async function createReservation(
       await createReservationPixCharge(reservation, event, buyerDocument);
     } catch (err) {
       await voidReservation(reservation.id).catch((e) =>
-        console.error('[EVENT] Falha ao cancelar reserva sem cobrança:', e)
+        log.error({ err: e }, 'Falha ao cancelar reserva sem cobrança')
       );
       void auditLog('event.reservation_charge_failed', input.userId ?? null, {
         reservationId: reservation.id,
@@ -401,10 +404,10 @@ export async function createReservation(
   // The reservation is already committed: a Resend failure must not fail the
   // response.
   void sendReservationReceivedEmail(reservation, event).catch((err) =>
-    console.error('[EVENT] Falha ao enviar e-mail de reserva:', err)
+    log.error({ err }, 'Falha ao enviar e-mail de reserva')
   );
   void notifyAdminOfReservation(reservation, event).catch((err) =>
-    console.error('[EVENT] Falha ao avisar o admin:', err)
+    log.error({ err }, 'Falha ao avisar o admin')
   );
   void auditLog('event.reservation_created', input.userId ?? null, {
     reservationId: reservation.id,
@@ -490,7 +493,7 @@ async function createReservationPixCharge(
   const charge = created.charges?.[0];
   const tx = charge?.last_transaction;
   if (!charge || !tx?.qr_code) {
-    console.error('[EVENT] Pagar.me order without qr_code:', JSON.stringify(created).slice(0, 800));
+    log.error({ detail: JSON.stringify(created).slice(0, 800) }, 'Pagar.me order without qr_code');
     throw new AppError(
       502,
       'Não foi possível gerar o PIX agora. Tente novamente em instantes.',
@@ -758,7 +761,7 @@ async function settleIfPaid(reservation: EventReservation): Promise<boolean> {
     });
     return true;
   } catch (err) {
-    console.error(`[EVENT] live charge lookup failed (${reservation.code}):`, err);
+    log.error({ err }, `live charge lookup failed (${reservation.code})`);
     return false;
   }
 }
@@ -980,7 +983,7 @@ export async function confirmReservation(
           quantity: String(reservation.quantity),
           tickets_url: reservationUrl(reservation.code),
         },
-      }).catch((err) => console.error('[EVENT] Falha ao enviar ingressos:', err));
+      }).catch((err) => log.error({ err }, 'Falha ao enviar ingressos'));
     }
 
     void auditLog('event.reservation_confirmed', actorUserId, {
@@ -1021,7 +1024,7 @@ export async function cancelReservation(
   } else if (before?.pagarmeChargeId && before.status === 'pending') {
     await pagarme
       .refundCharge(before.pagarmeChargeId)
-      .catch((err) => console.error(`[EVENT] Falha ao anular o PIX de ${before.code}:`, err));
+      .catch((err) => log.error({ err }, `Falha ao anular o PIX de ${before.code}`));
   }
 
   const client = await getClient();

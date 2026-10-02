@@ -1,5 +1,9 @@
 import { env, adminUrl } from '../config/env.js';
 import { query } from '../config/database.js';
+import { maskEmail, moduleLogger } from '../config/logger.js';
+import { alertOpsAsync } from './ops-alert.service.js';
+
+const log = moduleLogger('email');
 
 /** User-facing plan name. Emails used to print the slug "club". */
 function planLabel(plan?: string): string {
@@ -20,12 +24,37 @@ function escapeHtml(str: string): string {
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
+const EMAIL_FAILURE_WINDOW_MS = 60 * 60 * 1000;
+const EMAIL_FAILURE_THRESHOLD = 3;
+let emailFailures: number[] = [];
+
+/**
+ * Three failed sends in an hour means Resend is refusing us (key revoked,
+ * domain unverified, quota) — and every customer confirmation is being lost.
+ */
+function recordEmailFailure(template: string, err: unknown, now = Date.now()): void {
+  emailFailures = emailFailures.filter((t) => now - t < EMAIL_FAILURE_WINDOW_MS);
+  emailFailures.push(now);
+  if (emailFailures.length >= EMAIL_FAILURE_THRESHOLD) {
+    alertOpsAsync({
+      kind: 'email_failing',
+      subject: `E-mails falhando (${emailFailures.length} na última hora)`,
+      body:
+        `O envio pelo Resend falhou ${emailFailures.length} vezes na última hora. ` +
+        `Confirmações de pedido, ingressos e avisos não estão chegando.\n\n` +
+        `Último template: ${template}\nErro: ${err instanceof Error ? err.message : String(err)}\n\n` +
+        `Onde olhar: painel admin → Logs → E-mails; resend.com → Logs.`,
+      cooldownMin: 180,
+    });
+  }
+}
+
 const AVAILABLE_TEMPLATES = [
   'welcome', 'payment-confirmed', 'payment-failed', 'renewal-reminder',
   'subscription-created', 'subscription-payment',
   'subscription-paused', 'subscription-resumed', 'subscription-cancelled',
   'subscription-payment-failed', 'member-expired',
-  'verify-email', 'password-reset', 'contract-signed',
+  'verify-email', 'password-reset', 'account-locked', 'admin-new-login', 'contract-signed',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
   'order-pending-pix', 'order-refunded', 'order-cancelled-customer',
@@ -84,7 +113,7 @@ export async function sendTemplateEmail(data: {
         result.id || null,
         response.ok ? null : JSON.stringify(result),
       ]
-    ).catch((err) => console.error('[EMAIL] Log error:', err));
+    ).catch((err) => log.error({ err }, 'Log error'));
 
     if (!response.ok) {
       throw new Error(`Resend API error: ${JSON.stringify(result)}`);
@@ -92,7 +121,8 @@ export async function sendTemplateEmail(data: {
 
     return { id: result.id, status: 'sent' };
   } catch (err) {
-    console.error(`[EMAIL] Failed to send ${template} to ${to}:`, err);
+    log.error({ err, template, to: maskEmail(to) }, 'email send failed');
+    recordEmailFailure(template, err);
     throw err;
   }
 }
@@ -152,7 +182,7 @@ export async function sendContractEmail(data: {
         html,
         attachments,
       }),
-    }).catch((err) => console.error('[EMAIL] Admin copy error:', err));
+    }).catch((err) => log.error({ err }, 'Admin copy error'));
   }
 
   return { status: 'sent' };
@@ -197,6 +227,30 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Clique no botão abaixo para escolher uma nova senha:</p>
         ${infoBox('⏳ Este link expira em <strong>1 hora</strong>.<br>Se você não solicitou isso, pode ignorar este e-mail com segurança — sua conta permanece protegida.')}`,
       cta: { text: 'Redefinir Senha', url: v.reset_url || '#' },
+    },
+
+    'account-locked': {
+      subject: 'Tentativas de acesso bloqueadas — Clube GeekPop & Toys',
+      preheader: 'Bloqueamos o acesso à sua conta por alguns minutos.',
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Bloqueamos o acesso por alguns minutos</h2>
+        <p>Houve <strong>${v.attempts || 'várias'} tentativas seguidas com senha errada</strong> na sua conta, e o login ficou bloqueado temporariamente para protegê-la.</p>
+        <p>Se foi você, é só aguardar alguns minutos — ou redefinir a senha agora.</p>
+        ${infoBox('Se <strong>não</strong> foi você, alguém está tentando adivinhar sua senha. Redefina a senha e use uma que você não usa em outro site.')}`,
+      cta: { text: 'Redefinir Senha', url: `${frontendUrl}/recuperar-senha` },
+    },
+
+    'admin-new-login': {
+      subject: 'Novo acesso ao painel — GeekPop & Toys',
+      preheader: 'Sua conta de administração entrou de um aparelho novo.',
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Novo acesso ao painel</h2>
+        <p>Sua conta de administração entrou de um aparelho ou navegador que não reconhecemos.</p>
+        <p><strong>Quando:</strong> ${v.when || ''}<br>
+           <strong>Aparelho:</strong> ${v.device || 'desconhecido'}<br>
+           <strong>IP:</strong> ${v.ip || 'desconhecido'}</p>
+        ${infoBox('Foi você? Então não precisa fazer nada.<br>Se <strong>não</strong> foi, troque a senha agora e avise o responsável pelo sistema: esta conta pode estornar pagamentos e ver os dados de todos os clientes.')}`,
+      cta: { text: 'Abrir o Painel', url: adminUrl() },
     },
 
     // ─── ONBOARDING ─────────────────────────────────────

@@ -23,7 +23,16 @@ const { SECRET, queryMock, bcryptMock, openSession, getSetting, auditMock } = vi
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 vi.mock('../config/env.js', () => ({ env: { JWT_SECRET: SECRET } }));
 vi.mock('bcrypt', () => ({ default: bcryptMock }));
-vi.mock('./auth.service.js', () => ({ openRefreshSession: openSession, ACCESS_TOKEN_EXPIRY: '15m' }));
+const { assertLoginAllowedMock, registerLoginFailureMock } = vi.hoisted(() => ({
+  assertLoginAllowedMock: vi.fn(async (..._args: unknown[]) => {}),
+  registerLoginFailureMock: vi.fn(async (..._args: unknown[]) => {}),
+}));
+vi.mock('./auth.service.js', () => ({
+  openRefreshSession: openSession,
+  ACCESS_TOKEN_EXPIRY: '15m',
+  assertLoginAllowed: assertLoginAllowedMock,
+  registerLoginFailure: registerLoginFailureMock,
+}));
 vi.mock('./settings.service.js', () => ({ getSetting }));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 
@@ -179,5 +188,16 @@ describe('checkout gates', () => {
     expect(await isWholesaleSalesOpen()).toBe(true);
     expect(await isWholesaleSalesOpen()).toBe(false);
     expect(await isWholesaleSalesOpen()).toBe(false);
+  });
+});
+
+/** The wholesale door uses the same per-account lock as the main login. */
+describe('login — bloqueio por conta', () => {
+  it('confere o bloqueio antes da senha e conta a senha errada', async () => {
+    route([['FROM users WHERE email', { rows: [{ id: 'u1', email: 'ana@x.com', role: 'member', password_hash: 'h' }] }]]);
+    bcryptMock.compare.mockResolvedValueOnce(false);
+    await expect(loginWholesale({ email: 'ana@x.com', password: 'x', cnpj: CNPJ })).rejects.toThrow();
+    expect(assertLoginAllowedMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'u1' }));
+    expect(registerLoginFailureMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'u1' }));
   });
 });

@@ -22,6 +22,9 @@ import { auditLog } from '../utils/audit.js';
 import { decrementStockForOrder, restoreStockForOrder, releaseReservation } from './order.service.js';
 import { restoreCreditForOrder } from './store-credit.service.js';
 import { notifyAdminsOfPayment, type AdminPaymentNotice } from './admin-notification.service.js';
+import { maskEmail, moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('pagarme-webhook');
 
 // ─── Envelope ────────────────────────────────────────────────────────────────
 
@@ -110,7 +113,7 @@ async function confirmChargeIsPaid(chargeId: string): Promise<pagarme.PagarmeCha
     const charge = await pagarme.getCharge(chargeId);
     return pagarme.mapChargeStatus(charge.status) === 'paid' ? charge : null;
   } catch (err) {
-    console.error(`[PAGARME-HOOK] could not confirm charge ${chargeId}:`, err);
+    log.error({ err }, `could not confirm charge ${chargeId}`);
     return null;
   }
 }
@@ -188,7 +191,7 @@ export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<v
       [webhookKey, 'pagarme', event.type, event.id, '']
     );
     if (claim.rowCount === 0) {
-      console.log(`[PAGARME-HOOK] Already processed: ${webhookKey}`);
+      log.info(`Already processed: ${webhookKey}`);
       await client.query('ROLLBACK');
       return;
     }
@@ -212,7 +215,7 @@ export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<v
         await auditLog('order.credit_restored', null, { orderId, amount, reason: 'order_closed' });
       }
     } catch (err) {
-      console.error(`[PAGARME-HOOK] Credit restore failed (order=${orderId}):`, err);
+      log.error({ err }, `Credit restore failed (order=${orderId})`);
     }
   }
 
@@ -220,7 +223,7 @@ export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<v
     try {
       await sendTemplateEmail(job);
     } catch (err) {
-      console.error(`[PAGARME-HOOK] Email failed (${job.template} → ${job.to}):`, err);
+      log.error({ err, template: job.template, to: maskEmail(job.to) }, 'email send failed');
     }
   }
 
@@ -278,7 +281,7 @@ async function route(
       break;
 
     default:
-      console.log(`[PAGARME-HOOK] Unhandled event type: ${event.type}`);
+      log.info(`Unhandled event type: ${event.type}`);
   }
 }
 
@@ -291,7 +294,7 @@ async function handlePaid(
 ): Promise<void> {
   const payload = extractCharge(event);
   if (!payload?.id) {
-    console.warn('[PAGARME-HOOK] paid event without a charge id — ignoring');
+    log.warn('paid event without a charge id — ignoring');
     return;
   }
 
@@ -347,7 +350,7 @@ async function settleShopOrder(
 
   const order = updated.rows[0];
   if (!order) {
-    console.log(`[PAGARME-HOOK] charge ${charge.id}: no pending order to settle`);
+    log.info(`charge ${charge.id}: no pending order to settle`);
     return;
   }
 
@@ -412,7 +415,7 @@ async function settleEventReservation(
   );
   const reservation = updated.rows[0];
   if (!reservation) {
-    console.log(`[PAGARME-HOOK] charge ${charge.id}: no pending reservation to settle`);
+    log.info(`charge ${charge.id}: no pending reservation to settle`);
     return;
   }
 
@@ -502,13 +505,13 @@ async function settleClubPayment(
 
   const memberId = (paid.rows[0]?.member_id as string) ?? metadata.memberId;
   if (!memberId) {
-    console.warn(`[PAGARME-HOOK] charge ${charge.id} settled no payment and carries no memberId`);
+    log.warn(`charge ${charge.id} settled no payment and carries no memberId`);
     return;
   }
   if (paid.rowCount === 0) {
     // Already paid — the row was settled by an earlier delivery or by the
     // synchronous card response. Nothing left to activate.
-    console.log(`[PAGARME-HOOK] charge ${charge.id}: payment already paid`);
+    log.info(`charge ${charge.id}: payment already paid`);
     return;
   }
 
@@ -834,7 +837,7 @@ async function handleInvoicePaid(
 ): Promise<void> {
   const subscriptionId = subscriptionIdOf(event.data);
   if (!subscriptionId) {
-    console.log('[PAGARME-HOOK] invoice.paid without subscription — ignoring');
+    log.info('invoice.paid without subscription — ignoring');
     return;
   }
 
@@ -881,7 +884,7 @@ async function handleInvoicePaid(
     [subscriptionId]
   );
   if (memberResult.rows.length === 0) {
-    console.warn(`[PAGARME-HOOK] invoice.paid — no member for subscription ${subscriptionId}`);
+    log.warn(`invoice.paid — no member for subscription ${subscriptionId}`);
     return;
   }
 
@@ -957,7 +960,7 @@ async function handleInvoiceFailed(
     [subscriptionId]
   );
   if (result.rows.length === 0) {
-    console.warn(`[PAGARME-HOOK] invoice.payment_failed — unknown subscription ${subscriptionId}`);
+    log.warn(`invoice.payment_failed — unknown subscription ${subscriptionId}`);
     return;
   }
 

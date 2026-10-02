@@ -11,6 +11,9 @@ import { validate } from '../middleware/validate.js';
 import { env, SHOP_CANONICAL_URL } from '../config/env.js';
 import { isPlayableVideoHeader, FTYP_PROBE_BYTES } from '../utils/video.js';
 import * as productService from '../services/product.service.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('product-routes');
 
 export const productRouter = Router();
 
@@ -610,11 +613,9 @@ productRouter.post(
       // Whatever did not fit under the cap must not linger on disk.
       for (const url of result.rejected) discardUpload(pathByUrl.get(url) as string);
 
-      console.log(
-        `[UPLOAD] product=${productId} kept=${result.accepted.length}/${files.length}` +
+      log.info(`product=${productId} kept=${result.accepted.length}/${files.length}` +
           `${result.rejected.length ? ` over-limit=${result.rejected.length}` : ''}` +
-          `${sawHeic ? ' heic-skipped' : ''}`
-      );
+          `${sawHeic ? ' heic-skipped' : ''}`);
       res.status(201).json({ ...result.product, skippedOverLimit: result.rejected.length });
     } catch (err) {
       next(err);
@@ -723,7 +724,7 @@ productRouter.post(
           url,
           title: req.body?.title ? String(req.body.title).slice(0, 200) : undefined,
         });
-        console.log(`[UPLOAD] video product=${req.params.id} bytes=${file.size}`);
+        log.info(`video product=${req.params.id} bytes=${file.size}`);
         res.status(201).json(product);
       } catch (err) {
         discardUpload(file.path);
@@ -756,7 +757,7 @@ productRouter.post(
         rejectInvalidUpload(res, sawHeic);
         return;
       }
-      console.log(`[UPLOAD] media product=${req.params.id} kept=${urls.length}/${files.length}`);
+      log.info(`media product=${req.params.id} kept=${urls.length}/${files.length}`);
       res.status(201).json({ urls });
     } catch (err) {
       next(err);

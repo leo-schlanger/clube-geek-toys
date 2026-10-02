@@ -7,51 +7,74 @@ import { releaseReservationById } from './order.service.js';
 import { purgeExpiredRefreshSessions } from './auth.service.js';
 import { reconcilePendingCharges } from './reconcile.service.js';
 import { syncShipments } from './label.service.js';
+import { moduleLogger } from '../config/logger.js';
+import { alertOpsAsync } from './ops-alert.service.js';
+
+const log = moduleLogger('cron');
+
+/**
+ * A scheduled job failed. Logged, and mailed to ops: the nightly purge of
+ * `processed_webhooks` failed every night for weeks with only a stdout line to
+ * show for it. Six hours between alerts of this kind — the same job fails the
+ * same way on every run.
+ */
+function cronFailed(job: string, err: unknown): void {
+  log.error({ err, job }, 'scheduled job failed');
+  alertOpsAsync({
+    kind: 'cron_failed',
+    subject: `Tarefa agendada falhou: ${job}`,
+    body:
+      `A tarefa "${job}" falhou.\n\n` +
+      `Erro: ${err instanceof Error ? err.message : String(err)}\n\n` +
+      `Onde olhar:\n  journalctl CONTAINER_NAME=clube-geek-api --since -1h -o cat | jq 'select(.module=="cron")'`,
+    cooldownMin: 360,
+  });
+}
 
 export function initCronJobs() {
   // Daily at 6:00 AM UTC (3:00 AM BRT)
   cron.schedule('0 6 * * *', async () => {
-    console.log('[CRON] Running daily jobs...');
+    log.info('Running daily jobs...');
     try {
       await sendRenewalReminders();
     } catch (err) {
-      console.error('[CRON] Renewal reminders error:', err);
+      cronFailed('lembretes de renovação', err);
     }
     try {
       await expireMembers();
     } catch (err) {
-      console.error('[CRON] Expire members error:', err);
+      cronFailed('expiração de membros', err);
     }
     try {
       await releaseExpiredStockReservations();
     } catch (err) {
-      console.error('[CRON] Expire stock reservations error:', err);
+      cronFailed('liberação de reservas de estoque', err);
     }
     try {
       const purged = await purgeExpiredRefreshSessions();
-      if (purged > 0) console.log(`[CRON] Purged ${purged} expired refresh session(s)`);
+      if (purged > 0) log.info(`Purged ${purged} expired refresh session(s)`);
     } catch (err) {
-      console.error('[CRON] Purge refresh sessions error:', err);
+      cronFailed('limpeza de sessões', err);
     }
     try {
       await purgeOldRows();
     } catch (err) {
-      console.error('[CRON] Purge old rows error:', err);
+      cronFailed('limpeza de registros antigos', err);
     }
     // Last: it reports on the state the two jobs above just left behind.
     try {
       await sendAdminDailyDigest();
     } catch (err) {
-      console.error('[CRON] Admin daily digest error:', err);
+      cronFailed('resumo diário da equipe', err);
     }
 
     // Record cron execution for health monitoring
     await query(
       `INSERT INTO config (key, value) VALUES ('last_cron_run', to_jsonb(NOW()::text))
        ON CONFLICT (key) DO UPDATE SET value = to_jsonb(NOW()::text), updated_at = NOW()`
-    ).catch(err => console.error('[CRON] Health log error:', err));
+    ).catch(err => log.error({ err }, 'Health log error'));
 
-    console.log('[CRON] All daily jobs completed');
+    log.info('All daily jobs completed');
   });
 
   /**
@@ -71,7 +94,7 @@ export function initCronJobs() {
     try {
       await reconcilePendingCharges();
     } catch (err) {
-      console.error('[CRON] Reconcile error:', err);
+      cronFailed('conciliação de pagamentos', err);
     }
   });
 
@@ -87,15 +110,15 @@ export function initCronJobs() {
   cron.schedule('*/15 * * * *', async () => {
     try {
       const touched = await syncShipments();
-      if (touched > 0) console.log(`[CRON] Shipment sync updated ${touched} order(s)`);
+      if (touched > 0) log.info(`Shipment sync updated ${touched} order(s)`);
     } catch (err) {
-      console.error('[CRON] Shipment sync error:', err);
+      cronFailed('sincronização de envios', err);
     }
   });
 
-  console.log('[CRON] Scheduled daily jobs at 6:00 AM UTC');
-  console.log('[CRON] Scheduled payment reconciliation every 10 minutes');
-  console.log('[CRON] Scheduled shipment sync every 15 minutes');
+  log.info('Scheduled daily jobs at 6:00 AM UTC');
+  log.info('Scheduled payment reconciliation every 10 minutes');
+  log.info('Scheduled shipment sync every 15 minutes');
 }
 
 /**
@@ -121,7 +144,7 @@ async function releaseExpiredStockReservations() {
       LIMIT 500`
   );
   if (expired.rows.length === 0) {
-    console.log('[CRON] No expired stock reservations');
+    log.info('No expired stock reservations');
     return;
   }
   let released = 0;
@@ -130,10 +153,10 @@ async function releaseExpiredStockReservations() {
       if (await releaseReservationById(row.id)) released++;
     } catch (err) {
       // One bad order must not stop the rest from being released.
-      console.error(`[CRON] Release reservation failed for order ${row.order_number}:`, err);
+      log.error({ err }, `Release reservation failed for order ${row.order_number}`);
     }
   }
-  console.log(`[CRON] Released ${released} expired stock reservation(s)`);
+  log.info(`Released ${released} expired stock reservation(s)`);
 }
 
 /**
@@ -170,11 +193,11 @@ async function purgeOldRows(): Promise<void> {
         `DELETE FROM ${t.table} WHERE ${t.column} < NOW() - INTERVAL '${t.keep}'`
       );
       if (deleted.rowCount) {
-        console.log(`[CRON] Purged ${deleted.rowCount} row(s) from ${t.table}`);
+        log.info(`Purged ${deleted.rowCount} row(s) from ${t.table}`);
       }
     } catch (err) {
       // One table must not stop the rest.
-      console.error(`[CRON] Purge failed for ${t.table}:`, err);
+      cronFailed(`limpeza da tabela ${t.table}`, err);
     }
   }
 }
@@ -192,7 +215,7 @@ async function sendAdminDailyDigest() {
 
   const report = await getActionItems();
   if (report.totalPending === 0) {
-    console.log('[CRON] Daily digest skipped - no pending items');
+    log.info('Daily digest skipped - no pending items');
     return;
   }
 
@@ -204,7 +227,7 @@ async function sendAdminDailyDigest() {
      LIMIT 1`
   );
   if (alreadySent.rowCount) {
-    console.log('[CRON] Daily digest already sent today');
+    log.info('Daily digest already sent today');
     return;
   }
 
@@ -221,7 +244,7 @@ async function sendAdminDailyDigest() {
     },
   });
 
-  console.log(`[CRON] Daily digest sent - ${report.totalPending} pending item(s)`);
+  log.info(`Daily digest sent - ${report.totalPending} pending item(s)`);
 }
 
 async function sendRenewalReminders() {
@@ -256,11 +279,11 @@ async function sendRenewalReminders() {
       });
       sent++;
     } catch (err) {
-      console.error(`[CRON] Failed to send reminder to ${member.email}:`, err);
+      log.error({ err, memberId: member.id }, 'renewal reminder e-mail failed');
     }
   }
 
-  console.log(`[CRON] Sent ${sent} renewal reminders`);
+  log.info(`Sent ${sent} renewal reminders`);
 }
 
 async function expireMembers() {
@@ -282,7 +305,7 @@ async function expireMembers() {
   );
 
   if (result.rowCount && result.rowCount > 0) {
-    console.log(`[CRON] Expired ${result.rowCount} members`);
+    log.info(`Expired ${result.rowCount} members`);
 
     for (const member of result.rows) {
       // Audit log
@@ -302,9 +325,9 @@ async function expireMembers() {
           plan: planResult.rows[0]?.plan || '',
         },
         member_id: member.id,
-      }).catch((err) => console.error(`[CRON] Failed to send expiry email to ${member.email}:`, err));
+      }).catch((err) => log.error({ err, memberId: member.id }, 'expiry e-mail failed'));
     }
   } else {
-    console.log('[CRON] No members to expire');
+    log.info('No members to expire');
   }
 }

@@ -4,6 +4,9 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog } from '../utils/audit.js';
 import { FALLBACK_EVENT, type EventDefinition } from '../config/events.js';
 import { renderShareHtml } from '../utils/share-html.js';
+import { moduleLogger } from '../config/logger.js';
+
+const log = moduleLogger('event-config');
 
 /**
  * Event CRUD.
@@ -205,7 +208,7 @@ export async function getActiveEventOrFallback(): Promise<EventRecord | null> {
     // Events exist, none published: nothing on the marquee, and that is correct.
     if (any.rows.length > 0) return null;
   } catch (err) {
-    console.error('[EVENTS] falha lendo o evento ativo, usando fallback:', err);
+    log.error({ err }, 'falha lendo o evento ativo, usando fallback');
   }
   return FALLBACK_EVENT;
 }

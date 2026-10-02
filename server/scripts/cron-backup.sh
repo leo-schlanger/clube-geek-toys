@@ -2,6 +2,10 @@
 # Load DB name/user from the VPS .env (never commit that file) and run a daily dump.
 set -euo pipefail
 
+# shellcheck source=job-status.sh
+source /opt/clube-geek-toys/server/scripts/job-status.sh
+trap 'job_fail backup_daily "O backup diário parou com erro (linha $LINENO). O dump desta rodada pode não existir — confira /var/log/clube-backup*.log."' ERR
+
 ENV_FILE="/opt/clube-geek-toys/server/.env"
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: missing $ENV_FILE" >&2
@@ -25,16 +29,23 @@ for v in BACKUP_OFFSITE_BUCKET BACKUP_OFFSITE_ENDPOINT BACKUP_OFFSITE_ACCESS_KEY
 done
 
 /opt/clube-geek-toys/server/scripts/backup-postgres.sh daily
+job_ok backup_daily
 
 # The dump is already written and verified at this point. A failing off-site
 # push is loud but does not fail the job: throwing away a good backup because
 # its copy did not leave the host would be the wrong trade.
 if ! /opt/clube-geek-toys/server/scripts/backup-offsite.sh; then
   echo "[$(date)] WARNING: off-site copy of the dump failed — it is on this host only." >&2
+  job_fail offsite_dump "A cópia externa (R2) do backup do banco falhou. O dump existe só nesta VPS."
+else
+  job_ok offsite_dump
 fi
 
 # The photos never regenerate: the dump only stores their paths. Same rule as
 # above — loud, but it does not fail the job.
 if ! /opt/clube-geek-toys/server/scripts/uploads-offsite.sh; then
   echo "[$(date)] WARNING: off-site copy of the uploads failed — photos are on this host only." >&2
+  job_fail offsite_uploads "A cópia externa (R2) das fotos falhou. As fotos novas existem só nesta VPS."
+else
+  job_ok offsite_uploads
 fi

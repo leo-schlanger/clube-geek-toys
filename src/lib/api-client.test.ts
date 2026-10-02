@@ -602,3 +602,17 @@ describe('API_URL', () => {
     expect(API_URL).toBe('http://localhost:3001')
   })
 })
+
+describe('withRequestId', () => {
+  it('acrescenta o código curto da requisição ao erro 500', async () => {
+    const { withRequestId } = await import('./api-client')
+    expect(withRequestId('Erro interno do servidor', '9f8e7d6c5b4a39281706f5e4d3c2b1a0')).toBe(
+      'Erro interno do servidor (código 9f8e7d6c)'
+    )
+  })
+
+  it('deixa a mensagem intacta quando não há código', async () => {
+    const { withRequestId } = await import('./api-client')
+    expect(withRequestId('Cartão recusado.', undefined)).toBe('Cartão recusado.')
+  })
+})

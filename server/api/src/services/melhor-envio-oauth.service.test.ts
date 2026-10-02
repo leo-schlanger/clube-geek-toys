@@ -24,6 +24,17 @@ const { queryMock, envMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock, getClient: vi.fn() }));
+const { logMock } = vi.hoisted(() => ({
+  logMock: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('../config/logger.js', () => ({
+  moduleLogger: () => logMock,
+  logger: logMock,
+  maskEmail: (e: string) => e,
+}));
+/** Did any `log.error` call carry this text, in the message or the fields? */
+const loggedError = (text: string) =>
+  logMock.error.mock.calls.some((call: unknown[]) => JSON.stringify(call).includes(text));
 vi.mock('../config/env.js', () => ({ env: envMock }));
 
 const oauth = await import('./melhor-envio-oauth.service.js');
@@ -228,11 +239,10 @@ describe('getAccessToken', () => {
   // A sandbox token against production returns 401, which the fallback hides.
   it('ignores a stored token from the other environment', async () => {
     queryMock.mockResolvedValue(storedRow({ sandbox: true }));
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    logMock.error.mockClear();
 
     await expect(oauth.getAccessToken()).resolves.toBeNull();
-    expect(error).toHaveBeenCalledWith(expect.stringContaining('sandbox'));
-    error.mockRestore();
+    expect(loggedError('sandbox')).toBe(true);
   });
 });
 
