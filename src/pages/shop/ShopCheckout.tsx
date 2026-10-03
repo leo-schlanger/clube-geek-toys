@@ -36,6 +36,7 @@ import { formatCurrency, cn } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
+import { ClubCheckoutPitch } from '../../components/store/ClubPitch'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
@@ -1011,18 +1012,7 @@ export default function ShopCheckout() {
                     </span>
                   </Link>
                 )}
-                {!order && !isWholesale && !isMember && (
-                  <Link
-                    to="/entrar"
-                    className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs transition-colors hover:bg-primary/10"
-                  >
-                    <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                    <span>
-                      Membros ganham 10% de desconto.{' '}
-                      <strong className="text-primary">Entrar</strong>
-                    </span>
-                  </Link>
-                )}
+                {!order && !isWholesale && !isMember && <ClubCheckoutPitch subtotal={subtotal} />}
               </CardContent>
             </Card>
           </div>

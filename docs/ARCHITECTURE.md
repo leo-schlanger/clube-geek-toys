@@ -190,7 +190,7 @@ O cadastro e dividido em 3 etapas sequenciais. O usuario pode interromper e reto
 1. Criar conta com email + senha **ou** Google OAuth
 2. Verificar email (link HMAC com validade de 24h)
 3. Preencher dados pessoais: nome completo, CPF (validado), telefone
-4. Confirmar a assinatura do plano unico mensal (Clube GeekPop & Toys, R$ 12,50/mes) — sem selecao de tier nem de frequencia
+4. Confirmar a assinatura do plano unico anual (Clube GeekPop & Toys, R$ 159,90/ano) — sem selecao de tier nem de frequencia
 
 ### Etapa 2: Contrato Digital
 
@@ -458,7 +458,7 @@ Imagens sao enviadas por `POST /products/:id/images` (multipart) e armazenadas n
 
 | Transicao                        | Condicao                                | Comportamento                                                                        |
 | -------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
-| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+1 mes, plano mensal)                    |
+| `pending` -> `active`            | Pagamento confirmado (webhook ou admin) | Define `start_date`, calcula `expiry_date` (+1 ano, `addClubPeriod`)                 |
 | `active` -> `active` (renovacao) | Pagamento enquanto ainda ativo          | Estende `expiry_date` a partir da data de expiracao atual (nao perde dias restantes) |
 | `active` -> `expired`            | `expiry_date < hoje` + cron diario      | Marca `status = 'expired'`, envia email `member-expired`                             |
 | `expired` -> `active`            | Novo pagamento                          | Fresh start: `expiry_date` calculado a partir de hoje                                |

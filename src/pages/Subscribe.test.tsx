@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 
 // ---------------------------------------------------------------------------
 // Mocks — declared before importing the component
@@ -36,8 +36,16 @@ vi.mock('lucide-react', () => {
     Gift: icon,
     CreditCard: icon,
     ShoppingBag: icon,
+    Ticket: icon,
+    QrCode: icon,
+    Calculator: icon,
+    ChevronDown: icon,
   }
 })
+
+vi.mock('../hooks/useActiveEvent', () => ({
+  useActiveEvent: () => ({ event: { priceCents: 2000 }, visible: true, loading: false, isPlaceholder: false }),
+}))
 
 vi.mock('../components/RadioMiniPlayer', () => ({
   default: () => <div data-testid="radio-mini-player" />,
@@ -55,143 +63,99 @@ describe('Subscribe', () => {
     vi.clearAllMocks()
   })
 
-  // ─── Header ─────────────────────────────────────────────────
-
   it('renders the header with login button', () => {
     render(<Subscribe />)
-    const loginLink = screen.getByRole('link', { name: /entrar/i })
-    expect(loginLink).toBeInTheDocument()
+    const loginLink = screen.getByRole('link', { name: /entrar$/i })
     expect(loginLink).toHaveAttribute('href', '/login')
   })
 
   it('renders "Visite a loja" links', () => {
     render(<Subscribe />)
-    const links = screen.getAllByText('Visite a loja')
-    expect(links.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('Visite a loja').length).toBeGreaterThanOrEqual(1)
   })
 
-  // ─── Hero section ───────────────────────────────────────────
-
-  it('renders the hero tagline', () => {
+  it('sells the annual price and quotes it per month', () => {
     render(<Subscribe />)
-    expect(screen.getByText(/vantagens VIP/)).toBeInTheDocument()
+    expect(screen.getAllByText(/R\$\s*159,90/).length).toBeGreaterThanOrEqual(3)
+    expect(screen.getAllByText(/R\$\s*13,33/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('/ano').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText('/mês')).not.toBeInTheDocument()
+    expect(screen.queryByText(/12,50/)).not.toBeInTheDocument()
   })
 
-  it('renders the single monthly price in the hero', () => {
+  it('every signup link asks for the annual plan', () => {
     render(<Subscribe />)
-    expect(screen.getByText(/Apenas/)).toBeInTheDocument()
-    const prices = screen.getAllByText(/R\$\s*12,50/)
-    expect(prices.length).toBeGreaterThanOrEqual(1)
+    const links = screen
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href')?.startsWith('/cadastro'))
+    expect(links.length).toBeGreaterThanOrEqual(2)
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', '/cadastro?plano=club&tipo=annual')
+    }
   })
 
-  it('renders the ASSINE AGORA button', () => {
-    render(<Subscribe />)
-    expect(screen.getByRole('button', { name: /assine agora/i })).toBeInTheDocument()
-  })
-
-  // ─── Trust badges ──────────────────────────────────────────
-
-  it('renders trust badges', () => {
-    render(<Subscribe />)
-    // These appear in both hero and bottom section, use getAllByText
-    expect(screen.getAllByText('Pagamento seguro').length).toBeGreaterThanOrEqual(1)
-  })
-
-  // ─── Single plan card ──────────────────────────────────────
-
-  it('renders the single plan section heading', () => {
-    render(<Subscribe />)
-    expect(screen.getByText('Plano do Clube')).toBeInTheDocument()
-    expect(screen.getByText('Um único plano, mensal, com tudo incluso.')).toBeInTheDocument()
-  })
-
-  it('renders the club plan name and discount', () => {
-    render(<Subscribe />)
-    expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
-    // "10% em qualquer produto" aparece no card do plano e no hero
-    expect(screen.getAllByText('10% em qualquer produto').length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('renders the monthly price on the plan card', () => {
-    render(<Subscribe />)
-    const prices = screen.getAllByText(/R\$\s*12,50/)
-    expect(prices.length).toBeGreaterThanOrEqual(2)
-    expect(screen.getAllByText('/mês').length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('renders a single ASSINAR button linking to /cadastro?plano=club&tipo=monthly', () => {
-    render(<Subscribe />)
-    const assinarLinks = screen.getAllByRole('link').filter(
-      (link) => link.getAttribute('href')?.startsWith('/cadastro')
-    )
-    expect(assinarLinks).toHaveLength(1)
-    expect(assinarLinks[0]).toHaveAttribute('href', '/cadastro?plano=club&tipo=monthly')
-  })
-
-  it('does NOT render a monthly/annual toggle', () => {
-    render(<Subscribe />)
-    expect(screen.queryByText('Mensal')).not.toBeInTheDocument()
-  })
-
-  it('does NOT render multiple plan tiers (Silver/Gold/Black)', () => {
-    render(<Subscribe />)
-    expect(screen.queryByText('Silver')).not.toBeInTheDocument()
-    expect(screen.queryByText('Gold')).not.toBeInTheDocument()
-    expect(screen.queryByText('Black')).not.toBeInTheDocument()
-  })
-
-  it('does NOT render a plan comparison table', () => {
-    render(<Subscribe />)
-    expect(screen.queryByText('Compare os planos')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Multiplicador de pontos/)).not.toBeInTheDocument()
-  })
-
-  it('does NOT mention a points program', () => {
-    render(<Subscribe />)
-    expect(screen.queryByText(/Programa de pontos/)).not.toBeInTheDocument()
-  })
-
-  // ─── Plan benefits ─────────────────────────────────────────
-
-  it('renders the club plan benefits list', () => {
+  it('lists the plan benefits from CLUB_PLAN', () => {
     render(<Subscribe />)
     expect(screen.getByText('10% de desconto em qualquer produto')).toBeInTheDocument()
     expect(screen.getByText('50% de desconto nos ingressos dos eventos')).toBeInTheDocument()
     expect(screen.getByText('Brinde na primeira compra da loja')).toBeInTheDocument()
   })
 
-  it('renders extra benefits (QR Code carteirinha, sem fidelidade)', () => {
+  it('shows the savings on example purchases', () => {
     render(<Subscribe />)
-    expect(screen.getByText('Carteirinha digital com QR Code')).toBeInTheDocument()
-    expect(screen.getByText('Desconto válido na loja física e online')).toBeInTheDocument()
-    expect(screen.getByText('Renovação mensal, sem fidelidade')).toBeInTheDocument()
+    expect(screen.getByText('Um álbum de R$ 150,00')).toBeInTheDocument()
+    expect(screen.getByText('você guarda R$ 15,00')).toBeInTheDocument()
   })
 
-  // ─── Features section ──────────────────────────────────────
-
-  it('renders the "Por que ser VIP?" section with feature cards', () => {
+  it('prices the ticket benefit from the active event', () => {
     render(<Subscribe />)
-    expect(screen.getByText('Por que ser VIP?')).toBeInTheDocument()
-    expect(screen.getByText('10% de desconto')).toBeInTheDocument()
-    expect(screen.getByText('Brinde na 1ª compra')).toBeInTheDocument()
-    expect(screen.getByText('Eventos participantes')).toBeInTheDocument()
-    expect(screen.getByText('Carteirinha digital')).toBeInTheDocument()
+    expect(screen.getByText(/Um ingresso de R\$ 20,00 sai por R\$ 10,00/)).toBeInTheDocument()
   })
 
-  // ─── Footer ─────────────────────────────────────────────────
+  it('states the 7-day refund guarantee', () => {
+    render(<Subscribe />)
+    expect(screen.getByText('Risco zero: 7 dias para desistir')).toBeInTheDocument()
+    expect(screen.getByText(/devolvemos 100% do valor/)).toBeInTheDocument()
+  })
 
-  it('renders the footer with copyright', () => {
+  it('answers the objections, including that it is not monthly', () => {
+    render(<Subscribe />)
+    expect(screen.getByText('Preciso pagar todo mês?')).toBeInTheDocument()
+    expect(screen.getByText('Renova sozinho?')).toBeInTheDocument()
+    expect(screen.getByText('Soma com outras promoções?')).toBeInTheDocument()
+  })
+
+  // ─── Calculator ────────────────────────────────────────────
+
+  it('starts with a year that pays off', () => {
+    render(<Subscribe />)
+    // R$ 150/month → R$ 180 + 2 tickets → R$ 20 = R$ 200; 200 − 159,90 = 40,10
+    expect(screen.getByText('R$ 200,00')).toBeInTheDocument()
+    expect(screen.getByText(/sobram R\$ 40,10 no seu bolso/)).toBeInTheDocument()
+  })
+
+  it('says how far a light spender is from paying it off', () => {
+    render(<Subscribe />)
+    fireEvent.change(screen.getByLabelText(/gasta por mês/i), { target: { value: '50' } })
+    fireEvent.change(screen.getByLabelText(/ingressos de evento/i), { target: { value: '0' } })
+    // R$ 60 saved → R$ 99,90 short → R$ 83,25/month more, rounded up to R$ 85
+    expect(screen.getByText(/Faltam R\$ 99,90 para o clube se pagar/)).toBeInTheDocument()
+    expect(screen.getByText(/R\$ 85,00 a mais em compras por mês/)).toBeInTheDocument()
+  })
+
+  it('does NOT render multiple plan tiers or a points program', () => {
+    render(<Subscribe />)
+    expect(screen.queryByText('Silver')).not.toBeInTheDocument()
+    expect(screen.queryByText('Gold')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Programa de pontos/)).not.toBeInTheDocument()
+  })
+
+  it('renders the footer with copyright and legal links', () => {
     render(<Subscribe />)
     expect(screen.getByText(/2026 GeekPop & Toys/)).toBeInTheDocument()
-  })
-
-  it('renders Termos and Privacidade links in footer', () => {
-    render(<Subscribe />)
     expect(screen.getByText('Termos')).toHaveAttribute('href', '/termos')
     expect(screen.getByText('Privacidade')).toHaveAttribute('href', '/privacidade')
   })
-
-  // ─── RadioMiniPlayer ───────────────────────────────────────
 
   it('renders the RadioMiniPlayer component', () => {
     render(<Subscribe />)

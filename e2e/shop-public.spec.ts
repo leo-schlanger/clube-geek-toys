@@ -96,15 +96,15 @@ test.describe('Public shop (production)', () => {
 })
 
 test.describe('Club subscription (production)', () => {
-  test('/assinar: single plan R$ 12.50 / 10%, with no errors', async ({ page }, testInfo) => {
+  test('/assinar: single annual plan R$ 159.90 / 10%, with no errors', async ({ page }, testInfo) => {
     const errors = collectErrors(page)
     const resp = await page.goto(`${CLUB}/assinar`, { waitUntil: 'domcontentloaded' })
     expect(resp?.status()).toBeLessThan(400)
-    await expect(page.getByText(/12,50/).first()).toBeVisible()
+    await expect(page.getByText(/159,90/).first()).toBeVisible()
     await expect(page.getByText(/10%/).first()).toBeVisible()
     await expect(page.getByRole('link', { name: /ASSINAR/i }).first()).toBeVisible()
-    // não deve mais existir Silver/Gold/Black/mensal
-    await expect(page.getByText(/Silver|Gold|Black|\/m[êe]s/i)).toHaveCount(0)
+    // nem tiers nem o preço mensal antigo
+    await expect(page.getByText(/Silver|Gold|Black|12,50/i)).toHaveCount(0)
     await page.screenshot({ path: `e2e/.out/subscribe-${testInfo.project.name}.png`, fullPage: true })
     expect(errors, errors.join('\n')).toEqual([])
   })

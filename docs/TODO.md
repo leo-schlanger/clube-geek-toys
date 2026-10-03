@@ -62,6 +62,16 @@
       `shop.geeketoys.com.br` enquanto o `robots.txt` publica o arquivo em
       `shop.geekpoptoys.com.br` (o canônico). Sitemap cross-domain o Google
       descarta. As páginas de categoria não estavam em sitemap nenhum.
+- [x] **Clube voltou a ser anual (R$ 159,90)** — 02/10/2026. Cadastro, renovação
+      e pagamento retomado compram 12 meses (`addClubPeriod`, nos dois lados), só
+      à vista: o servidor fixa 1 parcela no cartão do clube, mesmo que o pedido
+      peça mais. Quem pagou um mês mantém a janela e paga o anual no vencimento
+      (migration 040). Reembolso integral em 7 dias; depois disso, cancelar só
+      desliga a renovação e os benefícios seguem até o fim do ano pago. O preço
+      saiu das Configurações: era um campo editável que nada cobrava, a mesma
+      armadilha do desconto. `/assinar` virou página de venda (calculadora de
+      economia, garantia, FAQ) e a loja ganhou o bloco "vale a pena ser membro"
+      na home, no checkout e na página de produto (`lib/club-value.ts`).
 - [x] **Clube passou a ser mensal (R$ 12,50)** — o plano era anual de R$ 149,99.
       Toda cobrança nova é mensal: cadastro, renovação e pagamento pendente
       retomado. Membro que já pagou um ano mantém a janela dele e só volta a ser

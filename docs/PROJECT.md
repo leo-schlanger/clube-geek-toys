@@ -19,15 +19,15 @@
 
 ## 2. Visao do Produto
 
-Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano mensal e recebem 10% de desconto em qualquer produto, 50% nos ingressos dos eventos, brinde na primeira compra da loja e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
+Clube de vantagens digital para loja fisica e online de produtos geek, colecionaveis e brinquedos. Os membros assinam o plano anual e recebem 10% de desconto em qualquer produto, 50% nos ingressos dos eventos, brinde na primeira compra da loja e uma carteirinha digital com QR Code. A plataforma opera tambem uma loja e-commerce propria em `shop.geeketoys.com.br`.
 
 ### Plano de Assinatura
 
-Um unico plano mensal, sem opcao anual nova e sem tiers (Silver/Gold/Black foram descontinuados).
+Um unico plano anual (R$ 159,90, a vista), sem tiers (Silver/Gold/Black foram descontinuados).
 
-| Plano                | Mensal   | Beneficios                                                                                                                     |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Clube GeekPop & Toys | R$ 12,50 | 10% de desconto em qualquer produto (loja fisica e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
+| Plano                | Mensal        | Beneficios                                                                                                                     |
+| -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Clube GeekPop & Toys | R$ 159,90/ano | 10% de desconto em qualquer produto (loja fisica e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
 
 O desconto de 10% do membro na loja online e aplicado **server-side** no checkout (nunca confiando no cliente), registrado em `orders.discount_reason = 'member_10'`.
 
@@ -35,7 +35,7 @@ O desconto de 10% do membro na loja online e aplicado **server-side** no checkou
 
 ### 3.1 Modulo Membro
 
-Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renovacao da assinatura mensal. Fluxo completo: criacao de conta, verificacao de email, dados pessoais, assinatura de contrato digital e pagamento. Como ha um unico plano, nao ha selecao de tier nem de frequencia.
+Cadastro em etapas (stepper), dashboard com carteirinha digital, gestao e renovacao da assinatura anual. Fluxo completo: criacao de conta, verificacao de email, dados pessoais, assinatura de contrato digital e pagamento. Como ha um unico plano, nao ha selecao de tier nem de frequencia.
 
 ### 3.2 Modulo Admin
 

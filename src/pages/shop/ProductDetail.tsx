@@ -29,6 +29,7 @@ import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
+import { clubSignupUrl } from '../../lib/club-value'
 import { SaveProductButton } from '../../components/store/SaveProductButton'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useShopChannel } from '../../components/store/useShopChannel'
@@ -498,16 +499,20 @@ export default function ProductDetail() {
                     </span>
                   </div>
                 ) : (
-                  <Link
-                    to="/entrar"
-                    className="mt-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm transition-colors hover:bg-primary/10"
-                  >
-                    <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+                    <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span>
-                      Entre e ganhe <strong className="text-primary">{MEMBER_DISCOUNT_PERCENT}% de desconto</strong> de
-                      membro ({formatCurrency(memberPrice)})
+                      Membros do clube pagam <strong className="text-primary">{formatCurrency(memberPrice)}</strong>{' '}
+                      ({MEMBER_DISCOUNT_PERCENT}% de desconto).{' '}
+                      <a href={clubSignupUrl()} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                        Conhecer o clube
+                      </a>
+                      {' · '}
+                      <Link to="/entrar" className="text-muted-foreground hover:text-foreground">
+                        Já sou membro: entrar
+                      </Link>
                     </span>
-                  </Link>
+                  </div>
                 )}
                 {(isMember || (isWholesale && isWholesaleApproved)) && (
                   <p className="mt-1 text-xs text-muted-foreground">

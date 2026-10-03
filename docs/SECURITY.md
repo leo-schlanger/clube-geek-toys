@@ -107,12 +107,12 @@ Todos os endpoints validam entrada com schemas Zod (request body, params e query
 
 ### Validações Específicas
 
-| Campo             | Validação                                                                                                                        |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco                                                     |
-| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX                                                         |
-| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                                                                     |
-| Valores numéricos | Assinatura: validada contra `CLUB_PLAN_PRICE` (R$ 12,50). Loja: totais recalculados server-side a partir dos preços dos produtos |
+| Campo             | Validação                                                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| CPF               | Algoritmo de checksum (Módulo 11) + consulta Brasil API + unicidade no banco                                                      |
+| Email             | RFC 5322 + detecção de descartáveis (400+ domínios) + verificação DNS MX                                                          |
+| Senha             | Mínimo 8 caracteres + 1 maiúscula + 1 número                                                                                      |
+| Valores numéricos | Assinatura: validada contra `CLUB_PLAN_PRICE` (R$ 159,90). Loja: totais recalculados server-side a partir dos preços dos produtos |
 
 ### Sanitização
 
@@ -204,7 +204,7 @@ reentrega, em vez de o sistema decidir no chute.
 
 ### Validação de Valores
 
-- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 12,50) e intervalo travado em mensal (`CLUB_PLAN_INTERVAL`) — o cliente não escolhe nem o valor nem a periodicidade
+- Assinatura: valor validado contra `CLUB_PLAN_PRICE` (R$ 159,90) e intervalo travado em anual (`CLUB_PLAN_INTERVAL`), sempre à vista — o cliente não escolhe nem o valor nem a periodicidade
 - Loja: subtotal, desconto e total são **recalculados no servidor** a partir dos preços dos produtos travados no banco (`SELECT ... FOR UPDATE`); o valor enviado pelo cliente nunca é usado
 
 ### Desconto de Membro na Loja (server-side)

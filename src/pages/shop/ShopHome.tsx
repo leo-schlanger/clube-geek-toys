@@ -24,6 +24,7 @@ import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { CreatorCredit } from '../../components/CreatorCredit'
 import { Button } from '../../components/ui/button'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
+import { ClubHomePitch } from '../../components/store/ClubPitch'
 
 /**
  * Main storefront, serving both "/" and "/categoria/:slug", and reading
@@ -240,6 +241,8 @@ export default function ShopHome() {
             <ProductGrid products={featured} isMember={isMember} />
           </section>
         )}
+
+        {!categorySlug && !search && !isMember && <ClubHomePitch />}
 
         <section>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

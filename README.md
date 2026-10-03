@@ -12,7 +12,7 @@ A **GeekPop & Toys** é uma loja de K-pop e cultura pop em Copacabana, Rio de Ja
 
 A plataforma inclui:
 
-- **Plano único mensal** com desconto exclusivo e benefícios para membros
+- **Plano único anual** com desconto exclusivo e benefícios para membros
 - **Contrato digital** com validade jurídica (Lei 14.063/2020)
 - **Carteirinha digital premium** com QR Code e design metálico
 - **Loja e-commerce própria** em `shop.geeketoys.com.br` com desconto de membro aplicado no checkout
@@ -24,11 +24,11 @@ A plataforma inclui:
 
 ## Plano e Preço
 
-Um único plano mensal, sem opção anual nova e sem tiers.
+Um único plano anual (R$ 159,90, à vista), sem tiers. Foi mensal de 22/08 a 02/10/2026.
 
-| Plano                    | Mensal   | Benefícios                                                                                                                     |
-| ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Clube GeekPop & Toys** | R$ 12,50 | 10% de desconto em qualquer produto (loja física e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
+| Plano                    | Mensal        | Benefícios                                                                                                                     |
+| ------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Clube GeekPop & Toys** | R$ 159,90/ano | 10% de desconto em qualquer produto (loja física e online) + 50% nos ingressos dos eventos + brinde na primeira compra da loja |
 
 ---
 
@@ -36,7 +36,7 @@ Um único plano mensal, sem opção anual nova e sem tiers.
 
 ### Cadastro e Assinatura
 
-Wizard de 3 etapas: criação de conta, assinatura de contrato digital e pagamento. Como há um único plano mensal, não há seleção de tier nem de frequência — o membro assina eletronicamente e paga na mesma sessão.
+Wizard de 3 etapas: criação de conta, assinatura de contrato digital e pagamento. Como há um único plano anual, não há seleção de tier nem de frequência — o membro assina eletronicamente e paga na mesma sessão.
 
 ### Contrato Digital
 
