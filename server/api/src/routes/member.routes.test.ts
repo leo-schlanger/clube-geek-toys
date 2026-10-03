@@ -132,7 +132,7 @@ describe('create and update', () => {
   it('binds a self-registration to the member, and a staff one to a new login', async () => {
     members.createMember.mockResolvedValue(own);
     expect((await api.post('/', { as: 'member', body })).status).toBe(201);
-    expect(members.createMember).toHaveBeenCalledWith('user-member', expect.objectContaining({ plan: 'club', paymentType: 'monthly' }));
+    expect(members.createMember).toHaveBeenCalledWith('user-member', expect.objectContaining({ plan: 'club', paymentType: 'annual' }));
 
     members.createMemberByStaff.mockResolvedValue(own);
     expect((await api.post('/', { as: 'admin', body })).status).toBe(201);

@@ -125,7 +125,7 @@ import { StepPayment } from './StepPayment'
 
 const defaultProps = {
   plan: 'club' as const,
-  paymentType: 'monthly' as const,
+  paymentType: 'annual' as const,
   memberId: 'member-123',
   memberEmail: 'test@example.com',
   memberName: 'Test User',
@@ -152,8 +152,8 @@ describe('StepPayment', () => {
     render(<StepPayment {...defaultProps} />)
 
     expect(screen.getAllByText('Clube GeekPop & Toys').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/assinatura mensal/i)).toBeInTheDocument()
-    expect(screen.getByText(/12,50/)).toBeInTheDocument()
+    expect(screen.getByText(/um ano de clube/i)).toBeInTheDocument()
+    expect(screen.getByText(/159,90/)).toBeInTheDocument()
     expect(screen.getByText(/pagamento seguro via pagar\.me/i)).toBeInTheDocument()
   })
 

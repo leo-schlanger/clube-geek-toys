@@ -113,8 +113,8 @@ describe('Payments API client', () => {
   // ---- calculatePlanPrice ----
 
   describe('calculatePlanPrice', () => {
-    it('returns the monthly club price (12.50)', () => {
-      expect(calculatePlanPrice('club', 'monthly')).toBe(12.50)
+    it('returns the annual club price (159.90)', () => {
+      expect(calculatePlanPrice('club', 'annual')).toBe(159.90)
     })
   })
 
@@ -252,7 +252,7 @@ describe('Payments API client', () => {
       )
 
       expect(mockedApi.post).toHaveBeenCalledWith('/checkout/card/create', {
-        amount: 12.50,
+        amount: 159.90,
         description: 'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
@@ -386,16 +386,16 @@ describe('Payments API client', () => {
       mockedApi.post.mockResolvedValue({ data: created, status: 201 })
 
       const result = await createSubscriptionPayment(
-        'club', 'monthly', 'payer@test.com', 'Payer Name', 'member-1', 'token_abc'
+        'club', 'annual', 'payer@test.com', 'Payer Name', 'member-1', 'token_abc'
       )
 
       expect(mockedApi.post).toHaveBeenCalledWith('/subscription/create', {
         member_id: 'member-1',
         plan: 'club',
-        frequency_type: 'months',
+        frequency_type: 'years',
         payer_email: 'payer@test.com',
         payer_name: 'Payer Name',
-        transaction_amount: 12.50,
+        transaction_amount: 159.90,
         card_token: 'token_abc',
       })
 

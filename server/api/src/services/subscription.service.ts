@@ -23,7 +23,7 @@ const log = moduleLogger('subscription');
 interface CreateSubscriptionData {
   member_id: string;
   plan: string;
-  /** Ignored server-side — the club plan is always monthly. */
+  /** Ignored server-side — the interval comes from CLUB_PLAN_INTERVAL. */
   frequency_type?: string;
   payer_email: string;
   payer_name: string;
@@ -142,7 +142,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
 
   // 3. Amount and interval are locked to the club plan server-side. Trusting
   //    the client's `transaction_amount` and `frequency_type` would let someone
-  //    ask for `years` and buy a whole year at the monthly price.
+  //    pick a cheaper interval than the one the price was set for.
   const amount = CLUB_PLAN_PRICE;
   const paymentType = CLUB_PLAN_PAYMENT_TYPE;
   const interval = CLUB_PLAN_INTERVAL;

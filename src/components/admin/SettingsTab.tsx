@@ -18,7 +18,8 @@ import {
 import { getSettings, updateSettings, type SettingDefinition } from '../../lib/settings'
 import { ThemeToggle } from '../ThemeToggle'
 import { MelhorEnvioCard } from './MelhorEnvioCard'
-import { MEMBER_DISCOUNT_PERCENT } from '../../types'
+import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, MEMBER_DISCOUNT_PERCENT, paymentTypeSuffix } from '../../types'
+import { formatCurrency } from '../../lib/utils'
 
 interface SettingsState {
   values: Record<string, unknown>
@@ -145,19 +146,19 @@ export function SettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Configuração do Plano</CardTitle>
-          <CardDescription>Preço mensal do clube e o desconto que o membro tem na loja</CardDescription>
+          <CardDescription>Preço do clube e o desconto que o membro tem na loja</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6 max-w-xl">
             <div>
-              <Label className="text-xs">Preço Mensal (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={num('pricing.club_annual')}
-                onChange={(e) => setValue('pricing.club_annual', parseFloat(e.target.value) || 0)}
-                className="mt-1"
-              />
+              <Label className="text-xs">Preço do plano</Label>
+              {/* Written into the contract and the Terms; changing it is a deploy. */}
+              <p className="mt-1 flex h-10 items-center text-sm font-semibold">
+                {formatCurrency(CLUB_PLAN.price)}{paymentTypeSuffix(CURRENT_PAYMENT_TYPE)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Fixo — está no contrato e nos Termos de Uso. Para mudar, fale com o desenvolvedor.
+              </p>
             </div>
             <div>
               <Label className="text-xs">Desconto do membro na loja</Label>

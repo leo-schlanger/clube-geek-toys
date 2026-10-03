@@ -589,7 +589,7 @@ describe('AdminDashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('Alice Pending')).toBeInTheDocument()
       expect(screen.getByText(/Clube GeekPop & Toys/)).toBeInTheDocument()
-      expect(screen.getByText(/R\$ 12\.50/)).toBeInTheDocument()
+      expect(screen.getByText(/R\$ 159\.90/)).toBeInTheDocument()
     })
   })
 

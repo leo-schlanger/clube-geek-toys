@@ -95,20 +95,20 @@ describe('RenewModal', () => {
     expect(screen.getByText(/10% de desconto em qualquer produto/)).toBeInTheDocument()
   })
 
-  it('shows monthly price (R$ 12,50)', () => {
+  it('shows annual price (R$ 159,90)', () => {
     renderModal()
-    expect(screen.getAllByText(/12,50/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/159,90/).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('shows total to pay with the monthly price', () => {
+  it('shows total to pay with the annual price', () => {
     renderModal()
     const totalSection = screen.getByText('Total a pagar:').closest('div')!
-    expect(totalSection).toHaveTextContent('12,50')
+    expect(totalSection).toHaveTextContent('159,90')
   })
 
-  it('shows renewal period info (1 month)', () => {
+  it('shows renewal period info (1 year)', () => {
     renderModal()
-    expect(screen.getByText('Sua assinatura será renovada por 1 mês')).toBeInTheDocument()
+    expect(screen.getByText('Sua assinatura será renovada por 1 ano')).toBeInTheDocument()
   })
 
   // ── Buttons ──

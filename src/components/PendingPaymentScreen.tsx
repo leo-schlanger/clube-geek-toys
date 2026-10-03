@@ -11,7 +11,7 @@ import { updateMember, clearPendingPayment } from '../lib/members'
 import { checkPixPaymentStatus, isPaymentConfigured } from '../lib/payments'
 import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
-import { PLANS, CURRENT_PAYMENT_TYPE, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
+import { PLANS, CURRENT_PAYMENT_TYPE, addClubPeriod, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -109,8 +109,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   async function handlePaymentSuccess() {
     // Calculate new expiry date
     const now = new Date()
-    const newExpiry = new Date(now)
-    newExpiry.setMonth(newExpiry.getMonth() + 1)
+    const newExpiry = addClubPeriod(now)
 
     // Update member status to active. `updateMember` throws on refusal — the
     // money is already in, so a failure here has to be visible, not swallowed.
@@ -220,14 +219,14 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                   <div>
                     <p className="font-bold text-lg">Plano {plan.name}</p>
                     <p className="text-sm opacity-80">
-                      {paymentTypeLabel(member.paymentType)}
+                      {paymentTypeLabel(CURRENT_PAYMENT_TYPE)}
                     </p>
                   </div>
                 </div>
                 <div className="text-2xl font-bold">
                   {formatCurrency(price)}
                   <span className="text-sm font-normal opacity-80">
-                    {paymentTypeSuffix(member.paymentType)}
+                    {paymentTypeSuffix(CURRENT_PAYMENT_TYPE)}
                   </span>
                 </div>
               </div>

@@ -176,19 +176,19 @@ describe('Register', () => {
     expect(link.closest('a')).toHaveAttribute('href', '/assinar')
   })
 
-  it('renders plan summary badge with the single club plan (monthly)', () => {
+  it('renders plan summary badge with the single club plan (annual)', () => {
     render(<Register />)
     expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
-    expect(screen.getByText('Mensal')).toBeInTheDocument()
+    expect(screen.getByText('Anual')).toBeInTheDocument()
   })
 
   it('always shows the club plan regardless of legacy plano/tipo params', () => {
     mockSearchParamsMap.set('plano', 'gold')
-    mockSearchParamsMap.set('tipo', 'annual')
+    mockSearchParamsMap.set('tipo', 'monthly')
     render(<Register />)
     expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
-    expect(screen.getByText('Mensal')).toBeInTheDocument()
-    expect(screen.queryByText('Anual')).not.toBeInTheDocument()
+    expect(screen.getByText('Anual')).toBeInTheDocument()
+    expect(screen.queryByText('Mensal')).not.toBeInTheDocument()
   })
 
   it('renders the stepper', () => {
@@ -716,11 +716,11 @@ describe('Register', () => {
   // ─── Legacy plan/type params ───────────────────────────────
 
   describe('legacy URL params', () => {
-    it('shows the monthly club plan even when tipo param is missing', () => {
+    it('shows the annual club plan even when tipo param is missing', () => {
       mockSearchParamsMap.delete('tipo')
       render(<Register />)
-      expect(screen.getByText('Mensal')).toBeInTheDocument()
-      expect(screen.queryByText('Anual')).not.toBeInTheDocument()
+      expect(screen.getByText('Anual')).toBeInTheDocument()
+      expect(screen.queryByText('Mensal')).not.toBeInTheDocument()
     })
   })
 

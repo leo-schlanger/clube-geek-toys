@@ -72,7 +72,7 @@ function makeSub(overrides: Partial<Subscription> = {}): Subscription {
     status: 'authorized',
     plan: 'club',
     frequencyType: 'years',
-    transactionAmount: 12.50,
+    transactionAmount: 159.90,
     failedPayments: 0,
     payerEmail: 'user@email.com',
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -89,8 +89,8 @@ beforeEach(() => {
 // =============================================================================
 
 describe('calculateSubscriptionPrice', () => {
-  it('returns the monthly club price (12.50)', () => {
-    expect(calculateSubscriptionPrice('club', 'months')).toBe(12.50)
+  it('returns the annual club price (159.90)', () => {
+    expect(calculateSubscriptionPrice('club', 'years')).toBe(159.90)
   })
 })
 
@@ -127,7 +127,7 @@ describe('createSubscription', () => {
       frequency_type: 'months',
       payer_email: 'user@email.com',
       payer_name: 'Joao',
-      transaction_amount: 12.50,
+      transaction_amount: 159.90,
     })
   })
 

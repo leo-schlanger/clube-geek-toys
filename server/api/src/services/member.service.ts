@@ -6,7 +6,7 @@ import { env, adminUrl } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { auditLog, diffObjects } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
-import type { Member } from '../types/index.js';
+import { addClubPeriod, type Member } from '../types/index.js';
 import { moduleLogger } from '../config/logger.js';
 
 const log = moduleLogger('member');
@@ -325,7 +325,7 @@ export async function updateMember(
   }
   const before = beforeRow.rows[0];
 
-  // Admin sets status=active without expiry → fill a monthly window so PDV/shop discount work.
+  // Admin sets status=active without expiry → fill one paid period so PDV/shop discount work.
   if (
     userRole !== 'member' &&
     data.status === 'active' &&
@@ -333,8 +333,7 @@ export async function updateMember(
     !before.expiry_date
   ) {
     const start = new Date();
-    const expiry = new Date(start);
-    expiry.setMonth(expiry.getMonth() + 1);
+    const expiry = addClubPeriod(start);
     if (data.startDate == null && !before.start_date) {
       setClauses.push(`start_date = $${paramIndex++}`);
       values.push(start.toISOString().slice(0, 10));

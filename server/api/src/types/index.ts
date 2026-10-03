@@ -108,16 +108,23 @@ export interface AuditLog {
   timestamp: string;
 }
 
-// Club monthly plan price (BRL). Must match frontend CLUB_PLAN.price.
-export const CLUB_PLAN_PRICE = 12.50;
+// Club annual plan price (BRL). Must match frontend CLUB_PLAN.price.
+export const CLUB_PLAN_PRICE = 159.90;
 
 // Billing frequency of every new charge, in the three vocabularies that need
-// it: `members.payment_type`, `subscriptions.frequency_type` and the Stripe
-// price interval. `annual` survives only on member rows that still have time
-// left on a year already paid for.
-export const CLUB_PLAN_PAYMENT_TYPE: PaymentType = 'monthly';
-export const CLUB_PLAN_FREQUENCY_TYPE: SubscriptionFrequencyType = 'months';
-export const CLUB_PLAN_INTERVAL: 'month' | 'year' = 'month';
+// it: `members.payment_type`, `subscriptions.frequency_type` and the provider
+// interval. `monthly` survives only on member rows that still have time left
+// on a month already paid for.
+export const CLUB_PLAN_PAYMENT_TYPE: PaymentType = 'annual';
+export const CLUB_PLAN_FREQUENCY_TYPE: SubscriptionFrequencyType = 'years';
+export const CLUB_PLAN_INTERVAL: 'month' | 'year' = 'year';
+
+/** End of one paid period starting at `from`. */
+export function addClubPeriod(from: Date): Date {
+  const end = new Date(from);
+  end.setFullYear(end.getFullYear() + 1);
+  return end;
+}
 
 // Active-member shop discount, applied server-side at checkout.
 export const MEMBER_SHOP_DISCOUNT = 0.10;

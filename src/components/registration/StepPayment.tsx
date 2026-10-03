@@ -32,7 +32,7 @@ import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { PagarmeCardForm } from '../PagarmeCardForm'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../../lib/payments'
-import { CLUB_PLAN, type PlanType, type PaymentType } from '../../types'
+import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, paymentTypeLabel, paymentTypeSuffix, type PlanType, type PaymentType } from '../../types'
 import { formatCurrency } from '../../lib/utils'
 import { savePendingPayment, clearPendingPayment } from '../../lib/members'
 import { api } from '../../lib/api-client'
@@ -315,10 +315,10 @@ export function StepPayment({
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <p className="font-semibold text-lg">{planData.name}</p>
-                <Badge variant="club">Mensal</Badge>
+                <Badge variant="club">{paymentTypeLabel(CURRENT_PAYMENT_TYPE)}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Assinatura mensal
+                Um ano de clube, pagamento único
               </p>
             </div>
             <p className="text-2xl font-bold">{formatCurrency(amount)}</p>
@@ -507,13 +507,12 @@ export function StepPayment({
             amount={amount}
             onToken={handleCardToken}
             onCancel={resetMethod}
-            // R$ 12,50 a month: there is nothing to split, and the provider
-            // refuses an instalment below its floor anyway.
+            // The club plan is sold in full only.
             allowInstallments={false}
             defaultHolderName={memberName}
             submitLabel={
               mode === 'subscription'
-                ? `Assinar por ${formatCurrency(amount)}/mês`
+                ? `Assinar por ${formatCurrency(amount)}${paymentTypeSuffix(CURRENT_PAYMENT_TYPE)}`
                 : undefined
             }
           />

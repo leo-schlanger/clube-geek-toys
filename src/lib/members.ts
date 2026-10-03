@@ -1,5 +1,5 @@
 import { api } from './api-client'
-import { CLUB_PLAN } from '../types'
+import { CLUB_PLAN, addClubPeriod } from '../types'
 import type { Member, MemberFormData, PendingPaymentInfo } from '../types'
 
 export interface PaginatedResult<T> {
@@ -147,13 +147,12 @@ export async function updateMember(
 }
 
 /**
- * Manual activation by an admin. The API fills the same monthly window when
+ * Manual activation by an admin. The API fills the same one-period window when
  * these fields are absent.
  */
 export async function activateMember(id: string): Promise<boolean> {
   const start = new Date()
-  const expiry = new Date(start)
-  expiry.setMonth(expiry.getMonth() + 1)
+  const expiry = addClubPeriod(start)
   return updateMember(id, {
     status: 'active',
     startDate: start.toISOString().slice(0, 10),

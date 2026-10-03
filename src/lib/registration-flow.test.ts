@@ -291,8 +291,8 @@ describe('Plans Configuration — Registration Flow', () => {
     }
   })
 
-  it('should have the expected monthly price (R$ 12,50)', () => {
-    expect(PLANS.club.price).toBe(12.50)
+  it('should have the expected annual price (R$ 159,90)', () => {
+    expect(PLANS.club.price).toBe(159.90)
   })
 
   it('should have a positive discount', () => {
@@ -302,7 +302,7 @@ describe('Plans Configuration — Registration Flow', () => {
 
   it('should format prices correctly', () => {
     expect(formatCurrency(PLANS.club.price)).toMatch(/R\$/)
-    expect(formatCurrency(PLANS.club.price)).toContain('12,50')
+    expect(formatCurrency(PLANS.club.price)).toContain('159,90')
   })
 
   it('should have valid plan IDs matching keys', () => {

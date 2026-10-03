@@ -7,7 +7,7 @@ import * as memberService from '../services/member.service.js';
 import * as paymentService from '../services/payment.service.js';
 import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
-import { MEMBER_SHOP_DISCOUNT } from '../types/index.js';
+import { CLUB_PLAN_PAYMENT_TYPE, MEMBER_SHOP_DISCOUNT } from '../types/index.js';
 
 export const memberRouter = Router();
 
@@ -71,7 +71,7 @@ const createMemberSchema = z.object({
   email: z.string().email(),
   phone: z.string().optional(),
   plan: z.enum(['club']).default('club'),
-  paymentType: z.enum(['monthly', 'annual']).default('monthly'),
+  paymentType: z.enum(['monthly', 'annual']).default(CLUB_PLAN_PAYMENT_TYPE),
 });
 
 const updateMemberSchema = z.object({

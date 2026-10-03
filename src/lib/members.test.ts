@@ -403,7 +403,7 @@ describe('Members API client', () => {
   // ---- activateMember ----
 
   describe('activateMember', () => {
-    it('should call updateMember with status active and a one-month window', async () => {
+    it('should call updateMember with status active and a one-year window', async () => {
       mockedApi.patch.mockResolvedValue({ data: {}, status: 200 })
 
       const result = await activateMember('member-1')
@@ -424,9 +424,8 @@ describe('Members API client', () => {
       }
       const start = new Date(body.startDate)
       const expiry = new Date(body.expiryDate)
-      const months =
-        (expiry.getFullYear() - start.getFullYear()) * 12 + (expiry.getMonth() - start.getMonth())
-      expect(months).toBe(1)
+      expect(expiry.getFullYear() - start.getFullYear()).toBe(1)
+      expect(body.expiryDate.slice(5)).toBe(body.startDate.slice(5))
       expect(result).toBe(true)
     })
 

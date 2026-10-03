@@ -4,10 +4,9 @@ import { auditLog } from '../utils/audit.js';
 /**
  * Settings persisted in the `config` table (key/JSONB pairs).
  *
- * Pattern: each setting key is a dotted path like `pricing.club_annual` and the value is
+ * Pattern: each setting key is a dotted path like `shop.online_discount_percent` and the value is
  * stored as JSONB. Defaults are returned when a key is missing, so the system keeps working
  * even before any explicit configuration has been saved.
- * `pricing.club_annual` is the stored key for the club price (now monthly).
  */
 
 export interface SettingDefinition {
@@ -22,8 +21,9 @@ export interface SettingDefinition {
  * the admin Settings tab without further code changes.
  */
 export const SETTINGS_CATALOGUE: SettingDefinition[] = [
-  // Must match CLUB_PLAN.price on the frontend.
-  { key: 'pricing.club_annual', default: 12.50, type: 'number', description: 'Plano do Clube — mensal (R$)' },
+  // NOTE: `pricing.club_annual` (the plan price) lived here and nothing charged
+  // from it — the checkout always used `CLUB_PLAN_PRICE`. Same trap as below,
+  // removed for the same reason.
 
   // NOTE: `plan.club.discount_products` used to live here, defaulting to 15,
   // described as the member's product discount — and nothing ever read it. The

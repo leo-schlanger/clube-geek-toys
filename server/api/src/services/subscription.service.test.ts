@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Club subscription — the recurring R$ 12,50/month, now on Pagar.me.
+ * Club subscription — the recurring R$ 159,90/year, on Pagar.me.
  *
  * What these protect, ordered by what a regression costs:
  *
  *  1. The client never chooses the amount **or the interval**. Locking only the
- *     amount would let a request ask for `year` and buy twelve months for the
- *     price of one.
+ *     amount would let a request pick a different interval than the one the
+ *     price was set for.
  *  2. The provider is called before the local rows change, and the two rows —
  *     `subscriptions` and `members` — move together or not at all.
  *  3. Pause, resume and cancel keep the member's mirrored status in step; a
@@ -132,7 +132,7 @@ const subRow = {
   provider: 'pagarme',
   status: 'authorized',
   plan: 'basic',
-  transaction_amount: '12.50',
+  transaction_amount: '159.90',
 };
 
 /** One from before it. `provider` is NULL on every such row, hence the default. */
@@ -143,7 +143,7 @@ const legacyStripeSubRow = {
   provider: null,
   status: 'authorized',
   plan: 'basic',
-  transaction_amount: '12.50',
+  transaction_amount: '159.90',
 };
 
 const memberRow = {
@@ -222,15 +222,15 @@ describe('createSubscription', () => {
 
   /**
    * The client sends `transaction_amount` and `frequency_type`; both are
-   * ignored. Locking only the amount would let a request ask for `year` and buy
-   * twelve months for R$ 12,50.
+   * ignored. Locking only the amount would let a request pick an interval the
+   * price was not set for.
    */
   it('ignora valor e periodicidade vindos do cliente', async () => {
     happyPath();
 
     await createSubscription({
       ...CREATE_INPUT,
-      frequency_type: 'years',
+      frequency_type: 'months',
       transaction_amount: 1,
     } as never);
 
@@ -240,11 +240,11 @@ describe('createSubscription', () => {
     expect(args.card_id).toBe('card_1');
     expect(args).not.toHaveProperty('card_token');
     const item = (args.items as Record<string, unknown>[])[0];
-    expect((item.pricing_scheme as Record<string, unknown>).price).toBe(1250);
-    expect(args.interval).toBe('month');
+    expect((item.pricing_scheme as Record<string, unknown>).price).toBe(15990);
+    expect(args.interval).toBe('year');
     expect(args.interval_count).toBe(1);
     // And the row stores the server figure, not the client's.
-    expect(clientParamsOf('INSERT INTO subscriptions')?.[6]).toBe(12.5);
+    expect(clientParamsOf('INSERT INTO subscriptions')?.[6]).toBe(159.9);
   });
 
   it('recusa quando o membro não existe', async () => {

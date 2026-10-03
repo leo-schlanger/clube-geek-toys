@@ -9,7 +9,7 @@ import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { AppError } from '../middleware/error-handler.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { isValidCnpj } from '../utils/cnpj.js';
-import { CLUB_PLAN_PRICE } from '../types/index.js';
+import { CLUB_PLAN_PRICE, CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
 import crypto from 'crypto';
 import { moduleLogger } from '../config/logger.js';
@@ -432,20 +432,20 @@ export async function confirmPixPayment(opts: {
       const isRenewal = member.status === 'active' && currentExpiry && currentExpiry > now;
       const baseDate = isRenewal ? currentExpiry : now;
 
-      // New charges are monthly even if the member originally paid a year.
-      const expiryDate = new Date(baseDate);
-      expiryDate.setMonth(expiryDate.getMonth() + 1);
+      // New charges buy the current plan period, whatever the member paid before.
+      const expiryDate = addClubPeriod(baseDate);
 
       await query(
         `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
          activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
-         auto_renewal = FALSE, payment_count = payment_count + 1, payment_type = 'monthly'
+         auto_renewal = FALSE, payment_count = payment_count + 1, payment_type = $5
          WHERE id = $4`,
         [
           now.toISOString().split('T')[0],
           expiryDate.toISOString().split('T')[0],
           opts.paymentId,
           payment.memberId,
+          CLUB_PLAN_PAYMENT_TYPE,
         ]
       );
 
@@ -522,6 +522,7 @@ export async function createCardPayment(data: {
   payerName: string;
   memberId: string;
   cardToken: string;
+  /** Ignored: the club plan is charged in full. */
   installments?: number;
 }): Promise<{
   paymentId: string;
@@ -539,12 +540,9 @@ export async function createCardPayment(data: {
 
   const payer = await loadClubPayer(data.memberId);
   const amountInCents = pagarme.toCents(data.amount);
-  // The plan is a small monthly amount; splitting it makes no sense and the
-  // provider would reject an instalment below its floor anyway.
-  const installments = Math.max(
-    1,
-    Math.min(data.installments ?? 1, pagarme.maxInstallmentsFor(data.amount)),
-  );
+  // The club plan is sold in full only (business decision); the form hides the
+  // selector, and a crafted request asking for more is held to one.
+  const installments = 1;
 
   // PSP bills a saved card, not a raw token: the token becomes a `card_id` on
   // the member's Pagar.me customer first. See `createCardForCustomer`.

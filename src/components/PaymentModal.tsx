@@ -21,7 +21,7 @@ import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { PagarmeCardForm } from './PagarmeCardForm'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../lib/payments'
-import { CLUB_PLAN, paymentTypeLabel, paymentTypeSuffix, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
+import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, paymentTypeLabel, paymentTypeSuffix, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { savePendingPayment, clearPendingPayment } from '../lib/members'
 import { api } from '../lib/api-client'
@@ -58,7 +58,7 @@ interface PaymentModalProps {
 
 export function PaymentModal({
   plan,
-  paymentType = 'monthly',
+  paymentType = CURRENT_PAYMENT_TYPE,
   memberEmail = 'cliente@email.com',
   memberId = 'temp_member',
   memberName = 'Membro',
@@ -459,8 +459,7 @@ export function PaymentModal({
               amount={amount}
               onToken={handleCardToken}
               onCancel={() => { setMethod(null); setError(null) }}
-              // The plan is R$ 12,50 a month: splitting it would be absurd, and
-              // the provider refuses an instalment below its floor anyway.
+              // The club plan is sold in full only.
               allowInstallments={false}
               defaultHolderName={memberName}
               submitLabel={mode === 'subscription'

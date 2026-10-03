@@ -51,7 +51,6 @@ vi.mock('lucide-react', () => {
 
 const fakeSettings = {
   values: {
-    'pricing.club_annual': 12.5,
     'payment.duplicate_window_days': 3,
     'shop.online_discount_enabled': true,
     'shop.online_discount_percent': 5,
@@ -62,7 +61,6 @@ const fakeSettings = {
     'notifications.admin_payment_min_amount': 50,
   },
   catalogue: [
-    { key: 'pricing.club_annual', default: 12.5, type: 'number' as const, description: 'Club monthly price' },
   ],
 }
 
@@ -163,8 +161,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    // Edit the annual price input
-    const priceInput = screen.getByDisplayValue('12.5')
+    const priceInput = screen.getByDisplayValue('3')
 
     await user.clear(priceInput)
     await user.type(priceInput, '199.99')
@@ -178,7 +175,7 @@ describe('SettingsTab', () => {
   it('saves changes successfully', async () => {
     const user = userEvent.setup()
     mockGetSettings.mockResolvedValue(fakeSettings)
-    const updatedValues = { ...fakeSettings.values, 'pricing.club_annual': 199.99 }
+    const updatedValues = { ...fakeSettings.values, 'payment.duplicate_window_days': 199 }
     mockUpdateSettings.mockResolvedValue({ values: updatedValues })
     render(<SettingsTab />)
 
@@ -186,7 +183,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    const priceInput = screen.getByDisplayValue('12.5')
+    const priceInput = screen.getByDisplayValue('3')
     await user.clear(priceInput)
     await user.type(priceInput, '199.99')
 
@@ -231,7 +228,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    const priceInput = screen.getByDisplayValue('12.5')
+    const priceInput = screen.getByDisplayValue('3')
     await user.clear(priceInput)
     await user.type(priceInput, '99')
 
@@ -253,7 +250,7 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    const priceInput = screen.getByDisplayValue('12.5')
+    const priceInput = screen.getByDisplayValue('3')
     await user.clear(priceInput)
     await user.type(priceInput, '99')
 
@@ -267,7 +264,7 @@ describe('SettingsTab', () => {
 
   // ── Input types / fields ──
 
-  it('renders the monthly price input and the fixed member discount', async () => {
+  it('shows the plan price and the member discount as fixed, not editable', async () => {
     mockGetSettings.mockResolvedValue(fakeSettings)
     render(<SettingsTab />)
 
@@ -275,8 +272,10 @@ describe('SettingsTab', () => {
       expect(screen.getByText('Configuração do Plano')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Preço Mensal (R$)')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('12.5')).toBeInTheDocument()
+    // Neither is a setting: the contract and the Terms fix both.
+    expect(screen.getByText('Preço do plano')).toBeInTheDocument()
+    expect(screen.getByText(/R\$\s*159,90\/ano/)).toBeInTheDocument()
+    expect(screen.queryByDisplayValue('159.9')).not.toBeInTheDocument()
     // The discount is not a setting: nothing reads one, and the Terms fix 10%.
     expect(screen.getByText('Desconto do membro na loja')).toBeInTheDocument()
     expect(screen.getByText('10%')).toBeInTheDocument()

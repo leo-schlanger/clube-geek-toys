@@ -88,7 +88,7 @@ describe('writing', () => {
       updateSettings({ 'shop.online_discount_percent': 10, 'wholesale.sales_open': 'yes' }, 'admin-1')
     ).rejects.toThrow('expected boolean');
     await expect(updateSettings({ 'no.such.key': 1 }, 'admin-1')).rejects.toThrow('Unknown setting key');
-    await expect(updateSettings({ 'pricing.club_annual': Number.NaN }, 'admin-1')).rejects.toThrow('expected number');
+    await expect(updateSettings({ 'notifications.admin_payment_min_amount': Number.NaN }, 'admin-1')).rejects.toThrow('expected number');
     expect(queryMock).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO config'), expect.anything());
     expect(auditMock).not.toHaveBeenCalled();
   });

@@ -102,7 +102,7 @@ vi.mock('lucide-react', () => {
 
 const defaultProps = {
   plan: 'club' as const,
-  paymentType: 'monthly' as const,
+  paymentType: 'annual' as const,
   memberEmail: 'test@example.com',
   memberId: 'member-123',
   memberName: 'Test User',
@@ -132,12 +132,12 @@ describe('PaymentModal', () => {
     renderModal()
     expect(screen.getByText('Pagamento')).toBeInTheDocument()
     expect(screen.getAllByText(/Clube GeekPop & Toys/).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText(/12,50/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/159,90/).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders the monthly price (R$ 12,50)', () => {
+  it('renders the annual price (R$ 159,90)', () => {
     renderModal()
-    expect(screen.getAllByText(/12,50/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/159,90/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders close button that calls onClose', async () => {
@@ -206,7 +206,7 @@ describe('PaymentModal', () => {
       expect(screen.getByTestId('qr-code')).toBeInTheDocument()
     })
     expect(mockGeneratePixPayment).toHaveBeenCalledWith(
-      12.5,
+      159.9,
       'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
       'test@example.com',
       'member-123'
@@ -346,7 +346,7 @@ describe('PaymentModal', () => {
     expect(mockApiPost).toHaveBeenCalledWith(
       '/checkout/card/create',
       expect.objectContaining({
-        amount: 12.5,
+        amount: 159.9,
         payer_email: 'test@example.com',
         card_token: 'token_abc',
         installments: 1,
@@ -499,8 +499,8 @@ describe('PaymentModal', () => {
     expect(screen.getByText(/Recorrente/)).toBeInTheDocument()
   })
 
-  it('always shows the monthly frequency label', () => {
+  it('always shows the annual frequency label', () => {
     renderModal()
-    expect(screen.getByText(/Mensal/)).toBeInTheDocument()
+    expect(screen.getByText(/Anual/)).toBeInTheDocument()
   })
 })

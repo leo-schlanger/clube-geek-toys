@@ -23,6 +23,7 @@ import { decrementStockForOrder, restoreStockForOrder, releaseReservation } from
 import { restoreCreditForOrder } from './store-credit.service.js';
 import { notifyAdminsOfPayment, type AdminPaymentNotice } from './admin-notification.service.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
+import { CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
 
 const log = moduleLogger('pagarme-webhook');
 
@@ -1101,19 +1102,19 @@ async function activateMember(
   // already paid for; a new or lapsed activation starts from today.
   const currentExpiry = member.expiry_date ? new Date(member.expiry_date as string) : null;
   const isRenewal = beforeStatus === 'active' && currentExpiry && currentExpiry > now;
-  const expiryDate = new Date(isRenewal ? currentExpiry : now);
-  expiryDate.setMonth(expiryDate.getMonth() + 1);
+  const expiryDate = addClubPeriod(isRenewal ? currentExpiry : now);
 
   await client.query(
     `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
             activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3,
-            pending_payment = NULL, payment_count = payment_count + 1, payment_type = 'monthly'
+            pending_payment = NULL, payment_count = payment_count + 1, payment_type = $5
       WHERE id = $4`,
     [
       now.toISOString().split('T')[0],
       expiryDate.toISOString().split('T')[0],
       paymentRef,
       member.id,
+      CLUB_PLAN_PAYMENT_TYPE,
     ]
   );
 

@@ -53,7 +53,7 @@ interface PagarmeCardFormProps {
    */
   onSwitchToPix?: () => void | Promise<void>
   submitLabel?: string
-  /** Hide the instalment picker where splitting makes no sense (the R$12,50 plan). */
+  /** Hide the instalment picker where splitting makes no sense (the club plan is sold in full). */
   allowInstallments?: boolean
   /** Pre-fills the holder document from the checkout, which already asked for it. */
   defaultDocument?: string

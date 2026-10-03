@@ -524,7 +524,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <p>Sua assinatura recorrente foi ativada com sucesso:</p>
         ${dataTable([
           ['Plano', `<strong>${planLabel(v.plan)}</strong>`],
-          ['Valor mensal', `R$ ${v.amount || '0,00'}`],
+          ['Valor anual', `R$ ${v.amount || '0,00'}`],
           ['Cartão', `•••• ${v.card_last_four || '****'}`],
         ])}
         ${infoBox('💳 A cobrança será feita automaticamente no cartão cadastrado.<br>📅 Você pode pausar ou cancelar a qualquer momento.')}`,

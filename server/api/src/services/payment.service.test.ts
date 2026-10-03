@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Club payments — PIX and card for the R$ 12,50 monthly plan.
+ * Club payments — PIX and card for the R$ 159,90 annual plan.
  *
  * What these protect, ordered by what a regression costs:
  *
@@ -112,7 +112,7 @@ import {
   getPaymentStatus,
 } from './payment.service.js';
 
-const PLAN_PRICE = 12.5;
+const PLAN_PRICE = 159.9;
 
 type Reply = { rows?: Record<string, unknown>[]; rowCount?: number };
 let routes: [string, Reply][] = [];
@@ -150,7 +150,7 @@ beforeEach(() => {
       {
         id: 'ch_1',
         status: 'pending',
-        amount: 1250,
+        amount: 15990,
         payment_method: 'pix',
         last_transaction: {
           qr_code: '00020101br.gov.bcb.pix-GEEKPOP',
@@ -182,7 +182,7 @@ const approvedCardOrder = {
     {
       id: 'ch_card',
       status: 'paid',
-      amount: 1250,
+      amount: 15990,
       payment_method: 'credit_card',
       last_transaction: { card: { brand: 'visa', last_four_digits: '4242' } },
     },
@@ -229,7 +229,7 @@ describe('valor cobrado', () => {
 
   /**
    * The guard is `Math.abs(CLUB_PLAN_PRICE - amount) < 0.01`, and in IEEE-754
-   * `12.51 - 12.50` is 0.00999…, so one cent over slips through. Pinned here so
+   * `159.91 - 159.90` is 0.00999…, so one cent over slips through. Pinned here so
    * the tolerance is a decision on the record rather than an accident — a cent
    * is not worth chasing, but widening it would be.
    */
@@ -238,7 +238,7 @@ describe('valor cobrado', () => {
 
     await expect(
       createPixPayment({
-        amount: 12.51,
+        amount: 159.91,
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
@@ -247,7 +247,7 @@ describe('valor cobrado', () => {
 
     await expect(
       createPixPayment({
-        amount: 12.52,
+        amount: 159.92,
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
@@ -269,7 +269,7 @@ describe('valor cobrado', () => {
     // The provider is asked for centavos; the row keeps reais. Getting this
     // wrong by a factor of 100 is the classic way to charge R$ 1.250,00.
     expect(createOrderMock).toHaveBeenCalledWith(
-      expect.objectContaining({ items: [expect.objectContaining({ amount: 1250 })] }),
+      expect.objectContaining({ items: [expect.objectContaining({ amount: 15990 })] }),
       expect.anything(),
     );
     expect(paramsOf('INSERT INTO payments')?.[2]).toBe(PLAN_PRICE);
@@ -370,7 +370,7 @@ describe('createPixPayment', () => {
     createOrderMock.mockResolvedValueOnce({
       id: 'or_2',
       status: 'pending',
-      charges: [{ id: 'ch_2', status: 'pending', amount: 1250, last_transaction: {} }],
+      charges: [{ id: 'ch_2', status: 'pending', amount: 15990, last_transaction: {} }],
     });
 
     await expect(
@@ -411,7 +411,7 @@ describe('confirmPixPayment', () => {
   const pendingPix = {
     id: 'pay-1',
     member_id: 'member-1',
-    amount: '12.50',
+    amount: '159.90',
     method: 'pix',
     status: 'pending',
     provider_id: 'CGT1',
@@ -460,6 +460,23 @@ describe('confirmPixPayment', () => {
     );
   });
 
+  it('um pagamento compra um ano, mesmo de quem vinha do mensal', async () => {
+    route('FROM payments p', { rows: [pendingPix] });
+    route("UPDATE payments SET status = 'paid'", { rows: [{ id: 'pay-1' }] });
+    route('SELECT id, payment_type, status, expiry_date FROM members', {
+      rows: [{ id: 'member-1', payment_type: 'monthly', status: 'pending', expiry_date: null }],
+    });
+    route('SELECT full_name, email, plan FROM members', { rows: [memberRow] });
+
+    await confirmPixPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' });
+
+    const [start, expiry, , , paymentType] = paramsOf('UPDATE members', "status = 'active'") ?? [];
+    const years = new Date(expiry as string).getUTCFullYear() - new Date(start as string).getUTCFullYear();
+    expect(years).toBe(1);
+    expect((expiry as string).slice(5)).toBe((start as string).slice(5));
+    expect(paymentType).toBe('annual');
+  });
+
   it('é idempotente para uma linha já paga', async () => {
     route('FROM payments p', { rows: [{ ...pendingPix, status: 'paid' }] });
 
@@ -489,7 +506,7 @@ describe('confirmPixPayment', () => {
     route('FROM payments p', {
       rows: [{ ...pendingPix, provider: 'pagarme', pagarme_charge_id: 'ch_open' }],
     });
-    getChargeMock.mockResolvedValue({ id: 'ch_open', status: 'pending', amount: 1250 });
+    getChargeMock.mockResolvedValue({ id: 'ch_open', status: 'pending', amount: 15990 });
 
     await expect(
       confirmPixPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' })
@@ -517,7 +534,7 @@ describe('confirmPixPayment', () => {
       rows: [{ id: 'member-1', payment_type: 'monthly', status: 'pending', expiry_date: null }],
     });
     route('SELECT full_name, email, plan FROM members', { rows: [memberRow] });
-    getChargeMock.mockResolvedValue({ id: 'ch_paid', status: 'paid', amount: 1250 });
+    getChargeMock.mockResolvedValue({ id: 'ch_paid', status: 'paid', amount: 15990 });
 
     await confirmPixPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' });
 
@@ -562,7 +579,7 @@ describe('refundPayment', () => {
   const paidRow = {
     id: 'pay-1',
     member_id: 'member-1',
-    amount: '12.50',
+    amount: '159.90',
     method: 'credit_card',
     status: 'paid',
     provider_id: 'pi_abc',
@@ -688,7 +705,7 @@ describe('createCardPayment', () => {
     const [payload] = createOrderMock.mock.calls[0] as [Record<string, never>];
     expect(payload).toMatchObject({
       customer_id: 'cus_1',
-      items: [expect.objectContaining({ amount: 1250 })],
+      items: [expect.objectContaining({ amount: 15990 })],
       payments: [
         expect.objectContaining({
           payment_method: 'credit_card',
@@ -731,7 +748,7 @@ describe('createCardPayment', () => {
         {
           id: 'ch_x',
           status: 'not_authorized',
-          amount: 1250,
+          amount: 15990,
           payment_method: 'credit_card',
           last_transaction: { acquirer_return_code: '51' },
         },
@@ -852,9 +869,9 @@ describe('findRecentPayment', () => {
 describe('getPaymentStatus — liquida na consulta', () => {
   it('liquida a cobrança paga da linha pendente', async () => {
     route('FROM payments WHERE id', {
-      rows: [{ id: 'p1', amount: '12.50', status: 'pending', method: 'pix', pagarme_charge_id: 'ch_9' }],
+      rows: [{ id: 'p1', amount: '159.90', status: 'pending', method: 'pix', pagarme_charge_id: 'ch_9' }],
     });
-    const charge = { id: 'ch_9', status: 'paid', amount: 1250, payment_method: 'pix' };
+    const charge = { id: 'ch_9', status: 'paid', amount: 15990, payment_method: 'pix' };
     getChargeMock.mockResolvedValue(charge);
 
     const out = await getPaymentStatus('p1');
@@ -869,15 +886,15 @@ describe('getPaymentStatus — liquida na consulta', () => {
 
   it('não liquida o que ainda está pendente', async () => {
     route('FROM payments WHERE id', {
-      rows: [{ id: 'p1', amount: '12.50', status: 'pending', method: 'pix', pagarme_charge_id: 'ch_9' }],
+      rows: [{ id: 'p1', amount: '159.90', status: 'pending', method: 'pix', pagarme_charge_id: 'ch_9' }],
     });
-    getChargeMock.mockResolvedValue({ id: 'ch_9', status: 'pending', amount: 1250 });
+    getChargeMock.mockResolvedValue({ id: 'ch_9', status: 'pending', amount: 15990 });
     await getPaymentStatus('p1');
     expect(processEventMock).not.toHaveBeenCalled();
   });
 
   it('uma falha ao liquidar não derruba a consulta', async () => {
-    getChargeMock.mockResolvedValue({ id: 'ch_9', status: 'paid', amount: 1250, payment_method: 'pix' });
+    getChargeMock.mockResolvedValue({ id: 'ch_9', status: 'paid', amount: 15990, payment_method: 'pix' });
     processEventMock.mockRejectedValueOnce(new Error('db down'));
     expect((await getPaymentStatus('ch_9')).mapped_status).toBe('paid');
   });

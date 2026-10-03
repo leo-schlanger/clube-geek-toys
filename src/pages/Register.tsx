@@ -7,7 +7,7 @@ import { validateEmail } from '../lib/email-validation'
 import { createMember, isCPFRegistered } from '../lib/members'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
-import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, type PlanType, type PaymentType, type ContractData } from '../types'
+import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, paymentTypeLabel, type PlanType, type PaymentType, type ContractData } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
@@ -50,7 +50,7 @@ export default function Register() {
     memberId: '',
   })
 
-  // Single monthly plan. Legacy query params are ignored.
+  // Single plan. Legacy query params are ignored.
   const selectedPlan: PlanType = 'club'
   const paymentType: PaymentType = CURRENT_PAYMENT_TYPE
 
@@ -406,7 +406,7 @@ export default function Register() {
                 {plan.name}
               </Badge>
               <span className="text-sm text-muted-foreground">
-                Mensal
+                {paymentTypeLabel(paymentType)}
               </span>
             </div>
             <span className="text-lg font-bold">{formatCurrency(price)}</span>

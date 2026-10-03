@@ -169,7 +169,7 @@ describe('PendingPaymentScreen', () => {
     render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText('Mensal')).toBeInTheDocument()
+      expect(screen.getByText('Anual')).toBeInTheDocument()
     })
   })
 

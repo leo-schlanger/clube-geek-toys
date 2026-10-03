@@ -8,8 +8,8 @@ export type PlanType = 'club'
 // Member status
 export type MemberStatus = 'active' | 'pending' | 'inactive' | 'expired'
 
-// Payment frequency. New signups are monthly; `annual` remains for members
-// who already paid a year and still have time on the clock.
+// Payment frequency. New signups are annual; `monthly` remains for members
+// who paid a month and still have time on the clock.
 export type PaymentType = 'monthly' | 'annual'
 
 export function paymentTypeLabel(type: PaymentType): 'Mensal' | 'Anual' {
@@ -22,10 +22,17 @@ export function paymentTypeSuffix(type: PaymentType): '/mês' | '/ano' {
 
 /**
  * Frequency of every new charge — signup, renewal or a pending payment picked
- * back up. A member row may still say `annual` while the year they paid runs
- * out; that never means the next charge is annual.
+ * back up. A member row may still say `monthly` while the month they paid runs
+ * out; that never means the next charge is monthly.
  */
-export const CURRENT_PAYMENT_TYPE: PaymentType = 'monthly'
+export const CURRENT_PAYMENT_TYPE: PaymentType = 'annual'
+
+/** End of one paid period starting at `from`. Mirrors the API's `addClubPeriod`. */
+export function addClubPeriod(from: Date): Date {
+  const end = new Date(from)
+  end.setFullYear(end.getFullYear() + 1)
+  return end
+}
 
 // Payment status
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
@@ -100,7 +107,7 @@ export interface Payment {
 export interface Plan {
   id: PlanType
   name: string
-  price: number        // monthly price (BRL)
+  price: number        // price of one paid period (BRL)
   discount: number     // % off any product
   benefits: string[]
   color: string
@@ -111,7 +118,6 @@ export interface Plan {
 // PLANS CONFIGURATION
 // ============================================
 
-// Single monthly club plan.
 /**
  * The member's product discount, as a percentage.
  *
@@ -129,7 +135,7 @@ export const MEMBER_DISCOUNT_PERCENT = 10
 export const CLUB_PLAN: Plan = {
   id: 'club',
   name: 'Clube GeekPop & Toys',
-  price: 12.50,
+  price: 159.90,
   discount: MEMBER_DISCOUNT_PERCENT,
   benefits: [
     `${MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto`,

@@ -116,8 +116,8 @@ const STEPS: SchemaStep[] = [
       await query(`DO $$ BEGIN
         ALTER TABLE members ADD CONSTRAINT chk_members_plan CHECK (plan IN ('club'));
       EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
-      // payment_type default + CHECK live in step 032 (monthly). Do not force
-      // `annual` here: this block runs on every boot.
+      // payment_type CHECK lives in step 032 and the default in step 040.
+      // Do not force a value here: this block runs on every boot.
     } catch (err) {
       log.error({ err }, 'single-plan migration block failed (non-fatal)');
     }
@@ -1267,6 +1267,14 @@ const STEPS: SchemaStep[] = [
     run: async () => {
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0`);
       await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ`);
+    },
+  },
+  {
+    // After step 032, which still sets the monthly default on every boot.
+    name: 'Annual club plan (migration 040)',
+    run: async () => {
+      await query(`ALTER TABLE members ALTER COLUMN payment_type SET DEFAULT 'annual'`);
+      await query(`DELETE FROM config WHERE key = 'pricing.club_annual'`);
     },
   },
 ];
