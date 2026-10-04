@@ -38,6 +38,7 @@ import {
   installmentOptions,
   isFutureExpiry,
   isPlausibleCardNumber,
+  parseExpiry,
   resetPaymentConfigCache,
 } from './pagarme'
 
@@ -255,6 +256,23 @@ describe('formatExpiry', () => {
     expect(formatExpiry('1')).toBe('1')
     expect(formatExpiry('12')).toBe('12')
     expect(formatExpiry('1230')).toBe('12/30')
+  })
+
+  it('keeps the year of a four-digit autofill', () => {
+    expect(formatExpiry('12/2030')).toBe('12/30')
+    expect(formatExpiry('3/2031')).toBe('03/31')
+  })
+})
+
+describe('parseExpiry', () => {
+  it('reads month and year with or without the slash', () => {
+    expect(parseExpiry('12/30')).toEqual({ month: '12', year: '30' })
+    expect(parseExpiry('1230')).toEqual({ month: '12', year: '30' })
+    expect(parseExpiry('12 / 2030')).toEqual({ month: '12', year: '30' })
+  })
+
+  it('leaves the year empty while it is being typed', () => {
+    expect(parseExpiry('12')).toEqual({ month: '12', year: '' })
   })
 })
 

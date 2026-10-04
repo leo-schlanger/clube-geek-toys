@@ -257,11 +257,31 @@ export function formatCardNumber(value: string): string {
   return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
 }
 
-/** "MM/AA" as it is typed, so the two fields feel like one. */
+/**
+ * "MM/AA" as it is typed, so the two fields feel like one.
+ *
+ * Also the normaliser for whatever lands in the field at once: browser autofill
+ * sends "12/2030" (which must not become "12/20") and some Android keyboards
+ * commit "1230" in one event.
+ */
 export function formatExpiry(value: string): string {
+  const autofilled = value.trim().match(/^(\d{1,2})\s*\/\s*(\d{4})$/)
+  if (autofilled) return `${autofilled[1].padStart(2, '0')}/${autofilled[2].slice(2)}`
   const digits = value.replace(/\D/g, '').slice(0, 4)
   if (digits.length <= 2) return digits
   return `${digits.slice(0, 2)}/${digits.slice(2)}`
+}
+
+/**
+ * Month and year out of the expiry field, from its digits.
+ *
+ * Splitting on "/" failed whenever the stored text had no slash: the field
+ * showed "12/30" and the form refused it as expired.
+ */
+export function parseExpiry(value: string): { month: string; year: string } {
+  const formatted = formatExpiry(value)
+  const [month = '', year = ''] = formatted.split('/')
+  return { month, year }
 }
 
 /**

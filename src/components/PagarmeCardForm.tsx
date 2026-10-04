@@ -31,8 +31,10 @@ import {
   installmentOptions,
   isFutureExpiry,
   isPlausibleCardNumber,
+  parseExpiry,
   type PaymentConfig,
 } from '../lib/pagarme'
+import { ErrorTracker } from '../lib/error-tracking'
 import { isValidCPFFormat } from '../lib/cpf-validation'
 import { isValidCnpj } from '../lib/cnpj'
 import { formatCurrency } from '../lib/utils'
@@ -135,7 +137,7 @@ export function PagarmeCardForm({
     if (!documentOk) {
       next.document = 'CPF ou CNPJ do titular inválido.'
     }
-    const [month = '', year = ''] = expiry.split('/')
+    const { month, year } = parseExpiry(expiry)
     if (!isFutureExpiry(month, year)) {
       next.expiry = 'Validade inválida ou vencida.'
     }
@@ -153,7 +155,14 @@ export function PagarmeCardForm({
 
     const found = validate()
     setErrors(found)
-    if (Object.keys(found).length > 0) return
+    if (Object.keys(found).length > 0) {
+      // Field names only, never values. Without this a buyer stopped here is
+      // invisible: the order exists and the server never hears about the card.
+      ErrorTracker.captureMessage('Card form blocked by local validation', 'warning', {
+        fields: Object.keys(found),
+      })
+      return
+    }
 
     if (!config?.publicKey) {
       setFormError('Pagamento com cartão indisponível no momento. Tente o PIX.')
@@ -163,7 +172,7 @@ export function PagarmeCardForm({
     setSubmitting(true)
     let tokenized = false
     try {
-      const [month = '', year = ''] = expiry.split('/')
+      const { month, year } = parseExpiry(expiry)
       const token = await createCardToken(
         {
           number,
@@ -189,6 +198,8 @@ export function PagarmeCardForm({
       const message = err instanceof Error ? err.message : 'Não foi possível processar o cartão.'
       setFormError(message)
       if (tokenized) setDeclined(true)
+      // A refused charge is logged by the API; a refused tokenization only exists here.
+      else ErrorTracker.captureMessage(`Card tokenization failed: ${message}`, 'warning')
       // The parent charge failed after tokenization: let them try again.
       setSubmitting(false)
       return
@@ -260,8 +271,8 @@ export function PagarmeCardForm({
             inputMode="numeric"
             autoComplete="cc-exp"
             placeholder="MM/AA"
-            value={formatExpiry(expiry)}
-            onChange={(e) => setExpiry(e.target.value)}
+            value={expiry}
+            onChange={(e) => setExpiry(formatExpiry(e.target.value))}
             error={Boolean(errors.expiry)}
             disabled={submitting}
             className="font-mono"
