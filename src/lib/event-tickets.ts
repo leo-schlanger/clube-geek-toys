@@ -153,6 +153,31 @@ export function ticketSituation(
   }
 }
 
+const KIND_COUNT_LABEL: Record<TicketKind, [one: string, many: string]> = {
+  full: ['inteira', 'inteiras'],
+  member: ['meia de membro', 'meias de membro'],
+  free: ['isento', 'isentos'],
+}
+
+/**
+ * How the money of one purchase is split, in the order the form asks.
+ *
+ * A total of R$ 40 for three people is also the price of two full tickets.
+ * Without this line the panel reads as two names paid.
+ */
+export function ticketPriceMix(tickets: { kind: TicketKind }[]): string {
+  const counts: Record<TicketKind, number> = { full: 0, member: 0, free: 0 }
+  for (const ticket of tickets) counts[ticket.kind] += 1
+  const parts: string[] = []
+  for (const kind of ['full', 'member', 'free'] as const) {
+    const count = counts[kind]
+    if (count === 0) continue
+    const [one, many] = KIND_COUNT_LABEL[kind]
+    parts.push(`${count} ${count === 1 ? one : many}`)
+  }
+  return parts.join(' + ')
+}
+
 export type CreateReservationResult =
   | { ok: true; reservation: EventReservation; ticketsUrl: string }
   /**

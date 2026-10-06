@@ -30,6 +30,7 @@ import {
   cancelReservation,
   confirmReservation,
   dayAndTime,
+  ticketPriceMix,
   ticketSituation,
   type EventReservation,
   type ReservationStatus,
@@ -342,8 +343,9 @@ export function EventTicketsTab() {
             Quem comprou
           </CardTitle>
           <CardDescription>
-            Cada compra mostra quem pagou e, embaixo, cada ingresso: se a pessoa já entrou e a
-            que horas. O PIX se confirma sozinho — não precisa conferir extrato.
+            Cada compra mostra quem pagou e, embaixo, cada pessoa com o valor do ingresso dela.
+            Uma meia deixa o total menor que o número de nomes — os dois aparecem na mesma linha.
+            O PIX se confirma sozinho — não precisa conferir extrato.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -375,7 +377,7 @@ export function EventTicketsTab() {
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nome, telefone, e-mail ou código"
+                placeholder="Nome de quem paga ou de quem entra, telefone, e-mail ou código"
                 className="sm:w-72"
               />
               <Button type="submit" variant="outline" size="icon" aria-label="Buscar">
@@ -429,7 +431,11 @@ export function EventTicketsTab() {
                         {reservation.buyerPhone} · {reservation.buyerEmail}
                       </p>
                       <p className="mt-0.5 text-sm">
-                        {reservation.quantity} ingresso(s) ·{' '}
+                        {reservation.quantity} ingresso(s)
+                        {reservation.tickets && reservation.tickets.length > 0 && (
+                          <> · {ticketPriceMix(reservation.tickets)}</>
+                        )}
+                        {' · '}
                         <strong>{brl(reservation.totalCents)}</strong> · comprou{' '}
                         {dayAndTime(reservation.createdAt)}
                       </p>
@@ -490,39 +496,41 @@ export function EventTicketsTab() {
                   </div>
 
                   {reservation.tickets && reservation.tickets.length > 0 && (
-                    <div className="mt-3 grid gap-2 border-t border-border pt-3 sm:grid-cols-2">
-                      {reservation.tickets.map((ticket) => (
-                        <div
-                          key={ticket.code}
-                          className="flex flex-col gap-0.5 rounded-lg bg-muted/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-2"
-                        >
-                          <span className="flex items-center gap-2 truncate">
-                            <Ticket className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            <span className="truncate font-medium">{ticket.attendeeName}</span>
-                            {/*
-                              A half-price ticket is self-declared: the public
-                              reservation form takes `kind` at face value and
-                              nothing verifies membership. Confirming the
-                              payment is where the shop can ask for the card,
-                              and it could not — the row looked identical to a
-                              full one. Only the kinds that cost less are
-                              labelled; "Inteira" on every line is noise.
-                            */}
-                            {ticket.kind !== 'full' && (
-                              <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                                {TICKET_KIND_LABEL[ticket.kind]}
-                              </span>
-                            )}
-                          </span>
-                          <span
-                            className={`shrink-0 pl-[22px] text-xs font-semibold sm:pl-0 ${
-                              ticketSituation(ticket, overFor(ticket.eventId)).tone
-                            }`}
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      {reservation.tickets.map((ticket) => {
+                        const situation = ticketSituation(ticket, overFor(ticket.eventId))
+                        return (
+                          <div
+                            key={ticket.code}
+                            className="flex flex-col gap-1 rounded-lg bg-muted/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                           >
-                            {ticketSituation(ticket, overFor(ticket.eventId)).label}
-                          </span>
-                        </div>
-                      ))}
+                            <span className="flex min-w-0 items-center gap-2">
+                              <Ticket className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                              <span className="truncate font-medium">{ticket.attendeeName}</span>
+                              {/*
+                                A half-price ticket is self-declared: the public
+                                reservation form takes `kind` at face value and
+                                nothing verifies membership. The price sits on
+                                the row because the purchase total alone lies:
+                                R$ 40 for three people is also two full tickets,
+                                and a two-column grid clipped the third name
+                                next to this badge.
+                              */}
+                              {ticket.kind !== 'full' && (
+                                <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                  {TICKET_KIND_LABEL[ticket.kind]}
+                                </span>
+                              )}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-3 pl-[22px] sm:pl-0">
+                              <span className="font-semibold tabular-nums">{brl(ticket.priceCents)}</span>
+                              <span className={`text-xs font-semibold ${situation.tone}`}>
+                                {situation.label}
+                              </span>
+                            </span>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>

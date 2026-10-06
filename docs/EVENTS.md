@@ -94,6 +94,12 @@ era cada compra.
   não entrou", "Não compareceu" (evento passado), "Aguardando pagamento",
   "Cancelado" — `ticketSituation()` em `src/lib/event-tickets.ts`. A lista abre
   em **Pagas**, que é o que responde "quem comprou".
+- **O valor de cada pessoa fica na compra** (06/10/2026): três ingressos com
+  duas meias saíam como "3 ingresso(s) · R$ 40,00" numa grade de duas colunas,
+  e o selo de meia cabia cortado. R$ 40 é o preço de duas inteiras, então a
+  lista parecia ter dois nomes pagos. Cada pessoa agora ocupa uma linha, com o
+  preço, e o total diz a mistura ("1 inteira + 2 meias de membro"). A busca
+  também acha o nome de quem vai entrar, não só de quem pagou.
 - **No histórico** a portaria some da tela e aparece o aviso de que aqueles
   ingressos não valem para outro evento.
 

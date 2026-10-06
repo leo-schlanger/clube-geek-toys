@@ -558,6 +558,10 @@ describe('adminListReservations', () => {
       ticketsValid: 3,
       ticketsUsed: 1,
     });
+    const listSql = queryMock.mock.calls
+      .map(([sql]) => String(sql))
+      .find((sql) => sql.includes('FROM event_reservations r'));
+    expect(listSql).toContain('t.attendee_name ILIKE');
   });
 
   it('sem evento escolhido, os totais cobrem tudo', async () => {

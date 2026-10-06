@@ -166,6 +166,60 @@ describe('EventTicketsTab', () => {
     expect(within(upcoming as HTMLElement).getByText(/Evento GeeKpop!/)).toBeInTheDocument()
   })
 
+  it('compra com meia mostra os três nomes e o preço de cada um', async () => {
+    const mixed = reservation('evento-geekpop')
+    mixed.buyerName = 'Tássia da Hora'
+    mixed.quantity = 3
+    mixed.totalCents = 4000
+    mixed.tickets = [
+      {
+        ...mixed.tickets![0]!,
+        id: 't1',
+        code: 'T-1',
+        attendeeName: 'Tássia da Hora',
+        kind: 'full',
+        priceCents: 2000,
+        status: 'valid',
+        usedAt: null,
+      },
+      {
+        ...mixed.tickets![0]!,
+        id: 't2',
+        code: 'T-2',
+        attendeeName: 'Marina Maria',
+        kind: 'member',
+        priceCents: 1000,
+        status: 'valid',
+        usedAt: null,
+      },
+      {
+        ...mixed.tickets![0]!,
+        id: 't3',
+        code: 'T-3',
+        attendeeName: 'Dora Maria',
+        kind: 'member',
+        priceCents: 1000,
+        status: 'valid',
+        usedAt: null,
+      },
+    ]
+    mocks.adminListReservations.mockResolvedValue({
+      ...listFor('evento-geekpop'),
+      reservations: [mixed],
+    })
+
+    render(<EventTicketsTab />)
+
+    expect(await screen.findByText(/1 inteira \+ 2 meias de membro/)).toBeInTheDocument()
+    expect(screen.getAllByText('Tássia da Hora')).toHaveLength(2)
+    expect(screen.getByText('Marina Maria')).toBeInTheDocument()
+    expect(screen.getByText('Dora Maria')).toBeInTheDocument()
+    expect(screen.getAllByText('Membro do Clube (50%)')).toHaveLength(2)
+    expect(screen.getAllByText(/R\$\s*10,00/)).toHaveLength(2)
+    expect(screen.getByText(/R\$\s*20,00/)).toBeInTheDocument()
+    expect(screen.getByText(/R\$\s*40,00/)).toBeInTheDocument()
+  })
+
   it('no próximo evento, diz quem já pagou e ainda não entrou', async () => {
     render(<EventTicketsTab />)
 

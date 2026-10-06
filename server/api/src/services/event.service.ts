@@ -857,8 +857,14 @@ export async function adminListReservations(
   if (opts.search?.trim()) {
     params.push(`%${opts.search.trim()}%`);
     const idx = params.length;
+    // The person entering is often not the buyer. Searching only the buyer
+    // hid a named ticket: the purchase existed, the name did not come up.
     where.push(
-      `(r.buyer_name ILIKE $${idx} OR r.buyer_email ILIKE $${idx} OR r.buyer_phone ILIKE $${idx} OR r.code ILIKE $${idx})`
+      `(r.buyer_name ILIKE $${idx} OR r.buyer_email ILIKE $${idx} OR r.buyer_phone ILIKE $${idx} OR r.code ILIKE $${idx}
+        OR EXISTS (
+          SELECT 1 FROM event_tickets t
+          WHERE t.reservation_id = r.id AND t.attendee_name ILIKE $${idx}
+        ))`
     );
   }
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';

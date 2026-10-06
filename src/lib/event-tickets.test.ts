@@ -9,6 +9,7 @@ import {
   createReservation,
   extractTicketCode,
   getPublicTicket,
+  ticketPriceMix,
   ticketSituation,
 } from './event-tickets'
 
@@ -104,6 +105,18 @@ describe('checkInTicket', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.reason).toBe('request_failed')
+  })
+})
+
+describe('ticketPriceMix', () => {
+  it('explica um total que também é o preço de menos inteiras', () => {
+    expect(
+      ticketPriceMix([{ kind: 'full' }, { kind: 'member' }, { kind: 'member' }])
+    ).toBe('1 inteira + 2 meias de membro')
+  })
+
+  it('omite o tipo que ninguém comprou', () => {
+    expect(ticketPriceMix([{ kind: 'free' }, { kind: 'free' }])).toBe('2 isentos')
   })
 })
 
