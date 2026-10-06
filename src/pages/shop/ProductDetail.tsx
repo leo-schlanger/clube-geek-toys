@@ -74,7 +74,8 @@ export default function ProductDetail() {
   const [alsoBought, setAlsoBought] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [activeImage, setActiveImage] = useState(0)
+  /** Gallery position, valid only for the gallery it was picked in (see `galleryKey`). */
+  const [selection, setSelection] = useState({ gallery: '', index: 0 })
   const [quantity, setQuantity] = useState(1)
   const [variantSel, setVariantSel] = useState<Record<string, string>>({})
   /** Initial touch X, to tell a drag from a tap. */
@@ -97,7 +98,7 @@ export default function ProductDetail() {
     async function loadProduct(productSlug: string) {
       setLoading(true)
       setNotFound(false)
-      setActiveImage(0)
+      setSelection({ gallery: '', index: 0 })
       setQuantity(1)
       setVariantSel({})
       setRelated([])
@@ -172,14 +173,20 @@ export default function ProductDetail() {
     () => buildProductMedia(displayImages, product?.videos),
     [displayImages, product?.videos]
   )
+  // Switching variant returns to the first photo of that variant's gallery.
+  // Derived, not reset in an effect: an effect landing after a tap on a
+  // thumbnail undid the tap.
+  const galleryKey = displayImages[0] ?? ''
+  const activeImage = selection.gallery === galleryKey ? selection.index : 0
   const activeIndex = Math.min(activeImage, Math.max(media.length - 1, 0))
   const current = media[activeIndex]
 
-  // Switching variant returns to the first photo of that variant's gallery.
-  const galleryKey = displayImages[0] ?? ''
-  useEffect(() => {
-    setActiveImage(0)
-  }, [galleryKey])
+  function setActiveImage(next: number | ((position: number) => number)) {
+    setSelection((prev) => {
+      const position = prev.gallery === galleryKey ? prev.index : 0
+      return { gallery: galleryKey, index: typeof next === 'function' ? next(position) : next }
+    })
+  }
 
   /** Steps through the gallery, wrapping at both ends. */
   function stepMedia(delta: number) {

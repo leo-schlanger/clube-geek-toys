@@ -262,6 +262,23 @@ describe('ProductDetail', () => {
     })
   })
 
+  it('returns to the first photo when the variant changes the gallery', async () => {
+    mockedGet.mockResolvedValue({ ...productWithVariants, videos: productWithVideo.videos })
+    renderPdp('bolsa-colorida')
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Bolsa colorida' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vídeo 1' }))
+    await screen.findByLabelText('Vídeo de Bolsa colorida')
+
+    fireEvent.click(screen.getByRole('button', { name: /Preto/i }))
+    await waitFor(() => {
+      const main = within(screen.getByRole('button', { name: 'Ampliar foto' })).getByRole('img')
+      expect(main).toHaveAttribute('src', 'https://example.com/preto.jpg')
+    })
+  })
+
   it('disables add-to-cart when variation selection is cleared', async () => {
     mockedGet.mockResolvedValue(productWithVariants)
     renderPdp('bolsa-colorida')
@@ -380,6 +397,19 @@ describe('ProductDetail', () => {
       expect(player).toHaveAttribute('src', 'https://example.com/reel.mp4')
       // A video is not a photo: zooming it makes no sense, so the control goes.
       expect(screen.queryByRole('button', { name: 'Ampliar foto' })).not.toBeInTheDocument()
+    })
+
+    // Clicked from inside waitFor, the moment the page is drawn and before React
+    // runs that commit's effects: the reset to the first photo used to land
+    // after the tap and undo it.
+    it('não desfaz o toque no vídeo dado enquanto a página termina de carregar', async () => {
+      mockedGet.mockResolvedValue(productWithVideo)
+      renderPdp('balas-azedas')
+      await waitFor(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Vídeo 1' }))
+      })
+
+      expect(await screen.findByLabelText('Vídeo de Balas azedas')).toBeInTheDocument()
     })
 
     it('volta para a foto ao clicar na miniatura dela', async () => {
