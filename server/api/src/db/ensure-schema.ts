@@ -1277,6 +1277,17 @@ const STEPS: SchemaStep[] = [
       await query(`DELETE FROM config WHERE key = 'pricing.club_annual'`);
     },
   },
+  {
+    // Half-price tickets used to trust the form. The column is who was checked;
+    // the index is one member discount per event, including two clicks at once.
+    name: 'Verified member ticket discount (migration 041)',
+    run: async () => {
+      await query(`ALTER TABLE event_tickets ADD COLUMN IF NOT EXISTS member_id UUID REFERENCES members(id)`);
+      await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_event_tickets_one_member_discount
+        ON event_tickets (event_id, member_id)
+        WHERE member_id IS NOT NULL AND status <> 'cancelled'`);
+    },
+  },
 ];
 
 let state: SchemaState = {

@@ -123,7 +123,7 @@ describe('createReservation', () => {
   it('grava um ingresso por pessoa e soma o total no servidor', async () => {
     clientQueryMock.mockImplementation(async (sql: string) => {
       if (sql.startsWith('INSERT INTO event_reservations')) {
-        return { rows: [reservationRow({ quantity: 2, total_cents: 3000 })] };
+        return { rows: [reservationRow({ quantity: 2, total_cents: 4000 })] };
       }
       if (sql.startsWith('INSERT INTO event_tickets')) {
         return { rows: [ticketRow({ status: 'pending' })] };
@@ -137,7 +137,7 @@ describe('createReservation', () => {
       buyerPhone: '21999999999',
       attendees: [
         { name: 'Ana Souza', kind: 'full' },
-        { name: 'Bia Souza', kind: 'member' },
+        { name: 'Bia Souza', kind: 'full' },
       ],
     });
 
@@ -146,10 +146,160 @@ describe('createReservation', () => {
     const insert = clientQueryMock.mock.calls.find(([sql]) =>
       String(sql).startsWith('INSERT INTO event_reservations')
     )!;
-    // R$ 20 (full) + R$ 10 (member) — the client does not send a price.
+    // R$ 20 + R$ 20 — the client does not send a price.
     expect(insert[1]).toEqual(
-      expect.arrayContaining([2, 3000, expect.stringMatching(/^R-[A-Z0-9]{4}-[A-Z0-9]{4}$/)])
+      expect.arrayContaining([2, 4000, expect.stringMatching(/^R-[A-Z0-9]{4}-[A-Z0-9]{4}$/)])
     );
+  });
+
+  it('recusa meia sem sócio ativo — o formulário não é prova', async () => {
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        buyerName: 'Ana Souza',
+        buyerEmail: 'ana@example.com',
+        buyerPhone: '21999999999',
+        attendees: [{ name: 'Bia Souza', kind: 'member' }],
+      })
+    ).rejects.toMatchObject({ code: 'MEMBER_TICKET_UNVERIFIED' });
+
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        buyerName: 'Ana Souza',
+        buyerEmail: 'ana@example.com',
+        buyerPhone: '21999999999',
+        attendees: [{ name: 'Bia Souza', kind: 'member', document: '52998224725' }],
+      })
+    ).rejects.toMatchObject({ code: 'MEMBER_NOT_ACTIVE' });
+
+    expect(clientQueryMock).not.toHaveBeenCalled();
+  });
+
+  it('aplica a meia só no nome da carteirinha, uma vez por evento', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('FROM members')) {
+        return { rows: [{ id: 'member-1', full_name: 'Bia Souza' }] };
+      }
+      return { rows: [] };
+    });
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('INSERT INTO event_reservations')) {
+        return { rows: [reservationRow({ quantity: 1, total_cents: 1000 })] };
+      }
+      if (sql.startsWith('INSERT INTO event_tickets')) {
+        return { rows: [ticketRow({ kind: 'member', price_cents: 1000, member_id: 'member-1' })] };
+      }
+      return { rows: [] };
+    });
+
+    const reservation = await eventService.createReservation(EVENT_ID, {
+      buyerName: 'Ana Souza',
+      buyerEmail: 'ana@example.com',
+      buyerPhone: '21999999999',
+      attendees: [{ name: 'biá  souza', kind: 'member', document: '529.982.247-25' }],
+    });
+
+    const ticketInsert = clientQueryMock.mock.calls.find(([sql]) =>
+      String(sql).startsWith('INSERT INTO event_tickets')
+    )!;
+    expect(ticketInsert[1]).toEqual(
+      expect.arrayContaining(['Bia Souza', 'member', 1000, 'member-1'])
+    );
+    expect(reservation.tickets?.[0]?.memberId).toBe('member-1');
+
+    const memberLookup = queryMock.mock.calls.find(([sql]) => String(sql).includes('FROM members'))!;
+    expect(String(memberLookup[0])).toContain("status = 'active'");
+    expect(String(memberLookup[0])).toContain('expiry_date >= CURRENT_DATE');
+    expect(memberLookup[1]).toEqual(['52998224725']);
+
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('FROM members')) {
+        return { rows: [{ id: 'member-1', full_name: 'Bia Souza' }] };
+      }
+      if (String(sql).includes('FROM event_tickets')) return { rows: [{ '?column?': 1 }] };
+      return { rows: [] };
+    });
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        buyerName: 'Ana Souza',
+        buyerEmail: 'ana@example.com',
+        buyerPhone: '21999999999',
+        attendees: [{ name: 'Bia Souza', kind: 'member', document: '52998224725' }],
+      })
+    ).rejects.toMatchObject({ code: 'MEMBER_TICKET_ALREADY_USED' });
+  });
+
+  it('não revela o nome da carteirinha quando o nome digitado não é o do sócio', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('FROM members')) {
+        return { rows: [{ id: 'member-1', full_name: 'Beatriz Souza' }] };
+      }
+      return { rows: [] };
+    });
+
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        buyerName: 'Ana Souza',
+        buyerEmail: 'ana@example.com',
+        buyerPhone: '21999999999',
+        attendees: [{ name: 'Bia Souza', kind: 'member', document: '52998224725' }],
+      })
+    ).rejects.toMatchObject({
+      code: 'MEMBER_NAME_MISMATCH',
+      message: expect.not.stringContaining('Beatriz'),
+    });
+    expect(clientQueryMock).not.toHaveBeenCalled();
+  });
+
+  it('recusa duas meias do mesmo sócio na mesma compra', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('FROM members')) {
+        return { rows: [{ id: 'member-1', full_name: 'Bia Souza' }] };
+      }
+      return { rows: [] };
+    });
+
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        buyerName: 'Ana Souza',
+        buyerEmail: 'ana@example.com',
+        buyerPhone: '21999999999',
+        attendees: [
+          { name: 'Bia Souza', kind: 'member', document: '52998224725' },
+          { name: 'Bia Souza', kind: 'member', document: '529.982.247-25' },
+        ],
+      })
+    ).rejects.toMatchObject({ code: 'MEMBER_TICKET_DUPLICATE' });
+    expect(clientQueryMock).not.toHaveBeenCalled();
+  });
+
+  it('dois cliques ao mesmo tempo desfazem a reserva e devolvem 409', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (String(sql).includes('FROM members')) {
+        return { rows: [{ id: 'member-1', full_name: 'Bia Souza' }] };
+      }
+      return { rows: [] };
+    });
+    clientQueryMock.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('INSERT INTO event_reservations')) return { rows: [reservationRow()] };
+      if (sql.startsWith('INSERT INTO event_tickets')) {
+        const err = new Error('duplicate key') as Error & { code: string; constraint: string };
+        err.code = '23505';
+        err.constraint = 'idx_event_tickets_one_member_discount';
+        throw err;
+      }
+      return { rows: [] };
+    });
+
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        buyerName: 'Ana Souza',
+        buyerEmail: 'ana@example.com',
+        buyerPhone: '21999999999',
+        attendees: [{ name: 'Bia Souza', kind: 'member', document: '52998224725' }],
+      })
+    ).rejects.toMatchObject({ statusCode: 409, code: 'MEMBER_TICKET_ALREADY_USED' });
+
+    expect(clientQueryMock.mock.calls.some(([sql]) => String(sql) === 'ROLLBACK')).toBe(true);
   });
 
   /**

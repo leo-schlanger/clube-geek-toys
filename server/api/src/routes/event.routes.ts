@@ -74,6 +74,9 @@ const reservationSchema = z.object({
       z.object({
         name: z.string().min(2).max(120),
         kind: z.enum(['full', 'member', 'free']).default('full'),
+        // CPF of the member. The service refuses a half-price ticket without one
+        // that belongs to an active membership — the form is not the authority.
+        document: z.string().trim().max(20).optional().nullable(),
       })
     )
     .min(1)

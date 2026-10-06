@@ -118,32 +118,44 @@ puro e link com query string.
 um QR bonito com pagamento pendente é exatamente a impressão que a portaria não
 pode aceitar.
 
-### Meia-entrada é autodeclarada
+### Meia de membro é conferida no servidor (06/10/2026)
 
-`POST /events/:eventId/reservations` é público e aceita `kind: 'member'` pelo
-valor de face: **ninguém verifica se a pessoa é sócia**. Como só o nome do
-acompanhante é informado, não há o que verificar server-side.
+`POST /events/:eventId/reservations` continua público, mas `kind: 'member'`
+**não** é desconto. A metade do preço só sai quando as três coisas abaixo são
+verdade, e a conferência acontece **antes** de gravar a reserva:
 
-O controle é humano, em dois momentos: ao confirmar o pagamento e na portaria.
-A tela de check-in já mostrava o tipo; a **lista de reservas não mostrava** — a
-linha de uma meia era idêntica à de uma inteira, justo onde a equipe decide se
-o valor recebido está certo. Agora os tipos que custam menos aparecem marcados
-(inteira não, para não virar ruído).
+1. O CPF do ingresso (`attendees[].document`) é de um sócio com
+   `status = 'active'` e `expiry_date >= CURRENT_DATE` — a mesma regra do
+   desconto de 10% na loja.
+2. O nome informado é o da carteirinha. Acento, maiúscula e espaço sobrando
+   não contam; o ingresso grava o `full_name` oficial, não o que foi digitado.
+   Se o nome não bate, a resposta **não** devolve o nome que está no cadastro.
+3. Esse sócio ainda não tem meia neste evento. Vale uma por compra e uma por
+   evento (`member_id` no ingresso + índice único parcial
+   `idx_event_tickets_one_member_discount`). Dois cliques ao mesmo tempo caem
+   no índice e a reserva é desfeita.
 
-Hoje em produção: 8 inteiras (R$ 160), 1 meia (R$ 10), 1 isento.
+Sem CPF válido, sem sócio ativo ou com nome diferente, a API responde 400 e
+**não grava nada** — não cobra a meia e não transforma a meia em inteira por
+conta própria. O acompanhante paga inteira. Isento (criança de colo ou PCD)
+segue sem cadastro para conferir: não há linha de sócio para essa pessoa.
+
+Ingresso de meia anterior a esta regra fica com `member_id` nulo. No painel
+isso aparece como **Meia sem sócio conferido**; meia conferida aparece como
+**Sócio conferido**. O `member_id` não vai para a página pública do ingresso.
 
 ---
 
 ## 4. Resumo
 
-| Área                               | Situação                                           |
-| ---------------------------------- | -------------------------------------------------- |
-| QR da carteirinha                  | ✅ real, validado de ponta a ponta                 |
-| Rota de verificação                | ✅ trata inexistente e malformado                  |
-| Desconto no checkout               | ✅ server-side, não empilha                        |
-| ~~Configuração morta de desconto~~ | ✅ removida                                        |
-| Texto do benefício nas telas       | ✅ deriva de uma constante só                      |
-| QR do ingresso                     | ✅ real, validado                                  |
-| Check-in                           | ✅ atômico, idempotente, fuso correto              |
-| Scanner → código                   | ✅ coberto e testado                               |
-| Meia-entrada                       | ⚠️ honra; controle humano, agora visível no painel |
+| Área                               | Situação                                     |
+| ---------------------------------- | -------------------------------------------- |
+| QR da carteirinha                  | ✅ real, validado de ponta a ponta           |
+| Rota de verificação                | ✅ trata inexistente e malformado            |
+| Desconto no checkout               | ✅ server-side, não empilha                  |
+| ~~Configuração morta de desconto~~ | ✅ removida                                  |
+| Texto do benefício nas telas       | ✅ deriva de uma constante só                |
+| QR do ingresso                     | ✅ real, validado                            |
+| Check-in                           | ✅ atômico, idempotente, fuso correto        |
+| Scanner → código                   | ✅ coberto e testado                         |
+| Meia-entrada                       | ✅ CPF e nome de sócio ativo, uma por evento |

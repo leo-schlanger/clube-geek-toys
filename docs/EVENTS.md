@@ -100,6 +100,12 @@ era cada compra.
   lista parecia ter dois nomes pagos. Cada pessoa agora ocupa uma linha, com o
   preço, e o total diz a mistura ("1 inteira + 2 meias de membro"). A busca
   também acha o nome de quem vai entrar, não só de quem pagou.
+- **A meia não sai na palavra de quem compra** (06/10/2026). `kind: member` só
+  cobra a metade quando o CPF daquele ingresso é de um sócio **ativo** e não
+  vencido, e o nome é o da carteirinha. Cada sócio tem uma meia por evento. Se
+  a conferência falha, a reserva inteira é recusada e nada é cobrado. Meia
+  antiga, sem essa conferência, aparece como **Meia sem sócio conferido**.
+  Isento (colo ou PCD) continua sem cadastro para conferir.
 - **No histórico** a portaria some da tela e aparece o aviso de que aqueles
   ingressos não valem para outro evento.
 

@@ -140,6 +140,20 @@ describe('public', () => {
       expect.objectContaining({ buyerDocument: '529.982.247-25' })
     );
 
+    // The member CPF is the attendee's, and it has to reach the service intact.
+    await api.post(`/${EVENT_ID}/reservations`, {
+      body: {
+        ...body,
+        attendees: [{ name: 'Janaina', kind: 'member', document: '529.982.247-25' }],
+      },
+    });
+    expect(events.createReservation).toHaveBeenLastCalledWith(
+      EVENT_ID,
+      expect.objectContaining({
+        attendees: [expect.objectContaining({ kind: 'member', document: '529.982.247-25' })],
+      })
+    );
+
     for (const bad of [
       { ...body, buyerDocument: '1'.repeat(21) },
       { ...body, attendees: [] },

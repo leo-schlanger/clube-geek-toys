@@ -28,7 +28,7 @@ type Props = {
   event?: EventConfig
 }
 
-type Attendee = { name: string; kind: TicketKind }
+type Attendee = { name: string; kind: TicketKind; document: string }
 
 const SELECT_CLASS =
   'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
@@ -48,7 +48,7 @@ function maskCPF(value: string): string {
  */
 export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   const [buyer, setBuyer] = useState({ name: '', phone: '', email: '', document: '', notes: '' })
-  const [attendees, setAttendees] = useState<Attendee[]>([{ name: '', kind: 'full' }])
+  const [attendees, setAttendees] = useState<Attendee[]>([{ name: '', kind: 'full', document: '' }])
   const [submitting, setSubmitting] = useState(false)
   /** Until the first name is edited, it tracks whoever is reserving. */
   const [firstNameTouched, setFirstNameTouched] = useState(false)
@@ -108,6 +108,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         ...Array.from({ length: target - current.length }, () => ({
           name: '',
           kind: 'full' as TicketKind,
+          document: '',
         })),
       ]
     })
@@ -138,10 +139,21 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
     e.preventDefault()
     if (submitting) return
 
-    const filled = attendees.map((a) => ({ name: a.name.trim(), kind: a.kind }))
+    const filled = attendees.map((a) => ({
+      name: a.name.trim(),
+      kind: a.kind,
+      document: a.document.replace(/\D/g, ''),
+    }))
     const missing = filled.findIndex((a) => a.name.length < 2)
     if (missing >= 0) {
       toast.error(`Informe o nome da pessoa ${missing + 1}.`)
+      return
+    }
+    const unverified = filled.findIndex((a) => a.kind === 'member' && !validateCPF(a.document))
+    if (unverified >= 0) {
+      toast.error(
+        `A meia da pessoa ${unverified + 1} só vale com o CPF de um sócio ativo, no nome da carteirinha.`
+      )
       return
     }
     if (needsDocument && !validateCPF(buyer.document)) {
@@ -158,7 +170,11 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         buyerPhone: buyer.phone.trim(),
         buyerDocument: needsDocument ? buyer.document.replace(/\D/g, '') : undefined,
         notes: buyer.notes.trim() || undefined,
-        attendees: filled,
+        attendees: filled.map((a) => ({
+          name: a.name,
+          kind: a.kind,
+          ...(a.kind === 'member' ? { document: a.document } : {}),
+        })),
       })
 
       if (created.ok) {
@@ -418,37 +434,57 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
           {attendees.map((attendee, index) => (
             <div
               key={index}
-              className="grid gap-2 rounded-xl border border-border bg-muted/30 p-3 sm:grid-cols-[1fr_auto_auto] sm:items-center"
+              className="space-y-2 rounded-xl border border-border bg-muted/30 p-3"
             >
-              <Input
-                required
-                aria-label={`Nome da pessoa ${index + 1}`}
-                value={attendee.name}
-                onChange={(e) => updateAttendee(index, { name: e.target.value })}
-                placeholder={`Nome da pessoa ${index + 1}`}
-              />
-              <select
-                aria-label={`Tipo de ingresso da pessoa ${index + 1}`}
-                className={`${SELECT_CLASS} sm:w-56`}
-                value={attendee.kind}
-                onChange={(e) => updateAttendee(index, { kind: e.target.value as TicketKind })}
-              >
-                {(Object.keys(TICKET_KIND_LABEL) as TicketKind[]).map((kind) => (
-                  <option key={kind} value={kind}>
-                    {TICKET_KIND_LABEL[kind]}
-                  </option>
-                ))}
-              </select>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`Remover pessoa ${index + 1}`}
-                disabled={attendees.length === 1}
-                onClick={() => setAttendees((current) => current.filter((_, i) => i !== index))}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                <Input
+                  required
+                  aria-label={`Nome da pessoa ${index + 1}`}
+                  value={attendee.name}
+                  onChange={(e) => updateAttendee(index, { name: e.target.value })}
+                  placeholder={`Nome da pessoa ${index + 1}`}
+                />
+                <select
+                  aria-label={`Tipo de ingresso da pessoa ${index + 1}`}
+                  className={`${SELECT_CLASS} sm:w-56`}
+                  value={attendee.kind}
+                  onChange={(e) => updateAttendee(index, { kind: e.target.value as TicketKind })}
+                >
+                  {(Object.keys(TICKET_KIND_LABEL) as TicketKind[]).map((kind) => (
+                    <option key={kind} value={kind}>
+                      {TICKET_KIND_LABEL[kind]}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Remover pessoa ${index + 1}`}
+                  disabled={attendees.length === 1}
+                  onClick={() => setAttendees((current) => current.filter((_, i) => i !== index))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              {attendee.kind === 'member' && (
+                <div className="space-y-1">
+                  <Input
+                    required
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={14}
+                    aria-label={`CPF do sócio da pessoa ${index + 1}`}
+                    value={attendee.document}
+                    onChange={(e) => updateAttendee(index, { document: maskCPF(e.target.value) })}
+                    placeholder="CPF do sócio"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    A meia só sai se esse CPF for de um sócio ativo e o nome for o da carteirinha.
+                    Cada sócio tem uma meia por evento.
+                  </p>
+                </div>
+              )}
             </div>
           ))}
 

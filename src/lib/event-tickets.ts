@@ -35,6 +35,8 @@ export interface EventTicket {
   attendeeName: string
   kind: TicketKind
   priceCents: number
+  /** Present when the half-price ticket was checked against an active member. */
+  memberId?: string | null
   status: TicketStatus
   usedAt: string | null
   createdAt: string
@@ -194,7 +196,7 @@ export async function createReservation(
     buyerPhone: string
     buyerDocument?: string
     notes?: string
-    attendees: { name: string; kind: TicketKind }[]
+    attendees: { name: string; kind: TicketKind; document?: string }[]
   }
 ): Promise<CreateReservationResult> {
   const result = await api.post<{ reservation: EventReservation; ticketsUrl: string }>(

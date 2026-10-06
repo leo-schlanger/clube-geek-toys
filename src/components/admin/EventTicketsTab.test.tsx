@@ -188,6 +188,7 @@ describe('EventTicketsTab', () => {
         code: 'T-2',
         attendeeName: 'Marina Maria',
         kind: 'member',
+        memberId: 'member-1',
         priceCents: 1000,
         status: 'valid',
         usedAt: null,
@@ -198,6 +199,7 @@ describe('EventTicketsTab', () => {
         code: 'T-3',
         attendeeName: 'Dora Maria',
         kind: 'member',
+        memberId: null,
         priceCents: 1000,
         status: 'valid',
         usedAt: null,
@@ -214,7 +216,8 @@ describe('EventTicketsTab', () => {
     expect(screen.getAllByText('Tássia da Hora')).toHaveLength(2)
     expect(screen.getByText('Marina Maria')).toBeInTheDocument()
     expect(screen.getByText('Dora Maria')).toBeInTheDocument()
-    expect(screen.getAllByText('Membro do Clube (50%)')).toHaveLength(2)
+    expect(screen.getByText('Sócio conferido')).toBeInTheDocument()
+    expect(screen.getByText('Meia sem sócio conferido')).toBeInTheDocument()
     expect(screen.getAllByText(/R\$\s*10,00/)).toHaveLength(2)
     expect(screen.getByText(/R\$\s*20,00/)).toBeInTheDocument()
     expect(screen.getByText(/R\$\s*40,00/)).toBeInTheDocument()

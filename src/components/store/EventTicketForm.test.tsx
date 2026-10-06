@@ -133,6 +133,39 @@ describe('EventTicketForm', () => {
     expect(screen.getByText('R$ 30,00')).toBeInTheDocument()
   })
 
+  it('não envia meia sem o CPF de um sócio', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await fillBuyer(user)
+    await user.selectOptions(screen.getByLabelText('Tipo de ingresso da pessoa 1'), 'member')
+    await user.type(screen.getByLabelText('CPF do sócio da pessoa 1'), '11111111111')
+    await user.click(screen.getByRole('button', { name: /Reservar e pagar com PIX/i }))
+
+    expect(createReservationMock).not.toHaveBeenCalled()
+    expect(toastMock.error).toHaveBeenCalledWith(expect.stringMatching(/sócio ativo/))
+  })
+
+  it('manda o CPF do sócio só no ingresso de meia', async () => {
+    createReservationMock.mockResolvedValue({
+      ok: true,
+      reservation: { code: 'R-AAAA-BBBB', totalCents: 1000, pix: PAGARME_PIX },
+      ticketsUrl: 'https://loja/ingressos/R-AAAA-BBBB',
+    })
+    const user = userEvent.setup()
+    renderForm()
+
+    await fillBuyer(user)
+    await user.selectOptions(screen.getByLabelText('Tipo de ingresso da pessoa 1'), 'member')
+    await user.type(screen.getByLabelText('CPF do sócio da pessoa 1'), '52998224725')
+    await user.click(screen.getByRole('button', { name: /Reservar e pagar com PIX/i }))
+
+    await waitFor(() => expect(createReservationMock).toHaveBeenCalled())
+    expect(createReservationMock.mock.calls[0]![1].attendees).toEqual([
+      { name: 'Ana Souza', kind: 'member', document: '52998224725' },
+    ])
+  })
+
   it('recusa CPF inválido antes de chamar a API', async () => {
     const user = userEvent.setup()
     renderForm()

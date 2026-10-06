@@ -508,15 +508,24 @@ export function EventTicketsTab() {
                               <Ticket className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                               <span className="truncate font-medium">{ticket.attendeeName}</span>
                               {/*
-                                A half-price ticket is self-declared: the public
-                                reservation form takes `kind` at face value and
-                                nothing verifies membership. The price sits on
-                                the row because the purchase total alone lies:
-                                R$ 40 for three people is also two full tickets,
-                                and a two-column grid clipped the third name
-                                next to this badge.
+                                Half price is a membership the server checked.
+                                `memberId` is that member. A member ticket from
+                                before the check has no id: the row says so,
+                                because the total alone cannot (R$ 40 for three
+                                people is also two full tickets).
                               */}
-                              {ticket.kind !== 'full' && (
+                              {ticket.kind === 'member' && (
+                                <span
+                                  className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                                    ticket.memberId
+                                      ? 'bg-green-500/15 text-green-500'
+                                      : 'bg-amber-500/20 text-amber-500'
+                                  }`}
+                                >
+                                  {ticket.memberId ? 'Sócio conferido' : 'Meia sem sócio conferido'}
+                                </span>
+                              )}
+                              {ticket.kind === 'free' && (
                                 <span className="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                                   {TICKET_KIND_LABEL[ticket.kind]}
                                 </span>

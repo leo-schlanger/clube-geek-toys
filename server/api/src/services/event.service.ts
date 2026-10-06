@@ -54,6 +54,8 @@ export interface EventTicket {
   attendeeName: string;
   kind: TicketKind;
   priceCents: number;
+  /** Set only when a member discount was checked against an active membership. */
+  memberId: string | null;
   status: TicketStatus;
   usedAt: string | null;
   createdAt: string;
@@ -170,6 +172,7 @@ function mapTicket(row: pg.QueryResultRow): EventTicket {
     attendeeName: row.attendee_name,
     kind: row.kind,
     priceCents: row.price_cents,
+    memberId: row.member_id ?? null,
     status: row.status,
     usedAt: row.used_at ?? null,
     createdAt: row.created_at,
@@ -275,6 +278,99 @@ async function requireOpenEvent(eventId: string): Promise<EventDefinition> {
 export interface AttendeeInput {
   name: string;
   kind: TicketKind;
+  /** CPF of the member. Required when `kind` is `member`; ignored otherwise. */
+  document?: string | null;
+}
+
+/** Same person, ignoring case, accents and spare spaces. */
+function samePersonName(a: string, b: string): boolean {
+  const norm = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  return norm(a) === norm(b);
+}
+
+interface CheckedMember {
+  id: string;
+  fullName: string;
+}
+
+/**
+ * A member discount is a checked membership, not a checkbox.
+ *
+ * The ticket name has to be the name on the card, the CPF has to belong to an
+ * active member whose plan has not expired, and that member gets one half-price
+ * ticket per event. Anything else is full price — the buyer does not get to say.
+ */
+async function requireMemberDiscount(
+  eventId: string,
+  attendee: AttendeeInput,
+  alreadyGranted: Set<string>
+): Promise<CheckedMember> {
+  const document = pagarme.normalizeDocument(attendee.document);
+  if (!isValidCPF(document)) {
+    throw new AppError(
+      400,
+      `A meia de ${attendee.name} precisa do CPF de um sócio ativo. Sem essa conferência o ingresso não sai pela metade.`,
+      'MEMBER_TICKET_UNVERIFIED'
+    );
+  }
+
+  const found = await query(
+    `SELECT id, full_name FROM members
+      WHERE cpf = $1 AND status = 'active' AND expiry_date >= CURRENT_DATE`,
+    [document]
+  );
+  const member = found.rows[0] as { id: string; full_name: string } | undefined;
+  if (!member) {
+    throw new AppError(
+      400,
+      `Não há sócio ativo com o CPF informado para ${attendee.name}. A meia não foi aplicada.`,
+      'MEMBER_NOT_ACTIVE'
+    );
+  }
+  if (!samePersonName(attendee.name, member.full_name)) {
+    throw new AppError(
+      400,
+      `O nome de ${attendee.name} não é o da carteirinha desse CPF. A meia só vale no nome do sócio.`,
+      'MEMBER_NAME_MISMATCH'
+    );
+  }
+  if (alreadyGranted.has(member.id)) {
+    throw new AppError(
+      400,
+      `${member.full_name} já está com meia nesta compra. Cada sócio tem uma meia por evento.`,
+      'MEMBER_TICKET_DUPLICATE'
+    );
+  }
+
+  const prior = await query(
+    `SELECT 1 FROM event_tickets
+      WHERE event_id = $1 AND member_id = $2 AND status <> 'cancelled'
+      LIMIT 1`,
+    [eventId, member.id]
+  );
+  if (prior.rows.length > 0) {
+    throw new AppError(
+      400,
+      `${member.full_name} já tem a meia deste evento. Outro ingresso sai inteira.`,
+      'MEMBER_TICKET_ALREADY_USED'
+    );
+  }
+
+  alreadyGranted.add(member.id);
+  return { id: member.id, fullName: member.full_name };
+}
+
+function memberDiscountTaken(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const pgErr = err as { code?: string; constraint?: string };
+  return pgErr.code === '23505' && pgErr.constraint === 'idx_event_tickets_one_member_discount';
 }
 
 export interface CreateReservationInput {
@@ -302,7 +398,7 @@ export async function createReservation(
   const event = await requireOpenEvent(eventId);
 
   const attendees = input.attendees
-    .map((a) => ({ name: a.name.trim(), kind: a.kind }))
+    .map((a) => ({ name: a.name.trim(), kind: a.kind, document: a.document }))
     .filter((a) => a.name.length > 0);
 
   if (attendees.length === 0) {
@@ -316,7 +412,25 @@ export async function createReservation(
     );
   }
 
-  const priced = attendees.map((a) => ({ ...a, priceCents: ticketPriceCents(event, a.kind) }));
+  // Before any row is written: a refused half-price ticket must not leave a
+  // reservation behind, and the price is decided here, not by the form.
+  const granted = new Map<number, CheckedMember>();
+  const grantedIds = new Set<string>();
+  for (let i = 0; i < attendees.length; i++) {
+    const attendee = attendees[i]!;
+    if (attendee.kind !== 'member') continue;
+    granted.set(i, await requireMemberDiscount(event.id, attendee, grantedIds));
+  }
+
+  const priced = attendees.map((attendee, i) => {
+    const member = granted.get(i);
+    return {
+      ...attendee,
+      name: member?.fullName ?? attendee.name,
+      memberId: member?.id ?? null,
+      priceCents: ticketPriceCents(event, attendee.kind),
+    };
+  });
   const totalCents = priced.reduce((sum, a) => sum + a.priceCents, 0);
 
   // Pagar.me when there is money to take and the integration is up; otherwise
@@ -364,10 +478,18 @@ export async function createReservation(
     for (const attendee of priced) {
       const ticketResult = await client.query(
         `INSERT INTO event_tickets
-           (reservation_id, event_id, code, attendee_name, kind, price_cents)
-         VALUES ($1, $2, $3, $4, $5, $6)
+           (reservation_id, event_id, code, attendee_name, kind, price_cents, member_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [reservation.id, event.id, newTicketCode(), attendee.name, attendee.kind, attendee.priceCents]
+        [
+          reservation.id,
+          event.id,
+          newTicketCode(),
+          attendee.name,
+          attendee.kind,
+          attendee.priceCents,
+          attendee.memberId,
+        ]
       );
       tickets.push(mapTicket(ticketResult.rows[0]!));
     }
@@ -376,6 +498,13 @@ export async function createReservation(
     reservation.tickets = tickets;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+    if (memberDiscountTaken(err)) {
+      throw new AppError(
+        409,
+        'Esse sócio já tem a meia deste evento. Outro ingresso sai inteira.',
+        'MEMBER_TICKET_ALREADY_USED'
+      );
+    }
     throw err;
   } finally {
     client.release();
