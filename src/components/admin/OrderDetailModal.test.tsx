@@ -75,6 +75,8 @@ async function open(o: Order | null) {
   getOrderMock.mockResolvedValue(o)
   render(<OrderDetailModal orderId="o1" onClose={vi.fn()} onChanged={vi.fn()} />)
   await waitFor(() => expect(getOrderMock).toHaveBeenCalled())
+  // Being called is not being drawn: wait for the order to replace the spinner.
+  await waitFor(() => expect(screen.queryByRole('status', { name: 'Carregando' })).toBeNull())
 }
 
 beforeEach(() => {
