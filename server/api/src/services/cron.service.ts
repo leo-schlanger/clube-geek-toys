@@ -32,6 +32,14 @@ function cronFailed(job: string, err: unknown): void {
 }
 
 export function initCronJobs() {
+  // node-cron logs to the console by default; keep its warnings in the JSON log.
+  cron.setLogger({
+    info: (msg) => log.info(msg),
+    warn: (msg) => log.warn(msg),
+    error: (msg, err) => log.error({ err: err ?? msg }, String(msg)),
+    debug: (msg, err) => log.debug({ err }, String(msg)),
+  });
+
   // Daily at 6:00 AM UTC (3:00 AM BRT)
   cron.schedule('0 6 * * *', async () => {
     log.info('Running daily jobs...');
