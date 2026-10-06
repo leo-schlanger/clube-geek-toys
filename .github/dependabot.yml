@@ -13,6 +13,15 @@ updates:
     groups:
       web-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Types follow the runtime: the API runs Node 24 (server/api/Dockerfile).
+      # Move both together when the runtime changes.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+      # typescript-eslint supports TypeScript < 6.1 only; TypeScript 7 breaks
+      # the type-aware lint. Revisit when typescript-eslint widens its peer range.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: npm
     directory: /server/api
@@ -25,6 +34,15 @@ updates:
     groups:
       api-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Types follow the runtime: the API runs Node 24 (server/api/Dockerfile).
+      # Move both together when the runtime changes.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+      # typescript-eslint supports TypeScript < 6.1 only; TypeScript 7 breaks
+      # the type-aware lint. Revisit when typescript-eslint widens its peer range.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
