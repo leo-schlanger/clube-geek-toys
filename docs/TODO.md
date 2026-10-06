@@ -1,6 +1,6 @@
 # TODO - Plano de Melhorias do Projeto
 
-> **Ultima atualizacao:** 02 de Outubro de 2026
+> **Ultima atualizacao:** 06 de Outubro de 2026
 
 ## Entregue em 01/09/2026
 
@@ -194,6 +194,22 @@ o sistema me diz o que fazer?
       Melhor Envio fecharia o ciclo e daria prazo médio de entrega real.
 - [x] **BAIXO — Etiqueta Melhor Envio + token em produção** — já rastreado na _(Resolvido — OAuth guardado no banco, `canBuyLabel: true` em 27/09; o `MELHOR_ENVIO_TOKEN` vazio no `.env` é o esperado (é só override manual) e o token se renova sozinho.)_
       seção da loja; segue bloqueado no `MELHOR_ENVIO_TOKEN` vazio.
+
+## Aberto pelo checkup de 06/10/2026
+
+Dependências: as atualizações que pedem mudança de código ficaram de fora de
+propósito, e o `dependabot.yml` diz a cada uma quando voltar.
+
+- [ ] **BAIXO** — `eslint-plugin-react-hooks` 7.1 (e, por tabela, ESLint 10, que
+      exige o 7.1). As regras novas (`set-state-in-effect`, `immutability`,
+      `preserve-manual-memoization`, `purity`) acusam 26 efeitos em 18 arquivos —
+      checkout, pagamento, cadastro, contrato. Nenhum é bug: o custo é uma
+      renderização a mais. Refatorar um por vez, com teste de comportamento antes e
+      depois, longe de semana de evento; depois tirar o `~7.0.1` do
+      `package.json` e as duas regras do `dependabot.yml`.
+- [ ] **BAIXO** — TypeScript 7: o `typescript-eslint` só aceita `<6.1`. Quando ele
+      aceitar o 7, subir raiz e `server/api` juntos e tirar a regra do
+      `dependabot.yml`.
 
 ## Aberto pelo checkup de 27/09/2026
 

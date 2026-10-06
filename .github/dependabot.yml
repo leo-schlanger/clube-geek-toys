@@ -22,6 +22,15 @@ updates:
       # the type-aware lint. Revisit when typescript-eslint widens its peer range.
       - dependency-name: typescript
         update-types: [version-update:semver-major]
+      # eslint-plugin-react-hooks 7.1 turns 26 working effects (checkout, payment,
+      # signup) into lint errors, and ESLint 10 needs 7.1. Both wait for that
+      # refactor, which is its own change; see docs/TODO.md.
+      - dependency-name: eslint-plugin-react-hooks
+        versions: ['>=7.1.0']
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      - dependency-name: '@eslint/js'
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: npm
     directory: /server/api
