@@ -295,7 +295,7 @@ export default function ProductDetail() {
             </Button>
           </div>
         ) : (
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
             <div className="space-y-3">
               {/* bg-white: non-square photos leave a frame, and grey stained the
                   product. White blends into the shop card background. */}
@@ -704,7 +704,7 @@ function productSeoJsonLd(product: Product) {
 
 function ProductDetailSkeleton() {
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
       <div className="space-y-3">
         <Skeleton className="aspect-square w-full rounded-xl" />
         <div className="flex gap-2">

@@ -58,28 +58,61 @@ async function findOverflowingElements(page: Page) {
   })
 }
 
+async function expectNoOverflow(page: Page, name: string) {
+  // Let fonts/images settle before measuring overflow.
+  await page.waitForTimeout(600)
+  // Outside Playwright's outputDir, which is wiped every run.
+  await page.screenshot({ path: `e2e/screenshots/mobile-${name}.png`, fullPage: true })
+
+  const scroll = await page.evaluate(() => ({
+    scrollW: document.documentElement.scrollWidth,
+    clientW: document.documentElement.clientWidth,
+  }))
+  const culprits = await findOverflowingElements(page)
+  const report = culprits
+    .map((c) => `  <${c.tag} class="${c.cls}"> w=${c.w} right=${c.right} "${c.text}"`)
+    .join('\n')
+
+  expect(
+    scroll.scrollW,
+    `${name}: overflow horizontal — scrollWidth ${scroll.scrollW} > viewport ${scroll.clientW}.\nCulpados:\n${report}`
+  ).toBeLessThanOrEqual(scroll.clientW + 1)
+}
+
 for (const p of PAGES) {
   test(`mobile ${p.name}: sem overflow horizontal @375px`, async ({ page }) => {
     const resp = await page.goto(p.url, { waitUntil: 'networkidle' })
     expect(resp?.status(), `HTTP status de ${p.url}`).toBeLessThan(400)
-
-    // Let fonts/images settle before measuring overflow.
-    await page.waitForTimeout(600)
-    // Outside Playwright's outputDir, which is wiped every run.
-    await page.screenshot({ path: `e2e/screenshots/mobile-${p.name}.png`, fullPage: true })
-
-    const scroll = await page.evaluate(() => ({
-      scrollW: document.documentElement.scrollWidth,
-      clientW: document.documentElement.clientWidth,
-    }))
-    const culprits = await findOverflowingElements(page)
-    const report = culprits
-      .map((c) => `  <${c.tag} class="${c.cls}"> w=${c.w} right=${c.right} "${c.text}"`)
-      .join('\n')
-
-    expect(
-      scroll.scrollW,
-      `${p.name}: overflow horizontal — scrollWidth ${scroll.scrollW} > viewport ${scroll.clientW}.\nCulpados:\n${report}`
-    ).toBeLessThanOrEqual(scroll.clientW + 1)
+    await expectNoOverflow(page, p.name)
   })
 }
+
+/**
+ * The product page was missing from the list above, and it overflowed: from six
+ * photos on, the thumbnail strip widened the grid column and the whole page
+ * scrolled sideways on a phone. Audit the product with the most photos — the
+ * catalogue changes, the worst case is what matters. Products with variants are
+ * skipped: their gallery shows only the selected variant's photos.
+ */
+test('mobile shop-product (mais fotos do catálogo): sem overflow horizontal @375px', async ({
+  page,
+  request,
+}) => {
+  let best = { slug: '', photos: 0 }
+  for (let pageNo = 1; pageNo <= 5; pageNo++) {
+    const res = await request.get(`https://api.geeketoys.com.br/products?limit=100&page=${pageNo}`)
+    const { products } = (await res.json()) as {
+      products: { slug: string; images?: string[]; hasVariants?: boolean }[]
+    }
+    for (const p of products) {
+      if (p.hasVariants) continue
+      if ((p.images?.length ?? 0) > best.photos) best = { slug: p.slug, photos: p.images!.length }
+    }
+    if (products.length < 100) break
+  }
+  expect(best.slug, 'nenhum produto no catálogo').not.toBe('')
+
+  const resp = await page.goto(`${SHOP}/produto/${best.slug}`, { waitUntil: 'networkidle' })
+  expect(resp?.status()).toBeLessThan(400)
+  await expectNoOverflow(page, `shop-product-${best.photos}-fotos`)
+})
