@@ -10,7 +10,7 @@ export function validate(schema: ZodSchema) {
       if (err instanceof ZodError) {
         res.status(400).json({
           error: 'Dados inválidos',
-          details: err.errors.map((e) => ({
+          details: err.issues.map((e) => ({
             field: e.path.join('.'),
             message: e.message,
           })),

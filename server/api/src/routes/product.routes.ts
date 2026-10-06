@@ -282,7 +282,7 @@ const variantsReplaceSchema = z.object({
     z.object({
       id: z.string().uuid().optional(),
       name: z.string().min(1).max(200),
-      options: z.record(z.string()),
+      options: z.record(z.string(), z.string()),
       sku: z.string().max(60).optional().nullable(),
       price: moneySchema,
       compareAtPrice: moneySchema.optional().nullable(),

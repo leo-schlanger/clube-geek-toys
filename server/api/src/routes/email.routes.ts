@@ -19,7 +19,7 @@ const VALID_TEMPLATES = [
 const sendEmailSchema = z.object({
   template: z.enum(VALID_TEMPLATES),
   to: z.string().email(),
-  variables: z.record(z.string().max(500)).optional(),
+  variables: z.record(z.string(), z.string().max(500)).optional(),
   member_id: z.string().optional(),
 });
 
