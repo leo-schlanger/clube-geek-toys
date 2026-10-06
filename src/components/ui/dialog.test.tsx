@@ -115,10 +115,10 @@ describe('Dialog', () => {
   })
 
   it('DialogTitle should have displayName', () => {
-    expect(DialogTitle.displayName).toBeDefined()
+    expect(DialogTitle.displayName).toBe('DialogTitle')
   })
 
   it('DialogDescription should have displayName', () => {
-    expect(DialogDescription.displayName).toBeDefined()
+    expect(DialogDescription.displayName).toBe('DialogDescription')
   })
 })
