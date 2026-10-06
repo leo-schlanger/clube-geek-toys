@@ -1,0 +1,48 @@
+name: CI
+
+# Pull requests had no checks at all: deploy.yml only runs on a push to master,
+# so the Dependabot PRs sat untested and the only way to learn whether one broke
+# the build was to merge it into production. Same gate as the deploy, plus the
+# web tests the deploy leaves out for speed.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm ci --prefix server/api
+
+      - name: Build (types + bundle)
+        run: npm run build
+
+      - name: Build backend
+        run: npm --prefix server/api run build
+
+      - name: Typecheck tests
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests (api + web)
+        run: npx vitest run
+
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm audit --prefix server/api --omit=dev --audit-level=high
