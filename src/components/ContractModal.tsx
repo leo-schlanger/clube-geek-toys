@@ -350,7 +350,7 @@ export function ContractModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] overflow-hidden">
+    <div className="fixed inset-0 z-9999 overflow-hidden">
       <div className="fixed inset-0 bg-black/70" onClick={handleOverlayClick} />
 
       <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4 overflow-hidden">

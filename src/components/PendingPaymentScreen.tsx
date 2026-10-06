@@ -175,7 +175,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
       <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Critical Inactive Banner — clearly tells the user benefits are not active yet */}
         <div className="mb-6 p-4 rounded-lg bg-red-500/15 border-2 border-red-500/50 flex items-start gap-4">
-          <AlertTriangle className="h-6 w-6 text-red-500 flex-shrink-0 mt-0.5" />
+          <AlertTriangle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
           <div className="flex-1">
             <h2 className="font-bold text-red-100 text-lg flex items-center gap-2">
               ⚠ ASSINATURA INATIVA
@@ -189,7 +189,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
 
         {/* Action Banner */}
         <div className="mb-8 p-4 rounded-lg bg-yellow-500/20 border border-yellow-500/50 flex items-start gap-4">
-          <Clock className="h-6 w-6 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <Clock className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
           <div>
             <h2 className="font-bold text-yellow-200">Complete o pagamento</h2>
             <p className="text-sm text-yellow-200/80 mt-1">
@@ -213,7 +213,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Plan Card */}
-              <div className={`p-4 rounded-lg bg-gradient-to-br ${planColors[member.plan as PlanType]} text-white`}>
+              <div className={`p-4 rounded-lg bg-linear-to-br/srgb ${planColors[member.plan as PlanType]} text-white`}>
                 <div className="flex items-center gap-3 mb-3">
                   {planIcons[member.plan as PlanType]}
                   <div>
@@ -237,7 +237,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                 <ul className="space-y-1.5">
                   {plan.benefits.slice(0, 4).map((benefit, index) => (
                     <li key={index} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                       <span>{benefit}</span>
                     </li>
                   ))}
@@ -400,7 +400,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
             <Card className="border-destructive/50">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <XCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                  <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="font-medium">Deseja cancelar?</p>
                     <p className="text-sm text-muted-foreground mt-1">

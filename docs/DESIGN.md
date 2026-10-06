@@ -113,7 +113,7 @@ Outfit 400/600/800 + Inter 400/500/600
 ```
 
 **Regra de app:** headings em `font-heading` / Outfit; body em `font-body` / Inter.  
-**Gap:** `tailwind.config.js` ainda declara `Space Grotesk` em `fontFamily.heading`, enquanto `index.css` e o HTML usam Outfit — padronizar para **Outfit** (ver §6).
+`--font-heading` (no `@theme` de `src/index.css`) é Outfit, com Space Grotesk só como fallback.
 
 ### Hierarquia sugerida
 
@@ -359,10 +359,29 @@ linear-gradient(
 
 ## 9. Arquivos-fonte de design no código
 
+**Tailwind 4 (desde 06/10/2026).** Não há mais `tailwind.config.js`: tema,
+cores e animações ficam no `@theme` de `src/index.css`. A migração manteve a
+interface idêntica à da v3 (112 capturas comparadas, claro e escuro, celular e
+desktop), e para isso o `index.css` tem regras de compatibilidade — **não as
+remova sem comparar as telas**:
+
+- `space-y-*` com a semântica da v3 (margem em cima dos irmãos). Na v4 a margem
+  vai embaixo, e embaixo de um `<label>` inline ela não faz nada: todo formulário
+  perdia o espaço entre rótulo e campo. Valor novo de `space-y` precisa entrar na
+  lista.
+- Alturas de linha absolutas da v3 (`--text-*--line-height`), paleta da v3 para
+  os tons usados, placeholder cinza e `cursor: pointer` em botões.
+- Degradês com `/srgb` (`bg-linear-to-r/srgb`): a v4 interpola em oklab e o
+  rosa→amarelo da marca mudava de meio-tom.
+- Em `@utility`, escreva `-webkit-backdrop-filter` **antes** de
+  `backdrop-filter`: na ordem inversa o minificador descarta o padrão e o Chrome
+  fica sem desfoque.
+
+
 | Arquivo                                           | Responsabilidade                          |
 | ------------------------------------------------- | ----------------------------------------- |
 | `src/index.css`                                   | Tokens CSS, utilitários glow/shimmer/hero |
-| `tailwind.config.js`                              | Mapa de cores → tokens, fonts, animações  |
+| `src/index.css` (`@theme`)                        | Mapa de cores → tokens, fonts, animações  |
 | `index.html`                                      | Google Fonts, `theme-color`               |
 | `src/components/ui/*`                             | Primitivos shadcn                         |
 | `src/components/member/MembershipCard.tsx`        | Visual da carteirinha                     |

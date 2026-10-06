@@ -241,7 +241,7 @@ export function UserModal({ onClose, onSuccess }: UserModalProps) {
             {/* Warning for Admin */}
             {selectedRole === 'admin' && (
               <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-                <Shield className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <Shield className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
                 <div className="text-sm">
                   <p className="font-medium text-red-600 dark:text-red-400">
                     Atenção: Acesso Administrativo

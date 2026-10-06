@@ -154,7 +154,7 @@ export function GoogleSignInButton({
       type="button"
       onClick={handleClick}
       disabled={disabled || loading || !scriptLoaded}
-      className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-md border border-border bg-white text-gray-700 font-medium shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full flex items-center justify-center gap-3 px-4 py-2.5 rounded-md border border-border bg-white text-gray-700 font-medium shadow-xs hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? (
         <div className="h-5 w-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />

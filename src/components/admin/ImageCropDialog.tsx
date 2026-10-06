@@ -295,7 +295,7 @@ export function ImageCropDialog({ files, onComplete, onCancel }: ImageCropDialog
 
   return (
     <div
-      className="modal-overlay z-[60]"
+      className="modal-overlay z-60"
       role="dialog"
       aria-modal="true"
       aria-labelledby="image-crop-title"

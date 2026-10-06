@@ -401,7 +401,7 @@ export default function ShopProfile() {
                   id="gender"
                   value={gender}
                   onChange={(e) => setGender(e.target.value as Gender | '')}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <option value="">Prefiro não informar agora</option>
                   {GENDERS.map((value) => (

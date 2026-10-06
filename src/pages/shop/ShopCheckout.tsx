@@ -461,7 +461,7 @@ export default function ShopCheckout() {
                         rows={3}
                         maxLength={500}
                         disabled={submitting}
-                        className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                       />
                       <p className="text-right text-xs text-muted-foreground">
                         {customerNote.length}/500

@@ -198,7 +198,7 @@ export function SubscriptionManagement({
     return (
       <Card className="border-dashed">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+          <div className="mx-auto w-16 h-16 rounded-full bg-linear-to-br/srgb from-primary/20 to-primary/5 flex items-center justify-center mb-4">
             <Repeat className="h-8 w-8 text-primary/60" />
           </div>
           <CardTitle className="text-xl">Assinatura Recorrente</CardTitle>
@@ -238,7 +238,7 @@ export function SubscriptionManagement({
     <>
       <Card className="overflow-hidden">
         {/* Plan Header Banner */}
-        <div className="bg-gradient-to-r from-primary to-primary/80 p-4 text-primary-foreground">
+        <div className="bg-linear-to-r/srgb from-primary to-primary/80 p-4 text-primary-foreground">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
@@ -351,7 +351,7 @@ export function SubscriptionManagement({
           {/* Failed payments warning */}
           {subscription.failedPayments > 0 && (
             <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-yellow-600 dark:text-yellow-400">
                   Problema com cobrança
@@ -367,7 +367,7 @@ export function SubscriptionManagement({
           {/* Paused warning */}
           {subscription.status === 'paused' && (
             <div className="flex items-start gap-3 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
-              <Pause className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+              <Pause className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-orange-600 dark:text-orange-400">
                   Assinatura pausada
@@ -554,7 +554,7 @@ export function SubscriptionManagement({
           {confirmAction === 'cancel' && (
             <div className="space-y-3">
               <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
                 <p className="text-sm text-red-600 dark:text-red-400">
                   Você perderá acesso a todos os benefícios imediatamente após o cancelamento.
                 </p>
@@ -564,7 +564,7 @@ export function SubscriptionManagement({
 
           {confirmAction === 'resume' && (
             <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+              <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
               <p className="text-sm text-green-600 dark:text-green-400">
                 Sua próxima cobrança será processada automaticamente na data agendada.
               </p>

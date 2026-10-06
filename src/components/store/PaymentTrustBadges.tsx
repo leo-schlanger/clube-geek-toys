@@ -57,7 +57,7 @@ export function PaymentTrustBadges({
 function Card({ children, label }: { children: React.ReactNode; label: string }) {
   return (
     <span
-      className="inline-flex h-8 w-[52px] items-center justify-center rounded-md border border-black/10 bg-white shadow-sm"
+      className="inline-flex h-8 w-[52px] items-center justify-center rounded-md border border-black/10 bg-white shadow-xs"
       title={label}
       aria-label={label}
       role="img"

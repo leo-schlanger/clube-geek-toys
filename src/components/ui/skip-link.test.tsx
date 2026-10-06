@@ -40,6 +40,6 @@ describe('SkipLink', () => {
 
   it('should have high z-index on focus', () => {
     render(<SkipLink />)
-    expect(screen.getByRole('link')).toHaveClass('focus:z-[100]')
+    expect(screen.getByRole('link')).toHaveClass('focus:z-100')
   })
 })

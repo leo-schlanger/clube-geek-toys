@@ -114,7 +114,7 @@ export default function AdminLogin() {
       <div className="absolute right-3 top-3 z-20">
         <ThemeToggle variant="icon" />
       </div>
-      <Card className="w-full max-w-md border-border bg-card/80 backdrop-blur">
+      <Card className="w-full max-w-md border-border bg-card/80 backdrop-blur-sm">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4">
             <img src="/logo.jpg" alt="GeekPop & Toys" className="h-16 rounded mx-auto" />

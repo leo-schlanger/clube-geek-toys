@@ -54,7 +54,7 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -10 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          className="relative overflow-hidden rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/15 via-primary/5 to-background p-6 text-center shadow-lg"
+          className="relative overflow-hidden rounded-2xl border-2 border-primary/40 bg-linear-to-br/srgb from-primary/15 via-primary/5 to-background p-6 text-center shadow-lg"
         >
           {/* Close button */}
           <button

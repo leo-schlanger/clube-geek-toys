@@ -106,7 +106,7 @@ export function SaveProductButton({
         handleClick()
       }}
       className={cn(
-        'flex h-9 w-9 items-center justify-center rounded-full bg-background/80 backdrop-blur transition hover:bg-background',
+        'flex h-9 w-9 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition hover:bg-background',
         className
       )}
     >

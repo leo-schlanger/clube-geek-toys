@@ -88,7 +88,7 @@ export function PixPaymentPanel({
       </p>
 
       <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-        <div className="rounded-xl bg-white p-3 shadow-sm">
+        <div className="rounded-xl bg-white p-3 shadow-xs">
           <QRCodeSVG value={emvCode} size={168} level="M" />
         </div>
 

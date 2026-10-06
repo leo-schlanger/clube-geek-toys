@@ -216,7 +216,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
 
                     {/* Animated scan line */}
                     <div
-                      className="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-primary to-transparent animate-scan"
+                      className="absolute left-4 right-4 h-0.5 bg-linear-to-r/srgb from-transparent via-primary to-transparent animate-scan"
                     />
                   </div>
                 </div>
@@ -234,7 +234,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
               {/* Status */}
               {isScanning && (
                 <div className="absolute bottom-4 left-0 right-0 text-center">
-                  <span className="px-4 py-2 bg-black/60 backdrop-blur-sm rounded-full text-white text-sm">
+                  <span className="px-4 py-2 bg-black/60 backdrop-blur-xs rounded-full text-white text-sm">
                     Procurando QR Code...
                   </span>
                 </div>

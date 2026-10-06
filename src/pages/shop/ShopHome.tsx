@@ -189,7 +189,7 @@ export default function ShopHome() {
       <main className="mx-auto max-w-6xl px-4 py-6">
         {/* Hero — unfiltered home only */}
         {!categorySlug && !search && (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 via-background to-accent/10 p-6 sm:p-10">
+          <section className="mb-8 overflow-hidden rounded-2xl border border-primary/20 bg-linear-to-br/srgb from-primary/15 via-background to-accent/10 p-6 sm:p-10">
             <div className="max-w-xl">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
                 <Sparkles className="h-3.5 w-3.5" />

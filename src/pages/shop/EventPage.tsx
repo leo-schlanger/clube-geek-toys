@@ -106,7 +106,7 @@ export default function EventPage() {
             <div className="space-y-2">
               <h1
                 id="event-title"
-                className="font-heading text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl"
+                className="font-heading text-3xl font-bold leading-tight sm:leading-10 lg:leading-none sm:text-4xl lg:text-5xl"
               >
                 {event.title}
               </h1>
@@ -334,7 +334,7 @@ function MobileReserveBar({ event }: { event: EventConfig }) {
   return (
     <div
       data-testid="mobile-reserve-bar"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm sm:hidden"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

@@ -261,7 +261,7 @@ export function StepPersonalData({
               type="text"
               placeholder="Seu nome completo"
               className={cn(
-                "w-full rounded-lg border bg-background py-2.5 pl-10 pr-3 text-sm outline-none transition-colors",
+                "w-full rounded-lg border bg-background py-2.5 pl-10 pr-3 text-sm outline-hidden transition-colors",
                 "focus:border-primary focus:ring-1 focus:ring-primary",
                 errors.fullName ? "border-red-500" : "border-border"
               )}
@@ -289,7 +289,7 @@ export function StepPersonalData({
               inputMode="numeric"
               placeholder="000.000.000-00"
               className={cn(
-                "w-full rounded-lg border bg-background py-2.5 pl-10 pr-10 text-sm outline-none transition-colors",
+                "w-full rounded-lg border bg-background py-2.5 pl-10 pr-10 text-sm outline-hidden transition-colors",
                 "focus:border-primary focus:ring-1 focus:ring-primary",
                 errors.cpf || cpfStatus === "error"
                   ? "border-red-500"
@@ -341,7 +341,7 @@ export function StepPersonalData({
               inputMode="numeric"
               placeholder="(00) 00000-0000"
               className={cn(
-                "w-full rounded-lg border bg-background py-2.5 pl-10 pr-3 text-sm outline-none transition-colors",
+                "w-full rounded-lg border bg-background py-2.5 pl-10 pr-3 text-sm outline-hidden transition-colors",
                 "focus:border-primary focus:ring-1 focus:ring-primary",
                 errors.phone ? "border-red-500" : "border-border"
               )}

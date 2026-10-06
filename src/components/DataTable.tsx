@@ -5,6 +5,7 @@ import { Input } from './ui/input'
 import { Badge } from './ui/badge'
 import { Pagination } from './ui/pagination'
 import { Skeleton } from './ui/skeleton'
+import { cn } from '../lib/utils'
 import {
   Search,
   X,
@@ -637,7 +638,7 @@ export function DataTable<T extends Record<string, any>>({
                 {displayColumns.map((col) => (
                   <th
                     key={col.key}
-                    className={`text-left py-3 px-4 font-medium text-sm ${col.className || ''}`}
+                    className={cn('text-left py-3 px-4 font-medium text-sm', col.className)}
                     style={{ width: col.width }}
                   >
                     {col.sortable ? (
@@ -722,7 +723,7 @@ export function DataTable<T extends Record<string, any>>({
                     }`}
                   >
                     {displayColumns.map((col) => (
-                      <td key={col.key} className={`py-4 px-4 ${col.className || ''}`}>
+                      <td key={col.key} className={cn('py-4 px-4', col.className)}>
                         {col.render ? col.render(item) : item[col.key]}
                       </td>
                     ))}

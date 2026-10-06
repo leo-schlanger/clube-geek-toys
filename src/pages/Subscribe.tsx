@@ -146,7 +146,7 @@ export default function Subscribe() {
           </motion.div>
 
           <motion.h1
-            className="font-heading text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight mb-4"
+            className="font-heading text-3xl sm:text-4xl md:text-5xl font-extrabold leading-tight sm:leading-10 md:leading-none mb-4"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
@@ -252,7 +252,7 @@ export default function Subscribe() {
           <Card className="relative overflow-hidden flex flex-col ring-2 ring-primary/50 shadow-lg shadow-primary/10">
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent text-primary-foreground">
+                <div className="p-2.5 rounded-xl bg-linear-to-br/srgb from-primary via-primary/80 to-accent text-primary-foreground">
                   <Sparkles className="h-7 w-7" />
                 </div>
                 <div>
@@ -270,7 +270,7 @@ export default function Subscribe() {
               </p>
             </div>
 
-            <CardContent className="px-6 pb-4 flex-grow">
+            <CardContent className="px-6 pb-4 grow">
               <ul className="space-y-2.5">
                 {[
                   ...CLUB_PLAN.benefits,
@@ -279,7 +279,7 @@ export default function Subscribe() {
                   'Garantia de 7 dias com reembolso integral',
                 ].map((benefit) => (
                   <li key={benefit} className="flex items-start gap-2.5 text-sm">
-                    <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
                     <span className="text-muted-foreground">{benefit}</span>
                   </li>
                 ))}

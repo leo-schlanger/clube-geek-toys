@@ -184,7 +184,7 @@ export default function WholesaleRegister() {
                   placeholder="Ex.: loja de presentes e artigos geek, revenda de photocards e Funko Pop…"
                   value={businessActivity}
                   onChange={(e) => setBusinessActivity(e.target.value)}
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 />
                 <p className="text-xs text-muted-foreground">
                   Usamos isso para conferir se o CNPJ está de acordo com o que você pretende

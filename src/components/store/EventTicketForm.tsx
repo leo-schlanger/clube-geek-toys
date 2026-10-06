@@ -31,7 +31,7 @@ type Props = {
 type Attendee = { name: string; kind: TicketKind }
 
 const SELECT_CLASS =
-  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
 
 /** Typing mask: digits only, formatted once all eleven are in. */
 function maskCPF(value: string): string {
@@ -297,7 +297,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
   return (
     <div
       id="ingressos"
-      className="scroll-mt-28 rounded-2xl border border-primary/20 bg-card p-6 shadow-sm md:p-8"
+      className="scroll-mt-28 rounded-2xl border border-primary/20 bg-card p-6 shadow-xs md:p-8"
     >
       <div className="mb-6 flex items-start gap-3">
         <div className="rounded-xl bg-primary/15 p-2.5 text-primary">
@@ -472,7 +472,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
             value={buyer.notes}
             onChange={(e) => setBuyer({ ...buyer, notes: e.target.value })}
             placeholder="Ex.: chegamos mais tarde, criança de colo…"
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
           />
         </div>
 

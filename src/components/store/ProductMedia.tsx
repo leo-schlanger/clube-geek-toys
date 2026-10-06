@@ -73,7 +73,7 @@ export function ProductVideoThumb({ video }: { video: ProductVideo }) {
       ) : (
         <span className="text-[10px] text-muted-foreground">{videoKindLabel(video.kind)}</span>
       )}
-      <Play className={cn('absolute h-5 w-5 text-white drop-shadow')} />
+      <Play className={cn('absolute h-5 w-5 text-white drop-shadow-sm')} />
     </span>
   )
 }

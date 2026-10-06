@@ -155,7 +155,7 @@ function UserFooter({ onSignOut, onClose }: { onSignOut: () => void; onClose?: (
     <div className="p-3 border-t border-border space-y-2">
       {user && (
         <div className="px-3 py-2 rounded-lg bg-muted/40 flex items-center gap-3 min-w-0">
-          <div className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0">
+          <div className="h-8 w-8 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-sm shrink-0">
             {user.email.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">

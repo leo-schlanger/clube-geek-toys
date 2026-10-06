@@ -134,7 +134,7 @@ export function ProductCard({
         <SaveProductButton
           productId={product.id}
           productName={product.name}
-          className="absolute right-2 top-2 z-10 shadow-sm"
+          className="absolute right-2 top-2 z-10 shadow-xs"
         />
       )}
 

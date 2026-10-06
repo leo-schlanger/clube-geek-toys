@@ -87,7 +87,7 @@ export function ProductQuestions({ productSlug, productId }: ProductQuestionsPro
             placeholder="Pergunte sobre tamanho, prazo, disponibilidade..."
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Sua pergunta sobre o produto"
           />
           <div className="flex items-center justify-between gap-3">

@@ -47,7 +47,7 @@ export function ClubCheckoutPitch({ subtotal }: { subtotal: number }) {
 /** Shop home section that makes the case for joining. */
 export function ClubHomePitch() {
   return (
-    <section className="mb-8 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/10 via-background to-primary/10 p-6 sm:p-8">
+    <section className="mb-8 rounded-2xl border border-accent/30 bg-linear-to-br/srgb from-accent/10 via-background to-primary/10 p-6 sm:p-8">
       <div className="grid gap-6 md:grid-cols-[1.2fr_1fr] md:items-center">
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-accent">

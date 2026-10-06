@@ -23,7 +23,7 @@ export function ProductSortSelect({ value, onChange, className, id = 'product-so
         aria-label="Ordenar produtos"
         value={value}
         onChange={(e) => onChange(e.target.value as ProductSort)}
-        className="h-9 min-w-[11.5rem] rounded-md border border-input bg-background px-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="h-9 min-w-46 rounded-md border border-input bg-background px-2 text-sm text-foreground ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {PRODUCT_SORT_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>

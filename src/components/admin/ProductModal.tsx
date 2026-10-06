@@ -1445,7 +1445,7 @@ export function ProductModal({
                     placeholder="Detalhes, dimensões, material..."
                     value={form.description}
                     onChange={(e) => update("description", e.target.value)}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   />
                 </div>
 
@@ -1871,7 +1871,7 @@ export function ProductModal({
                               type="button"
                               onClick={() => void startImageEdit(i)}
                               disabled={openingImageEdit != null || uploadingImages}
-                              className="absolute top-1 left-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-primary disabled:opacity-60"
+                              className="absolute top-1 left-1 rounded-full bg-black/70 p-1 text-white shadow-sm transition-colors hover:bg-primary disabled:opacity-60"
                               title="Editar foto (recortar/girar)"
                               aria-label={`Editar foto ${i + 1}`}
                             >
@@ -1885,7 +1885,7 @@ export function ProductModal({
                           <button
                             type="button"
                             onClick={() => removeExistingImage(i)}
-                            className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-destructive"
+                            className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white shadow-sm transition-colors hover:bg-destructive"
                             title="Remover imagem"
                             aria-label={`Remover foto ${i + 1}`}
                           >
@@ -1909,7 +1909,7 @@ export function ProductModal({
                           <button
                             type="button"
                             onClick={() => startPendingImageEdit(i)}
-                            className="absolute top-1 left-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-primary"
+                            className="absolute top-1 left-1 rounded-full bg-black/70 p-1 text-white shadow-sm transition-colors hover:bg-primary"
                             title="Editar foto (recortar/girar)"
                             aria-label={`Editar foto nova ${i + 1}`}
                           >
@@ -1918,7 +1918,7 @@ export function ProductModal({
                           <button
                             type="button"
                             onClick={() => removePendingFile(i)}
-                            className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white shadow transition-colors hover:bg-destructive"
+                            className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white shadow-sm transition-colors hover:bg-destructive"
                             title="Remover imagem"
                             aria-label={`Remover foto nova ${i + 1}`}
                           >

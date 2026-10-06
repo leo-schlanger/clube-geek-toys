@@ -3,7 +3,7 @@ import { Percent, ShoppingBag } from 'lucide-react'
 
 export function DiscountStrip() {
   return (
-    <div className="rounded-xl bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/20 p-4">
+    <div className="rounded-xl bg-linear-to-r/srgb from-green-900/30 to-emerald-900/30 border border-green-500/20 p-4">
       <div className="flex items-center gap-2 mb-3">
         <Percent className="h-4 w-4 text-green-400" />
         <span className="text-xs font-semibold text-green-300 uppercase tracking-wider">

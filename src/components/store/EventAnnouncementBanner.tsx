@@ -54,7 +54,7 @@ export function EventAnnouncementBanner() {
     <div
       role="region"
       aria-label="Anúncio do evento"
-      className="relative z-50 border-b border-primary/30 bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground shadow-md"
+      className="relative z-50 border-b border-primary/30 bg-linear-to-r/srgb from-primary via-primary to-primary/90 text-primary-foreground shadow-md"
     >
       <div className="relative mx-auto flex max-w-6xl flex-col items-center justify-center gap-2 px-4 py-2.5 pr-10 text-center md:flex-row md:gap-4 md:pr-12 md:text-left">
         <p className="flex items-center gap-2 text-sm font-semibold leading-snug md:text-[15px]">
@@ -71,7 +71,7 @@ export function EventAnnouncementBanner() {
           </Link>
           <Link
             to="/evento#ingressos"
-            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground shadow-sm transition-all hover:brightness-105 md:text-sm"
+            className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-foreground shadow-xs transition-all hover:brightness-105 md:text-sm"
           >
             <Ticket className="h-3.5 w-3.5" aria-hidden />
             {event.ticketReservation.enabled ? 'Reservar ingresso' : 'Saiba mais'}

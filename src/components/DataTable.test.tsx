@@ -97,6 +97,17 @@ describe('DataTable', () => {
       render(<DataTable {...defaultProps} />)
       expect(screen.queryByText('Ações')).not.toBeInTheDocument()
     })
+
+    // The header carried both text-left and the column's text-center, and the
+    // stylesheet's order decided which one won — Tailwind 4 flipped it.
+    it("a column's alignment replaces the default instead of competing with it", () => {
+      const centered: Column<TestRow>[] = [{ key: 'age', header: 'Idade', className: 'text-center' }]
+      render(<DataTable {...defaultProps} columns={centered} />)
+      const header = screen.getByRole('columnheader', { name: /Idade/ })
+      expect(header).toHaveClass('text-center')
+      expect(header).not.toHaveClass('text-left')
+      expect(screen.getByRole('cell', { name: '30' })).toHaveClass('text-center')
+    })
   })
 
   // ── Search ──────────────────────────────────────────────────

@@ -182,7 +182,7 @@ function QueueCard({ item, meta, onOpen }: QueueCardProps) {
       type="button"
       onClick={() => onOpen(meta.tab)}
       aria-label={`${item.count} ${meta.label} — abrir`}
-      className={`text-left rounded-lg border bg-card p-4 transition-all hover:shadow-lg hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${style.ring}`}
+      className={`text-left rounded-lg border bg-card p-4 transition-all hover:shadow-lg hover:border-primary/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${style.ring}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">

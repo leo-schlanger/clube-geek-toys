@@ -36,7 +36,7 @@ export function CatalogPager({ page, total, pageSize, onPageChange }: CatalogPag
           <ChevronLeft className="h-4 w-4" />
           Anterior
         </Button>
-        <span className="min-w-[5.5rem] text-center text-sm font-medium">
+        <span className="min-w-22 text-center text-sm font-medium">
           Página {page} de {totalPages}
         </span>
         <Button

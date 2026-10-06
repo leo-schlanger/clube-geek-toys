@@ -85,7 +85,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur-sm supports-backdrop-filter:bg-background/80">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:h-16 sm:gap-3">
           {/* Logo */}
           <Link to={isWholesale ? '/atacado' : '/'} className="flex shrink-0 items-center gap-2">
@@ -132,7 +132,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             onSubmit={handleSearch}
             className="relative ml-1 hidden min-w-0 flex-1 items-stretch sm:flex"
           >
-            <div className="flex w-full overflow-hidden rounded-md border-2 border-primary bg-background shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
+            <div className="flex w-full overflow-hidden rounded-md border-2 border-primary bg-background shadow-xs focus-within:ring-2 focus-within:ring-primary/30">
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -188,7 +188,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
                 <Badge
                   variant="default"
                   className={cn(
-                    'absolute -right-1 -top-1 h-5 min-w-[1.25rem] justify-center rounded-full px-1 text-[10px] tabular-nums'
+                    'absolute -right-1 -top-1 h-5 min-w-5 justify-center rounded-full px-1 text-[10px] tabular-nums'
                   )}
                 >
                   {count > 99 ? '99+' : count}
@@ -246,7 +246,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
 
         {/* Mobile row 2: search always visible (Shopee pattern) */}
         <form onSubmit={handleSearch} className="border-t px-3 py-2 sm:hidden">
-          <div className="flex overflow-hidden rounded-md border-2 border-primary bg-background shadow-sm focus-within:ring-2 focus-within:ring-primary/30">
+          <div className="flex overflow-hidden rounded-md border-2 border-primary bg-background shadow-xs focus-within:ring-2 focus-within:ring-primary/30">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input

@@ -1,7 +1,7 @@
 /**
  * Offline notice.
  *
- * **Sits at the bottom, not the top.** It used to be `fixed top-0 z-[9999]`,
+ * **Sits at the bottom, not the top.** It used to be `fixed top-0 z-9999`,
  * and all three SPAs put their header at `top: 0`. With the page scrolled, this
  * 39px strip covered the header's first row and blocked cart, login, search and
  * theme for as long as the connection was down.
@@ -40,7 +40,7 @@ export function OfflineBanner() {
     <div
       role="alert"
       aria-live="polite"
-      className={`fixed bottom-0 left-0 right-0 z-[9997] px-4 py-2 text-center text-sm font-medium transition-colors ${
+      className={`fixed bottom-0 left-0 right-0 z-9997 px-4 py-2 text-center text-sm font-medium transition-colors ${
         isOnline
           ? 'bg-green-500 text-white'
           : 'bg-yellow-500 text-yellow-900'

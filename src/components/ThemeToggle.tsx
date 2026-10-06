@@ -61,9 +61,9 @@ export function ThemeToggle({ variant = 'icon', className }: Props) {
             onClick={() => setTheme(id)}
             className={cn(
               'inline-flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
               active
-                ? 'bg-background text-foreground shadow-sm'
+                ? 'bg-background text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground'
             )}
             aria-pressed={active}

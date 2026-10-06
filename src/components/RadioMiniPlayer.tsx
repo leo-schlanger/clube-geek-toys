@@ -196,7 +196,7 @@ export default function RadioMiniPlayer() {
                       aria-hidden
                       className="w-full h-full object-cover scale-150 blur-3xl opacity-30"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/85 to-background/95" />
+                    <div className="absolute inset-0 bg-linear-to-b/srgb from-background/40 via-background/85 to-background/95" />
                   </div>
                 )}
 
@@ -246,7 +246,7 @@ export default function RadioMiniPlayer() {
                     <button
                       onClick={togglePlay}
                       aria-label={isPlaying ? 'Pausar' : 'Tocar'}
-                      className="relative w-16 h-16 rounded-xl overflow-hidden border border-border/60 shadow-lg flex-shrink-0 group"
+                      className="relative w-16 h-16 rounded-xl overflow-hidden border border-border/60 shadow-lg shrink-0 group"
                     >
                       {song?.art ? (
                         <img
@@ -256,7 +256,7 @@ export default function RadioMiniPlayer() {
                           decoding="async"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary/30 to-amber-600/20 flex items-center justify-center">
+                        <div className="w-full h-full bg-linear-to-br/srgb from-primary/30 to-amber-600/20 flex items-center justify-center">
                           <Music className="w-6 h-6 text-primary/80" />
                         </div>
                       )}
@@ -270,8 +270,8 @@ export default function RadioMiniPlayer() {
                         <div
                           className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg transition-all ${
                             isPlaying
-                              ? 'bg-white/0 group-hover:bg-gradient-to-r group-hover:from-yellow-500 group-hover:to-amber-600 text-transparent group-hover:text-black'
-                              : 'bg-gradient-to-r from-primary to-accent text-primary-foreground'
+                              ? 'bg-white/0 group-hover:bg-linear-to-r/srgb group-hover:from-yellow-500 group-hover:to-amber-600 text-transparent group-hover:text-black'
+                              : 'bg-linear-to-r/srgb from-primary to-accent text-primary-foreground'
                           }`}
                         >
                           {isPlaying ? (
@@ -369,7 +369,7 @@ export default function RadioMiniPlayer() {
               className="pointer-events-auto flex items-center gap-2 px-3 py-2.5 glass rounded-full border border-primary/40 shadow-lg shadow-black/30 hover:border-primary/80 hover:shadow-primary/20 transition-all group"
               aria-label="Abrir player da rádio"
             >
-              <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-md">
+              <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-r/srgb from-primary to-accent text-primary-foreground shadow-md">
                 {isPlaying ? (
                   <Pause className="w-4 h-4" fill="currentColor" />
                 ) : (

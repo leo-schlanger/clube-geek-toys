@@ -130,7 +130,7 @@ export default function WholesaleHome() {
       <ShopHeader isWholesale />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8 rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-6 sm:p-8">
+        <div className="mb-8 rounded-2xl border border-primary/20 bg-linear-to-br/srgb from-primary/10 via-background to-accent/10 p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2">

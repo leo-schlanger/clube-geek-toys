@@ -19,7 +19,7 @@ describe('Card', () => {
     const el = screen.getByTestId('card')
     expect(el).toHaveClass('rounded-lg')
     expect(el).toHaveClass('border')
-    expect(el).toHaveClass('shadow-sm')
+    expect(el).toHaveClass('shadow-xs')
   })
 
   it('should apply custom className', () => {

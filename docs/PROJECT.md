@@ -931,7 +931,6 @@ clube-geek-toys/
 ├── package.json
 ├── vite.config.ts
 ├── vitest.config.ts
-├── tailwind.config.js
 ├── postcss.config.js
 ├── eslint.config.js
 ├── commitlint.config.js

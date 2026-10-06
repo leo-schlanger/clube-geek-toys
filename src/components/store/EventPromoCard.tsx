@@ -25,7 +25,7 @@ export function EventPromoCard() {
   return (
     <section
       aria-labelledby="event-promo-title"
-      className="mb-8 overflow-hidden rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-accent/10 shadow-sm"
+      className="mb-8 overflow-hidden rounded-3xl border border-primary/25 bg-linear-to-br/srgb from-primary/10 via-card to-accent/10 shadow-xs"
     >
       <div className="flex gap-4 p-4 sm:gap-8 sm:p-6">
         {cover && (
@@ -37,7 +37,7 @@ export function EventPromoCard() {
             <img
               src={cover}
               alt={`Cartaz: ${event.title}`}
-              className="aspect-[4/5] h-full w-full object-cover object-top"
+              className="aspect-4/5 h-full w-full object-cover object-top"
             />
           </Link>
         )}
@@ -48,7 +48,7 @@ export function EventPromoCard() {
           </span>
           <h2
             id="event-promo-title"
-            className="font-heading text-xl font-bold leading-tight sm:text-3xl"
+            className="font-heading text-xl font-bold leading-tight sm:leading-9 sm:text-3xl"
           >
             {event.title}
           </h2>

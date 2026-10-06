@@ -558,7 +558,7 @@ export default function AdminDashboard() {
               )}
 
               {/* Quick Action - PDV */}
-              <Card className="bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
+              <Card className="bg-transparent bg-linear-to-r/srgb from-primary to-primary/80 text-primary-foreground">
                 <CardContent className="p-4 lg:p-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
