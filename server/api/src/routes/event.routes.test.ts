@@ -254,6 +254,17 @@ describe('admin: art', () => {
     expect((await api.post('/admin/events/..%2F..%2Fetc/banner', { as: 'admin', form: imageForm('banner') })).status).toBe(400);
   });
 
+  // The only test that reaches multer's size limit: the 413 depends on the
+  // error code multer raises, and the half-written file must not stay behind.
+  it('refuses a banner over 8 MB with 413 and leaves nothing on disk', async () => {
+    const big = Buffer.concat([JPEG, Buffer.alloc(8 * 1024 * 1024)]);
+    const res = await api.post(`/admin/events/${EVENT_ID}/banner`, { as: 'admin', form: imageForm('banner', big) });
+    expect(res.status).toBe(413);
+    expect(res.body.error).toMatch(/8 MB/);
+    expect(config.updateEvent).not.toHaveBeenCalled();
+    expect(filesOnDisk()).toHaveLength(0);
+  });
+
   it('appends a flyer, and deletes the file when the service refuses it', async () => {
     config.addEventFlyer.mockResolvedValueOnce(future);
     const ok = await api.post(`/admin/events/${EVENT_ID}/flyers`, { as: 'admin', form: imageForm('flyer') });
