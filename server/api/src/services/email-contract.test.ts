@@ -56,11 +56,15 @@ async function render(template: string, variables: Record<string, string> = {}) 
 
 /** Hosts the CTA button points at. */
 function ctaHosts(html: string): string[] {
-  // The CTA is the only anchor with the gradient background; the footer links
-  // are matched separately where they matter.
-  return [...html.matchAll(/<a href="([^"]+)"[^>]*background:linear-gradient/g)].map((m) =>
-    new URL(m[1] as string).host
-  );
+  return ctaUrls(html).map((url) => new URL(url).host);
+}
+
+/**
+ * URLs of the CTA button: the anchor inside the solid-colored cell. The footer
+ * links are matched separately where they matter.
+ */
+function ctaUrls(html: string): string[] {
+  return [...html.matchAll(/<td bgcolor="[^"]+"[^>]*>\s*<a href="([^"]+)"/g)].map((m) => m[1] as string);
 }
 
 beforeEach(() => {
@@ -169,8 +173,37 @@ describe('para onde cada e-mail leva', () => {
       buyer_name: 'Janaina',
       admin_url: 'https://adm.geeketoys.com.br/admin?tab=events',
     });
-    const cta = [...html.matchAll(/<a href="([^"]+)"[^>]*background:linear-gradient/g)][0]![1] as string;
-    expect(cta).toBe('https://adm.geeketoys.com.br/admin?tab=events');
+    expect(ctaUrls(html)[0]).toBe('https://adm.geeketoys.com.br/admin?tab=events');
+  });
+});
+
+/**
+ * "Ingressos liberados — abra o link", e o link não estava lá: a cliente usava
+ * Yahoo Mail, que descarta `linear-gradient`. O botão tinha só o gradiente de
+ * fundo e texto branco — sumia no branco. Ela foi pedir o QR pelo WhatsApp.
+ */
+describe('o botão sobrevive a cliente de e-mail que ignora gradiente', () => {
+  const TICKETS_URL = 'https://shop.geekpoptoys.com.br/ingressos/ABCD-1234';
+
+  it('o fundo do botão tem uma cor sólida, não só o gradiente', async () => {
+    const { html } = await render('event-tickets-ready', { tickets_url: TICKETS_URL });
+    expect(html).toMatch(/<td bgcolor="#[0-9A-Fa-f]{6}" style="background-color:#[0-9A-Fa-f]{6};/);
+    expect(html).not.toMatch(/style="background:linear-gradient/);
+  });
+
+  it.each(['event-tickets-ready', 'event-reservation-received'])(
+    '%s também traz o link dos ingressos em texto',
+    async (template) => {
+      const { html } = await render(template, { tickets_url: TICKETS_URL });
+      expect(ctaUrls(html)).toEqual([TICKETS_URL]);
+      // Fora do botão: o endereço legível, que dá para copiar mesmo sem CSS.
+      expect(html).toContain(`>${TICKETS_URL}</a>`);
+    },
+  );
+
+  it('sem URL de verdade, não imprime "#" como link para copiar', async () => {
+    const { html } = await render('event-tickets-ready');
+    expect(html).not.toContain('copie e abra este link');
   });
 });
 

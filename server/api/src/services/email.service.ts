@@ -794,7 +794,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         ${v.pix_code ? pixBox(v.pix_code, v.pix_key || '', v.total || '0,00') : ''}
         ${v.pix_auto
-          ? infoBox('⚡ A confirmação é <strong>automática</strong>: assim que o PIX cair, os ingressos são liberados e você recebe outro e-mail com o QR Code de cada pessoa. Não precisa mandar comprovante. O código PIX vale por 24 horas.')
+          ? infoBox('⚡ A confirmação é <strong>automática</strong>: assim que o PIX cair, os ingressos são liberados e você recebe outro e-mail com o link onde fica o QR Code de cada pessoa. Não precisa mandar comprovante. O código PIX vale por 24 horas.')
           : infoBox('⏳ Os ingressos ficam <strong>aguardando confirmação</strong> até a equipe conferir o pagamento. Assim que confirmarmos, cada pessoa recebe o QR Code de entrada neste mesmo link.')}`,
       cta: { text: v.pix_auto ? 'Pagar e ver meus ingressos' : 'Ver meus ingressos', url: v.tickets_url || '#' },
     },
@@ -806,7 +806,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         <h2 style="color:#4ade80;margin:0 0 12px">Ingressos liberados! ✅</h2>
         <p>Olá, <strong>${name}</strong>!</p>
         <p>Confirmamos o pagamento da reserva <strong>${v.reservation_code || ''}</strong>. Seus <strong>${v.quantity || '1'}</strong> ingresso(s) para o <strong>${v.event_title || 'evento'}</strong> já estão válidos.</p>
-        ${infoBox('🎫 Cada ingresso é <strong>nominal</strong> e tem um QR Code próprio. Na entrada, o código é lido uma única vez — depois disso ele aparece como utilizado. Abra o link no celular ou imprima.')}`,
+        ${infoBox('🎫 Cada ingresso é <strong>nominal</strong> e tem um QR Code próprio, que aparece na página do link abaixo. Na entrada, o código é lido uma única vez — depois disso ele aparece como utilizado. Abra o link no celular ou imprima.')}`,
       cta: { text: 'Abrir meus ingressos', url: v.tickets_url || '#' },
     },
 
@@ -839,10 +839,20 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     body: `<p>Template: ${template}</p>`,
   };
 
+  // The button used to be an <a> whose only background was a gradient. Yahoo
+  // Mail drops gradients, which left white text on nothing: a customer got
+  // "Ingressos liberados — abra o link" with no visible link (Oct/2026). So:
+  // a solid bgcolor the gradient merely paints over, and the URL in plain
+  // text underneath, which survives any client.
   const ctaHtml = tmpl.cta
-    ? `<div style="text-align:center;margin:28px 0 8px">
-        <a href="${tmpl.cta.url}" style="display:inline-block;background:linear-gradient(135deg,#F04080,#E11D6A);color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:0.3px;box-shadow:0 4px 14px rgba(240,64,128,0.35)">${tmpl.cta.text}</a>
-       </div>`
+    ? `<table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:28px auto 8px">
+        <tr><td bgcolor="#E11D6A" style="background-color:#E11D6A;background-image:linear-gradient(135deg,#F04080,#E11D6A);border-radius:8px;text-align:center">
+          <a href="${tmpl.cta.url}" style="display:inline-block;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:700;font-size:15px;letter-spacing:0.3px">${tmpl.cta.text}</a>
+        </td></tr>
+       </table>
+       ${tmpl.cta.url.startsWith('http')
+         ? `<p style="text-align:center;margin:12px 0 0;font-size:12px;line-height:1.5;color:#94a3b8">Se o botão não aparecer, copie e abra este link:<br><a href="${tmpl.cta.url}" style="color:#F04080;word-break:break-all">${tmpl.cta.url}</a></p>`
+         : ''}`
     : '';
 
   const siteUrl = 'https://geeketoys.com.br';
@@ -882,7 +892,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     <div style="height:2px;background:linear-gradient(90deg,transparent,#F04080,transparent);margin:0 40px 16px"></div>
 
     <!-- Content Card -->
-    <div style="background:linear-gradient(180deg,#16213e,#141e33);border-radius:16px;padding:28px 24px;border:1px solid rgba(240,64,128,0.12);color:#e2e8f0;line-height:1.7;font-size:15px">
+    <div style="background-color:#16213e;background-image:linear-gradient(180deg,#16213e,#141e33);border-radius:16px;padding:28px 24px;border:1px solid rgba(240,64,128,0.12);color:#e2e8f0;line-height:1.7;font-size:15px">
       ${tmpl.body}
       ${ctaHtml}
     </div>
