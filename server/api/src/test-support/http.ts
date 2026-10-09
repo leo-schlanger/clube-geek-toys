@@ -43,6 +43,8 @@ export function routerClient(mount: string, router: Router, { raw = false }: { r
     // Lazy: the error handler imports the env module, which the test mocks.
     const { errorHandler } = await import('../middleware/error-handler.js');
     const app = express();
+    // As in src/index.ts: one proxy (nginx) in front, so req.ip is the address it saw.
+    app.set('trust proxy', 1);
     app.use(raw ? express.raw({ type: '*/*' }) : express.json());
     app.use(mount, router);
     app.use(errorHandler);

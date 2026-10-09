@@ -40,11 +40,14 @@ const session = { accessToken: 'acc', refreshToken: 'ref-123', user: { id: 'u1' 
 beforeEach(() => vi.clearAllMocks());
 
 describe('sign-in', () => {
+  // nginx appends the address it saw to whatever X-Forwarded-For the client
+  // sent. The first entry is the client's own claim; the audit trail and the
+  // admin new-device alert must carry the one nginx added.
   it('logs in, passing the real client IP, and sets the refresh cookie', async () => {
     auth.login.mockResolvedValue(session);
     const res = await api.post('/login', {
       body: { email: 'laura@example.com', password: 'x' },
-      headers: { 'X-Forwarded-For': '177.1.2.3, 10.0.0.1', 'User-Agent': 'Test/1.0' },
+      headers: { 'X-Forwarded-For': '6.6.6.6, 177.1.2.3', 'User-Agent': 'Test/1.0' },
     });
     expect(res.status).toBe(200);
     expect(auth.login).toHaveBeenCalledWith(expect.objectContaining({ ip: '177.1.2.3', userAgent: 'Test/1.0' }));

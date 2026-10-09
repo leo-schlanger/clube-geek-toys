@@ -102,7 +102,7 @@ contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
       }
     }
 
-    const serverIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    const serverIp = req.ip || 'unknown';
     req.body.ipAddress = serverIp;
     const result = await contractService.saveContract(req.body, req.file);
     res.status(201).json(result);

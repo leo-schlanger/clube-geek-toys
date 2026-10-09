@@ -71,13 +71,15 @@ describe('upload', () => {
     expect((await api.post('/', { form: contractForm(MEMBER) })).status).toBe(401);
   });
 
+  // The signing IP is evidence: it must be the address nginx saw, not the
+  // first X-Forwarded-For entry, which the client writes.
   it("saves the member's own contract with the caller's IP", async () => {
     db();
     contracts.saveContract.mockResolvedValue({ id: 'c1' });
     const res = await api.post('/', {
       as: 'member',
       form: contractForm(MEMBER, [PDF, 'contrato.pdf', 'application/pdf']),
-      headers: { 'X-Forwarded-For': '177.10.20.30, 10.0.0.1' },
+      headers: { 'X-Forwarded-For': '6.6.6.6, 177.10.20.30' },
     });
     expect(res.status).toBe(201);
     expect(contracts.saveContract).toHaveBeenCalledWith(

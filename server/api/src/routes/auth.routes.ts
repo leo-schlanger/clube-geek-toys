@@ -96,7 +96,7 @@ const sendVerificationSchema = z.object({
 
 authRouter.post('/register', authLimiter, validate(registerSchema), async (req, res, next) => {
   try {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const ip = req.ip || '';
     const result = await authService.register({ ...req.body, ip, userAgent: req.headers['user-agent'] });
     setRefreshCookie(res, result.refreshToken);
     res.status(201).json(result);
@@ -108,7 +108,7 @@ authRouter.post('/register', authLimiter, validate(registerSchema), async (req, 
 
 authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, next) => {
   try {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const ip = req.ip || '';
     const result = await authService.login({ ...req.body, ip, userAgent: req.headers['user-agent'] });
     setRefreshCookie(res, result.refreshToken);
     res.json(result);
@@ -119,7 +119,7 @@ authRouter.post('/login', authLimiter, validate(loginSchema), async (req, res, n
 
 authRouter.post('/google', authLimiter, validate(googleAuthSchema), async (req, res, next) => {
   try {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '';
+    const ip = req.ip || '';
     const result = await authService.googleAuth(req.body.idToken, ip, req.headers['user-agent']);
     setRefreshCookie(res, result.refreshToken);
     res.json(result);
