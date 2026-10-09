@@ -44,6 +44,11 @@ updates:
       api-minor-patch:
         update-types: [minor, patch]
     ignore:
+      # Stripe is legacy (refunds of charges before 2026-09-01). A major bump
+      # moves every call to a newer Stripe API version, which no test can
+      # check without refunding real money. Stay on 22 until Stripe is removed.
+      - dependency-name: stripe
+        update-types: [version-update:semver-major]
       # Types follow the runtime: the API runs Node 24 (server/api/Dockerfile).
       # Move both together when the runtime changes.
       - dependency-name: '@types/node'
