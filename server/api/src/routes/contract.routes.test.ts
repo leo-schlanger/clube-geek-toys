@@ -139,6 +139,9 @@ describe('reading and revoking', () => {
     await api.post('/c1/revoke', { as: 'member', body: { memberId: MEMBER, reason: 'erro no nome' } });
     expect(contracts.revokeContract).toHaveBeenCalledWith('c1', MEMBER, 'erro no nome');
     expect((await api.post('/c1/revoke', { as: 'member', body: {} })).status).toBe(400);
+    // No body at all: Express 5 leaves req.body undefined, and the destructuring
+    // used to answer 500. See middleware/body-default.ts.
+    expect((await api.post('/c1/revoke', { as: 'member' })).status).toBe(400);
     db({ owner: 'user-other' });
     expect((await api.post('/c1/revoke', { as: 'member', body: { memberId: MEMBER } })).status).toBe(403);
   });

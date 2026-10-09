@@ -2,6 +2,7 @@ import express, { type Router } from 'express';
 import jwt from 'jsonwebtoken';
 import type { AddressInfo } from 'node:net';
 import { TEST_JWT_SECRET } from './env.js';
+import { bodyDefault } from '../middleware/body-default.js';
 
 /**
  * Real HTTP against a real router, for route tests.
@@ -46,6 +47,7 @@ export function routerClient(mount: string, router: Router, { raw = false }: { r
     // As in src/index.ts: one proxy (nginx) in front, so req.ip is the address it saw.
     app.set('trust proxy', 1);
     app.use(raw ? express.raw({ type: '*/*' }) : express.json());
+    app.use(bodyDefault);
     app.use(mount, router);
     app.use(errorHandler);
 

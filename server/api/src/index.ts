@@ -13,6 +13,7 @@ import { userRouter } from './routes/user.routes.js';
 import { paymentRouter } from './routes/payment.routes.js';
 import { subscriptionRouter } from './routes/subscription.routes.js';
 import { webhookRouter } from './routes/webhook.routes.js';
+import { bodyDefault } from './middleware/body-default.js';
 import { emailRouter } from './routes/email.routes.js';
 import { contractRouter } from './routes/contract.routes.js';
 import { reportRouter } from './routes/report.routes.js';
@@ -122,6 +123,7 @@ app.use('/webhook', express.raw({ type: 'application/json', limit: '100kb' }));
 app.use(['/contracts', '/email'], express.json({ limit: '15mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(bodyDefault);
 
 // Routes
 app.use('/health', healthRouter);
