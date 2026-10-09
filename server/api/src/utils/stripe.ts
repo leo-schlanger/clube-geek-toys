@@ -27,6 +27,13 @@ export function isStripeConfigured(): boolean {
  * it entirely is legitimate — but then a legacy refund cannot be processed, and
  * saying so beats a TypeError halfway through.
  */
+/**
+ * Pinned so a stripe package update cannot change how the refunds behave: the
+ * SDK otherwise sends the API version it was built for, and every minor
+ * release moves it. This is the version the legacy refunds have run on.
+ */
+export const STRIPE_API_VERSION = '2026-03-25.dahlia' as Stripe.LatestApiVersion;
+
 export function getStripe(): Stripe {
   if (!env.STRIPE_SECRET_KEY) {
     throw new AppError(
@@ -36,7 +43,7 @@ export function getStripe(): Stripe {
     );
   }
   if (!_stripe) {
-    _stripe = new Stripe(env.STRIPE_SECRET_KEY);
+    _stripe = new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
   }
   return _stripe;
 }
