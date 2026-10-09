@@ -19,7 +19,7 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 
-const { getActionItems, getOverviewReport } = await import('./report.service.js');
+const { getActionItems, getOverviewReport, getMonthlyReport, getChurnReport } = await import('./report.service.js');
 
 /** Route each queue's response by matching a fragment of its SQL. */
 function respondBy(matchers: Array<[RegExp, { count: number; oldest_days: number | null }]>) {
@@ -212,13 +212,60 @@ describe('getOverviewReport', () => {
     expect(params).toEqual(['month', '2026-08-18']);
   });
 
-  it('falls back to today when the reference date is malformed', async () => {
+  // "Today" is Rio's, so the database picks it: the API runs in UTC, and after
+  // 21h in Rio its date is already tomorrow.
+  it('falls back to today in Rio when the reference date is malformed', async () => {
     mockQueries(() => [{}]);
     await getOverviewReport('day', 'ontem');
 
-    const [, params] = queryMock.mock.calls[0];
-    expect(params[0]).toBe('day');
-    expect(params[1]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const [sql, params] = queryMock.mock.calls[0];
+    expect(params).toEqual(['day', null]);
+    expect(sql).toContain("NOW() AT TIME ZONE 'America/Sao_Paulo'");
+  });
+
+  it('cuts the period on the Rio calendar, not in UTC', async () => {
+    mockQueries(() => [{}]);
+    await getOverviewReport('month', '2026-10-09');
+
+    const [sql] = queryMock.mock.calls[0];
+    expect(sql).toMatch(/date_trunc\(\$1, COALESCE\(\$2::date/);
+    expect(sql).toContain("AT TIME ZONE 'America/Sao_Paulo'");
+  });
+
+  it('counts paid event tickets, in the period and in the one before', async () => {
+    const ticketWindows: unknown[][] = [];
+    queryMock.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
+      if (/FROM event_reservations/.test(sql)) {
+        ticketWindows.push(params);
+        const current = params[0] === bounds.start_at;
+        return { rows: [{ revenue: current ? 200 : 440, reservations: current ? 6 : 9 }], rowCount: 1 };
+      }
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    const report = await getOverviewReport('month', '2026-08-18');
+
+    expect(ticketWindows).toEqual(
+      expect.arrayContaining([[bounds.start_at, bounds.end_at], [bounds.prev_start_at, bounds.start_at]])
+    );
+    expect(report.tickets).toEqual({ revenue: 200, reservations: 6 });
+    expect(report.previous.ticketRevenue).toBe(440);
+  });
+
+  // line_total is the shelf price; the 5% online promotion and the member
+  // discount live on the order and must come off before a product is credited.
+  it('credits products net of the order discount, in the ranking and the margin', async () => {
+    const sqls: string[] = [];
+    mockQueries((sql) => {
+      sqls.push(sql);
+      return [{}];
+    });
+    await getOverviewReport('month', '2026-08-18');
+
+    const productSql = sqls.filter((q) => /FROM order_items oi/.test(q) && /revenue/.test(q));
+    expect(productSql.length).toBeGreaterThanOrEqual(2);
+    for (const q of productSql) expect(q).toContain('(o.subtotal - o.discount) / o.subtotal');
   });
 
   it('reads the previous window as the same period shifted back once', async () => {
@@ -320,5 +367,37 @@ describe('getOverviewReport', () => {
     expect(catalogSql).toBeDefined();
     // No period predicate: stock is a snapshot, not an aggregate over time.
     expect(catalogSql).not.toContain('paid_at');
+  });
+});
+
+
+describe('getMonthlyReport and getChurnReport', () => {
+  beforeEach(() => queryMock.mockReset());
+
+  it('adds paid event tickets as their own revenue line, and groups months in Rio', async () => {
+    queryMock.mockResolvedValue({
+      rows: [{ month: '2026-10', revenue: 0, payment_count: 0, new_members: 0, churned_members: 0,
+        shop_revenue: 781.31, shop_orders: 4, ticket_revenue: 200, ticket_count: 6 }],
+    });
+    const [october] = await getMonthlyReport(3);
+    const [sql] = queryMock.mock.calls[0];
+
+    expect(october).toMatchObject({ shopRevenue: 781.31, ticketRevenue: 200, ticketCount: 6 });
+    expect(sql).toContain('FROM event_reservations');
+    expect(sql).toContain('COALESCE(paid_at, confirmed_at)');
+    expect(sql).toContain("AT TIME ZONE 'America/Sao_Paulo'");
+  });
+
+  // updated_at moves on any edit: a member who expired in July and had a phone
+  // fixed in October would otherwise have left "in October".
+  it('dates a member\'s exit by the expiry, not by the last edit', async () => {
+    queryMock.mockResolvedValue({ rows: [] });
+    await getChurnReport(6);
+    await getMonthlyReport(6);
+
+    for (const [sql] of queryMock.mock.calls) {
+      expect(sql).toContain("WHEN status = 'expired' AND expiry_date IS NOT NULL");
+      expect(sql).not.toMatch(/TO_CHAR\(updated_at/);
+    }
   });
 });

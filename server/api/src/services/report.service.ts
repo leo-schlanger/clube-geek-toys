@@ -13,65 +13,106 @@ const log = moduleLogger('report');
  *  realtime-stats: members.* + payments.month_revenue + payments.today_revenue
  */
 
+/** Order states that represent money actually earned. */
+const EARNED_ORDER_STATUSES = `('paid','processing','shipped','delivered')`;
+/**
+ * What a line actually brought in. `line_total` is the shelf price times the
+ * quantity; the order's discount (member, promotion, coupon) lives only on the
+ * order, so it is spread over the lines in proportion to their value.
+ */
+const NET_LINE = `(oi.line_total * CASE WHEN o.subtotal > 0 THEN (o.subtotal - o.discount) / o.subtotal ELSE 1 END)`;
+
 function clampMonths(months: number): number {
   const n = Number.isFinite(months) ? Math.trunc(months) : 6;
   return Math.max(1, Math.min(n, 24));
 }
 
-/** Inclusive month series from (now - months + 1) .. current month (YYYY-MM). */
+/**
+ * Days and months are the shop's, in Rio — not UTC. Database and API both run
+ * in UTC, so cutting there put a sale made after 21h on the next day, and one
+ * on the evening of the 31st in the next month.
+ */
+export const BUSINESS_TZ = 'America/Sao_Paulo';
+/** A timestamptz seen on the shop's wall clock (a `timestamp` in Rio). */
+const local = (ts: string) => `(${ts} AT TIME ZONE '${BUSINESS_TZ}')`;
+const NOW_LOCAL = local('NOW()');
+const TODAY_LOCAL = `${NOW_LOCAL}::date`;
+/** Back from Rio wall-clock to a real instant, for comparisons against timestamptz columns. */
+const toInstant = (localTs: string) => `((${localTs}) AT TIME ZONE '${BUSINESS_TZ}')`;
+/** Start of the first month in a window of $N months that ends with the current one. */
+const windowStart = (paramIndex: number) =>
+  toInstant(`date_trunc('month', ${NOW_LOCAL}) - (($${paramIndex}::int - 1) * INTERVAL '1 month')`);
+
+/** Inclusive month series in Rio time, oldest first (YYYY-MM, start and end instants). */
 function monthSeriesSql(paramIndex: number): string {
-  // $N = months window
   return `
     SELECT
       TO_CHAR(d, 'YYYY-MM') AS month,
-      date_trunc('month', d)::timestamptz AS month_start,
-      (date_trunc('month', d) + INTERVAL '1 month')::timestamptz AS month_end
+      ${toInstant('d')} AS month_start,
+      ${toInstant(`d + INTERVAL '1 month'`)} AS month_end
     FROM generate_series(
-      date_trunc('month', NOW() - (($${paramIndex}::int - 1) * INTERVAL '1 month')),
-      date_trunc('month', NOW()),
+      date_trunc('month', ${NOW_LOCAL}) - (($${paramIndex}::int - 1) * INTERVAL '1 month'),
+      date_trunc('month', ${NOW_LOCAL}),
       INTERVAL '1 month'
     ) AS d
   `;
 }
 
-export async function getDailyReport() {
-  const today = new Date().toISOString().split('T')[0];
+/**
+ * Event tickets are the third kind of revenue, next to the shop and the club.
+ * Paid through Pagar.me they carry `paid_at`; the ones confirmed by hand before
+ * that only carry `confirmed_at`, which is when the money was acknowledged.
+ */
+const TICKET_PAID_AT = 'COALESCE(paid_at, confirmed_at)';
+const TICKET_EARNED = `status = 'confirmed' AND total_cents > 0 AND ${TICKET_PAID_AT} IS NOT NULL`;
 
-  const [revenue, members, shop] = await Promise.all([
+/**
+ * When a member left the club. `updated_at` moves on any edit, so a member who
+ * expired in July and had a phone number fixed in October left "in October".
+ * An expiry has its date; only a manual deactivation falls back to the edit.
+ */
+const MEMBER_EXIT_AT = `CASE WHEN status = 'expired' AND expiry_date IS NOT NULL
+    THEN ${toInstant('expiry_date::timestamp')} ELSE updated_at END`;
+
+export async function getDailyReport() {
+  const [day, revenue, members, shop, tickets] = await Promise.all([
+    query(`SELECT ${TODAY_LOCAL}::text AS today`),
     query(
       `SELECT COALESCE(SUM(amount), 0)::float AS total, COUNT(*)::int AS count
-       FROM payments WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at::date = $1`,
-      [today]
+       FROM payments WHERE status = 'paid' AND paid_at IS NOT NULL AND ${local('paid_at')}::date = ${TODAY_LOCAL}`
     ),
     query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-         COUNT(*) FILTER (WHERE created_at::date = $1)::int AS new_today
-       FROM members`,
-      [today]
+         COUNT(*) FILTER (WHERE ${local('created_at')}::date = ${TODAY_LOCAL})::int AS new_today
+       FROM members`
     ),
     query(
       `SELECT COALESCE(SUM(total), 0)::float AS total, COUNT(*)::int AS count
        FROM orders
-       WHERE status IN ('paid', 'processing', 'shipped', 'delivered')
-         AND COALESCE(paid_at, created_at)::date = $1`,
-      [today]
-    ).catch(() => ({ rows: [{ total: 0, count: 0 }] })),
+       WHERE status IN ${EARNED_ORDER_STATUSES}
+         AND ${local('COALESCE(paid_at, created_at)')}::date = ${TODAY_LOCAL}`
+    ),
+    query(
+      `SELECT COALESCE(SUM(total_cents), 0)::float / 100 AS total, COUNT(*)::int AS count
+       FROM event_reservations WHERE ${TICKET_EARNED} AND ${local(TICKET_PAID_AT)}::date = ${TODAY_LOCAL}`
+    ),
   ]);
 
   return {
-    date: today,
+    date: day.rows[0].today as string,
     revenue: { total: revenue.rows[0].total, paymentCount: revenue.rows[0].count },
     shop: { total: shop.rows[0].total, orderCount: shop.rows[0].count },
+    tickets: { total: Number(tickets.rows[0].total) || 0, count: tickets.rows[0].count },
     members: members.rows[0],
   };
 }
 
 /**
- * Monthly report with a continuous month axis (zeros when empty).
- * Revenue = paid club payments; newMembers = sign-ups; churned = expired/inactive that month.
- * shopRevenue = paid shop orders that month (when table exists).
+ * Monthly report with a continuous month axis (zeros when empty), in Rio time.
+ * revenue = paid club payments; shopRevenue = earned shop orders; ticketRevenue =
+ * confirmed paid tickets; newMembers = sign-ups; churned = members who left that month.
  */
 export async function getMonthlyReport(months: number) {
   const window = clampMonths(months);
@@ -80,41 +121,40 @@ export async function getMonthlyReport(months: number) {
     `
     WITH months AS (${monthSeriesSql(1)}),
     revenue AS (
-      SELECT
-        TO_CHAR(paid_at, 'YYYY-MM') AS month,
-        COALESCE(SUM(amount), 0)::float AS revenue,
-        COUNT(*)::int AS payment_count
+      SELECT TO_CHAR(${local('paid_at')}, 'YYYY-MM') AS month,
+             COALESCE(SUM(amount), 0)::float AS revenue,
+             COUNT(*)::int AS payment_count
       FROM payments
-      WHERE status = 'paid'
-        AND paid_at IS NOT NULL
-        AND paid_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
+      WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at >= ${windowStart(1)}
       GROUP BY 1
     ),
     new_members AS (
-      SELECT
-        TO_CHAR(created_at, 'YYYY-MM') AS month,
-        COUNT(*)::int AS new_members
+      SELECT TO_CHAR(${local('created_at')}, 'YYYY-MM') AS month, COUNT(*)::int AS new_members
       FROM members
-      WHERE created_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
+      WHERE created_at >= ${windowStart(1)}
       GROUP BY 1
     ),
     churned AS (
-      SELECT
-        TO_CHAR(updated_at, 'YYYY-MM') AS month,
-        COUNT(*)::int AS churned_members
-      FROM members
-      WHERE status IN ('expired', 'inactive')
-        AND updated_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
+      SELECT TO_CHAR(${local('exit_at')}, 'YYYY-MM') AS month, COUNT(*)::int AS churned_members
+      FROM (SELECT ${MEMBER_EXIT_AT} AS exit_at FROM members WHERE status IN ('expired', 'inactive')) e
+      WHERE exit_at >= ${windowStart(1)}
       GROUP BY 1
     ),
     shop AS (
-      SELECT
-        TO_CHAR(COALESCE(paid_at, created_at), 'YYYY-MM') AS month,
-        COALESCE(SUM(total), 0)::float AS shop_revenue,
-        COUNT(*)::int AS shop_orders
+      SELECT TO_CHAR(${local('COALESCE(paid_at, created_at)')}, 'YYYY-MM') AS month,
+             COALESCE(SUM(total), 0)::float AS shop_revenue,
+             COUNT(*)::int AS shop_orders
       FROM orders
-      WHERE status IN ('paid', 'processing', 'shipped', 'delivered')
-        AND COALESCE(paid_at, created_at) >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
+      WHERE status IN ${EARNED_ORDER_STATUSES}
+        AND COALESCE(paid_at, created_at) >= ${windowStart(1)}
+      GROUP BY 1
+    ),
+    tickets AS (
+      SELECT TO_CHAR(${local(TICKET_PAID_AT)}, 'YYYY-MM') AS month,
+             COALESCE(SUM(total_cents), 0)::float / 100 AS ticket_revenue,
+             COUNT(*)::int AS ticket_count
+      FROM event_reservations
+      WHERE ${TICKET_EARNED} AND ${TICKET_PAID_AT} >= ${windowStart(1)}
       GROUP BY 1
     )
     SELECT
@@ -124,68 +164,19 @@ export async function getMonthlyReport(months: number) {
       COALESCE(n.new_members, 0)::int AS new_members,
       COALESCE(c.churned_members, 0)::int AS churned_members,
       COALESCE(s.shop_revenue, 0)::float AS shop_revenue,
-      COALESCE(s.shop_orders, 0)::int AS shop_orders
+      COALESCE(s.shop_orders, 0)::int AS shop_orders,
+      COALESCE(t.ticket_revenue, 0)::float AS ticket_revenue,
+      COALESCE(t.ticket_count, 0)::int AS ticket_count
     FROM months m
     LEFT JOIN revenue r ON r.month = m.month
     LEFT JOIN new_members n ON n.month = m.month
     LEFT JOIN churned c ON c.month = m.month
     LEFT JOIN shop s ON s.month = m.month
+    LEFT JOIN tickets t ON t.month = m.month
     ORDER BY m.month ASC
     `,
     [window]
-  ).catch(async (err: { message?: string }) => {
-    // Fallback if orders table missing (pre-shop environments)
-    if (err?.message && /orders/i.test(err.message)) {
-      return query(
-        `
-        WITH months AS (${monthSeriesSql(1)}),
-        revenue AS (
-          SELECT
-            TO_CHAR(paid_at, 'YYYY-MM') AS month,
-            COALESCE(SUM(amount), 0)::float AS revenue,
-            COUNT(*)::int AS payment_count
-          FROM payments
-          WHERE status = 'paid'
-            AND paid_at IS NOT NULL
-            AND paid_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
-          GROUP BY 1
-        ),
-        new_members AS (
-          SELECT
-            TO_CHAR(created_at, 'YYYY-MM') AS month,
-            COUNT(*)::int AS new_members
-          FROM members
-          WHERE created_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
-          GROUP BY 1
-        ),
-        churned AS (
-          SELECT
-            TO_CHAR(updated_at, 'YYYY-MM') AS month,
-            COUNT(*)::int AS churned_members
-          FROM members
-          WHERE status IN ('expired', 'inactive')
-            AND updated_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
-          GROUP BY 1
-        )
-        SELECT
-          m.month,
-          COALESCE(r.revenue, 0)::float AS revenue,
-          COALESCE(r.payment_count, 0)::int AS payment_count,
-          COALESCE(n.new_members, 0)::int AS new_members,
-          COALESCE(c.churned_members, 0)::int AS churned_members,
-          0::float AS shop_revenue,
-          0::int AS shop_orders
-        FROM months m
-        LEFT JOIN revenue r ON r.month = m.month
-        LEFT JOIN new_members n ON n.month = m.month
-        LEFT JOIN churned c ON c.month = m.month
-        ORDER BY m.month ASC
-        `,
-        [window]
-      );
-    }
-    throw err;
-  });
+  );
 
   return result.rows.map((row) => ({
     month: row.month as string,
@@ -195,15 +186,14 @@ export async function getMonthlyReport(months: number) {
     churnedMembers: Number(row.churned_members) || 0,
     shopRevenue: Number(row.shop_revenue) || 0,
     shopOrders: Number(row.shop_orders) || 0,
+    ticketRevenue: Number(row.ticket_revenue) || 0,
+    ticketCount: Number(row.ticket_count) || 0,
   }));
 }
 
 /**
- * Churn per month for the UI:
- *  period, churned, total (base at month start), churnRate (%)
- *
- * Base ≈ members that were still "in the club" at the start of the month
- * (active, or left during/after that month). Pending never-paid are excluded.
+ * Churn per month, in Rio time: churned / members in the club at the month start.
+ * In the club = joined before the month and had not left yet (pending never-paid excluded).
  */
 export async function getChurnReport(months: number = 6) {
   const window = clampMonths(months);
@@ -211,27 +201,22 @@ export async function getChurnReport(months: number = 6) {
   const result = await query(
     `
     WITH months AS (${monthSeriesSql(1)}),
+    ever AS (
+      SELECT id, created_at, status, ${MEMBER_EXIT_AT} AS exit_at
+      FROM members WHERE status IN ('active', 'expired', 'inactive')
+    ),
     churned AS (
-      SELECT
-        TO_CHAR(updated_at, 'YYYY-MM') AS month,
-        COUNT(*)::int AS churned
-      FROM members
-      WHERE status IN ('expired', 'inactive')
-        AND updated_at >= date_trunc('month', NOW() - (($1::int - 1) * INTERVAL '1 month'))
+      SELECT TO_CHAR(${local('exit_at')}, 'YYYY-MM') AS month, COUNT(*)::int AS churned
+      FROM ever
+      WHERE status IN ('expired', 'inactive') AND exit_at >= ${windowStart(1)}
       GROUP BY 1
     ),
     base AS (
-      SELECT
-        m.month,
-        COUNT(mem.id)::int AS total
+      SELECT m.month, COUNT(e.id)::int AS total
       FROM months m
-      LEFT JOIN members mem
-        ON mem.created_at < m.month_start
-        AND mem.status IN ('active', 'expired', 'inactive')
-        AND (
-          mem.status = 'active'
-          OR mem.updated_at >= m.month_start
-        )
+      LEFT JOIN ever e
+        ON e.created_at < m.month_start
+        AND (e.status = 'active' OR e.exit_at >= m.month_start)
       GROUP BY m.month
     )
     SELECT
@@ -259,18 +244,23 @@ export async function getChurnReport(months: number = 6) {
 }
 
 export async function getTodayRevenue() {
-  const [club, shop] = await Promise.all([
+  const [day, club, shop, tickets] = await Promise.all([
+    query(`SELECT ${TODAY_LOCAL}::text AS today`),
     query(
       `SELECT COALESCE(SUM(amount), 0)::float AS total, COUNT(*)::int AS count
        FROM payments
-       WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at::date = CURRENT_DATE`
+       WHERE status = 'paid' AND paid_at IS NOT NULL AND ${local('paid_at')}::date = ${TODAY_LOCAL}`
     ),
     query(
       `SELECT COALESCE(SUM(total), 0)::float AS total, COUNT(*)::int AS count
        FROM orders
-       WHERE status IN ('paid', 'processing', 'shipped', 'delivered')
-         AND COALESCE(paid_at, created_at)::date = CURRENT_DATE`
-    ).catch(() => ({ rows: [{ total: 0, count: 0 }] })),
+       WHERE status IN ${EARNED_ORDER_STATUSES}
+         AND ${local('COALESCE(paid_at, created_at)')}::date = ${TODAY_LOCAL}`
+    ),
+    query(
+      `SELECT COALESCE(SUM(total_cents), 0)::float / 100 AS total, COUNT(*)::int AS count
+       FROM event_reservations WHERE ${TICKET_EARNED} AND ${local(TICKET_PAID_AT)}::date = ${TODAY_LOCAL}`
+    ),
   ]);
 
   return {
@@ -278,7 +268,9 @@ export async function getTodayRevenue() {
     paymentCount: club.rows[0].count,
     shopTotal: shop.rows[0].total,
     shopOrderCount: shop.rows[0].count,
-    date: new Date().toISOString().split('T')[0],
+    ticketTotal: Number(tickets.rows[0].total) || 0,
+    ticketCount: tickets.rows[0].count,
+    date: day.rows[0].today as string,
   };
 }
 
@@ -315,17 +307,12 @@ export async function getPlanDistribution() {
   ];
 }
 
-export async function getRealtimeStats() {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  // Copy before mutating for week start (Sunday-based, consistent with prior behavior)
-  const weekRef = new Date(now);
-  weekRef.setDate(weekRef.getDate() - weekRef.getDay());
-  weekRef.setHours(0, 0, 0, 0);
-  const startOfWeek = weekRef.toISOString();
-  const startOfDay = new Date().toISOString().split('T')[0];
+/** Month, Sunday-based week and day boundaries in Rio, as instants. */
+const MONTH_START = toInstant(`date_trunc('month', ${NOW_LOCAL})`);
+const WEEK_START = toInstant(`(${TODAY_LOCAL} - EXTRACT(DOW FROM ${NOW_LOCAL})::int)::timestamp`);
 
-  const [members, payments, shop] = await Promise.all([
+export async function getRealtimeStats() {
+  const [members, payments, shop, tickets, revenue] = await Promise.all([
     query(
       `
       SELECT
@@ -334,55 +321,66 @@ export async function getRealtimeStats() {
         COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
         COUNT(*) FILTER (WHERE status = 'expired')::int AS expired,
         COUNT(*) FILTER (WHERE status = 'inactive')::int AS inactive,
-        COUNT(*) FILTER (WHERE created_at::date = $1)::int AS new_today,
-        COUNT(*) FILTER (WHERE created_at >= $2)::int AS new_this_week
-      FROM members`,
-      [startOfDay, startOfWeek]
+        COUNT(*) FILTER (WHERE ${local('created_at')}::date = ${TODAY_LOCAL})::int AS new_today,
+        COUNT(*) FILTER (WHERE created_at >= ${WEEK_START})::int AS new_this_week
+      FROM members`
     ),
     query(
       `
       SELECT
-        COALESCE(SUM(amount) FILTER (
-          WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at >= $1
-        ), 0)::float AS month_revenue,
-        COUNT(*) FILTER (
-          WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at >= $1
-        )::int AS month_payments,
-        COALESCE(SUM(amount) FILTER (
-          WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at::date = $2
-        ), 0)::float AS today_revenue,
-        COUNT(*) FILTER (
-          WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at::date = $2
-        )::int AS today_payments
-      FROM payments`,
-      [startOfMonth, startOfDay]
+        COALESCE(SUM(amount) FILTER (WHERE paid_at >= ${MONTH_START}), 0)::float AS month_revenue,
+        COUNT(*) FILTER (WHERE paid_at >= ${MONTH_START})::int AS month_payments,
+        COALESCE(SUM(amount) FILTER (WHERE ${local('paid_at')}::date = ${TODAY_LOCAL}), 0)::float AS today_revenue,
+        COUNT(*) FILTER (WHERE ${local('paid_at')}::date = ${TODAY_LOCAL})::int AS today_payments
+      FROM payments
+      WHERE status = 'paid' AND paid_at IS NOT NULL`
     ),
     query(
       `
       SELECT
+        COALESCE(SUM(total) FILTER (WHERE COALESCE(paid_at, created_at) >= ${MONTH_START}), 0)::float AS month_shop_revenue,
+        COUNT(*) FILTER (WHERE COALESCE(paid_at, created_at) >= ${MONTH_START})::int AS month_shop_orders,
         COALESCE(SUM(total) FILTER (
-          WHERE status IN ('paid','processing','shipped','delivered')
-            AND COALESCE(paid_at, created_at) >= $1
-        ), 0)::float AS month_shop_revenue,
-        COUNT(*) FILTER (
-          WHERE status IN ('paid','processing','shipped','delivered')
-            AND COALESCE(paid_at, created_at) >= $1
-        )::int AS month_shop_orders,
-        COALESCE(SUM(total) FILTER (
-          WHERE status IN ('paid','processing','shipped','delivered')
-            AND COALESCE(paid_at, created_at)::date = $2
+          WHERE ${local('COALESCE(paid_at, created_at)')}::date = ${TODAY_LOCAL}
         ), 0)::float AS today_shop_revenue
-      FROM orders`,
-      [startOfMonth, startOfDay]
-    ).catch(() => ({
-      rows: [{ month_shop_revenue: 0, month_shop_orders: 0, today_shop_revenue: 0 }],
-    })),
+      FROM orders
+      WHERE status IN ${EARNED_ORDER_STATUSES}`
+    ),
+    query(
+      `
+      SELECT
+        COALESCE(SUM(total_cents) FILTER (WHERE ${TICKET_PAID_AT} >= ${MONTH_START}), 0)::float / 100 AS month_ticket_revenue,
+        COUNT(*) FILTER (WHERE ${TICKET_PAID_AT} >= ${MONTH_START})::int AS month_tickets,
+        COALESCE(SUM(total_cents) FILTER (
+          WHERE ${local(TICKET_PAID_AT)}::date = ${TODAY_LOCAL}
+        ), 0)::float / 100 AS today_ticket_revenue
+      FROM event_reservations
+      WHERE ${TICKET_EARNED}`
+    ),
+    // Everything that came in, from the three sources: the dashboard's headline.
+    query(
+      `
+      WITH earned AS (
+        SELECT COALESCE(paid_at, created_at) AS ts, total AS value FROM orders WHERE status IN ${EARNED_ORDER_STATUSES}
+        UNION ALL
+        SELECT paid_at, amount FROM payments WHERE status = 'paid' AND paid_at IS NOT NULL
+        UNION ALL
+        SELECT ${TICKET_PAID_AT}, total_cents::numeric / 100 FROM event_reservations WHERE ${TICKET_EARNED}
+      )
+      SELECT
+        COALESCE(SUM(value) FILTER (WHERE ts >= ${MONTH_START}), 0)::float AS month_total,
+        COALESCE(SUM(value) FILTER (WHERE ${local('ts')}::date = ${TODAY_LOCAL}), 0)::float AS today_total,
+        COALESCE(SUM(value) FILTER (WHERE ${local('ts')}::date = ${TODAY_LOCAL} - 1), 0)::float AS yesterday_total
+      FROM earned`
+    ),
   ]);
 
   return {
     members: members.rows[0],
     payments: payments.rows[0],
     shop: shop.rows[0],
+    tickets: tickets.rows[0],
+    revenue: revenue.rows[0],
     timestamp: new Date().toISOString(),
   };
 }
@@ -525,8 +523,6 @@ export function isOverviewPeriod(value: unknown): value is OverviewPeriod {
   return OVERVIEW_PERIODS.includes(value as OverviewPeriod);
 }
 
-/** Order states that represent money actually earned. */
-const EARNED_ORDER_STATUSES = `('paid','processing','shipped','delivered')`;
 
 export interface OverviewReport {
   period: { type: OverviewPeriod; start: string; end: string };
@@ -549,6 +545,7 @@ export interface OverviewReport {
     refundedOrders: number;
   };
   club: { revenue: number; payments: number; newMembers: number; activeMembers: number; expiredInPeriod: number };
+  tickets: { revenue: number; reservations: number };
   /**
    * Result, not revenue. Only lines carrying `unit_cost` are counted; the rest
    * become `revenueWithoutCost`, so the figure never passes itself off as whole.
@@ -572,7 +569,7 @@ export interface OverviewReport {
     outOfStock: number;
     lowStock: number;
   };
-  previous: { salesRevenue: number; clubRevenue: number; orders: number; newMembers: number };
+  previous: { salesRevenue: number; clubRevenue: number; ticketRevenue: number; orders: number; newMembers: number };
 }
 
 /**
@@ -585,12 +582,14 @@ export interface OverviewReport {
  * 31-day January, not against a rolling 30 days).
  */
 export async function getOverviewReport(period: OverviewPeriod, reference?: string): Promise<OverviewReport> {
-  const ref = reference && /^\d{4}-\d{2}-\d{2}$/.test(reference) ? reference : new Date().toISOString().slice(0, 10);
+  const ref = reference && /^\d{4}-\d{2}-\d{2}$/.test(reference) ? reference : null;
 
+  // Cut on the Rio calendar, then turned back into instants for the columns.
+  const day = `COALESCE($2::date, ${TODAY_LOCAL})::timestamp`;
   const bounds = await query(
-    `SELECT date_trunc($1, $2::timestamptz) AS start_at,
-            date_trunc($1, $2::timestamptz) + ('1 ' || $1)::interval AS end_at,
-            date_trunc($1, $2::timestamptz) - ('1 ' || $1)::interval AS prev_start_at`,
+    `SELECT ${toInstant(`date_trunc($1, ${day})`)} AS start_at,
+            ${toInstant(`date_trunc($1, ${day}) + ('1 ' || $1)::interval`)} AS end_at,
+            ${toInstant(`date_trunc($1, ${day}) - ('1 ' || $1)::interval`)} AS prev_start_at`,
     [period, ref]
   );
   const { start_at: startAt, end_at: endAt, prev_start_at: prevStartAt } = bounds.rows[0];
@@ -615,7 +614,12 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
     FROM orders
     WHERE COALESCE(paid_at, created_at) >= $1 AND COALESCE(paid_at, created_at) < $2`;
 
-  const [sales, club, top, itemTotals, margin, inventory, catalog, previous] = await Promise.all([
+  const ticketSql = `
+    SELECT COALESCE(SUM(total_cents), 0)::float / 100 AS revenue, COUNT(*)::int AS reservations
+    FROM event_reservations
+    WHERE ${TICKET_EARNED} AND ${TICKET_PAID_AT} >= $1 AND ${TICKET_PAID_AT} < $2`;
+
+  const [sales, club, top, itemTotals, margin, inventory, catalog, previous, tickets, previousTickets] = await Promise.all([
     query(salesSql, [startAt, endAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
     query(
       `SELECT
@@ -635,7 +639,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
     query(
       `SELECT oi.product_name AS name,
               SUM(oi.quantity)::int AS quantity,
-              SUM(oi.line_total)::float AS revenue
+              SUM(${NET_LINE})::float AS revenue
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        WHERE o.status IN ${EARNED_ORDER_STATUSES}
@@ -662,8 +666,8 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
     query(
       `SELECT
          COALESCE(SUM(oi.unit_cost * oi.quantity) FILTER (WHERE oi.unit_cost IS NOT NULL), 0)::float AS cogs,
-         COALESCE(SUM(oi.line_total) FILTER (WHERE oi.unit_cost IS NOT NULL), 0)::float AS revenue_with_cost,
-         COALESCE(SUM(oi.line_total) FILTER (WHERE oi.unit_cost IS NULL), 0)::float AS revenue_without_cost,
+         COALESCE(SUM(${NET_LINE}) FILTER (WHERE oi.unit_cost IS NOT NULL), 0)::float AS revenue_with_cost,
+         COALESCE(SUM(${NET_LINE}) FILTER (WHERE oi.unit_cost IS NULL), 0)::float AS revenue_without_cost,
          COALESCE(SUM(oi.quantity) FILTER (WHERE oi.unit_cost IS NULL), 0)::int AS units_without_cost
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
@@ -714,6 +718,8 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
            WHERE created_at >= $1 AND created_at < $2)::int AS new_members`,
       [prevStartAt, startAt]
     ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    query(ticketSql, [startAt, endAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    query(ticketSql, [prevStartAt, startAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
   ]);
 
   const s = sales.rows[0] || {};
@@ -723,6 +729,8 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
   const mg = margin.rows[0] || {};
   const inv = inventory.rows[0] || {};
   const p = previous.rows[0] || {};
+  const t = tickets.rows[0] || {};
+  const pt = previousTickets.rows[0] || {};
   const n = (value: unknown) => Number(value) || 0;
 
   const orders = n(s.orders);
@@ -760,6 +768,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
       activeMembers: n(c.active_members),
       expiredInPeriod: n(c.expired_in_period),
     },
+    tickets: { revenue: n(t.revenue), reservations: n(t.reservations) },
     margin: (() => {
       const cogs = n(mg.cogs);
       const revenueWithCost = n(mg.revenue_with_cost);
@@ -791,6 +800,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
     previous: {
       salesRevenue: n(p.sales_revenue),
       clubRevenue: n(p.club_revenue),
+      ticketRevenue: n(pt.revenue),
       orders: n(p.orders),
       newMembers: n(p.new_members),
     },
