@@ -43,6 +43,9 @@ export const ORDER_STATUS_META: Record<OrderStatus, { label: string; variant: 'd
   refunded: { label: 'Reembolsado', variant: 'outline' },
 }
 
+/** Statuses that mean the money came in; an order still pending cannot be moved to them by hand. */
+const PAID_STEPS: OrderStatus[] = ['paid', 'processing', 'shipped', 'delivered']
+
 export const ORDER_STATUSES: OrderStatus[] = [
   'pending',
   'paid',
@@ -140,17 +143,13 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
     setActionLoading(true)
     try {
       const updated = await updateOrderStatus(order.id, statusValue)
-      if (updated) {
-        setOrder(updated)
-        setStatusValue(updated.status)
-        toast.success('Status atualizado')
-        onChanged()
-      } else {
-        toast.error('Erro ao atualizar status')
-      }
+      setOrder(updated)
+      setStatusValue(updated.status)
+      toast.success('Status atualizado')
+      onChanged()
     } catch (error) {
       logger.error('Error updating order status:', error)
-      toast.error('Erro ao atualizar status')
+      toast.error(error instanceof Error ? error.message : 'Erro ao atualizar status')
     }
     setActionLoading(false)
   }
@@ -643,7 +642,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                     className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {ORDER_STATUSES.map((s) => (
-                      <option key={s} value={s}>
+                      <option key={s} value={s} disabled={order.status === 'pending' && PAID_STEPS.includes(s)}>
                         {ORDER_STATUS_META[s].label}
                       </option>
                     ))}
@@ -657,6 +656,13 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                     {actionLoading ? <Loading size="sm" /> : 'Aplicar'}
                   </Button>
                 </div>
+                {order.status === 'pending' && (
+                  <p className="text-xs text-muted-foreground">
+                    Pago, separação, envio e entrega só depois do pagamento.
+                    {canConfirmPix && ' Se o PIX já caiu, use “Confirmar PIX”.'} Pago no balcão:
+                    cancele este pedido e registre a venda no PDV.
+                  </p>
+                )}
               </div>
             </>
           )}

@@ -1,4 +1,4 @@
-import { api } from './api-client'
+import { api, unwrapApi } from './api-client'
 import type { DeliveryMethod, Order, OrderStatus, PixQRData } from '../types'
 import type { CartItem } from '../types'
 
@@ -278,9 +278,10 @@ export async function getOrder(id: string): Promise<Order | null> {
   return result.data ?? null
 }
 
-export async function updateOrderStatus(id: string, status: OrderStatus): Promise<Order | null> {
+/** Throws with the server's message: a refused change says why (unpaid, has a charge). */
+export async function updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
   const result = await api.patch<Order>(`/orders/${id}/status`, { status })
-  return result.data ?? null
+  return unwrapApi(result, 'Erro ao atualizar status')
 }
 
 export async function confirmPixOrder(id: string): Promise<Order | null> {

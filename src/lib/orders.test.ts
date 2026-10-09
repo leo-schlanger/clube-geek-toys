@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('./api-client', () => ({
+vi.mock('./api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./api-client')>()),
   api: {
     get: vi.fn(),
     post: vi.fn(),
@@ -112,6 +113,15 @@ describe('orders API client', () => {
       .mockResolvedValueOnce({ data: { id: 'o1' }, status: 200 })
     expect(await adminListOrders({ status: 'paid' })).toMatchObject({ total: 0 })
     expect(await getOrder('o1')).toMatchObject({ id: 'o1' })
+  })
+
+  it("a refused status change throws the server's reason", async () => {
+    mockedApi.patch.mockResolvedValueOnce({
+      error: 'Este pedido ainda não foi pago.',
+      status: 409,
+      code: 'ORDER_NOT_PAID',
+    })
+    await expect(updateOrderStatus('o1', 'delivered')).rejects.toThrow('Este pedido ainda não foi pago.')
   })
 
   it('update status, confirm pix, refund, tracking', async () => {

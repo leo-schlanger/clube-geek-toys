@@ -1583,6 +1583,22 @@ describe('fechar um pedido que tem cobrança', () => {
     await expect(updateOrderStatus('o1', 'cancelled', 'admin-1')).resolves.toBeDefined();
   });
 
+  /** Order #23 was marked delivered without ever being paid: no paid_at, no stock decrement. */
+  it.each([['paid'], ['processing'], ['shipped'], ['delivered']])(
+    'recusa levar um pedido pendente a %s à mão, sem mexer em nada',
+    async (status) => {
+      queryMock.mockResolvedValue({ rows: [chargedOrder({ status: 'pending', pagarme_charge_id: null })] });
+
+      await expect(updateOrderStatus('o1', status as string, 'admin-1')).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'ORDER_NOT_PAID',
+      });
+      expect(
+        queryMock.mock.calls.some((c) => sqlOf(c[0]).includes('UPDATE orders SET status'))
+      ).toBe(false);
+    }
+  );
+
   /** A pending order was never charged, so closing it by hand is fine. */
   it('deixa cancelar um pedido ainda pendente', async () => {
     queryMock.mockImplementation(async (sql: string) => {

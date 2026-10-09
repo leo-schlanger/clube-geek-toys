@@ -1792,6 +1792,18 @@ export async function updateOrderStatus(
     );
   }
 
+  // An unpaid order moved forward by hand skips what a payment does: paid_at,
+  // the stock decrement and the release of the hold. It also reads as revenue.
+  if (prev.status === 'pending' && ['paid', 'processing', 'shipped', 'delivered'].includes(status)) {
+    throw new AppError(
+      409,
+      'Este pedido ainda não foi pago. ' +
+        (prev.paymentMethod === 'pix' ? 'Se o PIX caiu, use "Confirmar PIX". ' : '') +
+        'Se o cliente pagou no balcão, cancele este pedido e registre a venda no PDV.',
+      'ORDER_NOT_PAID',
+    );
+  }
+
   // Compare-and-swap on the status we just read. Without it, two clicks in the
   // panel both saw `prev.status = 'paid'`, both computed `closing &&
   // hadStockDecremented`, and both restocked — `restoreStockForOrder` is the

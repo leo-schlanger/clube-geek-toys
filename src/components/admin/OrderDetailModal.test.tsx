@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Order } from '../../types'
 
 /**
@@ -299,5 +299,30 @@ describe('OrderDetailModal — cartão recusado', () => {
     await open(order({ status: 'pending', paymentMethod: 'credit_card', paymentError: null }))
     await screen.findByText(/Status/)
     expect(screen.queryByText(/Cartão recusado/)).not.toBeInTheDocument()
+  })
+})
+
+describe('OrderDetailModal — status de pedido não pago', () => {
+  it('não oferece pago, separação, envio nem entrega num pedido pendente, e diz o caminho', async () => {
+    await open(order({ status: 'pending', paymentMethod: 'credit_card', deliveryMethod: 'pickup' }))
+
+    for (const label of ['Pago', 'Em separação', 'Enviado', 'Entregue']) {
+      const option = screen.getByRole('option', { name: new RegExp(`^${label}`) }) as HTMLOptionElement
+      expect(option.disabled).toBe(true)
+    }
+    expect((screen.getByRole('option', { name: /^Cancelado/ }) as HTMLOptionElement).disabled).toBe(false)
+    expect(screen.getByText(/registre a venda no PDV/)).toBeInTheDocument()
+  })
+
+  it('mostra a razão do servidor quando a mudança é recusada', async () => {
+    const { updateOrderStatus } = await import('../../lib/orders')
+    const { toast } = await import('sonner')
+    vi.mocked(updateOrderStatus).mockRejectedValueOnce(new Error('Este pedido tem cobrança na operadora.'))
+    await open(order({ status: 'paid' }))
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'cancelled' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Este pedido tem cobrança na operadora.'))
   })
 })
