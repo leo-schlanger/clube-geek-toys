@@ -1,4 +1,4 @@
-import { api } from './api-client'
+import { api, unwrapApi } from './api-client'
 import type { PlanType } from '../types'
 
 // ============================================
@@ -14,6 +14,8 @@ export interface MonthlyReportData {
   churnedMembers: number
   shopRevenue: number
   shopOrders: number
+  ticketRevenue: number
+  ticketCount: number
 }
 
 export interface DailyReportData {
@@ -53,11 +55,11 @@ function num(v: unknown): number {
 /**
  * Monthly report — continuous month series with real revenue, members and shop totals.
  */
+// The report getters throw on a failed call. Returning [] made the charts say
+// "nenhum pagamento confirmado" — an outage read as a month without sales.
 export async function getMonthlyReport(months: number = 6): Promise<MonthlyReportData[]> {
-  const result = await api.get(`/reports/monthly?months=${months}`)
-  if (result.error || !result.data) return []
-
-  const rows = Array.isArray(result.data) ? result.data : []
+  const data = unwrapApi(await api.get(`/reports/monthly?months=${months}`), 'Erro ao carregar o relatório mensal')
+  const rows = Array.isArray(data) ? data : []
   return rows.map((row: Record<string, unknown>) => {
     const month = String(row.month ?? '')
     return {
@@ -69,6 +71,8 @@ export async function getMonthlyReport(months: number = 6): Promise<MonthlyRepor
       churnedMembers: num(row.churnedMembers ?? row.churned_members),
       shopRevenue: num(row.shopRevenue ?? row.shop_revenue),
       shopOrders: num(row.shopOrders ?? row.shop_orders),
+      ticketRevenue: num(row.ticketRevenue ?? row.ticket_revenue),
+      ticketCount: num(row.ticketCount ?? row.ticket_count),
     }
   })
 }
@@ -77,10 +81,8 @@ export async function getMonthlyReport(months: number = 6): Promise<MonthlyRepor
  * Plan distribution (single club plan with real active count + paid revenue).
  */
 export async function getRevenueByPlan(): Promise<PlanDistribution[]> {
-  const result = await api.get('/reports/plan-distribution')
-  if (result.error || !result.data) return []
-
-  const rows = Array.isArray(result.data) ? result.data : []
+  const data = unwrapApi(await api.get('/reports/plan-distribution'), 'Erro ao carregar o plano do clube')
+  const rows = Array.isArray(data) ? data : []
   return rows.map((row: Record<string, unknown>) => ({
     plan: (row.plan as PlanType) || 'club',
     count: num(row.count),
@@ -93,21 +95,19 @@ export async function getRevenueByPlan(): Promise<PlanDistribution[]> {
  * Churn rate over time — shape: period, churnRate, churned, total
  */
 export async function getChurnRate(months: number = 6): Promise<ChurnData[]> {
-  try {
-    // Raw row: the route mixes snake_case and camelCase and the `map` below is
-    // what normalises it. Typing this as ChurnData would misstate what arrived.
-    const result = await api.get<Record<string, unknown>[]>(`/reports/churn?months=${months}`)
-    if (result.error || !result.data) return []
-    const rows = Array.isArray(result.data) ? result.data : []
-    return rows.map((row: Record<string, unknown>) => ({
-      period: String(row.period ?? row.month ?? ''),
-      churnRate: num(row.churnRate ?? row.churn_rate),
-      churned: num(row.churned),
-      total: num(row.total),
-    }))
-  } catch {
-    return []
-  }
+  // Raw row: the route mixes snake_case and camelCase and the `map` below is
+  // what normalises it. Typing this as ChurnData would misstate what arrived.
+  const data = unwrapApi(
+    await api.get<Record<string, unknown>[]>(`/reports/churn?months=${months}`),
+    'Erro ao carregar o churn'
+  )
+  const rows = Array.isArray(data) ? data : []
+  return rows.map((row: Record<string, unknown>) => ({
+    period: String(row.period ?? row.month ?? ''),
+    churnRate: num(row.churnRate ?? row.churn_rate),
+    churned: num(row.churned),
+    total: num(row.total),
+  }))
 }
 
 /**
@@ -251,7 +251,8 @@ export interface OverviewReport {
     outOfStock: number
     lowStock: number
   }
-  previous: { salesRevenue: number; clubRevenue: number; orders: number; newMembers: number }
+  tickets: { revenue: number; reservations: number }
+  previous: { salesRevenue: number; clubRevenue: number; ticketRevenue: number; orders: number; newMembers: number }
 }
 
 /**

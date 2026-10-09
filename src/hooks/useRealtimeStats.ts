@@ -6,8 +6,10 @@ export interface RealtimeStats {
   activeMembers: number
   pendingMembers: number
   expiredMembers: number
+  /** Shop + club + event tickets, month to date (Rio calendar). */
   monthlyRevenue: number
   todayRevenue: number
+  yesterdayRevenue: number
   newMembersToday: number
   newMembersThisWeek: number
 }
@@ -23,8 +25,6 @@ export interface RealtimeStatsResult {
   trends: {
     totalMembers: StatsTrend
     activeMembers: StatsTrend
-    monthlyRevenue: StatsTrend
-    todayRevenue: StatsTrend
   }
   loading: boolean
   error: string | null
@@ -38,6 +38,7 @@ const initialStats: RealtimeStats = {
   expiredMembers: 0,
   monthlyRevenue: 0,
   todayRevenue: 0,
+  yesterdayRevenue: 0,
   newMembersToday: 0,
   newMembersThisWeek: 0,
 }
@@ -86,18 +87,19 @@ export function useRealtimeStats(): RealtimeStatsResult {
 
         const data = (result.data ?? {}) as {
           members?: Record<string, number>
-          payments?: Record<string, number>
+          revenue?: Record<string, number>
         }
         const members = data.members || {}
-        const payments = data.payments || {}
+        const revenue = data.revenue || {}
 
         const newStats: RealtimeStats = {
           totalMembers: members.total || 0,
           activeMembers: members.active || 0,
           pendingMembers: members.pending || 0,
           expiredMembers: (members.expired || 0) + (members.inactive || 0),
-          monthlyRevenue: payments.month_revenue || 0,
-          todayRevenue: payments.today_revenue || 0,
+          monthlyRevenue: revenue.month_total || 0,
+          todayRevenue: revenue.today_total || 0,
+          yesterdayRevenue: revenue.yesterday_total || 0,
           newMembersToday: members.new_today || 0,
           newMembersThisWeek: members.new_this_week || 0,
         }
@@ -135,8 +137,6 @@ export function useRealtimeStats(): RealtimeStatsResult {
   const trends = {
     totalMembers: calculateTrend(stats.totalMembers, previousStats?.totalMembers ?? stats.totalMembers),
     activeMembers: calculateTrend(stats.activeMembers, previousStats?.activeMembers ?? stats.activeMembers),
-    monthlyRevenue: calculateTrend(stats.monthlyRevenue, previousStats?.monthlyRevenue ?? stats.monthlyRevenue),
-    todayRevenue: calculateTrend(stats.todayRevenue, previousStats?.todayRevenue ?? stats.todayRevenue),
   }
 
   return {

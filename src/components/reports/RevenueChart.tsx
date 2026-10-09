@@ -28,19 +28,12 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
   }, [data])
 
   const totalClub = useMemo(() => data.reduce((sum, d) => sum + d.revenue, 0), [data])
-  const totalShop = useMemo(
-    () => data.reduce((sum, d) => sum + (d.shopRevenue || 0), 0),
-    [data]
-  )
-  const hasShop = totalShop > 0
-  const monthsWithActivity = useMemo(
-    () => data.filter((d) => d.revenue > 0 || (d.shopRevenue || 0) > 0 || d.paymentCount > 0).length,
-    [data]
-  )
-  const averageRevenue = useMemo(() => {
-    const base = monthsWithActivity || data.length || 1
-    return totalClub / base
-  }, [totalClub, monthsWithActivity, data.length])
+  const totalShop = useMemo(() => data.reduce((sum, d) => sum + (d.shopRevenue || 0), 0), [data])
+  const totalTickets = useMemo(() => data.reduce((sum, d) => sum + (d.ticketRevenue || 0), 0), [data])
+  // The headline is everything that came in. It used to be the club alone,
+  // the smallest of the three, with the shop as a footnote.
+  const total = totalClub + totalShop + totalTickets
+  const averageRevenue = total / (data.length || 1)
 
   if (loading) {
     return (
@@ -70,34 +63,29 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
               Receita Mensal
             </CardTitle>
             <CardDescription>
-              Assinaturas do clube (pagamentos confirmados)
-              {hasShop ? ' e loja online' : ''}
+              Loja, ingressos e clube — só o que foi pago
               {data.length > 0 ? ` · últimos ${data.length} meses` : ''}
             </CardDescription>
           </div>
           <div className="text-left sm:text-right space-y-1">
             <div>
-              <p className="text-sm text-muted-foreground">Clube (total)</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalClub)}</p>
+              <p className="text-sm text-muted-foreground">Total no período</p>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(total)}</p>
             </div>
-            {hasShop && (
-              <div>
-                <p className="text-sm text-muted-foreground">Loja (total)</p>
-                <p className="text-lg font-semibold text-primary">{formatCurrency(totalShop)}</p>
-              </div>
-            )}
             <p className="text-xs text-muted-foreground">
-              Média clube: {formatCurrency(averageRevenue)}/mês
+              Loja {formatCurrency(totalShop)} · Ingressos {formatCurrency(totalTickets)} · Clube{' '}
+              {formatCurrency(totalClub)}
             </p>
+            <p className="text-xs text-muted-foreground">Média: {formatCurrency(averageRevenue)}/mês</p>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
-          {data.length === 0 || (totalClub === 0 && totalShop === 0) ? (
+          {data.length === 0 || total === 0 ? (
             <div className="h-full flex items-center justify-center text-muted-foreground text-center px-4">
               Nenhum pagamento confirmado neste período ainda. Quando houver
-              assinaturas ou pedidos pagos, a receita aparece mês a mês aqui.
+              pedidos, ingressos ou assinaturas pagos, a receita aparece mês a mês aqui.
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -114,15 +102,7 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
                   className="text-muted-foreground"
                 />
                 <Tooltip
-                  formatter={(value, name) => {
-                    const label =
-                      name === 'revenue'
-                        ? 'Clube'
-                        : name === 'shopRevenue'
-                          ? 'Loja'
-                          : String(name)
-                    return [formatCurrency(Number(value)), label]
-                  }}
+                  formatter={(value, name) => [formatCurrency(Number(value)), String(name)]}
                   labelStyle={{ color: 'var(--foreground)' }}
                   contentStyle={{
                     backgroundColor: 'var(--card)',
@@ -140,17 +120,24 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
                   dot={{ fill: '#10b981', strokeWidth: 2 }}
                   activeDot={{ r: 6 }}
                 />
-                {hasShop && (
-                  <Line
-                    type="monotone"
-                    dataKey="shopRevenue"
-                    name="Loja"
-                    stroke="#F04080"
-                    strokeWidth={2}
-                    dot={{ fill: '#F04080', strokeWidth: 2 }}
-                    activeDot={{ r: 6 }}
-                  />
-                )}
+                <Line
+                  type="monotone"
+                  dataKey="shopRevenue"
+                  name="Loja"
+                  stroke="#F04080"
+                  strokeWidth={2}
+                  dot={{ fill: '#F04080', strokeWidth: 2 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="ticketRevenue"
+                  name="Ingressos"
+                  stroke="#FCBE04"
+                  strokeWidth={2}
+                  dot={{ fill: '#FCBE04', strokeWidth: 2 }}
+                  activeDot={{ r: 6 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           )}

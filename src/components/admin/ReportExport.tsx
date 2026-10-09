@@ -94,7 +94,7 @@ export function ReportExport() {
         </div>
 
         <p className="text-xs text-muted-foreground">
-          {PERIODS.find((p) => p.value === period)?.hint} — inclui receita da loja e do clube, ticket médio,
+          {PERIODS.find((p) => p.value === period)?.hint} — inclui receita da loja, dos ingressos e do clube, ticket médio,
           varejo × atacado, novos membros, produtos mais vendidos e a situação do estoque, com comparação
           contra o período anterior.
         </p>

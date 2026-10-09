@@ -39,6 +39,8 @@ const sampleData: MonthlyReportData[] = [
     churnedMembers: 1,
     shopRevenue: 0,
     shopOrders: 0,
+    ticketRevenue: 0,
+    ticketCount: 0,
   },
   {
     period: '2026-02',
@@ -49,6 +51,8 @@ const sampleData: MonthlyReportData[] = [
     churnedMembers: 2,
     shopRevenue: 100,
     shopOrders: 1,
+    ticketRevenue: 440,
+    ticketCount: 9,
   },
   {
     period: '2026-03',
@@ -59,6 +63,8 @@ const sampleData: MonthlyReportData[] = [
     churnedMembers: 1,
     shopRevenue: 50,
     shopOrders: 1,
+    ticketRevenue: 200,
+    ticketCount: 6,
   },
 ]
 
@@ -94,6 +100,23 @@ describe('RevenueChart', () => {
     render(<RevenueChart data={sampleData} />)
 
     expect(screen.getByText(/m[eé]dia/i)).toBeInTheDocument()
+  })
+
+  // The headline was the club alone, the smallest of the three; tickets were missing.
+  it('heads with everything that came in — shop, tickets and club', () => {
+    render(<RevenueChart data={sampleData} />)
+
+    // 2500 club + 150 shop + 640 tickets
+    expect(screen.getByText('Total no período')).toBeInTheDocument()
+    expect(screen.getByText(/R\$\s?3\.290,00/)).toBeInTheDocument()
+    expect(screen.getByText(/Ingressos R\$\s?640,00/)).toBeInTheDocument()
+  })
+
+  it('draws a chart when only tickets were sold', () => {
+    const ticketsOnly = sampleData.map((d) => ({ ...d, revenue: 0, shopRevenue: 0 }))
+    render(<RevenueChart data={ticketsOnly} />)
+
+    expect(screen.getByTestId('responsive-container')).toBeInTheDocument()
   })
 
   it('renders the responsive container when data exists', () => {

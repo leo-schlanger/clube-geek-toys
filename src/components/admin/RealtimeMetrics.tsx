@@ -183,20 +183,20 @@ export function RealtimeMetrics() {
           trend={trends.activeMembers}
           colorClass="text-green-500"
         />
+        {/* Loja + clube + ingressos. It once showed the club alone, under a
+            "projeção" label, and read close to zero in a month of shop sales. */}
         <StatCard
-          title="Receita Mensal"
+          title="Receita do Mês"
           value={formatCurrency(stats.monthlyRevenue)}
-          subtitle="Projeção baseada em ativos"
+          subtitle="Loja, clube e ingressos"
           icon={<DollarSign className="h-5 w-5" />}
-          trend={trends.monthlyRevenue}
           colorClass="text-emerald-500"
         />
         <StatCard
           title="Receita Hoje"
           value={formatCurrency(stats.todayRevenue)}
+          subtitle={`Ontem: ${formatCurrency(stats.yesterdayRevenue)}`}
           icon={<DollarSign className="h-5 w-5" />}
-          trend={trends.todayRevenue}
-          trendLabel="vs ontem"
           colorClass="text-emerald-500"
           highlight={stats.todayRevenue > 0}
         />

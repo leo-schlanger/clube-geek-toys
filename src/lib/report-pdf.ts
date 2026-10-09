@@ -72,12 +72,22 @@ const PERIOD_LABEL: Record<OverviewPeriod, string> = {
 }
 
 /** Inclusive end date — the API's `end` is the exclusive start of the next period. */
-function formatRange(period: OverviewPeriod, startIso: string, endIso: string): string {
+export function formatRange(period: OverviewPeriod, startIso: string, endIso: string): string {
   const start = new Date(startIso)
   const lastDay = new Date(new Date(endIso).getTime() - 1)
-  const date = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+  // Periods are cut on the Rio calendar (the API returns Rio midnights as instants).
+  const date = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
   if (period === 'day') return date(start)
   return `${date(start)} a ${date(lastDay)}`
+}
+
+/** Shop + event tickets + club, for the period and the one before it. */
+export function revenueTotals(report: OverviewReport): { current: number; previous: number } {
+  const { sales, club, tickets, previous } = report
+  return {
+    current: sales.revenue + tickets.revenue + club.revenue,
+    previous: previous.salesRevenue + previous.ticketRevenue + previous.clubRevenue,
+  }
 }
 
 /** Cursor-based layout: every writer moves `y` down and asks for a page break. */
@@ -302,9 +312,8 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   const bold = await doc.embedFont(StandardFonts.HelveticaBold)
   const layout = new Layout(doc, font, bold)
 
-  const { sales, club, products, margin, previous, period } = report
-  const totalRevenue = sales.revenue + club.revenue
-  const previousTotal = previous.salesRevenue + previous.clubRevenue
+  const { sales, club, tickets, products, margin, period } = report
+  const { current: totalRevenue, previous: previousTotal } = revenueTotals(report)
 
   doc.setTitle(`${PERIOD_LABEL[period.type]} - GeekPop & Toys`)
   doc.setProducer('Clube GeekPop & Toys')
@@ -312,13 +321,14 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.header(
     PERIOD_LABEL[period.type],
     formatRange(period.type, period.start, period.end),
-    new Date().toLocaleString('pt-BR')
+    new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
   )
 
   layout.section('Resumo')
-  layout.highlight('Receita total (loja + clube)', money(totalRevenue), growth(totalRevenue, previousTotal))
+  layout.highlight('Receita total (loja + ingressos + clube)', money(totalRevenue), growth(totalRevenue, previousTotal))
   layout.rows([
-    ['Receita da loja', money(sales.revenue)],
+    ['Receita da loja (inclui frete)', money(sales.revenue)],
+    ['Receita de ingressos', money(tickets.revenue)],
     ['Receita do clube (assinaturas)', money(club.revenue)],
     ['Pedidos pagos', integer(sales.orders)],
     ['Ticket medio da loja', money(sales.averageTicket)],
@@ -373,6 +383,12 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     )
   }
 
+  layout.section('Ingressos')
+  layout.rows([
+    ['Reservas pagas', integer(tickets.reservations)],
+    ['Receita de ingressos', money(tickets.revenue)],
+  ])
+
   layout.section('Clube')
   layout.rows([
     ['Pagamentos confirmados', integer(club.payments)],
@@ -387,6 +403,7 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     layout.note('Nenhum produto vendido neste periodo.')
   } else {
     layout.ranking(products.top)
+    layout.note('Receita por produto ja com o desconto do pedido (promocao, membro, cupom) abatido.')
     layout.rows([
       ['Unidades vendidas no periodo', integer(products.unitsSold)],
       ['Produtos distintos vendidos', integer(products.distinctProducts)],

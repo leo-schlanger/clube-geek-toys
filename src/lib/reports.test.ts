@@ -11,7 +11,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('./api-client', () => ({
+vi.mock('./api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./api-client')>()),
   api: {
     get: vi.fn(),
     post: vi.fn(),
@@ -51,6 +52,8 @@ describe('getMonthlyReport', () => {
         churnedMembers: 2,
         shopRevenue: 200,
         shopOrders: 3,
+        ticketRevenue: 440,
+        ticketCount: 9,
       },
       {
         month: '2026-02',
@@ -76,7 +79,10 @@ describe('getMonthlyReport', () => {
       churnedMembers: 2,
       shopRevenue: 200,
       shopOrders: 3,
+      ticketRevenue: 440,
+      ticketCount: 9,
     })
+    expect(result[1]).toMatchObject({ ticketRevenue: 0, ticketCount: 0 })
     expect(mockedApi.get).toHaveBeenCalledWith('/reports/monthly?months=6')
   })
 
@@ -88,20 +94,17 @@ describe('getMonthlyReport', () => {
     expect(mockedApi.get).toHaveBeenCalledWith('/reports/monthly?months=12')
   })
 
-  it('should return empty array on error', async () => {
+  // An empty list made the chart say "nenhum pagamento" during an outage.
+  it('throws the server error instead of returning an empty month list', async () => {
     mockedApi.get.mockResolvedValueOnce({ error: 'Server error', status: 500 })
 
-    const result = await getMonthlyReport()
-
-    expect(result).toEqual([])
+    await expect(getMonthlyReport()).rejects.toThrow('Server error')
   })
 
-  it('should return empty array when no data', async () => {
+  it('throws when the call comes back without data', async () => {
     mockedApi.get.mockResolvedValueOnce({ data: undefined, status: 200 })
 
-    const result = await getMonthlyReport()
-
-    expect(result).toEqual([])
+    await expect(getMonthlyReport()).rejects.toThrow('Erro ao carregar o relatório mensal')
   })
 
   it('should default missing numeric fields to 0', async () => {
@@ -153,20 +156,16 @@ describe('getRevenueByPlan', () => {
     expect(result[0]).toEqual({ plan: 'club', count: 0, revenue: 0, percentage: 0 })
   })
 
-  it('should return empty array on error', async () => {
+  it('throws the server error', async () => {
     mockedApi.get.mockResolvedValueOnce({ error: 'fail', status: 500 })
 
-    const result = await getRevenueByPlan()
-
-    expect(result).toEqual([])
+    await expect(getRevenueByPlan()).rejects.toThrow('fail')
   })
 
-  it('should return empty array when no data', async () => {
+  it('throws when the call comes back without data', async () => {
     mockedApi.get.mockResolvedValueOnce({ data: undefined, status: 200 })
 
-    const result = await getRevenueByPlan()
-
-    expect(result).toEqual([])
+    await expect(getRevenueByPlan()).rejects.toThrow('Erro ao carregar o plano do clube')
   })
 })
 
@@ -204,20 +203,16 @@ describe('getChurnRate', () => {
     expect(mockedApi.get).toHaveBeenCalledWith('/reports/churn?months=3')
   })
 
-  it('should return empty array on no data', async () => {
+  it('throws when the call comes back without data', async () => {
     mockedApi.get.mockResolvedValueOnce({ data: undefined, status: 200 })
 
-    const result = await getChurnRate()
-
-    expect(result).toEqual([])
+    await expect(getChurnRate()).rejects.toThrow('Erro ao carregar o churn')
   })
 
-  it('should return empty array on thrown error', async () => {
+  it('lets a network failure through', async () => {
     mockedApi.get.mockRejectedValueOnce(new Error('fail'))
 
-    const result = await getChurnRate()
-
-    expect(result).toEqual([])
+    await expect(getChurnRate()).rejects.toThrow('fail')
   })
 })
 

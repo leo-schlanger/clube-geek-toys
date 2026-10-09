@@ -136,6 +136,7 @@ export default function AdminDashboard() {
   const [planDistribution, setPlanDistribution] = useState<PlanDistribution[]>([])
   const [churnData, setChurnData] = useState<ChurnData[]>([])
   const [loadingReports, setLoadingReports] = useState(false)
+  const [reportsError, setReportsError] = useState<string | null>(null)
 
   // Modal state
   const [modalMode, setModalMode] = useState<ModalMode>(null)
@@ -161,6 +162,7 @@ export default function AdminDashboard() {
 
   const fetchReports = useCallback(async () => {
     setLoadingReports(true)
+    setReportsError(null)
     try {
       const [monthly, plans, churn] = await Promise.all([
         getMonthlyReport(reportPeriod),
@@ -173,7 +175,7 @@ export default function AdminDashboard() {
       setChurnData(churn)
     } catch (error) {
       logger.error('Error fetching reports:', error)
-      toast.error('Erro ao carregar relatórios')
+      setReportsError(error instanceof Error ? error.message : 'Erro ao carregar relatórios')
     } finally {
       setLoadingReports(false)
     }
@@ -658,6 +660,7 @@ export default function AdminDashboard() {
                 planDistribution={planDistribution}
                 churnData={churnData}
                 loadingReports={loadingReports}
+                reportsError={reportsError}
                 onPeriodChange={setReportPeriod}
                 onRefresh={fetchReports}
               />

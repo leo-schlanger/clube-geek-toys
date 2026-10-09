@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { generateReportPDF, reportFilename, toPdfText } from './report-pdf'
+import { formatRange, generateReportPDF, reportFilename, revenueTotals, toPdfText } from './report-pdf'
 import type { OverviewReport } from './reports'
 
 function makeReport(overrides: Partial<OverviewReport> = {}): OverviewReport {
@@ -57,7 +57,8 @@ function makeReport(overrides: Partial<OverviewReport> = {}): OverviewReport {
       outOfStock: 6,
       lowStock: 14,
     },
-    previous: { salesRevenue: 3000, clubRevenue: 1200, orders: 10, newMembers: 3 },
+    tickets: { revenue: 440, reservations: 9 },
+    previous: { salesRevenue: 3000, clubRevenue: 1200, ticketRevenue: 200, orders: 10, newMembers: 3 },
     ...overrides,
   }
 }
@@ -105,7 +106,8 @@ describe('generateReportPDF', () => {
     const empty = makeReport({
       sales: { ...makeReport().sales, orders: 0, revenue: 0, averageTicket: 0 },
       products: { ...makeReport().products, top: [], unitsSold: 0, distinctProducts: 0 },
-      previous: { salesRevenue: 0, clubRevenue: 0, orders: 0, newMembers: 0 },
+      tickets: { revenue: 0, reservations: 0 },
+      previous: { salesRevenue: 0, clubRevenue: 0, ticketRevenue: 0, orders: 0, newMembers: 0 },
     })
 
     await expect(generateReportPDF(empty)).resolves.toBeInstanceOf(Uint8Array)
@@ -149,5 +151,21 @@ describe('reportFilename', () => {
       period: { type: 'year', start: '2026-01-01T00:00:00.000Z', end: '2027-01-01T00:00:00.000Z' },
     })
     expect(reportFilename(report)).toBe('relatorio-geekpop-year-2026.pdf')
+  })
+})
+
+describe('report totals and period', () => {
+  // Tickets were missing from every report; the PDF said "loja + clube".
+  it('counts event tickets in the total and in the comparison', () => {
+    const totals = revenueTotals(makeReport())
+    expect(totals.current).toBeCloseTo(3480.5 + 440 + makeReport().club.revenue)
+    expect(totals.previous).toBe(3000 + 200 + 1200)
+  })
+
+  // The API now cuts months at Rio midnight (03:00Z). Read in UTC, October
+  // would have ended "01/11"; read in Rio it ends on the 31st.
+  it('shows the period on the Rio calendar', () => {
+    expect(formatRange('month', '2026-10-01T03:00:00.000Z', '2026-11-01T03:00:00.000Z')).toBe('01/10/2026 a 31/10/2026')
+    expect(formatRange('day', '2026-10-09T03:00:00.000Z', '2026-10-10T03:00:00.000Z')).toBe('09/10/2026')
   })
 })

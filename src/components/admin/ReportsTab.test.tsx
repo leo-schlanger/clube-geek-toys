@@ -40,6 +40,8 @@ const sampleMonthlyData: MonthlyReportData[] = [
     churnedMembers: 1,
     shopRevenue: 0,
     shopOrders: 0,
+    ticketRevenue: 0,
+    ticketCount: 0,
   },
 ]
 
@@ -74,6 +76,19 @@ describe('ReportsTab', () => {
     expect(screen.getByTestId('revenue-chart')).toBeInTheDocument()
     expect(screen.getByTestId('members-chart')).toBeInTheDocument()
     expect(screen.getByTestId('churn-metrics')).toBeInTheDocument()
+  })
+
+  // The charts drawn from an empty list said "nenhum pagamento" during an outage.
+  it('shows the failure instead of charts that would read as no sales', async () => {
+    const onRefresh = vi.fn()
+    render(<ReportsTab {...defaultProps} monthlyReportData={[]} reportsError="Erro ao carregar o relatório mensal" onRefresh={onRefresh} />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar os relatórios')
+    expect(screen.getByRole('alert')).toHaveTextContent('não quer dizer que não houve vendas')
+    expect(screen.queryByTestId('revenue-chart')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('churn-metrics')).not.toBeInTheDocument()
+    screen.getByRole('button', { name: 'Tentar de novo' }).click()
+    expect(onRefresh).toHaveBeenCalled()
   })
 
   it('should pass period to ReportFilters', () => {

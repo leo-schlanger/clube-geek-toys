@@ -53,6 +53,7 @@ function makeStatsResult(overrides: Partial<RealtimeStatsResult> = {}): Realtime
       expiredMembers: 7,
       monthlyRevenue: 1500,
       todayRevenue: 200,
+      yesterdayRevenue: 320,
       newMembersToday: 2,
       newMembersThisWeek: 8,
     },
@@ -60,8 +61,6 @@ function makeStatsResult(overrides: Partial<RealtimeStatsResult> = {}): Realtime
     trends: {
       totalMembers: stableTrend,
       activeMembers: upTrend,
-      monthlyRevenue: stableTrend,
-      todayRevenue: stableTrend,
     },
     loading: false,
     error: null,
@@ -106,6 +105,20 @@ describe('RealtimeMetrics', () => {
     expect(screen.getByText('50')).toBeInTheDocument()
     expect(screen.getByText('Membros Ativos')).toBeInTheDocument()
     expect(screen.getByText('40')).toBeInTheDocument()
+  })
+
+  // The month card showed the club alone as a "projeção"; the day card compared
+  // with the poll from 30 seconds earlier and called it "vs ontem".
+  it('shows revenue from every source, and yesterday as a value, not a fake trend', () => {
+    mockUseRealtimeStats.mockReturnValue(makeStatsResult())
+
+    render(<RealtimeMetrics />)
+
+    expect(screen.getByText('Receita do Mês')).toBeInTheDocument()
+    expect(screen.getByText('Loja, clube e ingressos')).toBeInTheDocument()
+    expect(screen.queryByText(/Projeção/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Ontem: R\$\s?320,00/)).toBeInTheDocument()
+    expect(screen.queryByText(/vs ontem/)).not.toBeInTheDocument()
   })
 
   it('renders secondary stats cards', () => {

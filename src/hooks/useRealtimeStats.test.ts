@@ -24,9 +24,15 @@ const fakeApiResponse = {
       new_today: 3,
       new_this_week: 12,
     },
+    // Club alone — what the card used to show.
     payments: {
-      month_revenue: 15000,
-      today_revenue: 500,
+      month_revenue: 150,
+      today_revenue: 0,
+    },
+    revenue: {
+      month_total: 15000,
+      today_total: 500,
+      yesterday_total: 320,
     },
   },
   error: null,
@@ -66,8 +72,10 @@ describe('useRealtimeStats', () => {
     expect(result.current.stats.activeMembers).toBe(80)
     expect(result.current.stats.pendingMembers).toBe(10)
     expect(result.current.stats.expiredMembers).toBe(10) // expired + inactive
+    // Shop + club + tickets, not the club's 150.
     expect(result.current.stats.monthlyRevenue).toBe(15000)
     expect(result.current.stats.todayRevenue).toBe(500)
+    expect(result.current.stats.yesterdayRevenue).toBe(320)
     expect(result.current.stats.newMembersToday).toBe(3)
     expect(result.current.stats.newMembersThisWeek).toBe(12)
     expect(result.current.lastUpdate).toBeInstanceOf(Date)
