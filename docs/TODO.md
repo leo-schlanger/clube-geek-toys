@@ -207,6 +207,15 @@ propósito, e o `dependabot.yml` diz a cada uma quando voltar.
       renderização a mais. Refatorar um por vez, com teste de comportamento antes e
       depois, longe de semana de evento; depois tirar o `~7.0.1` do
       `package.json` e as duas regras do `dependabot.yml`.
+- [ ] **BAIXO** — Vite 8 + `@vitejs/plugin-react` 6: o plugin exige o Vite 8
+      (Rolldown) e puxa o Babel 8, e o `vite-plugin-pwa` (workbox) ainda está no
+      Babel 7 — o `npm install` recusa. Forçar com `--legacy-peer-deps` esconderia
+      o conflito justamente no service worker. Quando o `vite-plugin-pwa` suportar
+      o Vite 8, subir os três juntos, conferir o `manualChunks` (vira opção do
+      Rolldown) e as telas, e tirar as regras do `dependabot.yml`.
+- [ ] **BAIXO** — Stripe 23: o SDK novo muda a versão da API de toda chamada, e
+      o Stripe aqui só estorna cobrança anterior a 01/09/2026 — não há como testar
+      sem estornar dinheiro de verdade. Fica no 22 até o Stripe sair do código.
 - [ ] **BAIXO** — TypeScript 7: o `typescript-eslint` só aceita `<6.1`. Quando ele
       aceitar o 7, subir raiz e `server/api` juntos e tirar a regra do
       `dependabot.yml`.

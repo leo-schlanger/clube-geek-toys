@@ -31,6 +31,13 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: '@eslint/js'
         update-types: [version-update:semver-major]
+      # @vitejs/plugin-react 6 needs Vite 8 (Rolldown) and pulls Babel 8, while
+      # vite-plugin-pwa (workbox) is still on Babel 7. Move all three together
+      # once vite-plugin-pwa supports Vite 8; see docs/TODO.md.
+      - dependency-name: '@vitejs/plugin-react'
+        update-types: [version-update:semver-major]
+      - dependency-name: vite
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: npm
     directory: /server/api
