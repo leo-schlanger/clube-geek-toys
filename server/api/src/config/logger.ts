@@ -35,8 +35,8 @@ export function resolveLogLevel(raw: string | undefined, isTest: boolean): strin
 
 const level = resolveLogLevel(process.env.LOG_LEVEL, Boolean(process.env.VITEST));
 
-export const logger = pino({
-  level,
+/** Everything but the level: exported so a test can check the real format and redaction. */
+export const loggerOptions = {
   base: { service: 'api' },
   timestamp: pino.stdTimeFunctions.isoTime,
   formatters: { level: (label) => ({ level: label }) },
@@ -60,7 +60,9 @@ export const logger = pino({
     ],
     censor: '[redacted]',
   },
-});
+} satisfies pino.LoggerOptions;
+
+export const logger = pino({ level, ...loggerOptions });
 
 /** A logger for one area of the code — `module` is what you filter on. */
 export function moduleLogger(module: string): pino.Logger {
