@@ -11,6 +11,8 @@ import { isValidCPF } from '../utils/cpf.js';
 import { isValidCnpj } from '../utils/cnpj.js';
 import { CLUB_PLAN_PRICE, CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
 import { auditLog } from '../utils/audit.js';
+import { revokeRefundedPeriod } from './club-access.service.js';
+import { cancelSubscription } from './subscription.service.js';
 import crypto from 'crypto';
 import { moduleLogger } from '../config/logger.js';
 
@@ -885,7 +887,9 @@ export async function getPaymentStatus(paymentId: string): Promise<{
  * - Calls stripe.refunds.create() to refund the PaymentIntent
  * - Updates payments.status to 'refunded'
  * - Writes audit_log entry
- * - Member status remains 'active' until expiry; admin may manually deactivate if needed
+ * - Takes back the period the payment bought (`revokeRefundedPeriod`): with a
+ *   single payment the member goes `inactive` today, and a live recurrence is
+ *   cancelled so it is not charged again
  *
  * Idempotent: a payment already 'refunded' returns the existing record without re-calling Stripe.
  */
@@ -941,11 +945,27 @@ export async function refundPayment(opts: {
     );
   }
 
-  // Mark as refunded in DB (store reason for audit trail)
-  await query(
-    `UPDATE payments SET status = 'refunded', refund_reason = $2, updated_at = NOW() WHERE id = $1`,
+  // Mark as refunded in DB (store reason for audit trail). Conditional: the
+  // provider's `charge.refunded` webhook can land first, and only the writer
+  // that flips the row takes the membership period back.
+  const flipped = await query(
+    `UPDATE payments SET status = 'refunded', refund_reason = $2, updated_at = NOW()
+      WHERE id = $1 AND status <> 'refunded'
+      RETURNING id`,
     [opts.paymentId, opts.reason || null]
   );
+  if (flipped.rows.length > 0 && payment.memberId) {
+    const revoked = await revokeRefundedPeriod(
+      { query },
+      payment.memberId as string,
+      payment.amount,
+    );
+    if (revoked?.subscriptionId) {
+      await cancelSubscription(revoked.subscriptionId).catch((err) =>
+        log.error({ err }, `cancel subscription after refund failed (${revoked.subscriptionId})`)
+      );
+    }
+  }
 
   await auditLog(
     'payment.refunded',

@@ -57,7 +57,8 @@ const AVAILABLE_TEMPLATES = [
   'verify-email', 'password-reset', 'account-locked', 'admin-new-login', 'contract-signed',
   'admin-new-member', 'order-confirmed', 'order-shipped', 'order-ready-for-pickup',
   'question-answered',
-  'order-pending-pix', 'order-refunded', 'order-cancelled-customer',
+  'order-pending-pix', 'order-refunded', 'order-cancelled-customer', 'order-not-completed',
+  'club-signup-reminder',
   'payment-refunded',
   'admin-pix-order-pending', 'admin-order-cancelled', 'admin-order-disputed',
   'admin-daily-digest', 'admin-payment-event',
@@ -270,6 +271,19 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       cta: { text: 'Ver Minha Carteirinha', url: `${frontendUrl}/membro` },
     },
 
+    /** Signed up, never paid: the Bruna case — a refused card and no way out. */
+    'club-signup-reminder': {
+      subject: 'Falta pouco para entrar no Clube GeekPop & Toys',
+      preheader: 'Seu cadastro está salvo. Conclua o pagamento no PIX ou no cartão.',
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Seu cadastro está esperando por você</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>Vimos que você se cadastrou no Clube GeekPop &amp; Toys, mas o pagamento não foi concluído. Nada foi cobrado, e o seu cadastro continua salvo.</p>
+        ${infoBox('Para concluir, é só entrar com seu e-mail e senha e escolher: <strong>PIX</strong>, com confirmação automática na hora, ou <strong>cartão</strong>. Se o banco recusar o cartão, o PIX aparece na mesma tela.')}
+        <p style="margin-top:16px">Ficou alguma dúvida? Responda este e-mail que a gente ajuda.</p>`,
+      cta: { text: 'Concluir minha assinatura', url: `${frontendUrl}/membro` },
+    },
+
     // ─── Payments ─────────────────────────────────────
     'payment-confirmed': {
       subject: 'Pagamento confirmado — Clube GeekPop & Toys',
@@ -412,6 +426,31 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
         ])}
         ${infoBox('Se você já tinha pago, o valor é devolvido — e você recebe um e-mail separado confirmando o estorno. Nenhuma cobrança fica em aberto.')}`,
       cta: { text: 'Ver a loja', url: 'https://shop.geeketoys.com.br' },
+    },
+
+    /**
+     * The system closed an order nobody paid (card form left, PIX expired).
+     * Replaces the bare "cancelado" notice: the buyer wanted the item, and the
+     * way back — PIX or installments — is what they need to read.
+     */
+    'order-not-completed': {
+      subject: `Seu pedido não foi concluído — ${v.product_name || 'GeekPop & Toys'}`,
+      preheader: 'Ainda dá tempo: o produto continua disponível, no PIX ou no cartão.',
+      body: `
+        <h2 style="color:#F04080;margin:0 0 12px">Seu pedido não foi concluído</h2>
+        <p>Olá, <strong>${name}</strong>!</p>
+        <p>${
+          v.reason === 'pix_expired'
+            ? 'O PIX do seu pedido venceu antes do pagamento, então o pedido foi encerrado.'
+            : 'O pagamento do seu pedido não chegou a ser concluído, então o pedido foi encerrado.'
+        }${v.decline_hint ? ` ${v.decline_hint}` : ''} Nada foi cobrado.</p>
+        ${dataTable([
+          ['Pedido', `<strong>#${v.order_number || '—'}</strong>`],
+          ...(v.product_name ? [['Produto', v.product_name]] : []),
+          ['Valor', `R$ ${v.total || '0,00'}`],
+        ])}
+        ${infoBox('Se ainda quiser, é só fazer o pedido de novo: no <strong>PIX</strong> a confirmação é automática, e no <strong>cartão</strong> dá para parcelar sem juros. Ficou alguma dúvida? Responda este e-mail que a gente ajuda.')}`,
+      cta: { text: 'Voltar ao produto', url: v.product_url || 'https://shop.geeketoys.com.br' },
     },
 
     'order-shipped': {

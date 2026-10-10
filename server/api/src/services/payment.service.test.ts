@@ -641,6 +641,28 @@ describe('refundPayment', () => {
     expect(ran("UPDATE payments SET status = 'refunded'")).toBe(true);
   });
 
+  /** Decision of 10/10/2026: a refund ends the membership it paid for. */
+  it('o estorno tira o período que o pagamento comprou', async () => {
+    route('FROM payments p', { rows: [{ ...paidRow, provider_id: 'ch_abc' }] });
+    route("UPDATE payments SET status = 'refunded'", { rows: [{ id: 'pay-1' }] });
+    route('UPDATE members', { rows: [{ status: 'inactive', subscription_id: null }] });
+
+    await refundPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' });
+
+    expect(ran('UPDATE members', "ELSE 'inactive'")).toBe(true);
+    expect(paramsOf('UPDATE members')).toEqual(['member-1', '1 year']);
+  });
+
+  /** The webhook got there first and already took the period back. */
+  it('não tira o período duas vezes quando o webhook chegou antes', async () => {
+    route('FROM payments p', { rows: [{ ...paidRow, provider_id: 'ch_abc' }] });
+    route("UPDATE payments SET status = 'refunded'", { rows: [] });
+
+    await refundPayment({ paymentId: 'pay-1', adminUserId: 'admin-1' });
+
+    expect(ran('UPDATE members')).toBe(false);
+  });
+
   it('não marca nada quando a operadora recusa', async () => {
     route('FROM payments p', { rows: [{ ...paidRow, provider_id: 'ch_abc' }] });
     refundChargeMock.mockRejectedValueOnce(new Error('charge_already_refunded'));

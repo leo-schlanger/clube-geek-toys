@@ -28,6 +28,7 @@ import { abandonCardOrder, updateOrderStatus } from './order.service.js';
 import { expireReservation } from './event.service.js';
 import { moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
+import { sendOrderRecoveryEmail } from './recovery.service.js';
 
 const log = moduleLogger('reconcile');
 
@@ -156,7 +157,10 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
         // store credit and tells the customer — doing it with a bare UPDATE
         // here would skip all three.
         if (isDeadPix(charge) && orderId) {
-          await updateOrderStatus(orderId, 'cancelled', 'system-reconcile');
+          // The buyer gets the "não foi concluído" invitation instead of a bare
+          // "cancelado": they wanted the item, and nothing was charged.
+          await updateOrderStatus(orderId, 'cancelled', 'system-reconcile', { notifyCustomer: false });
+          await sendOrderRecoveryEmail(orderId, 'pix_expired');
           result.expired += 1;
           log.info(`${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pedido cancelado`);
         } else if (isDeadPix(charge) && reservationId) {
@@ -266,6 +270,7 @@ export async function closeAbandonedCardOrders(): Promise<number> {
     try {
       if (await abandonCardOrder(row.id as string, 'system-reconcile')) {
         closed += 1;
+        await sendOrderRecoveryEmail(row.id as string, 'card_abandoned');
         log.info(`pedido #${row.order_number}: cartão não concluído — pedido cancelado`);
       }
     } catch (err) {

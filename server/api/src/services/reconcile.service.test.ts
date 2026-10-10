@@ -39,6 +39,10 @@ vi.mock('./order.service.js', () => ({
   abandonCardOrder: abandonMock,
 }));
 vi.mock('./event.service.js', () => ({ expireReservation: expireReservationMock }));
+const { recoveryMock } = vi.hoisted(() => ({
+  recoveryMock: vi.fn(async (..._args: unknown[]) => true),
+}));
+vi.mock('./recovery.service.js', () => ({ sendOrderRecoveryEmail: recoveryMock }));
 const { alertMock } = vi.hoisted(() => ({ alertMock: vi.fn() }));
 vi.mock('./ops-alert.service.js', () => ({ alertOpsAsync: alertMock }));
 vi.mock('../utils/pagarme.js', async () => {
@@ -253,9 +257,13 @@ describe('PIX expirado', () => {
     const out = await reconcilePendingCharges();
 
     expect(out).toMatchObject({ checked: 1, settled: 0, expired: 1 });
-    // Through updateOrderStatus, which is what releases the hold, returns the
-    // store credit and tells the customer — a bare UPDATE would skip all three.
-    expect(updateStatusMock).toHaveBeenCalledWith('o1', 'cancelled', 'system-reconcile');
+    // Through updateOrderStatus, which is what releases the hold and returns the
+    // store credit — a bare UPDATE would skip both. The customer hears through
+    // the recovery e-mail instead of the bare "cancelado".
+    expect(updateStatusMock).toHaveBeenCalledWith('o1', 'cancelled', 'system-reconcile', {
+      notifyCustomer: false,
+    });
+    expect(recoveryMock).toHaveBeenCalledWith('o1', 'pix_expired');
   });
 
   /**
@@ -376,6 +384,9 @@ describe('closeAbandonedCardOrders', () => {
     expect(await closeAbandonedCardOrders()).toBe(1);
     expect(abandonMock).toHaveBeenCalledWith('o1', 'system-reconcile');
     expect(abandonMock).toHaveBeenCalledWith('o2', 'system-reconcile');
+    // Only the order actually closed gets the invitation back.
+    expect(recoveryMock).toHaveBeenCalledTimes(1);
+    expect(recoveryMock).toHaveBeenCalledWith('o1', 'card_abandoned');
   });
 
   it('só olha cartão, sem Stripe, parado há mais de uma hora', async () => {

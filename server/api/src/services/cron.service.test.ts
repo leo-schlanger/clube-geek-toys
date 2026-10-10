@@ -7,10 +7,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
  * order would sit `pending` with nobody told.
  */
 
-const { query, reconcile, syncShipments, alertOpsAsync, logWarn } = vi.hoisted(() => ({
+const { query, reconcile, syncShipments, sendClubSignupReminders, alertOpsAsync, logWarn } = vi.hoisted(() => ({
   query: vi.fn(async (..._args: unknown[]) => ({ rows: [] as unknown[], rowCount: 0 })),
   reconcile: vi.fn(async () => undefined),
   syncShipments: vi.fn(async () => 0),
+  sendClubSignupReminders: vi.fn(async () => 0),
   alertOpsAsync: vi.fn(),
   logWarn: vi.fn(),
 }))
@@ -25,6 +26,7 @@ vi.mock('./order.service.js', () => ({ releaseReservationById: vi.fn(async () =>
 vi.mock('./auth.service.js', () => ({ purgeExpiredRefreshSessions: vi.fn(async () => 0) }))
 vi.mock('./reconcile.service.js', () => ({ reconcilePendingCharges: reconcile }))
 vi.mock('./label.service.js', () => ({ syncShipments }))
+vi.mock('./recovery.service.js', () => ({ sendClubSignupReminders }))
 vi.mock('./ops-alert.service.js', () => ({ alertOpsAsync }))
 vi.mock('../config/logger.js', () => {
   const log = { info: vi.fn(), warn: logWarn, error: vi.fn(), debug: vi.fn() }
@@ -53,9 +55,18 @@ describe('initCronJobs', () => {
     vi.useRealTimers()
   })
 
-  it('registers the three schedules', () => {
+  it('registers the four schedules', () => {
     const patterns = [...cron.getTasks().values()].map((t) => t.getPattern()).sort()
-    expect(patterns).toEqual(['*/10 * * * *', '*/15 * * * *', '0 6 * * *'])
+    expect(patterns).toEqual(['*/10 * * * *', '*/15 * * * *', '0 13 * * *', '0 6 * * *'])
+  })
+
+  it('sends the club sign-up reminders at 13:00 UTC (10:00 in Rio), not with the 03:00 jobs', async () => {
+    await tick(15_000) // 06:00:05
+    expect(sendClubSignupReminders).not.toHaveBeenCalled()
+    await tick(7 * 60 * 60_000 - 60_000) // 12:59:05
+    expect(sendClubSignupReminders).not.toHaveBeenCalled()
+    await tick(60_000) // 13:00:05
+    expect(sendClubSignupReminders).toHaveBeenCalledTimes(1)
   })
 
   it('runs the payment reconciliation every ten minutes', async () => {

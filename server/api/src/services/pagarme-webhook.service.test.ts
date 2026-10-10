@@ -58,6 +58,10 @@ vi.mock('./order.service.js', () => ({
   releaseReservation: releaseReservationMock,
 }));
 vi.mock('./store-credit.service.js', () => ({ restoreCreditForOrder: restoreCreditMock }));
+const { cancelSubMock } = vi.hoisted(() => ({
+  cancelSubMock: vi.fn(async (..._args: unknown[]) => ({})),
+}));
+vi.mock('./subscription.service.js', () => ({ cancelSubscription: cancelSubMock }));
 vi.mock('../utils/pagarme.js', async () => {
   const actual = await vi.importActual<typeof import('../utils/pagarme.js')>('../utils/pagarme.js');
   return { ...actual, getCharge: getChargeMock };
@@ -521,6 +525,47 @@ describe('charge.refunded', () => {
 
     expect(restoreStockMock).not.toHaveBeenCalled();
     expect(restoreCreditMock).not.toHaveBeenCalled();
+  });
+
+  /** Decision of 10/10/2026: a refund ends the membership it paid for. */
+  it('estorno de assinatura do clube corta o acesso e cancela a recorrência', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [] });
+    route('UPDATE event_reservations', { rows: [] });
+    route('UPDATE payments SET status = ', {
+      rows: [{ id: 'pay-1', member_id: 'm1', amount: '159.90' }],
+    });
+    route('UPDATE members', {
+      rows: [{ status: 'inactive', subscription_id: 'sub_1', subscription_status: 'active' }],
+    });
+
+    await processPagarmeEvent({
+      id: 'hook_club_refund',
+      type: 'charge.refunded',
+      data: { id: 'ch_club', status: 'canceled', amount: 15990, payment_method: 'credit_card' },
+    } as PagarmeWebhookEvent);
+
+    expect(ran('UPDATE members', "ELSE 'inactive'")).toBe(true);
+    // After the commit, not inside the transaction.
+    expect(cancelSubMock).toHaveBeenCalledWith('sub_1');
+  });
+
+  it('estorno de um de dois anos pagos mantém o membro e a recorrência', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [] });
+    route('UPDATE event_reservations', { rows: [] });
+    route('UPDATE payments SET status = ', {
+      rows: [{ id: 'pay-2', member_id: 'm1', amount: '159.90' }],
+    });
+    route('UPDATE members', { rows: [{ status: 'active', subscription_id: 'sub_1' }] });
+
+    await processPagarmeEvent({
+      id: 'hook_club_refund_2',
+      type: 'charge.refunded',
+      data: { id: 'ch_club2', status: 'canceled', amount: 15990 },
+    } as PagarmeWebhookEvent);
+
+    expect(cancelSubMock).not.toHaveBeenCalled();
   });
 });
 

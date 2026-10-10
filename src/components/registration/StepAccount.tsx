@@ -18,6 +18,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
 import { GoogleSignInButton } from '../GoogleSignInButton'
+import { EmailSuggestion } from '../EmailSuggestion'
 import { Turnstile } from '../Turnstile'
 import { validateEmail, type EmailValidationResult } from '../../lib/email-validation'
 import { PASSWORD_MIN_LENGTH } from '../../lib/password-validation'
@@ -101,6 +102,7 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -112,6 +114,7 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
   })
 
   const passwordValue = watch('password', '')
+  const emailValue = watch('email', '')
 
   // -----------------------------------------------------------------------
   // Email blur validation with rate limiting
@@ -237,6 +240,10 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
                   {renderEmailFeedback()}
                 </span>
               </div>
+              <EmailSuggestion
+                email={emailValue}
+                onAccept={(fixed) => setValue('email', fixed, { shouldValidate: true })}
+              />
               {errors.email && (
                 <p className="text-sm text-red-500">{errors.email.message}</p>
               )}

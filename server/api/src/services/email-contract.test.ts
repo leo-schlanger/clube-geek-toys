@@ -90,6 +90,7 @@ const ADMIN_TEMPLATES = [
 
 /** Templates addressed to a shop customer. */
 const SHOP_TEMPLATES = [
+  'order-not-completed',
   'order-confirmed',
   'order-pending-pix',
   'order-ready-for-pickup',
@@ -102,6 +103,7 @@ const SHOP_TEMPLATES = [
 
 /** Templates addressed to a club member. */
 const MEMBER_TEMPLATES = [
+  'club-signup-reminder',
   'welcome',
   // Login locked after wrong passwords: the way out is the reset page.
   'account-locked',

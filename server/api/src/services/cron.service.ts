@@ -7,6 +7,7 @@ import { releaseReservationById } from './order.service.js';
 import { purgeExpiredRefreshSessions } from './auth.service.js';
 import { reconcilePendingCharges } from './reconcile.service.js';
 import { syncShipments } from './label.service.js';
+import { sendClubSignupReminders } from './recovery.service.js';
 import { moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
 
@@ -121,6 +122,15 @@ export function initCronJobs() {
       if (touched > 0) log.info(`Shipment sync updated ${touched} order(s)`);
     } catch (err) {
       cronFailed('sincronização de envios', err);
+    }
+  });
+
+  // 10:00 in Rio: a customer reminder at the 03:00 daily run would read as spam.
+  cron.schedule('0 13 * * *', async () => {
+    try {
+      await sendClubSignupReminders();
+    } catch (err) {
+      cronFailed('lembrete de cadastro do clube', err);
     }
   });
 

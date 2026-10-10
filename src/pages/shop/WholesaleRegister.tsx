@@ -20,6 +20,7 @@ import {
 } from '../../components/ui/card'
 import { SeoHead } from '../../components/store/SeoHead'
 import { useWholesaleSalesOpen } from '../../components/store/useWholesaleSalesOpen'
+import { EmailSuggestion } from '../../components/EmailSuggestion'
 
 /**
  * Wholesale signup: CNPJ + company details.
@@ -201,6 +202,7 @@ export default function WholesaleRegister() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
+                <EmailSuggestion email={email} onAccept={setEmail} />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="password">Senha * (mín. 8)</Label>

@@ -24,6 +24,8 @@ import { restoreCreditForOrder } from './store-credit.service.js';
 import { notifyAdminsOfPayment, type AdminPaymentNotice } from './admin-notification.service.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
 import { CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
+import { revokeRefundedPeriod } from './club-access.service.js';
+import { cancelSubscription } from './subscription.service.js';
 
 const log = moduleLogger('pagarme-webhook');
 
@@ -49,6 +51,8 @@ interface Deferred {
   emails: PendingEmail[];
   creditRestores: string[];
   adminNotices: AdminPaymentNotice[];
+  /** Recurrences to cancel once the transaction is committed (refunded members). */
+  subscriptionCancels: string[];
 }
 
 // ─── Authenticity ────────────────────────────────────────────────────────────
@@ -178,7 +182,7 @@ function formatBRL(amount: number): string {
 
 export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<void> {
   const webhookKey = `pagarme_${event.id}`;
-  const deferred: Deferred = { emails: [], creditRestores: [], adminNotices: [] };
+  const deferred: Deferred = { emails: [], creditRestores: [], adminNotices: [], subscriptionCancels: [] };
 
   const client = await getClient();
   try {
@@ -230,6 +234,14 @@ export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<v
 
   for (const notice of deferred.adminNotices) {
     await notifyAdminsOfPayment(notice);
+  }
+
+  for (const subscriptionId of deferred.subscriptionCancels) {
+    try {
+      await cancelSubscription(subscriptionId);
+    } catch (err) {
+      log.error({ err }, `cancel subscription after refund failed (${subscriptionId})`);
+    }
   }
 }
 
@@ -708,6 +720,17 @@ async function handleRefunded(
     [charge.id]
   );
   if (payment.rows.length === 0) return;
+
+  // A refund takes back the period it bought — see `revokeRefundedPeriod`.
+  const refunded = payment.rows[0]!;
+  if (refunded.member_id) {
+    const revoked = await revokeRefundedPeriod(
+      client,
+      refunded.member_id as string,
+      parseFloat(refunded.amount as string),
+    );
+    if (revoked?.subscriptionId) deferred.subscriptionCancels.push(revoked.subscriptionId);
+  }
 
   deferred.adminNotices.push({
     event: 'payment_refunded',
