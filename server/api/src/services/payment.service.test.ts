@@ -726,6 +726,23 @@ describe('createCardPayment', () => {
     expect(paramsOf('INSERT INTO payments')?.[4]).toBe('ch_card');
   });
 
+  /**
+   * Settlement only activates on the row it flips to `paid`. Writing the
+   * approved charge as `paid` made it read "already settled", and a member who
+   * paid by card was never activated.
+   */
+  it('grava a cobrança aprovada como pendente e liquida na hora, para ativar o membro', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    createOrderMock.mockResolvedValueOnce(approvedCardOrder);
+
+    await createCardPayment(cardInput);
+
+    expect(paramsOf('INSERT INTO payments')?.[3]).toBe('pending');
+    expect(processEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'reconcile_ch_card', type: 'charge.paid' })
+    );
+  });
+
   it('exige o token do cartão', async () => {
     await expect(createCardPayment({ ...cardInput, cardToken: '' })).rejects.toThrow(
       'Cartão não informado.'

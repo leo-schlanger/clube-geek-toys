@@ -635,6 +635,11 @@ export async function createCardPayment(data: {
 
   // Same reason as the PIX insert above: TEXT and VARCHAR(64) cannot share a
   // placeholder, so the charge id is bound twice.
+  //
+  // An approved charge is written `pending`, never `paid`: activation belongs
+  // to the settlement path, which only acts on the row it flips to `paid`.
+  // Writing `paid` here made it read "already settled" and the member who paid
+  // stayed pending. It is settled right below; the sweep catches it otherwise.
   await query(
     `INSERT INTO payments
        (id, member_id, amount, method, status, provider, provider_id, provider_status,
@@ -644,7 +649,7 @@ export async function createCardPayment(data: {
       paymentId,
       payer.id,
       data.amount,
-      status,
+      status === 'paid' ? 'pending' : status,
       charge.id,
       charge.status,
       order.id,
@@ -685,9 +690,10 @@ export async function createCardPayment(data: {
     throw new AppError(402, pagarme.describeChargeFailure(charge), 'CARD_DECLINED');
   }
 
-  // The webhook still does the activating, so the member is activated exactly
-  // once whichever path wins the race. What this returns is only the outcome
-  // the browser needs in order to stop showing a spinner.
+  // Activate now through the same processor the webhook uses, so the member
+  // is activated exactly once whichever path wins the race.
+  if (status === 'paid') await settleIfPaid(charge);
+
   await auditLog(
     'payment.card_created',
     null,
