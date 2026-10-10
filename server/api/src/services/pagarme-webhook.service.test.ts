@@ -758,6 +758,19 @@ describe('invoice.paid — renovação da assinatura', () => {
 
     expect(ran('UPDATE subscriptions', 'failed_payments = 0', 'next_payment_date')).toBe(true);
   });
+
+  /**
+   * The first invoice is paid while the subscription row is still being
+   * written. Recording it as processed would leave the member pending forever;
+   * failing makes the webhook answer 500 and Pagar.me re-deliver.
+   */
+  it('falha (e não marca como processado) quando a assinatura ainda não está gravada', async () => {
+    claimWins();
+
+    await expect(processPagarmeEvent(invoiceEvent())).rejects.toThrow('no member for subscription');
+    expect(ran('ROLLBACK')).toBe(true);
+    expect(ran('COMMIT')).toBe(false);
+  });
 });
 
 // ─── invoice.payment_failed ──────────────────────────────────────────────────

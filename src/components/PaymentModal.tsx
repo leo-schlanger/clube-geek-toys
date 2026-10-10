@@ -288,9 +288,13 @@ export function PaymentModal({
         throw new Error('Pagamento recusado. Tente outro cartão ou use PIX.')
       }
 
-      toast.success(
-        mode === 'subscription' ? 'Assinatura ativada!' : 'Pagamento confirmado!'
-      )
+      // Only `paid`/`authorized` is settled; anything else is still processing,
+      // and the pending screen flips on its own once it lands.
+      if (status === 'paid' || status === 'authorized') {
+        toast.success(mode === 'subscription' ? 'Assinatura ativada!' : 'Pagamento confirmado!')
+      } else {
+        toast.info('Pagamento em processamento. A conta é ativada assim que ele for confirmado.')
+      }
       handlePaymentSuccess()
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

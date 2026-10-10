@@ -885,8 +885,11 @@ async function handleInvoicePaid(
     [subscriptionId]
   );
   if (memberResult.rows.length === 0) {
-    log.warn(`invoice.paid — no member for subscription ${subscriptionId}`);
-    return;
+    // The first invoice is paid while `createSubscription` is still writing the
+    // row, so its webhook can arrive first. Returning would record it as
+    // processed and the member would never be activated; throwing rolls the
+    // claim back and Pagar.me re-delivers.
+    throw new Error(`invoice.paid — no member for subscription ${subscriptionId} yet`);
   }
 
   const member = memberResult.rows[0]!;
