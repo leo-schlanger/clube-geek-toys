@@ -763,6 +763,30 @@ describe('createCardPayment', () => {
     );
   });
 
+  /** 09/10/2026: the issuer refused to save the card and nobody heard of it. */
+  it('avisa a equipe quando o banco recusa validar o cartão (412)', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    const { PagarmeError } = await vi.importActual<typeof import('../utils/pagarme.js')>(
+      '../utils/pagarme.js'
+    );
+    createCardMock.mockRejectedValueOnce(new PagarmeError(412, 'verification failed', 'recusado'));
+
+    await expect(createCardPayment(cardInput)).rejects.toThrow('verification failed');
+
+    expect(createOrderMock).not.toHaveBeenCalled();
+    expect(notifyAdminsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'payment_failed', method: 'credit_card' })
+    );
+  });
+
+  it('não avisa a equipe por erro que não é recusa do cartão', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    createCardMock.mockRejectedValueOnce(new Error('network down'));
+
+    await expect(createCardPayment(cardInput)).rejects.toThrow('network down');
+    expect(notifyAdminsMock).not.toHaveBeenCalled();
+  });
+
   it('recusa quando o membro não existe', async () => {
     route('FROM members WHERE id', { rows: [] });
 

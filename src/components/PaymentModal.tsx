@@ -381,7 +381,7 @@ export function PaymentModal({
                   <span className="text-xs text-muted-foreground">Crédito</span>
                 </Button>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center">PIX: ativação após nossa equipe confirmar o recebimento (geralmente em minutos)</p>
+              <p className="text-[10px] text-muted-foreground text-center">PIX: confirmação automática, a conta é ativada assim que o pagamento cair</p>
               {loading && <div className="flex justify-center"><Loading size="lg" /></div>}
             </div>
           )}
@@ -459,6 +459,11 @@ export function PaymentModal({
               amount={amount}
               onToken={handleCardToken}
               onCancel={() => { setMethod(null); setError(null) }}
+              onSwitchToPix={async () => {
+                setMode('one-time')
+                setMethod(null)
+                await handlePixPayment()
+              }}
               // The club plan is sold in full only.
               allowInstallments={false}
               defaultHolderName={memberName}

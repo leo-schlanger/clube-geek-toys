@@ -296,7 +296,7 @@ function buildUserMessage(httpStatus: number, body: unknown): string {
   // account. It happens *before* any charge, so "não foi possível criar a
   // cobrança" would send the customer looking in the wrong place.
   if (httpStatus === 412) {
-    return 'Não foi possível validar o cartão. Confira o número, a validade e o CVV, ou use outro cartão.';
+    return 'O banco do cartão não autorizou a validação (nada foi cobrado). Confira os dados, tente outro cartão ou pague com PIX.';
   }
   if (httpStatus >= 500) {
     return 'O processador de pagamentos está instável. Tente novamente em alguns minutos.';

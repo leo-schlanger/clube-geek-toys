@@ -151,7 +151,34 @@ export async function createSubscription(data: CreateSubscriptionData) {
   // `expiry_date` is extended when `invoice.paid` arrives.
   // Same PSP rule as a one-off charge: the recurrence bills a saved card, not
   // the browser token. See `createCardForCustomer`.
-  const savedCard = await pagarme.createCardForCustomer(customerId, data.card_token);
+  let savedCard: Awaited<ReturnType<typeof pagarme.createCardForCustomer>>;
+  try {
+    savedCard = await pagarme.createCardForCustomer(customerId, data.card_token);
+  } catch (err) {
+    // Issuer refused to save the card (412): nothing was charged, but the team
+    // has to hear of it, or the member is left alone on the form.
+    const providerErr = err as { name?: string; httpStatus?: number };
+    if (providerErr?.name === 'PagarmeError' && providerErr.httpStatus === 412) {
+      auditLog(
+        'payment.failed',
+        null,
+        { provider: 'pagarme', stage: 'card_verification', providerStatus: 412, subscription: true },
+        data.member_id,
+      ).catch(() => {});
+      notifyAdminsOfPaymentAsync({
+        event: 'payment_failed',
+        subject: `Assinatura — ${member.full_name}`,
+        amount: CLUB_PLAN_PRICE,
+        method: 'credit_card',
+        customerName: member.full_name,
+        customerEmail: member.email,
+        link: '/admin?tab=members',
+        detail:
+          'O banco emissor recusou validar o cartão (nada foi cobrado). A tela ofereceu o PIX; se não houver pagamento, vale entrar em contato.',
+      });
+    }
+    throw err;
+  }
 
   const remote = await pagarme.createSubscription({
     customer_id: customerId,
@@ -246,7 +273,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
     customerName: member.full_name,
     customerEmail: member.email,
     link: '/admin?tab=members',
-    detail: 'Assinatura mensal recorrente.',
+    detail: 'Assinatura anual recorrente.',
     chargeId: remote.id,
   });
 

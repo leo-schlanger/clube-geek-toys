@@ -2,7 +2,7 @@
  * StepPayment — Step 5 of the registration flow (inline, not modal).
  *
  * Card flow: the browser tokenizes the card with Pagar.me and the server charges the token.
- * PIX flow: backend generates EMV QR code -> frontend displays it -> admin confirms manually.
+ * PIX flow: Pagar.me issues the QR code and confirms the payment on its own.
  * Subscription flow: goes straight to card (no PIX option).
  */
 
@@ -216,6 +216,13 @@ export function StepPayment({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amount, planData.name, memberEmail, memberId])
 
+  /** A refused card's way out: PIX always works, whichever mode was picked. */
+  const switchToPix = useCallback(async () => {
+    setMode('one-time')
+    setMethod(null)
+    await handlePixPayment()
+  }, [handlePixPayment])
+
   // ─── Card flow (Pagar.me) ──────────────────────────────────────────────────
 
   /**
@@ -402,7 +409,7 @@ export function StepPayment({
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center">
-            PIX: ativacao apos nossa equipe confirmar o recebimento (geralmente em minutos)
+            PIX: confirmação automática, a conta é ativada assim que o pagamento cair
           </p>
           {loading && (
             <div className="flex justify-center py-2">
@@ -483,14 +490,14 @@ export function StepPayment({
               <li>
                 Confirme o pagamento de <strong>{formatCurrency(amount)}</strong>
               </li>
-              <li>Aguarde a confirmacao (nossa equipe verifica e ativa sua conta)</li>
+              <li>Pronto: a confirmação é automática e sua conta é ativada na hora</li>
             </ol>
           </div>
 
           {/* Security badge */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Shield className="h-4 w-4 text-green-500 shrink-0" />
-            <span>Apos o pagamento, nossa equipe sera notificada e ativara sua conta.</span>
+            <span>A confirmação é automática: não é preciso enviar comprovante.</span>
           </div>
 
           {/* Back to method selection */}
@@ -507,6 +514,7 @@ export function StepPayment({
             amount={amount}
             onToken={handleCardToken}
             onCancel={resetMethod}
+            onSwitchToPix={switchToPix}
             // The club plan is sold in full only.
             allowInstallments={false}
             defaultHolderName={memberName}

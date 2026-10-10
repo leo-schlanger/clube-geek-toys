@@ -505,6 +505,35 @@ export async function confirmPixPayment(opts: {
 // ─── Pagar.me: card ──────────────────────────────────────────────────────────
 
 /**
+ * Audit and tell the team when the issuer refused to save a member's card.
+ * Anything other than that 412 is left to the error handler.
+ */
+export function reportCardRefused(
+  err: unknown,
+  payer: { id: string; fullName: string; email: string; amount: number },
+): void {
+  const providerErr = err as { name?: string; httpStatus?: number; userMessage?: string };
+  if (providerErr?.name !== 'PagarmeError' || providerErr.httpStatus !== 412) return;
+  auditLog(
+    'payment.failed',
+    null,
+    { provider: 'pagarme', stage: 'card_verification', providerStatus: 412, amount: payer.amount },
+    payer.id,
+  ).catch(() => {});
+  notifyAdminsOfPaymentAsync({
+    event: 'payment_failed',
+    subject: `Assinatura — ${payer.fullName}`,
+    amount: payer.amount,
+    method: 'credit_card',
+    customerName: payer.fullName,
+    customerEmail: payer.email,
+    link: '/admin?tab=members',
+    detail:
+      'O banco emissor recusou validar o cartão (nada foi cobrado). A tela ofereceu o PIX; se não houver pagamento, vale entrar em contato.',
+  });
+}
+
+/**
  * Charge a card for the club plan.
  *
  * The shape of this flow changed with the migration. Stripe handed the browser
@@ -554,7 +583,16 @@ export async function createCardPayment(data: {
     phone: payer.phone,
     pagarmeCustomerId: payer.pagarmeCustomerId,
   });
-  const savedCard = await pagarme.createCardForCustomer(customerId, data.cardToken);
+  let savedCard: Awaited<ReturnType<typeof pagarme.createCardForCustomer>>;
+  try {
+    savedCard = await pagarme.createCardForCustomer(customerId, data.cardToken);
+  } catch (err) {
+    // The issuer refusing to save the card (412) is a refusal like a declined
+    // charge, but it happens before any charge exists — so without this the
+    // team never hears of it and the member is left alone on the form.
+    reportCardRefused(err, { ...payer, amount: data.amount });
+    throw err;
+  }
 
   const paymentId = crypto.randomUUID();
   const order = await pagarme.createOrder(

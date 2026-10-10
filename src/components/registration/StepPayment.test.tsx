@@ -90,9 +90,11 @@ vi.mock('../PagarmeCardForm', async () => {
     PagarmeCardForm: function MockCardForm({
       onToken,
       onCancel,
+      onSwitchToPix,
     }: {
       onToken: (token: string, installments: number) => Promise<void> | void
       onCancel: () => void
+      onSwitchToPix?: () => void | Promise<void>
       amount: number
       submitLabel?: string
     }) {
@@ -113,6 +115,11 @@ vi.mock('../PagarmeCardForm', async () => {
             Cancel
           </button>
           {error && <p role="alert">{error}</p>}
+          {error && onSwitchToPix && (
+            <button data-testid="card-switch-pix" onClick={() => void onSwitchToPix()}>
+              Pagar com PIX
+            </button>
+          )}
         </div>
       )
     },
@@ -310,6 +317,36 @@ describe('StepPayment', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Cartão recusado.')
     expect(screen.getByTestId('card-form')).toBeInTheDocument()
     expect(defaultProps.onSuccess).not.toHaveBeenCalled()
+  })
+
+  /** 09/10/2026: the issuer refused the card and the form had no way to PIX. */
+  it('offers PIX after a refused card, in either mode, and shows the QR', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockApiPost.mockResolvedValue({ data: null, error: 'O banco do cartão não autorizou a validação.' })
+    mockGeneratePixPayment.mockResolvedValue({
+      paymentIntentId: 'pay_1',
+      clientSecret: '',
+      qrCode: '00020126580014BR.GOV.BCB.PIX...',
+      qrCodeBase64: '',
+      qrCodeImageUrl: '',
+      amount: 159.9,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    })
+
+    render(<StepPayment {...defaultProps} />)
+    await user.click(screen.getByText(/cobranca recorrente/i))
+    await user.click(screen.getByRole('button', { name: /iniciar assinatura/i }))
+    await user.click(await screen.findByTestId('card-pay'))
+    await user.click(await screen.findByTestId('card-switch-pix'))
+
+    await waitFor(() => expect(screen.getByTestId('qrcode-svg')).toBeInTheDocument())
+    expect(mockGeneratePixPayment).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(String),
+      defaultProps.memberEmail,
+      defaultProps.memberId,
+    )
   })
 
   it('resets method when cancel is clicked on the card form', async () => {
