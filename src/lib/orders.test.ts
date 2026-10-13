@@ -23,6 +23,7 @@ import {
   listMyOrders,
   getMyOrder,
   needsShippingLabel,
+  awaitingPickupRelease,
   awaitingPosting,
   pixConfirmationCopy,
 } from './orders'
@@ -223,6 +224,25 @@ describe('awaitingPosting', () => {
 
   it('never flags a pickup order', () => {
     expect(awaitingPosting(order({ deliveryMethod: 'pickup' }))).toBe(false)
+  })
+})
+
+describe('awaitingPickupRelease', () => {
+  const order = (over: Record<string, unknown> = {}) =>
+    ({ id: 'o1', deliveryMethod: 'pickup', status: 'processing', ...over }) as Parameters<
+      typeof awaitingPickupRelease
+    >[0]
+
+  it('flags a pickup order picked and not yet released to the customer', () => {
+    expect(awaitingPickupRelease(order())).toBe(true)
+  })
+
+  it('stops once it is marked shipped, which sends "pronto para retirada"', () => {
+    expect(awaitingPickupRelease(order({ status: 'shipped' }))).toBe(false)
+  })
+
+  it('never flags an order that goes by post', () => {
+    expect(awaitingPickupRelease(order({ deliveryMethod: 'shipping' }))).toBe(false)
   })
 })
 

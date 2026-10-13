@@ -793,6 +793,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
             ['💰 PIX aguardando (confirma sozinho)', v.pix_pending, '#f59e0b'],
             ['📦 Pedidos pagos a separar', v.to_separate, '#4ade80'],
             ['🚚 Pedidos a postar', v.to_ship, '#4ade80'],
+            ['🏪 Retiradas a liberar ao cliente', v.to_release_pickup, '#4ade80'],
             [`🕐 Enviados há +10 dias sem entrega`, v.shipped_stale, '#f87171'],
             ['🎫 Ingressos aguardando', v.event_tickets_pending, '#f59e0b'],
             ['❓ Perguntas sem resposta', v.questions_unanswered, '#3b82f6'],

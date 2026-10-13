@@ -7,6 +7,7 @@ import { OrderDetailModal, ORDER_STATUS_META, ORDER_STATUSES } from './OrderDeta
 import type { Order, OrderStatus } from '../../types'
 import {
   adminListOrders,
+  awaitingPickupRelease,
   awaitingPosting,
   cardRefusal,
   needsShippingLabel,
@@ -131,6 +132,12 @@ export function OrdersTab() {
                           Etiqueta pendente
                         </span>
                       )}
+                      {awaitingPickupRelease(order) && (
+                        <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-accent">
+                          <Store className="h-3 w-3" />
+                          Avisar cliente para buscar
+                        </span>
+                      )}
                       {awaitingPosting(order) && (
                         <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-medium text-primary">
                           <Tag className="h-3 w-3" />
@@ -197,6 +204,12 @@ export function OrdersTab() {
                         <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
                           <Tag className="h-3 w-3" />
                           Etiqueta pendente
+                        </span>
+                      )}
+                      {awaitingPickupRelease(order) && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
+                          <Store className="h-3 w-3" />
+                          Avisar cliente para buscar
                         </span>
                       )}
                       {awaitingPosting(order) && (

@@ -164,6 +164,16 @@ export function awaitingPosting(order: Order): boolean {
   )
 }
 
+/**
+ * Picked for the counter, customer not told yet.
+ *
+ * Moving a pickup order to "shipped" is what sends "pronto para retirada";
+ * until then the customer has no reason to come by.
+ */
+export function awaitingPickupRelease(order: Order): boolean {
+  return order.deliveryMethod === 'pickup' && order.status === 'processing'
+}
+
 /** Where the label stands, asked of Melhor Envio. Safe to call on open. */
 export async function getLabelState(orderId: string): Promise<LabelState | null> {
   const result = await api.get<LabelState>(`/orders/${orderId}/label`)

@@ -394,6 +394,7 @@ export type ActionItemKey =
   | 'pix_pending'
   | 'to_separate'
   | 'to_ship'
+  | 'to_release_pickup'
   | 'shipped_stale'
   | 'questions_unanswered'
   | 'event_tickets_pending'
@@ -477,7 +478,16 @@ export async function getActionItems(): Promise<ActionItemsReport> {
     // to the row bumps updated_at — saving a tracking code, adopting a guest
     // order — and a queue that resets because someone touched the order is a
     // queue that hides exactly the order that has been stuck the longest.
-    queueStat('to_ship', queueSql('orders', `status = 'processing'`, 'COALESCE(status_changed_at, updated_at)')),
+    // Pickup never goes to the Correios, so it gets its own queue: counted as
+    // "a postar", it showed up as an order the shop could not find in the list.
+    queueStat(
+      'to_ship',
+      queueSql('orders', `status = 'processing' AND delivery_method <> 'pickup'`, 'COALESCE(status_changed_at, updated_at)')
+    ),
+    queueStat(
+      'to_release_pickup',
+      queueSql('orders', `status = 'processing' AND delivery_method = 'pickup'`, 'COALESCE(status_changed_at, updated_at)')
+    ),
     queueStat(
       'shipped_stale',
       queueSql(

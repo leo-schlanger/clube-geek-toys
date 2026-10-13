@@ -154,6 +154,7 @@ export type ActionItemKey =
   | 'pix_pending'
   | 'to_separate'
   | 'to_ship'
+  | 'to_release_pickup'
   | 'shipped_stale'
   | 'questions_unanswered'
   | 'event_tickets_pending'

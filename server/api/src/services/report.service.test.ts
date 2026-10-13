@@ -45,7 +45,7 @@ describe('getActionItems', () => {
     respondBy([]);
     const report = await getActionItems();
 
-    expect(report.items).toHaveLength(12);
+    expect(report.items).toHaveLength(13);
     expect(report.totalPending).toBe(0);
     expect(report.items.every((i) => i.count === 0 && i.oldestDays === null)).toBe(true);
   });
@@ -68,6 +68,17 @@ describe('getActionItems', () => {
 
     expect(itemFor(report, 'pix_pending')).toEqual({ key: 'pix_pending', count: 3, oldestDays: 4 });
     expect(report.totalPending).toBe(3);
+  });
+
+  it('keeps pickup orders out of the posting queue and in their own', async () => {
+    respondBy([
+      [/status = 'processing' AND delivery_method <> 'pickup'/, { count: 1, oldest_days: 0 }],
+      [/status = 'processing' AND delivery_method = 'pickup'/, { count: 1, oldest_days: 8 }],
+    ]);
+    const report = await getActionItems();
+
+    expect(itemFor(report, 'to_ship')).toEqual({ key: 'to_ship', count: 1, oldestDays: 0 });
+    expect(itemFor(report, 'to_release_pickup')).toEqual({ key: 'to_release_pickup', count: 1, oldestDays: 8 });
   });
 
   it('reports no age for an empty queue even if the row carries one', async () => {
@@ -94,7 +105,7 @@ describe('getActionItems', () => {
       oldestDays: null,
     });
     expect(itemFor(report, 'to_separate')?.count).toBe(2);
-    expect(report.items).toHaveLength(12);
+    expect(report.items).toHaveLength(13);
   });
 
   it('excludes inactive and seed rows from the stock counts, like the stock tab', async () => {
@@ -135,7 +146,7 @@ describe('getActionItems', () => {
     queryMock.mockImplementation(async () => ({ rows: [{ count: 2, oldest_days: 1 }], rowCount: 1 }));
     const report = await getActionItems();
 
-    expect(report.totalPending).toBe(24);
+    expect(report.totalPending).toBe(26);
   });
 
   it('measures shipped orders that have gone quiet, not all shipped orders', async () => {

@@ -95,6 +95,7 @@ vi.mock('lucide-react', () => {
     ShieldAlert: icon,
     ShoppingCart: icon,
     Star: icon,
+    Store: icon,
     Tag: icon,
     Ticket: icon,
     TrendingUp: icon,

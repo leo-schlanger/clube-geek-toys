@@ -11,6 +11,7 @@ import {
   PackageX,
   RefreshCw,
   Star,
+  Store,
   Ticket,
   Truck,
 } from 'lucide-react'
@@ -68,6 +69,16 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     hint: 'Separados, aguardando postagem — etiqueta comprada aqui atualiza sozinha',
     tab: 'orders',
     icon: <Truck className="h-5 w-5" />,
+    severity: 'attention',
+    age: 'waiting',
+  },
+  to_release_pickup: {
+    label: 'Retiradas a liberar',
+    // Pickup orders sat in "Pedidos a postar", where the shop looked for a
+    // parcel to post and found none. The step left is telling the customer.
+    hint: 'Separado para o balcão? Mude para Enviado — avisa o cliente que pode buscar',
+    tab: 'orders',
+    icon: <Store className="h-5 w-5" />,
     severity: 'attention',
     age: 'waiting',
   },
