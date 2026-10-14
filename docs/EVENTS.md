@@ -1,7 +1,7 @@
 # Eventos na loja (shop.geeketoys.com.br)
 
-> **Última atualização:** 28 de Setembro de 2026  
-> **Evento em cartaz:** **11/out/2026 (domingo) 14h–18h**, Mar Palace Copacabana Hotel, entrada **R$ 20** (membro R$ 10; criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`  
+> **Última atualização:** 14 de Outubro de 2026  
+> **Evento em cartaz:** **1/nov/2026 (domingo) 14h–18h**, Tijuca Tênis Clube (Rua Conde de Bonfim, 451), **Halloween K-Pop** — performance e aulão com Mari Moon, entrada **R$ 25** (membro R$ 12,50; criança de colo e PCD isentos), WhatsApp loja `(11) 91466-2881`. Id `halloween-kpop`. O de 11/out segue publicado como histórico.  
 > **Pagamento:** PIX da Pagar.me — **confirma sozinho** e libera os ingressos. Ver [Compra do ingresso](#compra-do-ingresso-pagarme-28092026).  
 > **Onde roda:** loja (`shop.*`) neste repo **e** site institucional (`geek-toys-home`)  
 > **Quem edita:** a admin, na aba **Eventos** — não é mais deploy. Ver [Trocar de evento](#trocar-de-evento-sem-deploy).
@@ -265,16 +265,16 @@ reservas** — os ingressos já emitidos continuam válidos na portaria.
 
 ## Evento ativo (referência)
 
-| Campo                 | Valor                                                      |
-| --------------------- | ---------------------------------------------------------- |
-| Título                | Evento GeeKpop! (id `evento-geekpop`)                      |
-| Data                  | Domingo, 11 de outubro de 2026                             |
-| Horário               | 14h–18h                                                    |
-| Local                 | Mar Palace Copacabana Hotel — Av. N. S. de Copacabana, 552 |
-| Entrada               | R$ 20 / pessoa · membro do Clube R$ 10                     |
-| Isentos               | Criança de colo e criança PCD                              |
-| WhatsApp reserva      | (11) 91466-2881                                            |
-| Ingressos por reserva | sem teto (freio anti-abuso da API: 50)                     |
+| Campo                 | Valor                                                 |
+| --------------------- | ----------------------------------------------------- |
+| Título                | Halloween K-Pop (id `halloween-kpop`)                 |
+| Data                  | Domingo, 1 de novembro de 2026                        |
+| Horário               | 14h–18h                                               |
+| Local                 | Tijuca Tênis Clube — Rua Conde de Bonfim, 451, Tijuca |
+| Entrada               | R$ 25 / pessoa · membro do Clube R$ 12,50             |
+| Isentos               | Criança de colo e criança PCD                         |
+| WhatsApp reserva      | (11) 91466-2881                                       |
+| Ingressos por reserva | sem teto (freio anti-abuso da API: 50)                |
 
 ---
 
