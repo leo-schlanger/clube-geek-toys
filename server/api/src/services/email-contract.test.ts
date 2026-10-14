@@ -209,6 +209,24 @@ describe('o botão sobrevive a cliente de e-mail que ignora gradiente', () => {
   });
 });
 
+describe('aviso de cadastro do clube', () => {
+  // Chegava como "Novo membro cadastrado" antes de qualquer pagamento, e a
+  // equipe leu como venda feita (Bruna, 09/10/2026: cartão recusado, R$ 0).
+  it('diz no assunto e no corpo que ainda não houve pagamento', async () => {
+    const { subject, html } = await render('admin-new-member', {
+      member_name: 'Bruna Teste',
+      plan: 'club',
+      payment_type: 'Anual',
+    });
+
+    expect(subject).toContain('sem pagamento');
+    expect(subject).toContain('Bruna Teste');
+    expect(subject).not.toMatch(/novo membro/i);
+    expect(html).toContain('Isto ainda não é uma venda');
+    expect(html).toContain('Aguardando pagamento');
+  });
+});
+
 describe('integridade dos templates', () => {
   /** Nome inexistente renderiza "Template: xyz" e isso sairia para o cliente. */
   it('todo template anunciado por getAvailableTemplates existe de verdade', async () => {

@@ -19,7 +19,9 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 
-const { getActionItems, getOverviewReport, getMonthlyReport, getChurnReport } = await import('./report.service.js');
+const { getActionItems, getOverviewReport, getMonthlyReport, getChurnReport, getRealtimeStats } = await import(
+  './report.service.js'
+);
 
 /** Route each queue's response by matching a fragment of its SQL. */
 function respondBy(matchers: Array<[RegExp, { count: number; oldest_days: number | null }]>) {
@@ -412,3 +414,28 @@ describe('getMonthlyReport and getChurnReport', () => {
     }
   });
 });
+
+describe('novos membros', () => {
+  // A signup whose card was refused counted as a new member, and the staff read
+  // it as a sale. New means activated, i.e. paid.
+  it('conta pela ativação, nunca pelo cadastro', async () => {
+    const sqls: string[] = [];
+    queryMock.mockReset();
+    queryMock.mockImplementation(async (sql: string) => {
+      sqls.push(sql);
+      return { rows: [{}], rowCount: 1 };
+    });
+
+    await getMonthlyReport(6).catch(() => undefined);
+    await getOverviewReport('month', '2026-10-09').catch(() => undefined);
+    await getRealtimeStats().catch(() => undefined);
+
+    const memberCounts = sqls.filter((q) => /new_members|new_today|new_this_week/.test(q));
+    expect(memberCounts.length).toBeGreaterThanOrEqual(3);
+    for (const q of memberCounts) {
+      expect(q).toContain('activated_at');
+      expect(q).not.toMatch(/new_members[\s\S]*WHERE created_at|created_at >= \$1 AND created_at < \$2\)::int AS new_members/);
+    }
+  });
+});
+

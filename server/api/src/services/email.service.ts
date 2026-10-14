@@ -729,12 +729,14 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
     },
 
     // ─── ADMIN: NEW MEMBER ─────────────────────────────
+    // Sent at signup, before any payment. Read as "new member" it passed for a
+    // sale; the card that was then refused never became one (09/10/2026).
     'admin-new-member': {
-      subject: '👤 Novo membro cadastrado — Clube GeekPop & Toys',
-      preheader: `${v.member_name || 'Novo membro'} se cadastrou no ${planLabel(v.plan)}.`,
+      subject: `⏳ Cadastro no clube sem pagamento — ${v.member_name || 'novo cadastro'}`,
+      preheader: 'Ainda não é venda: o membro só entra quando o pagamento for confirmado.',
       body: `
-        <h2 style="color:#3b82f6;margin:0 0 12px">Novo membro cadastrado 👤</h2>
-        <p>Um novo membro completou o cadastro no clube.</p>
+        <h2 style="color:#f59e0b;margin:0 0 12px">Cadastro iniciado — ainda sem pagamento ⏳</h2>
+        ${infoBox('<strong>Isto ainda não é uma venda.</strong> A pessoa preencheu o cadastro do clube, mas nenhum pagamento foi feito. Quando o pagamento for confirmado, chega o aviso <strong>Pagamento confirmado</strong> e o membro é ativado sozinho.')}
         ${dataTable([
           ['Nome', escapeHtml(v.member_name || '—')],
           ['Email', v.member_email || '—'],
@@ -742,8 +744,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
           ['Telefone', v.member_phone || '—'],
           ['Plano', planLabel(v.plan)],
           ['Pagamento', v.payment_type || '—'],
+          ['Situação', 'Aguardando pagamento'],
         ])}
-        <p style="margin-top:12px;font-size:13px;color:#94a3b8">O membro está aguardando pagamento para ativação.</p>`,
+        <p style="margin-top:12px;font-size:13px;color:#94a3b8">Se não pagar em 24 h, a pessoa recebe um lembrete automático. No painel, aparece em Membros como pendente.</p>`,
       cta: { text: 'Ver no Painel Admin', url: v.admin_url || adminUrl() },
     },
 

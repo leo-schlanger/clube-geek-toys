@@ -85,7 +85,7 @@ export async function getDailyReport() {
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-         COUNT(*) FILTER (WHERE ${local('created_at')}::date = ${TODAY_LOCAL})::int AS new_today
+         COUNT(*) FILTER (WHERE ${local('activated_at')}::date = ${TODAY_LOCAL})::int AS new_today
        FROM members`
     ),
     query(
@@ -128,10 +128,12 @@ export async function getMonthlyReport(months: number) {
       WHERE status = 'paid' AND paid_at IS NOT NULL AND paid_at >= ${windowStart(1)}
       GROUP BY 1
     ),
+    -- A member is new when activated, not when the form was filled: a signup
+    -- whose payment never came counted as a new member (09/10/2026).
     new_members AS (
-      SELECT TO_CHAR(${local('created_at')}, 'YYYY-MM') AS month, COUNT(*)::int AS new_members
+      SELECT TO_CHAR(${local('activated_at')}, 'YYYY-MM') AS month, COUNT(*)::int AS new_members
       FROM members
-      WHERE created_at >= ${windowStart(1)}
+      WHERE activated_at >= ${windowStart(1)}
       GROUP BY 1
     ),
     churned AS (
@@ -321,8 +323,8 @@ export async function getRealtimeStats() {
         COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
         COUNT(*) FILTER (WHERE status = 'expired')::int AS expired,
         COUNT(*) FILTER (WHERE status = 'inactive')::int AS inactive,
-        COUNT(*) FILTER (WHERE ${local('created_at')}::date = ${TODAY_LOCAL})::int AS new_today,
-        COUNT(*) FILTER (WHERE created_at >= ${WEEK_START})::int AS new_this_week
+        COUNT(*) FILTER (WHERE ${local('activated_at')}::date = ${TODAY_LOCAL})::int AS new_today,
+        COUNT(*) FILTER (WHERE activated_at >= ${WEEK_START})::int AS new_this_week
       FROM members`
     ),
     query(
@@ -638,7 +640,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
          (SELECT COUNT(*) FROM payments
            WHERE status = 'paid' AND paid_at >= $1 AND paid_at < $2)::int AS payments,
          (SELECT COUNT(*) FROM members
-           WHERE created_at >= $1 AND created_at < $2)::int AS new_members,
+           WHERE activated_at >= $1 AND activated_at < $2)::int AS new_members,
          (SELECT COUNT(*) FROM members WHERE status = 'active')::int AS active_members,
          (SELECT COUNT(*) FROM members
            WHERE status = 'expired' AND expiry_date >= $1::date AND expiry_date < $2::date)::int AS expired_in_period`,
@@ -725,7 +727,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
          (SELECT COALESCE(SUM(amount), 0) FROM payments
            WHERE status = 'paid' AND paid_at >= $1 AND paid_at < $2)::float AS club_revenue,
          (SELECT COUNT(*) FROM members
-           WHERE created_at >= $1 AND created_at < $2)::int AS new_members`,
+           WHERE activated_at >= $1 AND activated_at < $2)::int AS new_members`,
       [prevStartAt, startAt]
     ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
     query(ticketSql, [startAt, endAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
