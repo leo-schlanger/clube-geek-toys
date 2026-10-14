@@ -17,7 +17,7 @@
  *    display and to retry.
  */
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { CreditCard, Loader2, Lock, QrCode } from 'lucide-react'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -61,6 +61,8 @@ interface PagarmeCardFormProps {
   defaultDocument?: string
   /** Pre-fills the holder name from the buyer's name. */
   defaultHolderName?: string
+  /** Extra fields for the "left without paying" report, e.g. the order number. */
+  logContext?: Record<string, unknown>
 }
 
 interface FieldErrors {
@@ -88,6 +90,7 @@ export function PagarmeCardForm({
   allowInstallments = true,
   defaultDocument = '',
   defaultHolderName = '',
+  logContext,
 }: PagarmeCardFormProps) {
   const [config, setConfig] = useState<PaymentConfig | null>(null)
   const [number, setNumber] = useState('')
@@ -101,6 +104,56 @@ export function PagarmeCardForm({
   const [submitting, setSubmitting] = useState(false)
   // Set only by a refusal from the parent's charge, not by a typo caught here.
   const [declined, setDeclined] = useState(false)
+
+  // What the exit report needs, kept in refs so the listeners see current values.
+  const paidRef = useRef(false)
+  const attemptsRef = useRef(0)
+  const filledRef = useRef<string[]>([])
+  const declinedRef = useRef(false)
+  const logContextRef = useRef(logContext)
+  filledRef.current = [
+    number && 'number',
+    holderName && 'holderName',
+    holderDocument && 'document',
+    expiry && 'expiry',
+    cvv && 'cvv',
+  ].filter((f): f is string => Boolean(f))
+  declinedRef.current = declined
+  logContextRef.current = logContext
+
+  /*
+   * Reports a buyer who reaches this form and leaves without paying. A card
+   * order abandoned here looks exactly like a broken checkout from the server
+   * side: the order exists and nothing else arrives. Field names only, never
+   * values.
+   */
+  const cancelPendingExit = useRef<() => void>(() => {})
+  useEffect(() => {
+    // Deferred reports from StrictMode's mount-unmount-mount in development
+    // are cancelled here, by the remount.
+    cancelPendingExit.current()
+    const shownAt = Date.now()
+    let sent = false
+    const report = (reason: 'pagehide' | 'unmount') => {
+      if (sent || paidRef.current) return
+      sent = true
+      ErrorTracker.captureMessage('Card form left without paying', 'warning', {
+        reason,
+        attempts: attemptsRef.current,
+        filled: filledRef.current,
+        declined: declinedRef.current,
+        secondsOnForm: Math.round((Date.now() - shownAt) / 1000),
+        ...logContextRef.current,
+      })
+    }
+    const onPageHide = () => report('pagehide')
+    window.addEventListener('pagehide', onPageHide)
+    return () => {
+      window.removeEventListener('pagehide', onPageHide)
+      const timer = setTimeout(() => report('unmount'), 0)
+      cancelPendingExit.current = () => clearTimeout(timer)
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -152,6 +205,7 @@ export function PagarmeCardForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
+    attemptsRef.current += 1
 
     const found = validate()
     setErrors(found)
@@ -194,6 +248,7 @@ export function PagarmeCardForm({
 
       tokenized = true
       await onToken(token, installments)
+      paidRef.current = true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Não foi possível processar o cartão.'
       setFormError(message)

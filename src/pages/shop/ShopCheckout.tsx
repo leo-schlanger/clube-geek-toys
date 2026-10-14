@@ -770,6 +770,7 @@ export default function ShopCheckout() {
                     defaultDocument={isWholesale ? (wholesaleAccount?.cnpj ?? '') : customerDocument}
                     defaultHolderName={name}
                     submitLabel={`Pagar ${formatCurrency(order.total)}`}
+                    logContext={{ flow: 'shop', orderNumber: order.orderNumber }}
                     onToken={async (cardToken, installments) => {
                       await payOrderWithCard(order.id, cardToken, installments)
                       // `fromCheckout` is what tells the confirmation page it

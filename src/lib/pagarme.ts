@@ -15,6 +15,11 @@ import { api } from './api-client'
 import { paymentLogger } from './logger'
 
 const TOKENS_ENDPOINT = 'https://api.pagar.me/core/v5/tokens'
+/**
+ * How long the browser waits for a token. Without a limit a stalled request on
+ * a mobile network left the button on "Processando..." with nothing logged.
+ */
+export const TOKENIZE_TIMEOUT_MS = 20_000
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -191,20 +196,32 @@ export async function createCardToken(card: CardInput, publicKey: string): Promi
     },
   }
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), TOKENIZE_TIMEOUT_MS)
   let response: Response
+  let text: string
   try {
     response = await fetch(`${TOKENS_ENDPOINT}?appId=${encodeURIComponent(publicKey)}`, {
       method: 'POST',
       // Only Content-Type is permitted here; anything else is refused.
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: controller.signal,
     })
+    text = await response.text()
   } catch (err) {
+    if (controller.signal.aborted) {
+      paymentLogger.error('Card tokenization timed out')
+      throw new CardTokenError(
+        'A operadora demorou para responder. Confira sua conexão e tente de novo — nada foi cobrado.'
+      )
+    }
     paymentLogger.error('Card tokenization request failed:', err)
     throw new CardTokenError('Não conseguimos falar com a operadora. Verifique sua conexão.')
+  } finally {
+    clearTimeout(timer)
   }
 
-  const text = await response.text()
   let parsed: unknown = null
   if (text) {
     try {

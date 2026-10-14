@@ -634,6 +634,7 @@ export function SubscriptionManagement({
           </DialogHeader>
           <PagarmeCardForm
             amount={subscription?.transactionAmount ?? 0}
+            logContext={{ flow: 'club-update-card' }}
             onToken={handleCardToken}
             onCancel={() => setShowUpdateCard(false)}
             allowInstallments={false}

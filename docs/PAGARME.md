@@ -634,6 +634,40 @@ Conferido em produção (02/10/2026): todas as cobranças da Pagar.me dos últim
 31 dias batem com o estado local — nenhuma paga lá e pendente aqui, nem o
 contrário.
 
+## 8.7 "Cancelado é defeito?" — revisão de 14/10/2026
+
+Dos 37 pedidos cancelados, 12 eram o defeito do campo de validade (o campo
+mostrava "12/30" e o formulário recusava como vencida; corrigido em 04/10 às
+15h50 do Rio com `formatExpiry`/`parseExpiry`): cartão que nunca chegou à
+operadora. Depois disso,
+os pedidos de cartão cancelados sem tentativa (#40, #43, #44, #47) mostram, no
+log da API, `POST /orders` → `GET /payments/config` e mais nada — nem
+`pay-card`, nem "Voltar", nem aviso de validação ou de tokenização. Um
+checkout real em Chromium (bundle de produção, escrita interceptada) passou
+inteiro, com token emitido pela Pagar.me nos dois domínios. Era abandono, mas
+o servidor não tinha como distinguir abandono de checkout quebrado.
+
+Para que a próxima dúvida se responda pelo log:
+
+- **`Card form left without paying`** (`warning` em `error_logs`): o
+  `PagarmeCardForm` reporta quem sai da tela do cartão sem pagar — no
+  `pagehide` (fechou a aba, saiu do site) ou ao desmontar (Voltar, navegação).
+  Leva `attempts`, `declined`, `secondsOnForm`, os **nomes** dos campos
+  preenchidos (nunca valores) e `flow`/`orderNumber`. `attempts: 0` com
+  `filled: []` é quem nem começou a digitar. O relatório usa `fetch` com
+  `keepalive`, que sobrevive ao fechamento da aba.
+- **Timeout de 20 s na tokenização** (`TOKENIZE_TIMEOUT_MS`): sem ele, uma
+  chamada parada à `api.pagar.me` deixava o botão em "Processando..." sem
+  limite e sem registro. Agora vira mensagem ao cliente ("nada foi cobrado") e
+  `Card tokenization failed` no log.
+
+Consulta rápida:
+
+```sql
+SELECT created_at, context FROM error_logs
+WHERE message = 'Card form left without paying' ORDER BY created_at DESC;
+```
+
 ---
 
 ## 9. Ir para produção

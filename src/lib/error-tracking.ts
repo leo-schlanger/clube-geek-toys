@@ -145,6 +145,8 @@ class ErrorTrackingService {
     fetch(`${API_URL}/logs/errors`, {
       method: 'POST',
       headers,
+      // Lets a report sent from `pagehide` outlive the closing tab.
+      keepalive: true,
       body: JSON.stringify({
         severity: event.severity,
         message: event.message,

@@ -519,6 +519,7 @@ export function StepPayment({
         <div className="space-y-4">
           <PagarmeCardForm
             amount={amount}
+            logContext={{ flow: 'club-signup' }}
             onToken={handleCardToken}
             onCancel={resetMethod}
             onSwitchToPix={switchToPix}

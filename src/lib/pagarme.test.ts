@@ -30,6 +30,7 @@ vi.mock('./logger', () => ({
 import { api } from './api-client'
 import {
   CardTokenError,
+  TOKENIZE_TIMEOUT_MS,
   createCardToken,
   formatCardNumber,
   formatExpiry,
@@ -124,6 +125,27 @@ describe('createCardToken', () => {
     vi.mocked(fetch).mockRejectedValue(new Error('ECONNRESET'))
 
     await expect(createCardToken(card, 'pk_test_1')).rejects.toThrow(/conexão/)
+  })
+
+  it('gives up after the timeout instead of spinning forever', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(fetch).mockImplementation(
+        (_url, init) =>
+          new Promise((_resolve, reject) => {
+            ;(init as RequestInit).signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError'))
+            )
+          })
+      )
+
+      const pending = createCardToken(card, 'pk_test_1')
+      const assertion = expect(pending).rejects.toThrow(/demorou para responder/)
+      await vi.advanceTimersByTimeAsync(TOKENIZE_TIMEOUT_MS)
+      await assertion
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('fails loudly when the provider answers 200 with no token', async () => {

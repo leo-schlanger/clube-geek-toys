@@ -461,6 +461,7 @@ export function PaymentModal({
           {method === 'card' && (
             <PagarmeCardForm
               amount={amount}
+              logContext={{ flow: 'club-payment' }}
               onToken={handleCardToken}
               onCancel={() => { setMethod(null); setError(null) }}
               onSwitchToPix={async () => {
