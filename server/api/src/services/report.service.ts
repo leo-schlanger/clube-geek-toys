@@ -204,7 +204,7 @@ export async function getChurnReport(months: number = 6) {
     `
     WITH months AS (${monthSeriesSql(1)}),
     ever AS (
-      SELECT id, created_at, status, ${MEMBER_EXIT_AT} AS exit_at
+      SELECT id, COALESCE(activated_at, created_at) AS joined_at, status, ${MEMBER_EXIT_AT} AS exit_at
       FROM members WHERE status IN ('active', 'expired', 'inactive')
     ),
     churned AS (
@@ -217,7 +217,7 @@ export async function getChurnReport(months: number = 6) {
       SELECT m.month, COUNT(e.id)::int AS total
       FROM months m
       LEFT JOIN ever e
-        ON e.created_at < m.month_start
+        ON e.joined_at < m.month_start
         AND (e.status = 'active' OR e.exit_at >= m.month_start)
       GROUP BY m.month
     )

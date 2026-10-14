@@ -430,6 +430,11 @@ describe('novos membros', () => {
     await getOverviewReport('month', '2026-10-09').catch(() => undefined);
     await getRealtimeStats().catch(() => undefined);
 
+    await getChurnReport(6).catch(() => undefined);
+    const churn = sqls.find((q) => /churn_rate/.test(q));
+    // Someone who signed up and paid a month later was not in the club before.
+    expect(churn).toContain('COALESCE(activated_at, created_at) AS joined_at');
+
     const memberCounts = sqls.filter((q) => /new_members|new_today|new_this_week/.test(q));
     expect(memberCounts.length).toBeGreaterThanOrEqual(3);
     for (const q of memberCounts) {
