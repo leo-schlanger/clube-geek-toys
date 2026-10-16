@@ -18,13 +18,14 @@ export function ReportFilters({
     { value: 3, label: '3 meses' },
     { value: 6, label: '6 meses' },
     { value: 12, label: '12 meses' },
+    { value: 24, label: '24 meses' },
   ]
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div className="flex flex-wrap items-center gap-2">
         <Calendar className="h-5 w-5 text-muted-foreground" />
-        <span className="text-sm font-medium">Período:</span>
+        <span className="text-sm font-medium">Tendência dos últimos:</span>
         <div className="flex flex-wrap gap-1">
           {periods.map((period) => (
             <Button

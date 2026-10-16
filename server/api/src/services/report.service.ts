@@ -526,18 +526,74 @@ export async function getActionItems(): Promise<ActionItemsReport> {
   };
 }
 
-/** Periods the consolidated report can be cut by. */
-export type OverviewPeriod = 'day' | 'month' | 'year';
+/** Periods the consolidated report can be cut by. `range` is two dates the admin picks. */
+export type OverviewPeriod = 'day' | 'month' | 'year' | 'range';
 
-const OVERVIEW_PERIODS: OverviewPeriod[] = ['day', 'month', 'year'];
+const OVERVIEW_PERIODS: OverviewPeriod[] = ['day', 'month', 'year', 'range'];
 
 export function isOverviewPeriod(value: unknown): value is OverviewPeriod {
   return OVERVIEW_PERIODS.includes(value as OverviewPeriod);
 }
 
+/** Inclusive calendar dates (YYYY-MM-DD) on the Rio calendar. */
+export interface OverviewRange {
+  start: string;
+  end: string;
+}
+
+/** Longest custom window: three years keeps the ledger and the daily series sane. */
+export const MAX_RANGE_DAYS = 1100;
+/** Above this many days the series is grouped by month instead of by day. */
+const DAILY_SERIES_MAX_DAYS = 62;
+/** The ledger is a working list, not an export of the whole history. */
+export const LEDGER_LIMIT = 2000;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIsoDate(value: unknown): Date | null {
+  if (typeof value !== 'string' || !ISO_DATE.test(value)) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  // Rejects 2026-02-31, which Date would roll into March.
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? null : date;
+}
+
+/**
+ * Validate a custom range. Returns the range or a message the admin can act on;
+ * a silently "fixed" range would report a period nobody asked for.
+ */
+export function parseRange(start: unknown, end: unknown): OverviewRange | { error: string } {
+  const from = parseIsoDate(start);
+  const to = parseIsoDate(end);
+  if (!from || !to) return { error: 'Informe a data inicial e a final (AAAA-MM-DD).' };
+  if (from > to) return { error: 'A data inicial é depois da final.' };
+  const days = Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1;
+  if (days > MAX_RANGE_DAYS) return { error: `O intervalo pode ter no máximo ${MAX_RANGE_DAYS} dias.` };
+  return { start: start as string, end: end as string };
+}
+
+export type PaymentMethodKey = 'pix' | 'credit_card' | 'debit_card' | 'boleto' | 'cash' | 'other';
+
+export interface LedgerEntry {
+  kind: 'shop' | 'club' | 'ticket';
+  id: string;
+  reference: string;
+  at: string;
+  customer: string;
+  description: string;
+  method: PaymentMethodKey;
+  channel: string | null;
+  installments: number | null;
+  status: string;
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  total: number;
+  /** True when the entry is part of the period's revenue. */
+  counted: boolean;
+}
 
 export interface OverviewReport {
-  period: { type: OverviewPeriod; start: string; end: string };
+  period: { type: OverviewPeriod; start: string; end: string; previousStart: string; days: number };
   sales: {
     orders: number;
     revenue: number;
@@ -552,12 +608,25 @@ export interface OverviewReport {
     wholesaleRevenue: number;
     pixOrders: number;
     cardOrders: number;
+    pixRevenue: number;
+    cardRevenue: number;
     pendingOrders: number;
+    pendingRevenue: number;
     cancelledOrders: number;
+    cancelledRevenue: number;
     refundedOrders: number;
+    refundedRevenue: number;
   };
-  club: { revenue: number; payments: number; newMembers: number; activeMembers: number; expiredInPeriod: number };
-  tickets: { revenue: number; reservations: number };
+  club: {
+    revenue: number;
+    payments: number;
+    newMembers: number;
+    activeMembers: number;
+    expiredInPeriod: number;
+    refunded: number;
+    refundedPayments: number;
+  };
+  tickets: { revenue: number; reservations: number; tickets: number };
   /**
    * Result, not revenue. Only lines carrying `unit_cost` are counted; the rest
    * become `revenueWithoutCost`, so the figure never passes itself off as whole.
@@ -577,34 +646,97 @@ export interface OverviewReport {
     unitsSold: number;
     distinctProducts: number;
     top: { name: string; quantity: number; revenue: number }[];
+    /** Every product sold in the period, with its cost when known (spreadsheet source). */
+    ranking: { name: string; quantity: number; revenue: number; cost: number | null }[];
     activeSkus: number;
     outOfStock: number;
     lowStock: number;
   };
+  /** Revenue of the three sources, bucketed by day (short windows) or month. */
+  series: {
+    bucket: 'day' | 'month';
+    points: { date: string; shop: number; club: number; tickets: number; total: number; orders: number }[];
+  };
+  /** Money in by payment method, across shop, club and tickets. */
+  byMethod: { method: PaymentMethodKey; count: number; revenue: number }[];
+  /** Shop revenue by the product's main category, net of the order discount. */
+  byCategory: { name: string; quantity: number; revenue: number }[];
+  ledger: { entries: LedgerEntry[]; truncated: boolean };
   previous: { salesRevenue: number; clubRevenue: number; ticketRevenue: number; orders: number; newMembers: number };
 }
 
-/**
- * Everything about one period in a single call — the backing data for the PDF.
- *
- * Boundaries are cut by the database (`date_trunc`) rather than in JS: the API
- * container and Postgres do not have to agree on a timezone for "yesterday" to
- * mean the same day in both. `previous` is the same window shifted back once,
- * so growth is always compared like for like (a 28-day February against a
- * 31-day January, not against a rolling 30 days).
- */
-export async function getOverviewReport(period: OverviewPeriod, reference?: string): Promise<OverviewReport> {
-  const ref = reference && /^\d{4}-\d{2}-\d{2}$/.test(reference) ? reference : null;
+const METHODS: PaymentMethodKey[] = ['pix', 'credit_card', 'debit_card', 'boleto', 'cash'];
+const toMethod = (value: unknown): PaymentMethodKey =>
+  METHODS.includes(value as PaymentMethodKey) ? (value as PaymentMethodKey) : 'other';
 
-  // Cut on the Rio calendar, then turned back into instants for the columns.
+const iso = (value: unknown) => new Date(value as string).toISOString();
+
+/**
+ * Where the period starts and ends, and where the comparison window starts.
+ *
+ * Calendar periods are cut by the database on the Rio calendar; the previous
+ * window is the same period shifted back once, so February is compared with
+ * January, not with a rolling 28 days. A custom range is compared with the same
+ * number of days right before it.
+ */
+async function resolveBounds(period: OverviewPeriod, reference?: string, range?: OverviewRange) {
+  if (period === 'range') {
+    if (!range) throw new Error('range period needs start and end');
+    const bounds = await query(
+      `SELECT ${toInstant('$1::date::timestamp')} AS start_at,
+              ${toInstant(`($2::date + 1)::timestamp`)} AS end_at,
+              ${toInstant(`($1::date - ($2::date - $1::date + 1))::timestamp`)} AS prev_start_at,
+              ($2::date - $1::date + 1)::int AS days`,
+      [range.start, range.end]
+    );
+    return bounds.rows[0];
+  }
+
+  const ref = reference && ISO_DATE.test(reference) ? reference : null;
   const day = `COALESCE($2::date, ${TODAY_LOCAL})::timestamp`;
   const bounds = await query(
     `SELECT ${toInstant(`date_trunc($1, ${day})`)} AS start_at,
             ${toInstant(`date_trunc($1, ${day}) + ('1 ' || $1)::interval`)} AS end_at,
-            ${toInstant(`date_trunc($1, ${day}) - ('1 ' || $1)::interval`)} AS prev_start_at`,
+            ${toInstant(`date_trunc($1, ${day}) - ('1 ' || $1)::interval`)} AS prev_start_at,
+            ((date_trunc($1, ${day}) + ('1 ' || $1)::interval)::date - date_trunc($1, ${day})::date)::int AS days`,
     [period, ref]
   );
-  const { start_at: startAt, end_at: endAt, prev_start_at: prevStartAt } = bounds.rows[0];
+  return bounds.rows[0];
+}
+
+/** Earned money of the three sources inside [$1, $2), one row per receipt. */
+const EARNED_IN_WINDOW = `
+  SELECT COALESCE(paid_at, created_at) AS ts, total AS value, 'shop' AS source,
+         COALESCE(payment_method, 'other') AS method
+  FROM orders
+  WHERE status IN ${EARNED_ORDER_STATUSES}
+    AND COALESCE(paid_at, created_at) >= $1 AND COALESCE(paid_at, created_at) < $2
+  UNION ALL
+  SELECT paid_at, amount, 'club', method
+  FROM payments
+  WHERE status = 'paid' AND paid_at >= $1 AND paid_at < $2
+  UNION ALL
+  -- Tickets are paid by PIX only (Pagar.me, or the static code before it).
+  SELECT ${TICKET_PAID_AT}, total_cents::numeric / 100, 'tickets', 'pix'
+  FROM event_reservations
+  WHERE ${TICKET_EARNED} AND ${TICKET_PAID_AT} >= $1 AND ${TICKET_PAID_AT} < $2`;
+
+/**
+ * Everything about one period in a single call — the screen, the PDF and the
+ * spreadsheet all read this, so they never disagree about a number.
+ */
+export async function getOverviewReport(
+  period: OverviewPeriod,
+  reference?: string,
+  range?: OverviewRange
+): Promise<OverviewReport> {
+  const { start_at: startAt, end_at: endAt, prev_start_at: prevStartAt, days: rawDays } = await resolveBounds(
+    period,
+    reference,
+    range
+  );
+  const days = Number(rawDays) || 1;
+  const bucket: 'day' | 'month' = days <= DAILY_SERIES_MAX_DAYS ? 'day' : 'month';
 
   const salesSql = `
     SELECT
@@ -620,32 +752,64 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
       COALESCE(SUM(total) FILTER (WHERE status IN ${EARNED_ORDER_STATUSES} AND channel = 'wholesale'), 0)::float AS wholesale_revenue,
       COUNT(*) FILTER (WHERE status IN ${EARNED_ORDER_STATUSES} AND payment_method = 'pix')::int AS pix_orders,
       COUNT(*) FILTER (WHERE status IN ${EARNED_ORDER_STATUSES} AND payment_method = 'credit_card')::int AS card_orders,
+      COALESCE(SUM(total) FILTER (WHERE status IN ${EARNED_ORDER_STATUSES} AND payment_method = 'pix'), 0)::float AS pix_revenue,
+      COALESCE(SUM(total) FILTER (WHERE status IN ${EARNED_ORDER_STATUSES} AND payment_method = 'credit_card'), 0)::float AS card_revenue,
+      -- Money that did not come in, kept apart from revenue: what is still
+      -- waiting, what was given up and what went back to the customer.
       COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_orders,
+      COALESCE(SUM(total) FILTER (WHERE status = 'pending'), 0)::float AS pending_value,
       COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled_orders,
-      COUNT(*) FILTER (WHERE status = 'refunded')::int AS refunded_orders
+      COALESCE(SUM(total) FILTER (WHERE status = 'cancelled'), 0)::float AS cancelled_value,
+      COUNT(*) FILTER (WHERE status = 'refunded')::int AS refunded_orders,
+      COALESCE(SUM(total) FILTER (WHERE status = 'refunded'), 0)::float AS refunded_value
     FROM orders
     WHERE COALESCE(paid_at, created_at) >= $1 AND COALESCE(paid_at, created_at) < $2`;
 
   const ticketSql = `
-    SELECT COALESCE(SUM(total_cents), 0)::float / 100 AS revenue, COUNT(*)::int AS reservations
+    SELECT COALESCE(SUM(total_cents), 0)::float / 100 AS revenue,
+           COUNT(*)::int AS reservations,
+           COALESCE(SUM(quantity), 0)::int AS tickets
     FROM event_reservations
     WHERE ${TICKET_EARNED} AND ${TICKET_PAID_AT} >= $1 AND ${TICKET_PAID_AT} < $2`;
 
-  const [sales, club, top, itemTotals, margin, inventory, catalog, previous, tickets, previousTickets] = await Promise.all([
-    query(salesSql, [startAt, endAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+  const empty = { rows: [{}] as Record<string, unknown>[] };
+  const none = { rows: [] as Record<string, unknown>[] };
+
+  const [
+    sales,
+    club,
+    top,
+    itemTotals,
+    margin,
+    inventory,
+    catalog,
+    previous,
+    tickets,
+    previousTickets,
+    series,
+    byMethod,
+    byCategory,
+    ranking,
+    ledger,
+  ] = await Promise.all([
+    query(salesSql, [startAt, endAt]).catch(() => empty),
     query(
       `SELECT
          (SELECT COALESCE(SUM(amount), 0) FROM payments
            WHERE status = 'paid' AND paid_at >= $1 AND paid_at < $2)::float AS revenue,
          (SELECT COUNT(*) FROM payments
            WHERE status = 'paid' AND paid_at >= $1 AND paid_at < $2)::int AS payments,
+         (SELECT COALESCE(SUM(amount), 0) FROM payments
+           WHERE status = 'refunded' AND COALESCE(paid_at, created_at) >= $1 AND COALESCE(paid_at, created_at) < $2)::float AS refunded,
+         (SELECT COUNT(*) FROM payments
+           WHERE status = 'refunded' AND COALESCE(paid_at, created_at) >= $1 AND COALESCE(paid_at, created_at) < $2)::int AS refunded_payments,
          (SELECT COUNT(*) FROM members
            WHERE activated_at >= $1 AND activated_at < $2)::int AS new_members,
          (SELECT COUNT(*) FROM members WHERE status = 'active')::int AS active_members,
          (SELECT COUNT(*) FROM members
            WHERE status = 'expired' AND expiry_date >= $1::date AND expiry_date < $2::date)::int AS expired_in_period`,
       [startAt, endAt]
-    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    ).catch(() => empty),
     // Ranked by revenue, not units: the manager reorders by what pays, and a
     // cheap SKU can outsell a profitable one without deserving the shelf.
     query(
@@ -660,7 +824,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
        ORDER BY revenue DESC, quantity DESC
        LIMIT 10`,
       [startAt, endAt]
-    ).catch(() => ({ rows: [] as Record<string, unknown>[] })),
+    ).catch(() => none),
     // Totals over the whole period — the top-10 is a ranking, not a sum.
     query(
       `SELECT COALESCE(SUM(oi.quantity), 0)::int AS units_sold,
@@ -670,7 +834,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
        WHERE o.status IN ${EARNED_ORDER_STATUSES}
          AND COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2`,
       [startAt, endAt]
-    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    ).catch(() => empty),
     // COGS and margin for the period. `unit_cost` is the snapshot written at
     // sale time (migration 022), so a supplier price rise today does not rewrite
     // March's margin. A line without cost stays out of the sum and is counted
@@ -686,7 +850,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
        WHERE o.status IN ${EARNED_ORDER_STATUSES}
          AND COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2`,
       [startAt, endAt]
-    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    ).catch(() => empty),
     // Tied-up value: how much money is sitting on the shelf right now. It is
     // the other half the cost column unlocks — revenue never says this.
     query(
@@ -701,7 +865,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
          FROM product_variants v JOIN products p ON p.id = v.product_id
        ) s
        WHERE s.active = TRUE AND s.product_name NOT ILIKE 'checkup%'`
-    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    ).catch(() => empty),
     // Point-in-time, not period: "what is on the shelf right now".
     query(
       `SELECT COUNT(*)::int AS active_skus,
@@ -715,7 +879,7 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
          FROM product_variants v JOIN products p ON p.id = v.product_id
        ) s
        WHERE s.active = TRUE AND s.product_name NOT ILIKE 'checkup%'`
-    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    ).catch(() => empty),
     query(
       `SELECT
          (SELECT COALESCE(SUM(total), 0) FROM orders
@@ -729,9 +893,114 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
          (SELECT COUNT(*) FROM members
            WHERE activated_at >= $1 AND activated_at < $2)::int AS new_members`,
       [prevStartAt, startAt]
-    ).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
-    query(ticketSql, [startAt, endAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
-    query(ticketSql, [prevStartAt, startAt]).catch(() => ({ rows: [{}] as Record<string, unknown>[] })),
+    ).catch(() => empty),
+    query(ticketSql, [startAt, endAt]).catch(() => empty),
+    query(ticketSql, [prevStartAt, startAt]).catch(() => empty),
+    // A continuous axis (zeros on quiet days), cut on the Rio calendar.
+    query(
+      `WITH earned AS (${EARNED_IN_WINDOW}),
+       buckets AS (
+         SELECT generate_series(
+           date_trunc($3, ($1::timestamptz AT TIME ZONE '${BUSINESS_TZ}')),
+           ($2::timestamptz AT TIME ZONE '${BUSINESS_TZ}') - INTERVAL '1 second',
+           ('1 ' || $3)::interval
+         ) AS b
+       ),
+       grouped AS (
+         SELECT date_trunc($3, ${local('ts')}) AS b,
+                COALESCE(SUM(value) FILTER (WHERE source = 'shop'), 0)::float AS shop,
+                COALESCE(SUM(value) FILTER (WHERE source = 'club'), 0)::float AS club,
+                COALESCE(SUM(value) FILTER (WHERE source = 'tickets'), 0)::float AS tickets,
+                COUNT(*) FILTER (WHERE source = 'shop')::int AS orders
+         FROM earned GROUP BY 1
+       )
+       SELECT TO_CHAR(bk.b, 'YYYY-MM-DD') AS date,
+              COALESCE(g.shop, 0)::float AS shop,
+              COALESCE(g.club, 0)::float AS club,
+              COALESCE(g.tickets, 0)::float AS tickets,
+              COALESCE(g.orders, 0)::int AS orders
+       FROM buckets bk LEFT JOIN grouped g ON g.b = bk.b
+       ORDER BY bk.b`,
+      [startAt, endAt, bucket]
+    ).catch(() => none),
+    query(
+      `SELECT method, COUNT(*)::int AS count, COALESCE(SUM(value), 0)::float AS revenue
+       FROM (${EARNED_IN_WINDOW}) e
+       GROUP BY method
+       ORDER BY revenue DESC`,
+      [startAt, endAt]
+    ).catch(() => none),
+    query(
+      `SELECT COALESCE(c.name, 'Sem categoria') AS name,
+              SUM(oi.quantity)::int AS quantity,
+              SUM(${NET_LINE})::float AS revenue
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       LEFT JOIN products p ON p.id = oi.product_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE o.status IN ${EARNED_ORDER_STATUSES}
+         AND COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2
+       GROUP BY 1
+       ORDER BY revenue DESC`,
+      [startAt, endAt]
+    ).catch(() => none),
+    // The whole list, with cost: the spreadsheet's product sheet. Cost is null
+    // when any line of the product lacks it — a partial cost reads as profit.
+    query(
+      `SELECT oi.product_name AS name,
+              SUM(oi.quantity)::int AS quantity,
+              SUM(${NET_LINE})::float AS revenue,
+              CASE WHEN bool_and(oi.unit_cost IS NOT NULL)
+                THEN SUM(oi.unit_cost * oi.quantity)::float END AS cost
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.status IN ${EARNED_ORDER_STATUSES}
+         AND COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2
+       GROUP BY oi.product_name
+       ORDER BY revenue DESC, quantity DESC
+       LIMIT 500`,
+      [startAt, endAt]
+    ).catch(() => none),
+    // One row per sale: shop orders (every state, flagged), club payments that
+    // were paid or refunded, and ticket reservations that carry a price.
+    query(
+      `SELECT * FROM (
+         SELECT 'shop' AS kind, o.id::text AS id, '#' || o.order_number AS reference,
+                COALESCE(o.paid_at, o.created_at) AS at, o.customer_name AS customer,
+                COALESCE((SELECT string_agg(oi.quantity || 'x ' || oi.product_name, '; ')
+                          FROM order_items oi WHERE oi.order_id = o.id), '') AS description,
+                o.payment_method AS method, o.channel, o.installments::int AS installments, o.status,
+                o.subtotal::float AS subtotal, o.discount::float AS discount,
+                o.shipping_cost::float AS shipping, o.total::float AS total,
+                (o.status IN ${EARNED_ORDER_STATUSES}) AS counted
+         FROM orders o
+         WHERE COALESCE(o.paid_at, o.created_at) >= $1 AND COALESCE(o.paid_at, o.created_at) < $2
+         UNION ALL
+         SELECT 'club', p.id::text, 'Clube', COALESCE(p.paid_at, p.created_at), COALESCE(m.full_name, '-'),
+                'Anuidade do clube', p.method, NULL, p.installments::int, p.status,
+                p.amount::float, 0, 0, p.amount::float, (p.status = 'paid' AND p.paid_at IS NOT NULL)
+         FROM payments p LEFT JOIN members m ON m.id = p.member_id
+         WHERE p.status IN ('paid', 'refunded')
+           AND COALESCE(p.paid_at, p.created_at) >= $1 AND COALESCE(p.paid_at, p.created_at) < $2
+         UNION ALL
+         SELECT 'ticket', r.id::text, r.code, r.at, r.buyer_name,
+                r.quantity || ' ingresso(s) - ' || COALESCE(ev.title, r.event_id),
+                'pix', NULL, NULL, r.status,
+                r.total_cents::float / 100, 0, 0, r.total_cents::float / 100, r.counted
+         FROM (
+           SELECT er.*, COALESCE(er.paid_at, er.confirmed_at, er.created_at) AS at, (${TICKET_EARNED}) AS counted
+           FROM event_reservations er WHERE er.total_cents > 0
+         ) r
+         LEFT JOIN events ev ON ev.id = r.event_id
+         WHERE r.at >= $1 AND r.at < $2
+       ) ledger
+       ORDER BY at DESC
+       LIMIT ${LEDGER_LIMIT + 1}`,
+      [startAt, endAt]
+    ).catch((err) => {
+      log.error({ err }, 'sales ledger failed');
+      return none;
+    }),
   ]);
 
   const s = sales.rows[0] || {};
@@ -752,9 +1021,16 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
     quantity: n(row.quantity),
     revenue: n(row.revenue),
   }));
+  const ledgerRows = (ledger.rows || []).filter((row: Record<string, unknown>) => row.kind && row.at);
 
   return {
-    period: { type: period, start: new Date(startAt).toISOString(), end: new Date(endAt).toISOString() },
+    period: {
+      type: period,
+      start: iso(startAt),
+      end: iso(endAt),
+      previousStart: iso(prevStartAt),
+      days,
+    },
     sales: {
       orders,
       revenue,
@@ -769,9 +1045,14 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
       wholesaleRevenue: n(s.wholesale_revenue),
       pixOrders: n(s.pix_orders),
       cardOrders: n(s.card_orders),
+      pixRevenue: n(s.pix_revenue),
+      cardRevenue: n(s.card_revenue),
       pendingOrders: n(s.pending_orders),
+      pendingRevenue: n(s.pending_value),
       cancelledOrders: n(s.cancelled_orders),
+      cancelledRevenue: n(s.cancelled_value),
       refundedOrders: n(s.refunded_orders),
+      refundedRevenue: n(s.refunded_value),
     },
     club: {
       revenue: n(c.revenue),
@@ -779,8 +1060,10 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
       newMembers: n(c.new_members),
       activeMembers: n(c.active_members),
       expiredInPeriod: n(c.expired_in_period),
+      refunded: n(c.refunded),
+      refundedPayments: n(c.refunded_payments),
     },
-    tickets: { revenue: n(t.revenue), reservations: n(t.reservations) },
+    tickets: { revenue: n(t.revenue), reservations: n(t.reservations), tickets: n(t.tickets) },
     margin: (() => {
       const cogs = n(mg.cogs);
       const revenueWithCost = n(mg.revenue_with_cost);
@@ -805,9 +1088,61 @@ export async function getOverviewReport(period: OverviewPeriod, reference?: stri
       unitsSold: n(totals.units_sold),
       distinctProducts: n(totals.distinct_products),
       top: topRows,
+      ranking: (ranking.rows || []).map((row: Record<string, unknown>) => ({
+        name: String(row.name ?? ''),
+        quantity: n(row.quantity),
+        revenue: n(row.revenue),
+        cost: row.cost === null || row.cost === undefined ? null : n(row.cost),
+      })),
       activeSkus: n(cat.active_skus),
       outOfStock: n(cat.out_of_stock),
       lowStock: n(cat.low_stock),
+    },
+    series: {
+      bucket,
+      points: (series.rows || []).map((row: Record<string, unknown>) => {
+        const shop = n(row.shop);
+        const clubValue = n(row.club);
+        const ticketValue = n(row.tickets);
+        return {
+          date: String(row.date ?? ''),
+          shop,
+          club: clubValue,
+          tickets: ticketValue,
+          total: shop + clubValue + ticketValue,
+          orders: n(row.orders),
+        };
+      }),
+    },
+    byMethod: (byMethod.rows || []).map((row: Record<string, unknown>) => ({
+      method: toMethod(row.method),
+      count: n(row.count),
+      revenue: n(row.revenue),
+    })),
+    byCategory: (byCategory.rows || []).map((row: Record<string, unknown>) => ({
+      name: String(row.name ?? ''),
+      quantity: n(row.quantity),
+      revenue: n(row.revenue),
+    })),
+    ledger: {
+      entries: ledgerRows.slice(0, LEDGER_LIMIT).map((row: Record<string, unknown>) => ({
+        kind: row.kind as LedgerEntry['kind'],
+        id: String(row.id ?? ''),
+        reference: String(row.reference ?? ''),
+        at: iso(row.at),
+        customer: String(row.customer ?? ''),
+        description: String(row.description ?? ''),
+        method: toMethod(row.method),
+        channel: row.channel ? String(row.channel) : null,
+        installments: row.installments === null || row.installments === undefined ? null : n(row.installments),
+        status: String(row.status ?? ''),
+        subtotal: n(row.subtotal),
+        discount: n(row.discount),
+        shipping: n(row.shipping),
+        total: n(row.total),
+        counted: row.counted === true,
+      })),
+      truncated: ledgerRows.length > LEDGER_LIMIT,
     },
     previous: {
       salesRevenue: n(p.sales_revenue),

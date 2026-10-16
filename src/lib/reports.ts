@@ -203,10 +203,37 @@ export async function getActionItems(): Promise<ActionItemsReport> {
 // CONSOLIDATED PERIOD REPORT (PDF source)
 // ============================================
 
-export type OverviewPeriod = 'day' | 'month' | 'year'
+export type OverviewPeriod = 'day' | 'month' | 'year' | 'range'
+
+/** Inclusive calendar dates (YYYY-MM-DD) for the custom range. */
+export interface OverviewRange {
+  start: string
+  end: string
+}
+
+export type PaymentMethodKey = 'pix' | 'credit_card' | 'debit_card' | 'boleto' | 'cash' | 'other'
+
+export interface LedgerEntry {
+  kind: 'shop' | 'club' | 'ticket'
+  id: string
+  reference: string
+  at: string
+  customer: string
+  description: string
+  method: PaymentMethodKey
+  channel: string | null
+  installments: number | null
+  status: string
+  subtotal: number
+  discount: number
+  shipping: number
+  total: number
+  /** True when the entry is part of the period's revenue. */
+  counted: boolean
+}
 
 export interface OverviewReport {
-  period: { type: OverviewPeriod; start: string; end: string }
+  period: { type: OverviewPeriod; start: string; end: string; previousStart?: string; days?: number }
   sales: {
     orders: number
     revenue: number
@@ -221,9 +248,14 @@ export interface OverviewReport {
     wholesaleRevenue: number
     pixOrders: number
     cardOrders: number
+    pixRevenue: number
+    cardRevenue: number
     pendingOrders: number
+    pendingRevenue: number
     cancelledOrders: number
+    cancelledRevenue: number
     refundedOrders: number
+    refundedRevenue: number
   }
   club: {
     revenue: number
@@ -231,6 +263,8 @@ export interface OverviewReport {
     newMembers: number
     activeMembers: number
     expiredInPeriod: number
+    refunded: number
+    refundedPayments: number
   }
   /** Result: only lines with a known cost are counted. */
   margin: {
@@ -248,24 +282,70 @@ export interface OverviewReport {
     unitsSold: number
     distinctProducts: number
     top: { name: string; quantity: number; revenue: number }[]
+    ranking: { name: string; quantity: number; revenue: number; cost: number | null }[]
     activeSkus: number
     outOfStock: number
     lowStock: number
   }
-  tickets: { revenue: number; reservations: number }
+  tickets: { revenue: number; reservations: number; tickets: number }
+  series: {
+    bucket: 'day' | 'month'
+    points: { date: string; shop: number; club: number; tickets: number; total: number; orders: number }[]
+  }
+  byMethod: { method: PaymentMethodKey; count: number; revenue: number }[]
+  byCategory: { name: string; quantity: number; revenue: number }[]
+  ledger: { entries: LedgerEntry[]; truncated: boolean }
   previous: { salesRevenue: number; clubRevenue: number; ticketRevenue: number; orders: number; newMembers: number }
 }
 
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethodKey, string> = {
+  pix: 'PIX',
+  credit_card: 'Cartão de crédito',
+  debit_card: 'Cartão de débito',
+  boleto: 'Boleto',
+  cash: 'Dinheiro',
+  other: 'Outro',
+}
+
+export const LEDGER_KIND_LABEL: Record<LedgerEntry['kind'], string> = {
+  shop: 'Loja',
+  club: 'Clube',
+  ticket: 'Ingresso',
+}
+
+/** Order, club payment and ticket states, in the words the panel uses. */
+export const LEDGER_STATUS_LABEL: Record<string, string> = {
+  pending: 'Aguardando pagamento',
+  paid: 'Pago',
+  processing: 'Em separação',
+  shipped: 'Enviado',
+  delivered: 'Entregue',
+  cancelled: 'Cancelado',
+  refunded: 'Estornado',
+  confirmed: 'Confirmado',
+  failed: 'Falhou',
+}
+
 /**
- * Everything about one period — shop, club, products and stock — in one call.
+ * Everything about one period — shop, club, tickets, products, stock and the
+ * list of sales — in one call. The panel, the PDF and the spreadsheet all read
+ * it, so the three never disagree about a number.
  *
- * Throws on failure rather than returning zeros: this feeds a PDF the manager
- * may file or forward, and a report full of legitimate-looking zeros is worse
- * than no report.
+ * Throws on failure rather than returning zeros: a report full of
+ * legitimate-looking zeros is worse than no report.
  */
-export async function getOverviewReport(period: OverviewPeriod, date?: string): Promise<OverviewReport> {
+export async function getOverviewReport(
+  period: OverviewPeriod,
+  date?: string,
+  range?: OverviewRange
+): Promise<OverviewReport> {
   const params = new URLSearchParams({ period })
-  if (date) params.set('date', date)
+  if (period === 'range' && range) {
+    params.set('start', range.start)
+    params.set('end', range.end)
+  } else if (date) {
+    params.set('date', date)
+  }
 
   const result = await api.get<OverviewReport>(`/reports/overview?${params.toString()}`)
   if (result.error || !result.data) {

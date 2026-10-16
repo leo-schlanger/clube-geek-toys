@@ -19,7 +19,7 @@ const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 
-const { getActionItems, getOverviewReport, getMonthlyReport, getChurnReport, getRealtimeStats } = await import(
+const { getActionItems, getOverviewReport, getMonthlyReport, getChurnReport, getRealtimeStats, parseRange } = await import(
   './report.service.js'
 );
 
@@ -252,7 +252,8 @@ describe('getOverviewReport', () => {
       if (/FROM event_reservations/.test(sql)) {
         ticketWindows.push(params);
         const current = params[0] === bounds.start_at;
-        return { rows: [{ revenue: current ? 200 : 440, reservations: current ? 6 : 9 }], rowCount: 1 };
+        if (!/AS reservations/.test(sql)) return { rows: [], rowCount: 0 };
+        return { rows: [{ revenue: current ? 200 : 440, reservations: current ? 6 : 9, tickets: current ? 11 : 0 }], rowCount: 1 };
       }
       return { rows: [{}], rowCount: 1 };
     });
@@ -262,7 +263,7 @@ describe('getOverviewReport', () => {
     expect(ticketWindows).toEqual(
       expect.arrayContaining([[bounds.start_at, bounds.end_at], [bounds.prev_start_at, bounds.start_at]])
     );
-    expect(report.tickets).toEqual({ revenue: 200, reservations: 6 });
+    expect(report.tickets).toEqual({ revenue: 200, reservations: 6, tickets: 11 });
     expect(report.previous.ticketRevenue).toBe(440);
   });
 
@@ -308,9 +309,12 @@ describe('getOverviewReport', () => {
 
     const salesSql = sqls.find((s) => /AS retail_revenue/.test(s));
     expect(salesSql).toContain("('paid','processing','shipped','delivered')");
-    // pending/cancelled/refunded are reported as counts, never summed into revenue.
+    // pending/cancelled/refunded get their own value columns, never summed into revenue.
     expect(salesSql).toContain('AS pending_orders');
-    expect(salesSql).not.toMatch(/SUM\(total\) FILTER \(WHERE status = 'cancelled'/);
+    expect(salesSql).toMatch(/SUM\(total\) FILTER \(WHERE status = 'cancelled'\), 0\)::float AS cancelled_value/);
+    expect(salesSql).toMatch(
+      /SUM\(total\) FILTER \(WHERE status IN \('paid','processing','shipped','delivered'\)\), 0\)::float AS revenue/
+    );
   });
 
   it('derives the average ticket from the period, and guards against no orders', async () => {
@@ -380,6 +384,145 @@ describe('getOverviewReport', () => {
     expect(catalogSql).toBeDefined();
     // No period predicate: stock is a snapshot, not an aggregate over time.
     expect(catalogSql).not.toContain('paid_at');
+  });
+});
+
+
+describe('relatório financeiro por intervalo', () => {
+  const rangeBounds = {
+    start_at: '2026-09-10T03:00:00.000Z',
+    end_at: '2026-10-17T03:00:00.000Z',
+    prev_start_at: '2026-08-04T03:00:00.000Z',
+    days: 37,
+  };
+
+  beforeEach(() => queryMock.mockReset());
+
+  function route(rowsFor: (sql: string, params: unknown[]) => Record<string, unknown>[] | undefined) {
+    const calls: { sql: string; params: unknown[] }[] = [];
+    queryMock.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      calls.push({ sql, params });
+      if (/prev_start_at/.test(sql)) return { rows: [rangeBounds], rowCount: 1 };
+      return { rows: rowsFor(sql, params) ?? [{}], rowCount: 1 };
+    });
+    return calls;
+  }
+
+  it('corta o intervalo no calendário do Rio, com o dia final incluído', async () => {
+    const calls = route(() => undefined);
+    const report = await getOverviewReport('range', undefined, { start: '2026-09-10', end: '2026-10-16' });
+
+    expect(calls[0].params).toEqual(['2026-09-10', '2026-10-16']);
+    expect(calls[0].sql).toContain('($2::date + 1)::timestamp');
+    expect(calls[0].sql).toContain("AT TIME ZONE 'America/Sao_Paulo'");
+    // Compared with the same number of days right before it.
+    expect(calls[0].sql).toContain('($1::date - ($2::date - $1::date + 1))');
+    expect(report.period).toMatchObject({ type: 'range', days: 37, previousStart: rangeBounds.prev_start_at });
+  });
+
+  it('agrupa a série por dia em janela curta e por mês em janela longa', async () => {
+    let calls = route(() => undefined);
+    await getOverviewReport('range', undefined, { start: '2026-09-10', end: '2026-10-16' });
+    expect(calls.find((c) => /generate_series/.test(c.sql))?.params[2]).toBe('day');
+
+    calls = [];
+    queryMock.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      calls.push({ sql, params });
+      if (/prev_start_at/.test(sql)) return { rows: [{ ...rangeBounds, days: 365 }], rowCount: 1 };
+      return { rows: [{}], rowCount: 1 };
+    });
+    const year = await getOverviewReport('year', '2026-05-01');
+    expect(calls.find((c) => /generate_series/.test(c.sql))?.params[2]).toBe('month');
+    expect(year.series.bucket).toBe('month');
+  });
+
+  it('soma as três fontes em cada ponto da série', async () => {
+    route((sql) =>
+      /generate_series/.test(sql) ? [{ date: '2026-10-04', shop: 626.62, club: 0, tickets: 20, orders: 1 }] : undefined
+    );
+    const report = await getOverviewReport('range', undefined, { start: '2026-10-01', end: '2026-10-16' });
+    expect(report.series.points).toEqual([
+      { date: '2026-10-04', shop: 626.62, club: 0, tickets: 20, total: 646.62, orders: 1 },
+    ]);
+  });
+
+  it('separa a receita por forma de pagamento, com ingresso como PIX', async () => {
+    const calls = route((sql) =>
+      /GROUP BY method/.test(sql)
+        ? [
+            { method: 'pix', count: 34, revenue: 1805.79 },
+            { method: 'weird', count: 1, revenue: 5 },
+          ]
+        : undefined
+    );
+    const report = await getOverviewReport('month', '2026-10-09');
+    const methodSql = calls.find((c) => /GROUP BY method/.test(c.sql))!.sql;
+
+    expect(methodSql).toContain('FROM event_reservations');
+    expect(methodSql).toContain("'tickets', 'pix'");
+    expect(report.byMethod).toEqual([
+      { method: 'pix', count: 34, revenue: 1805.79 },
+      { method: 'other', count: 1, revenue: 5 },
+    ]);
+  });
+
+  it('mantém pendente, cancelado e estornado fora da receita, mas com valor', async () => {
+    route((sql) =>
+      /AS retail_revenue/.test(sql)
+        ? [{ orders: 2, revenue: 300, pending_orders: 3, pending_value: 450, cancelled_orders: 1, cancelled_value: 90, refunded_orders: 1, refunded_value: 60 }]
+        : undefined
+    );
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(report.sales).toMatchObject({
+      revenue: 300,
+      pendingRevenue: 450,
+      cancelledRevenue: 90,
+      refundedRevenue: 60,
+    });
+  });
+
+  it('lista cada venda no razão e avisa quando corta a lista', async () => {
+    const row = {
+      kind: 'shop', id: 'o1', reference: '#48', at: '2026-10-13T19:59:35.000Z', customer: 'Larissa',
+      description: '1x Pepero', method: 'pix', channel: 'retail', installments: null, status: 'delivered',
+      subtotal: 20, discount: 1, shipping: 0, total: 19, counted: true,
+    };
+    const calls = route((sql) => (/\) ledger/.test(sql) ? Array.from({ length: 2001 }, () => row) : undefined));
+    const report = await getOverviewReport('month', '2026-10-09');
+    const ledgerSql = calls.find((c) => /\) ledger/.test(c.sql))!.sql;
+
+    expect(ledgerSql).toContain('LIMIT 2001');
+    // Only paid or refunded club payments: a failed card attempt is not a sale.
+    expect(ledgerSql).toContain("p.status IN ('paid', 'refunded')");
+    expect(report.ledger.truncated).toBe(true);
+    expect(report.ledger.entries).toHaveLength(2000);
+    expect(report.ledger.entries[0]).toEqual({ ...row, at: '2026-10-13T19:59:35.000Z' });
+  });
+
+  it('deixa o custo do produto vazio quando falta em alguma linha', async () => {
+    const calls = route((sql) =>
+      /LIMIT 500/.test(sql) ? [{ name: 'Mochila', quantity: 3, revenue: 256.2, cost: null }, { name: 'Bolsa', quantity: 1, revenue: 142.5, cost: 70 }] : undefined
+    );
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(calls.find((c) => /LIMIT 500/.test(c.sql))!.sql).toContain('bool_and(oi.unit_cost IS NOT NULL)');
+    expect(report.products.ranking).toEqual([
+      { name: 'Mochila', quantity: 3, revenue: 256.2, cost: null },
+      { name: 'Bolsa', quantity: 1, revenue: 142.5, cost: 70 },
+    ]);
+  });
+});
+
+describe('parseRange', () => {
+  it('aceita datas válidas, com início igual ao fim', () => {
+    expect(parseRange('2026-10-16', '2026-10-16')).toEqual({ start: '2026-10-16', end: '2026-10-16' });
+  });
+
+  it('recusa data inexistente, invertida, malformada ou longa demais', () => {
+    expect(parseRange('2026-02-31', '2026-03-05')).toHaveProperty('error');
+    expect(parseRange('2026-10-16', '2026-10-01')).toEqual({ error: 'A data inicial é depois da final.' });
+    expect(parseRange('16/10/2026', '2026-10-20')).toHaveProperty('error');
+    expect(parseRange(undefined, '2026-10-20')).toHaveProperty('error');
+    expect(parseRange('2020-01-01', '2026-10-16')).toHaveProperty('error');
   });
 });
 

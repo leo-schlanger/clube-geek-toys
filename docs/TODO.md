@@ -157,6 +157,21 @@ o sistema me diz o que fazer?
       padrão do pdf-lib são WinAnsi e **lançam exceção** no primeiro caractere
       que não encodam — num catálogo de K-pop isso quebraria o download.
       17 testes.
+- [x] **Financeiro por mês e por intervalo, com PDF e Excel** (16/10/2026) —
+      o Norberto não tinha como ver as vendas de um mês escolhido nem de um
+      intervalo dele: a aba só tinha gráficos de 3/6/12 meses e um PDF por
+      dia/mês/ano. O bloco **Financeiro** no topo de Relatórios escolhe Hoje,
+      Este mês, Mês passado, um mês qualquer, Este ano ou **Intervalo** (De/Até,
+      até 1.100 dias) e mostra receita das três fontes comparada com o período
+      anterior, gráfico por dia (ou por mês acima de 62 dias), formas de
+      pagamento, loja por categoria, top produtos, o que **ficou fora da
+      receita** (pendente, cancelado, estornado — com valor) e a **lista de
+      vendas** (loja, ingressos e clube; cartões no celular). PDF e **Excel**
+      (`exceljs`, carregado só no clique; abas Resumo, Vendas, Por dia/mês,
+      Produtos, Categorias, Pagamentos) saem do mesmo `GET /reports/overview`,
+      então tela e arquivos nunca discordam. A tabela **Vendas por mês** (até
+      24 meses) também exporta Excel. Datas no Excel são gravadas no relógio do
+      Rio: o Excel não tem fuso e venda às 22h cairia no dia seguinte.
 - [x] **`countUnanswered()` deixa de ser código morto** — existia no
       `question.service.ts` com o comentário "for the admin tab badge", sem rota
       e sem uso desde que foi escrito. O contador de perguntas sem resposta

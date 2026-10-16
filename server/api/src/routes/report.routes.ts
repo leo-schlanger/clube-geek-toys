@@ -82,10 +82,21 @@ reportRouter.get('/action-items', async (_req, res, next) => {
   }
 });
 
-// GET /reports/overview?period=day|month|year&date=YYYY-MM-DD — consolidated period report (PDF source)
+// GET /reports/overview?period=day|month|year&date=YYYY-MM-DD
+//     /reports/overview?period=range&start=YYYY-MM-DD&end=YYYY-MM-DD
+// Consolidated period report: the finance panel, the PDF and the spreadsheet.
 reportRouter.get('/overview', async (req, res, next) => {
   try {
     const period = reportService.isOverviewPeriod(req.query.period) ? req.query.period : 'month';
+    if (period === 'range') {
+      const range = reportService.parseRange(req.query.start, req.query.end);
+      if ('error' in range) {
+        res.status(400).json({ error: range.error });
+        return;
+      }
+      res.json(await reportService.getOverviewReport('range', undefined, range));
+      return;
+    }
     const date = typeof req.query.date === 'string' ? req.query.date : undefined;
     const result = await reportService.getOverviewReport(period, date);
     res.json(result);

@@ -23,10 +23,13 @@ vi.mock('../reports', () => ({
   ChurnMetrics: ({ loading }: { loading: boolean }) => (
     <div data-testid="churn-metrics">{loading ? 'loading' : 'churn'}</div>
   ),
+  MonthlySalesTable: () => <div data-testid="monthly-sales-table" />,
   ReportFilters: ({ selectedPeriod, refreshing }: { selectedPeriod: number; refreshing?: boolean }) => (
     <div data-testid="report-filters">period: {selectedPeriod}, refreshing: {String(!!refreshing)}</div>
   ),
 }))
+
+vi.mock('./FinancePanel', () => ({ FinancePanel: () => <div data-testid="finance-panel" /> }))
 
 // ── Test data ────────────────────────────────────────────────
 
@@ -72,6 +75,8 @@ describe('ReportsTab', () => {
 
   it('should render all sub-components', () => {
     render(<ReportsTab {...defaultProps} />)
+    expect(screen.getByTestId('finance-panel')).toBeInTheDocument()
+    expect(screen.getByTestId('monthly-sales-table')).toBeInTheDocument()
     expect(screen.getByTestId('report-filters')).toBeInTheDocument()
     expect(screen.getByTestId('revenue-chart')).toBeInTheDocument()
     expect(screen.getByTestId('members-chart')).toBeInTheDocument()

@@ -30,11 +30,24 @@ function makeReport(overrides: Partial<OverviewReport> = {}): OverviewReport {
       wholesaleRevenue: 1000,
       pixOrders: 7,
       cardOrders: 5,
+      pixRevenue: 1480.5,
+      cardRevenue: 2000,
       pendingOrders: 3,
+      pendingRevenue: 310,
       cancelledOrders: 1,
+      cancelledRevenue: 90,
       refundedOrders: 0,
+      refundedRevenue: 0,
     },
-    club: { revenue: 1499.9, payments: 10, newMembers: 4, activeMembers: 38, expiredInPeriod: 2 },
+    club: {
+      revenue: 1499.9,
+      payments: 10,
+      newMembers: 4,
+      activeMembers: 38,
+      expiredInPeriod: 2,
+      refunded: 0,
+      refundedPayments: 0,
+    },
     margin: {
       cogs: 1800,
       grossProfit: 1200,
@@ -53,11 +66,40 @@ function makeReport(overrides: Partial<OverviewReport> = {}): OverviewReport {
         { name: 'Photocard NewJeans', quantity: 24, revenue: 720 },
         { name: 'Album BTS Proof', quantity: 8, revenue: 640 },
       ],
+      ranking: [],
       activeSkus: 210,
       outOfStock: 6,
       lowStock: 14,
     },
-    tickets: { revenue: 440, reservations: 9 },
+    tickets: { revenue: 440, reservations: 9, tickets: 15 },
+    series: { bucket: 'day', points: [] },
+    byMethod: [
+      { method: 'pix', count: 16, revenue: 3420.4 },
+      { method: 'credit_card', count: 5, revenue: 2000 },
+    ],
+    byCategory: [{ name: 'K-pop', quantity: 40, revenue: 2100 }],
+    ledger: {
+      entries: [
+        {
+          kind: 'shop',
+          id: 'o1',
+          reference: '#48',
+          at: '2026-08-13T22:30:00.000Z',
+          customer: 'Larissa 라리사',
+          description: '1x Pepero',
+          method: 'pix',
+          channel: 'retail',
+          installments: null,
+          status: 'delivered',
+          subtotal: 20,
+          discount: 1,
+          shipping: 0,
+          total: 19,
+          counted: true,
+        },
+      ],
+      truncated: false,
+    },
     previous: { salesRevenue: 3000, clubRevenue: 1200, ticketRevenue: 200, orders: 10, newMembers: 3 },
     ...overrides,
   }
@@ -106,7 +148,10 @@ describe('generateReportPDF', () => {
     const empty = makeReport({
       sales: { ...makeReport().sales, orders: 0, revenue: 0, averageTicket: 0 },
       products: { ...makeReport().products, top: [], unitsSold: 0, distinctProducts: 0 },
-      tickets: { revenue: 0, reservations: 0 },
+      tickets: { revenue: 0, reservations: 0, tickets: 0 },
+      ledger: { entries: [], truncated: false },
+      byMethod: [],
+      byCategory: [],
       previous: { salesRevenue: 0, clubRevenue: 0, ticketRevenue: 0, orders: 0, newMembers: 0 },
     })
 
@@ -114,7 +159,7 @@ describe('generateReportPDF', () => {
   })
 
   it('renders every period type', async () => {
-    for (const type of ['day', 'month', 'year'] as const) {
+    for (const type of ['day', 'month', 'year', 'range'] as const) {
       const report = makeReport({
         period: { type, start: '2026-08-01T00:00:00.000Z', end: '2026-09-01T00:00:00.000Z' },
       })
@@ -151,6 +196,28 @@ describe('reportFilename', () => {
       period: { type: 'year', start: '2026-01-01T00:00:00.000Z', end: '2027-01-01T00:00:00.000Z' },
     })
     expect(reportFilename(report)).toBe('relatorio-geekpop-year-2026.pdf')
+  })
+})
+
+describe('custom range', () => {
+  const range = makeReport({
+    period: { type: 'range', start: '2026-09-10T03:00:00.000Z', end: '2026-10-17T03:00:00.000Z' },
+  })
+
+  it('names the file by the first and the last day, on the Rio calendar', () => {
+    expect(reportFilename(range)).toBe('relatorio-geekpop-periodo-2026-09-10_a_2026-10-16.pdf')
+  })
+
+  it('shows the range with the last day included', () => {
+    expect(formatRange('range', range.period.start, range.period.end)).toBe('10/09/2026 a 16/10/2026')
+  })
+
+  // The sales list carries customer names, and K-pop fans write them in Hangul.
+  it('lists hundreds of sales across pages without throwing', async () => {
+    const entry = range.ledger.entries[0]
+    const entries = Array.from({ length: 400 }, (_, i) => ({ ...entry, id: `o${i}`, customer: `Cliente 김 ${i}` }))
+    const bytes = await generateReportPDF({ ...range, ledger: { entries, truncated: true } })
+    expect(bytes.byteLength).toBeGreaterThan(5000)
   })
 })
 

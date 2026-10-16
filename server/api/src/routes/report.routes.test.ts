@@ -17,7 +17,9 @@ const reports = vi.hoisted(() => ({
   getRealtimeStats: vi.fn(async () => ({ r: 1 })),
   getActionItems: vi.fn(async () => ({ items: [] })),
   getOverviewReport: vi.fn(async () => ({ o: 1 })),
-  isOverviewPeriod: (v: unknown) => v === 'day' || v === 'week' || v === 'month',
+  isOverviewPeriod: (v: unknown) => v === 'day' || v === 'week' || v === 'month' || v === 'range',
+  parseRange: (start: unknown, end: unknown) =>
+    typeof start === 'string' && typeof end === 'string' && start <= end ? { start, end } : { error: 'datas inválidas' },
 }));
 vi.mock('../services/report.service.js', () => reports);
 
@@ -60,6 +62,18 @@ describe('reports', () => {
     expect(reports.getOverviewReport).toHaveBeenCalledWith('month', '2026-09-01');
     await api.get('/overview?period=week', { as: 'admin' });
     expect(reports.getOverviewReport).toHaveBeenLastCalledWith('week', undefined);
+  });
+
+  // The finance panel's "Intervalo": two dates the admin picks.
+  it('serve a custom range, and refuse one that makes no sense', async () => {
+    const ok = await api.get('/overview?period=range&start=2026-09-10&end=2026-10-16', { as: 'admin' });
+    expect(ok.status).toBe(200);
+    expect(reports.getOverviewReport).toHaveBeenCalledWith('range', undefined, { start: '2026-09-10', end: '2026-10-16' });
+
+    const bad = await api.get('/overview?period=range&start=2026-10-16&end=2026-09-10', { as: 'admin' });
+    expect(bad.status).toBe(400);
+    expect(bad.body).toEqual({ error: 'datas inválidas' });
+    expect(reports.getOverviewReport).toHaveBeenCalledTimes(1);
   });
 
   it('pass a failure to the error handler', async () => {

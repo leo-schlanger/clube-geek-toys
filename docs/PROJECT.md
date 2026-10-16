@@ -560,15 +560,15 @@ O mesmo router e montado em quatro prefixos para compatibilidade.
 
 ### Reports (`/reports`)
 
-| Metodo | Endpoint                  | Descricao                                                                            | Auth  |
-| ------ | ------------------------- | ------------------------------------------------------------------------------------ | ----- |
-| GET    | `/reports/daily`          | Relatorio diario                                                                     | admin |
-| GET    | `/reports/monthly`        | Relatorio mensal (parametro `months`)                                                | admin |
-| GET    | `/reports/churn`          | Churn por mes (expired + cancelled)                                                  | admin |
-| GET    | `/reports/today-revenue`  | Receita do dia                                                                       | admin |
-| GET    | `/reports/realtime-stats` | Metricas em tempo real                                                               | admin |
-| GET    | `/reports/action-items`   | Filas pendentes (Painel do dia)                                                      | admin |
-| GET    | `/reports/overview`       | Fechamento consolidado do periodo (`period=day\|month\|year`, `date`) — fonte do PDF | admin |
+| Metodo | Endpoint                  | Descricao                                                                                                                      | Auth  |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| GET    | `/reports/daily`          | Relatorio diario                                                                                                               | admin |
+| GET    | `/reports/monthly`        | Relatorio mensal (parametro `months`)                                                                                          | admin |
+| GET    | `/reports/churn`          | Churn por mes (expired + cancelled)                                                                                            | admin |
+| GET    | `/reports/today-revenue`  | Receita do dia                                                                                                                 | admin |
+| GET    | `/reports/realtime-stats` | Metricas em tempo real                                                                                                         | admin |
+| GET    | `/reports/action-items`   | Filas pendentes (Painel do dia)                                                                                                | admin |
+| GET    | `/reports/overview`       | Fechamento do periodo (`period=day\|month\|year` + `date`, ou `period=range` + `start`/`end`) — painel Financeiro, PDF e Excel | admin |
 
 ### Logs (`/logs`)
 
@@ -886,7 +886,7 @@ clube-geek-toys/
 │   │   │   └── ...
 │   │   ├── reports/                     # Graficos (lazy loaded)
 │   │   │   ├── RevenueChart.tsx, MembersChart.tsx
-│   │   │   ├── ChurnMetrics.tsx
+│   │   │   ├── ChurnMetrics.tsx, MonthlySalesTable.tsx
 │   │   │   └── ReportFilters.tsx
 │   │   ├── ContractModal.tsx, PaymentModal.tsx
 │   │   ├── MemberModal.tsx, UserModal.tsx, ProfileEditModal.tsx

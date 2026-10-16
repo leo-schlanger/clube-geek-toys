@@ -10,7 +10,11 @@
  */
 
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
-import type { OverviewReport, OverviewPeriod } from './reports'
+import { LEDGER_KIND_LABEL, LEDGER_STATUS_LABEL, PAYMENT_METHOD_LABEL, type OverviewReport, type OverviewPeriod } from './reports'
+import { formatRange, reportBasename, revenueTotals } from './report-format'
+
+// Kept importable from here: the PDF tests and older callers read them from this module.
+export { formatRange, lastDay, reportBasename, revenueTotals, rioDate } from './report-format'
 
 // Brand (DESIGN.md): Hot Pink primary, Pop Yellow accent.
 const PINK = rgb(0xf0 / 255, 0x40 / 255, 0x80 / 255)
@@ -69,26 +73,11 @@ const PERIOD_LABEL: Record<OverviewPeriod, string> = {
   day: 'Relatorio diario',
   month: 'Relatorio mensal',
   year: 'Relatorio anual',
+  range: 'Relatorio do periodo',
 }
 
-/** Inclusive end date — the API's `end` is the exclusive start of the next period. */
-export function formatRange(period: OverviewPeriod, startIso: string, endIso: string): string {
-  const start = new Date(startIso)
-  const lastDay = new Date(new Date(endIso).getTime() - 1)
-  // Periods are cut on the Rio calendar (the API returns Rio midnights as instants).
-  const date = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-  if (period === 'day') return date(start)
-  return `${date(start)} a ${date(lastDay)}`
-}
-
-/** Shop + event tickets + club, for the period and the one before it. */
-export function revenueTotals(report: OverviewReport): { current: number; previous: number } {
-  const { sales, club, tickets, previous } = report
-  return {
-    current: sales.revenue + tickets.revenue + club.revenue,
-    previous: previous.salesRevenue + previous.ticketRevenue + previous.clubRevenue,
-  }
-}
+/** Most sales listed in the PDF; the spreadsheet carries the full list. */
+export const PDF_LEDGER_LIMIT = 300
 
 /** Cursor-based layout: every writer moves `y` down and asks for a page break. */
 class Layout {
@@ -270,6 +259,47 @@ class Layout {
     this.y -= 4
   }
 
+  /** Column table for the sales list; long text is cut on width, not length. */
+  table(columns: { label: string; width: number; align?: 'right' }[], rows: string[][]) {
+    const size = 8
+    const head = () => {
+      let x = MARGIN
+      for (const col of columns) {
+        const w = CONTENT_WIDTH * col.width
+        const label = toPdfText(col.label.toUpperCase())
+        const lx = col.align === 'right' ? x + w - this.bold.widthOfTextAtSize(label, 7) : x
+        this.page.drawText(label, { x: lx, y: this.y, size: 7, font: this.bold, color: MUTED })
+        x += w
+      }
+      this.y -= 13
+    }
+    this.ensure(30)
+    head()
+    for (const row of rows) {
+      const before = this.pages.length
+      this.ensure(16)
+      if (this.pages.length !== before) head()
+      let x = MARGIN
+      columns.forEach((col, i) => {
+        const w = CONTENT_WIDTH * col.width
+        let text = toPdfText(row[i] ?? '')
+        while (text.length > 2 && this.font.widthOfTextAtSize(text, size) > w - 6) text = `${text.slice(0, -2)}…`
+        const tx = col.align === 'right' ? x + w - this.font.widthOfTextAtSize(text, size) : x
+        this.page.drawText(text, { x: tx, y: this.y, size, font: this.font, color: INK })
+        x += w
+      })
+      this.y -= 5
+      this.page.drawLine({
+        start: { x: MARGIN, y: this.y },
+        end: { x: PAGE_WIDTH - MARGIN, y: this.y },
+        thickness: 0.4,
+        color: RULE,
+      })
+      this.y -= 10
+    }
+    this.y -= 6
+  }
+
   note(text: string) {
     this.ensure(24)
     this.page.drawText(toPdfText(text), { x: MARGIN, y: this.y, size: 8.5, font: this.font, color: MUTED })
@@ -293,11 +323,8 @@ class Layout {
   }
 }
 
-/** Filename with the period baked in, so a folder of them sorts by date. */
 export function reportFilename(report: OverviewReport): string {
-  const start = report.period.start.slice(0, 10)
-  const suffix = report.period.type === 'day' ? start : report.period.type === 'month' ? start.slice(0, 7) : start.slice(0, 4)
-  return `relatorio-geekpop-${report.period.type}-${suffix}.pdf`
+  return `${reportBasename(report)}.pdf`
 }
 
 /**
@@ -344,13 +371,28 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ['Credito de loja usado', money(sales.storeCredit)],
     ['Pedidos varejo', `${integer(sales.retailOrders)} - ${money(sales.retailRevenue)}`],
     ['Pedidos atacado', `${integer(sales.wholesaleOrders)} - ${money(sales.wholesaleRevenue)}`],
-    ['Pagos por PIX', integer(sales.pixOrders)],
-    ['Pagos por cartao', integer(sales.cardOrders)],
-    ['Aguardando pagamento', integer(sales.pendingOrders)],
-    ['Cancelados', integer(sales.cancelledOrders)],
-    ['Estornados', integer(sales.refundedOrders)],
+    ['Pagos por PIX', `${integer(sales.pixOrders)} - ${money(sales.pixRevenue ?? 0)}`],
+    ['Pagos por cartao', `${integer(sales.cardOrders)} - ${money(sales.cardRevenue ?? 0)}`],
   ])
   layout.note('Receita conta apenas pedidos pagos, em separacao, enviados ou entregues.')
+
+  layout.section('Nao realizado')
+  layout.rows([
+    ['Aguardando pagamento', `${integer(sales.pendingOrders)} - ${money(sales.pendingRevenue ?? 0)}`],
+    ['Cancelados', `${integer(sales.cancelledOrders)} - ${money(sales.cancelledRevenue ?? 0)}`],
+    ['Estornados (loja)', `${integer(sales.refundedOrders)} - ${money(sales.refundedRevenue ?? 0)}`],
+    ['Estornados (clube)', `${integer(club.refundedPayments ?? 0)} - ${money(club.refunded ?? 0)}`],
+  ])
+  layout.note('Nada deste bloco entra na receita. Cancelado inclui PIX vencido e cartao abandonado.')
+
+  const byMethod = report.byMethod ?? []
+  if (byMethod.length > 0) {
+    layout.section('Formas de pagamento (loja + ingressos + clube)')
+    layout.rows(
+      byMethod.map((m) => [PAYMENT_METHOD_LABEL[m.method] ?? m.method, `${integer(m.count)} - ${money(m.revenue)}`])
+    )
+    layout.note('Valores brutos, antes das taxas da operadora de pagamento.')
+  }
 
   layout.section('Resultado')
   layout.highlight('Lucro bruto da loja', money(margin.grossProfit), null)
@@ -410,6 +452,12 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ])
   }
 
+  const byCategory = report.byCategory ?? []
+  if (byCategory.length > 0) {
+    layout.section('Vendas por categoria')
+    layout.ranking(byCategory)
+  }
+
   layout.section('Estoque hoje')
   layout.rows([
     ['SKUs ativos', integer(products.activeSkus)],
@@ -417,6 +465,44 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ['No estoque minimo', integer(products.lowStock)],
   ])
   layout.note('Estoque e uma fotografia do momento da emissao, nao um acumulado do periodo.')
+
+  // Only what entered the revenue: the list is the proof of the total above.
+  const sold = (report.ledger?.entries ?? []).filter((entry) => entry.counted)
+  if (sold.length > 0) {
+    layout.section(`Vendas do periodo (${integer(sold.length)})`)
+    const dateTime = (value: string) =>
+      new Date(value).toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        day: '2-digit',
+        month: '2-digit',
+        year: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    layout.table(
+      [
+        { label: 'Data', width: 0.17 },
+        { label: 'Origem', width: 0.1 },
+        { label: 'Ref.', width: 0.13 },
+        { label: 'Cliente', width: 0.3 },
+        { label: 'Pagamento', width: 0.15 },
+        { label: 'Valor', width: 0.15, align: 'right' },
+      ],
+      sold.slice(0, PDF_LEDGER_LIMIT).map((entry) => [
+        dateTime(entry.at),
+        LEDGER_KIND_LABEL[entry.kind] ?? entry.kind,
+        entry.reference,
+        entry.customer,
+        PAYMENT_METHOD_LABEL[entry.method] ?? entry.method,
+        money(entry.total),
+      ])
+    )
+    if (sold.length > PDF_LEDGER_LIMIT || report.ledger?.truncated) {
+      layout.note(`Lista cortada no PDF. A planilha Excel do mesmo periodo traz todas as vendas.`)
+    }
+    const status = new Set(sold.map((e) => LEDGER_STATUS_LABEL[e.status] ?? e.status))
+    layout.note(`Situacoes incluidas: ${[...status].join(', ')}.`)
+  }
 
   layout.finish()
   return doc.save()

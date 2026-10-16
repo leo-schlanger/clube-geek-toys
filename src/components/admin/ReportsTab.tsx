@@ -3,13 +3,14 @@ import {
   MembersChart,
   ChurnMetrics,
   ReportFilters,
+  MonthlySalesTable,
 } from '../reports'
 import type {
   MonthlyReportData,
   PlanDistribution,
   ChurnData,
 } from '../../lib/reports'
-import { ReportExport } from './ReportExport'
+import { FinancePanel } from './FinancePanel'
 import { Button } from '../ui/button'
 
 interface ReportsTabProps {
@@ -36,14 +37,18 @@ export function ReportsTab({
 }: ReportsTabProps) {
   return (
     <div className="space-y-6">
+      <FinancePanel />
+
+      <div className="border-t pt-6">
+        <h2 className="mb-2 text-lg font-semibold">Mês a mês</h2>
+      </div>
+
       <ReportFilters
         selectedPeriod={reportPeriod}
         onPeriodChange={onPeriodChange}
         onRefresh={onRefresh}
         refreshing={loadingReports}
       />
-
-      <ReportExport />
 
       {reportsError && !loadingReports ? (
         <div role="alert" className="rounded-lg border border-red-500/40 bg-red-500/10 p-4 text-sm">
@@ -61,6 +66,8 @@ export function ReportsTab({
         <>
           {/* Revenue Chart */}
           <RevenueChart data={monthlyReportData} loading={loadingReports} />
+
+          <MonthlySalesTable data={monthlyReportData} loading={loadingReports} />
 
           {/* Members Charts */}
           <MembersChart
