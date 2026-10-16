@@ -123,8 +123,9 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
     const row = summary.addRow([title, 'Valor', 'Período anterior'])
     styleHeader(row)
   }
+  const cents = (value: number) => Math.round(value * 100) / 100
   const money = (label: string, value: number, previous?: number) => {
-    const row = summary.addRow([label, value, previous ?? null])
+    const row = summary.addRow([label, cents(value), previous === undefined ? null : cents(previous)])
     row.getCell(2).numFmt = MONEY
     row.getCell(3).numFmt = MONEY
     return row
@@ -225,7 +226,7 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
     const countedTotal = entries.filter((e) => e.counted).reduce((sum, e) => sum + e.total, 0)
     const row = ledger.addRow({
       customer: 'Total que entra na receita',
-      total: { formula: `SUMIFS(N2:N${last},J2:J${last},"Sim")`, result: countedTotal },
+      total: { formula: `SUMIFS(N2:N${last},J2:J${last},"Sim")`, result: Math.round(countedTotal * 100) / 100 },
     })
     styleTotal(row)
   }

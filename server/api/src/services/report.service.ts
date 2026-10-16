@@ -692,7 +692,8 @@ async function resolveBounds(period: OverviewPeriod, reference?: string, range?:
     return bounds.rows[0];
   }
 
-  const ref = reference && ISO_DATE.test(reference) ? reference : null;
+  // An impossible date (2026-02-31) reached Postgres and came back as a 500.
+  const ref = parseIsoDate(reference) ? (reference as string) : null;
   const day = `COALESCE($2::date, ${TODAY_LOCAL})::timestamp`;
   const bounds = await query(
     `SELECT ${toInstant(`date_trunc($1, ${day})`)} AS start_at,

@@ -214,7 +214,16 @@ function SalesLedger({ report }: { report: OverviewReport }) {
           </ul>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col className="w-[8.5rem]" />
+                <col className="w-[7.5rem]" />
+                <col className="w-[22%]" />
+                <col />
+                <col className="w-[9.5rem]" />
+                <col className="w-[10rem]" />
+                <col className="w-[7.5rem]" />
+              </colgroup>
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
                   <th className="py-2 pr-3 font-medium">Data</th>
@@ -230,11 +239,13 @@ function SalesLedger({ report }: { report: OverviewReport }) {
                 {page.map((entry) => (
                   <tr key={`${entry.kind}-${entry.id}`} className="border-b last:border-0">
                     <td className="whitespace-nowrap py-2 pr-3 tabular-nums">{dateTime(entry.at)}</td>
-                    <td className="whitespace-nowrap py-2 pr-3">
+                    <td className="truncate py-2 pr-3">
                       {LEDGER_KIND_LABEL[entry.kind]} <span className="text-muted-foreground">{entry.reference}</span>
                     </td>
-                    <td className="max-w-[12rem] truncate py-2 pr-3">{entry.customer}</td>
-                    <td className="max-w-[18rem] truncate py-2 pr-3 text-muted-foreground" title={entry.description}>
+                    <td className="truncate py-2 pr-3" title={entry.customer}>
+                      {entry.customer}
+                    </td>
+                    <td className="truncate py-2 pr-3 text-muted-foreground" title={entry.description}>
                       {entry.description}
                     </td>
                     <td className="whitespace-nowrap py-2 pr-3">
@@ -462,7 +473,7 @@ function FinanceReport({ report, loading }: { report: OverviewReport; loading: b
 
   return (
     <div className={`space-y-4 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 [&>*]:min-w-0">
         <div className="col-span-2">
           <Kpi
             emphasis
@@ -528,7 +539,8 @@ function FinanceReport({ report, loading }: { report: OverviewReport; loading: b
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {/* min-w-0: a long product name must truncate, not widen the page on a phone. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 [&>*]:min-w-0">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Formas de pagamento</CardTitle>

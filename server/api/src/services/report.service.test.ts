@@ -236,6 +236,12 @@ describe('getOverviewReport', () => {
     expect(sql).toContain("NOW() AT TIME ZONE 'America/Sao_Paulo'");
   });
 
+  it('treats an impossible date as today instead of sending it to Postgres', async () => {
+    mockQueries(() => [{}]);
+    await getOverviewReport('month', '2026-02-31');
+    expect(queryMock.mock.calls[0][1]).toEqual(['month', null]);
+  });
+
   it('cuts the period on the Rio calendar, not in UTC', async () => {
     mockQueries(() => [{}]);
     await getOverviewReport('month', '2026-10-09');
