@@ -142,7 +142,8 @@ class Layout {
   }
 
   section(title: string) {
-    this.ensure(46)
+    // Room for the title and its first rows: a heading alone at the foot of a page reads as a mistake.
+    this.ensure(110)
     this.page.drawText(toPdfText(title.toUpperCase()), {
       x: MARGIN,
       y: this.y,
@@ -399,7 +400,7 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.rows([
     ['Receita com custo conhecido', money(margin.revenueWithCost)],
     ['CMV (custo dos produtos vendidos)', money(margin.cogs)],
-    ['Margem bruta', `${margin.marginPct.toFixed(1)}%`],
+    ['Margem bruta', `${margin.marginPct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`],
     ['Valor imobilizado em estoque', money(margin.inventoryValue)],
   ])
   if (margin.revenueWithCost <= 0) {
@@ -411,7 +412,7 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     // The footnote exists so the figure is not mistaken for a complete total:
     // readers need to know how much revenue was excluded before trusting the margin.
     layout.note(
-      `Calculado sobre ${margin.costCoveragePct.toFixed(0)}% da receita. ` +
+      `Calculado sobre ${margin.costCoveragePct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}% da receita. ` +
         `${money(margin.revenueWithoutCost)} em vendas (${integer(margin.unitsWithoutCost)} unidades) ` +
         'ficaram de fora por não terem custo cadastrado.'
     )
