@@ -214,15 +214,17 @@ function SalesLedger({ report }: { report: OverviewReport }) {
           </ul>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-sm">
+            {/* Fixed columns keep Total in view; the min width stops Descrição
+                from collapsing to nothing on a 1280px screen. */}
+            <table className="w-full min-w-[52rem] table-fixed text-sm">
               <colgroup>
-                <col className="w-[8.5rem]" />
-                <col className="w-[7.5rem]" />
-                <col className="w-[22%]" />
-                <col />
-                <col className="w-[9.5rem]" />
+                <col className="w-[7rem]" />
+                <col className="w-[6.5rem]" />
                 <col className="w-[10rem]" />
+                <col />
                 <col className="w-[7.5rem]" />
+                <col className="w-[8rem]" />
+                <col className="w-[6.5rem]" />
               </colgroup>
               <thead>
                 <tr className="border-b text-left text-xs text-muted-foreground">
@@ -248,7 +250,7 @@ function SalesLedger({ report }: { report: OverviewReport }) {
                     <td className="truncate py-2 pr-3 text-muted-foreground" title={entry.description}>
                       {entry.description}
                     </td>
-                    <td className="whitespace-nowrap py-2 pr-3">
+                    <td className="truncate py-2 pr-3" title={PAYMENT_METHOD_LABEL[entry.method]}>
                       {PAYMENT_METHOD_LABEL[entry.method]}
                       {entry.installments && entry.installments > 1 ? ` ${entry.installments}x` : ''}
                     </td>
