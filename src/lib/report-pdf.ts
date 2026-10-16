@@ -60,20 +60,20 @@ function integer(value: number): string {
 
 /** Growth vs the same window one period back. */
 function growth(current: number, previous: number): { text: string; positive: boolean } | null {
-  if (previous <= 0) return current > 0 ? { text: 'primeiro periodo com movimento', positive: true } : null
+  if (previous <= 0) return current > 0 ? { text: 'primeiro período com movimento', positive: true } : null
   const pct = ((current - previous) / previous) * 100
   const rounded = Math.round(pct * 10) / 10
   return {
-    text: `${rounded >= 0 ? '+' : ''}${rounded.toLocaleString('pt-BR')}% vs periodo anterior`,
+    text: `${rounded >= 0 ? '+' : ''}${rounded.toLocaleString('pt-BR')}% vs período anterior`,
     positive: rounded >= 0,
   }
 }
 
 const PERIOD_LABEL: Record<OverviewPeriod, string> = {
-  day: 'Relatorio diario',
-  month: 'Relatorio mensal',
-  year: 'Relatorio anual',
-  range: 'Relatorio do periodo',
+  day: 'Relatório diário',
+  month: 'Relatório mensal',
+  year: 'Relatório anual',
+  range: 'Relatório do período',
 }
 
 /** Most sales listed in the PDF; the spreadsheet carries the full list. */
@@ -223,7 +223,7 @@ class Layout {
 
     entries.forEach((entry, index) => {
       this.ensure(20)
-      const safeName = toPdfText(entry.name) || '(nome nao suportado no PDF)'
+      const safeName = toPdfText(entry.name) || '(nome não suportado no PDF)'
       const label = `${index + 1}. ${safeName}`
       // Truncate on width, not character count: proportional font.
       let shown = label
@@ -356,9 +356,9 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.rows([
     ['Receita da loja (inclui frete)', money(sales.revenue)],
     ['Receita de ingressos', money(tickets.revenue)],
-    ['Receita do clube (assinaturas)', money(club.revenue)],
+    ['Receita do clube (anuidades)', money(club.revenue)],
     ['Pedidos pagos', integer(sales.orders)],
-    ['Ticket medio da loja', money(sales.averageTicket)],
+    ['Ticket médio da loja', money(sales.averageTicket)],
     ['Novos membros', integer(club.newMembers)],
     ['Membros ativos (hoje)', integer(club.activeMembers)],
   ])
@@ -368,22 +368,22 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ['Subtotal dos produtos', money(sales.subtotal)],
     ['Descontos concedidos', money(sales.discount)],
     ['Frete cobrado', money(sales.shipping)],
-    ['Credito de loja usado', money(sales.storeCredit)],
+    ['Crédito de loja usado', money(sales.storeCredit)],
     ['Pedidos varejo', `${integer(sales.retailOrders)} - ${money(sales.retailRevenue)}`],
     ['Pedidos atacado', `${integer(sales.wholesaleOrders)} - ${money(sales.wholesaleRevenue)}`],
     ['Pagos por PIX', `${integer(sales.pixOrders)} - ${money(sales.pixRevenue ?? 0)}`],
-    ['Pagos por cartao', `${integer(sales.cardOrders)} - ${money(sales.cardRevenue ?? 0)}`],
+    ['Pagos por cartão', `${integer(sales.cardOrders)} - ${money(sales.cardRevenue ?? 0)}`],
   ])
-  layout.note('Receita conta apenas pedidos pagos, em separacao, enviados ou entregues.')
+  layout.note('Receita conta apenas pedidos pagos, em separação, enviados ou entregues.')
 
-  layout.section('Nao realizado')
+  layout.section('Não realizado')
   layout.rows([
     ['Aguardando pagamento', `${integer(sales.pendingOrders)} - ${money(sales.pendingRevenue ?? 0)}`],
     ['Cancelados', `${integer(sales.cancelledOrders)} - ${money(sales.cancelledRevenue ?? 0)}`],
     ['Estornados (loja)', `${integer(sales.refundedOrders)} - ${money(sales.refundedRevenue ?? 0)}`],
     ['Estornados (clube)', `${integer(club.refundedPayments ?? 0)} - ${money(club.refunded ?? 0)}`],
   ])
-  layout.note('Nada deste bloco entra na receita. Cancelado inclui PIX vencido e cartao abandonado.')
+  layout.note('Nada deste bloco entra na receita. Cancelado inclui PIX vencido e cartão abandonado.')
 
   const byMethod = report.byMethod ?? []
   if (byMethod.length > 0) {
@@ -404,7 +404,7 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   ])
   if (margin.revenueWithCost <= 0) {
     layout.note(
-      'Nenhuma venda do periodo tem custo cadastrado, entao nao ha margem a calcular. ' +
+      'Nenhuma venda do período tem custo cadastrado, então não há margem a calcular. ' +
         'Preencha o custo dos produtos para este bloco deixar de ficar vazio.'
     )
   } else if (margin.revenueWithoutCost > 0) {
@@ -413,14 +413,14 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     layout.note(
       `Calculado sobre ${margin.costCoveragePct.toFixed(0)}% da receita. ` +
         `${money(margin.revenueWithoutCost)} em vendas (${integer(margin.unitsWithoutCost)} unidades) ` +
-        'ficaram de fora por nao terem custo cadastrado.'
+        'ficaram de fora por não terem custo cadastrado.'
     )
   } else {
-    layout.note('Todas as vendas do periodo tem custo cadastrado.')
+    layout.note('Todas as vendas do período têm custo cadastrado.')
   }
   if (margin.productsWithoutCost > 0) {
     layout.note(
-      `${integer(margin.productsWithoutCost)} SKU(s) ativos ainda estao sem custo e ficam de fora ` +
+      `${integer(margin.productsWithoutCost)} SKU(s) ativos ainda estão sem custo e ficam de fora ` +
         'do valor imobilizado.'
     )
   }
@@ -434,20 +434,20 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.section('Clube')
   layout.rows([
     ['Pagamentos confirmados', integer(club.payments)],
-    ['Receita de assinaturas', money(club.revenue)],
-    ['Novos membros no periodo', integer(club.newMembers)],
-    ['Membros que expiraram no periodo', integer(club.expiredInPeriod)],
+    ['Receita de anuidades', money(club.revenue)],
+    ['Novos membros no período', integer(club.newMembers)],
+    ['Membros que expiraram no período', integer(club.expiredInPeriod)],
     ['Membros ativos agora', integer(club.activeMembers)],
   ])
 
   layout.section('Produtos mais vendidos')
   if (products.top.length === 0) {
-    layout.note('Nenhum produto vendido neste periodo.')
+    layout.note('Nenhum produto vendido neste período.')
   } else {
     layout.ranking(products.top)
-    layout.note('Receita por produto ja com o desconto do pedido (promocao, membro, cupom) abatido.')
+    layout.note('Receita por produto já com o desconto do pedido (promoção, membro, cupom) abatido.')
     layout.rows([
-      ['Unidades vendidas no periodo', integer(products.unitsSold)],
+      ['Unidades vendidas no período', integer(products.unitsSold)],
       ['Produtos distintos vendidos', integer(products.distinctProducts)],
     ])
   }
@@ -462,14 +462,14 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.rows([
     ['SKUs ativos', integer(products.activeSkus)],
     ['Esgotados', integer(products.outOfStock)],
-    ['No estoque minimo', integer(products.lowStock)],
+    ['No estoque mínimo', integer(products.lowStock)],
   ])
-  layout.note('Estoque e uma fotografia do momento da emissao, nao um acumulado do periodo.')
+  layout.note('Estoque é uma fotografia do momento da emissão, não um acumulado do período.')
 
   // Only what entered the revenue: the list is the proof of the total above.
   const sold = (report.ledger?.entries ?? []).filter((entry) => entry.counted)
   if (sold.length > 0) {
-    layout.section(`Vendas do periodo (${integer(sold.length)})`)
+    layout.section(`Vendas do período (${integer(sold.length)})`)
     const dateTime = (value: string) =>
       new Date(value).toLocaleString('pt-BR', {
         timeZone: 'America/Sao_Paulo',
@@ -498,10 +498,10 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
       ])
     )
     if (sold.length > PDF_LEDGER_LIMIT || report.ledger?.truncated) {
-      layout.note(`Lista cortada no PDF. A planilha Excel do mesmo periodo traz todas as vendas.`)
+      layout.note(`Lista cortada no PDF. A planilha Excel do mesmo período traz todas as vendas.`)
     }
     const status = new Set(sold.map((e) => LEDGER_STATUS_LABEL[e.status] ?? e.status))
-    layout.note(`Situacoes incluidas: ${[...status].join(', ')}.`)
+    layout.note(`Situações incluídas: ${[...status].join(', ')}.`)
   }
 
   layout.finish()

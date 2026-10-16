@@ -218,8 +218,8 @@ function SalesLedger({ report }: { report: OverviewReport }) {
                 from collapsing to nothing on a 1280px screen. */}
             <table className="w-full min-w-[52rem] table-fixed text-sm">
               <colgroup>
+                <col className="w-[7.75rem]" />
                 <col className="w-[7rem]" />
-                <col className="w-[6.5rem]" />
                 <col className="w-[10rem]" />
                 <col />
                 <col className="w-[7.5rem]" />
