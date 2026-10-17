@@ -33,6 +33,7 @@ const {
   refundChargeMock,
   createCardMock,
   getOrCreateCustomerMock,
+  updateCustomerMock,
 } = vi.hoisted(() => ({
   queryMock: vi.fn(),
   auditMock: vi.fn(async () => {}),
@@ -48,6 +49,7 @@ const {
     last_four_digits: '4242',
   })),
   getOrCreateCustomerMock: vi.fn(async () => 'cus_1'),
+  updateCustomerMock: vi.fn(async () => ({ id: 'cus_1' })),
 }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
@@ -74,6 +76,7 @@ vi.mock('../utils/pagarme.js', async () => {
     // before the charge, so both steps are stubbed.
     createCardForCustomer: createCardMock,
     getOrCreatePagarmeCustomer: getOrCreateCustomerMock,
+    updateCustomer: updateCustomerMock,
     getCharge: getChargeMock,
     // The throttled variant calls `getCharge` through the module's own closure,
     // which an export override does not reach — so it is stubbed too, or the
@@ -174,6 +177,16 @@ const memberRow = {
   pagarme_customer_id: null,
 };
 
+const billingAddress = {
+  cep: '22011-001',
+  street: 'Rua Barata Ribeiro',
+  number: '181',
+  complement: 'Loja J',
+  neighborhood: 'Copacabana',
+  city: 'Rio de Janeiro',
+  state: 'RJ',
+};
+
 /** What Pagar.me returns for an approved card. */
 const approvedCardOrder = {
   id: 'or_card',
@@ -206,6 +219,7 @@ describe('valor cobrado', () => {
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
+        billingAddress,
       })
     ).rejects.toThrow();
 
@@ -242,6 +256,7 @@ describe('valor cobrado', () => {
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
+        billingAddress,
       })
     ).resolves.toBeDefined();
 
@@ -251,6 +266,7 @@ describe('valor cobrado', () => {
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
+        billingAddress,
       })
     ).rejects.toThrow();
   });
@@ -263,6 +279,7 @@ describe('valor cobrado', () => {
       description: 'Plano',
       payerEmail: 'ana@example.com',
       memberId: 'member-1',
+      billingAddress,
     });
 
     expect(result.pixData.amount).toBe(PLAN_PRICE);
@@ -273,6 +290,13 @@ describe('valor cobrado', () => {
       expect.anything(),
     );
     expect(paramsOf('INSERT INTO payments')?.[2]).toBe(PLAN_PRICE);
+    const [payload] = createOrderMock.mock.calls[0] as [{ customer?: { address?: { zip_code?: string } } }];
+    expect(payload.customer?.address?.zip_code).toBe('22011001');
+    expect(payload.customer?.address).toMatchObject({
+      line_1: '181, Rua Barata Ribeiro, Copacabana',
+      country: 'BR',
+    });
+    expect(ran('billing_address')).toBe(true);
   });
 
   /**
@@ -289,6 +313,7 @@ describe('valor cobrado', () => {
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
+        billingAddress,
       })
     ).rejects.toThrow('CPF válido');
 
@@ -326,6 +351,7 @@ describe('createPixPayment', () => {
       description: 'Plano',
       payerEmail: 'ana@example.com',
       memberId: 'member-1',
+      billingAddress,
     });
 
     expect(notifyAdminsMock).toHaveBeenCalledWith(
@@ -346,6 +372,7 @@ describe('createPixPayment', () => {
       description: 'Plano',
       payerEmail: 'ana@example.com',
       memberId: 'member-1',
+      billingAddress,
     });
 
     expect(result.pixData.emvCode).toBe('00020101br.gov.bcb.pix-GEEKPOP');
@@ -379,6 +406,7 @@ describe('createPixPayment', () => {
         description: 'Plano',
         payerEmail: 'ana@example.com',
         memberId: 'member-1',
+        billingAddress,
       })
     ).rejects.toThrow('QR Code');
 
@@ -398,10 +426,31 @@ describe('createPixPayment', () => {
       description: 'Plano',
       payerEmail: 'ana@example.com',
       memberId: 'member-1',
+      billingAddress,
     });
 
     const [, opts] = createOrderMock.mock.calls[0] as [unknown, { idempotencyKey?: string }];
     expect(opts?.idempotencyKey).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('atualiza o cliente que já existe e mantém o PIX com cliente inline', async () => {
+    route('FROM members WHERE id', { rows: [{ ...memberRow, pagarme_customer_id: 'cus_old' }] });
+
+    await createPixPayment({
+      amount: PLAN_PRICE,
+      description: 'Plano',
+      payerEmail: 'ana@example.com',
+      memberId: 'member-1',
+      billingAddress,
+    });
+
+    expect(updateCustomerMock).toHaveBeenCalledWith(
+      'cus_old',
+      expect.objectContaining({ address: expect.objectContaining({ zip_code: '22011001' }) }),
+    );
+    const [payload] = createOrderMock.mock.calls[0] as [{ customer_id?: string; customer?: unknown }];
+    expect(payload.customer_id).toBeUndefined();
+    expect(payload.customer).toBeDefined();
   });
 });
 
@@ -711,6 +760,7 @@ describe('createCardPayment', () => {
     payerName: 'Ana',
     memberId: 'member-1',
     cardToken: 'token_abc',
+    billingAddress,
   };
 
   it('cobra em centavos com o token, e nunca com dado de cartão', async () => {
@@ -722,7 +772,22 @@ describe('createCardPayment', () => {
     // The browser token is exchanged for a saved card first; the charge bills
     // the `card_id`. Sending `card_token` straight to /orders is the Gateway
     // flow, and this account is PSP.
-    expect(createCardMock).toHaveBeenCalledWith('cus_1', 'token_abc');
+    expect(createCardMock).toHaveBeenCalledWith(
+      'cus_1',
+      'token_abc',
+      expect.objectContaining({
+        zip_code: '22011001',
+        line_1: '181, Rua Barata Ribeiro, Copacabana',
+        line_2: 'Loja J',
+        country: 'BR',
+      }),
+    );
+    expect(getOrCreateCustomerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: expect.objectContaining({ zip_code: '22011001', country: 'BR' }),
+      }),
+    );
+    expect(ran('billing_address')).toBe(true);
 
     const [payload] = createOrderMock.mock.calls[0] as [Record<string, never>];
     expect(payload).toMatchObject({
@@ -813,9 +878,21 @@ describe('createCardPayment', () => {
     await expect(createCardPayment(cardInput)).rejects.toThrow('verification failed');
 
     expect(createOrderMock).not.toHaveBeenCalled();
+    expect(ran('billing_address')).toBe(true);
     expect(notifyAdminsMock).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'payment_failed', method: 'credit_card' })
     );
+  });
+
+  it('recusa sem endereço antes de criar cliente ou cartão', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+
+    await expect(
+      createCardPayment({ ...cardInput, billingAddress: undefined })
+    ).rejects.toMatchObject({ code: 'BILLING_ADDRESS_REQUIRED' });
+
+    expect(getOrCreateCustomerMock).not.toHaveBeenCalled();
+    expect(createCardMock).not.toHaveBeenCalled();
   });
 
   it('não avisa a equipe por erro que não é recusa do cartão', async () => {

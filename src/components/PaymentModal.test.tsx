@@ -100,12 +100,23 @@ vi.mock('lucide-react', () => {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const completeAddress = {
+  cep: '22011-001',
+  street: 'Rua Barata Ribeiro',
+  number: '181',
+  complement: 'Loja J',
+  neighborhood: 'Copacabana',
+  city: 'Rio de Janeiro',
+  state: 'RJ',
+}
+
 const defaultProps = {
   plan: 'club' as const,
   paymentType: 'annual' as const,
   memberEmail: 'test@example.com',
   memberId: 'member-123',
   memberName: 'Test User',
+  initialAddress: completeAddress,
   onClose: vi.fn(),
   onSuccess: vi.fn(),
 }
@@ -184,6 +195,19 @@ describe('PaymentModal', () => {
     expect(screen.getByText(/Iniciar Assinatura com Cartão/)).toBeInTheDocument()
   })
 
+  it('does not start PIX or open the card form without an address', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderModal({ initialAddress: null })
+
+    await user.click(screen.getByText('PIX'))
+    expect(mockGeneratePixPayment).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Informe o CEP.')
+
+    await user.click(screen.getByText('Cartão'))
+    expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
+    expect(mockApiPost).not.toHaveBeenCalled()
+  })
+
   // ── PIX Flow ──
 
   it('starts PIX payment on PIX button click', async () => {
@@ -209,7 +233,8 @@ describe('PaymentModal', () => {
       159.9,
       'Clube GeekPop & Toys - Plano Clube GeekPop & Toys',
       'test@example.com',
-      'member-123'
+      'member-123',
+      expect.objectContaining({ cep: '22011001', state: 'RJ' }),
     )
     expect(mockSavePendingPayment).toHaveBeenCalled()
   })
@@ -350,6 +375,7 @@ describe('PaymentModal', () => {
         payer_email: 'test@example.com',
         card_token: 'token_abc',
         installments: 1,
+        billing_address: expect.objectContaining({ cep: '22011001', state: 'RJ' }),
       })
     )
     await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalled())
@@ -372,6 +398,7 @@ describe('PaymentModal', () => {
         member_id: 'member-123',
         plan: 'club',
         card_token: 'token_abc',
+        billing_address: expect.objectContaining({ cep: '22011001', neighborhood: 'Copacabana' }),
       })
     )
   })

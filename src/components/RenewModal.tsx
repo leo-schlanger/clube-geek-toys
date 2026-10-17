@@ -38,6 +38,7 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
         memberId={member.id}
         memberEmail={member.email}
         memberName={member.fullName}
+        initialAddress={member.billingAddress}
         onClose={() => setShowPayment(false)}
         onSuccess={handlePaymentSuccess}
       />

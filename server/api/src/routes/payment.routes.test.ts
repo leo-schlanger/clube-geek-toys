@@ -65,7 +65,21 @@ function memberOwnedBy(userId: string | null) {
   });
 }
 
-const pix = { amount: 12.5, description: 'Clube', payer_email: 'laura@example.com', external_reference: MEMBER };
+const billingAddress = {
+  cep: '22011-001',
+  street: 'Rua Barata Ribeiro',
+  number: '181',
+  neighborhood: 'Copacabana',
+  city: 'Rio de Janeiro',
+  state: 'RJ',
+};
+const pix = {
+  amount: 12.5,
+  description: 'Clube',
+  payer_email: 'laura@example.com',
+  external_reference: MEMBER,
+  billing_address: billingAddress,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -98,7 +112,13 @@ describe('paying for the membership', () => {
     memberOwnedBy('user-member');
     payments.createPixPayment.mockResolvedValue({ qrCode: 'x' });
     expect((await api.post('/create', { as: 'member', body: pix })).status).toBe(201);
-    expect(payments.createPixPayment).toHaveBeenCalledWith({ amount: 12.5, description: 'Clube', payerEmail: 'laura@example.com', memberId: MEMBER });
+    expect(payments.createPixPayment).toHaveBeenCalledWith({
+      amount: 12.5,
+      description: 'Clube',
+      payerEmail: 'laura@example.com',
+      memberId: MEMBER,
+      billingAddress: expect.objectContaining({ cep: '22011-001', state: 'RJ', city: 'Rio de Janeiro' }),
+    });
   });
 
   it("refuses to charge someone else's membership", async () => {
@@ -124,9 +144,21 @@ describe('paying for the membership', () => {
     payments.createCardPayment.mockResolvedValue({ status: 'paid' });
     const body = { ...pix, payer_name: 'Laura', card_token: 'card_x', installments: 2 };
     expect((await api.post('/card/create', { as: 'seller', body })).status).toBe(201);
-    expect(payments.createCardPayment).toHaveBeenCalledWith(expect.objectContaining({ cardToken: 'card_x', installments: 2, memberId: MEMBER }));
+    expect(payments.createCardPayment).toHaveBeenCalledWith(expect.objectContaining({
+      cardToken: 'card_x',
+      installments: 2,
+      memberId: MEMBER,
+      billingAddress: expect.objectContaining({ cep: '22011-001', state: 'RJ' }),
+    }));
     expect(queryMock).not.toHaveBeenCalled();
     expect((await api.post('/card/create', { as: 'seller', body: { ...body, installments: 13 } })).status).toBe(400);
+  });
+
+  it('refuses a charge with no billing address', async () => {
+    memberOwnedBy('user-member');
+    const { billing_address: _drop, ...noAddress } = pix;
+    expect((await api.post('/create', { as: 'member', body: noAddress })).status).toBe(400);
+    expect(payments.createPixPayment).not.toHaveBeenCalled();
   });
 });
 

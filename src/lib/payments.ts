@@ -16,6 +16,7 @@ import { api, API_URL } from './api-client'
 import { paymentLogger } from './logger'
 import { getPaymentConfig } from './pagarme'
 import type { Payment, PaymentStatus, PlanType, PaymentType } from '../types'
+import type { BillingAddressBody } from './billing-address'
 import { CLUB_PLAN, PLANS } from '../types'
 
 // ============================================
@@ -87,7 +88,8 @@ export async function generatePixPayment(
   amount: number,
   description: string,
   payerEmail: string,
-  memberId: string
+  memberId: string,
+  billingAddress?: BillingAddressBody,
 ): Promise<PixPaymentData | null> {
   if (!memberId || memberId.trim() === '') {
     paymentLogger.error('Cannot create PIX payment: memberId is required')
@@ -111,6 +113,7 @@ export async function generatePixPayment(
       description,
       payer_email: payerEmail,
       external_reference: memberId,
+      ...(billingAddress ? { billing_address: billingAddress } : {}),
     })
 
     if (result.error) {
@@ -168,6 +171,7 @@ export async function createCardPayment(
   memberId: string,
   cardToken: string,
   installments = 1,
+  billingAddress?: BillingAddressBody,
 ): Promise<CardPaymentData | null> {
   const amount = calculatePlanPrice(plan, paymentType)
   const planName = PLANS[plan].name
@@ -188,6 +192,7 @@ export async function createCardPayment(
       external_reference: memberId,
       card_token: cardToken,
       installments,
+      ...(billingAddress ? { billing_address: billingAddress } : {}),
     })
 
     if (result.error) {

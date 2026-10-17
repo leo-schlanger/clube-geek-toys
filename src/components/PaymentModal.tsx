@@ -20,7 +20,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { PagarmeCardForm } from './PagarmeCardForm'
+import { BillingAddressFields } from './BillingAddressFields'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../lib/payments'
+import {
+  billingAddressFromStored,
+  billingAddressProblem,
+  toBillingAddressBody,
+  type BillingAddressInput,
+} from '../lib/billing-address'
 import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, paymentTypeLabel, paymentTypeSuffix, type PlanType, type PaymentType, type PendingPaymentInfo } from '../types'
 import { formatCurrency } from '../lib/utils'
 import { savePendingPayment, clearPendingPayment } from '../lib/members'
@@ -54,6 +61,8 @@ interface PaymentModalProps {
   onSuccess: () => void
   defaultMode?: PaymentMode
   allowModeSwitch?: boolean
+  /** Address already stored on the member, so a renewal does not ask twice. */
+  initialAddress?: Partial<BillingAddressInput> | null
 }
 
 export function PaymentModal({
@@ -67,9 +76,12 @@ export function PaymentModal({
   onSuccess,
   defaultMode = 'one-time',
   allowModeSwitch = true,
+  initialAddress,
 }: PaymentModalProps) {
   const [mode, setMode] = useState<PaymentMode>(defaultMode)
   const [method, setMethod] = useState<PaymentMethod>(null)
+  const [address, setAddress] = useState<BillingAddressInput>(() => billingAddressFromStored(initialAddress))
+  const [addressError, setAddressError] = useState<string | null>(null)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
   const confirm = useConfirm()
 
@@ -192,7 +204,20 @@ export function PaymentModal({
 
   // ─── PIX Flow ──────────────────────────────────────────────────────────────
 
+  const addressOrStop = useCallback((): ReturnType<typeof toBillingAddressBody> | null => {
+    const problem = billingAddressProblem(address)
+    if (problem) {
+      setAddressError(problem)
+      toast.error(problem)
+      return null
+    }
+    setAddressError(null)
+    return toBillingAddressBody(address)
+  }, [address])
+
   const handlePixPayment = useCallback(async () => {
+    const billing = addressOrStop()
+    if (!billing) return
     setLoading(true)
     setError(null)
     try {
@@ -200,7 +225,8 @@ export function PaymentModal({
         amount,
         `Clube GeekPop & Toys - Plano ${planData.name}`,
         memberEmail,
-        memberId
+        memberId,
+        billing,
       )
       if (pix) {
         setPixData(pix)
@@ -228,7 +254,7 @@ export function PaymentModal({
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, planData.name, memberEmail, memberId])
+  }, [amount, planData.name, memberEmail, memberId, addressOrStop])
 
   // ─── Card flow (Pagar.me) ──────────────────────────────────────────────────
 
@@ -241,9 +267,10 @@ export function PaymentModal({
    * does the whole charge in one request.
    */
   const handleCardPayment = useCallback(() => {
+    if (!addressOrStop()) return
     setError(null)
     setMethod('card')
-  }, [])
+  }, [addressOrStop])
 
   /**
    * Charge (or subscribe) with a token the form just produced.
@@ -253,6 +280,9 @@ export function PaymentModal({
    */
   const handleCardToken = useCallback(
     async (cardToken: string, installments: number) => {
+      const problem = billingAddressProblem(address)
+      if (problem) throw new Error(problem)
+      const billing = toBillingAddressBody(address)
       setError(null)
 
       const endpoint = mode === 'subscription' ? '/subscription/create' : '/checkout/card/create'
@@ -266,6 +296,7 @@ export function PaymentModal({
               payer_name: memberName,
               transaction_amount: amount,
               card_token: cardToken,
+              billing_address: billing,
             }
           : {
               amount,
@@ -275,6 +306,7 @@ export function PaymentModal({
               external_reference: memberId,
               card_token: cardToken,
               installments,
+              billing_address: billing,
             }
 
       const res = await api.post<{ status?: string }>(endpoint, body)
@@ -298,7 +330,7 @@ export function PaymentModal({
       handlePaymentSuccess()
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, memberId, plan, paymentType, amount, memberEmail, memberName, planData.name]
+    [mode, memberId, plan, paymentType, amount, memberEmail, memberName, planData.name, address]
   )
 
   function handlePaymentSuccess() {
@@ -344,6 +376,23 @@ export function PaymentModal({
                 <p className="text-sm font-medium">Assinatura</p>
                 <p className="text-xs text-muted-foreground">Cobrança recorrente</p>
               </button>
+            </div>
+          )}
+
+          {method !== 'pix' && (
+            <div className="space-y-2">
+              <BillingAddressFields
+                value={address}
+                onChange={(next) => {
+                  setAddress(next)
+                  setAddressError(null)
+                }}
+              />
+              {addressError && (
+                <p role="alert" className="text-sm text-red-500">
+                  {addressError}
+                </p>
+              )}
             </div>
           )}
 

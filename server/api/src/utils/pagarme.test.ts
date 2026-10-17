@@ -36,6 +36,7 @@ import {
   toCents,
   fromCents,
   idempotencyKeyFor,
+  getOrCreatePagarmeCustomer,
 } from './pagarme.js';
 
 describe('normalizeCustomer', () => {
@@ -68,6 +69,79 @@ describe('normalizeCustomer', () => {
     });
 
     expect(out.type).toBe('company');
+  });
+});
+
+describe('getOrCreatePagarmeCustomer', () => {
+  const address = {
+    line_1: '181, Rua Barata Ribeiro, Copacabana',
+    zip_code: '22011001',
+    city: 'Rio de Janeiro',
+    state: 'RJ',
+    country: 'BR',
+  };
+
+  function stubFetch(body: unknown = { id: 'cus_1' }, status = 200) {
+    const fetchMock = vi.fn(async () => ({
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => JSON.stringify(body),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  }
+
+  it('grava o endereço num cliente que já existe antes de devolver o id', async () => {
+    const fetchMock = stubFetch();
+
+    const id = await getOrCreatePagarmeCustomer({
+      id: 'member-1',
+      email: 'ana@example.com',
+      fullName: 'Ana',
+      document: '52998224725',
+      pagarmeCustomerId: 'cus_old',
+      address,
+    });
+
+    expect(id).toBe('cus_old');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { method?: string; body?: string }];
+    expect(url).toBe('https://api.pagar.me/core/v5/customers/cus_old');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body ?? '{}').address).toMatchObject({ zip_code: '22011001' });
+    vi.unstubAllGlobals();
+  });
+
+  it('não chama a operadora quando o cliente já existe e não há endereço novo', async () => {
+    const fetchMock = stubFetch();
+
+    const id = await getOrCreatePagarmeCustomer({
+      id: 'member-1',
+      email: 'ana@example.com',
+      fullName: 'Ana',
+      document: '52998224725',
+      pagarmeCustomerId: 'cus_old',
+    });
+
+    expect(id).toBe('cus_old');
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('propaga a falha do PUT para a cobrança não seguir sem endereço', async () => {
+    stubFetch({ message: 'invalid' }, 422);
+
+    await expect(
+      getOrCreatePagarmeCustomer({
+        id: 'member-1',
+        email: 'ana@example.com',
+        fullName: 'Ana',
+        document: '52998224725',
+        pagarmeCustomerId: 'cus_old',
+        address,
+      }),
+    ).rejects.toMatchObject({ name: 'PagarmeError', httpStatus: 422 });
+    vi.unstubAllGlobals();
   });
 });
 

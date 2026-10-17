@@ -1288,6 +1288,13 @@ const STEPS: SchemaStep[] = [
         WHERE member_id IS NOT NULL AND status <> 'cancelled'`);
     },
   },
+  {
+    // Club card verification needs a billing address. The shop already had one.
+    name: 'Club billing address (migration 042)',
+    run: async () => {
+      await query(`ALTER TABLE members ADD COLUMN IF NOT EXISTS billing_address JSONB`);
+    },
+  },
 ];
 
 let state: SchemaState = {

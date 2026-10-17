@@ -31,7 +31,14 @@ import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { PagarmeCardForm } from '../PagarmeCardForm'
+import { BillingAddressFields } from '../BillingAddressFields'
 import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../../lib/payments'
+import {
+  billingAddressFromStored,
+  billingAddressProblem,
+  toBillingAddressBody,
+  type BillingAddressInput,
+} from '../../lib/billing-address'
 import { CLUB_PLAN, CURRENT_PAYMENT_TYPE, paymentTypeLabel, paymentTypeSuffix, type PlanType, type PaymentType } from '../../types'
 import { formatCurrency } from '../../lib/utils'
 import { savePendingPayment, clearPendingPayment } from '../../lib/members'
@@ -50,6 +57,8 @@ interface StepPaymentProps {
   memberId: string
   memberEmail: string
   memberName: string
+  /** Address already stored on the member, when this step is a retry. */
+  initialAddress?: Partial<BillingAddressInput> | null
   onSuccess: () => void
   onBack: () => void
 }
@@ -71,11 +80,14 @@ export function StepPayment({
   memberId,
   memberEmail,
   memberName,
+  initialAddress,
   onSuccess,
   onBack,
 }: StepPaymentProps) {
   const [mode, setMode] = useState<PaymentMode>('one-time')
   const [method, setMethod] = useState<PaymentMethodChoice>(null)
+  const [address, setAddress] = useState<BillingAddressInput>(() => billingAddressFromStored(initialAddress))
+  const [addressError, setAddressError] = useState<string | null>(null)
   const [pixData, setPixData] = useState<PixPaymentData | null>(null)
   const confirm = useConfirm()
 
@@ -180,7 +192,20 @@ export function StepPayment({
 
   // ─── PIX Flow ──────────────────────────────────────────────────────────────
 
+  const addressOrStop = useCallback((): ReturnType<typeof toBillingAddressBody> | null => {
+    const problem = billingAddressProblem(address)
+    if (problem) {
+      setAddressError(problem)
+      toast.error(problem)
+      return null
+    }
+    setAddressError(null)
+    return toBillingAddressBody(address)
+  }, [address])
+
   const handlePixPayment = useCallback(async () => {
+    const billing = addressOrStop()
+    if (!billing) return
     setLoading(true)
     setError(null)
     try {
@@ -189,6 +214,7 @@ export function StepPayment({
         `Clube GeekPop & Toys - Plano ${planData.name}`,
         memberEmail,
         memberId,
+        billing,
       )
       if (pix) {
         setPixData(pix)
@@ -214,7 +240,7 @@ export function StepPayment({
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, planData.name, memberEmail, memberId])
+  }, [amount, planData.name, memberEmail, memberId, addressOrStop])
 
   /** A refused card's way out: PIX always works, whichever mode was picked. */
   const switchToPix = useCallback(async () => {
@@ -233,9 +259,10 @@ export function StepPayment({
    * so nothing is created until the member has actually typed a card.
    */
   const handleCardPayment = useCallback(() => {
+    if (!addressOrStop()) return
     setError(null)
     setMethod('card')
-  }, [])
+  }, [addressOrStop])
 
   /**
    * Run the charge with the token the form produced.
@@ -245,6 +272,9 @@ export function StepPayment({
    */
   const handleCardToken = useCallback(
     async (cardToken: string, installments: number) => {
+      const billing = toBillingAddressBody(address)
+      const problem = billingAddressProblem(address)
+      if (problem) throw new Error(problem)
       setError(null)
 
       const endpoint = mode === 'subscription' ? '/subscription/create' : '/checkout/card/create'
@@ -258,6 +288,7 @@ export function StepPayment({
               payer_name: memberName,
               transaction_amount: amount,
               card_token: cardToken,
+              billing_address: billing,
             }
           : {
               amount,
@@ -267,6 +298,7 @@ export function StepPayment({
               external_reference: memberId,
               card_token: cardToken,
               installments,
+              billing_address: billing,
             }
 
       const res = await api.post<{ status?: string }>(endpoint, body)
@@ -286,7 +318,7 @@ export function StepPayment({
       handlePaymentSuccess()
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, memberId, plan, amount, memberEmail, memberName, planData.name]
+    [mode, memberId, plan, amount, memberEmail, memberName, planData.name, address]
   )
 
   // ─── Success handler ───────────────────────────────────────────────────────
@@ -342,6 +374,23 @@ export function StepPayment({
           </p>
         </CardContent>
       </Card>
+
+      {method !== 'pix' && (
+        <div className="space-y-2">
+          <BillingAddressFields
+            value={address}
+            onChange={(next) => {
+              setAddress(next)
+              setAddressError(null)
+            }}
+          />
+          {addressError && (
+            <p role="alert" className="text-sm text-red-500">
+              {addressError}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* ── Payment mode toggle (only when no method selected yet) ──────── */}
       {!method && (

@@ -74,6 +74,16 @@ export interface Member {
   paymentCount: number
   /** Oldest pending PIX, from the member list. Empty when no charge was created. */
   pendingPixPaymentId?: string | null
+  /** Saved for the next club charge. Empty until the member pays once. */
+  billingAddress?: {
+    cep: string
+    street: string
+    number: string
+    complement?: string
+    neighborhood: string
+    city: string
+    state: string
+  } | null
   /**
    * Manual activation by an admin. The backend schema accepted both fields
    * long before this type did: `activateMember()` only compiled because

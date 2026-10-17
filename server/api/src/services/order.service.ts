@@ -31,6 +31,7 @@ import { sendTemplateEmail } from './email.service.js';
 import { getApprovedAccountByUserId, isWholesaleSalesOpen } from './wholesale.service.js';
 import { isValidCnpj, normalizeCnpj } from '../utils/cnpj.js';
 import { isValidCPF } from '../utils/cpf.js';
+import { toPagarmeAddress } from '../utils/billing-address.js';
 import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { notify } from './notification.service.js';
 import {
@@ -835,7 +836,6 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
 function orderToPagarmeCustomer(order: Order, document: string): pagarme.PagarmeCustomerInput {
   const phone = pagarme.parseBrazilianPhone(order.customerPhone);
   const addr = (order.shippingAddress ?? {}) as Record<string, string>;
-  const zip = (addr.cep ?? '').replace(/\D/g, '');
   return {
     name: order.customerName,
     email: order.customerEmail,
@@ -844,17 +844,8 @@ function orderToPagarmeCustomer(order: Order, document: string): pagarme.Pagarme
     phones: phone ? { mobile_phone: phone } : undefined,
     // A pickup order carries the shop's own address, which is a real one and
     // satisfies the acquirer's requirement without inventing anything.
-    address:
-      zip.length === 8
-        ? {
-            line_1: [addr.number, addr.street, addr.neighborhood].filter(Boolean).join(', '),
-            line_2: addr.complement || undefined,
-            zip_code: zip,
-            city: addr.city ?? '',
-            state: addr.state ?? '',
-            country: 'BR',
-          }
-        : undefined,
+    // Same line_1 as a club charge (`number, street, neighborhood`).
+    address: toPagarmeAddress(addr),
     metadata: { orderId: order.id, orderNumber: String(order.orderNumber) },
   };
 }

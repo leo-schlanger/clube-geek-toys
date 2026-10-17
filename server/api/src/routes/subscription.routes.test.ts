@@ -43,13 +43,31 @@ beforeEach(() => {
 });
 
 describe('create', () => {
-  const body = { member_id: MEMBER, payer_email: 'laura@example.com', payer_name: 'Laura', card_token: 'card_x' };
+  const body = {
+    member_id: MEMBER,
+    payer_email: 'laura@example.com',
+    payer_name: 'Laura',
+    card_token: 'card_x',
+    billing_address: {
+      cep: '22011-001',
+      street: 'Rua Barata Ribeiro',
+      number: '181',
+      neighborhood: 'Copacabana',
+      city: 'Rio de Janeiro',
+      state: 'RJ',
+    },
+  };
 
   it("subscribes the member's own membership, filling the defaults", async () => {
     ownedBy('user-member');
     subs.createSubscription.mockResolvedValue({ id: 's1' });
     expect((await api.post('/create', { as: 'member', body })).status).toBe(201);
-    expect(subs.createSubscription).toHaveBeenCalledWith(expect.objectContaining({ plan: 'club', frequency_type: 'months', card_token: 'card_x' }));
+    expect(subs.createSubscription).toHaveBeenCalledWith(expect.objectContaining({
+      plan: 'club',
+      frequency_type: 'months',
+      card_token: 'card_x',
+      billing_address: expect.objectContaining({ cep: '22011-001', state: 'RJ' }),
+    }));
   });
 
   it("refuses someone else's membership and a request without login", async () => {

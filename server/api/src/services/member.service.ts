@@ -7,6 +7,7 @@ import { AppError } from '../middleware/error-handler.js';
 import { auditLog, diffObjects } from '../utils/audit.js';
 import { sendTemplateEmail } from './email.service.js';
 import { addClubPeriod, type Member } from '../types/index.js';
+import { readStoredBillingAddress } from '../utils/billing-address.js';
 import { moduleLogger } from '../config/logger.js';
 
 const log = moduleLogger('member');
@@ -35,6 +36,7 @@ function mapMemberRow(row: pg.QueryResultRow): Member {
     activatedByPayment: row.activated_by_payment,
     paymentCount: row.payment_count ?? 0,
     pendingPixPaymentId: row.pending_pix_payment_id ?? null,
+    billingAddress: readStoredBillingAddress(row.billing_address),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

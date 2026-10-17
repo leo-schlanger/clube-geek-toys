@@ -45,6 +45,16 @@ export interface Member {
    * Absent means the caller did not ask; null means there is no open PIX.
    */
   pendingPixPaymentId?: string | null;
+  /** Billing address collected for club charges. Null until the member pays. */
+  billingAddress?: {
+    cep: string;
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }

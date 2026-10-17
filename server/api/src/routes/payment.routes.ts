@@ -7,6 +7,7 @@ import { z } from 'zod';
 import * as paymentService from '../services/payment.service.js';
 import { env } from '../config/env.js';
 import { maxInstallmentsFor, isPagarmeConfigured } from '../utils/pagarme.js';
+import { billingAddressSchema } from '../utils/billing-address.js';
 import { reconcilePendingCharges } from '../services/reconcile.service.js';
 
 export const paymentRouter = Router();
@@ -20,6 +21,7 @@ const pixCreateSchema = z.object({
   description: z.string().min(1),
   payer_email: z.string().email(),
   external_reference: z.string().min(1), // memberId
+  billing_address: billingAddressSchema,
 });
 
 const cardCreateSchema = z.object({
@@ -30,6 +32,7 @@ const cardCreateSchema = z.object({
   external_reference: z.string().min(1), // memberId
   card_token: z.string().min(1),
   installments: z.number().int().min(1).max(12).optional(),
+  billing_address: billingAddressSchema,
 });
 
 /**
@@ -91,6 +94,7 @@ paymentRouter.post('/create', authenticate, paymentLimiter, validate(pixCreateSc
       description: req.body.description,
       payerEmail: req.body.payer_email,
       memberId: req.body.external_reference,
+      billingAddress: req.body.billing_address,
     });
     res.status(201).json(result);
   } catch (err) {
@@ -123,6 +127,7 @@ paymentRouter.post('/card/create', authenticate, paymentLimiter, validate(cardCr
       memberId: req.body.external_reference,
       cardToken: req.body.card_token,
       installments: req.body.installments,
+      billingAddress: req.body.billing_address,
     });
     res.status(201).json(result);
   } catch (err) {

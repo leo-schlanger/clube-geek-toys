@@ -210,6 +210,15 @@ const CREATE_INPUT = {
   payer_email: 'ana@example.com',
   payer_name: 'Ana',
   card_token: 'token_abc',
+  billing_address: {
+    cep: '22011-001',
+    street: 'Rua Barata Ribeiro',
+    number: '181',
+    complement: 'Loja J',
+    neighborhood: 'Copacabana',
+    city: 'Rio de Janeiro',
+    state: 'RJ',
+  },
 };
 
 // ─── createSubscription ──────────────────────────────────────────────────────
@@ -236,7 +245,18 @@ describe('createSubscription', () => {
 
     const args = pagarmeCreateMock.mock.calls[0][0] as Record<string, unknown>;
     // The recurrence bills a saved card, never the browser token.
-    expect(pagarmeCreateCardMock).toHaveBeenCalledWith('cus_pagarme_1', 'token_abc');
+    expect(pagarmeCreateCardMock).toHaveBeenCalledWith(
+      'cus_pagarme_1',
+      'token_abc',
+      expect.objectContaining({
+        zip_code: '22011001',
+        line_1: '181, Rua Barata Ribeiro, Copacabana',
+        country: 'BR',
+      }),
+    );
+    expect(pagarmeCustomerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ address: expect.objectContaining({ zip_code: '22011001' }) }),
+    );
     expect(args.card_id).toBe('card_1');
     expect(args).not.toHaveProperty('card_token');
     const item = (args.items as Record<string, unknown>[])[0];
@@ -272,6 +292,14 @@ describe('createSubscription', () => {
    * whose CPF is a placeholder is stopped here rather than at a 422 three
    * steps later.
    */
+  it('exige endereço de cobrança depois do CPF', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    const { billing_address: _drop, ...withoutAddress } = CREATE_INPUT;
+
+    await expect(createSubscription(withoutAddress as never)).rejects.toThrow(/CEP|endereço/);
+    expect(pagarmeCreateCardMock).not.toHaveBeenCalled();
+  });
+
   it('recusa quem não tem CPF válido no cadastro', async () => {
     route('FROM members WHERE id', { rows: [{ ...memberRow, cpf: '11111111111' }] });
 
@@ -497,6 +525,30 @@ describe('updatePaymentMethod', () => {
     expect(pagarmeUpdateCardMock).toHaveBeenCalledWith('psub1', 'card_1');
     expect(out).toMatchObject({ cardBrand: 'mastercard', cardLastFour: '1111' });
     expect(sqlLog.some((q) => q.includes('UPDATE subscriptions SET card_last_four'))).toBe(true);
+  });
+
+  it('reusa o endereço guardado ao trocar o cartão', async () => {
+    route('FROM subscriptions WHERE id', { rows: [subRow] });
+    route('billing_address FROM members', {
+      rows: [{
+        billing_address: {
+          cep: '22011001',
+          street: 'Rua Barata Ribeiro',
+          number: '181',
+          neighborhood: 'Copacabana',
+          city: 'Rio de Janeiro',
+          state: 'RJ',
+        },
+      }],
+    });
+
+    await updatePaymentMethod('sub_psub1', 'token_saved');
+
+    expect(pagarmeCreateCardMock).toHaveBeenCalledWith(
+      'cus_pagarme_1',
+      'token_saved',
+      expect.objectContaining({ zip_code: '22011001', country: 'BR' }),
+    );
   });
 
   /** The token is a card credential, single-use or not: it never reaches a log. */

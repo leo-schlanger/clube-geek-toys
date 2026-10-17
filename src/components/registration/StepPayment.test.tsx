@@ -130,12 +130,23 @@ import { StepPayment } from './StepPayment'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+const completeAddress = {
+  cep: '22011-001',
+  street: 'Rua Barata Ribeiro',
+  number: '181',
+  complement: 'Loja J',
+  neighborhood: 'Copacabana',
+  city: 'Rio de Janeiro',
+  state: 'RJ',
+}
+
 const defaultProps = {
   plan: 'club' as const,
   paymentType: 'annual' as const,
   memberId: 'member-123',
   memberEmail: 'test@example.com',
   memberName: 'Test User',
+  initialAddress: completeAddress,
   onSuccess: vi.fn(),
   onBack: vi.fn(),
 }
@@ -178,6 +189,7 @@ describe('StepPayment', () => {
 
     expect(screen.getByRole('button', { name: /pix.*qr code/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^cartao.*credito$/i })).toBeInTheDocument()
+    expect(screen.getByText('Endereço de cobrança')).toBeInTheDocument()
   })
 
   it('renders back button', () => {
@@ -212,6 +224,20 @@ describe('StepPayment', () => {
     expect(screen.queryByRole('button', { name: /pix.*qr code/i })).not.toBeInTheDocument()
   })
 
+  it('does not start PIX or the card form without an address', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    render(<StepPayment {...defaultProps} initialAddress={null} />)
+
+    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
+    expect(mockGeneratePixPayment).not.toHaveBeenCalled()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Informe o CEP.')
+
+    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
+    expect(mockApiPost).not.toHaveBeenCalled()
+  })
+
   // ── PIX flow ──────────────────────────────────────────────────────────
 
   it('generates PIX payment and shows QR code', async () => {
@@ -235,6 +261,13 @@ describe('StepPayment', () => {
     })
 
     expect(mockSavePendingPayment).toHaveBeenCalled()
+    expect(mockGeneratePixPayment).toHaveBeenCalledWith(
+      159.9,
+      expect.any(String),
+      'test@example.com',
+      'member-123',
+      expect.objectContaining({ cep: '22011001', street: 'Rua Barata Ribeiro', state: 'RJ' }),
+    )
   })
 
   it('shows error when PIX generation fails', async () => {
@@ -296,7 +329,10 @@ describe('StepPayment', () => {
     await waitFor(() => {
       expect(mockApiPost).toHaveBeenCalledWith(
         '/checkout/card/create',
-        expect.objectContaining({ card_token: 'token_abc' })
+        expect.objectContaining({
+          card_token: 'token_abc',
+          billing_address: expect.objectContaining({ cep: '22011001', state: 'RJ' }),
+        })
       )
     })
     await waitFor(() => expect(defaultProps.onSuccess).toHaveBeenCalledTimes(1))
@@ -346,6 +382,7 @@ describe('StepPayment', () => {
       expect.any(String),
       defaultProps.memberEmail,
       defaultProps.memberId,
+      expect.objectContaining({ cep: '22011001', state: 'RJ' }),
     )
   })
 

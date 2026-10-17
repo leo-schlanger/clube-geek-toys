@@ -6,6 +6,7 @@ import { validate } from '../middleware/validate.js';
 import { z } from 'zod';
 import * as subscriptionService from '../services/subscription.service.js';
 import { query } from '../config/database.js';
+import { billingAddressSchema } from '../utils/billing-address.js';
 
 export const subscriptionRouter = Router();
 subscriptionRouter.use(authenticate);
@@ -22,6 +23,7 @@ const createSchema = z.object({
   /** Optional for backwards compat — server always uses CLUB_PLAN_PRICE. */
   transaction_amount: z.number().positive().optional(),
   card_token: z.string().min(1).max(200),
+  billing_address: billingAddressSchema,
 });
 
 // POST /subscription/create

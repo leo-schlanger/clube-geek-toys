@@ -10,6 +10,13 @@ import { AppError } from '../middleware/error-handler.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { isValidCnpj } from '../utils/cnpj.js';
 import { CLUB_PLAN_PRICE, CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
+import {
+  SAVE_MEMBER_BILLING_ADDRESS_SQL,
+  billingAddressJson,
+  requireBillingAddress,
+  toPagarmeAddress,
+  type BillingAddress,
+} from '../utils/billing-address.js';
 import { auditLog } from '../utils/audit.js';
 import { revokeRefundedPeriod } from './club-access.service.js';
 import { cancelSubscription } from './subscription.service.js';
@@ -204,7 +211,10 @@ async function loadClubPayer(memberId: string): Promise<ClubPayer> {
 }
 
 /** The customer block Pagar.me wants, built from a member row. */
-function payerToPagarmeCustomer(payer: ClubPayer): pagarme.PagarmeCustomerInput {
+function payerToPagarmeCustomer(
+  payer: ClubPayer,
+  address: pagarme.PagarmeCustomerInput['address'],
+): pagarme.PagarmeCustomerInput {
   const phone = pagarme.parseBrazilianPhone(payer.phone);
   return {
     name: payer.fullName,
@@ -212,8 +222,17 @@ function payerToPagarmeCustomer(payer: ClubPayer): pagarme.PagarmeCustomerInput 
     document: payer.document,
     code: payer.id,
     phones: phone ? { mobile_phone: phone } : undefined,
+    address,
     metadata: { memberId: payer.id },
   };
+}
+
+/**
+ * Keep the address even if the issuer later refuses the card. The next attempt
+ * can prefill it, and a customer created on this call already carries it.
+ */
+async function rememberBillingAddress(memberId: string, address: BillingAddress): Promise<void> {
+  await query(SAVE_MEMBER_BILLING_ADDRESS_SQL, [billingAddressJson(address), memberId]);
 }
 
 /** Pull the PIX transaction out of a created order, or explain why there isn't one. */
@@ -263,19 +282,35 @@ export async function createPixPayment(data: {
   description: string;
   payerEmail: string;
   memberId: string;
+  billingAddress?: unknown;
 }): Promise<{
   paymentId: string;
   pixData: PixQRData;
 }> {
   validateAmount(data.amount);
   const payer = await loadClubPayer(data.memberId);
+  // After the member and the CPF: a bad amount or a missing document must
+  // still be that error, not "address required".
+  const address = requireBillingAddress(data.billingAddress);
+  const pagarmeAddress = toPagarmeAddress(address);
+  if (!pagarmeAddress) {
+    throw new AppError(400, 'Informe o endereço de cobrança.', 'BILLING_ADDRESS_REQUIRED');
+  }
+  await rememberBillingAddress(payer.id, address);
+  // PIX stays an inline customer. If this member already has a Pagar.me
+  // customer (a refused card created one), put the address on it too so the
+  // next card sees it. A failed update must not issue a code against a
+  // customer we know is incomplete.
+  if (payer.pagarmeCustomerId) {
+    await pagarme.updateCustomer(payer.pagarmeCustomerId, { address: pagarmeAddress });
+  }
   const amountInCents = pagarme.toCents(data.amount);
 
   const paymentId = crypto.randomUUID();
   const order = await pagarme.createOrder(
     {
       code: paymentId,
-      customer: payerToPagarmeCustomer(payer),
+      customer: payerToPagarmeCustomer(payer, pagarmeAddress),
       items: [
         {
           amount: amountInCents,
@@ -555,6 +590,7 @@ export async function createCardPayment(data: {
   cardToken: string;
   /** Ignored: the club plan is charged in full. */
   installments?: number;
+  billingAddress?: unknown;
 }): Promise<{
   paymentId: string;
   chargeId: string;
@@ -570,6 +606,13 @@ export async function createCardPayment(data: {
   }
 
   const payer = await loadClubPayer(data.memberId);
+  const address = requireBillingAddress(data.billingAddress);
+  const pagarmeAddress = toPagarmeAddress(address);
+  if (!pagarmeAddress) {
+    throw new AppError(400, 'Informe o endereço de cobrança.', 'BILLING_ADDRESS_REQUIRED');
+  }
+  // Before the provider, so a 412 still leaves the address for the next try.
+  await rememberBillingAddress(payer.id, address);
   const amountInCents = pagarme.toCents(data.amount);
   // The club plan is sold in full only (business decision); the form hides the
   // selector, and a crafted request asking for more is held to one.
@@ -577,6 +620,7 @@ export async function createCardPayment(data: {
 
   // PSP bills a saved card, not a raw token: the token becomes a `card_id` on
   // the member's Pagar.me customer first. See `createCardForCustomer`.
+  // An existing customer is updated with this address before the card is saved.
   const customerId = await pagarme.getOrCreatePagarmeCustomer({
     id: payer.id,
     email: payer.email,
@@ -584,10 +628,11 @@ export async function createCardPayment(data: {
     document: payer.document,
     phone: payer.phone,
     pagarmeCustomerId: payer.pagarmeCustomerId,
+    address: pagarmeAddress,
   });
   let savedCard: Awaited<ReturnType<typeof pagarme.createCardForCustomer>>;
   try {
-    savedCard = await pagarme.createCardForCustomer(customerId, data.cardToken);
+    savedCard = await pagarme.createCardForCustomer(customerId, data.cardToken, pagarmeAddress);
   } catch (err) {
     // The issuer refusing to save the card (412) is a refusal like a declined
     // charge, but it happens before any charge exists — so without this the

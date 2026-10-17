@@ -15,6 +15,13 @@ import {
   CLUB_PLAN_INTERVAL,
 } from '../types/index.js';
 import { moduleLogger } from '../config/logger.js';
+import {
+  SAVE_MEMBER_BILLING_ADDRESS_SQL,
+  billingAddressJson,
+  readStoredBillingAddress,
+  requireBillingAddress,
+  toPagarmeAddress,
+} from '../utils/billing-address.js';
 
 const log = moduleLogger('subscription');
 
@@ -31,6 +38,7 @@ interface CreateSubscriptionData {
   transaction_amount?: number;
   /** Pagar.me card token, produced in the browser with the public key. */
   card_token: string;
+  billing_address?: unknown;
 }
 
 interface SubscriptionRow {
@@ -130,7 +138,15 @@ export async function createSubscription(data: CreateSubscriptionData) {
     );
   }
 
-  // 2. Pagar.me customer, created once and reused.
+  const address = requireBillingAddress(data.billing_address);
+  const pagarmeAddress = toPagarmeAddress(address);
+  if (!pagarmeAddress) {
+    throw new AppError(400, 'Informe o endereço de cobrança.', 'BILLING_ADDRESS_REQUIRED');
+  }
+  await query(SAVE_MEMBER_BILLING_ADDRESS_SQL, [billingAddressJson(address), member.id]);
+
+  // 2. Pagar.me customer, created once and reused. An id already on the member
+  //    is updated with this address before the card is saved.
   const customerId = await pagarme.getOrCreatePagarmeCustomer({
     id: member.id,
     email: data.payer_email || member.email,
@@ -138,6 +154,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
     document,
     phone: member.phone,
     pagarmeCustomerId: member.pagarme_customer_id,
+    address: pagarmeAddress,
   });
 
   // 3. Amount and interval are locked to the club plan server-side. Trusting
@@ -153,7 +170,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
   // the browser token. See `createCardForCustomer`.
   let savedCard: Awaited<ReturnType<typeof pagarme.createCardForCustomer>>;
   try {
-    savedCard = await pagarme.createCardForCustomer(customerId, data.card_token);
+    savedCard = await pagarme.createCardForCustomer(customerId, data.card_token, pagarmeAddress);
   } catch (err) {
     // Issuer refused to save the card (412): nothing was charged, but the team
     // has to hear of it, or the member is left alone on the form.
@@ -539,7 +556,13 @@ export async function updatePaymentMethod(subscriptionId: string, token: string)
         'PAGARME_SUBSCRIPTION_NO_CUSTOMER',
       );
     }
-    const savedCard = await pagarme.createCardForCustomer(customerId, token);
+    // A swap has no form of its own. Use the address already stored; if there
+    // isn't one, save the card the way this call always did (two arguments).
+    const stored = await query('SELECT billing_address FROM members WHERE id = $1', [sub.member_id]);
+    const pagarmeAddress = toPagarmeAddress(readStoredBillingAddress(stored.rows[0]?.billing_address) ?? {});
+    const savedCard = pagarmeAddress
+      ? await pagarme.createCardForCustomer(customerId, token, pagarmeAddress)
+      : await pagarme.createCardForCustomer(customerId, token);
     const updated = await pagarme.updateSubscriptionCard(sub.provider_id, savedCard.id);
     cardBrand = updated.card?.brand ?? savedCard.brand ?? null;
     cardLastFour = updated.card?.last_four_digits ?? savedCard.last_four_digits ?? null;

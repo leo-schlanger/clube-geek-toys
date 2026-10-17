@@ -530,6 +530,14 @@ export async function getCustomer(id: string) {
   return request<{ id: string; email?: string; name?: string }>('GET', `/customers/${id}`);
 }
 
+/** Patch a customer that was created before we had a billing address. */
+export async function updateCustomer(
+  id: string,
+  patch: { address?: PagarmeCustomerInput['address'] },
+): Promise<{ id: string }> {
+  return request<{ id: string }>('PUT', `/customers/${id}`, patch);
+}
+
 /**
  * The member's Pagar.me customer id, created on first use.
  *
@@ -543,8 +551,15 @@ export async function getOrCreatePagarmeCustomer(member: {
   document: string;
   phone?: string | null;
   pagarmeCustomerId?: string | null;
+  /** Sent on create, and PUT onto a customer that was saved without one. */
+  address?: PagarmeCustomerInput['address'];
 }): Promise<string> {
-  if (member.pagarmeCustomerId) return member.pagarmeCustomerId;
+  if (member.pagarmeCustomerId) {
+    if (member.address) {
+      await updateCustomer(member.pagarmeCustomerId, { address: member.address });
+    }
+    return member.pagarmeCustomerId;
+  }
 
   const phone = parseBrazilianPhone(member.phone);
   const customer = await createCustomer({
@@ -553,6 +568,7 @@ export async function getOrCreatePagarmeCustomer(member: {
     document: member.document,
     code: member.id,
     phones: phone ? { mobile_phone: phone } : undefined,
+    address: member.address,
     metadata: { memberId: member.id },
   });
 
