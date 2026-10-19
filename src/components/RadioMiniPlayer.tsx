@@ -366,7 +366,9 @@ export default function RadioMiniPlayer() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
               transition={{ duration: 0.2 }}
-              className="pointer-events-auto flex items-center gap-2 px-3 py-2.5 glass rounded-full border border-primary/40 shadow-lg shadow-black/30 hover:border-primary/80 hover:shadow-primary/20 transition-all group"
+              // Icon only on a phone: with the label, the pill sat over the
+              // "Quero ser membro" button and the calculator text.
+              className="pointer-events-auto flex items-center gap-2 p-1.5 sm:px-3 sm:py-2.5 glass rounded-full border border-primary/40 shadow-lg shadow-black/30 hover:border-primary/80 hover:shadow-primary/20 transition-all group"
               aria-label="Abrir player da rádio"
             >
               <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-linear-to-r/srgb from-primary to-accent text-primary-foreground shadow-md">
@@ -382,7 +384,7 @@ export default function RadioMiniPlayer() {
                   </span>
                 )}
               </span>
-              <span className="flex flex-col items-start pr-1">
+              <span className="hidden sm:flex flex-col items-start pr-1">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-primary leading-none">
                   Rádio
                 </span>

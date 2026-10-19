@@ -134,12 +134,12 @@ describe('Members API client', () => {
   // ---- isCPFRegistered ----
 
   describe('isCPFRegistered', () => {
-    it('should call GET /members/cpf-exists/:cpf with skipAuth', async () => {
+    it('should call GET /members/cpf-exists/:cpf with the session', async () => {
       mockedApi.get.mockResolvedValue({ data: { exists: true }, status: 200 })
 
       const result = await isCPFRegistered('529.982.247-25')
 
-      expect(mockedApi.get).toHaveBeenCalledWith('/members/cpf-exists/52998224725', { skipAuth: true })
+      expect(mockedApi.get).toHaveBeenCalledWith('/members/cpf-exists/52998224725')
       expect(result).toBe(true)
     })
 

@@ -13,10 +13,11 @@ export const memberRouter = Router();
 
 const MEMBER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Public endpoint: check if CPF is already registered (used during registration).
-// Returns only { exists: boolean } — never exposes member data.
-// Uses its own rate limiter to avoid starving the auth endpoints.
-memberRouter.get('/cpf-exists/:cpf', cpfLookupLimiter, async (req, res, next) => {
+// Is this CPF already a member? Asked by the signup form, which only reaches the
+// CPF step after the account exists — so it needs a session. Open to anyone, it
+// told a stranger whether a given CPF belongs to a member.
+// Returns only { exists: boolean } and keeps its own rate limiter.
+memberRouter.get('/cpf-exists/:cpf', authenticate, cpfLookupLimiter, async (req, res, next) => {
   try {
     const cpf = (req.params.cpf as string).replace(/\D/g, '');
     if (cpf.length !== 11 || !isValidCPF(cpf)) {

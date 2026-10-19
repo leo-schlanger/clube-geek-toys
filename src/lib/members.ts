@@ -31,11 +31,12 @@ export async function verifyMemberCard(id: string): Promise<MemberCardPublic | n
 }
 
 /**
- * Uses a public endpoint that does not require authentication.
+ * Needs the session the signup creates first: the endpoint stopped answering
+ * anonymous callers, who could probe whether a CPF belongs to a member.
  */
 export async function isCPFRegistered(cpf: string): Promise<boolean> {
   const cleanCpf = cpf.replace(/\D/g, '')
-  const result = await api.get<{ exists: boolean }>(`/members/cpf-exists/${cleanCpf}`, { skipAuth: true })
+  const result = await api.get<{ exists: boolean }>(`/members/cpf-exists/${cleanCpf}`)
   return result.data?.exists ?? false
 }
 

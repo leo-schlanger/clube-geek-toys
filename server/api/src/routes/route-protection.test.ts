@@ -273,10 +273,6 @@ const PUBLIC = new Set([
 
   // ── Clube ──
   'GET /members/verify/:id', // QR da carteirinha, lido pela câmera na porta
-  // Devolve só `{exists: boolean}` e passa pelo cpfLookupLimiter (10 em 15 min por IP). É o que
-  // permite avisar "CPF já cadastrado" antes de criar a conta; em troca, aceita
-  // que dá para sondar se um CPF é membro. Trade-off registrado, não descuido.
-  'GET /members/cpf-exists/:cpf',
 ]);
 
 /**

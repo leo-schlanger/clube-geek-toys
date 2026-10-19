@@ -45,10 +45,16 @@ beforeEach(() => vi.clearAllMocks());
 describe('public', () => {
   it('says only whether a CPF exists, and refuses an invalid one', async () => {
     members.getMemberByCpf.mockResolvedValueOnce(own).mockResolvedValueOnce(null);
-    expect((await api.get('/cpf-exists/529.982.247-25')).body).toEqual({ exists: true });
-    expect((await api.get(`/cpf-exists/${CPF}`)).body).toEqual({ exists: false });
-    expect((await api.get('/cpf-exists/11111111111')).status).toBe(400);
-    expect((await api.get('/cpf-exists/123')).status).toBe(400);
+    expect((await api.get('/cpf-exists/529.982.247-25', { as: 'member' })).body).toEqual({ exists: true });
+    expect((await api.get(`/cpf-exists/${CPF}`, { as: 'member' })).body).toEqual({ exists: false });
+    expect((await api.get('/cpf-exists/11111111111', { as: 'member' })).status).toBe(400);
+    expect((await api.get('/cpf-exists/123', { as: 'member' })).status).toBe(400);
+  });
+
+  // Anonymous, it answered whether any CPF belongs to a member.
+  it('does not tell a stranger whether a CPF is a member', async () => {
+    expect((await api.get(`/cpf-exists/${CPF}`)).status).toBe(401);
+    expect(members.getMemberByCpf).not.toHaveBeenCalled();
   });
 
   it('checks a card without exposing personal data', async () => {

@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 export const defaultLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -54,9 +54,12 @@ export const contractUploadLimiter = rateLimit({
 
 // "CPF já cadastrado?" answers whether a CPF is a member. Registration asks it
 // once or twice per attempt; a tight window keeps it from being a lookup service.
+// Counted per account (it runs after `authenticate`), so rotating IPs does not
+// buy more lookups; per IP only as a fallback.
 export const cpfLookupLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  keyGenerator: (req) => req.user?.userId ?? ipKeyGenerator(req.ip ?? ''),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Muitas consultas de CPF. Aguarde alguns minutos.' },
