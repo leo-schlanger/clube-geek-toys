@@ -139,7 +139,12 @@ idade:
 | `backup_weekly`                                   | 8 dias          |
 | `restore_drill`                                   | 32 dias         |
 
-`stale: null` = ainda não rodou desde que o mecanismo existe (não é alarme).
+`stale: null` = ainda não rodou desde que o mecanismo existe — mas só até a
+data em que a primeira execução era devida (`FIRST_RUN_DUE` em
+`health.routes.ts`). Depois dela, nunca ter rodado conta como `stale: true`:
+o `restore_drill` passou e não deixou registro em 01/10/2026 (o `job_ok` só
+existe desde 02/10), e um drill que **nunca** rodasse nunca seria sinalizado.
+Para ele a data é 02/11/2026.
 Isso resolve o caso que nenhum alerta de falha pega: **o cron que parou de
 rodar** (crontab apagado, script quebrado) não falha — ele simplesmente some.
 O `status` geral do `/health` ignora `jobs` de propósito: o deploy lê o
@@ -156,12 +161,25 @@ Arquivos em `server/ops/`, instalados à mão (ver `DEPLOY.md` §11):
   `/wp-admin`…) banem o IP por um dia. Lê o log JSON do nginx no journald, e
   bane na chain `DOCKER-USER` — a `INPUT` padrão não pega tráfego para porta
   publicada de container. A rádio (AzuraCast, que é PHP) fica de fora.
+  `ignoreip = 127.0.0.1/8 ::1 172.16.0.0/12` (19/10/2026): um teste feito de
+  dentro da VPS baniu o gateway do Docker (`172.19.0.1`), o que corta o que o
+  host faz contra os containers — health check e crons. O nginx recebe o IP
+  real do cliente, então ignorar a rede do Docker não abre buraco. **Cuidado ao
+  testar de fora:** três pedidos a `/.env` ou `/.git/` banem o seu IP por um dia.
 - **nginx**: `server_tokens off`; limite de 20 req/s por IP com rajada de 120
   (`limit_req`, folgado de propósito: uma página carrega dezenas de arquivos, e
   operadora de celular põe muita gente atrás de um IP só); `X-XSS-Protection: 0`
   (recomendação atual do OWASP).
 - **API**: corpo JSON limitado a 1 MB (15 MB só em `/contracts` e `/email`, que
   carregam assinatura e PDF).
+
+### Ruído que não é nosso
+
+`log.routes.ts` descarta, além dos robôs (`isCrawlerReport`), o erro de script
+alheio (`isForeignNoise`): `Rejected` com `ServiceWorkerContainer.register` no
+stack (extensão ou antivírus que embrulha o `register`) e
+`window.webkit.messageHandlers` (navegador interno do Instagram no iOS). O
+service worker agora é registrado por `src/lib/register-sw.ts`, com `.catch`.
 
 ## 6. Login
 
