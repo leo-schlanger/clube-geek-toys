@@ -33,7 +33,7 @@ const schema = z
     password: z
       .string()
       .min(PASSWORD_MIN_LENGTH, `Senha deve ter pelo menos ${PASSWORD_MIN_LENGTH} caracteres`)
-      .refine((v) => /[A-Z]/.test(v), 'Deve conter 1 letra maiuscula')
+      .refine((v) => /[A-Z]/.test(v), 'Deve conter 1 letra maiúscula')
       .refine((v) => /[0-9]/.test(v), 'Deve conter 1 número'),
     confirmPassword: z.string(),
   })
@@ -74,7 +74,7 @@ interface PasswordRule {
 
 const passwordRules: PasswordRule[] = [
   { label: `Pelo menos ${PASSWORD_MIN_LENGTH} caracteres`, test: (v) => v.length >= PASSWORD_MIN_LENGTH },
-  { label: 'Uma letra maiuscula', test: (v) => /[A-Z]/.test(v) },
+  { label: 'Uma letra maiúscula', test: (v) => /[A-Z]/.test(v) },
   { label: 'Um número', test: (v) => /[0-9]/.test(v) },
   { label: 'Um caractere especial (opcional)', test: (v) => /[^A-Za-z0-9]/.test(v), optional: true },
 ]

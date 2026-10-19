@@ -179,7 +179,7 @@ describe('StepAccount', () => {
       await user.type(passwordInput, 'a')
 
       expect(screen.getByText(/pelo menos 8 caracteres/i)).toBeInTheDocument()
-      expect(screen.getByText(/uma letra maiuscula/i)).toBeInTheDocument()
+      expect(screen.getByText(/uma letra maiúscula/i)).toBeInTheDocument()
       expect(screen.getByText(/um número/i)).toBeInTheDocument()
       expect(screen.getByText(/um caractere especial/i)).toBeInTheDocument()
     })
@@ -195,7 +195,7 @@ describe('StepAccount', () => {
       const minLengthItem = screen.getByText(/pelo menos 8 caracteres/i)
       expect(minLengthItem.className).toContain('green')
 
-      const uppercaseItem = screen.getByText(/uma letra maiuscula/i)
+      const uppercaseItem = screen.getByText(/uma letra maiúscula/i)
       expect(uppercaseItem.className).toContain('green')
 
       const numberItem = screen.getByText(/um número/i)
@@ -213,7 +213,7 @@ describe('StepAccount', () => {
       const minLengthItem = screen.getByText(/pelo menos 8 caracteres/i)
       expect(minLengthItem.className).toContain('red')
 
-      const uppercaseItem = screen.getByText(/uma letra maiuscula/i)
+      const uppercaseItem = screen.getByText(/uma letra maiúscula/i)
       expect(uppercaseItem.className).toContain('red')
 
       const numberItem = screen.getByText(/um número/i)
@@ -456,7 +456,7 @@ describe('StepAccount', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/1 letra maiuscula/i)
+          screen.getByText(/1 letra maiúscula/i)
         ).toBeInTheDocument()
       })
 

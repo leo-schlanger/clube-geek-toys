@@ -481,7 +481,7 @@ export default function Register() {
           <Card className="border-red-500/50 bg-red-500/10">
             <CardContent className="p-6 text-center space-y-3">
               <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
-              <p className="text-sm font-medium">Dados do membro nao encontrados.</p>
+              <p className="text-sm font-medium">Dados do membro não encontrados.</p>
               <p className="text-xs text-muted-foreground">Por favor, volte e preencha seus dados novamente.</p>
               <Button variant="outline" onClick={() => { setStep(1); setAccountCreated(true) }}>
                 <ArrowLeft className="h-4 w-4" /> Voltar para dados
