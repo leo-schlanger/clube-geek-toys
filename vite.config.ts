@@ -9,6 +9,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registered by src/lib/register-sw.ts, which catches a refused register().
+      injectRegister: false,
       includeAssets: ['logo.jpg', 'favicon.ico', 'favicon-32.png', 'favicon-180.png'],
       manifest: {
         name: 'Clube GeekPop & Toys',
@@ -50,6 +52,20 @@ export default defineConfig({
         // including 4G users who only wanted a product. Photos are content,
         // not app shell — runtimeCaching, on demand.
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+        // Staff-only chunks stay out of the precache: exceljs, pdf-lib, the QR
+        // scanner and the admin tabs are ~2.3 MB that every shop visitor's
+        // phone used to download. The panel still loads them on demand.
+        globIgnores: [
+          '**/node_modules/**',
+          '**/assets/report-*.js',
+          '**/assets/PDFButton-*.js',
+          '**/assets/TicketCheckIn-*.js',
+          '**/assets/AdminDashboard-*.js',
+          '**/assets/*Tab-*.js',
+          '**/assets/PDV-*.js',
+          '**/assets/ActionCenter-*.js',
+          '**/assets/RealtimeMetrics-*.js',
+        ],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2MB max per file
         runtimeCaching: [
           {

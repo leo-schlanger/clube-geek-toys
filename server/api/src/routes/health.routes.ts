@@ -11,8 +11,10 @@ export const healthRouter = Router();
 
 /**
  * Host cron jobs and how old their last success may get before it is news.
- * Written by `scripts/job-status.sh` (`job_ok`); a job with no row yet has
- * never reported — `stale: null`, not an alarm, until its first run.
+ * Written by `scripts/job-status.sh` (`job_ok`). A job with no row yet has
+ * never reported: `stale: null` until its first run is due (`FIRST_RUN_DUE`),
+ * `stale: true` after — a cron that never runs does not fail, it just stays
+ * silent, and `null` was never an alarm.
  */
 const JOB_MAX_AGE_HOURS: Record<string, number> = {
   backup_daily: 26,
@@ -20,6 +22,16 @@ const JOB_MAX_AGE_HOURS: Record<string, number> = {
   offsite_uploads: 26,
   backup_weekly: 8 * 24 + 2,
   restore_drill: 32 * 24,
+};
+
+/** When each job's first `job_ok` was due (the mechanism exists since 02/10/2026). */
+const FIRST_RUN_DUE: Record<string, string> = {
+  backup_daily: '2026-10-04T00:00:00Z',
+  offsite_dump: '2026-10-04T00:00:00Z',
+  offsite_uploads: '2026-10-04T00:00:00Z',
+  backup_weekly: '2026-10-12T00:00:00Z',
+  // The drill runs on the 1st (05:00 UTC); its October run predates job_ok.
+  restore_drill: '2026-11-02T00:00:00Z',
 };
 
 async function jobHeartbeats(): Promise<Record<string, { lastOk: string | null; stale: boolean | null }>> {
@@ -32,7 +44,11 @@ async function jobHeartbeats(): Promise<Record<string, { lastOk: string | null; 
     const at = seen.get(job) ?? null;
     out[job] = {
       lastOk: at,
-      stale: at ? Date.now() - new Date(at).getTime() > maxHours * 3600 * 1000 : null,
+      stale: at
+        ? Date.now() - new Date(at).getTime() > maxHours * 3600 * 1000
+        : Date.now() > new Date(FIRST_RUN_DUE[job]).getTime()
+          ? true
+          : null,
     };
   }
   return out;

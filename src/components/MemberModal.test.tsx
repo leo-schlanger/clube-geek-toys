@@ -26,6 +26,9 @@ vi.mock('../lib/members', () => ({
   activateMember: vi.fn().mockResolvedValue(true),
 }))
 
+const { openContractPdf } = vi.hoisted(() => ({ openContractPdf: vi.fn(async (..._args: unknown[]) => {}) }))
+vi.mock('../lib/contract-storage', () => ({ openContractPdf }))
+
 // Mock lib/api-client — payments returns empty array, contracts rejects (→ null)
 vi.mock('../lib/api-client', () => ({
   api: {
@@ -738,10 +741,11 @@ describe('MemberModal', () => {
           return Promise.resolve({
             data: {
               id: 'contract-1',
-              status: 'signed',
-              signed_at: '2024-06-01T12:00:00Z',
-              hash: 'abc123def456ghi789jkl012mno345',
-              pdf_url: 'https://example.com/contract.pdf',
+              // The API's real shape (camelCase, status 'active').
+              status: 'active',
+              signedAt: '2024-06-01T12:00:00Z',
+              documentHash: 'abc123def456ghi789jkl012mno345',
+              pdfUrl: 'https://api.example.com/contracts/contract-1/pdf',
             },
           })
         }
@@ -771,7 +775,7 @@ describe('MemberModal', () => {
             data: {
               id: 'contract-1',
               status: 'pending',
-              signed_at: null,
+              signedAt: null,
             },
           })
         }
@@ -787,7 +791,7 @@ describe('MemberModal', () => {
 
       // "Pendente" appears in the contract status badge
       expect(await screen.findByText('Pendente')).toBeInTheDocument()
-      expect(screen.getByText('N/A')).toBeInTheDocument() // signed_at is null
+      expect(screen.getByText('N/A')).toBeInTheDocument() // signedAt is null
     })
 
     it('calls verify API and shows valid result', async () => {
@@ -800,7 +804,7 @@ describe('MemberModal', () => {
         }
         if (url.includes('/contracts')) {
           return Promise.resolve({
-            data: { id: 'contract-1', status: 'signed', signed_at: '2024-06-01T12:00:00Z' },
+            data: { id: 'contract-1', status: 'active', signedAt: '2024-06-01T12:00:00Z' },
           })
         }
         return Promise.resolve({ data: null })
@@ -829,7 +833,7 @@ describe('MemberModal', () => {
         }
         if (url.includes('/contracts')) {
           return Promise.resolve({
-            data: { id: 'contract-1', status: 'signed', signed_at: '2024-06-01T12:00:00Z' },
+            data: { id: 'contract-1', status: 'active', signedAt: '2024-06-01T12:00:00Z' },
           })
         }
         return Promise.resolve({ data: null })
@@ -848,7 +852,7 @@ describe('MemberModal', () => {
       expect(await screen.findByText('Erro ao verificar integridade')).toBeInTheDocument()
     })
 
-    it('opens PDF in new tab when download clicked', async () => {
+    it('opens the PDF through the authenticated download when clicked', async () => {
       const { api } = await import('../lib/api-client')
       const mockedApiGet = vi.mocked(api.get)
       mockedApiGet.mockImplementation((url: string) => {
@@ -857,16 +861,14 @@ describe('MemberModal', () => {
           return Promise.resolve({
             data: {
               id: 'contract-1',
-              status: 'signed',
-              signed_at: '2024-06-01T12:00:00Z',
-              pdf_url: 'https://example.com/contract.pdf',
+              status: 'active',
+              signedAt: '2024-06-01T12:00:00Z',
+              pdfUrl: 'https://api.example.com/contracts/contract-1/pdf',
             },
           })
         }
         return Promise.resolve({ data: null })
       })
-
-      const windowOpen = vi.spyOn(window, 'open').mockImplementation(() => null)
 
       const user = userEvent.setup()
       const member = makeMember()
@@ -878,8 +880,8 @@ describe('MemberModal', () => {
       const downloadBtn = await screen.findByText(/Baixar PDF/)
       await user.click(downloadBtn.closest('button')!)
 
-      expect(windowOpen).toHaveBeenCalledWith('https://example.com/contract.pdf', '_blank')
-      windowOpen.mockRestore()
+      // The file sits behind login: a bare window.open of the URL would 401.
+      expect(openContractPdf).toHaveBeenCalledWith('https://api.example.com/contracts/contract-1/pdf')
     })
   })
 

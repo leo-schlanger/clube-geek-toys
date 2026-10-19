@@ -7,6 +7,7 @@
 
 import { api } from './api-client'
 import { logger } from './logger'
+import { fetchContractPdf } from './contract-storage'
 
 export interface EmailResponse {
   success: boolean
@@ -158,17 +159,19 @@ export async function sendContractEmail(
 }
 
 /**
- * Resend contract email by downloading PDF from URL
+ * Resend contract email: download the stored PDF (with the session) and send it again
  */
 export async function resendContractEmail(
   email: string, memberName: string, plan: string, signedAt: string,
   hash: string, pdfUrl: string
 ): Promise<EmailResponse> {
   try {
-    const pdfResponse = await fetch(pdfUrl)
-    if (!pdfResponse.ok) return { success: false, error: 'Não foi possível baixar o contrato' }
-
-    const pdfArrayBuffer = await pdfResponse.arrayBuffer()
+    let pdfArrayBuffer: ArrayBuffer
+    try {
+      pdfArrayBuffer = await (await fetchContractPdf(pdfUrl)).arrayBuffer()
+    } catch {
+      return { success: false, error: 'Não foi possível baixar o contrato' }
+    }
     const pdfBytes = new Uint8Array(pdfArrayBuffer)
     let binary = ''
     for (let i = 0; i < pdfBytes.length; i++) {

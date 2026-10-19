@@ -11,6 +11,10 @@ export const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  // A runaway query is cancelled by Postgres instead of holding a connection
+  // (and the request) forever. The heaviest legit one, a 3-year finance report,
+  // takes under 1 s; backups use pg_dump, not this pool.
+  statement_timeout: 30_000,
 });
 
 pool.on('error', (err) => {

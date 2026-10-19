@@ -58,6 +58,8 @@ export function ContractModal({
   const [signatureImage, setSignatureImage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  // Local copy for the download link: the stored PDF is behind login.
+  const signedPdfRef = useRef<Uint8Array | null>(null)
   const [canvasReady, setCanvasReady] = useState(false)
   const [canvasError, setCanvasError] = useState(false)
   const [scrolledToBottom, setScrolledToBottom] = useState(false)
@@ -282,6 +284,7 @@ export function ContractModal({
         return
       }
 
+      signedPdfRef.current = pdfBytes
       setPdfUrl(url)
       contractData.pdfUrl = url
 
@@ -566,9 +569,13 @@ export function ContractModal({
                 </p>
 
                 {pdfUrl && (
-                  <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 text-primary text-sm hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => signedPdfRef.current && downloadPDF(signedPdfRef.current, 'contrato-assinado.pdf')}
+                    className="flex w-full items-center justify-center gap-2 text-primary text-sm hover:underline"
+                  >
                     <Download className="h-4 w-4" /> Baixar contrato assinado
-                  </a>
+                  </button>
                 )}
               </div>
             )}

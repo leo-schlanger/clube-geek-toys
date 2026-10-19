@@ -107,15 +107,63 @@ describe('upload', () => {
   it("refuses another member's contract, bad fields and a non-PDF type", async () => {
     db({ owner: 'user-other' });
     expect((await api.post('/', { as: 'member', form: contractForm(MEMBER, [PDF, 'c.pdf', 'application/pdf']) })).status).toBe(403);
+    // Nothing reaches the volume for a member the caller does not own.
+    expect(fs.readdirSync(tmpRoot).filter((f) => f !== 'kept.pdf')).toHaveLength(0);
 
     db();
-    const bad = contractForm(MEMBER);
+    const bad = contractForm(MEMBER, [PDF, 'c.pdf', 'application/pdf']);
     bad.set('memberEmail', 'nope');
     expect((await api.post('/', { as: 'member', form: bad })).status).toBe(400);
+    expect(onDisk()).toHaveLength(0);
 
     const png = await api.post('/', { as: 'member', form: contractForm(MEMBER, [PDF, 'c.png', 'image/png']) });
     expect(png.status).toBe(400);
     expect(png.body.code).toBe('INVALID_FILE_TYPE');
+  });
+
+  it('removes the file when saving the row fails', async () => {
+    db();
+    contracts.saveContract.mockRejectedValue(new Error('db down'));
+    const res = await api.post('/', { as: 'member', form: contractForm(MEMBER, [PDF, 'c.pdf', 'application/pdf']) });
+    expect(res.status).toBe(500);
+    expect(onDisk()).toHaveLength(0);
+  });
+});
+
+describe('PDF download', () => {
+  const stored = () => {
+    fs.mkdirSync(path.join(tmpRoot, MEMBER), { recursive: true });
+    const p = path.join(tmpRoot, MEMBER, 'contract_1.pdf');
+    fs.writeFileSync(p, PDF);
+    return p;
+  };
+
+  it('streams the PDF to its member and to staff, privately', async () => {
+    db({ contract: { id: 'c1', member_id: MEMBER, pdf_path: stored() } });
+    const res = await api.get('/c1/pdf', { as: 'member' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+    expect((await api.get('/c1/pdf', { as: 'admin' })).status).toBe(200);
+  });
+
+  it('finds the file of an old row by its public URL', async () => {
+    stored();
+    db({ contract: { id: 'c1', member_id: MEMBER, pdf_path: null, pdf_url: `https://api.x/uploads/contracts/${MEMBER}/contract_1.pdf` } });
+    expect((await api.get('/c1/pdf', { as: 'member' })).status).toBe(200);
+  });
+
+  it("refuses a login-less caller, someone else's contract and a path outside the member's folder", async () => {
+    expect((await api.get('/c1/pdf')).status).toBe(401);
+    db({ owner: 'user-other', contract: { id: 'c1', member_id: MEMBER, pdf_path: stored() } });
+    expect((await api.get('/c1/pdf', { as: 'member' })).status).toBe(403);
+
+    const outside = path.join(tmpRoot, 'kept.pdf');
+    fs.writeFileSync(outside, PDF);
+    db({ contract: { id: 'c1', member_id: MEMBER, pdf_path: outside } });
+    expect((await api.get('/c1/pdf', { as: 'admin' })).body.code).toBe('CONTRACT_PDF_NOT_FOUND');
+    db({ contract: null });
+    expect((await api.get('/c9/pdf', { as: 'admin' })).body.code).toBe('CONTRACT_NOT_FOUND');
   });
 });
 

@@ -33,4 +33,6 @@ export const rateLimitModule = {
   publicLookupLimiter: pass,
   paymentLimiter: pass,
   emailLimiter: pass,
+  contractUploadLimiter: pass,
+  cpfLookupLimiter: pass,
 };

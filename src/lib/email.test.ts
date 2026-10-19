@@ -17,6 +17,10 @@ vi.mock('./api-client', () => ({
   },
 }))
 
+// The stored PDF is fetched with the session (contract-storage has its own tests)
+const { fetchContractPdf } = vi.hoisted(() => ({ fetchContractPdf: vi.fn() }))
+vi.mock('./contract-storage', () => ({ fetchContractPdf }))
+
 // Mock logger
 vi.mock('./logger', () => ({
   logger: {
@@ -318,55 +322,34 @@ describe('Email API client', () => {
   // ---- resendContractEmail ----
 
   describe('resendContractEmail', () => {
-    it('should fetch PDF from URL and forward to sendContractEmail', async () => {
-      // Mock fetch for PDF download
-      const pdfBytes = new Uint8Array([80, 68, 70]) // "PDF"
-      const mockResponse = {
-        ok: true,
-        arrayBuffer: vi.fn().mockResolvedValue(pdfBytes.buffer),
-      }
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse))
+    const PDF_URL = 'https://api.example.com/contracts/c1/pdf'
 
-      // Mock API call for sendContractEmail
+    it('downloads the stored PDF with the session and forwards it to sendContractEmail', async () => {
+      const pdfBytes = new Uint8Array([80, 68, 70]) // "PDF"
+      fetchContractPdf.mockResolvedValue({ arrayBuffer: vi.fn().mockResolvedValue(pdfBytes.buffer) })
       mockedApi.post.mockResolvedValue({ data: { id: 'resent-1' }, status: 200 })
 
-      const result = await resendContractEmail(
-        'user@test.com', 'Name', 'Gold',
-        '2026-05-01', 'hash', 'https://example.com/contract.pdf'
-      )
+      const result = await resendContractEmail('user@test.com', 'Name', 'Gold', '2026-05-01', 'hash', PDF_URL)
 
-      expect(fetch).toHaveBeenCalledWith('https://example.com/contract.pdf')
+      expect(fetchContractPdf).toHaveBeenCalledWith(PDF_URL)
       expect(mockedApi.post).toHaveBeenCalledWith('/email/send-contract', expect.objectContaining({
         to: 'user@test.com',
         member_name: 'Name',
         plan: 'Gold',
         signed_at: '2026-05-01',
         hash: 'hash',
+        pdf_base64: btoa('PDF'),
       }))
       expect(result.success).toBe(true)
     })
 
-    it('should return error when PDF fetch fails', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
+    it('returns an error when the PDF cannot be downloaded', async () => {
+      fetchContractPdf.mockRejectedValue(new Error('Não foi possível baixar o contrato'))
 
-      const result = await resendContractEmail(
-        'user@test.com', 'Name', 'Gold',
-        '2026-05-01', 'hash', 'https://example.com/404.pdf'
-      )
+      const result = await resendContractEmail('user@test.com', 'Name', 'Gold', '2026-05-01', 'hash', PDF_URL)
 
       expect(result).toEqual({ success: false, error: 'Não foi possível baixar o contrato' })
       expect(mockedApi.post).not.toHaveBeenCalled()
-    })
-
-    it('should return error on fetch exception', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('DNS lookup failed')))
-
-      const result = await resendContractEmail(
-        'user@test.com', 'Name', 'Gold',
-        '2026-05-01', 'hash', 'https://bad-host/contract.pdf'
-      )
-
-      expect(result).toEqual({ success: false, error: 'Erro ao reenviar contrato' })
     })
   })
 

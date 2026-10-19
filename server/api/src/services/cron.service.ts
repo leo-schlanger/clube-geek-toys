@@ -32,6 +32,13 @@ function cronFailed(job: string, err: unknown): void {
   });
 }
 
+/**
+ * A run still going when the next tick fires is skipped, not stacked. The
+ * reconciliation waits up to 30 s per Pagar.me call; two of them at once only
+ * doubled the calls (the settle claim kept the money right).
+ */
+const NO_OVERLAP = { noOverlap: true } as const;
+
 export function initCronJobs() {
   // node-cron logs to the console by default; keep its warnings in the JSON log.
   cron.setLogger({
@@ -84,7 +91,7 @@ export function initCronJobs() {
     ).catch(err => log.error({ err }, 'Health log error'));
 
     log.info('All daily jobs completed');
-  });
+  }, NO_OVERLAP);
 
   /**
    * Every 10 minutes: catch payments the webhook never told us about.
@@ -105,7 +112,7 @@ export function initCronJobs() {
     } catch (err) {
       cronFailed('conciliação de pagamentos', err);
     }
-  });
+  }, NO_OVERLAP);
 
   /**
    * Every 15 minutes: follow the parcels whose labels were bought in the panel.
@@ -123,7 +130,7 @@ export function initCronJobs() {
     } catch (err) {
       cronFailed('sincronização de envios', err);
     }
-  });
+  }, NO_OVERLAP);
 
   // 10:00 in Rio: a customer reminder at the 03:00 daily run would read as spam.
   cron.schedule('0 13 * * *', async () => {
@@ -132,7 +139,7 @@ export function initCronJobs() {
     } catch (err) {
       cronFailed('lembrete de cadastro do clube', err);
     }
-  });
+  }, NO_OVERLAP);
 
   log.info('Scheduled daily jobs at 6:00 AM UTC');
   log.info('Scheduled payment reconciliation every 10 minutes');

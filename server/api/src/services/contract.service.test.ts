@@ -50,7 +50,8 @@ describe('saveContract', () => {
     const insert = clientQuery.mock.calls.find(([s]) => String(s).includes('INSERT INTO contracts'))!;
     const params = insert[1] as unknown[];
     expect(params[7]).not.toBe('2000-01-01T00:00:00.000Z'); // server time, not the client's
-    expect(params[11]).toBe(`https://api.geeketoys.com.br/uploads/contracts/${MEMBER}/contract_1.pdf`);
+    // The authenticated route, never the public /uploads/ folder.
+    expect(params[11]).toBe(`https://api.geeketoys.com.br/contracts/${encodeURIComponent(String(params[0]))}/pdf`);
     expect(params[13]).toBe(crypto.createHash('sha256').update(pdf).digest('hex'));
     expect(res).toMatchObject({ status: 'active', pdfUrl: params[11] });
     expect(release).toHaveBeenCalled();
@@ -77,6 +78,15 @@ describe('reading and revoking', () => {
     expect(await getActiveContract(MEMBER)).toBeNull();
     queryMock.mockResolvedValueOnce({ rows: [{ id: 'c1' }, { id: 'c0' }] });
     expect((await getContractHistory(MEMBER)).map((c) => c.id)).toEqual(['c1', 'c0']);
+  });
+
+  it('hands out the authenticated PDF route, even for rows that stored a public URL', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: 'c1', pdf_path: null, pdf_url: `https://api.geeketoys.com.br/uploads/contracts/${MEMBER}/contract_1.pdf` }],
+    });
+    expect((await getActiveContract(MEMBER))?.pdfUrl).toBe('https://api.geeketoys.com.br/contracts/c1/pdf');
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 'c2', pdf_path: null, pdf_url: null }] });
+    expect((await getActiveContract(MEMBER))?.pdfUrl).toBeNull();
   });
 
   it("revokes only the member's own active contract, with an audit row", async () => {

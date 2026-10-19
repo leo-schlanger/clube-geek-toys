@@ -136,3 +136,49 @@ export async function storeContract(
     pdfUrl: data.pdfUrl || '',
   }
 }
+
+/**
+ * Download a signed contract. The PDF sits behind login (GET /contracts/:id/pdf),
+ * so a plain link cannot open it: fetch it with the session, then hand the
+ * browser a local copy. The token only goes to our own API.
+ */
+export async function fetchContractPdf(pdfUrl: string): Promise<Blob> {
+  if (!pdfUrl.startsWith(`${API_URL}/contracts/`)) {
+    throw new Error('Endereço de contrato inválido')
+  }
+  const get = (token: string | null) =>
+    fetch(pdfUrl, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+
+  let response = await get(getAccessToken())
+  if (response.status === 401 && (await tryRefreshToken()) === 'refreshed') {
+    response = await get(getAccessToken())
+  }
+  if (!response.ok) throw new Error('Não foi possível baixar o contrato')
+  return response.blob()
+}
+
+/**
+ * Open the contract in a new tab. The tab is opened before the download so the
+ * click still counts as the user's gesture (popup blockers, iOS Safari).
+ */
+export async function openContractPdf(pdfUrl: string): Promise<void> {
+  const tab = window.open('', '_blank')
+  try {
+    const blob = await fetchContractPdf(pdfUrl)
+    const url = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))
+    if (tab) {
+      tab.location.href = url
+    } else {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'contrato.pdf'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (err) {
+    tab?.close()
+    throw err
+  }
+}

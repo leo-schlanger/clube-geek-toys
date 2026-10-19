@@ -2,6 +2,7 @@ import { env, adminUrl } from '../config/env.js';
 import { query } from '../config/database.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
+import { AppError } from '../middleware/error-handler.js';
 
 const log = moduleLogger('email');
 
@@ -23,6 +24,8 @@ function escapeHtml(str: string): string {
 }
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
+/** A hung Resend call must not hold the request (or the cron) that sent it. */
+const RESEND_TIMEOUT_MS = 15_000;
 
 const EMAIL_FAILURE_WINDOW_MS = 60 * 60 * 1000;
 const EMAIL_FAILURE_THRESHOLD = 3;
@@ -98,6 +101,7 @@ export async function sendTemplateEmail(data: {
         subject,
         html,
       }),
+      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
     });
 
     const result = await response.json() as Record<string, unknown>;
@@ -151,42 +155,46 @@ export async function sendContractEmail(data: {
     },
   ];
 
-  // Send to member
-  await fetch(RESEND_API_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: env.FROM_EMAIL,
-      to: [data.to],
-      subject,
-      html,
-      attachments,
-    }),
-  });
-
-  // Send copy to admin (use explicit admin_email or fallback to env.ADMIN_EMAIL)
-  const adminRecipient = data.admin_email || env.ADMIN_EMAIL;
-  if (adminRecipient && adminRecipient !== data.to) {
-    await fetch(RESEND_API_URL, {
+  const send = async (to: string, mailSubject: string) => {
+    const response = await fetch(RESEND_API_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: env.FROM_EMAIL,
-        to: [adminRecipient],
-        subject: `[Cópia] ${subject}`,
-        html,
-        attachments,
-      }),
-    }).catch((err) => log.error({ err }, 'Admin copy error'));
+      body: JSON.stringify({ from: env.FROM_EMAIL, to: [to], subject: mailSubject, html, attachments }),
+      signal: AbortSignal.timeout(RESEND_TIMEOUT_MS),
+    });
+    const result = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    await query(
+      `INSERT INTO email_logs (template, recipient, status, resend_id, error_message)
+       VALUES ('contract-signed', $1, $2, $3, $4)`,
+      [to, response.ok ? 'sent' : 'failed', result.id || null, response.ok ? null : JSON.stringify(result)]
+    ).catch((err) => log.error({ err }, 'Log error'));
+    if (!response.ok) throw new Error(`Resend API error: ${JSON.stringify(result)}`);
+    return result;
+  };
+
+  // Send to member. A refusal used to come back as "sent" with no trace.
+  let result: Record<string, unknown>;
+  try {
+    result = await send(data.to, subject);
+  } catch (err) {
+    log.error({ err, to: maskEmail(data.to) }, 'contract e-mail failed');
+    recordEmailFailure('contract-signed', err);
+    throw new AppError(502, 'Não foi possível enviar o contrato por e-mail. Tente novamente.', 'EMAIL_SEND_FAILED');
   }
 
-  return { status: 'sent' };
+  // Send copy to admin (use explicit admin_email or fallback to env.ADMIN_EMAIL)
+  const adminRecipient = data.admin_email || env.ADMIN_EMAIL;
+  if (adminRecipient && adminRecipient !== data.to) {
+    await send(adminRecipient, `[Cópia] ${subject}`).catch((err) => {
+      log.error({ err }, 'Admin copy error');
+      recordEmailFailure('contract-signed', err);
+    });
+  }
+
+  return { status: 'sent', id: result.id ?? null };
 }
 
 // ============================================

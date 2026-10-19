@@ -27,6 +27,20 @@ const errorLogSchema = z.object({
 const EXTENSION_STACK = /(chrome|moz|safari-web|ms-browser)-extension:\/\//i;
 
 /**
+ * Noise the page cannot act on, from scripts that are not ours:
+ *  - in-app browsers (Instagram, Facebook on iOS) inject a bridge that calls
+ *    `window.webkit.messageHandlers`, which throws on our page;
+ *  - a wrapper around `navigator.serviceWorker.register` (an extension or an
+ *    antivirus) rejects with a bare "Rejected" from the old `registerSW.js`,
+ *    which had no catch. The page now registers with one; tabs still holding
+ *    the old file keep reporting it for a while.
+ */
+export function isForeignNoise(message: string, stack: string | undefined): boolean {
+  if (message.includes('webkit.messageHandlers')) return true;
+  return message === 'Rejected' && !!stack && stack.includes('ServiceWorkerContainer.register');
+}
+
+/**
  * Errors reported by search and link crawlers rendering the SPA.
  *
  * On 27/09/2026, 135 of 163 frontend rows in ten days came from crawlers —
@@ -50,6 +64,11 @@ logRouter.post('/errors', defaultLimiter, validate(errorLogSchema), async (req, 
 
     if (isCrawlerReport(req.headers['user-agent'], stack)) {
       res.status(202).json({ logged: false, reason: 'crawler' });
+      return;
+    }
+
+    if (isForeignNoise(message, stack)) {
+      res.status(202).json({ logged: false, reason: 'foreign_script' });
       return;
     }
 

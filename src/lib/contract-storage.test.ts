@@ -35,6 +35,7 @@ import {
   getMemberContract,
   getMemberContractHistory,
   storeContract,
+  fetchContractPdf,
 } from './contract-storage'
 import { api, getAccessToken, tryRefreshToken } from './api-client'
 import type { ContractData, Contract } from '../types'
@@ -402,5 +403,40 @@ describe('storeContract', () => {
     expect(formData.get('memberName')).toBe('Joao Silva')
     expect(formData.get('plan')).toBe('silver')
     expect(formData.get('pdf')).toBeInstanceOf(Blob)
+  })
+})
+
+describe('fetchContractPdf', () => {
+  const URL_OK = 'http://localhost:3001/contracts/c1/pdf'
+
+  beforeEach(() => {
+    mockFetch.mockReset()
+    mockedGetAccessToken.mockReturnValue('tok')
+  })
+
+  it('downloads with the session token', async () => {
+    const blob = new Blob(['%PDF'])
+    mockFetch.mockResolvedValue({ ok: true, status: 200, blob: async () => blob })
+    expect(await fetchContractPdf(URL_OK)).toBe(blob)
+    expect(mockFetch).toHaveBeenCalledWith(URL_OK, { headers: { Authorization: 'Bearer tok' } })
+  })
+
+  it('refreshes once on 401, and fails on anything else', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 401 })
+      .mockResolvedValueOnce({ ok: true, status: 200, blob: async () => new Blob(['%PDF']) })
+    mockedTryRefreshToken.mockResolvedValue('refreshed')
+    await fetchContractPdf(URL_OK)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+
+    mockFetch.mockResolvedValue({ ok: false, status: 403 })
+    await expect(fetchContractPdf(URL_OK)).rejects.toThrow('Não foi possível baixar o contrato')
+  })
+
+  // The token must never travel to an address stored in a row.
+  it('refuses any address other than our own contract route', async () => {
+    await expect(fetchContractPdf('https://evil.example/contracts/c1/pdf')).rejects.toThrow()
+    await expect(fetchContractPdf('http://localhost:3001/uploads/contracts/x/contract_1.pdf')).rejects.toThrow()
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 })

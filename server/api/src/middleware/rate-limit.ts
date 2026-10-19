@@ -41,3 +41,23 @@ export const emailLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Muitas requisições de email. Aguarde 5 minutos.' },
 });
+
+// Contract upload: signing retries three times at most, and each request may
+// carry 5 MB to the uploads volume.
+export const contractUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitos envios de contrato. Aguarde alguns minutos.' },
+});
+
+// "CPF já cadastrado?" answers whether a CPF is a member. Registration asks it
+// once or twice per attempt; a tight window keeps it from being a lookup service.
+export const cpfLookupLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas consultas de CPF. Aguarde alguns minutos.' },
+});

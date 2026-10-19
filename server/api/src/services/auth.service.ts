@@ -145,6 +145,8 @@ async function verifyTurnstileToken(token: string, ip?: string): Promise<boolean
         response: token,
         ...(ip ? { remoteip: ip } : {}),
       }),
+      // Login and signup wait on this; a hung Cloudflare must not hold them.
+      signal: AbortSignal.timeout(8000),
     });
     const result = await response.json() as { success: boolean };
     return result.success;
@@ -676,7 +678,8 @@ export async function updateProfile(userId: string, data: { email?: string; curr
 export async function googleAuth(idToken: string, ip?: string, userAgent?: string) {
   // 1. Verify Google ID token via Google's tokeninfo endpoint
   const response = await fetch(
-    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
+    `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+    { signal: AbortSignal.timeout(8000) }
   );
 
   if (!response.ok) {

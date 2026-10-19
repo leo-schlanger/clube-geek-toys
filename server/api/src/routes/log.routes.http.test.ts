@@ -53,6 +53,23 @@ describe('intake', () => {
     expect(logs.createErrorLog).not.toHaveBeenCalled();
   });
 
+  it('drops errors thrown by scripts that are not ours, and keeps a real "Rejected"', async () => {
+    const insta = await api.post('/errors', {
+      body: { message: "undefined is not an object (evaluating 'window.webkit.messageHandlers')" },
+      headers: { 'User-Agent': PERSON },
+    });
+    expect(insta.body.reason).toBe('foreign_script');
+    const sw = await api.post('/errors', {
+      body: { message: 'Rejected', stack: 'Error: Rejected\n at ServiceWorkerContainer.register (<anonymous>:461:195)\n at https://adm.geeketoys.com.br/registerSW.js:1:98' },
+      headers: { 'User-Agent': PERSON },
+    });
+    expect(sw.body.reason).toBe('foreign_script');
+    expect(logs.createErrorLog).not.toHaveBeenCalled();
+
+    await api.post('/errors', { body: { message: 'Rejected', stack: 'at checkout (main.js:1:1)' }, headers: { 'User-Agent': PERSON } });
+    expect(logs.createErrorLog).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses an oversized or empty report', async () => {
     expect((await api.post('/errors', { body: { message: '' }, headers: { 'User-Agent': PERSON } })).status).toBe(400);
     expect((await api.post('/errors', { body: { message: 'x'.repeat(5001) }, headers: { 'User-Agent': PERSON } })).status).toBe(400);

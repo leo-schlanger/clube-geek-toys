@@ -5,11 +5,13 @@ import { authenticate } from '../middleware/auth.js';
 import { verifyMemberOwnership } from '../middleware/ownership.js';
 import multer from 'multer';
 import fs from 'fs';
+import path from 'path';
 import * as contractService from '../services/contract.service.js';
 import { query } from '../config/database.js';
 import { uploadDir } from '../utils/upload-path.js';
 import { AppError } from '../middleware/error-handler.js';
 import { moduleLogger } from '../config/logger.js';
+import { contractUploadLimiter } from '../middleware/rate-limit.js';
 
 const log = moduleLogger('contract-routes');
 
@@ -29,35 +31,15 @@ contractRouter.use(authenticate);
 /** The directory name is a member UUID and nothing else. */
 const MEMBER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const storage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    // `destination` runs BEFORE `verifyMemberOwnership` and before the %PDF
-    // magic-byte check, on a value that comes straight from the multipart body.
-    // A `memberId` of `../../../x` therefore wrote a file anywhere the container
-    // could reach, and the rejection path only unlinks the final path — the file
-    // was already on disk. `uploadDir` is that rule, shared with every other
-    // upload; here there is no `temp` stage, so the id must be a real one.
-    const memberId = req.body?.memberId || req.params?.memberId;
-    const dir =
-      typeof memberId === 'string' && MEMBER_ID_RE.test(memberId)
-        ? uploadDir('/app/uploads/contracts', memberId)
-        : null;
-    if (!dir) {
-      cb(new AppError(400, 'memberId inválido.', 'INVALID_MEMBER_ID'), '');
-      return;
-    }
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (_req, _file, cb) => {
-    const timestamp = Date.now();
-    cb(null, `contract_${timestamp}.pdf`);
-  },
-});
+/** Where signed contracts live. nginx refuses this folder; see GET /:contractId/pdf. */
+export const CONTRACTS_ROOT = '/app/uploads/contracts';
 
+// Memory, not disk: nothing touches the volume until the caller is known to own
+// the member and the bytes are known to be a PDF. With disk storage the file was
+// written before both checks, and a 400 or 403 left it behind.
 const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 }, // 5MB
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -69,8 +51,13 @@ const upload = multer({
   },
 });
 
+const isPdf = (buf: Buffer) =>
+  buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46;
+
 // POST /contracts — upload contract PDF
-contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
+contractRouter.post('/', contractUploadLimiter, upload.single('pdf'), async (req, res, next) => {
+  let written: string | null = null;
+  let saved = false;
   try {
     const parsed = contractBodySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -78,34 +65,81 @@ contractRouter.post('/', upload.single('pdf'), async (req, res, next) => {
       return;
     }
     const memberId = parsed.data.memberId;
+    const dir = MEMBER_ID_RE.test(memberId) ? uploadDir(CONTRACTS_ROOT, memberId) : null;
+    if (!dir) {
+      res.status(400).json({ error: 'memberId inválido.', code: 'INVALID_MEMBER_ID' });
+      return;
+    }
     if (!await verifyMemberOwnership(req, res, memberId)) return;
 
-    // Magic-bytes validation: a real PDF starts with "%PDF" (0x25 0x50 0x44 0x46).
-    // multer's MIME-type filter can be spoofed by the client; this is the actual content check.
-    if (req.file?.path) {
-      try {
-        const fd = fs.openSync(req.file.path, 'r');
-        const header = Buffer.alloc(4);
-        fs.readSync(fd, header, 0, 4, 0);
-        fs.closeSync(fd);
-        const isPdf = header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
-        if (!isPdf) {
-          // Cleanup the bogus file before rejecting.
-          try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
-          res.status(400).json({ error: 'Arquivo enviado não é um PDF válido.', code: 'INVALID_PDF' });
-          return;
-        }
-      } catch (err) {
-        log.error({ err }, 'Failed to validate PDF magic bytes');
-        res.status(400).json({ error: 'Não foi possível validar o arquivo enviado.', code: 'PDF_VALIDATION_FAILED' });
-        return;
-      }
+    // Magic bytes: multer's MIME filter trusts what the client says.
+    if (req.file && !isPdf(req.file.buffer)) {
+      res.status(400).json({ error: 'Arquivo enviado não é um PDF válido.', code: 'INVALID_PDF' });
+      return;
     }
 
-    const serverIp = req.ip || 'unknown';
-    req.body.ipAddress = serverIp;
-    const result = await contractService.saveContract(req.body, req.file);
+    let file: Express.Multer.File | undefined;
+    if (req.file) {
+      const filename = `contract_${Date.now()}.pdf`;
+      await fs.promises.mkdir(dir, { recursive: true });
+      written = path.join(dir, filename);
+      await fs.promises.writeFile(written, req.file.buffer, { flag: 'wx' });
+      file = { ...req.file, destination: dir, filename, path: written };
+    }
+
+    req.body.ipAddress = req.ip || 'unknown';
+    const result = await contractService.saveContract(req.body, file);
+    saved = true;
     res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  } finally {
+    if (written && !saved) {
+      await fs.promises.unlink(written).catch((err) => log.warn({ err }, 'orphan contract not removed'));
+    }
+  }
+});
+
+/**
+ * The stored file of a contract, only if it sits in that member's own folder.
+ * Rows from before 2026-10-19 may carry only the public `pdf_url`.
+ */
+function contractFilePath(row: { member_id: string; pdf_path?: string | null; pdf_url?: string | null }): string | null {
+  const dir = uploadDir(CONTRACTS_ROOT, row.member_id);
+  if (!dir) return null;
+  let candidate = row.pdf_path || null;
+  if (!candidate && row.pdf_url) {
+    const m = /\/uploads\/contracts\/[^/]+\/(contract_[\w.-]+\.pdf)$/.exec(row.pdf_url);
+    if (m) candidate = path.join(dir, m[1]);
+  }
+  if (!candidate) return null;
+  const resolved = path.resolve(candidate);
+  return resolved.startsWith(path.resolve(dir) + path.sep) ? resolved : null;
+}
+
+// GET /contracts/:contractId/pdf — the signed PDF, to its member or staff
+contractRouter.get('/:contractId/pdf', async (req, res, next) => {
+  try {
+    const result = await query<{ id: string; member_id: string; pdf_path: string | null; pdf_url: string | null }>(
+      'SELECT id, member_id, pdf_path, pdf_url FROM contracts WHERE id = $1',
+      [req.params.contractId]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      res.status(404).json({ error: 'Contrato não encontrado', code: 'CONTRACT_NOT_FOUND' });
+      return;
+    }
+    if (!await verifyMemberOwnership(req, res, row.member_id)) return;
+
+    const filePath = contractFilePath(row);
+    if (!filePath || !fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'PDF do contrato não encontrado', code: 'CONTRACT_PDF_NOT_FOUND' });
+      return;
+    }
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline; filename="contrato.pdf"');
+    fs.createReadStream(filePath).on('error', next).pipe(res);
   } catch (err) {
     next(err);
   }

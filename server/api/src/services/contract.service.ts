@@ -32,7 +32,7 @@ export async function saveContract(
 
     const contractId = `contract_${data.memberId}_${Date.now()}`;
     const pdfPath = file ? file.path.replace(/\\/g, '/') : null;
-    const pdfUrl = file ? `${env.API_URL}/uploads/contracts/${data.memberId}/${file.filename}` : null;
+    const pdfUrl = file ? contractPdfUrl(contractId) : null;
     const signedAt = new Date().toISOString(); // Always server timestamp
 
     // Calculate PDF hash if file exists
@@ -124,6 +124,15 @@ export async function revokeContract(contractId: string, memberId: string, reaso
   }
 }
 
+/**
+ * The PDF is served by GET /contracts/:id/pdf, behind login and ownership.
+ * Rows signed before 2026-10-19 still hold a public /uploads/ address in
+ * `pdf_url`; nginx refuses that folder now, so it is never handed out.
+ */
+export function contractPdfUrl(contractId: string): string {
+  return `${env.API_URL}/contracts/${encodeURIComponent(contractId)}/pdf`;
+}
+
 function mapContractRow(row: pg.QueryResultRow) {
   return {
     id: row.id,
@@ -137,7 +146,7 @@ function mapContractRow(row: pg.QueryResultRow) {
     ipAddress: row.ip_address,
     userAgent: row.user_agent,
     documentHash: row.document_hash,
-    pdfUrl: row.pdf_url,
+    pdfUrl: row.pdf_path || row.pdf_url ? contractPdfUrl(row.id) : null,
     pdfPath: row.pdf_path,
     pdfHash: row.pdf_hash,
     status: row.status,

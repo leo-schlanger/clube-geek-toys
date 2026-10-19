@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { defaultLimiter, publicLookupLimiter } from '../middleware/rate-limit.js';
+import { cpfLookupLimiter, defaultLimiter, publicLookupLimiter } from '../middleware/rate-limit.js';
 import { z } from 'zod';
 import * as memberService from '../services/member.service.js';
 import * as paymentService from '../services/payment.service.js';
@@ -16,7 +16,7 @@ const MEMBER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 // Public endpoint: check if CPF is already registered (used during registration).
 // Returns only { exists: boolean } — never exposes member data.
 // Uses its own rate limiter to avoid starving the auth endpoints.
-memberRouter.get('/cpf-exists/:cpf', publicLookupLimiter, async (req, res, next) => {
+memberRouter.get('/cpf-exists/:cpf', cpfLookupLimiter, async (req, res, next) => {
   try {
     const cpf = (req.params.cpf as string).replace(/\D/g, '');
     if (cpf.length !== 11 || !isValidCPF(cpf)) {

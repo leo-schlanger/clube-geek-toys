@@ -5,6 +5,7 @@ import { Loading } from '../ui/loading'
 import { PLANS, paymentTypeLabel, type Member, type PlanType } from '../../types'
 import type { Contract } from '../../types'
 import { resendContractEmail } from '../../lib/email'
+import { openContractPdf } from '../../lib/contract-storage'
 import { generateAdhesionPDF, downloadPDF } from '../../lib/contract-generator'
 import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
@@ -164,7 +165,9 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => window.open(contract.pdfUrl, '_blank')}
+                  onClick={() => {
+                    openContractPdf(contract.pdfUrl).catch(() => toast.error('Não foi possível abrir o contrato'))
+                  }}
                 >
                   <Download className="h-4 w-4" />
                   Baixar PDF

@@ -17,6 +17,7 @@ import { api } from '../lib/api-client'
 import { formatCurrency, formatCPF, validateCPF, getStatusLabel } from '../lib/utils'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { toast } from 'sonner'
+import { openContractPdf } from '../lib/contract-storage'
 import {
   X,
   User,
@@ -776,8 +777,8 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                           <div>
                             <span className="text-muted-foreground">Assinado em:</span>
                             <span className="ml-2 font-medium">
-                              {contract.signed_at
-                                ? new Date(contract.signed_at as string).toLocaleDateString('pt-BR')
+                              {contract.signedAt
+                                ? new Date(contract.signedAt as string).toLocaleDateString('pt-BR')
                                 : 'N/A'}
                             </span>
                           </div>
@@ -786,36 +787,40 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                             <Badge
                               className="ml-2"
                               variant={
-                                (contract.status as string) === 'signed'
+                                ['signed', 'active'].includes(contract.status as string)
                                   ? 'success'
                                   : (contract.status as string) === 'pending'
                                   ? 'warning'
                                   : 'destructive'
                               }
                             >
-                              {(contract.status as string) === 'signed'
+                              {['signed', 'active'].includes(contract.status as string)
                                 ? 'Assinado'
                                 : (contract.status as string) === 'pending'
                                 ? 'Pendente'
                                 : String(contract.status)}
                             </Badge>
                           </div>
-                          {Boolean(contract.hash) && (
+                          {Boolean(contract.documentHash) && (
                             <div className="sm:col-span-2">
                               <span className="text-muted-foreground">Hash:</span>
                               <span className="ml-2 font-mono text-xs">
-                                {String(contract.hash).slice(0, 20)}...
+                                {String(contract.documentHash).slice(0, 20)}...
                               </span>
                             </div>
                           )}
                         </div>
                         <div className="flex gap-2 pt-2">
-                          {Boolean(contract.pdf_url) && (
+                          {Boolean(contract.pdfUrl) && (
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => window.open(contract.pdf_url as string, '_blank')}
+                              onClick={() => {
+                                openContractPdf(contract.pdfUrl as string).catch(() =>
+                                  toast.error('Não foi possível abrir o contrato')
+                                )
+                              }}
                             >
                               <Download className="h-4 w-4" /> Baixar PDF
                             </Button>

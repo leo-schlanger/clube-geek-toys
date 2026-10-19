@@ -53,8 +53,22 @@ describe('GET /health — jobs', () => {
     expect(body.jobs.backup_daily.stale).toBe(true);
     expect(body.jobs.offsite_dump.stale).toBe(false);
     expect(body.jobs.restore_drill.stale).toBe(false);
-    // Never reported yet: unknown, not an alarm.
-    expect(body.jobs.backup_weekly).toEqual({ lastOk: null, stale: null });
+    // Never reported, and its first run was due long ago: a cron that stopped.
+    expect(body.jobs.backup_weekly).toEqual({ lastOk: null, stale: true });
+  });
+
+  it('não acusa o drill que ainda não teve a primeira execução, e acusa depois', async () => {
+    poolQuery.mockImplementation(async (sql: string) =>
+      sql.includes("LIKE 'job_ok_%'") ? { rows: [] } : { rows: [{ '?column?': 1 }] },
+    );
+    vi.useFakeTimers({ now: new Date('2026-10-19T12:00:00Z'), toFake: ['Date'] });
+    try {
+      expect((await api.get('/')).body.jobs.restore_drill).toEqual({ lastOk: null, stale: null });
+      vi.setSystemTime(new Date('2026-11-02T06:00:00Z'));
+      expect((await api.get('/')).body.jobs.restore_drill).toEqual({ lastOk: null, stale: true });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('continua respondendo se a leitura dos jobs falhar', async () => {
