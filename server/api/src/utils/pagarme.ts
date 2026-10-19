@@ -530,12 +530,18 @@ export async function getCustomer(id: string) {
   return request<{ id: string; email?: string; name?: string }>('GET', `/customers/${id}`);
 }
 
-/** Patch a customer that was created before we had a billing address. */
+/**
+ * Rewrite a customer, e.g. one created before we had a billing address.
+ *
+ * Takes the whole customer on purpose: this PUT replaces every field, and one
+ * left out is stored as null. Sending only `address` wiped the name, CPF and
+ * phone the card verification needs.
+ */
 export async function updateCustomer(
   id: string,
-  patch: { address?: PagarmeCustomerInput['address'] },
+  customer: PagarmeCustomerInput,
 ): Promise<{ id: string }> {
-  return request<{ id: string }>('PUT', `/customers/${id}`, patch);
+  return request<{ id: string }>('PUT', `/customers/${id}`, normalizeCustomer(customer));
 }
 
 /**
@@ -554,15 +560,8 @@ export async function getOrCreatePagarmeCustomer(member: {
   /** Sent on create, and PUT onto a customer that was saved without one. */
   address?: PagarmeCustomerInput['address'];
 }): Promise<string> {
-  if (member.pagarmeCustomerId) {
-    if (member.address) {
-      await updateCustomer(member.pagarmeCustomerId, { address: member.address });
-    }
-    return member.pagarmeCustomerId;
-  }
-
   const phone = parseBrazilianPhone(member.phone);
-  const customer = await createCustomer({
+  const input: PagarmeCustomerInput = {
     name: member.fullName,
     email: member.email,
     document: member.document,
@@ -570,7 +569,16 @@ export async function getOrCreatePagarmeCustomer(member: {
     phones: phone ? { mobile_phone: phone } : undefined,
     address: member.address,
     metadata: { memberId: member.id },
-  });
+  };
+
+  if (member.pagarmeCustomerId) {
+    if (member.address) {
+      await updateCustomer(member.pagarmeCustomerId, input);
+    }
+    return member.pagarmeCustomerId;
+  }
+
+  const customer = await createCustomer(input);
 
   await query('UPDATE members SET pagarme_customer_id = $1 WHERE id = $2', [
     customer.id,

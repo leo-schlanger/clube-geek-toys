@@ -8,6 +8,7 @@ import { env } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
 import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { auditLog } from '../utils/audit.js';
+import { claimClubCardAttempt } from '../utils/club-card-lock.js';
 import {
   CLUB_PLAN_PRICE,
   CLUB_PLAN_PAYMENT_TYPE,
@@ -145,17 +146,27 @@ export async function createSubscription(data: CreateSubscriptionData) {
   }
   await query(SAVE_MEMBER_BILLING_ADDRESS_SQL, [billingAddressJson(address), member.id]);
 
+  // Same lock as a one-off club card: a second submit must not open a second
+  // recurrence. Released wherever nothing was charged.
+  const releaseCardLock = await claimClubCardAttempt(member.id);
+
   // 2. Pagar.me customer, created once and reused. An id already on the member
   //    is updated with this address before the card is saved.
-  const customerId = await pagarme.getOrCreatePagarmeCustomer({
-    id: member.id,
-    email: data.payer_email || member.email,
-    fullName: data.payer_name || member.full_name,
-    document,
-    phone: member.phone,
-    pagarmeCustomerId: member.pagarme_customer_id,
-    address: pagarmeAddress,
-  });
+  let customerId: string;
+  try {
+    customerId = await pagarme.getOrCreatePagarmeCustomer({
+      id: member.id,
+      email: data.payer_email || member.email,
+      fullName: data.payer_name || member.full_name,
+      document,
+      phone: member.phone,
+      pagarmeCustomerId: member.pagarme_customer_id,
+      address: pagarmeAddress,
+    });
+  } catch (err) {
+    await releaseCardLock();
+    throw err;
+  }
 
   // 3. Amount and interval are locked to the club plan server-side. Trusting
   //    the client's `transaction_amount` and `frequency_type` would let someone
@@ -172,6 +183,7 @@ export async function createSubscription(data: CreateSubscriptionData) {
   try {
     savedCard = await pagarme.createCardForCustomer(customerId, data.card_token, pagarmeAddress);
   } catch (err) {
+    await releaseCardLock();
     // Issuer refused to save the card (412): nothing was charged, but the team
     // has to hear of it, or the member is left alone on the form.
     const providerErr = err as { name?: string; httpStatus?: number };

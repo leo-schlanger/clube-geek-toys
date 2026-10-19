@@ -21,6 +21,8 @@ import { sendTemplateEmail } from './email.service.js';
 import { auditLog } from '../utils/audit.js';
 import { decrementStockForOrder, restoreStockForOrder, releaseReservation } from './order.service.js';
 import { restoreCreditForOrder } from './store-credit.service.js';
+import { releaseCouponForOrder } from './promo.service.js';
+import { alertOpsAsync } from './ops-alert.service.js';
 import { notifyAdminsOfPayment, type AdminPaymentNotice } from './admin-notification.service.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
 import { CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
@@ -53,6 +55,21 @@ interface Deferred {
   adminNotices: AdminPaymentNotice[];
   /** Recurrences to cancel once the transaction is committed (refunded members). */
   subscriptionCancels: string[];
+  /** Orders closed unpaid here, whose coupon use goes back after COMMIT. */
+  couponReleases: string[];
+  /**
+   * Audit rows, written after COMMIT. `auditLog` writes through the pool, not
+   * this transaction, so a row written inside it survived a rollback and
+   * recorded an activation that never happened.
+   */
+  audits: Parameters<typeof auditLog>[];
+}
+
+/** Order statuses whose stock was already decremented by the payment. */
+const STOCK_TAKEN_STATUSES = ['paid', 'processing', 'shipped', 'delivered'];
+
+function audit(deferred: Deferred, ...args: Parameters<typeof auditLog>): void {
+  deferred.audits.push(args);
 }
 
 // ─── Authenticity ────────────────────────────────────────────────────────────
@@ -182,7 +199,14 @@ function formatBRL(amount: number): string {
 
 export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<void> {
   const webhookKey = `pagarme_${event.id}`;
-  const deferred: Deferred = { emails: [], creditRestores: [], adminNotices: [], subscriptionCancels: [] };
+  const deferred: Deferred = {
+    emails: [],
+    creditRestores: [],
+    adminNotices: [],
+    subscriptionCancels: [],
+    couponReleases: [],
+    audits: [],
+  };
 
   const client = await getClient();
   try {
@@ -217,11 +241,21 @@ export async function processPagarmeEvent(event: PagarmeWebhookEvent): Promise<v
         note: 'Crédito devolvido (pedido cancelado ou reembolsado)',
       });
       if (amount > 0) {
-        await auditLog('order.credit_restored', null, { orderId, amount, reason: 'order_closed' });
+        audit(deferred, 'order.credit_restored', null, { orderId, amount, reason: 'order_closed' });
       }
     } catch (err) {
       log.error({ err }, `Credit restore failed (order=${orderId})`);
     }
+  }
+
+  for (const orderId of deferred.couponReleases) {
+    await releaseCouponForOrder(orderId).catch((err: unknown) =>
+      log.error({ err }, `coupon release failed (order=${orderId})`)
+    );
+  }
+
+  for (const args of deferred.audits) {
+    await auditLog(...args).catch((err: unknown) => log.error({ err }, 'audit after commit failed'));
   }
 
   for (const job of deferred.emails) {
@@ -363,7 +397,7 @@ async function settleShopOrder(
 
   const order = updated.rows[0];
   if (!order) {
-    log.info(`charge ${charge.id}: no pending order to settle`);
+    await flagOrphanPaidCharge(client, charge, metadata, deferred);
     return;
   }
 
@@ -393,12 +427,64 @@ async function settleShopOrder(
     chargeId: charge.id,
   });
 
-  await auditLog('order.paid', null, {
+  audit(deferred, 'order.paid', null, {
     orderId: order.id,
     orderNumber: order.order_number,
     pagarmeChargeId: charge.id,
     amount: pagarme.fromCents(charge.amount),
     provider: 'pagarme',
+  });
+}
+
+/**
+ * A paid charge that settled no order.
+ *
+ * Usually a repeat delivery: the order already carries this charge. Anything
+ * else is money with nowhere to land — e.g. a card attempt that timed out on
+ * our side after the acquirer authorised it, followed by a second card on the
+ * same order. That used to be one `info` line nobody reads.
+ */
+async function flagOrphanPaidCharge(
+  client: pg.PoolClient,
+  charge: pagarme.PagarmeCharge,
+  metadata: Record<string, string>,
+  deferred: Deferred,
+): Promise<void> {
+  // Two parameters on purpose: `pagarme_charge_id` is VARCHAR and `id` is UUID.
+  const existing = await client.query(
+    `SELECT order_number, status, pagarme_charge_id FROM orders
+      WHERE pagarme_charge_id = $1 OR id = $2::uuid
+      LIMIT 1`,
+    [charge.id, metadata.orderId ?? null]
+  );
+  const row = existing.rows[0];
+  if (row && row.pagarme_charge_id === charge.id) {
+    log.info(`charge ${charge.id}: order #${row.order_number} already ${row.status as string}`);
+    return;
+  }
+
+  const amount = pagarme.fromCents(charge.paid_amount ?? charge.amount);
+  const ref = row ? `pedido #${row.order_number} (${row.status as string})` : 'nenhum pedido';
+  log.error(`charge ${charge.id}: paid with no open order to settle (${ref})`);
+  deferred.adminNotices.push({
+    event: 'payment_received',
+    subject: row ? `Pedido #${row.order_number} — cobrança a mais` : 'Cobrança sem pedido',
+    amount,
+    method: charge.payment_method ?? null,
+    link: '/admin?tab=orders',
+    detail:
+      'Esta cobrança foi paga, mas o pedido já estava pago por outra (ou não existe). ' +
+      'Pode ser cobrança em duplicidade: confira no painel da Pagar.me e estorne se for o caso.',
+    chargeId: charge.id,
+  });
+  alertOpsAsync({
+    kind: 'payment_orphan',
+    subject: `Cobrança paga sem pedido aberto (${charge.id})`,
+    body:
+      `A cobrança ${charge.id} (R$ ${formatBRL(amount)}) está paga na Pagar.me e não liquidou ` +
+      `nenhum pedido — ${ref}. Possível cobrança em duplicidade.\n\n` +
+      `Conferir no painel da Pagar.me e estornar se o cliente pagou duas vezes.`,
+    cooldownMin: 5,
   });
 }
 
@@ -468,7 +554,7 @@ async function settleEventReservation(
     chargeId: charge.id,
   });
 
-  await auditLog('event.reservation_paid', null, {
+  audit(deferred, 'event.reservation_paid', null, {
     reservationId: reservation.id,
     code,
     pagarmeChargeId: charge.id,
@@ -539,7 +625,7 @@ async function settleClubPayment(
     chargeId: charge.id,
   });
 
-  await auditLog(
+  audit(deferred,
     'payment.received',
     null,
     { pagarmeChargeId: charge.id, amount, provider: 'pagarme' },
@@ -561,7 +647,7 @@ async function handlePaymentFailed(
   // A ticket PIX that failed leaves the reservation pending: the expiry sweep
   // closes it, and a retry is a new reservation.
   if (metadata.kind === 'event_reservation') {
-    await auditLog('event.reservation_payment_failed', null, {
+    audit(deferred, 'event.reservation_payment_failed', null, {
       reservationId: metadata.reservationId ?? null,
       pagarmeChargeId: charge.id,
       providerStatus: charge.status,
@@ -577,7 +663,7 @@ async function handlePaymentFailed(
   // order: money captured, stock never decremented, no e-mail. Only an explicit
   // cancel closes an order; otherwise the TTL sweep does it if the buyer walks.
   if (metadata.kind === 'shop_order' || metadata.orderId) {
-    await auditLog('order.payment_failed', null, {
+    audit(deferred, 'order.payment_failed', null, {
       orderId: metadata.orderId ?? null,
       pagarmeChargeId: charge.id,
       providerStatus: charge.status,
@@ -628,7 +714,7 @@ async function handlePaymentFailed(
     chargeId: charge.id,
   });
 
-  await auditLog(
+  audit(deferred,
     'payment.failed',
     null,
     { pagarmeChargeId: charge.id, providerStatus: charge.status, provider: 'pagarme' },
@@ -653,18 +739,50 @@ async function handleRefunded(
   const charge = extractCharge(event);
   if (!charge?.id) return;
 
-  const updated = await client.query(
-    `UPDATE orders SET status = 'refunded', updated_at = NOW()
-      WHERE pagarme_charge_id = $1 AND status <> 'refunded'
-      RETURNING id, order_number, customer_name, customer_email, total, store_credit_applied`,
+  // What the order was decides what comes back: only a paid order had its
+  // stock taken. A pending one (a charge voided in the dashboard) still holds
+  // a reservation, and that hold is the thing to give back.
+  const found = await client.query(
+    `SELECT id, status FROM orders WHERE pagarme_charge_id = $1 FOR UPDATE`,
     [charge.id]
   );
+  const before = found.rows[0];
+  if (before && !['pending', ...STOCK_TAKEN_STATUSES].includes(before.status as string)) {
+    // Already refunded or cancelled: nothing left to undo, and it is not a
+    // ticket or a club payment either.
+    log.info(`charge ${charge.id}: order already ${before.status as string}`);
+    return;
+  }
+  const wasPending = before?.status === 'pending';
+
+  const updated = before
+    ? await client.query(
+        `UPDATE orders SET status = $2, updated_at = NOW()
+          WHERE id = $1
+          RETURNING id, order_number, customer_name, customer_email, total, store_credit_applied`,
+        [before.id, wasPending ? 'cancelled' : 'refunded']
+      )
+    : { rows: [] as pg.QueryResultRow[] };
   const order = updated.rows[0];
 
   if (order) {
-    await restoreStockForOrder(client, order.id as string);
+    if (wasPending) {
+      await releaseReservation(client, order.id as string);
+    } else {
+      await restoreStockForOrder(client, order.id as string);
+    }
     if (parseFloat((order.store_credit_applied as string) || '0') > 0) {
       deferred.creditRestores.push(order.id as string);
+    }
+    if (wasPending) {
+      // A voided charge on an unpaid order: no money moved, so no refund notice.
+      deferred.couponReleases.push(order.id as string);
+      audit(deferred, 'order.payment_cancelled', null, {
+        orderId: order.id,
+        pagarmeChargeId: charge.id,
+        provider: 'pagarme',
+      });
+      return;
     }
     deferred.adminNotices.push({
       event: 'payment_refunded',
@@ -676,7 +794,7 @@ async function handleRefunded(
       link: '/admin?tab=orders',
       chargeId: charge.id,
     });
-    await auditLog('order.refunded_via_provider', null, {
+    audit(deferred, 'order.refunded_via_provider', null, {
       orderId: order.id,
       orderNumber: order.order_number,
       pagarmeChargeId: charge.id,
@@ -703,7 +821,7 @@ async function handleRefunded(
       link: '/admin?tab=events',
       chargeId: charge.id,
     });
-    await auditLog('event.reservation_refunded_via_provider', null, {
+    audit(deferred, 'event.reservation_refunded_via_provider', null, {
       reservationId: reservation.id,
       code: reservation.code,
       pagarmeChargeId: charge.id,
@@ -740,7 +858,7 @@ async function handleRefunded(
     link: '/admin?tab=members',
     chargeId: charge.id,
   });
-  await auditLog(
+  audit(deferred,
     'payment.refunded',
     null,
     { pagarmeChargeId: charge.id, provider: 'pagarme', external: true },
@@ -774,7 +892,7 @@ async function handleOrderCanceled(
       [pagarmeOrderId, charge?.id ?? null]
     );
     if (reservation) {
-      await auditLog('event.reservation_payment_cancelled', null, {
+      audit(deferred, 'event.reservation_payment_cancelled', null, {
         reservationId: reservation.id,
         pagarmeOrderId,
         provider: 'pagarme',
@@ -785,10 +903,11 @@ async function handleOrderCanceled(
 
   // The hold outlives the order otherwise: the TTL sweep only visits `pending`.
   await releaseReservation(client, row.id as string);
+  deferred.couponReleases.push(row.id as string);
   if (parseFloat((row.store_credit_applied as string) || '0') > 0) {
     deferred.creditRestores.push(row.id as string);
   }
-  await auditLog('order.payment_cancelled', null, {
+  audit(deferred, 'order.payment_cancelled', null, {
     orderId: row.id,
     pagarmeOrderId,
     provider: 'pagarme',
@@ -816,7 +935,7 @@ async function handleChargeback(
   const order = found.rows[0];
   const amount = charge ? pagarme.fromCents(charge.amount) : 0;
 
-  await auditLog('order.disputed', null, {
+  audit(deferred, 'order.disputed', null, {
     orderId: order?.id ?? null,
     orderNumber: order?.order_number ?? null,
     pagarmeChargeId: chargeId,
@@ -901,7 +1020,7 @@ async function handleInvoicePaid(
   );
 
   const memberResult = await client.query(
-    `SELECT m.id, m.email, m.full_name, m.plan, m.payment_type
+    `SELECT m.id, m.email, m.full_name, m.plan, m.payment_type, m.status
        FROM members m
        JOIN subscriptions s ON m.subscription_id = s.id
       WHERE s.provider_id = $1`,
@@ -926,7 +1045,10 @@ async function handleInvoicePaid(
     `UPDATE members
         SET expiry_date = GREATEST(COALESCE(expiry_date, CURRENT_DATE), CURRENT_DATE) + $2::interval,
             status = 'active',
-            payment_count = payment_count + 1
+            payment_count = payment_count + 1,
+            start_date = COALESCE(start_date, CURRENT_DATE),
+            activated_at = COALESCE(activated_at, NOW()),
+            pending_payment = NULL
       WHERE id = $1`,
     [member.id, interval]
   );
@@ -948,6 +1070,16 @@ async function handleInvoicePaid(
     member_id: member.id as string,
   });
 
+  // The first invoice is the subscriber's activation, so it owes the welcome.
+  if (member.status !== 'active') {
+    deferred.emails.push({
+      template: 'welcome',
+      to: member.email as string,
+      variables: { name: member.full_name as string, plan: member.plan as string },
+      member_id: member.id as string,
+    });
+  }
+
   deferred.adminNotices.push({
     event: 'payment_received',
     subject: `Assinatura — ${member.full_name}`,
@@ -960,7 +1092,7 @@ async function handleInvoicePaid(
     chargeId: invoiceId,
   });
 
-  await auditLog(
+  audit(deferred,
     'subscription.charge.succeeded',
     null,
     { subscriptionId, invoiceId, amount, provider: 'pagarme' },
@@ -1011,7 +1143,7 @@ async function handleInvoiceFailed(
       },
       member_id: member.id as string,
     });
-    await auditLog(
+    audit(deferred,
       'subscription.charge.failed',
       null,
       { subscriptionId, failedCount, amount, provider: 'pagarme' },
@@ -1048,7 +1180,7 @@ async function handleInvoiceFailed(
         variables: { name: member.full_name as string },
         member_id: member.id as string,
       });
-      await auditLog(
+      audit(deferred,
         'subscription.cancelled',
         null,
         { subscriptionId, reason: 'failed_payments_threshold', failedCount },
@@ -1096,7 +1228,7 @@ async function handleSubscriptionCanceled(
       variables: { name: member.full_name as string },
       member_id: member.id as string,
     });
-    await auditLog(
+    audit(deferred,
       'subscription.cancelled',
       null,
       { subscriptionId, reason: 'cancelled_externally', provider: 'pagarme' },
@@ -1144,7 +1276,7 @@ async function activateMember(
     ]
   );
 
-  await auditLog(
+  audit(deferred,
     'member.activated',
     null,
     {

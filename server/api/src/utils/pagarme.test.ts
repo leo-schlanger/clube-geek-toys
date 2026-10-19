@@ -98,7 +98,8 @@ describe('getOrCreatePagarmeCustomer', () => {
       id: 'member-1',
       email: 'ana@example.com',
       fullName: 'Ana',
-      document: '52998224725',
+      document: '529.982.247-25',
+      phone: '(21) 99876-5432',
       pagarmeCustomerId: 'cus_old',
       address,
     });
@@ -108,7 +109,17 @@ describe('getOrCreatePagarmeCustomer', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { method?: string; body?: string }];
     expect(url).toBe('https://api.pagar.me/core/v5/customers/cus_old');
     expect(init.method).toBe('PUT');
-    expect(JSON.parse(init.body ?? '{}').address).toMatchObject({ zip_code: '22011001' });
+    // This PUT replaces the customer: a field left out is stored as null.
+    const body = JSON.parse(init.body ?? '{}');
+    expect(body).toMatchObject({
+      name: 'Ana',
+      email: 'ana@example.com',
+      document: '52998224725',
+      type: 'individual',
+      document_type: 'CPF',
+      phones: { mobile_phone: { area_code: '21', number: '998765432' } },
+    });
+    expect(body.address).toMatchObject({ zip_code: '22011001' });
     vi.unstubAllGlobals();
   });
 

@@ -18,6 +18,7 @@ import {
   type BillingAddress,
 } from '../utils/billing-address.js';
 import { auditLog } from '../utils/audit.js';
+import { claimClubCardAttempt } from '../utils/club-card-lock.js';
 import { revokeRefundedPeriod } from './club-access.service.js';
 import { cancelSubscription } from './subscription.service.js';
 import crypto from 'crypto';
@@ -300,9 +301,10 @@ export async function createPixPayment(data: {
   // PIX stays an inline customer. If this member already has a Pagar.me
   // customer (a refused card created one), put the address on it too so the
   // next card sees it. A failed update must not issue a code against a
-  // customer we know is incomplete.
+  // customer we know is incomplete. The PUT replaces the whole customer, so
+  // the whole customer goes.
   if (payer.pagarmeCustomerId) {
-    await pagarme.updateCustomer(payer.pagarmeCustomerId, { address: pagarmeAddress });
+    await pagarme.updateCustomer(payer.pagarmeCustomerId, payerToPagarmeCustomer(payer, pagarmeAddress));
   }
   const amountInCents = pagarme.toCents(data.amount);
 
@@ -618,22 +620,27 @@ export async function createCardPayment(data: {
   // selector, and a crafted request asking for more is held to one.
   const installments = 1;
 
+  const releaseCardLock = await claimClubCardAttempt(payer.id);
+
   // PSP bills a saved card, not a raw token: the token becomes a `card_id` on
   // the member's Pagar.me customer first. See `createCardForCustomer`.
   // An existing customer is updated with this address before the card is saved.
-  const customerId = await pagarme.getOrCreatePagarmeCustomer({
-    id: payer.id,
-    email: payer.email,
-    fullName: payer.fullName,
-    document: payer.document,
-    phone: payer.phone,
-    pagarmeCustomerId: payer.pagarmeCustomerId,
-    address: pagarmeAddress,
-  });
+  let customerId: string;
   let savedCard: Awaited<ReturnType<typeof pagarme.createCardForCustomer>>;
   try {
+    customerId = await pagarme.getOrCreatePagarmeCustomer({
+      id: payer.id,
+      email: payer.email,
+      fullName: payer.fullName,
+      document: payer.document,
+      phone: payer.phone,
+      pagarmeCustomerId: payer.pagarmeCustomerId,
+      address: pagarmeAddress,
+    });
     savedCard = await pagarme.createCardForCustomer(customerId, data.cardToken, pagarmeAddress);
   } catch (err) {
+    // Nothing was charged: the next card must not wait for the lock.
+    await releaseCardLock();
     // The issuer refusing to save the card (412) is a refusal like a declined
     // charge, but it happens before any charge exists — so without this the
     // team never hears of it and the member is left alone on the form.
@@ -734,6 +741,7 @@ export async function createCardPayment(data: {
       detail: pagarme.describeChargeFailure(charge),
       chargeId: charge.id,
     });
+    await releaseCardLock();
     throw new AppError(402, pagarme.describeChargeFailure(charge), 'CARD_DECLINED');
   }
 

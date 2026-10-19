@@ -52,7 +52,18 @@ const {
   updateCustomerMock: vi.fn(async () => ({ id: 'cus_1' })),
 }));
 
+const { claimCardLockMock, releaseCardLockMock } = vi.hoisted(() => ({
+  claimCardLockMock: vi.fn(async (..._args: unknown[]) => {}),
+  releaseCardLockMock: vi.fn(async () => {}),
+}));
+
 vi.mock('../config/database.js', () => ({ query: queryMock }));
+vi.mock('../utils/club-card-lock.js', () => ({
+  claimClubCardAttempt: async (...args: unknown[]) => {
+    await claimCardLockMock(...args);
+    return releaseCardLockMock;
+  },
+}));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('./admin-notification.service.js', () => ({
@@ -444,9 +455,15 @@ describe('createPixPayment', () => {
       billingAddress,
     });
 
+    // The PUT replaces the whole customer: anything missing would be nulled.
     expect(updateCustomerMock).toHaveBeenCalledWith(
       'cus_old',
-      expect.objectContaining({ address: expect.objectContaining({ zip_code: '22011001' }) }),
+      expect.objectContaining({
+        name: memberRow.full_name,
+        email: memberRow.email,
+        document: expect.stringMatching(/^\d{11}$/),
+        address: expect.objectContaining({ zip_code: '22011001' }),
+      }),
     );
     const [payload] = createOrderMock.mock.calls[0] as [{ customer_id?: string; customer?: unknown }];
     expect(payload.customer_id).toBeUndefined();
@@ -865,6 +882,29 @@ describe('createCardPayment', () => {
     expect(notifyAdminsMock).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'payment_failed' })
     );
+    // A refused card is retried with another one at once.
+    expect(releaseCardLockMock).toHaveBeenCalled();
+  });
+
+  /** Two tabs, or "voltar" and submit again, were two charges and two years. */
+  it('recusa um segundo cartão enquanto o primeiro está em andamento', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    const { AppError } = await import('../middleware/error-handler.js');
+    claimCardLockMock.mockRejectedValueOnce(new AppError(409, 'em andamento', 'PAYMENT_IN_FLIGHT'));
+
+    await expect(createCardPayment(cardInput)).rejects.toMatchObject({ code: 'PAYMENT_IN_FLIGHT' });
+    expect(createCardMock).not.toHaveBeenCalled();
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
+
+  it('mantém a trava depois de uma cobrança aprovada', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+    createOrderMock.mockResolvedValueOnce(approvedCardOrder);
+
+    await createCardPayment(cardInput);
+
+    expect(claimCardLockMock).toHaveBeenCalledWith('member-1');
+    expect(releaseCardLockMock).not.toHaveBeenCalled();
   });
 
   /** 09/10/2026: the issuer refused to save the card and nobody heard of it. */
@@ -879,6 +919,7 @@ describe('createCardPayment', () => {
 
     expect(createOrderMock).not.toHaveBeenCalled();
     expect(ran('billing_address')).toBe(true);
+    expect(releaseCardLockMock).toHaveBeenCalled();
     expect(notifyAdminsMock).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'payment_failed', method: 'credit_card' })
     );

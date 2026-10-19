@@ -18,3 +18,12 @@ export async function claimCooldown(key: string, minutes: number): Promise<boole
   );
   return result.rows.length > 0;
 }
+
+/** Give a claim back early, so the next `claimCooldown` on the key wins. */
+export async function releaseCooldown(key: string): Promise<void> {
+  await query(
+    `UPDATE config SET value = to_jsonb('1970-01-01T00:00:00Z'::text), updated_at = NOW()
+      WHERE key = $1`,
+    [key.slice(0, 100)],
+  );
+}

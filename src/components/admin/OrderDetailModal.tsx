@@ -660,7 +660,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                   <p className="text-xs text-muted-foreground">
                     Pago, separação, envio e entrega só depois do pagamento.
                     {canConfirmPix && ' Se o PIX já caiu, use “Confirmar PIX”.'} Pago no balcão:
-                    cancele este pedido e registre a venda no PDV.
+                    cancele este pedido — a venda de balcão não passa pela loja online.
                   </p>
                 )}
               </div>

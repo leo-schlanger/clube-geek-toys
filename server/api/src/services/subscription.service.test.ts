@@ -64,6 +64,16 @@ vi.mock('../config/database.js', () => ({
   query: queryMock,
   getClient: async () => ({ query: clientQueryMock, release: releaseMock }),
 }));
+const { claimCardLockMock, releaseCardLockMock } = vi.hoisted(() => ({
+  claimCardLockMock: vi.fn(async (..._args: unknown[]) => {}),
+  releaseCardLockMock: vi.fn(async () => {}),
+}));
+vi.mock('../utils/club-card-lock.js', () => ({
+  claimClubCardAttempt: async (...args: unknown[]) => {
+    await claimCardLockMock(...args);
+    return releaseCardLockMock;
+  },
+}));
 vi.mock('../utils/audit.js', () => ({ auditLog: auditMock }));
 vi.mock('./email.service.js', () => ({ sendTemplateEmail: sendEmailMock }));
 vi.mock('./admin-notification.service.js', () => ({
@@ -265,6 +275,28 @@ describe('createSubscription', () => {
     expect(args.interval_count).toBe(1);
     // And the row stores the server figure, not the client's.
     expect(clientParamsOf('INSERT INTO subscriptions')?.[6]).toBe(159.9);
+  });
+
+  /** A second submit must not open a second recurrence. */
+  it('recusa uma segunda assinatura enquanto a primeira está em andamento', async () => {
+    happyPath();
+    const { AppError } = await import('../middleware/error-handler.js');
+    claimCardLockMock.mockRejectedValueOnce(new AppError(409, 'em andamento', 'PAYMENT_IN_FLIGHT'));
+
+    await expect(createSubscription(CREATE_INPUT as never)).rejects.toMatchObject({
+      code: 'PAYMENT_IN_FLIGHT',
+    });
+    expect(pagarmeCreateCardMock).not.toHaveBeenCalled();
+    expect(pagarmeCreateMock).not.toHaveBeenCalled();
+  });
+
+  it('solta a trava quando o banco recusa salvar o cartão', async () => {
+    happyPath();
+    pagarmeCreateCardMock.mockRejectedValueOnce(new Error('verification failed'));
+
+    await expect(createSubscription(CREATE_INPUT as never)).rejects.toThrow('verification failed');
+    expect(releaseCardLockMock).toHaveBeenCalled();
+    expect(pagarmeCreateMock).not.toHaveBeenCalled();
   });
 
   it('recusa quando o membro não existe', async () => {

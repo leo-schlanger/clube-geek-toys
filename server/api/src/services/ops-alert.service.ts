@@ -28,7 +28,8 @@ export type OpsAlertKind =
   | 'reconcile_failing'
   | 'email_failing'
   | 'http_5xx_burst'
-  | 'cron_failed';
+  | 'cron_failed'
+  | 'payment_orphan';
 
 export interface OpsAlert {
   kind: OpsAlertKind;

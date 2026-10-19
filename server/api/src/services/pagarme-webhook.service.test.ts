@@ -58,6 +58,12 @@ vi.mock('./order.service.js', () => ({
   releaseReservation: releaseReservationMock,
 }));
 vi.mock('./store-credit.service.js', () => ({ restoreCreditForOrder: restoreCreditMock }));
+const { alertOpsMock, releaseCouponMock } = vi.hoisted(() => ({
+  alertOpsMock: vi.fn(),
+  releaseCouponMock: vi.fn(async (..._args: unknown[]) => true),
+}));
+vi.mock('./ops-alert.service.js', () => ({ alertOpsAsync: alertOpsMock }));
+vi.mock('./promo.service.js', () => ({ releaseCouponForOrder: releaseCouponMock }));
 const { cancelSubMock } = vi.hoisted(() => ({
   cancelSubMock: vi.fn(async (..._args: unknown[]) => ({})),
 }));
@@ -275,6 +281,53 @@ describe('charge.paid — pedido da loja', () => {
     expect(getChargeMock).not.toHaveBeenCalled();
     expect(decrementStockMock).not.toHaveBeenCalled();
     expect(ran('ROLLBACK')).toBe(true);
+  });
+
+  it('reentrega da mesma cobrança, com o pedido já pago por ela, não alerta', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [] });
+    route('SELECT order_number, status, pagarme_charge_id', {
+      rows: [{ order_number: 1001, status: 'paid', pagarme_charge_id: 'ch_1' }],
+    });
+    getChargeMock.mockResolvedValue(paidCharge);
+
+    await processPagarmeEvent(chargeEvent());
+
+    expect(alertOpsMock).not.toHaveBeenCalled();
+    expect(notifyAdminsMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A card attempt that timed out on our side after the acquirer authorised it,
+   * then a second card on the same order: the first charge pays an order that
+   * is already paid. That was one `info` line.
+   */
+  it('cobrança paga num pedido já pago por outra avisa a equipe e o mantenedor', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [] });
+    route('SELECT order_number, status, pagarme_charge_id', {
+      rows: [{ order_number: 1001, status: 'paid', pagarme_charge_id: 'ch_outra' }],
+    });
+    getChargeMock.mockResolvedValue(paidCharge);
+
+    await processPagarmeEvent(chargeEvent());
+
+    expect(alertOpsMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'payment_orphan' }));
+    expect(notifyAdminsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ chargeId: 'ch_1', subject: expect.stringContaining('#1001') })
+    );
+    expect(decrementStockMock).not.toHaveBeenCalled();
+  });
+
+  /** `auditLog` writes through the pool: a row written mid-transaction survived the rollback. */
+  it('não grava auditoria de um efeito que fez rollback', async () => {
+    claimWins();
+    route('UPDATE orders SET status = ', { rows: [orderRow] });
+    getChargeMock.mockResolvedValue(paidCharge);
+    decrementStockMock.mockRejectedValueOnce(new Error('stock constraint'));
+
+    await expect(processPagarmeEvent(chargeEvent())).rejects.toThrow('stock constraint');
+    expect(auditMock).not.toHaveBeenCalled();
   });
 
   /** Money already captured must land on the order even if something cancelled it. */
@@ -495,6 +548,7 @@ describe('charge.refunded', () => {
    */
   it('devolve estoque e crédito de um estorno feito fora do painel', async () => {
     claimWins();
+    route('SELECT id, status FROM orders', { rows: [{ id: 'o1', status: 'paid' }] });
     route('UPDATE orders SET status = ', {
       rows: [{ ...orderRow, store_credit_applied: '5.00' }],
     });
@@ -510,6 +564,45 @@ describe('charge.refunded', () => {
     expect(notifyAdminsMock).toHaveBeenCalledWith(
       expect.objectContaining({ event: 'payment_refunded' })
     );
+  });
+
+  /**
+   * A charge voided in the dashboard while the order was still pending: the
+   * stock was never taken, so restocking would invent units, and the hold is
+   * what has to go back.
+   */
+  it('pedido pendente com cobrança anulada é cancelado e solta a reserva, sem reabastecer', async () => {
+    claimWins();
+    route('SELECT id, status FROM orders', { rows: [{ id: 'o1', status: 'pending' }] });
+    route('UPDATE orders SET status = ', { rows: [{ ...orderRow, store_credit_applied: '0' }] });
+
+    await processPagarmeEvent({
+      id: 'hook_void',
+      type: 'charge.refunded',
+      data: { id: 'ch_1', status: 'canceled', amount: 12400, payment_method: 'pix' },
+    } as PagarmeWebhookEvent);
+
+    expect(restoreStockMock).not.toHaveBeenCalled();
+    expect(releaseReservationMock).toHaveBeenCalledWith(expect.anything(), 'o1');
+    const update = clientQueryMock.mock.calls.find((c) => sqlOf(c[0]).startsWith('UPDATE orders SET status'));
+    expect(update?.[1]).toEqual(['o1', 'cancelled']);
+    expect(notifyAdminsMock).not.toHaveBeenCalled();
+    expect(releaseCouponMock).toHaveBeenCalledWith('o1');
+  });
+
+  it('pedido já cancelado não ganha estoque nem vira estorno', async () => {
+    claimWins();
+    route('SELECT id, status FROM orders', { rows: [{ id: 'o1', status: 'cancelled' }] });
+
+    await processPagarmeEvent({
+      id: 'hook_void2',
+      type: 'charge.refunded',
+      data: { id: 'ch_1', status: 'canceled', amount: 12400 },
+    } as PagarmeWebhookEvent);
+
+    expect(restoreStockMock).not.toHaveBeenCalled();
+    expect(ran('UPDATE orders SET status')).toBe(false);
+    expect(ran('UPDATE payments')).toBe(false);
   });
 
   it('é idempotente: um pedido já estornado não mexe em nada', async () => {
@@ -751,7 +844,7 @@ describe('invoice.paid — renovação da assinatura', () => {
     } as PagarmeWebhookEvent;
   }
 
-  function memberFound() {
+  function memberFound(status = 'active') {
     route('JOIN subscriptions s ON m.subscription_id', {
       rows: [
         {
@@ -760,10 +853,34 @@ describe('invoice.paid — renovação da assinatura', () => {
           full_name: 'Ana',
           plan: 'basic',
           payment_type: 'monthly',
+          status,
         },
       ],
     });
   }
+
+  /**
+   * The first invoice of a new subscriber is the activation: "novos membros"
+   * counts by `activated_at`, and it was left null.
+   */
+  it('a primeira fatura ativa o membro com data de ativação e boas-vindas', async () => {
+    claimWins();
+    memberFound('pending');
+
+    await processPagarmeEvent(invoiceEvent());
+
+    expect(ran('activated_at = COALESCE(activated_at, NOW())', 'start_date = COALESCE(start_date')).toBe(true);
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({ template: 'welcome' }));
+  });
+
+  it('a renovação de quem já está ativo não manda boas-vindas', async () => {
+    claimWins();
+    memberFound('active');
+
+    await processPagarmeEvent(invoiceEvent());
+
+    expect(sendEmailMock).not.toHaveBeenCalledWith(expect.objectContaining({ template: 'welcome' }));
+  });
 
   /**
    * `payments` is the only table the reports read. Without this mirror every

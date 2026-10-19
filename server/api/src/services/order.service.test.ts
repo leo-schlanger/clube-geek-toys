@@ -153,6 +153,9 @@ vi.mock('../utils/pagarme.js', async () => {
  * `retailDiscountCandidates` stay real — they *are* the rule these tests are
  * here to protect, and stubbing them would leave the money decision untested.
  */
+const { releaseCouponForOrderMock } = vi.hoisted(() => ({
+  releaseCouponForOrderMock: vi.fn(async (..._args: unknown[]) => true),
+}));
 vi.mock('./promo.service.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./promo.service.js')>();
   return {
@@ -162,6 +165,7 @@ vi.mock('./promo.service.js', async (importOriginal) => {
     claimCoupon: claimCouponMock,
     recordRedemption: recordRedemptionMock,
     releaseCoupon: releaseCouponMock,
+    releaseCouponForOrder: releaseCouponForOrderMock,
   };
 });
 
@@ -1012,6 +1016,34 @@ describe('cancelMyOrder', () => {
     expect(sqls.some((q) => /reserved = GREATEST\(0, p\.reserved - oi\.quantity\)/.test(q))).toBe(true);
   });
 
+  /**
+   * The PIX stays payable for an hour. Paid after the cancel, the webhook
+   * revives the order after the credit was already handed back.
+   */
+  it('anula o PIX ainda pendente e devolve o uso do cupom', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow({ pagarme_charge_id: 'ch_pix' })] })
+      .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled', pagarme_charge_id: 'ch_pix' })] });
+    pagarmeGetChargeMock.mockResolvedValueOnce({ id: 'ch_pix', status: 'pending', amount: 12400 });
+
+    await cancelMyOrder('u1', 'o1');
+
+    expect(pagarmeRefundMock).toHaveBeenCalledWith('ch_pix');
+    expect(releaseCouponForOrderMock).toHaveBeenCalledWith('o1');
+  });
+
+  // A DELETE on a paid charge is a refund, not a void.
+  it('não toca numa cobrança que a operadora já diz paga', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [orderRow({ pagarme_charge_id: 'ch_pix' })] })
+      .mockResolvedValueOnce({ rows: [orderRow({ status: 'cancelled', pagarme_charge_id: 'ch_pix' })] });
+    pagarmeGetChargeMock.mockResolvedValueOnce({ id: 'ch_pix', status: 'paid', amount: 12400 });
+
+    await cancelMyOrder('u1', 'o1');
+
+    expect(pagarmeRefundMock).not.toHaveBeenCalled();
+  });
+
   // Ownership lives in the WHERE clause, so a guessed id finds nothing.
   it('does not find an order belonging to someone else', async () => {
     queryMock.mockResolvedValue({ rows: [] });
@@ -1630,6 +1662,19 @@ describe('fechar um pedido que tem cobrança', () => {
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({ template: 'order-refunded', to: 'laura@example.com' })
     );
+  });
+
+  /** A pending order has no money to return, and its hold would never be released. */
+  it('recusa estornar um pedido ainda pendente', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sqlOf(sql).includes("UPDATE orders SET status = 'refunded'")) return { rows: [] };
+      return { rows: [chargedOrder({ status: 'pending' })] };
+    });
+
+    await expect(refundOrder('o1', 'admin-1')).rejects.toMatchObject({ code: 'ORDER_NOT_PAID' });
+    expect(pagarmeRefundMock).not.toHaveBeenCalled();
+    const claim = queryMock.mock.calls.map((c) => sqlOf(c[0])).find((s) => s.includes("SET status = 'refunded'"));
+    expect(claim).toContain("status IN ('paid', 'processing', 'shipped', 'delivered')");
   });
 });
 

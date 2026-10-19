@@ -311,7 +311,7 @@ describe('OrderDetailModal — status de pedido não pago', () => {
       expect(option.disabled).toBe(true)
     }
     expect((screen.getByRole('option', { name: /^Cancelado/ }) as HTMLOptionElement).disabled).toBe(false)
-    expect(screen.getByText(/registre a venda no PDV/)).toBeInTheDocument()
+    expect(screen.getByText(/venda de balcão não passa pela loja online/)).toBeInTheDocument()
   })
 
   it('mostra a razão do servidor quando a mudança é recusada', async () => {

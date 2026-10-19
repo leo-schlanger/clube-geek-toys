@@ -220,8 +220,21 @@ describe('checkCoupon', () => {
 
     expect(result).toMatchObject({ ok: false, code: 'COUPON_ALREADY_USED' });
     const [sql, params] = queryMock.mock.calls[1];
-    expect(sql).toContain('lower(customer_email)');
+    expect(sql).toContain('lower(r.customer_email)');
     expect(params).toContain('laura@example.com');
+  });
+
+  /** An order cancelled unpaid gave its use back; its row must not refuse the retry. */
+  it('does not count redemptions of cancelled orders', async () => {
+    queryMock
+      .mockResolvedValueOnce({ rows: [couponRow({ max_uses_per_customer: 1 })] })
+      .mockResolvedValueOnce({ rows: [{ n: 0 }] });
+
+    await checkCoupon('VERAO20', { subtotal: 100, customerEmail: 'laura@example.com' });
+
+    const [sql] = queryMock.mock.calls[1];
+    expect(sql).toContain('LEFT JOIN orders o ON o.id = r.order_id');
+    expect(sql).toContain("o.status IS DISTINCT FROM 'cancelled'");
   });
 
   it('accepts a coupon that is within every limit', async () => {

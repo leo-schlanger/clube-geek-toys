@@ -42,6 +42,7 @@ import {
   pickBestDiscount,
   recordRedemption,
   releaseCoupon,
+  releaseCouponForOrder,
   retailDiscountCandidates,
 } from './promo.service.js';
 import { moduleLogger } from '../config/logger.js';
@@ -1609,6 +1610,7 @@ export async function cancelMyOrder(userId: string, orderId: string): Promise<Or
   await releaseReservationById(orderId).catch((err) =>
     log.error({ err }, 'release reservation after customer cancel')
   );
+  await undoUnpaidOrder(order);
 
   if ((order.storeCreditApplied ?? 0) > 0) {
     const restored = await restoreCreditForOrder(orderId, {
@@ -1751,6 +1753,32 @@ export function notifyOrderDelivered(order: Order): void {
 
 const VALID_STATUS = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
 
+/**
+ * Undo what an unpaid order took, once it has been cancelled: the coupon use,
+ * and a PIX the buyer could otherwise still pay.
+ *
+ * A PIX stays payable for its whole expiry window. Paid after the cancel, the
+ * webhook revives the order (captured money must land somewhere) after its
+ * store credit was already handed back — the credit would be spent twice.
+ * The charge is voided only while the provider still calls it pending: a
+ * DELETE on a paid charge is a refund. Best effort: if voiding fails, the
+ * revival path still records the money.
+ */
+async function undoUnpaidOrder(order: Order): Promise<void> {
+  await releaseCouponForOrder(order.id).catch((err) =>
+    log.error({ err }, `coupon release failed (order=${order.id})`)
+  );
+  if (order.paymentMethod !== 'pix' || !order.pagarmeChargeId) return;
+  try {
+    const charge = await pagarme.getCharge(order.pagarmeChargeId);
+    if (charge && pagarme.mapChargeStatus(charge.status) === 'pending') {
+      await pagarme.refundCharge(order.pagarmeChargeId);
+    }
+  } catch (err) {
+    log.warn({ err }, `could not void PIX of cancelled order #${order.orderNumber}`);
+  }
+}
+
 export async function updateOrderStatus(
   id: string,
   status: string,
@@ -1790,7 +1818,7 @@ export async function updateOrderStatus(
       409,
       'Este pedido ainda não foi pago. ' +
         (prev.paymentMethod === 'pix' ? 'Se o PIX caiu, use "Confirmar PIX". ' : '') +
-        'Se o cliente pagou no balcão, cancele este pedido e registre a venda no PDV.',
+        'Se o cliente pagou no balcão, cancele este pedido — a venda de balcão não passa pela loja online.',
       'ORDER_NOT_PAID',
     );
   }
@@ -1840,6 +1868,8 @@ export async function updateOrderStatus(
     await releaseReservationById(id).catch((err) =>
       log.error({ err }, 'release reservation on status change')
     );
+    // Coupon use and a still-payable PIX, for an order that was never paid.
+    if (prev.status === 'pending') await undoUnpaidOrder(order);
   }
 
   // Restock when undoing a paid (or later) order.
@@ -1994,11 +2024,22 @@ export async function refundOrder(id: string, actorUserId: string): Promise<Orde
   // quietly: if the UPDATE failed after the refund succeeded, the cash was gone
   // and the order stayed `paid` — still counted as revenue — while a retry hit
   // `charge_already_refunded` and 500'd forever.
+  // Only a paid order is refunded. A pending one has no money to return and
+  // still holds a reservation that nothing here would release.
   const result = await query(
-    `UPDATE orders SET status = 'refunded' WHERE id = $1 AND status <> 'refunded' RETURNING *`,
+    `UPDATE orders SET status = 'refunded'
+      WHERE id = $1 AND status IN ('paid', 'processing', 'shipped', 'delivered')
+      RETURNING *`,
     [id]
   );
   if (result.rows.length === 0) {
+    if (order.status === 'pending') {
+      throw new AppError(
+        409,
+        'Este pedido ainda não foi pago: cancele-o em vez de reembolsar.',
+        'ORDER_NOT_PAID',
+      );
+    }
     throw new AppError(409, 'Pedido já reembolsado.', 'ORDER_ALREADY_REFUNDED');
   }
 

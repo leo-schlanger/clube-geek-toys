@@ -367,19 +367,24 @@ async function countCustomerRedemptions(
   let i = 2;
 
   if (ctx.userId) {
-    conditions.push(`user_id = $${i++}`);
+    conditions.push(`r.user_id = $${i++}`);
     params.push(ctx.userId);
   }
   const email = ctx.customerEmail?.trim().toLowerCase();
   if (email) {
-    conditions.push(`lower(customer_email) = $${i++}`);
+    conditions.push(`lower(r.customer_email) = $${i++}`);
     params.push(email);
   }
   if (conditions.length === 0) return 0;
 
+  // An order that was cancelled unpaid gave its use back (`releaseCouponForOrder`);
+  // counting its row would refuse the buyer's retry.
   const result = await query(
-    `SELECT COUNT(*)::int AS n FROM coupon_redemptions
-      WHERE coupon_id = $1 AND (${conditions.join(' OR ')})`,
+    `SELECT COUNT(*)::int AS n
+       FROM coupon_redemptions r
+       LEFT JOIN orders o ON o.id = r.order_id
+      WHERE r.coupon_id = $1 AND (${conditions.join(' OR ')})
+        AND o.status IS DISTINCT FROM 'cancelled'`,
     params
   );
   return Number(result.rows[0]?.n ?? 0);
@@ -432,6 +437,21 @@ export async function recordRedemption(
       input.discountAmount,
     ]
   );
+}
+
+/**
+ * Gives back the use an order took, when that order never became a sale.
+ * Call it only from the writer that moved the order out of `pending`.
+ */
+export async function releaseCouponForOrder(orderId: string): Promise<boolean> {
+  const result = await query(
+    `UPDATE coupons
+        SET used_count = GREATEST(0, used_count - 1), updated_at = NOW()
+      WHERE id = (SELECT coupon_id FROM coupon_redemptions WHERE order_id = $1)
+      RETURNING id`,
+    [orderId]
+  );
+  return result.rows.length > 0;
 }
 
 /** Gives a use back when the order it belonged to never became a sale. */
