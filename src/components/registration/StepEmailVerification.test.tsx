@@ -65,10 +65,10 @@ describe('StepEmailVerification', () => {
     expect(screen.getByText('test@example.com')).toBeInTheDocument()
   })
 
-  it('renders "Ja verifiquei" button', () => {
+  it('renders "Já verifiquei" button', () => {
     render(<StepEmailVerification {...defaultProps} />)
 
-    expect(screen.getByRole('button', { name: /ja verifiquei/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /já verifiquei/i })).toBeInTheDocument()
   })
 
   it('renders resend button', () => {
@@ -109,12 +109,12 @@ describe('StepEmailVerification', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('Email verificado com sucesso!')
   })
 
-  it('calls onRefreshUser when "Ja verifiquei" is clicked', async () => {
+  it('calls onRefreshUser when "Já verifiquei" is clicked', async () => {
     vi.useRealTimers() // userEvent needs real timers
     const user = userEvent.setup()
     render(<StepEmailVerification {...defaultProps} />)
 
-    await user.click(screen.getByRole('button', { name: /ja verifiquei/i }))
+    await user.click(screen.getByRole('button', { name: /já verifiquei/i }))
 
     expect(defaultProps.onRefreshUser).toHaveBeenCalled()
   })
@@ -124,10 +124,10 @@ describe('StepEmailVerification', () => {
     const user = userEvent.setup()
     render(<StepEmailVerification {...defaultProps} />)
 
-    await user.click(screen.getByRole('button', { name: /ja verifiquei/i }))
+    await user.click(screen.getByRole('button', { name: /já verifiquei/i }))
 
     expect(mockToastInfo).toHaveBeenCalledWith(
-      expect.stringContaining('nao verificado'),
+      expect.stringContaining('não verificado'),
     )
   })
 

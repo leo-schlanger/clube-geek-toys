@@ -66,7 +66,7 @@ function shortDay(iso: string): string {
   })
 }
 
-export function EventTicketsTab() {
+export function EventTicketsTab({ initialFilter }: { initialFilter?: string } = {}) {
   const [reservations, setReservations] = useState<EventReservation[]>([])
   const [summary, setSummary] = useState({
     pending: 0,
@@ -78,7 +78,7 @@ export function EventTicketsTab() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
-  const [filter, setFilter] = useState<FilterId>('confirmed')
+  const [filter, setFilter] = useState<FilterId>(initialFilter === 'pending' ? 'pending' : 'confirmed')
   const [events, setEvents] = useState<EventConfig[] | null>(null)
   const [eventId, setEventId] = useState<string>('')
   const [search, setSearch] = useState('')

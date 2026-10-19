@@ -311,13 +311,22 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
     hasProviderCharge &&
     (order?.status === 'paid' || order?.status === 'processing' || order?.status === 'shipped')
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label="Detalhes do pedido">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="relative">
           <button
             type="button"
             onClick={onClose}
+            aria-label="Fechar"
             className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
           >
             <X className="h-5 w-5" />
@@ -428,11 +437,15 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                   <h4 className="flex items-center gap-1 text-sm font-semibold">
                     <Store className="h-4 w-4 text-primary" /> Retirada na loja
                   </h4>
-                  <p className="text-sm text-muted-foreground">
-                    O cliente busca no balcão — não postar. Ao separar, mude o status para{' '}
-                    <strong className="text-foreground">Enviado</strong>: é o que dispara o e-mail
-                    "pronto para retirada".
-                  </p>
+                  {order.status === 'paid' || order.status === 'processing' ? (
+                    <p className="text-sm text-muted-foreground">
+                      O cliente busca no balcão — não postar. Ao separar, mude o status para{' '}
+                      <strong className="text-foreground">Enviado</strong>: é o que dispara o e-mail
+                      "pronto para retirada".
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">O cliente busca no balcão — não postar.</p>
+                  )}
                 </div>
               )}
 
@@ -480,7 +493,9 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 <div className="space-y-1 border-t pt-4">
                   <h4 className="text-sm font-semibold">Etiqueta de envio</h4>
                   <p className="text-xs text-muted-foreground">
-                    {order.status !== 'pending'
+                    {order.status === 'delivered'
+                      ? 'Pedido já entregue — não há etiqueta a comprar.'
+                      : order.status !== 'pending'
                       ? 'Pedido cancelado ou reembolsado — não há etiqueta a comprar.'
                       : canConfirmPix
                         ? 'A etiqueta aparece aqui assim que o pagamento for confirmado. Use "Confirmar PIX" no rodapé se o dinheiro já caiu.'
@@ -637,12 +652,20 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                 </h4>
                 <div className="flex gap-2">
                   <select
+                    aria-label="Novo status do pedido"
                     value={statusValue}
                     onChange={(e) => setStatusValue(e.target.value as OrderStatus)}
                     className="flex h-10 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {ORDER_STATUSES.map((s) => (
-                      <option key={s} value={s} disabled={order.status === 'pending' && PAID_STEPS.includes(s)}>
+                      <option
+                        key={s}
+                        value={s}
+                        disabled={
+                          (order.status === 'pending' && PAID_STEPS.includes(s)) ||
+                          ((order.status === 'cancelled' || order.status === 'refunded') && s !== order.status)
+                        }
+                      >
                         {ORDER_STATUS_META[s].label}
                       </option>
                     ))}

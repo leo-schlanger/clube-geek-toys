@@ -85,7 +85,7 @@ export function StepEmailVerification({
     try {
       await onRefreshUser()
       if (!verifiedRef.current) {
-        toast.info('Ainda nao verificado. Verifique seu email e tente novamente.')
+        toast.info('Ainda não verificado. Verifique seu email e tente novamente.')
       }
     } finally {
       setChecking(false)
@@ -170,7 +170,7 @@ export function StepEmailVerification({
             ) : (
               <CheckCircle className="h-4 w-4" />
             )}
-            Ja verifiquei
+            Já verifiquei
           </Button>
 
           {/* Resend button with cooldown */}
@@ -208,7 +208,7 @@ export function StepEmailVerification({
           {/* Help text */}
           <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1.5">
             <Inbox className="h-3.5 w-3.5" />
-            Nao recebeu? Verifique sua caixa de spam
+            Não recebeu? Verifique sua caixa de spam
           </p>
         </CardContent>
       </Card>

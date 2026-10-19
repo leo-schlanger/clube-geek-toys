@@ -30,8 +30,8 @@ import { sanitizeName, normalizePhone, normalizeCPF } from "../../lib/sanitize"
 
 const schema = z.object({
   fullName: z.string().min(3, "Nome deve ter pelo menos 3 caracteres"),
-  cpf: z.string().refine((val) => validateCPF(val), "CPF invalido"),
-  phone: z.string().min(10, "Telefone invalido"),
+  cpf: z.string().refine((val) => validateCPF(val), "CPF inválido"),
+  phone: z.string().min(10, "Telefone inválido"),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -137,7 +137,7 @@ export function StepPersonalData({
     if (digits.length !== 11) return
     if (!validateCPF(digits)) {
       setCpfStatus("error")
-      setCpfMessage("CPF invalido")
+      setCpfMessage("CPF inválido")
       return
     }
 
@@ -165,7 +165,7 @@ export function StepPersonalData({
       const registered = await isCPFRegistered(digits)
       if (registered) {
         setCpfStatus("error")
-        setCpfMessage("CPF ja cadastrado no sistema")
+        setCpfMessage("CPF já cadastrado no sistema")
         cpfValidatingRef.current = false
         return
       }
@@ -186,7 +186,7 @@ export function StepPersonalData({
       }
     } catch {
       setCpfStatus("warning")
-      setCpfMessage("Nao foi possivel verificar o CPF")
+      setCpfMessage("Não foi possível verificar o CPF")
     } finally {
       cpfValidatingRef.current = false
     }
@@ -373,7 +373,7 @@ export function StepPersonalData({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                Proximo
+                Próximo
                 <ArrowRight className="h-4 w-4" />
               </>
             )}

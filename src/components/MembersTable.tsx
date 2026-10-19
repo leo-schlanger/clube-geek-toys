@@ -7,6 +7,7 @@ import { formatCPF, getStatusLabel } from '../lib/utils'
 import { api } from '../lib/api-client'
 import { toast } from 'sonner'
 import { useConfirm } from '../hooks/useConfirm'
+import { useIsMobile } from '../hooks/useIsMobile'
 import {
   Eye,
   Edit,
@@ -199,6 +200,8 @@ export function MembersTable({
         header: 'Validade',
         sortable: true,
         render: (member) => {
+          // A signup that never paid has no expiry; new Date(null) printed 31/12/1969.
+          if (!member.expiryDate) return <span className="text-muted-foreground">—</span>
           const isExpired = new Date(member.expiryDate) < new Date()
           return (
             <span className={isExpired ? 'text-red-500 font-medium' : ''}>
@@ -235,44 +238,54 @@ export function MembersTable({
   )
 
   // Row actions
+  const isMobile = useIsMobile()
+  // On a phone the cards spell the actions out; an icon row alone was a guess.
+  const actionSize = isMobile ? 'sm' : 'icon'
+  const actionClass = isMobile ? 'h-8 gap-1 px-2 text-xs' : 'h-8 w-8'
   const renderActions = useCallback(
     (member: Member) => (
       <div className="flex items-center justify-end gap-1">
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+          size={actionSize}
+          className={actionClass}
           onClick={(e) => {
             e.stopPropagation()
             onView(member)
           }}
           title="Ver detalhes"
+          aria-label="Ver detalhes"
         >
           <Eye className="h-4 w-4" />
+          {isMobile && 'Ver'}
         </Button>
         <Button
           variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+          size={actionSize}
+          className={actionClass}
           onClick={(e) => {
             e.stopPropagation()
             onEdit(member)
           }}
           title="Editar"
+          aria-label="Editar"
         >
           <Edit className="h-4 w-4" />
+          {isMobile && 'Editar'}
         </Button>
         {onResendEmail && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-8 w-8"
+                size={actionSize}
+                className={actionClass}
                 onClick={(e) => e.stopPropagation()}
                 title="Enviar email"
+                aria-label="Enviar email"
               >
                 <Mail className="h-4 w-4" />
+                {isMobile && 'E-mail'}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -297,11 +310,14 @@ export function MembersTable({
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              size="icon"
-              className="h-8 w-8"
+              size={actionSize}
+              className={actionClass}
               onClick={(e) => e.stopPropagation()}
+              title="Mais ações"
+              aria-label="Mais ações"
             >
               <MoreHorizontal className="h-4 w-4" />
+              {isMobile && 'Mais'}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -316,7 +332,7 @@ export function MembersTable({
         </DropdownMenu>
       </div>
     ),
-    [onView, onEdit, onDelete, onResendEmail]
+    [onView, onEdit, onDelete, onResendEmail, isMobile, actionSize, actionClass]
   )
 
   // Export data function
@@ -329,7 +345,7 @@ export function MembersTable({
       m.phone,
       PLANS[m.plan].name,
       getStatusLabel(m.status),
-      new Date(m.expiryDate).toLocaleDateString('pt-BR'),
+      m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('pt-BR') : '',
     ])
     return [headers, ...rows]
   }, [])

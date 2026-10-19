@@ -180,7 +180,7 @@ describe('StepAccount', () => {
 
       expect(screen.getByText(/pelo menos 8 caracteres/i)).toBeInTheDocument()
       expect(screen.getByText(/uma letra maiuscula/i)).toBeInTheDocument()
-      expect(screen.getByText(/um numero/i)).toBeInTheDocument()
+      expect(screen.getByText(/um número/i)).toBeInTheDocument()
       expect(screen.getByText(/um caractere especial/i)).toBeInTheDocument()
     })
 
@@ -198,7 +198,7 @@ describe('StepAccount', () => {
       const uppercaseItem = screen.getByText(/uma letra maiuscula/i)
       expect(uppercaseItem.className).toContain('green')
 
-      const numberItem = screen.getByText(/um numero/i)
+      const numberItem = screen.getByText(/um número/i)
       expect(numberItem.className).toContain('green')
     })
 
@@ -216,7 +216,7 @@ describe('StepAccount', () => {
       const uppercaseItem = screen.getByText(/uma letra maiuscula/i)
       expect(uppercaseItem.className).toContain('red')
 
-      const numberItem = screen.getByText(/um numero/i)
+      const numberItem = screen.getByText(/um número/i)
       expect(numberItem.className).toContain('red')
     })
   })
@@ -351,7 +351,7 @@ describe('StepAccount', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/senhas nao conferem/i)
+          screen.getByText(/senhas não conferem/i)
         ).toBeInTheDocument()
       })
     })
@@ -373,7 +373,7 @@ describe('StepAccount', () => {
       await user.click(submitButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/senhas nao conferem/i)).toBeInTheDocument()
+        expect(screen.getByText(/senhas não conferem/i)).toBeInTheDocument()
       })
 
       expect(onNext).not.toHaveBeenCalled()
@@ -480,7 +480,7 @@ describe('StepAccount', () => {
       await user.click(submitButton)
 
       await waitFor(() => {
-        expect(screen.getByText(/1 numero/i)).toBeInTheDocument()
+        expect(screen.getByText(/1 número/i)).toBeInTheDocument()
       })
 
       expect(onNext).not.toHaveBeenCalled()

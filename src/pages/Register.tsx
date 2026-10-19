@@ -181,7 +181,7 @@ export default function Register() {
       toast.loading('Validando email...', { id: 'reg-progress' })
       const emailResult = await validateEmail(data.email)
       if (!emailResult.valid) {
-        toast.error(emailResult.error || 'Email invalido', { id: 'reg-progress' })
+        toast.error(emailResult.error || 'Email inválido', { id: 'reg-progress' })
         return
       }
 
@@ -190,10 +190,10 @@ export default function Register() {
       if (!result.success) {
         // Use error code (stable) instead of comparing translated error strings
         if (result.code === 'EMAIL_ALREADY_EXISTS') {
-          toast.error('Este email ja esta cadastrado.', {
+          toast.error('Este email já está cadastrado.', {
             id: 'reg-progress',
             duration: 8000,
-            description: 'Se voce esqueceu a senha, use "Esqueci minha senha" na tela de login.',
+            description: 'Se você esqueceu a senha, use "Esqueci minha senha" na tela de login.',
             action: {
               label: 'Fazer login',
               onClick: () => navigate(`/login?email=${encodeURIComponent(data.email)}`),
@@ -233,7 +233,7 @@ export default function Register() {
         }))
         setAccountCreated(true)
         toast.success('Conta Google conectada! Complete seus dados.')
-        toast.info('Dica: voce pode criar uma senha para login sem Google em "Esqueci minha senha" a qualquer momento.', {
+        toast.info('Dica: você pode criar uma senha para login sem Google em "Esqueci minha senha" a qualquer momento.', {
           duration: 8000,
         })
       } else {
@@ -263,12 +263,12 @@ export default function Register() {
           new Promise<boolean>((_, reject) => setTimeout(() => reject('timeout'), 5000)),
         ]) as boolean
       } catch {
-        toast.error('Nao foi possivel verificar o CPF. Tente novamente.', { id: 'reg-progress' })
+        toast.error('Não foi possível verificar o CPF. Tente novamente.', { id: 'reg-progress' })
         return
       }
 
       if (isRegistered) {
-        toast.error('Este CPF ja esta cadastrado', { id: 'reg-progress' })
+        toast.error('Este CPF já está cadastrado', { id: 'reg-progress' })
         return
       }
 
@@ -276,7 +276,7 @@ export default function Register() {
       const userId = user?.id || ''
       const memberEmail = memberData.email || user?.email || ''
       if (!memberEmail) {
-        toast.error('Email nao encontrado. Volte e crie sua conta novamente.', { id: 'reg-progress' })
+        toast.error('Email não encontrado. Volte e crie sua conta novamente.', { id: 'reg-progress' })
         return
       }
 
@@ -365,7 +365,7 @@ export default function Register() {
     : step === 2 ? 'Contrato' : 'Pagamento'
 
   const stepSubtitle = step === 1
-    ? (accountCreated ? 'Preencha seus dados pessoais' : 'Crie sua conta para comecar')
+    ? (accountCreated ? 'Preencha seus dados pessoais' : 'Crie sua conta para começar')
     : step === 2 ? 'Leia e assine o contrato de adesão'
     : 'Finalize o pagamento para ativar'
 
@@ -423,7 +423,7 @@ export default function Register() {
                   Sim, continuar
                 </button>
                 <button className="px-3 py-1.5 text-sm font-medium rounded-md border border-border hover:bg-muted" onClick={discardDraft}>
-                  Nao, comecar novo
+                  Não, começar novo
                 </button>
               </div>
             </CardContent>
@@ -445,7 +445,7 @@ export default function Register() {
             onNext={handlePersonalDataComplete}
             onBack={() => {
               if (accountAlreadyExists) {
-                toast.info('Sua conta ja existe. Complete os dados abaixo.')
+                toast.info('Sua conta já existe. Complete os dados abaixo.')
               } else {
                 setAccountCreated(false)
               }
@@ -461,7 +461,7 @@ export default function Register() {
 
         {/* Step 2: Contract */}
         {step === 2 && memberData.memberId && (
-          <SectionErrorBoundary fallbackMessage="Erro ao carregar o contrato. Tente recarregar a pagina.">
+          <SectionErrorBoundary fallbackMessage="Erro ao carregar o contrato. Tente recarregar a página.">
             <StepContract
               memberId={memberData.memberId}
               memberName={memberData.fullName}
@@ -505,7 +505,7 @@ export default function Register() {
 
         {/* Footer links */}
         <p className="text-center text-muted-foreground mt-8 text-sm">
-          Ja tem uma conta? <Link to="/login" className="text-primary hover:underline font-medium">Fazer Login</Link>
+          Já tem uma conta? <Link to="/login" className="text-primary hover:underline font-medium">Fazer Login</Link>
         </p>
 
         <div className="mt-8 flex justify-center gap-4 text-xs text-muted-foreground/60">

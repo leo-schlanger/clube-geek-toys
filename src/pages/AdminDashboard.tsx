@@ -126,6 +126,13 @@ export default function AdminDashboard() {
       return next
     }, { replace: true })
   }, [setSearchParams])
+  // Set by a "Painel do dia" card so the tab opens on the queue it counted;
+  // any other way into a tab clears it.
+  const [queueFilter, setQueueFilter] = useState<string | undefined>()
+  const openTab = useCallback((tab: AdminTab, filter?: string) => {
+    setQueueFilter(filter)
+    setActiveTab(tab)
+  }, [setActiveTab])
   const [members, setMembers] = useState<Member[]>([])
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [systemUsers, setSystemUsers] = useState<{ id: string; email: string; role: string; createdAt?: string }[]>([])
@@ -405,7 +412,7 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <AdminSidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={openTab}
         onSignOut={signOut}
       />
 
@@ -583,7 +590,7 @@ export default function AdminDashboard() {
               {/* What needs a human today — before the metrics, which is the
                   order a shift actually reads the dashboard in. */}
               <Suspense fallback={<TabLoadingFallback />}>
-                <ActionCenter onNavigate={setActiveTab} />
+                <ActionCenter onNavigate={openTab} />
               </Suspense>
 
               {/* Real-time Metrics */}
@@ -626,15 +633,15 @@ export default function AdminDashboard() {
               />
             )}
             {activeTab === 'products' && <ProductsTab />}
-            {activeTab === 'stock' && <StockTab />}
-            {activeTab === 'orders' && <OrdersTab />}
+            {activeTab === 'stock' && <StockTab key={queueFilter} initialFilter={queueFilter} />}
+            {activeTab === 'orders' && <OrdersTab key={queueFilter} initialStatus={queueFilter} />}
             {activeTab === 'wholesale' && <WholesaleTab />}
             {activeTab === 'reviews' && <ReviewsTab />}
             {activeTab === 'questions' && <QuestionsTab />}
             {activeTab === 'event-config' && <EventConfigTab />}
             {activeTab === 'categories' && <CategoriesTab />}
             {activeTab === 'coupons' && <CouponsTab />}
-            {activeTab === 'events' && <EventTicketsTab />}
+            {activeTab === 'events' && <EventTicketsTab key={queueFilter} initialFilter={queueFilter} />}
             {activeTab === 'gallery' && <GalleryTab />}
             {activeTab === 'users' && (
               <UsersTab

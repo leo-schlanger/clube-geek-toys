@@ -32,6 +32,7 @@ vi.mock('../lib/utils', async (importOriginal) => {
   return {
     ...actual,
     formatCPF: (cpf: string) => cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'),
+    validateCPF: (cpf: string) => cpf.replace(/\D/g, '') !== '11111111111',
     getStatusLabel: (s: string) => s === 'active' ? 'Ativo' : 'Inativo',
   }
 })
@@ -220,6 +221,16 @@ describe('PDV', () => {
     await waitFor(() => {
       expect(screen.getByText(/Clube GeekPop & Toys/)).toBeInTheDocument()
     })
+  })
+
+  it('refuses a mistyped CPF without asking the server', async () => {
+    render(<PDV />)
+
+    await userEvent.type(screen.getByPlaceholderText('Digite o CPF...'), '11111111111')
+    fireEvent.submit(screen.getByPlaceholderText('Digite o CPF...').closest('form')!)
+
+    expect(await screen.findByText(/CPF inválido/)).toBeInTheDocument()
+    expect(mockGetMemberByCPF).not.toHaveBeenCalled()
   })
 
   it('shows not found when CPF does not match', async () => {

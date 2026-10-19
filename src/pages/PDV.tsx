@@ -9,7 +9,7 @@ import { Badge } from '../components/ui/badge'
 import { Loading } from '../components/ui/loading'
 import { QRScanner } from '../components/QRScanner'
 import { CLUB_PLAN, type Member } from '../types'
-import { formatCPF, getStatusLabel } from '../lib/utils'
+import { formatCPF, getStatusLabel, validateCPF } from '../lib/utils'
 import { getMemberByCPF, getMemberById, isMemberActive } from '../lib/members'
 import { PDVDoor } from '../components/PDVDoor'
 
@@ -155,6 +155,12 @@ export default function PDV() {
    * Verify member by CPF
    */
   async function verifyMember(cpf: string) {
+    // A mistyped CPF used to go to the server and come back "não encontrado",
+    // which reads as "not a member" to the person at the counter.
+    if (!validateCPF(cpf)) {
+      setResult({ member: null, isValid: false, message: 'CPF inválido — confira os números digitados' })
+      return
+    }
     try {
       const member = await getMemberByCPF(cpf)
 

@@ -30,6 +30,8 @@ interface QueueMeta {
   /** What clearing the queue actually means, so the card is self-explanatory. */
   hint: string
   tab: AdminTab
+  /** The filter the tab opens on, so the card lands on the queue it counts. */
+  filter?: string
   icon: React.ReactNode
   severity: Severity
   /** How to read `oldestDays` for this queue. */
@@ -47,6 +49,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     // that sits here for hours is someone who generated a code and walked away.
     hint: 'Confirma sozinho quando o PIX cair — só acompanhe',
     tab: 'orders',
+    filter: 'pending',
     icon: <Banknote className="h-5 w-5" />,
     severity: 'routine',
     age: 'waiting',
@@ -58,6 +61,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     // settings tab before reporting it as missing.
     hint: 'Pagos e esperando separação — a etiqueta se compra dentro do pedido',
     tab: 'orders',
+    filter: 'paid',
     icon: <PackageCheck className="h-5 w-5" />,
     severity: 'attention',
     age: 'waiting',
@@ -68,6 +72,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     // Correios scan; only a label bought elsewhere needs its code typed in.
     hint: 'Separados, aguardando postagem — etiqueta comprada aqui atualiza sozinha',
     tab: 'orders',
+    filter: 'processing',
     icon: <Truck className="h-5 w-5" />,
     severity: 'attention',
     age: 'waiting',
@@ -78,6 +83,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     // parcel to post and found none. The step left is telling the customer.
     hint: 'Separado para o balcão? Mude para Enviado — avisa o cliente que pode buscar',
     tab: 'orders',
+    filter: 'processing',
     icon: <Store className="h-5 w-5" />,
     severity: 'attention',
     age: 'waiting',
@@ -86,6 +92,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     label: 'Enviados sem entrega',
     hint: 'Mais de 10 dias em trânsito — verifique com o cliente',
     tab: 'orders',
+    filter: 'shipped',
     icon: <AlertTriangle className="h-5 w-5" />,
     severity: 'urgent',
     age: 'waiting',
@@ -105,6 +112,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     // gets marked paid. What remains is a queue to watch.
     hint: 'O PIX confirma sozinho. Quem fica aqui gerou o código e ainda não pagou',
     tab: 'events',
+    filter: 'pending',
     icon: <Ticket className="h-5 w-5" />,
     severity: 'routine',
     age: 'waiting',
@@ -129,6 +137,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     label: 'SKUs esgotados',
     hint: 'Sem estoque — some da vitrine',
     tab: 'stock',
+    filter: 'out',
     icon: <PackageX className="h-5 w-5" />,
     severity: 'urgent',
     age: 'none',
@@ -137,6 +146,7 @@ const QUEUES: Record<ActionItemKey, QueueMeta> = {
     label: 'SKUs no mínimo',
     hint: 'No limite do estoque mínimo — hora de repor',
     tab: 'stock',
+    filter: 'low',
     icon: <AlertTriangle className="h-5 w-5" />,
     severity: 'attention',
     age: 'none',
@@ -181,7 +191,7 @@ function ageLabel(meta: QueueMeta, days: number | null): string | null {
 interface QueueCardProps {
   item: ActionItem
   meta: QueueMeta
-  onOpen: (tab: AdminTab) => void
+  onOpen: (tab: AdminTab, filter?: string) => void
 }
 
 function QueueCard({ item, meta, onOpen }: QueueCardProps) {
@@ -191,7 +201,7 @@ function QueueCard({ item, meta, onOpen }: QueueCardProps) {
   return (
     <button
       type="button"
-      onClick={() => onOpen(meta.tab)}
+      onClick={() => onOpen(meta.tab, meta.filter)}
       aria-label={`${item.count} ${meta.label} — abrir`}
       className={`text-left rounded-lg border bg-card p-4 transition-all hover:shadow-lg hover:border-primary/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${style.ring}`}
     >
@@ -213,7 +223,7 @@ function QueueCard({ item, meta, onOpen }: QueueCardProps) {
 }
 
 interface ActionCenterProps {
-  onNavigate: (tab: AdminTab) => void
+  onNavigate: (tab: AdminTab, filter?: string) => void
 }
 
 /**

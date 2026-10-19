@@ -1631,6 +1631,22 @@ describe('fechar um pedido que tem cobrança', () => {
     }
   );
 
+  /** Moving a refunded order back to delivered counted the money again. */
+  it.each([['refunded', 'delivered'], ['refunded', 'pending'], ['cancelled', 'paid'], ['cancelled', 'pending']])(
+    'mantém fechado um pedido %s (recusa %s)',
+    async (from, to) => {
+      queryMock.mockResolvedValue({ rows: [chargedOrder({ status: from, pagarme_charge_id: null })] });
+
+      await expect(updateOrderStatus('o1', to, 'admin-1')).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'ORDER_CLOSED',
+      });
+      expect(
+        queryMock.mock.calls.some((c) => sqlOf(c[0]).includes('UPDATE orders SET status'))
+      ).toBe(false);
+    }
+  );
+
   /** A pending order was never charged, so closing it by hand is fine. */
   it('deixa cancelar um pedido ainda pendente', async () => {
     queryMock.mockImplementation(async (sql: string) => {

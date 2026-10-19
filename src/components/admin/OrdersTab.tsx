@@ -18,25 +18,36 @@ import { logger } from '../../lib/logger'
 import { toast } from 'sonner'
 import { ClipboardList, CreditCard, Eye, RotateCcw, Store, Tag } from 'lucide-react'
 
-export function OrdersTab() {
+const PAGE_SIZE = 25
+
+export function OrdersTab({ initialStatus }: { initialStatus?: string } = {}) {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(
+    ORDER_STATUSES.includes(initialStatus as OrderStatus) ? (initialStatus as OrderStatus) : 'all'
+  )
   const [detailId, setDetailId] = useState<string | null>(null)
+  // The API pages at 20 by default, and the list once stopped there without
+  // saying so: 49 orders, 20 on screen, no way to reach the rest.
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
 
   const fetchOrders = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await adminListOrders(
-        statusFilter === 'all' ? {} : { status: statusFilter }
-      )
+      const result = await adminListOrders({
+        ...(statusFilter === 'all' ? {} : { status: statusFilter }),
+        page,
+        limit: PAGE_SIZE,
+      })
       setOrders(result.orders)
+      setTotal(result.total)
     } catch (error) {
       logger.error('Error fetching orders:', error)
       toast.error('Erro ao carregar pedidos')
     }
     setLoading(false)
-  }, [statusFilter])
+  }, [statusFilter, page])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- data fetch on mount/filter change
@@ -80,7 +91,11 @@ export function OrdersTab() {
 
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
+            aria-label="Filtrar pedidos por status"
+            onChange={(e) => {
+              setStatusFilter(e.target.value as OrderStatus | 'all')
+              setPage(1)
+            }}
             className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <option value="all">Todos os status</option>
@@ -281,6 +296,29 @@ export function OrdersTab() {
                     ? 'Os pedidos da loja aparecem aqui'
                     : 'Nenhum pedido com este status'}
                 </p>
+              </div>
+            )}
+
+            {total > 0 && (
+              <div className="mt-4 flex flex-col items-center justify-between gap-3 border-t border-border pt-4 text-sm sm:flex-row">
+                <span className="text-muted-foreground">
+                  Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} de {total} pedido(s)
+                </span>
+                {total > PAGE_SIZE && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                      Mais recentes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page * PAGE_SIZE >= total}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Mais antigos
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </>

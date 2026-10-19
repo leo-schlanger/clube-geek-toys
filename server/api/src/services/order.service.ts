@@ -1791,6 +1791,16 @@ export async function updateOrderStatus(
   const prev = await getOrderById(id, false);
   if (!prev) throw new AppError(404, 'Pedido não encontrado.', 'ORDER_NOT_FOUND');
 
+  // A closed order stays closed. Moving a refunded one back to "delivered"
+  // counted the money again; back to "pending" left a hold nothing releases.
+  if ((prev.status === 'cancelled' || prev.status === 'refunded') && status !== prev.status) {
+    throw new AppError(
+      409,
+      'Pedido cancelado ou reembolsado não muda mais de status. Se o cliente ainda quer o produto, faça um pedido novo.',
+      'ORDER_CLOSED',
+    );
+  }
+
   // Marking a charged order `refunded` (or `cancelled`) by hand gives the
   // customer NOTHING back — this function restocks and returns store credit,
   // but it never talks to the acquirer. The panel offers both a status dropdown

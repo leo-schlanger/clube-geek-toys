@@ -167,7 +167,7 @@ describe('Register', () => {
   it('renders the registration page with header', () => {
     render(<Register />)
     expect(screen.getByText('Criar Conta')).toBeInTheDocument()
-    expect(screen.getByText('Crie sua conta para comecar')).toBeInTheDocument()
+    expect(screen.getByText('Crie sua conta para começar')).toBeInTheDocument()
   })
 
   it('renders the back link to plans', () => {
@@ -311,7 +311,7 @@ describe('Register', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Este CPF ja esta cadastrado',
+          'Este CPF já está cadastrado',
           expect.objectContaining({ id: 'reg-progress' })
         )
       })
@@ -334,7 +334,7 @@ describe('Register', () => {
       // The 5-second timeout should trigger
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Nao foi possivel verificar o CPF. Tente novamente.',
+          'Não foi possível verificar o CPF. Tente novamente.',
           expect.objectContaining({ id: 'reg-progress' })
         )
       }, { timeout: 7000 })
@@ -413,7 +413,7 @@ describe('Register', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Email nao encontrado. Volte e crie sua conta novamente.',
+          'Email não encontrado. Volte e crie sua conta novamente.',
           expect.objectContaining({ id: 'reg-progress' })
         )
       })
@@ -672,7 +672,7 @@ describe('Register', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Este email ja esta cadastrado.',
+          'Este email já está cadastrado.',
           expect.objectContaining({ id: 'reg-progress' })
         )
       })
@@ -756,7 +756,7 @@ describe('Register', () => {
       fireEvent.click(screen.getByTestId('step-personal-back'))
 
       await waitFor(() => {
-        expect(toast.info).toHaveBeenCalledWith('Sua conta ja existe. Complete os dados abaixo.')
+        expect(toast.info).toHaveBeenCalledWith('Sua conta já existe. Complete os dados abaixo.')
       })
 
       // Should still show personal data (not go back to account)

@@ -17,8 +17,8 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-500' },
   payment_failed: { label: 'Pagamento Falhou', color: 'text-red-500' },
   role_updated: { label: 'Cargo Atualizado', color: 'text-orange-500' },
-  user_disabled: { label: 'Usuario Desativado', color: 'text-red-500' },
-  user_created: { label: 'Usuario Criado', color: 'text-blue-500' },
+  user_disabled: { label: 'Usuário Desativado', color: 'text-red-500' },
+  user_created: { label: 'Usuário Criado', color: 'text-blue-500' },
 }
 
 function getActionLabel(action: string): { label: string; color: string } {

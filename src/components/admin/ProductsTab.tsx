@@ -432,7 +432,7 @@ export function ProductsTab() {
                         className="h-4 w-4 cursor-pointer accent-primary"
                       />
                     </td>
-                    <td className="py-4 px-4">
+                    <td className="max-w-[18rem] py-4 px-3 xl:max-w-sm">
                       <div className="flex items-center gap-3">
                         <div
                           className={`h-12 w-12 rounded-lg overflow-hidden border bg-muted flex items-center justify-center shrink-0 ${
@@ -446,8 +446,8 @@ export function ProductsTab() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium truncate flex items-center gap-1">
-                            {product.featured && <Star className="h-3.5 w-3.5 text-yellow-500 shrink-0" />}
+                          <p className="font-medium line-clamp-2" title={product.name}>
+                            {product.featured && <Star className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-yellow-500" />}
                             {product.name}
                           </p>
                           {product.sku && (
@@ -461,10 +461,12 @@ export function ProductsTab() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-sm text-muted-foreground">
+                    <td className="max-w-[10rem] py-4 px-3 text-sm text-muted-foreground">
+                      <span className="line-clamp-2">
                       {product.categoryNames?.length
                         ? product.categoryNames.join(', ')
                         : product.categoryName || '—'}
+                      </span>
                     </td>
                     <td className="py-4 px-4">
                       <div className="flex flex-col">
@@ -501,6 +503,7 @@ export function ProductsTab() {
                           onClick={() => openEdit(product)}
                           className="h-8 w-8 p-0"
                           title="Editar produto"
+                          aria-label="Editar produto"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -510,6 +513,7 @@ export function ProductsTab() {
                           onClick={() => handleDuplicate(product)}
                           className="h-8 w-8 p-0"
                           title="Duplicar produto (mesmas medidas, peso e variações)"
+                          aria-label="Duplicar produto"
                         >
                           <Copy className="h-4 w-4" />
                         </Button>

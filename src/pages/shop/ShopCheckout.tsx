@@ -46,6 +46,7 @@ import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { SeoHead } from '../../components/store/SeoHead'
 import { getStoreCredit } from '../../lib/reviews'
 import { useAuth } from '../../contexts/AuthContext'
+import { fetchProfile } from '../../lib/profile'
 import { PagarmeCardForm } from '../../components/PagarmeCardForm'
 import { isValidCPFFormat } from '../../lib/cpf-validation'
 import { Button } from '../../components/ui/button'
@@ -111,6 +112,25 @@ export default function ShopCheckout() {
 
   usePixExitGuard(Boolean(result?.pixData) && result?.order?.status === 'pending')
   const [copied, setCopied] = useState(false)
+
+  // A logged-in shop customer (not a member) typed name and e-mail again at
+  // every purchase; the account already has them.
+  useEffect(() => {
+    if (!user || member) return
+    let active = true
+    setEmail((prev) => prev || user.email)
+    fetchProfile()
+      .then((profile) => {
+        if (!active) return
+        setName((prev) => prev || profile.fullName || '')
+        setEmail((prev) => prev || profile.email)
+        setPhone((prev) => prev || profile.phone || '')
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [user, member])
 
   useEffect(() => {
     if (member) {

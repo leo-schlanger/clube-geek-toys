@@ -105,8 +105,10 @@ function NavContent({
     onClose?.()
   }
 
+  // flex-1 + min-h-0, not h-full: under the logo, h-full overflowed the
+  // screen and pushed "Sair" below a 768 px laptop's bottom edge.
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* PDV Button */}
       <div className="p-3 border-b border-border">
         <Button
@@ -130,7 +132,7 @@ function NavContent({
               key={item.id}
               onClick={() => handleTabClick(item.id)}
               className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -213,11 +215,11 @@ export function AdminSidebar({ activeTab, onTabChange, onSignOut }: AdminSidebar
           <div className="flex items-center gap-3">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" aria-label="Abrir menu">
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
+              <SheetContent side="left" className="flex w-72 flex-col p-0">
                 <SheetHeader className="p-4 border-b border-border">
                   <div className="flex items-center gap-3">
                     <img src="/logo.jpg" alt="GeekPop & Toys" className="h-10 w-10 rounded" />
@@ -243,7 +245,7 @@ export function AdminSidebar({ activeTab, onTabChange, onSignOut }: AdminSidebar
 
           {/* Quick Actions Mobile */}
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={handleNavigatePDV}>
+            <Button variant="ghost" size="icon" onClick={handleNavigatePDV} aria-label="Abrir PDV">
               <ShoppingCart className="h-5 w-5" />
             </Button>
           </div>

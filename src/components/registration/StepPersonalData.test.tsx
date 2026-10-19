@@ -68,7 +68,7 @@ function renderStep(overrides: Partial<React.ComponentProps<typeof StepPersonalD
   return { ...result, props }
 }
 
-/** Find the submit button (may have text "Proximo" or be empty when loading spinner shows). */
+/** Find the submit button (may have text "Próximo" or be empty when loading spinner shows). */
 function getSubmitButton() {
   // The submit button is the second button in the footer
   const buttons = screen.getAllByRole('button')
@@ -123,10 +123,10 @@ describe('StepPersonalData', () => {
       expect(screen.getByPlaceholderText('(00) 00000-0000')).toBeInTheDocument()
     })
 
-    it('renders Voltar and Proximo buttons', () => {
+    it('renders Voltar and Próximo buttons', () => {
       renderStep()
       expect(screen.getByRole('button', { name: /voltar/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /proximo/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /próximo/i })).toBeInTheDocument()
     })
 
     it('populates defaultValues when provided', () => {
@@ -210,7 +210,7 @@ describe('StepPersonalData', () => {
       // avoids consuming a rate-limit attempt on blur.
       await user.type(screen.getByLabelText('CPF'), '12345678901')
       await user.type(screen.getByLabelText('Telefone'), '21999887766')
-      await user.click(screen.getByRole('button', { name: /proximo/i }))
+      await user.click(screen.getByRole('button', { name: /próximo/i }))
 
       await waitFor(() => {
         expect(screen.getByText('Nome deve ter pelo menos 3 caracteres')).toBeInTheDocument()
@@ -230,10 +230,10 @@ describe('StepPersonalData', () => {
       await user.type(screen.getByLabelText('Nome completo'), 'Maria Silva')
       await user.type(screen.getByLabelText('CPF'), '12345678901')
       await user.type(screen.getByLabelText('Telefone'), '21999887766')
-      await user.click(screen.getByRole('button', { name: /proximo/i }))
+      await user.click(screen.getByRole('button', { name: /próximo/i }))
 
       await waitFor(() => {
-        expect(screen.getByText('CPF invalido')).toBeInTheDocument()
+        expect(screen.getByText('CPF inválido')).toBeInTheDocument()
       })
       expect(props.onNext).not.toHaveBeenCalled()
     })
@@ -356,7 +356,7 @@ describe('StepPersonalData', () => {
       await user.tab()
 
       await waitFor(() => {
-        expect(screen.getByText('CPF ja cadastrado no sistema')).toBeInTheDocument()
+        expect(screen.getByText('CPF já cadastrado no sistema')).toBeInTheDocument()
       })
     })
 
@@ -389,7 +389,7 @@ describe('StepPersonalData', () => {
       await user.tab()
 
       await waitFor(() => {
-        expect(screen.getByText('CPF invalido')).toBeInTheDocument()
+        expect(screen.getByText('CPF inválido')).toBeInTheDocument()
       })
     })
   })
@@ -433,12 +433,12 @@ describe('StepPersonalData', () => {
       await user.tab() // blur CPF → sets cpfStatus="error"
 
       await waitFor(() => {
-        expect(screen.getByText('CPF invalido')).toBeInTheDocument()
+        expect(screen.getByText('CPF inválido')).toBeInTheDocument()
       })
 
       // Form zod validation fails first for invalid CPF, so onNext never runs.
       // The cpfStatus="error" guard in onSubmit is a secondary defense.
-      await user.click(screen.getByRole('button', { name: /proximo/i }))
+      await user.click(screen.getByRole('button', { name: /próximo/i }))
 
       await waitFor(() => {
         expect(props.onNext).not.toHaveBeenCalled()

@@ -186,7 +186,7 @@ export function StepPayment({
       toast.success('Codigo PIX copiado!')
       setTimeout(() => setCopied(false), 3000)
     } catch {
-      toast.error('Nao foi possivel copiar')
+      toast.error('Não foi possível copiar')
     }
   }
 
@@ -405,7 +405,7 @@ export function StepPayment({
           >
             <Zap className="h-5 w-5 mx-auto mb-1 text-primary" />
             <p className="text-sm font-medium">Pagamento Unico</p>
-            <p className="text-xs text-muted-foreground">PIX ou Cartao</p>
+            <p className="text-xs text-muted-foreground">PIX ou Cartão</p>
           </button>
           <button
             onClick={() => setMode('subscription')}
@@ -460,8 +460,8 @@ export function StepPayment({
               className="h-auto py-6 flex-col gap-2"
             >
               <CreditCard className="h-8 w-8 text-blue-500" />
-              <span className="font-medium">Cartao</span>
-              <span className="text-xs text-muted-foreground">Credito</span>
+              <span className="font-medium">Cartão</span>
+              <span className="text-xs text-muted-foreground">Crédito</span>
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground text-center">
@@ -483,7 +483,7 @@ export function StepPayment({
           ) : (
             <>
               <CreditCard className="h-4 w-4" />
-              Iniciar Assinatura com Cartao
+              Iniciar Assinatura com Cartão
             </>
           )}
         </Button>
@@ -518,7 +518,7 @@ export function StepPayment({
           {/* Copy code */}
           <div className="space-y-2">
             <p className="text-xs text-center text-muted-foreground">
-              Ou copie o codigo PIX:
+              Ou copie o código PIX:
             </p>
             <div className="flex gap-2">
               <input

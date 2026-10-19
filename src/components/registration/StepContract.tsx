@@ -297,7 +297,7 @@ export function StepContract({
       }
 
       if (!storeSuccess) {
-        toast.error('Nao foi possivel salvar o contrato no servidor. Tente novamente.', {
+        toast.error('Não foi possível salvar o contrato no servidor. Tente novamente.', {
           id: 'contract',
           duration: 8000,
         })

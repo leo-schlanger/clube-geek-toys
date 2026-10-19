@@ -34,14 +34,16 @@ const FILTERS: { id: StockFilter; label: string }[] = [
   { id: 'out', label: 'Esgotados' },
 ]
 
-export function StockTab() {
+export function StockTab({ initialFilter }: { initialFilter?: string } = {}) {
   const isMobile = useIsMobile()
   const [rows, setRows] = useState<StockRow[]>([])
   const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState({ out: 0, low: 0, ok: 0 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<StockFilter>('all')
+  const [filter, setFilter] = useState<StockFilter>(
+    initialFilter === 'low' || initialFilter === 'out' ? initialFilter : 'all'
+  )
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE)
   const debouncedSearch = useDebounce(search, 300)
@@ -384,7 +386,7 @@ export function StockTab() {
                         row.status === 'out' ? 'bg-red-500/5' : row.status === 'low' ? 'bg-amber-500/5' : ''
                       }`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="max-w-[18rem] px-3 py-3 xl:max-w-sm">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
                             {row.imageUrl ? (
@@ -394,7 +396,7 @@ export function StockTab() {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{row.productName}</p>
+                            <p className="line-clamp-2 font-medium" title={row.productName}>{row.productName}</p>
                             {row.variantName && (
                               <p className="truncate text-xs text-muted-foreground">
                                 {row.variantName}

@@ -99,7 +99,16 @@ describe('ActionCenter', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Atacado a aprovar/i }))
 
-    expect(onNavigate).toHaveBeenCalledWith('wholesale')
+    expect(onNavigate).toHaveBeenCalledWith('wholesale', undefined)
+  })
+
+  it('opens the queue on the filter it counts', async () => {
+    const user = userEvent.setup()
+    const onNavigate = await renderPanel(report([{ key: 'stock_low', count: 36, oldestDays: null }]))
+
+    await user.click(await screen.findByRole('button', { name: /SKUs no mínimo — abrir/ }))
+
+    expect(onNavigate).toHaveBeenCalledWith('stock', 'low')
   })
 
   it('reads a waiting queue backwards in time', async () => {

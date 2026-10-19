@@ -73,16 +73,16 @@ function StatCard({
   return (
     <Card className={`transition-all duration-300 hover:shadow-lg ${highlight ? 'ring-2 ring-primary/20' : ''}`}>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1">
             <p className="text-sm text-muted-foreground">{title}</p>
-            <p className={`text-2xl font-bold ${colorClass}`}>{value}</p>
+            <p className={`text-xl font-bold sm:text-2xl ${colorClass}`}>{value}</p>
             {subtitle && (
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             )}
             {trend && <TrendIndicator trend={trend} label={trendLabel} />}
           </div>
-          <div className={`p-2 rounded-lg bg-muted ${colorClass}`}>
+          <div className={`shrink-0 p-2 rounded-lg bg-muted ${colorClass}`}>
             {icon}
           </div>
         </div>

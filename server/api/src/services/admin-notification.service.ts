@@ -73,7 +73,8 @@ export function methodLabel(method: string | null | undefined): string {
 }
 
 function formatBRL(amount: number): string {
-  return amount.toFixed(2).replace('.', ',');
+  // 1.092,50, like every other amount in the panel — not 1092,50.
+  return amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /**

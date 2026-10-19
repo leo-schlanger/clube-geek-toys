@@ -188,7 +188,7 @@ describe('StepPayment', () => {
     render(<StepPayment {...defaultProps} />)
 
     expect(screen.getByRole('button', { name: /pix.*qr code/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^cartao.*credito$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^cartão.*crédito$/i })).toBeInTheDocument()
     expect(screen.getByText('Endereço de cobrança')).toBeInTheDocument()
   })
 
@@ -218,7 +218,7 @@ describe('StepPayment', () => {
     await user.click(screen.getByText(/cobranca recorrente/i))
 
     expect(
-      screen.getByRole('button', { name: /iniciar assinatura com cartao/i })
+      screen.getByRole('button', { name: /iniciar assinatura com cartão/i })
     ).toBeInTheDocument()
     // PIX method button should not be visible (only the mode toggle remains)
     expect(screen.queryByRole('button', { name: /pix.*qr code/i })).not.toBeInTheDocument()
@@ -233,7 +233,7 @@ describe('StepPayment', () => {
     expect(mockGeneratePixPayment).not.toHaveBeenCalled()
     expect(await screen.findByRole('alert')).toHaveTextContent('Informe o CEP.')
 
-    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await user.click(screen.getByRole('button', { name: /^cartão.*crédito$/i }))
     expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
     expect(mockApiPost).not.toHaveBeenCalled()
   })
@@ -307,7 +307,7 @@ describe('StepPayment', () => {
     const user = userEvent.setup()
 
     render(<StepPayment {...defaultProps} />)
-    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await user.click(screen.getByRole('button', { name: /^cartão.*crédito$/i }))
 
     await waitFor(() => {
       expect(screen.getByTestId('card-form')).toBeInTheDocument()
@@ -321,7 +321,7 @@ describe('StepPayment', () => {
     mockApiPost.mockResolvedValue({ data: { status: 'paid' }, error: null })
 
     render(<StepPayment {...defaultProps} />)
-    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await user.click(screen.getByRole('button', { name: /^cartão.*crédito$/i }))
     await waitFor(() => expect(screen.getByTestId('card-pay')).toBeInTheDocument())
 
     await user.click(screen.getByTestId('card-pay'))
@@ -345,7 +345,7 @@ describe('StepPayment', () => {
     mockApiPost.mockResolvedValue({ data: null, error: 'Cartão recusado.' })
 
     render(<StepPayment {...defaultProps} />)
-    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await user.click(screen.getByRole('button', { name: /^cartão.*crédito$/i }))
     await waitFor(() => expect(screen.getByTestId('card-pay')).toBeInTheDocument())
 
     await user.click(screen.getByTestId('card-pay'))
@@ -391,7 +391,7 @@ describe('StepPayment', () => {
     const user = userEvent.setup()
 
     render(<StepPayment {...defaultProps} />)
-    await user.click(screen.getByRole('button', { name: /^cartao.*credito$/i }))
+    await user.click(screen.getByRole('button', { name: /^cartão.*crédito$/i }))
 
     await waitFor(() => {
       expect(screen.getByTestId('card-cancel')).toBeInTheDocument()
