@@ -694,8 +694,7 @@ export default function ShopCheckout() {
                                   {opt.company} — {opt.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                  Prazo estimado: {opt.days} dia{opt.days === 1 ? '' : 's'} útil
-                                  {opt.days === 1 ? '' : 'eis'}
+                                  Prazo estimado: {opt.days === 1 ? '1 dia útil' : `${opt.days} dias úteis`}
                                 </p>
                               </div>
                               <span className="shrink-0 font-semibold tabular-nums">
