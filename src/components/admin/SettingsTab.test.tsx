@@ -130,7 +130,7 @@ describe('SettingsTab', () => {
     render(<SettingsTab />)
 
     await waitFor(() => {
-      expect(screen.getByText(/Configurações persistidas no banco/)).toBeInTheDocument()
+      expect(screen.getByText(/As alterações valem na hora/)).toBeInTheDocument()
     })
   })
 

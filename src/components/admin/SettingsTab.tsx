@@ -121,8 +121,8 @@ export function SettingsTab() {
         <CardContent className="p-4 flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-blue-500 shrink-0" />
           <p className="text-sm text-blue-700 dark:text-blue-300">
-            Configurações persistidas no banco. As alterações entram em vigor imediatamente
-            e ficam registradas no audit log.
+            As alterações valem na hora, para todos, assim que você clicar em Salvar — e ficam
+            anotadas no histórico (aba Logs), com quem mudou e quando.
           </p>
         </CardContent>
       </Card>

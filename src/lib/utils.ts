@@ -120,7 +120,9 @@ export function isExpired(expiryDate: Date): boolean {
 /**
  * Format date to Brazilian format
  */
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date | null | undefined): string {
+  // An unpaid signup has no start or expiry; new Date(null) printed 31/12/1969.
+  if (!date) return '—'
   return new Date(date).toLocaleDateString('pt-BR')
 }
 

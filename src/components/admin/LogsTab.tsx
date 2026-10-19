@@ -19,6 +19,56 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   role_updated: { label: 'Cargo Atualizado', color: 'text-orange-500' },
   user_disabled: { label: 'Usuário Desativado', color: 'text-red-500' },
   user_created: { label: 'Usuário Criado', color: 'text-blue-500' },
+  // Dotted names are what the API writes today; the snake_case ones above are older rows.
+  'auth.login': { label: 'Entrou no sistema', color: 'text-muted-foreground' },
+  'auth.login_failed': { label: 'Tentativa de login com senha errada', color: 'text-red-500' },
+  'auth.register': { label: 'Conta criada', color: 'text-blue-500' },
+  'auth.email_verified': { label: 'E-mail confirmado', color: 'text-green-500' },
+  'auth.password_reset': { label: 'Senha redefinida', color: 'text-yellow-500' },
+  'auth.admin_new_device': { label: 'Admin entrou de um aparelho novo', color: 'text-orange-500' },
+  'profile.updated': { label: 'Perfil atualizado', color: 'text-muted-foreground' },
+  'profile.photo_set': { label: 'Foto de perfil enviada', color: 'text-muted-foreground' },
+  'profile.photo_removed': { label: 'Foto de perfil removida', color: 'text-muted-foreground' },
+  'member.updated': { label: 'Membro atualizado', color: 'text-yellow-500' },
+  'member.activated': { label: 'Membro ativado', color: 'text-green-500' },
+  'member_expired': { label: 'Assinatura expirou', color: 'text-red-500' },
+  'contract_signed': { label: 'Contrato assinado', color: 'text-blue-500' },
+  'payment.pix_created': { label: 'PIX do clube gerado', color: 'text-blue-500' },
+  'payment.pix_confirmed': { label: 'PIX do clube confirmado', color: 'text-green-500' },
+  'payment.failed': { label: 'Pagamento do clube recusado', color: 'text-red-500' },
+  'order.created': { label: 'Pedido criado', color: 'text-blue-500' },
+  'order.create_failed': { label: 'Falha ao criar pedido', color: 'text-red-500' },
+  'order.paid': { label: 'Pedido pago', color: 'text-green-500' },
+  'order.pix_confirmed': { label: 'PIX do pedido confirmado à mão', color: 'text-green-500' },
+  'order.card_authorized': { label: 'Cartão aprovado', color: 'text-green-500' },
+  'order.card_abandoned': { label: 'Cliente saiu sem pagar o cartão', color: 'text-yellow-500' },
+  'order.payment_failed': { label: 'Cartão recusado', color: 'text-red-500' },
+  'order.status_changed': { label: 'Status do pedido alterado', color: 'text-yellow-500' },
+  'order.refunded': { label: 'Pedido reembolsado', color: 'text-red-500' },
+  'order.stock_restored': { label: 'Estoque devolvido', color: 'text-muted-foreground' },
+  'order.label_cart_created': { label: 'Etiqueta preparada', color: 'text-muted-foreground' },
+  'order.label_purchased': { label: 'Etiqueta comprada', color: 'text-blue-500' },
+  'order.shipment_synced': { label: 'Rastreio atualizado', color: 'text-muted-foreground' },
+  'order.tracking_set': { label: 'Código de rastreio salvo', color: 'text-blue-500' },
+  'order.recovery_email_sent': { label: 'E-mail de compra não concluída enviado', color: 'text-muted-foreground' },
+  'order.counter_payment_recorded': { label: 'Pagamento no balcão registrado', color: 'text-green-500' },
+  'stock.adjusted': { label: 'Estoque ajustado', color: 'text-yellow-500' },
+  'stock.threshold_changed': { label: 'Aviso de estoque mínimo alterado', color: 'text-muted-foreground' },
+  'event.created': { label: 'Evento criado', color: 'text-blue-500' },
+  'event.updated': { label: 'Evento editado', color: 'text-yellow-500' },
+  'event.deleted': { label: 'Evento excluído', color: 'text-red-500' },
+  'event.reservation_created': { label: 'Reserva de ingresso feita', color: 'text-blue-500' },
+  'event.reservation_paid': { label: 'Ingresso pago', color: 'text-green-500' },
+  'event.reservation_confirmed': { label: 'Reserva confirmada', color: 'text-green-500' },
+  'event.reservation_cancelled': { label: 'Reserva cancelada', color: 'text-red-500' },
+  'event.ticket_checked_in': { label: 'Entrada na portaria', color: 'text-green-500' },
+  'event.ticket_checkin_failed': { label: 'Ingresso recusado na portaria', color: 'text-red-500' },
+  'gallery.album_created': { label: 'Pasta da galeria criada', color: 'text-blue-500' },
+  'gallery.album_updated': { label: 'Pasta da galeria editada', color: 'text-yellow-500' },
+  'gallery.album_deleted': { label: 'Pasta da galeria apagada', color: 'text-red-500' },
+  'settings.updated': { label: 'Configurações alteradas', color: 'text-orange-500' },
+  'wholesale.register': { label: 'Cadastro de atacado', color: 'text-blue-500' },
+  'wholesale.approve': { label: 'Atacado aprovado', color: 'text-green-500' },
 }
 
 function getActionLabel(action: string): { label: string; color: string } {
@@ -227,8 +277,8 @@ export function LogsTab({
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <CardTitle>Error Logs</CardTitle>
-                  <CardDescription>Erros capturados do frontend e backend</CardDescription>
+                  <CardTitle>Erros do sistema</CardTitle>
+                  <CardDescription>Falhas registradas automaticamente no site e no servidor — útil para o suporte técnico</CardDescription>
                 </div>
                 <div className="flex gap-2">
                   <select

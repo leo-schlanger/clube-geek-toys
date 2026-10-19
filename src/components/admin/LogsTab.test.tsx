@@ -121,7 +121,7 @@ describe('LogsTab', () => {
     await user.click(screen.getByText('Erros'))
 
     await waitFor(() => {
-      expect(screen.getByText('Error Logs')).toBeInTheDocument()
+      expect(screen.getByText('Erros do sistema')).toBeInTheDocument()
     })
   })
 
