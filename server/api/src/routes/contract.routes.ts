@@ -92,11 +92,11 @@ contractRouter.post('/', contractUploadLimiter, upload.single('pdf'), async (req
     saved = true;
     res.status(201).json(result);
   } catch (err) {
-    next(err);
-  } finally {
+    // Removed before answering: in a finally it raced the error response.
     if (written && !saved) {
-      await fs.promises.unlink(written).catch((err) => log.warn({ err }, 'orphan contract not removed'));
+      await fs.promises.unlink(written).catch((e) => log.warn({ err: e }, 'orphan contract not removed'));
     }
+    next(err);
   }
 });
 
