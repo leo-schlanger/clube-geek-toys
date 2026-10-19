@@ -107,7 +107,9 @@ export function useRealtimeStats(): RealtimeStatsResult {
         if (previousStatsRef.current) {
           setPreviousStats(previousStatsRef.current)
         }
-        previousStatsRef.current = stats
+        // `stats` here is the first render's value (the effect runs once), so the
+        // trend always compared against zeros. Keep the poll that just arrived.
+        previousStatsRef.current = newStats
 
         setStats(newStats)
         setLastUpdate(new Date())
@@ -131,7 +133,7 @@ export function useRealtimeStats(): RealtimeStatsResult {
       isMounted = false
       clearInterval(interval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   const trends = {

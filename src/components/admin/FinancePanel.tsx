@@ -54,6 +54,15 @@ function growthPct(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 1000) / 10
 }
 
+/** A percentage the pt-BR way: 12,5 and not 12.5. */
+function pct(value: number, digits: number): string {
+  return value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })
+}
+
+function dayMonth(value: string): string {
+  return new Date(value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
 function shortDate(value: string, bucket: 'day' | 'month'): string {
   const [y, m, d] = value.split('-')
   return bucket === 'month' ? `${m}/${y.slice(2)}` : `${d}/${m}`
@@ -471,7 +480,10 @@ function FinanceReport({ report, loading }: { report: OverviewReport; loading: b
   const totals = revenueTotals(report)
   const bucket = report.series.bucket
   const chartData = report.series.points.map((p) => ({ ...p, label: shortDate(p.date, bucket) }))
-  const unrealized = sales.pendingRevenue + sales.cancelledRevenue + sales.refundedRevenue + club.refunded
+  // Each lost cart once, not every retry of it: one customer trying a refused
+  // card ten times is not ten sales lost.
+  const unrealized = sales.pendingRevenue + sales.cancelledCartsValue + sales.refundedRevenue + club.refunded
+  const priorRefunds = sales.priorRefunds + club.priorRefunds
 
   return (
     <div className={`space-y-4 ${loading ? 'opacity-60' : ''}`} aria-busy={loading}>
@@ -489,7 +501,11 @@ function FinanceReport({ report, loading }: { report: OverviewReport; loading: b
           label="Loja"
           value={formatCurrency(sales.revenue)}
           delta={growthPct(sales.revenue, previous.salesRevenue)}
-          hint={`${sales.orders} pedido(s) pago(s)`}
+          hint={
+            sales.priorRefunds > 0
+              ? `${sales.orders} pedido(s) pago(s) · menos ${formatCurrency(sales.priorRefunds)} de estorno de venda anterior`
+              : `${sales.orders} pedido(s) pago(s)`
+          }
         />
         <Kpi
           label="Ingressos"
@@ -497,17 +513,39 @@ function FinanceReport({ report, loading }: { report: OverviewReport; loading: b
           delta={growthPct(tickets.revenue, previous.ticketRevenue)}
           hint={`${tickets.tickets} ingresso(s) em ${tickets.reservations} reserva(s)`}
         />
-        <Kpi label="Clube" value={formatCurrency(club.revenue)} hint={`${club.payments} anuidade(s) · ${club.newMembers} novo(s) membro(s)`} />
-        <Kpi label="Ticket médio da loja" value={formatCurrency(sales.averageTicket)} hint={`Frete cobrado: ${formatCurrency(sales.shipping)}`} />
+        <Kpi
+          label="Clube"
+          value={formatCurrency(club.revenue)}
+          hint={`${club.payments} pagamento(s) · ${club.newMembers} novo(s) membro(s)`}
+        />
+        <Kpi
+          label="Ticket médio da loja"
+          value={formatCurrency(sales.averageTicket)}
+          hint={`Só produtos, sem frete: ${formatCurrency(sales.averageProductTicket)}`}
+        />
         <Kpi label="Descontos concedidos" value={formatCurrency(sales.discount)} hint={`Sobre ${formatCurrency(sales.subtotal)} em produtos`} />
         <Kpi
           label="Lucro bruto da loja"
           value={margin.revenueWithCost > 0 ? formatCurrency(margin.grossProfit) : '—'}
           hint={
             margin.revenueWithCost > 0
-              ? `Margem ${margin.marginPct.toFixed(1)}% sobre ${margin.costCoveragePct.toFixed(0)}% das vendas`
+              ? `Margem ${pct(margin.marginPct, 1)}% sobre ${pct(margin.costCoveragePct, 0)}% das vendas`
               : 'Sem custo cadastrado nos produtos vendidos'
           }
+        />
+        <Kpi
+          label="Frete cobrado"
+          value={formatCurrency(sales.shipping)}
+          hint={
+            sales.labelsWithCost > 0
+              ? `Etiquetas: ${formatCurrency(sales.labelCost)} em ${sales.labelsWithCost} pedido(s) que cobraram ${formatCurrency(sales.shippingWithLabel)}`
+              : `${sales.shippedOrders} envio(s); custo das etiquetas ainda não registrado`
+          }
+        />
+        <Kpi
+          label="Conversão do clube"
+          value={club.signups > 0 ? `${pct(club.conversionPct, 0)}%` : '—'}
+          hint={`${club.signupsPaid} de ${club.signups} cadastro(s) do período pagaram`}
         />
       </div>
 
@@ -605,25 +643,102 @@ function FinanceReport({ report, loading }: { report: OverviewReport; loading: b
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Fora da receita</CardTitle>
             <CardDescription>
-              {formatCurrency(unrealized)} que não entraram — nada disto está somado acima.
+              {formatCurrency(unrealized)} que não ficaram com a loja.
+              {priorRefunds > 0
+                ? ` ${formatCurrency(priorRefunds)} são estornos de vendas de períodos anteriores e já foram descontados da receita; o resto nunca entrou nela.`
+                : ' Nada disto está somado na receita.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="space-y-2 text-sm">
               {[
-                ['Aguardando pagamento', sales.pendingOrders, sales.pendingRevenue],
-                ['Cancelados (inclui PIX vencido e cartão abandonado)', sales.cancelledOrders, sales.cancelledRevenue],
-                ['Estornados na loja', sales.refundedOrders, sales.refundedRevenue],
-                ['Estornados no clube', club.refundedPayments, club.refunded],
+                ['Aguardando pagamento', `${sales.pendingOrders}`, sales.pendingRevenue],
+                [
+                  'Cancelados (PIX vencido, cartão recusado ou abandonado)',
+                  `${sales.cancelledCustomers} cliente(s), ${sales.cancelledOrders} tentativa(s)`,
+                  sales.cancelledCartsValue,
+                ],
+                ['Estornados na loja no período', `${sales.refundedOrders}`, sales.refundedRevenue],
+                ['Estornados no clube no período', `${club.refundedPayments}`, club.refunded],
               ].map(([label, count, value]) => (
                 <div key={label as string} className="flex items-baseline justify-between gap-3">
                   <dt className="min-w-0">
-                    {label} <span className="text-muted-foreground">({count as number})</span>
+                    {label} <span className="text-muted-foreground">({count as string})</span>
                   </dt>
                   <dd className="shrink-0 font-semibold tabular-nums">{formatCurrency(value as number)}</dd>
                 </div>
               ))}
             </dl>
+            {sales.cancelledOrders > sales.cancelledCustomers && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Nos cancelados conta o maior carrinho de cada cliente. Somando todas as tentativas daria{' '}
+                {formatCurrency(sales.cancelledRevenue)}, mas é o mesmo carrinho tentado várias vezes.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Ingressos por evento</CardTitle>
+            <CardDescription>Pagos no período, e quantos já passaram pela portaria.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {report.ticketsByEvent.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum ingresso pago no período.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {report.ticketsByEvent.map((ev) => (
+                  <li key={ev.eventId} className="flex items-baseline justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate">{ev.title}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {ev.startsAt ? `${dayMonth(ev.startsAt)} · ` : ''}
+                        {ev.tickets} ingresso(s) em {ev.reservations} reserva(s) · {ev.checkedIn} na portaria
+                      </span>
+                    </span>
+                    <strong className="shrink-0 tabular-nums">{formatCurrency(ev.revenue)}</strong>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Produtos parados</CardTitle>
+            <CardDescription>
+              Hoje, não no período: ativos, com estoque e sem venda há {report.stale.days} dias ou mais.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {report.stale.count === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum produto parado.</p>
+            ) : (
+              <>
+                <p className="mb-3 text-sm">
+                  <strong>{report.stale.count}</strong> produto(s), {report.stale.units} unidade(s) ·{' '}
+                  <strong>{formatCurrency(report.stale.shelfValue)}</strong> a preço de venda
+                </p>
+                <ol className="space-y-2 text-sm">
+                  {report.stale.items.slice(0, 8).map((item) => (
+                    <li key={item.name} className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block truncate">{item.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.lastSoldAt ? `Última venda ${dayMonth(item.lastSoldAt)}` : 'Nunca vendeu'}
+                        </span>
+                      </span>
+                      <span className="shrink-0 tabular-nums">{item.stock} un.</span>
+                    </li>
+                  ))}
+                </ol>
+                {report.stale.count > 8 && (
+                  <p className="mt-2 text-xs text-muted-foreground">A lista completa está na planilha (Excel).</p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

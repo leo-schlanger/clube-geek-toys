@@ -141,15 +141,24 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
   }
   money('Receita da loja (inclui frete)', sales.revenue, report.previous.salesRevenue)
   money('Receita de ingressos', tickets.revenue, report.previous.ticketRevenue)
-  money('Receita do clube (anuidades)', club.revenue, report.previous.clubRevenue)
+  money('Receita do clube', club.revenue, report.previous.clubRevenue)
   count('Pedidos pagos', sales.orders, report.previous.orders)
-  money('Ticket médio da loja', sales.averageTicket)
+  money('Ticket médio da loja (com frete)', sales.averageTicket)
+  money('Ticket médio só de produtos', sales.averageProductTicket ?? 0)
   count('Novos membros', club.newMembers, report.previous.newMembers)
+  if ((sales.priorRefundsCount ?? 0) > 0 || (club.priorRefundsCount ?? 0) > 0) {
+    money('Estornos de vendas de períodos anteriores (já descontados)', -((sales.priorRefunds ?? 0) + (club.priorRefunds ?? 0)))
+      .getCell(3).value = `${(sales.priorRefundsCount ?? 0) + (club.priorRefundsCount ?? 0)} estorno(s)`
+  }
 
   section('Loja')
   money('Subtotal dos produtos', sales.subtotal)
   money('Descontos concedidos', sales.discount)
   money('Frete cobrado', sales.shipping)
+  if ((sales.labelsWithCost ?? 0) > 0) {
+    money('Etiquetas pagas ao Melhor Envio', sales.labelCost).getCell(3).value = `${sales.labelsWithCost} etiqueta(s)`
+    money('Frete cobrado nesses mesmos pedidos', sales.shippingWithLabel)
+  }
   money('Crédito de loja usado', sales.storeCredit)
   money('Varejo', sales.retailRevenue).getCell(3).value = `${sales.retailOrders} pedido(s)`
   money('Atacado', sales.wholesaleRevenue).getCell(3).value = `${sales.wholesaleOrders} pedido(s)`
@@ -158,7 +167,10 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
 
   section('Não realizado (fora da receita)')
   money('Aguardando pagamento', sales.pendingRevenue).getCell(3).value = `${sales.pendingOrders} pedido(s)`
-  money('Cancelados', sales.cancelledRevenue).getCell(3).value = `${sales.cancelledOrders} pedido(s)`
+  money('Cancelados (soma de todas as tentativas)', sales.cancelledRevenue).getCell(3).value =
+    `${sales.cancelledOrders} tentativa(s)`
+  money('Cancelados (maior carrinho de cada cliente)', sales.cancelledCartsValue ?? 0).getCell(3).value =
+    `${sales.cancelledCustomers ?? 0} cliente(s)`
   money('Estornados (loja)', sales.refundedRevenue).getCell(3).value = `${sales.refundedOrders} pedido(s)`
   money('Estornados (clube)', club.refunded).getCell(3).value = `${club.refundedPayments} pagamento(s)`
 
@@ -177,6 +189,10 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
   count('Pagamentos do clube', club.payments)
   count('Membros que expiraram no período', club.expiredInPeriod)
   count('Membros ativos (hoje)', club.activeMembers)
+  count('Cadastros no clube no período', club.signups ?? 0)
+  count('Desses, pagaram', club.signupsPaid ?? 0)
+  const conversion = summary.addRow(['Conversão cadastro → pago', (club.conversionPct ?? 0) / 100])
+  conversion.getCell(2).numFmt = PERCENT
 
   summary.addRow([])
   summary.addRow(['Valores brutos, antes das taxas da operadora de pagamento.']).font = {
@@ -225,7 +241,7 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
     const last = entries.length + 1
     const countedTotal = entries.filter((e) => e.counted).reduce((sum, e) => sum + e.total, 0)
     const row = ledger.addRow({
-      customer: 'Total que entra na receita',
+      customer: report.ledger?.truncated ? 'Total desta lista (cortada)' : 'Total que entra na receita',
       total: { formula: `SUMIFS(N2:N${last},J2:J${last},"Sim")`, result: Math.round(countedTotal * 100) / 100 },
     })
     styleTotal(row)
@@ -317,6 +333,49 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
       revenue: method.revenue,
       share: totals.current > 0 ? method.revenue / totals.current : 0,
     })
+  }
+
+  // ── Ingressos por evento ────────────────────────────────────────────
+  const events = report.ticketsByEvent ?? []
+  if (events.length > 0) {
+    const eventSheet = listSheet(wb, 'Ingressos por evento', [
+      { header: 'Evento', key: 'title', width: 40 },
+      { header: 'Data', key: 'startsAt', width: 17, numFmt: DATE_TIME },
+      { header: 'Reservas pagas', key: 'reservations', width: 15 },
+      { header: 'Ingressos', key: 'tickets', width: 11 },
+      { header: 'Entraram na portaria', key: 'checkedIn', width: 20 },
+      { header: 'Receita', key: 'revenue', width: 14, numFmt: MONEY },
+    ])
+    for (const event of events) {
+      eventSheet.addRow({ ...event, startsAt: event.startsAt ? rioWallClock(event.startsAt) : null })
+    }
+  }
+
+  // ── Produtos parados ────────────────────────────────────────────────
+  const stale = report.stale
+  if (stale && stale.items.length > 0) {
+    const staleSheet = listSheet(wb, 'Produtos parados', [
+      { header: 'Produto', key: 'name', width: 48 },
+      { header: 'Estoque', key: 'stock', width: 10 },
+      { header: 'Preço', key: 'price', width: 13, numFmt: MONEY },
+      { header: 'Valor na prateleira', key: 'shelf', width: 18, numFmt: MONEY },
+      { header: 'Última venda', key: 'lastSoldAt', width: 15, numFmt: DATE },
+      { header: 'Cadastrado em', key: 'listedAt', width: 15, numFmt: DATE },
+    ])
+    for (const item of stale.items) {
+      staleSheet.addRow({
+        name: item.name,
+        stock: item.stock,
+        price: item.price,
+        shelf: item.stock * item.price,
+        lastSoldAt: item.lastSoldAt ? rioWallClock(item.lastSoldAt) : 'nunca vendeu',
+        listedAt: item.listedAt ? rioWallClock(item.listedAt) : null,
+      })
+    }
+    staleSheet.addRow({ name: `Ativos com estoque e sem venda há ${stale.days} dias ou mais: ${stale.count} produto(s).` }).font = {
+      italic: true,
+      size: 9,
+    }
   }
 
   return wb

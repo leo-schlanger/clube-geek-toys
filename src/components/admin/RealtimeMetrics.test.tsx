@@ -126,7 +126,7 @@ describe('RealtimeMetrics', () => {
 
     render(<RealtimeMetrics />)
 
-    expect(screen.getByText(/aguardando ativa/i)).toBeInTheDocument()
+    expect(screen.getByText(/cadastros sem pagamento/i)).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(screen.getByText(/membros expirados/i)).toBeInTheDocument()
     expect(screen.getByText('7')).toBeInTheDocument()

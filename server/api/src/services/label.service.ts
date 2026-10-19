@@ -392,11 +392,25 @@ interface Shipment {
   delivered_at?: string | null;
   canceled_at?: string | null;
   expired_at?: string | null;
+  /** What the label cost the shop, in reais (number or numeric string). */
+  price?: number | string | null;
 }
 
 /** Read one shipment back, to know which steps are already done. */
 async function fetchShipment(meOrderId: string) {
   return meRequest<Shipment>(`/me/orders/${meOrderId}`, undefined, 'GET');
+}
+
+/**
+ * Keep what the label cost next to the shipping the customer paid, so the
+ * report can compare the two. Written once; bookkeeping never fails a purchase.
+ */
+async function recordLabelCost(orderId: string, shipment: Shipment): Promise<void> {
+  const price = Number(shipment.price);
+  if (!shipment.paid_at || !Number.isFinite(price) || price <= 0) return;
+  await query(`UPDATE orders SET label_cost = $1 WHERE id = $2 AND label_cost IS NULL`, [price, orderId]).catch(
+    (err) => log.error({ err }, 'label cost not recorded'),
+  );
 }
 
 // ─── Following the parcel ────────────────────────────────────────────────────
@@ -537,6 +551,8 @@ export async function getLabelState(orderId: string): Promise<LabelState> {
     await applyShipment(order, shipment).catch((err) =>
       log.error({ err }, 'shipment sync on open failed'),
     );
+    // Labels bought before the cost was kept get it the next time they are opened.
+    await recordLabelCost(order.id, shipment);
     return {
       melhorEnvioOrderId: order.melhorEnvioOrderId,
       purchased: Boolean(shipment.paid_at),
@@ -640,6 +656,7 @@ async function runLabelPurchase(order: Order, actorUserId: string): Promise<Labe
     });
     shipment = await fetchShipment(meOrderId);
   }
+  await recordLabelCost(order.id, shipment);
 
   // 3. Generate — turns the paid shipment into a printable label.
   if (!shipment.generated_at) {

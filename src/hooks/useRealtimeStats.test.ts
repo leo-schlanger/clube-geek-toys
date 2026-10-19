@@ -181,6 +181,31 @@ describe('useRealtimeStats', () => {
     expect(result.current.trends.activeMembers.direction).toBe('stable')
   })
 
+  // The previous poll was read from the first render (all zeros), so from the
+  // second poll on every card showed an "up" arrow for nothing.
+  it('compares each poll with the one before it, not with the empty start', async () => {
+    const { result } = renderHook(() => useRealtimeStats())
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000)
+    })
+
+    expect(result.current.previousStats?.totalMembers).toBe(100)
+    expect(result.current.trends.totalMembers.direction).toBe('stable')
+
+    mockApiGet.mockResolvedValue({
+      ...fakeApiResponse,
+      data: { ...fakeApiResponse.data, members: { ...fakeApiResponse.data.members, total: 110 } },
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000)
+    })
+
+    expect(result.current.trends.totalMembers).toEqual({ direction: 'up', percentage: 10 })
+  })
+
   it('should call /reports/realtime-stats endpoint', async () => {
     const { result } = renderHook(() => useRealtimeStats())
 

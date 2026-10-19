@@ -192,6 +192,35 @@ describe('buyAndPrintLabel', () => {
     expect(calls()[0]).toBe('POST /me/cart');
   });
 
+  // The report compares the shipping the customer paid with what the label cost.
+  it('grava o custo da etiqueta depois do checkout, uma vez só', async () => {
+    orderMock.mockResolvedValue(order());
+    replies(
+      { body: { id: 'me_1' } },
+      { body: { id: 'me_1', paid_at: null, generated_at: null } },
+      { body: {} },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: null, price: '23.86' } },
+      { body: {} },
+      { body: { id: 'me_1', paid_at: 'x', generated_at: 'y', price: '23.86' } },
+      { body: { url: 'u' } },
+    );
+
+    await buyAndPrintLabel('o1', 'admin-1');
+
+    const write = queryMock.mock.calls.find((c) => String(c[0]).includes('SET label_cost'));
+    expect(String(write![0])).toContain('label_cost IS NULL');
+    expect(write![1]).toEqual([23.86, 'o1']);
+  });
+
+  it('não grava custo de etiqueta que não foi paga', async () => {
+    orderMock.mockResolvedValue(order({ melhorEnvioOrderId: 'me_1' }));
+    replies({ body: { id: 'me_1', paid_at: null, generated_at: null, price: 20 } });
+
+    await getLabelState('o1');
+
+    expect(queryMock.mock.calls.some((c) => String(c[0]).includes('SET label_cost'))).toBe(false);
+  });
+
   /** Pressing twice, or resuming, must not buy a second label. */
   it('não recompra quando a etiqueta já foi paga', async () => {
     orderMock.mockResolvedValue(order({ melhorEnvioOrderId: 'me_1' }));

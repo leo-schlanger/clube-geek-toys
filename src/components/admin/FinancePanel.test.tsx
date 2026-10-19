@@ -75,9 +75,12 @@ function makeReport(): OverviewReport {
       retailOrders: 2, retailRevenue: 300, wholesaleOrders: 0, wholesaleRevenue: 0, pixOrders: 1, cardOrders: 1,
       pixRevenue: 100, cardRevenue: 200, pendingOrders: 1, pendingRevenue: 80, cancelledOrders: 2, cancelledRevenue: 120,
       refundedOrders: 0, refundedRevenue: 0,
+      grossRevenue: 300, priorRefunds: 0, priorRefundsCount: 0, averageProductTicket: 150, shippedOrders: 0, labelCost: 0, shippingWithLabel: 0, labelsWithCost: 0, cancelledCustomers: 1, cancelledCartsValue: 120,
     },
-    club: { revenue: 0, payments: 0, newMembers: 0, activeMembers: 4, expiredInPeriod: 0, refunded: 0, refundedPayments: 0 },
+    club: { revenue: 0, payments: 0, newMembers: 0, activeMembers: 4, expiredInPeriod: 0, refunded: 0, refundedPayments: 0, grossRevenue: 0, priorRefunds: 0, priorRefundsCount: 0, signups: 0, signupsPaid: 0, conversionPct: 0 },
     tickets: { revenue: 75, reservations: 1, tickets: 3 },
+    ticketsByEvent: [],
+    stale: { days: 60, count: 0, units: 0, shelfValue: 0, items: [] },
     margin: {
       cogs: 0, grossProfit: 0, marginPct: 0, revenueWithCost: 0, revenueWithoutCost: 300, costCoveragePct: 0,
       unitsWithoutCost: 3, inventoryValue: 0, productsWithoutCost: 0,
@@ -184,8 +187,9 @@ describe('FinancePanel', () => {
   it('keeps money that did not come in apart from the revenue', async () => {
     render(<FinancePanel />)
     await screen.findByText('Fora da receita')
-    // 80 waiting + 120 cancelled.
-    expect(screen.getByText(/R\$ 200,00 que não entraram/)).toBeInTheDocument()
+    // 80 waiting + the largest cancelled cart of the one customer who retried.
+    expect(screen.getByText(/R\$ 200,00 que não ficaram com a loja/)).toBeInTheDocument()
+    expect(screen.getByText(/1 cliente\(s\), 2 tentativa\(s\)/)).toBeInTheDocument()
   })
 
   it('builds the PDF and the spreadsheet from the report on screen', async () => {

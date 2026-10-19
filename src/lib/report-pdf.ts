@@ -357,18 +357,33 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.rows([
     ['Receita da loja (inclui frete)', money(sales.revenue)],
     ['Receita de ingressos', money(tickets.revenue)],
-    ['Receita do clube (anuidades)', money(club.revenue)],
+    ['Receita do clube', money(club.revenue)],
     ['Pedidos pagos', integer(sales.orders)],
     ['Ticket médio da loja', money(sales.averageTicket)],
+    ['Ticket médio só de produtos', money(sales.averageProductTicket)],
     ['Novos membros', integer(club.newMembers)],
     ['Membros ativos (hoje)', integer(club.activeMembers)],
   ])
+  const priorRefunds = sales.priorRefunds + club.priorRefunds
+  if (priorRefunds > 0) {
+    layout.note(
+      `A receita já desconta ${money(priorRefunds)} de estornos feitos no período de vendas de períodos anteriores ` +
+        `(${integer(sales.priorRefundsCount + club.priorRefundsCount)}). A venda continua no período em que foi paga.`
+    )
+  }
 
   layout.section('Loja')
   layout.rows([
     ['Subtotal dos produtos', money(sales.subtotal)],
     ['Descontos concedidos', money(sales.discount)],
     ['Frete cobrado', money(sales.shipping)],
+    ['Envios pela transportadora', integer(sales.shippedOrders)],
+    [
+      'Custo das etiquetas',
+      sales.labelsWithCost > 0
+        ? `${money(sales.labelCost)} em ${integer(sales.labelsWithCost)} pedido(s) que cobraram ${money(sales.shippingWithLabel)}`
+        : 'ainda não registrado',
+    ],
     ['Crédito de loja usado', money(sales.storeCredit)],
     ['Pedidos varejo', `${integer(sales.retailOrders)} - ${money(sales.retailRevenue)}`],
     ['Pedidos atacado', `${integer(sales.wholesaleOrders)} - ${money(sales.wholesaleRevenue)}`],
@@ -380,11 +395,18 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
   layout.section('Não realizado')
   layout.rows([
     ['Aguardando pagamento', `${integer(sales.pendingOrders)} - ${money(sales.pendingRevenue ?? 0)}`],
-    ['Cancelados', `${integer(sales.cancelledOrders)} - ${money(sales.cancelledRevenue ?? 0)}`],
-    ['Estornados (loja)', `${integer(sales.refundedOrders)} - ${money(sales.refundedRevenue ?? 0)}`],
-    ['Estornados (clube)', `${integer(club.refundedPayments ?? 0)} - ${money(club.refunded ?? 0)}`],
+    [
+      'Cancelados',
+      `${integer(sales.cancelledCustomers)} cliente(s), ${integer(sales.cancelledOrders)} tentativa(s) - ${money(sales.cancelledCartsValue)}`,
+    ],
+    ['Estornados no período (loja)', `${integer(sales.refundedOrders)} - ${money(sales.refundedRevenue ?? 0)}`],
+    ['Estornados no período (clube)', `${integer(club.refundedPayments ?? 0)} - ${money(club.refunded ?? 0)}`],
   ])
-  layout.note('Nada deste bloco entra na receita. Cancelado inclui PIX vencido e cartão abandonado.')
+  layout.note(
+    'Cancelado inclui PIX vencido e cartão recusado ou abandonado, e conta o maior carrinho de cada cliente: ' +
+      `somando todas as tentativas daria ${money(sales.cancelledRevenue)}. Estorno de venda de período anterior ` +
+      'é descontado da receita; o resto deste bloco nunca entrou nela.'
+  )
 
   const byMethod = report.byMethod ?? []
   if (byMethod.length > 0) {
@@ -431,12 +453,39 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ['Reservas pagas', integer(tickets.reservations)],
     ['Receita de ingressos', money(tickets.revenue)],
   ])
+  const byEvent = report.ticketsByEvent ?? []
+  if (byEvent.length > 0) {
+    layout.table(
+      [
+        { label: 'Evento', width: 0.4 },
+        { label: 'Data', width: 0.12 },
+        { label: 'Ingressos', width: 0.14, align: 'right' },
+        { label: 'Portaria', width: 0.14, align: 'right' },
+        { label: 'Receita', width: 0.2, align: 'right' },
+      ],
+      byEvent.map((ev) => [
+        ev.title,
+        ev.startsAt ? new Date(ev.startsAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-',
+        integer(ev.tickets),
+        integer(ev.checkedIn),
+        money(ev.revenue),
+      ])
+    )
+    layout.note('Ingressos pagos no período, por evento; Portaria é quantos já foram usados na entrada.')
+  }
 
   layout.section('Clube')
   layout.rows([
     ['Pagamentos confirmados', integer(club.payments)],
-    ['Receita de anuidades', money(club.revenue)],
+    ['Receita do clube', money(club.revenue)],
     ['Novos membros no período', integer(club.newMembers)],
+    ['Cadastros no período', integer(club.signups)],
+    [
+      'Cadastros que pagaram',
+      club.signups > 0
+        ? `${integer(club.signupsPaid)} (${club.conversionPct.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%)`
+        : '-',
+    ],
     ['Membros que expiraram no período', integer(club.expiredInPeriod)],
     ['Membros ativos agora', integer(club.activeMembers)],
   ])
@@ -466,6 +515,35 @@ export async function generateReportPDF(report: OverviewReport): Promise<Uint8Ar
     ['No estoque mínimo', integer(products.lowStock)],
   ])
   layout.note('Estoque é uma fotografia do momento da emissão, não um acumulado do período.')
+
+  const stale = report.stale
+  if (stale && stale.count > 0) {
+    layout.section(`Produtos parados (${integer(stale.count)})`)
+    layout.rows([
+      ['Unidades em estoque', integer(stale.units)],
+      ['Valor a preço de venda', money(stale.shelfValue)],
+    ])
+    layout.table(
+      [
+        { label: 'Produto', width: 0.5 },
+        { label: 'Estoque', width: 0.15, align: 'right' },
+        { label: 'Preço', width: 0.15, align: 'right' },
+        { label: 'Última venda', width: 0.2 },
+      ],
+      stale.items.slice(0, 20).map((item) => [
+        item.name,
+        integer(item.stock),
+        money(item.price),
+        item.lastSoldAt
+          ? new Date(item.lastSoldAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+          : 'nunca',
+      ])
+    )
+    layout.note(
+      `Ativos, com estoque e sem venda há ${integer(stale.days)} dias ou mais, na data da emissão. ` +
+        (stale.count > 20 ? 'A lista completa está na planilha Excel.' : '')
+    )
+  }
 
   // Only what entered the revenue: the list is the proof of the total above.
   const sold = (report.ledger?.entries ?? []).filter((entry) => entry.counted)

@@ -41,9 +41,12 @@ function makeReport(): OverviewReport {
       retailOrders: 1, retailRevenue: 19, wholesaleOrders: 0, wholesaleRevenue: 0, pixOrders: 1, cardOrders: 0,
       pixRevenue: 19, cardRevenue: 0, pendingOrders: 1, pendingRevenue: 50, cancelledOrders: 0, cancelledRevenue: 0,
       refundedOrders: 0, refundedRevenue: 0,
+      grossRevenue: 19, priorRefunds: 0, priorRefundsCount: 0, averageProductTicket: 19, shippedOrders: 0, labelCost: 0, shippingWithLabel: 0, labelsWithCost: 0, cancelledCustomers: 0, cancelledCartsValue: 0,
     },
-    club: { revenue: 0, payments: 0, newMembers: 0, activeMembers: 4, expiredInPeriod: 0, refunded: 0, refundedPayments: 0 },
+    club: { revenue: 0, payments: 0, newMembers: 0, activeMembers: 4, expiredInPeriod: 0, refunded: 0, refundedPayments: 0, grossRevenue: 0, priorRefunds: 0, priorRefundsCount: 0, signups: 0, signupsPaid: 0, conversionPct: 0 },
     tickets: { revenue: 75, reservations: 1, tickets: 3 },
+    ticketsByEvent: [],
+    stale: { days: 60, count: 0, units: 0, shelfValue: 0, items: [] },
     margin: {
       cogs: 0, grossProfit: 0, marginPct: 0, revenueWithCost: 0, revenueWithoutCost: 19, costCoveragePct: 0,
       unitsWithoutCost: 1, inventoryValue: 9000, productsWithoutCost: 3,

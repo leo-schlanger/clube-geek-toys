@@ -87,7 +87,12 @@ reportRouter.get('/action-items', async (_req, res, next) => {
 // Consolidated period report: the finance panel, the PDF and the spreadsheet.
 reportRouter.get('/overview', async (req, res, next) => {
   try {
-    const period = reportService.isOverviewPeriod(req.query.period) ? req.query.period : 'month';
+    const rawPeriod = req.query.period;
+    if (rawPeriod !== undefined && !reportService.isOverviewPeriod(rawPeriod)) {
+      res.status(400).json({ error: 'Período inválido. Use day, month, year ou range.' });
+      return;
+    }
+    const period = rawPeriod ?? 'month';
     if (period === 'range') {
       const range = reportService.parseRange(req.query.start, req.query.end);
       if ('error' in range) {
@@ -97,7 +102,12 @@ reportRouter.get('/overview', async (req, res, next) => {
       res.json(await reportService.getOverviewReport('range', undefined, range));
       return;
     }
-    const date = typeof req.query.date === 'string' ? req.query.date : undefined;
+    // An impossible date used to come back as this month, labelled as asked.
+    const date = req.query.date;
+    if (date !== undefined && !reportService.isIsoDate(date)) {
+      res.status(400).json({ error: 'Data inválida. Use AAAA-MM-DD.' });
+      return;
+    }
     const result = await reportService.getOverviewReport(period, date);
     res.json(result);
   } catch (err) {

@@ -1295,6 +1295,43 @@ const STEPS: SchemaStep[] = [
       await query(`ALTER TABLE members ADD COLUMN IF NOT EXISTS billing_address JSONB`);
     },
   },
+  {
+    // A refund is dated when it happened, by a trigger so no refund path can
+    // forget it; the label cost sits next to the shipping the customer paid.
+    name: 'Refund date and label cost (migration 043)',
+    run: async () => {
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`);
+      await query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS label_cost NUMERIC(10,2)`);
+      await query(`UPDATE orders SET refunded_at = COALESCE(status_changed_at, updated_at)
+        WHERE status = 'refunded' AND refunded_at IS NULL`);
+      await query(`UPDATE payments SET refunded_at = updated_at
+        WHERE status = 'refunded' AND refunded_at IS NULL`);
+      await query(`
+        CREATE OR REPLACE FUNCTION set_refunded_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          IF NEW.status = 'refunded' THEN
+            NEW.refunded_at = COALESCE(NEW.refunded_at, NOW());
+          ELSE
+            NEW.refunded_at = NULL;
+          END IF;
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+      `);
+      for (const table of ['orders', 'payments']) {
+        await query(`DROP TRIGGER IF EXISTS tr_${table}_refunded_at ON ${table}`);
+        await query(`CREATE TRIGGER tr_${table}_refunded_at
+          BEFORE UPDATE ON ${table}
+          FOR EACH ROW
+          WHEN (OLD.status IS DISTINCT FROM NEW.status)
+          EXECUTE FUNCTION set_refunded_at()`);
+        await query(`CREATE INDEX IF NOT EXISTS idx_${table}_refunded_at
+          ON ${table}(refunded_at) WHERE refunded_at IS NOT NULL`);
+      }
+    },
+  },
 ];
 
 let state: SchemaState = {

@@ -18,6 +18,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
 vi.mock('../config/database.js', () => ({ query: queryMock }));
+vi.mock('../config/env.js', async () => (await import('../test-support/env.js')).envModule);
+vi.mock('../services/log.service.js', () => ({ createErrorLog: vi.fn(async () => {}) }));
 
 const { getActionItems, getOverviewReport, getMonthlyReport, getChurnReport, getRealtimeStats, parseRange } = await import(
   './report.service.js'
@@ -176,9 +178,11 @@ describe('getActionItems', () => {
 
     const expiring = sqls.find((s) => /expiry_date BETWEEN/.test(s));
     expect(expiring).toBeDefined();
-    // MIN(expiry_date) - NOW(): days until the soonest lapse.
-    expect(expiring).toContain('MIN(expiry_date)');
-    expect(expiring).toContain("INTERVAL '7 days'");
+    // MIN(expiry_date) - today: days until the soonest lapse, on Rio's calendar
+    // (CURRENT_DATE is UTC, already tomorrow after 21h).
+    expect(expiring).toContain("(MIN(expiry_date) - (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)");
+    expect(expiring).toContain("+ 7");
+    expect(expiring).not.toContain('CURRENT_DATE');
   });
 });
 
@@ -227,19 +231,22 @@ describe('getOverviewReport', () => {
 
   // "Today" is Rio's, so the database picks it: the API runs in UTC, and after
   // 21h in Rio its date is already tomorrow.
-  it('falls back to today in Rio when the reference date is malformed', async () => {
+  it('uses today in Rio when no reference date is given', async () => {
     mockQueries(() => [{}]);
-    await getOverviewReport('day', 'ontem');
+    await getOverviewReport('day');
 
     const [sql, params] = queryMock.mock.calls[0];
     expect(params).toEqual(['day', null]);
     expect(sql).toContain("NOW() AT TIME ZONE 'America/Sao_Paulo'");
   });
 
-  it('treats an impossible date as today instead of sending it to Postgres', async () => {
+  // Swapping it for today answered a question nobody asked, under its label.
+  it('refuses a date that is not a calendar date, without asking Postgres', async () => {
     mockQueries(() => [{}]);
-    await getOverviewReport('month', '2026-02-31');
-    expect(queryMock.mock.calls[0][1]).toEqual(['month', null]);
+    for (const bad of ['ontem', '2026-02-31', '2026-13-01']) {
+      await expect(getOverviewReport('month', bad)).rejects.toMatchObject({ statusCode: 400 });
+    }
+    expect(queryMock).not.toHaveBeenCalled();
   });
 
   it('cuts the period on the Rio calendar, not in UTC', async () => {
@@ -314,13 +321,131 @@ describe('getOverviewReport', () => {
     await getOverviewReport('month');
 
     const salesSql = sqls.find((s) => /AS retail_revenue/.test(s));
-    expect(salesSql).toContain("('paid','processing','shipped','delivered')");
-    // pending/cancelled/refunded get their own value columns, never summed into revenue.
+    // Earned states, or a sale refunded only after the window ended.
+    const counted =
+      "(o.status IN ('paid','processing','shipped','delivered') OR (o.status = 'refunded' AND o.refunded_at >= $2))";
+    expect(salesSql).toContain(`SUM(o.total) FILTER (WHERE ${counted}), 0)::float AS revenue`);
+    // pending/cancelled get their own value columns, never summed into revenue.
     expect(salesSql).toContain('AS pending_orders');
-    expect(salesSql).toMatch(/SUM\(total\) FILTER \(WHERE status = 'cancelled'\), 0\)::float AS cancelled_value/);
-    expect(salesSql).toMatch(
-      /SUM\(total\) FILTER \(WHERE status IN \('paid','processing','shipped','delivered'\)\), 0\)::float AS revenue/
+    expect(salesSql).toContain("SUM(o.total) FILTER (WHERE o.status = 'cancelled'), 0)::float AS cancelled_value");
+  });
+
+  // An order paid in September and refunded in October stays in September —
+  // a closed month does not change — and comes off October's revenue.
+  it('dates a refund when it happened and takes earlier sales off this period', async () => {
+    const sqls: string[] = [];
+    mockQueries((sql) => {
+      sqls.push(sql);
+      if (/AS retail_revenue/.test(sql)) return [{ orders: 3, revenue: 936 }];
+      if (/AS shop_prior_value/.test(sql)) {
+        return [{ shop_count: 2, shop_value: 1192.5, shop_prior_count: 1, shop_prior_value: 100, club_count: 1, club_value: 159.9, club_prior_count: 1, club_prior_value: 159.9 }];
+      }
+      if (/AS signups_paid/.test(sql)) return [{ revenue: 159.9, payments: 1 }];
+      return [{}];
+    });
+
+    const report = await getOverviewReport('month', '2026-10-09');
+
+    expect(report.sales).toMatchObject({ grossRevenue: 936, priorRefunds: 100, revenue: 836, refundedOrders: 2, refundedRevenue: 1192.5 });
+    expect(report.sales.averageTicket).toBe(312);
+    expect(report.club).toMatchObject({ grossRevenue: 159.9, priorRefunds: 159.9, revenue: 0, refundedPayments: 1 });
+    const refundSql = sqls.find((s) => /AS shop_prior_value/.test(s))!;
+    expect(refundSql).toContain('refunded_at >= $1 AND refunded_at < $2');
+    // The series and the payment methods carry the same negative rows.
+    const series = sqls.find((s) => /generate_series/.test(s))!;
+    expect(series).toContain("'refund'");
+    expect(series).toContain('-total');
+  });
+
+  it('counts cancelled attempts apart from the customers behind them', async () => {
+    mockQueries((sql) => {
+      if (/AS retail_revenue/.test(sql)) return [{ cancelled_orders: 20, cancelled_value: 16872.64 }];
+      if (/AS carts_value/.test(sql)) return [{ customers: 11, carts_value: 4200 }];
+      return [{}];
+    });
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(report.sales).toMatchObject({
+      cancelledOrders: 20,
+      cancelledRevenue: 16872.64,
+      cancelledCustomers: 11,
+      cancelledCartsValue: 4200,
+    });
+    const sql = queryMock.mock.calls.map((c) => String(c[0])).find((s) => /AS carts_value/.test(s))!;
+    expect(sql).toContain('GROUP BY COALESCE(LOWER(o.customer_email), o.id::text)');
+  });
+
+  it('separates the products ticket from the order ticket, and compares shipping with the label', async () => {
+    mockQueries((sql) =>
+      /AS retail_revenue/.test(sql)
+        ? [{ orders: 4, revenue: 500, subtotal: 480, discount: 40, shipping: 60, shipped_orders: 3, label_cost: 41.5, shipping_with_label: 45, labels_with_cost: 2 }]
+        : [{}]
     );
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(report.sales).toMatchObject({
+      averageTicket: 125,
+      averageProductTicket: 110,
+      shipping: 60,
+      shippedOrders: 3,
+      labelCost: 41.5,
+      shippingWithLabel: 45,
+      labelsWithCost: 2,
+    });
+  });
+
+  it('reports sign-up conversion and guards against no sign-ups', async () => {
+    mockQueries((sql) => (/AS signups_paid/.test(sql) ? [{ signups: 4, signups_paid: 1 }] : [{}]));
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(report.club).toMatchObject({ signups: 4, signupsPaid: 1, conversionPct: 25 });
+
+    mockQueries(() => [{}]);
+    expect((await getOverviewReport('month', '2026-10-09')).club.conversionPct).toBe(0);
+  });
+
+  it('lists paid tickets per event with how many went through the door', async () => {
+    const calls: string[] = [];
+    mockQueries((sql) => {
+      calls.push(sql);
+      return /AS checked_in/.test(sql)
+        ? [{ event_id: 'halloween', title: 'Halloween K-pop', starts_at: '2026-10-31T22:00:00Z', reservations: 3, tickets: 7, checked_in: 0, revenue: 175 }]
+        : [{}];
+    });
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(report.ticketsByEvent).toEqual([
+      { eventId: 'halloween', title: 'Halloween K-pop', startsAt: '2026-10-31T22:00:00.000Z', reservations: 3, tickets: 7, checkedIn: 0, revenue: 175 },
+    ]);
+    expect(calls.find((s) => /AS checked_in/.test(s))).toContain("er.status = 'confirmed' AND er.total_cents > 0");
+  });
+
+  it('lists products with stock that stopped selling, as of now', async () => {
+    const calls: string[] = [];
+    mockQueries((sql) => {
+      calls.push(sql);
+      return /AS listed_at/.test(sql)
+        ? [
+            { name: 'Mochila', stock: 3, price: 100, last_sold_at: null, listed_at: '2026-07-01T12:00:00Z' },
+            { name: 'Chaveiro', stock: 10, price: 5, last_sold_at: '2026-08-01T12:00:00Z', listed_at: '2026-06-01T12:00:00Z' },
+          ]
+        : [{}];
+    });
+    const report = await getOverviewReport('month', '2026-10-09');
+    expect(report.stale).toMatchObject({ days: 60, count: 2, units: 13, shelfValue: 350 });
+    expect(report.stale.items[0]).toEqual({ name: 'Mochila', stock: 3, price: 100, lastSoldAt: null, listedAt: '2026-07-01T12:00:00.000Z' });
+    const sql = calls.find((s) => /AS listed_at/.test(s))!;
+    expect(sql).toContain("INTERVAL '60 days'");
+    expect(sql).not.toContain('$1');
+  });
+
+  // A renamed product is still one product in the ranking.
+  it('groups products by id, not by the name printed on the order', async () => {
+    const sqls: string[] = [];
+    mockQueries((sql) => {
+      sqls.push(sql);
+      return [{}];
+    });
+    await getOverviewReport('month', '2026-10-09');
+    for (const s of sqls.filter((q) => /LIMIT 10\b|LIMIT 500/.test(q))) {
+      expect(s).toContain("GROUP BY COALESCE(oi.product_id::text, 'name:' || oi.product_name)");
+    }
   });
 
   it('derives the average ticket from the period, and guards against no orders', async () => {
@@ -361,7 +486,9 @@ describe('getOverviewReport', () => {
     expect(topSql).toContain('ORDER BY revenue DESC');
   });
 
-  it('keeps the report usable when one block fails', async () => {
+  // A failed block used to become zeros that read as a period without sales —
+  // in the panel, the PDF and the spreadsheet alike.
+  it('fails the whole report when one block fails, instead of showing zeros', async () => {
     queryMock.mockImplementation(async (sql: string) => {
       if (/date_trunc/.test(sql) && /prev_start_at/.test(sql)) return { rows: [bounds], rowCount: 1 };
       if (/order_items/.test(sql)) throw new Error('relation "order_items" does not exist');
@@ -369,11 +496,7 @@ describe('getOverviewReport', () => {
       return { rows: [{}], rowCount: 1 };
     });
 
-    const report = await getOverviewReport('day');
-
-    expect(report.sales.revenue).toBe(100);
-    expect(report.products.top).toEqual([]);
-    expect(report.products.unitsSold).toBe(0);
+    await expect(getOverviewReport('day')).rejects.toThrow('order_items');
   });
 
   it('reports the catalog as of now, not as of the period', async () => {
@@ -475,8 +598,10 @@ describe('relatório financeiro por intervalo', () => {
   it('mantém pendente, cancelado e estornado fora da receita, mas com valor', async () => {
     route((sql) =>
       /AS retail_revenue/.test(sql)
-        ? [{ orders: 2, revenue: 300, pending_orders: 3, pending_value: 450, cancelled_orders: 1, cancelled_value: 90, refunded_orders: 1, refunded_value: 60 }]
-        : undefined
+        ? [{ orders: 2, revenue: 300, pending_orders: 3, pending_value: 450, cancelled_orders: 1, cancelled_value: 90 }]
+        : /AS shop_prior_value/.test(sql)
+          ? [{ shop_count: 1, shop_value: 60 }]
+          : undefined
     );
     const report = await getOverviewReport('month', '2026-10-09');
     expect(report.sales).toMatchObject({

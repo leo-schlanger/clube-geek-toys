@@ -21,7 +21,8 @@ export function previousMonth(today: string): string {
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
-const ISO_MONTH = /^\d{4}-\d{2}$/
+// Months 01–12 only: a browser without a month picker lets "2026-13" through.
+const ISO_MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 
 /**
  * Turn the panel's choice into the API query, or null while the choice is

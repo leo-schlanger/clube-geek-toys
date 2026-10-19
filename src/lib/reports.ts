@@ -223,6 +223,7 @@ export interface LedgerEntry {
   method: PaymentMethodKey
   channel: string | null
   installments: number | null
+  /** `refunded_later`: sold here, refunded after the period. `refund`: money back for an earlier sale. */
   status: string
   subtotal: number
   discount: number
@@ -236,11 +237,22 @@ export interface OverviewReport {
   period: { type: OverviewPeriod; start: string; end: string; previousStart?: string; days?: number }
   sales: {
     orders: number
+    /** The period's sales minus refunds made in it of earlier sales. */
     revenue: number
+    grossRevenue: number
+    priorRefunds: number
+    priorRefundsCount: number
     averageTicket: number
+    /** Products only (subtotal minus discount), per order. */
+    averageProductTicket: number
     subtotal: number
     discount: number
     shipping: number
+    shippedOrders: number
+    /** What Melhor Envio charged for the labels, and the shipping charged on those same orders. */
+    labelCost: number
+    shippingWithLabel: number
+    labelsWithCost: number
     storeCredit: number
     retailOrders: number
     retailRevenue: number
@@ -252,19 +264,31 @@ export interface OverviewReport {
     cardRevenue: number
     pendingOrders: number
     pendingRevenue: number
+    /** Attempts: one customer retrying a card counts many times. */
     cancelledOrders: number
     cancelledRevenue: number
+    cancelledCustomers: number
+    /** Largest cancelled cart of each customer, summed. */
+    cancelledCartsValue: number
+    /** Refunds made in the period, whatever period the sale was in. */
     refundedOrders: number
     refundedRevenue: number
   }
   club: {
     revenue: number
+    grossRevenue: number
+    priorRefunds: number
+    priorRefundsCount: number
     payments: number
     newMembers: number
     activeMembers: number
     expiredInPeriod: number
     refunded: number
     refundedPayments: number
+    /** Sign-up forms filled in the period, and how many of them paid. */
+    signups: number
+    signupsPaid: number
+    conversionPct: number
   }
   /** Result: only lines with a known cost are counted. */
   margin: {
@@ -288,6 +312,23 @@ export interface OverviewReport {
     lowStock: number
   }
   tickets: { revenue: number; reservations: number; tickets: number }
+  ticketsByEvent: {
+    eventId: string
+    title: string
+    startsAt: string | null
+    reservations: number
+    tickets: number
+    checkedIn: number
+    revenue: number
+  }[]
+  /** As of now: active products with stock and no sale for `days` days. */
+  stale: {
+    days: number
+    count: number
+    units: number
+    shelfValue: number
+    items: { name: string; stock: number; price: number; lastSoldAt: string | null; listedAt: string | null }[]
+  }
   series: {
     bucket: 'day' | 'month'
     points: { date: string; shop: number; club: number; tickets: number; total: number; orders: number }[]
@@ -322,6 +363,8 @@ export const LEDGER_STATUS_LABEL: Record<string, string> = {
   delivered: 'Entregue',
   cancelled: 'Cancelado',
   refunded: 'Estornado',
+  refunded_later: 'Estornado depois',
+  refund: 'Estorno',
   confirmed: 'Confirmado',
   failed: 'Falhou',
 }

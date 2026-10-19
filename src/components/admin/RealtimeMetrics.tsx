@@ -205,9 +205,9 @@ export function RealtimeMetrics() {
       {/* Secondary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Aguardando Ativação"
+          title="Cadastros sem pagamento"
           value={stats.pendingMembers}
-          subtitle={stats.pendingMembers > 0 ? 'Verifique o extrato e ative' : 'Nenhum pendente'}
+          subtitle={stats.pendingMembers > 0 ? 'Preencheram e ainda não pagaram' : 'Nenhum pendente'}
           icon={<Clock className="h-5 w-5" />}
           colorClass="text-yellow-500"
           highlight={stats.pendingMembers > 0}

@@ -17,7 +17,8 @@ const reports = vi.hoisted(() => ({
   getRealtimeStats: vi.fn(async () => ({ r: 1 })),
   getActionItems: vi.fn(async () => ({ items: [] })),
   getOverviewReport: vi.fn(async () => ({ o: 1 })),
-  isOverviewPeriod: (v: unknown) => v === 'day' || v === 'week' || v === 'month' || v === 'range',
+  isOverviewPeriod: (v: unknown) => v === 'day' || v === 'month' || v === 'range',
+  isIsoDate: (v: unknown) => typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|30)$/.test(v),
   parseRange: (start: unknown, end: unknown) =>
     typeof start === 'string' && typeof end === 'string' && start <= end ? { start, end } : { error: 'datas inválidas' },
 }));
@@ -57,11 +58,22 @@ describe('reports', () => {
     expect(reports.getChurnReport).toHaveBeenLastCalledWith(1);
   });
 
-  it('default an unknown overview period to the month', async () => {
-    await api.get('/overview?period=year&date=2026-09-01', { as: 'admin' });
+  it('default a missing overview period to the month and refuse an unknown one', async () => {
+    await api.get('/overview?date=2026-09-01', { as: 'admin' });
     expect(reports.getOverviewReport).toHaveBeenCalledWith('month', '2026-09-01');
-    await api.get('/overview?period=week', { as: 'admin' });
-    expect(reports.getOverviewReport).toHaveBeenLastCalledWith('week', undefined);
+    await api.get('/overview?period=day&date=2026-09-01', { as: 'admin' });
+    expect(reports.getOverviewReport).toHaveBeenLastCalledWith('day', '2026-09-01');
+    expect((await api.get('/overview?period=year', { as: 'admin' })).status).toBe(400);
+    expect(reports.getOverviewReport).toHaveBeenCalledTimes(2);
+  });
+
+  // An impossible date came back as the current month, labelled as asked.
+  it('refuse a date that is not a calendar date', async () => {
+    for (const q of ['date=2026-02-31', 'date=2026-13-01', 'date=ontem', 'date=2026-09-01&date=2026-10-01']) {
+      const res = await api.get(`/overview?period=month&${q}`, { as: 'admin' });
+      expect(res.status, q).toBe(400);
+    }
+    expect(reports.getOverviewReport).not.toHaveBeenCalled();
   });
 
   // The finance panel's "Intervalo": two dates the admin picks.

@@ -28,6 +28,9 @@ describe('resolveFinanceQuery', () => {
   it('reports any month the admin picks', () => {
     expect(resolveFinanceQuery('month', { month: '2026-08' }, today)).toEqual({ period: 'month', date: '2026-08-01' })
     expect(resolveFinanceQuery('month', { month: '' }, today)).toBeNull()
+    // Typed by hand where there is no month picker; the API would refuse it.
+    expect(resolveFinanceQuery('month', { month: '2026-13' }, today)).toBeNull()
+    expect(resolveFinanceQuery('month', { month: '2026-00' }, today)).toBeNull()
   })
 
   it('sends a custom range only when it makes sense', () => {
