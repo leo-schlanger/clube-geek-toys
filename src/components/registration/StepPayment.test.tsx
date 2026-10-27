@@ -189,7 +189,8 @@ describe('StepPayment', () => {
 
     expect(screen.getByRole('button', { name: /pix.*qr code/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^cartão.*crédito$/i })).toBeInTheDocument()
-    expect(screen.getByText('Endereço de cobrança')).toBeInTheDocument()
+    // The address belongs to the card; PIX is one tap, as on an event ticket.
+    expect(screen.queryByText('Endereço de cobrança')).not.toBeInTheDocument()
   })
 
   it('renders back button', () => {
@@ -224,17 +225,42 @@ describe('StepPayment', () => {
     expect(screen.queryByRole('button', { name: /pix.*qr code/i })).not.toBeInTheDocument()
   })
 
-  it('does not start PIX or the card form without an address', async () => {
+  // 27/10/2026: seven address fields stood in front of the PIX button. An event
+  // ticket never asked for one, and is the payment that keeps selling.
+  it('issues the PIX with no address at all', async () => {
+    vi.useRealTimers()
+    const user = userEvent.setup()
+    mockGeneratePixPayment.mockResolvedValue({
+      paymentIntentId: 'pi_noaddr',
+      clientSecret: '',
+      qrCode: '00020126580014BR.GOV.BCB.PIX...',
+      qrCodeBase64: '',
+      qrCodeImageUrl: '',
+      amount: 159.9,
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    })
+    render(<StepPayment {...defaultProps} initialAddress={null} />)
+
+    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
+
+    await waitFor(() => expect(screen.getByTestId('qrcode-svg')).toBeInTheDocument())
+    expect(mockGeneratePixPayment).toHaveBeenCalledWith(
+      159.9, expect.any(String), 'test@example.com', 'member-123', undefined,
+    )
+  })
+
+  it('asks for the address with the card, and charges nothing without it', async () => {
     vi.useRealTimers()
     const user = userEvent.setup()
     render(<StepPayment {...defaultProps} initialAddress={null} />)
 
-    await user.click(screen.getByRole('button', { name: /pix.*qr code/i }))
-    expect(mockGeneratePixPayment).not.toHaveBeenCalled()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Informe o CEP.')
-
     await user.click(screen.getByRole('button', { name: /^cartão.*crédito$/i }))
-    expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
+    expect(screen.getByTestId('card-form')).toBeInTheDocument()
+    expect(screen.getByText('Endereço de cobrança')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('card-pay'))
+    const alerts = await screen.findAllByRole('alert')
+    expect(alerts.map((a) => a.textContent)).toContain('Informe o CEP.')
     expect(mockApiPost).not.toHaveBeenCalled()
   })
 

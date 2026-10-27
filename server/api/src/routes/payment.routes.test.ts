@@ -154,11 +154,27 @@ describe('paying for the membership', () => {
     expect((await api.post('/card/create', { as: 'seller', body: { ...body, installments: 13 } })).status).toBe(400);
   });
 
-  it('refuses a charge with no billing address', async () => {
+  it('issues a PIX without a billing address, as an event ticket does', async () => {
+    memberOwnedBy('user-member');
+    payments.createPixPayment.mockResolvedValue({ qrCode: 'x' });
+    const { billing_address: _drop, ...noAddress } = pix;
+    expect((await api.post('/create', { as: 'member', body: noAddress })).status).toBe(201);
+    expect(payments.createPixPayment).toHaveBeenCalledWith(expect.objectContaining({ billingAddress: undefined }))
+  });
+
+  it('still refuses a half-filled address on a PIX', async () => {
+    memberOwnedBy('user-member');
+    const body = { ...pix, billing_address: { ...pix.billing_address, number: '' } };
+    expect((await api.post('/create', { as: 'member', body })).status).toBe(400);
+    expect(payments.createPixPayment).not.toHaveBeenCalled();
+  });
+
+  it('refuses a card charge with no billing address', async () => {
     memberOwnedBy('user-member');
     const { billing_address: _drop, ...noAddress } = pix;
-    expect((await api.post('/create', { as: 'member', body: noAddress })).status).toBe(400);
-    expect(payments.createPixPayment).not.toHaveBeenCalled();
+    const body = { ...noAddress, payer_name: 'L', card_token: 'card_x' };
+    expect((await api.post('/card/create', { as: 'member', body })).status).toBe(400);
+    expect(payments.createCardPayment).not.toHaveBeenCalled();
   });
 });
 

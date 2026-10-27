@@ -204,8 +204,9 @@ export function StepPayment({
   }, [address])
 
   const handlePixPayment = useCallback(async () => {
-    const billing = addressOrStop()
-    if (!billing) return
+    // PIX goes out without an address, as an event ticket does; one already
+    // complete (saved from a card attempt) still travels.
+    const billing = billingAddressProblem(address) ? undefined : toBillingAddressBody(address)
     setLoading(true)
     setError(null)
     try {
@@ -240,7 +241,7 @@ export function StepPayment({
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, planData.name, memberEmail, memberId, addressOrStop])
+  }, [amount, planData.name, memberEmail, memberId, address])
 
   /** A refused card's way out: PIX always works, whichever mode was picked. */
   const switchToPix = useCallback(async () => {
@@ -259,10 +260,10 @@ export function StepPayment({
    * so nothing is created until the member has actually typed a card.
    */
   const handleCardPayment = useCallback(() => {
-    if (!addressOrStop()) return
     setError(null)
+    setAddressError(null)
     setMethod('card')
-  }, [addressOrStop])
+  }, [])
 
   /**
    * Run the charge with the token the form produced.
@@ -272,9 +273,8 @@ export function StepPayment({
    */
   const handleCardToken = useCallback(
     async (cardToken: string, installments: number) => {
-      const billing = toBillingAddressBody(address)
-      const problem = billingAddressProblem(address)
-      if (problem) throw new Error(problem)
+      const billing = addressOrStop()
+      if (!billing) throw new Error(billingAddressProblem(address) ?? 'Informe o endereço de cobrança.')
       setError(null)
 
       const endpoint = mode === 'subscription' ? '/subscription/create' : '/checkout/card/create'
@@ -318,7 +318,7 @@ export function StepPayment({
       handlePaymentSuccess()
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, memberId, plan, amount, memberEmail, memberName, planData.name, address]
+    [mode, memberId, plan, amount, memberEmail, memberName, planData.name, address, addressOrStop]
   )
 
   // ─── Success handler ───────────────────────────────────────────────────────
@@ -375,7 +375,8 @@ export function StepPayment({
         </CardContent>
       </Card>
 
-      {method !== 'pix' && (
+      {/* Only the card needs it: the issuer checks it when the card is saved. */}
+      {method === 'card' && (
         <div className="space-y-2">
           <BillingAddressFields
             value={address}

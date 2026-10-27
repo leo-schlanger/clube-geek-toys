@@ -21,6 +21,7 @@ import { auditLog } from '../utils/audit.js';
 import { claimClubCardAttempt } from '../utils/club-card-lock.js';
 import { revokeRefundedPeriod } from './club-access.service.js';
 import { cancelSubscription } from './subscription.service.js';
+import { STORE_PICKUP_LOCATION } from './shipping.service.js';
 import crypto from 'crypto';
 import { moduleLogger } from '../config/logger.js';
 
@@ -290,21 +291,24 @@ export async function createPixPayment(data: {
 }> {
   validateAmount(data.amount);
   const payer = await loadClubPayer(data.memberId);
-  // After the member and the CPF: a bad amount or a missing document must
-  // still be that error, not "address required".
-  const address = requireBillingAddress(data.billingAddress);
-  const pagarmeAddress = toPagarmeAddress(address);
+  // Optional, as on an event ticket: a PSP customer needs an address but a PIX
+  // never verifies it, so the shop's stands in. One that was sent is still
+  // validated, after the member and the CPF.
+  const address = data.billingAddress == null ? null : requireBillingAddress(data.billingAddress);
+  const pagarmeAddress = toPagarmeAddress(address ?? STORE_PICKUP_LOCATION);
   if (!pagarmeAddress) {
     throw new AppError(400, 'Informe o endereço de cobrança.', 'BILLING_ADDRESS_REQUIRED');
   }
-  await rememberBillingAddress(payer.id, address);
-  // PIX stays an inline customer. If this member already has a Pagar.me
-  // customer (a refused card created one), put the address on it too so the
-  // next card sees it. A failed update must not issue a code against a
-  // customer we know is incomplete. The PUT replaces the whole customer, so
-  // the whole customer goes.
-  if (payer.pagarmeCustomerId) {
-    await pagarme.updateCustomer(payer.pagarmeCustomerId, payerToPagarmeCustomer(payer, pagarmeAddress));
+  if (address) {
+    await rememberBillingAddress(payer.id, address);
+    // PIX stays an inline customer. If this member already has a Pagar.me
+    // customer (a refused card created one), put the address on it too so the
+    // next card sees it. A failed update must not issue a code against a
+    // customer we know is incomplete. The PUT replaces the whole customer, so
+    // the whole customer goes. The shop's address never goes onto it.
+    if (payer.pagarmeCustomerId) {
+      await pagarme.updateCustomer(payer.pagarmeCustomerId, payerToPagarmeCustomer(payer, pagarmeAddress));
+    }
   }
   const amountInCents = pagarme.toCents(data.amount);
 

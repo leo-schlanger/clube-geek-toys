@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { lookupCep, maskCep } from '../lib/shipping'
@@ -23,6 +23,10 @@ export function BillingAddressFields({
   idPrefix?: string
 }) {
   const [looking, setLooking] = useState(false)
+  // The lookup resolves after the member has moved on to the next field; merge
+  // into what is on screen then, not into the value captured at blur.
+  const latest = useRef(value)
+  latest.current = value
 
   function patch(partial: Partial<BillingAddressInput>) {
     onChange({ ...value, ...partial })
@@ -34,12 +38,14 @@ export function BillingAddressFields({
     setLooking(true)
     try {
       const found = await lookupCep(digits)
+      const now = latest.current
+      if (now.cep.replace(/\D/g, '') !== digits) return
       onChange({
-        ...value,
-        street: value.street.trim() ? value.street : found.street,
-        neighborhood: value.neighborhood.trim() ? value.neighborhood : found.neighborhood,
-        city: value.city.trim() ? value.city : found.city,
-        state: value.state.trim() ? value.state : found.state.toUpperCase().slice(0, 2),
+        ...now,
+        street: now.street.trim() ? now.street : found.street,
+        neighborhood: now.neighborhood.trim() ? now.neighborhood : found.neighborhood,
+        city: now.city.trim() ? now.city : found.city,
+        state: now.state.trim() ? now.state : found.state.toUpperCase().slice(0, 2),
       })
     } catch {
       // A missed lookup must not wipe what was typed.

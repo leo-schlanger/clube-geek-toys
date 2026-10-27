@@ -216,8 +216,9 @@ export function PaymentModal({
   }, [address])
 
   const handlePixPayment = useCallback(async () => {
-    const billing = addressOrStop()
-    if (!billing) return
+    // PIX goes out without an address, as an event ticket does; one already
+    // complete (saved from a card attempt) still travels.
+    const billing = billingAddressProblem(address) ? undefined : toBillingAddressBody(address)
     setLoading(true)
     setError(null)
     try {
@@ -254,7 +255,7 @@ export function PaymentModal({
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amount, planData.name, memberEmail, memberId, addressOrStop])
+  }, [amount, planData.name, memberEmail, memberId, address])
 
   // ─── Card flow (Pagar.me) ──────────────────────────────────────────────────
 
@@ -267,10 +268,10 @@ export function PaymentModal({
    * does the whole charge in one request.
    */
   const handleCardPayment = useCallback(() => {
-    if (!addressOrStop()) return
     setError(null)
+    setAddressError(null)
     setMethod('card')
-  }, [addressOrStop])
+  }, [])
 
   /**
    * Charge (or subscribe) with a token the form just produced.
@@ -280,9 +281,8 @@ export function PaymentModal({
    */
   const handleCardToken = useCallback(
     async (cardToken: string, installments: number) => {
-      const problem = billingAddressProblem(address)
-      if (problem) throw new Error(problem)
-      const billing = toBillingAddressBody(address)
+      const billing = addressOrStop()
+      if (!billing) throw new Error(billingAddressProblem(address) ?? 'Informe o endereço de cobrança.')
       setError(null)
 
       const endpoint = mode === 'subscription' ? '/subscription/create' : '/checkout/card/create'
@@ -330,7 +330,7 @@ export function PaymentModal({
       handlePaymentSuccess()
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode, memberId, plan, paymentType, amount, memberEmail, memberName, planData.name, address]
+    [mode, memberId, plan, paymentType, amount, memberEmail, memberName, planData.name, address, addressOrStop]
   )
 
   function handlePaymentSuccess() {
@@ -379,7 +379,8 @@ export function PaymentModal({
             </div>
           )}
 
-          {method !== 'pix' && (
+          {/* Only the card needs it: the issuer checks it when the card is saved. */}
+          {method === 'card' && (
             <div className="space-y-2">
               <BillingAddressFields
                 value={address}

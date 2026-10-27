@@ -195,16 +195,37 @@ describe('PaymentModal', () => {
     expect(screen.getByText(/Iniciar Assinatura com Cartão/)).toBeInTheDocument()
   })
 
-  it('does not start PIX or open the card form without an address', async () => {
+  // 27/10/2026: seven address fields stood in front of the PIX button. An event
+  // ticket never asked for one, and is the payment that keeps selling.
+  it('issues the PIX with no address, and asks for it only with the card', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    mockGeneratePixPayment.mockResolvedValue({
+      paymentIntentId: 'pi_noaddr',
+      clientSecret: '',
+      qrCode: 'pix-code-emv',
+      qrCodeBase64: '',
+      qrCodeImageUrl: '',
+      pixKey: 'key',
+      expiresAt: new Date(Date.now() + 30 * 60000).toISOString(),
+      amount: 159.9,
+    })
+    renderModal({ initialAddress: null })
+    expect(screen.queryByText('Endereço de cobrança')).not.toBeInTheDocument()
+
+    await user.click(screen.getByText('PIX'))
+    await waitFor(() => expect(screen.getByTestId('qr-code')).toBeInTheDocument())
+    expect(mockGeneratePixPayment).toHaveBeenCalledWith(
+      159.9, expect.any(String), 'test@example.com', 'member-123', undefined,
+    )
+  })
+
+  it('opens the card with the address, and charges nothing without it', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     renderModal({ initialAddress: null })
 
-    await user.click(screen.getByText('PIX'))
-    expect(mockGeneratePixPayment).not.toHaveBeenCalled()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Informe o CEP.')
-
     await user.click(screen.getByText('Cartão'))
-    expect(screen.queryByTestId('card-form')).not.toBeInTheDocument()
+    expect(screen.getByTestId('card-form')).toBeInTheDocument()
+    expect(screen.getByText('Endereço de cobrança')).toBeInTheDocument()
     expect(mockApiPost).not.toHaveBeenCalled()
   })
 

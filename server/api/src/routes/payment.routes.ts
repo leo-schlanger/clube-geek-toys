@@ -21,7 +21,7 @@ const pixCreateSchema = z.object({
   description: z.string().min(1),
   payer_email: z.string().email(),
   external_reference: z.string().min(1), // memberId
-  billing_address: billingAddressSchema,
+  billing_address: billingAddressSchema.optional(),
 });
 
 const cardCreateSchema = z.object({

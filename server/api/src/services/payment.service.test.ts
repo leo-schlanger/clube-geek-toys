@@ -469,6 +469,47 @@ describe('createPixPayment', () => {
     expect(payload.customer_id).toBeUndefined();
     expect(payload.customer).toBeDefined();
   });
+
+  // 27/10/2026: an event ticket never asked for an address and keeps selling;
+  // the club asked for seven fields before its PIX.
+  it('emite o PIX sem endereço, com o da loja, como o ingresso', async () => {
+    route('FROM members WHERE id', { rows: [{ ...memberRow, pagarme_customer_id: 'cus_old' }] });
+
+    const result = await createPixPayment({
+      amount: PLAN_PRICE,
+      description: 'Plano',
+      payerEmail: 'ana@example.com',
+      memberId: 'member-1',
+    });
+
+    expect(result.pixData.amount).toBe(PLAN_PRICE);
+    const [payload] = createOrderMock.mock.calls[0] as [{ customer?: { name?: string; document?: string; address?: unknown } }];
+    expect(payload.customer).toMatchObject({
+      name: memberRow.full_name,
+      document: expect.stringMatching(/^\d{11}$/),
+      address: expect.objectContaining({ zip_code: '22011001', line_1: '181, Rua Barata Ribeiro, Copacabana' }),
+    });
+    // The shop's address is a stand-in for this charge only: it must not land
+    // on the member, nor on the customer a later card is verified against.
+    expect(ran('billing_address')).toBe(false);
+    expect(updateCustomerMock).not.toHaveBeenCalled();
+    expect(ran('INSERT INTO payments')).toBe(true);
+  });
+
+  it('recusa endereço enviado pela metade no PIX', async () => {
+    route('FROM members WHERE id', { rows: [memberRow] });
+
+    await expect(
+      createPixPayment({
+        amount: PLAN_PRICE,
+        description: 'Plano',
+        payerEmail: 'ana@example.com',
+        memberId: 'member-1',
+        billingAddress: { ...billingAddress, number: '' },
+      })
+    ).rejects.toMatchObject({ code: 'BILLING_ADDRESS_REQUIRED' });
+    expect(createOrderMock).not.toHaveBeenCalled();
+  });
 });
 
 // ─── PIX confirmation ────────────────────────────────────────────────────────

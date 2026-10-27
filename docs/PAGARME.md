@@ -439,12 +439,12 @@ Pagar.me aceita o que mandamos.
 
 Riscos concretos, por ordem de probabilidade de morder:
 
-| Risco                               | Por quê                                                                                                                                                                                                                                                                                | Como descobrir                                                                                                                                                                                                    |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`customer` incompleto no clube**  | PSP exige endereço e telefone. O clube só tinha telefone. Medido em 17/10/2026: o cartão voltava **412** na verificação do emissor (`POST /cards`), sem código da adquirente — não era o 422 de campo que esta linha previa. A loja, que manda `billing_address`, passava dessa etapa. | Desde 17/10/2026 o cadastro e a renovação pedem o endereço, gravam em `members.billing_address` e enviam no cliente (cria ou `PUT`) e no cartão. O PIX do clube segue com cliente inline e leva o mesmo endereço. |
-| **Formato do webhook**              | O envelope (`id`/`type`/`data`) e a Basic auth vieram do meu conhecimento — as páginas de doc que busquei voltaram vazias nesse ponto.                                                                                                                                                 | Primeiro `charge.paid` real. Se o pedido não virar `paid` sozinho, o parse ou a auth estão errados.                                                                                                               |
-| **`PATCH /subscriptions/:id/card`** | Endpoint não confirmado na doc.                                                                                                                                                                                                                                                        | Trocar o cartão de uma assinatura de teste.                                                                                                                                                                       |
-| **Antifraude**                      | Não configurado. Cobrança pode voltar `pending` esperando análise em vez de `paid`.                                                                                                                                                                                                    | Uma compra de valor mais alto.                                                                                                                                                                                    |
+| Risco                               | Por quê                                                                                                                                                                                                                                                                                | Como descobrir                                                                                                                                                                                                                                                                               |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`customer` incompleto no clube**  | PSP exige endereço e telefone. O clube só tinha telefone. Medido em 17/10/2026: o cartão voltava **412** na verificação do emissor (`POST /cards`), sem código da adquirente — não era o 422 de campo que esta linha previa. A loja, que manda `billing_address`, passava dessa etapa. | Desde 17/10/2026 o cadastro e a renovação pedem o endereço, gravam em `members.billing_address` e enviam no cliente (cria ou `PUT`) e no cartão. O PIX do clube segue com cliente inline e leva o mesmo endereço — desde 27/10/2026 só se a pessoa já o tiver; sem ele vai o da loja (§8.9). |
+| **Formato do webhook**              | O envelope (`id`/`type`/`data`) e a Basic auth vieram do meu conhecimento — as páginas de doc que busquei voltaram vazias nesse ponto.                                                                                                                                                 | Primeiro `charge.paid` real. Se o pedido não virar `paid` sozinho, o parse ou a auth estão errados.                                                                                                                                                                                          |
+| **`PATCH /subscriptions/:id/card`** | Endpoint não confirmado na doc.                                                                                                                                                                                                                                                        | Trocar o cartão de uma assinatura de teste.                                                                                                                                                                                                                                                  |
+| **Antifraude**                      | Não configurado. Cobrança pode voltar `pending` esperando análise em vez de `paid`.                                                                                                                                                                                                    | Uma compra de valor mais alto.                                                                                                                                                                                                                                                               |
 
 ### O que já foi corrigido por causa desta revisão
 
@@ -681,6 +681,38 @@ WHERE message = 'Card form left without paying' ORDER BY created_at DESC;
 | Auditoria fantasma                     | `auditLog` (pool) dentro da transação do webhook ficava mesmo com rollback — 4 `member.activated` de uma ativação que não aconteceu (05/09)                                          | Auditoria do webhook gravada depois do COMMIT                                                        |
 | Cartão do clube sem trava              | Cada envio gerava cobrança nova (duas abas = dois anos)                                                                                                                              | `claimClubCardAttempt`: 2 min por membro, solta quando nada foi cobrado                              |
 | Cobrança paga sem pedido               | Pedido já pago por outra cobrança: só um log `info`                                                                                                                                  | `alertOps('payment_orphan')` + aviso no painel                                                       |
+
+## 8.9 "O clube não chega na Pagar.me" — 27/10/2026
+
+A Pagar.me respondeu ao Norberto que não recebia pedido nenhum do clube, e
+que o ingresso funcionava. Os dois fatos estavam certos, e o motivo é este:
+
+- **Os 3 cadastros pendentes** (09, 15 e 16/10) assinaram o contrato e
+  tentaram **cartão**. A Pagar.me cria o cliente e, ao salvar o cartão
+  (`POST /customers/{id}/cards`), pergunta ao banco — que recusou os três
+  (412). A recusa vem **antes** do `POST /orders`, então do lado da Pagar.me
+  existe o cliente e nenhum pedido. Nenhum dos três chegou a gerar PIX.
+- **O PIX do clube nunca tinha sido usado por cliente.** Desde 17/10 ele
+  exigia o endereço de cobrança (7 campos) antes do botão; o ingresso, que não
+  pede endereço, segue vendendo. Depois de 16/10 nenhum cliente chegou à etapa
+  de pagamento do clube, então não há medida de quantos o formulário barrou —
+  só de que era o caminho mais longo para o meio que funciona.
+- **O CEP apagava o número.** `BillingAddressFields` mesclava o resultado da
+  busca no endereço capturado no blur: no celular, quem tocava em "Número" e
+  digitava enquanto o CEP buscava via o campo esvaziar, e o PIX respondia
+  "Informe o número.". Reproduzido em produção com Playwright.
+
+| Mudança                                                                                                                                                                                                                   | Onde                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| PIX do clube sem endereço, como o ingresso: sem endereço do membro vai o da loja (`STORE_PICKUP_LOCATION`) só naquela cobrança — não grava no membro nem faz `PUT` no cliente. Endereço enviado pela metade continua 400. | `createPixPayment`, `pixCreateSchema` |
+| O endereço só aparece depois de escolher **Cartão** (cadastro e painel); o cartão continua sem cobrar nada sem ele                                                                                                        | `StepPayment`, `PaymentModal`         |
+| A busca do CEP mescla no valor atual e ignora resposta de CEP que já mudou                                                                                                                                                | `BillingAddressFields`                |
+
+O caminho do cartão do clube manda hoje o mesmo que a loja (cliente completo
+com endereço e telefone, `billing_address` no `POST /cards`, pedido com
+`card_id`). Nenhum cliente real tentou cartão no clube depois de 17/10, então
+não há aprovação real que prove isso; a recusa de 412 continua oferecendo
+**Pagar com PIX** na mesma tela.
 
 ---
 
