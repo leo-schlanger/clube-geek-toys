@@ -378,7 +378,7 @@ export default function AdminDashboard() {
         </header>
 
         {/* Main Content Skeleton */}
-        <main className="pt-16 lg:pt-0 lg:pl-64">
+        <div className="pt-16 lg:pt-0 lg:pl-64">
           <div className="p-4 lg:p-8 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -402,7 +402,7 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
-        </main>
+        </div>
       </div>
     )
   }
@@ -417,7 +417,7 @@ export default function AdminDashboard() {
       />
 
       {/* Main Content */}
-      <main className="pt-16 lg:pt-0 lg:pl-64">
+      <div className="pt-16 lg:pt-0 lg:pl-64">
         <div className="p-4 lg:p-8">
           {/* Header com Refresh */}
           <div className="flex items-center justify-between mb-6">
@@ -677,7 +677,7 @@ export default function AdminDashboard() {
             )}
           </Suspense>
         </div>
-      </main>
+      </div>
 
       {/* Member Modal */}
       {modalMode && (

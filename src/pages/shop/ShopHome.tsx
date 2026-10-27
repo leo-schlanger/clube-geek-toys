@@ -186,7 +186,7 @@ export default function ShopHome() {
       />
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Hero — unfiltered home only */}
         {!categorySlug && !search && (
           <section className="mb-8 overflow-hidden rounded-2xl border border-primary/20 bg-linear-to-br/srgb from-primary/15 via-background to-accent/10 p-6 sm:p-10">
@@ -279,7 +279,7 @@ export default function ShopHome() {
             />
           )}
         </section>
-      </main>
+      </div>
 
       <footer className="mt-12 border-t py-8 text-center text-sm text-muted-foreground space-y-3">
         <p className="font-medium text-foreground">GeekPop &amp; Toys — Loja de K-pop no Rio de Janeiro</p>

@@ -179,8 +179,8 @@ describe('StepPayment', () => {
     vi.useRealTimers()
     render(<StepPayment {...defaultProps} />)
 
-    expect(screen.getByText(/pagamento unico/i)).toBeInTheDocument()
-    expect(screen.getByText(/cobranca recorrente/i)).toBeInTheDocument()
+    expect(screen.getByText('Pagamento Único')).toBeInTheDocument()
+    expect(screen.getByText(/cobrança recorrente/i)).toBeInTheDocument()
   })
 
   it('renders PIX and card method selection in one-time mode', () => {
@@ -216,7 +216,7 @@ describe('StepPayment', () => {
     const user = userEvent.setup()
     render(<StepPayment {...defaultProps} />)
 
-    await user.click(screen.getByText(/cobranca recorrente/i))
+    await user.click(screen.getByText(/cobrança recorrente/i))
 
     expect(
       screen.getByRole('button', { name: /iniciar assinatura com cartão/i })
@@ -397,7 +397,7 @@ describe('StepPayment', () => {
     })
 
     render(<StepPayment {...defaultProps} />)
-    await user.click(screen.getByText(/cobranca recorrente/i))
+    await user.click(screen.getByText(/cobrança recorrente/i))
     await user.click(screen.getByRole('button', { name: /iniciar assinatura/i }))
     await user.click(await screen.findByTestId('card-pay'))
     await user.click(await screen.findByTestId('card-switch-pix'))

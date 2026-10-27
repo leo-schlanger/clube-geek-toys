@@ -172,7 +172,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Critical Inactive Banner — clearly tells the user benefits are not active yet */}
         <div className="mb-6 p-4 rounded-lg bg-red-500/15 border-2 border-red-500/50 flex items-start gap-4">
           <AlertTriangle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
@@ -421,7 +421,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
             </Card>
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Payment Modal */}
       {showPayment && (

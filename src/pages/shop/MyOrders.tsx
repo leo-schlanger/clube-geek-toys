@@ -98,7 +98,7 @@ export default function MyOrders() {
       />
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto max-w-3xl px-4 py-6">
+      <div className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="mb-4 text-2xl font-heading font-bold">Minhas compras</h1>
 
         {pendingGuestOrders > 0 && (
@@ -223,7 +223,7 @@ export default function MyOrders() {
             })}
           </ul>
         )}
-      </main>
+      </div>
     </div>
   )
 }

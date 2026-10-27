@@ -133,7 +133,7 @@ export default function MyOrderDetail() {
       <SeoHead title={order ? `Pedido #${order.orderNumber}` : 'Pedido'} path={`/minhas-compras/${id}`} noIndex />
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <div className="mx-auto max-w-2xl px-4 py-6">
         <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2 text-muted-foreground">
           <Link to="/minhas-compras">
             <ArrowLeft className="h-4 w-4" />
@@ -429,7 +429,7 @@ export default function MyOrderDetail() {
             )}
           </div>
         )}
-      </main>
+      </div>
     </div>
   )
 }

@@ -189,7 +189,7 @@ export default function MemberDashboard() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         {/* Email Verification Banner */}
         {!emailVerified && (
           <div className="p-4 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3">
@@ -271,7 +271,7 @@ export default function MemberDashboard() {
         />
 
         <MemberActivityHistory memberId={member.id} limit={5} />
-      </main>
+      </div>
 
       {/* Modals — lazy-loaded */}
       <Suspense fallback={null}>

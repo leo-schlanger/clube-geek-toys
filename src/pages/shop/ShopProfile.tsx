@@ -292,7 +292,7 @@ export default function ShopProfile() {
       <SeoHead title="Meu perfil" path="/perfil" noIndex />
       <ShopHeader isMember={profile.isMember} />
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <h1 className="font-heading text-2xl font-bold">Meu perfil</h1>
 
         <Card>
@@ -662,7 +662,7 @@ export default function ShopProfile() {
             .
           </span>
         </p>
-      </main>
+      </div>
     </div>
   )
 }

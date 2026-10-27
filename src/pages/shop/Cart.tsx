@@ -33,7 +33,7 @@ export default function Cart() {
     <div className="min-h-screen bg-background">
       <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <div className="mx-auto max-w-4xl px-4 py-6">
         <h1 className="mb-6 text-2xl font-heading font-bold">
           {isWholesale ? 'Carrinho atacado' : 'Meu carrinho'}
         </h1>
@@ -225,7 +225,7 @@ export default function Cart() {
             </div>
           </div>
         )}
-      </main>
+      </div>
     </div>
   )
 }

@@ -140,7 +140,7 @@ export default function OrderConfirmation() {
       <SeoHead title="Pedido" path={`/pedido/${id ?? ''}`} noIndex />
       <ShopHeader isMember={isMember} />
 
-      <main
+      <div
         className={`mx-auto flex flex-col items-center px-4 py-12 ${
           pix ? 'max-w-2xl' : 'max-w-lg'
         }`}
@@ -251,7 +251,7 @@ export default function OrderConfirmation() {
             </div>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   )
 }

@@ -266,7 +266,7 @@ export default function ProductDetail() {
       )}
       <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <div className="mx-auto max-w-6xl px-4 py-6">
         <Button
           variant="ghost"
           size="sm"
@@ -676,7 +676,7 @@ export default function ProductDetail() {
             />
           </section>
         )}
-      </main>
+      </div>
     </div>
   )
 }

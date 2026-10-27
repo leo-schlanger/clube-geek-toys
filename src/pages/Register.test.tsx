@@ -706,7 +706,7 @@ describe('Register', () => {
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          'Erro ao criar conta. Verifique sua conexao.',
+          'Erro ao criar conta. Verifique sua conexão.',
           expect.objectContaining({ id: 'reg-progress' })
         )
       })

@@ -167,7 +167,7 @@ export default function Register() {
   function discardDraft() {
     localStorage.removeItem(DRAFT_KEY)
     setShowDraftPrompt(false)
-    toast.info('Formulario limpo.')
+    toast.info('Formulário limpo.')
   }
 
   // ─── Step 1a: Account creation ────────────────────────────────────────────
@@ -213,7 +213,7 @@ export default function Register() {
       // Calling sendVerificationEmail() here would duplicate the email AND waste a rate-limit token.
     } catch (error) {
       logger.error('Error creating account:', error)
-      toast.error('Erro ao criar conta. Verifique sua conexao.', { id: 'reg-progress' })
+      toast.error('Erro ao criar conta. Verifique sua conexão.', { id: 'reg-progress' })
     } finally {
       setLoading(false)
       isSubmittingRef.current = false
@@ -325,7 +325,7 @@ export default function Register() {
       }
     } catch (error) {
       logger.error('Error in personal data step:', error)
-      toast.error('Erro ao salvar dados. Verifique sua conexao.', { id: 'reg-progress' })
+      toast.error('Erro ao salvar dados. Verifique sua conexão.', { id: 'reg-progress' })
     } finally {
       setLoading(false)
       isSubmittingRef.current = false

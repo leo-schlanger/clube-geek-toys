@@ -74,7 +74,7 @@ export default function EventPage() {
       />
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:pb-16">
+      <div className="mx-auto max-w-6xl px-4 pb-28 pt-6 sm:pb-16">
         <Button variant="ghost" size="sm" asChild className="mb-6 -ml-2 gap-1.5">
           <Link to="/">
             <ArrowLeft className="h-4 w-4" />
@@ -202,7 +202,7 @@ export default function EventPage() {
             Fotos dos eventos anteriores
           </a>
         </p>
-      </main>
+      </div>
 
       {canReserve && <MobileReserveBar event={event} />}
 

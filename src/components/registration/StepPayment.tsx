@@ -183,7 +183,7 @@ export function StepPayment({
     try {
       await navigator.clipboard.writeText(pixData.qrCode)
       setCopied(true)
-      toast.success('Codigo PIX copiado!')
+      toast.success('Código PIX copiado!')
       setTimeout(() => setCopied(false), 3000)
     } catch {
       toast.error('Não foi possível copiar')
@@ -405,7 +405,7 @@ export function StepPayment({
             }`}
           >
             <Zap className="h-5 w-5 mx-auto mb-1 text-primary" />
-            <p className="text-sm font-medium">Pagamento Unico</p>
+            <p className="text-sm font-medium">Pagamento Único</p>
             <p className="text-xs text-muted-foreground">PIX ou Cartão</p>
           </button>
           <button
@@ -418,7 +418,7 @@ export function StepPayment({
           >
             <Repeat className="h-5 w-5 mx-auto mb-1 text-primary" />
             <p className="text-sm font-medium">Assinatura</p>
-            <p className="text-xs text-muted-foreground">Cobranca recorrente</p>
+            <p className="text-xs text-muted-foreground">Cobrança recorrente</p>
           </button>
         </div>
       )}
@@ -439,7 +439,7 @@ export function StepPayment({
       {!method && !error && mode === 'one-time' && (
         <div className="space-y-3">
           <p className="text-sm font-medium text-center text-muted-foreground">
-            Escolha o metodo de pagamento:
+            Escolha o método de pagamento:
           </p>
           <div className="grid grid-cols-2 gap-3">
             <Button
@@ -543,7 +543,7 @@ export function StepPayment({
             <ol className="text-xs text-muted-foreground space-y-1 list-decimal pl-4">
               <li>Abra o app do seu banco</li>
               <li>Escolha pagar com PIX (QR Code ou Copia e Cola)</li>
-              <li>Escaneie o QR ou cole o codigo acima</li>
+              <li>Escaneie o QR ou cole o código acima</li>
               <li>
                 Confirme o pagamento de <strong>{formatCurrency(amount)}</strong>
               </li>
@@ -559,7 +559,7 @@ export function StepPayment({
 
           {/* Back to method selection */}
           <Button variant="ghost" onClick={resetMethod} className="w-full">
-            Escolher outro metodo
+            Escolher outro método
           </Button>
         </div>
       )}

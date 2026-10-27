@@ -213,7 +213,7 @@ export default function PDV() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Mode Toggle */}
         <div className="mb-6 grid grid-cols-3 gap-2">
           <Button
@@ -390,7 +390,7 @@ export default function PDV() {
             </CardContent>
           </Card>
         )}
-      </main>
+      </div>
     </div>
   )
 }

@@ -386,7 +386,7 @@ export default function ShopCheckout() {
       />
       <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
-      <main className="mx-auto max-w-4xl px-4 py-6">
+      <div className="mx-auto max-w-4xl px-4 py-6">
         {!result && (
           <Button
             variant="ghost"
@@ -1037,7 +1037,7 @@ export default function ShopCheckout() {
             </Card>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

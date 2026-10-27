@@ -120,7 +120,7 @@ export default function TicketPage({ mode }: Props) {
       />
       <ShopHeader isMember={isMember} />
 
-      <main className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-16">
+      <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 pb-16">
         <Button variant="ghost" size="sm" asChild className="-ml-2 gap-1.5 print:hidden">
           <Link to="/evento">
             <ArrowLeft className="h-4 w-4" />
@@ -242,7 +242,7 @@ export default function TicketPage({ mode }: Props) {
             </Button>
           </>
         )}
-      </main>
+      </div>
     </div>
   )
 }
