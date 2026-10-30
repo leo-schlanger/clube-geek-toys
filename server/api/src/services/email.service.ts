@@ -547,7 +547,7 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
             : '⏳ O estorno aparece na fatura do cartão em até <strong>2 faturas</strong> — é o prazo da operadora.'
         )}
         <p style="margin-top:16px">Qualquer dúvida, é só responder este e-mail.</p>`,
-      cta: { text: 'Ver minha conta', url: `${frontendUrl}/minha-conta` },
+      cta: { text: 'Ver minha conta', url: `${frontendUrl}/membro` },
     },
 
     'payment-failed': {

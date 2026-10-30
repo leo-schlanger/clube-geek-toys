@@ -11,7 +11,7 @@ import { CookieConsent } from './components/CookieConsent'
 import { ConfirmProvider } from './hooks/useConfirm'
 import { CartProvider } from './contexts/CartContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
-import { getAppMode } from './lib/subdomain'
+import { getAppMode, getLoginRedirectPath } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
 import { ShopPromoBanner } from './components/store/ShopPromoBanner'
 import { ScrollToTop } from './components/store/ScrollToTop'
@@ -214,6 +214,19 @@ function AdminRoutes() {
   )
 }
 
+/**
+ * Where `/` and unknown paths land on the member subdomain.
+ *
+ * A signed-in member goes to their area, where a pending signup sees the
+ * payment screen; only visitors get the sales page.
+ */
+function MemberEntry() {
+  const { user, role, loading } = useAuth()
+  if (loading) return <LoadingPage />
+  if (user && role) return <Navigate to={getLoginRedirectPath(role, 'member')} replace />
+  return <Navigate to="/assinar" replace />
+}
+
 function MemberRoutes() {
   return (
     <Routes>
@@ -259,8 +272,8 @@ function MemberRoutes() {
         }
       />
 
-      <Route path="/" element={<Navigate to="/assinar" replace />} />
-      <Route path="*" element={<Navigate to="/assinar" replace />} />
+      <Route path="/" element={<MemberEntry />} />
+      <Route path="*" element={<MemberEntry />} />
     </Routes>
   )
 }

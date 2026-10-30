@@ -168,6 +168,19 @@ describe('para onde cada e-mail leva', () => {
   });
 
   /**
+   * Path the member SPA does not have falls to the catch-all: `/minha-conta`
+   * sent the refunded member to the sales page. Keep in step with `MemberRoutes`.
+   */
+  const MEMBER_SPA_PATHS = ['/', '/membro', '/login', '/recuperar-senha', '/assinar', '/cadastro'];
+
+  it.each(MEMBER_TEMPLATES)('%s aponta para uma rota que existe na SPA de membro', async (template) => {
+    const { html } = await render(template);
+    for (const url of ctaUrls(html)) {
+      expect(MEMBER_SPA_PATHS, `${template} → ${url}`).toContain(new URL(url).pathname);
+    }
+  });
+
+  /**
    * O aviso da reserva de ingresso: o caso concreto que motivou este arquivo.
    */
   it('o template respeita o admin_url que o service manda', async () => {

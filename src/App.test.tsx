@@ -24,8 +24,9 @@ const mockAuthState = {
 // ── Mocks ──────────────────────────────────────────────────────
 
 // Mock subdomain module to control app mode
-vi.mock('./lib/subdomain', () => ({
+vi.mock('./lib/subdomain', async (importOriginal) => ({
   getAppMode: () => 'member',
+  getLoginRedirectPath: (await importOriginal<typeof import('./lib/subdomain')>()).getLoginRedirectPath,
 }))
 
 // Mock AuthContext — useAuth reads from mutable mockAuthState
@@ -175,6 +176,31 @@ describe('App', () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByTestId('subscribe-page')).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * A pending member who opened club.* landed on the sales page and never saw
+   * "Falta o pagamento" — their area is where the payment screen is.
+   */
+  it('sends a signed-in member from the root to their area, not the sales page', async () => {
+    mockAuthState.user = { uid: 'u1', email: 'ana@example.com' }
+    mockAuthState.role = 'member'
+    window.history.pushState({}, '', '/')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByTestId('member-dashboard')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('subscribe-page')).not.toBeInTheDocument()
+  })
+
+  it('sends a signed-in member from an unknown path to their area', async () => {
+    mockAuthState.user = { uid: 'u1', email: 'ana@example.com' }
+    mockAuthState.role = 'member'
+    window.history.pushState({}, '', '/minha-conta')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByTestId('member-dashboard')).toBeInTheDocument()
     })
   })
 
