@@ -473,6 +473,8 @@ export function parseBrazilianPhone(raw: string | null | undefined): PagarmePhon
   if (!raw) return null;
   let digits = raw.replace(/\D/g, '');
   if (digits.startsWith('55') && digits.length > 11) digits = digits.slice(2);
+  // Trunk prefix: "(021) 99999-9999" is typed often and is still the same number.
+  if (digits.startsWith('0') && digits.length > 10) digits = digits.slice(1);
   if (digits.length < 10 || digits.length > 11) return null;
   return {
     country_code: '55',

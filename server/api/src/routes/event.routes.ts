@@ -13,6 +13,7 @@ import { MAX_TICKETS_PER_RESERVATION } from '../config/events.js';
 import { env, SHOP_CANONICAL_URL } from '../config/env.js';
 import * as eventService from '../services/event.service.js';
 import * as eventConfig from '../services/event-config.service.js';
+import { parseBrazilianPhone } from '../utils/pagarme.js';
 
 export const eventRouter = Router();
 
@@ -64,7 +65,12 @@ eventRouter.get('/active/share', async (_req, res, next) => {
 const reservationSchema = z.object({
   buyerName: z.string().min(2).max(120),
   buyerEmail: z.string().email().max(160),
-  buyerPhone: z.string().min(8).max(30),
+  // The PSP refuses a PIX without a usable phone ("At least one customer phone
+  // is required"), so a malformed one is a 400 here, not a 502 after the order.
+  buyerPhone: z
+    .string()
+    .max(30)
+    .refine((v) => parseBrazilianPhone(v) !== null, 'Informe o telefone com DDD, ex.: (21) 99999-9999.'),
   // CPF/CNPJ, masked or not. Required by the service only when the purchase is
   // charged through Pagar.me — a free event does not ask for it.
   buyerDocument: z.string().trim().max(20).optional().nullable(),

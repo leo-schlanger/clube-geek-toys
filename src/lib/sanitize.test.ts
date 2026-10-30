@@ -7,6 +7,7 @@ import {
   normalizeCPF,
   sanitizeMemberForm,
   sanitizeLoginForm,
+  isValidBrazilianPhone,
 } from './sanitize'
 
 describe('sanitizeString', () => {
@@ -168,5 +169,24 @@ describe('sanitizeLoginForm', () => {
     })
 
     expect(result.password).toBe('!@#$%^&*()')
+  })
+})
+
+describe('isValidBrazilianPhone', () => {
+  it('aceita DDD + 8 ou 9 dígitos, com ou sem máscara', () => {
+    expect(isValidBrazilianPhone('(21) 99999-8888')).toBe(true)
+    expect(isValidBrazilianPhone('2133334444')).toBe(true)
+  })
+
+  it('aceita o prefixo 0 de tronco e o +55', () => {
+    expect(isValidBrazilianPhone('(021) 99999-8888')).toBe(true)
+    expect(isValidBrazilianPhone('+55 21 99999-8888')).toBe(true)
+  })
+
+  it('recusa número sem DDD, curto demais ou vazio', () => {
+    expect(isValidBrazilianPhone('99999-8888')).toBe(false)
+    expect(isValidBrazilianPhone('219999988881234')).toBe(false)
+    expect(isValidBrazilianPhone('')).toBe(false)
+    expect(isValidBrazilianPhone(null)).toBe(false)
   })
 })

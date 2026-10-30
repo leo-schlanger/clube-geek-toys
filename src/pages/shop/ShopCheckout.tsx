@@ -49,6 +49,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { fetchProfile } from '../../lib/profile'
 import { PagarmeCardForm } from '../../components/PagarmeCardForm'
 import { isValidCPFFormat } from '../../lib/cpf-validation'
+import { isValidBrazilianPhone } from '../../lib/sanitize'
 import { Button } from '../../components/ui/button'
 import { Input } from '../../components/ui/input'
 import { Label } from '../../components/ui/label'
@@ -294,6 +295,13 @@ export default function ShopCheckout() {
       }
     }
 
+    // The PSP refuses the charge without a usable phone, after the order exists.
+    if (!isValidBrazilianPhone(phone)) {
+      toast.error('Informe o telefone com DDD, ex.: (21) 99999-9999.')
+      document.getElementById('phone')?.focus()
+      return
+    }
+
     // Retail always pays under a CPF. Checking here turns a 400 from the API
     // into a corrected field, before the cart is committed.
     if (!isWholesale && !isValidCPFFormat(customerDocument)) {
@@ -446,6 +454,8 @@ export default function ShopCheckout() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="(21) 99999-9999"
+                        autoComplete="tel"
+                        required
                         disabled={submitting}
                       />
                     </div>

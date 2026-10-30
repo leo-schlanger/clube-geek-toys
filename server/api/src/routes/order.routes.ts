@@ -5,6 +5,7 @@ import { paymentLimiter, publicLookupLimiter } from '../middleware/rate-limit.js
 import { validate } from '../middleware/validate.js';
 import * as orderService from '../services/order.service.js';
 import * as labelService from '../services/label.service.js';
+import { parseBrazilianPhone } from '../utils/pagarme.js';
 
 export const orderRouter = Router();
 
@@ -34,7 +35,12 @@ const createOrderSchema = z.object({
   customer: z.object({
     name: z.string().min(1).max(200),
     email: z.string().email(),
-    phone: z.string().max(30).optional(),
+    // A malformed phone makes the PSP refuse the charge after the order exists.
+    phone: z
+      .string()
+      .max(30)
+      .optional()
+      .refine((v) => !v || parseBrazilianPhone(v) !== null, 'Informe o telefone com DDD, ex.: (21) 99999-9999.'),
     // CPF (or CNPJ on the wholesale channel). Required by the acquirer on both
     // payment methods; the check digits are verified in the service.
     document: z.string().min(11).max(18),

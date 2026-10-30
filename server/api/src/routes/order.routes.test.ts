@@ -75,6 +75,7 @@ describe('checkout', () => {
       { ...order, customer: { ...order.customer, email: 'nope' } },
       { ...order, paymentMethod: 'boleto' },
       { ...order, items: [{ productId: 'not-a-uuid', quantity: 1 }] },
+      { ...order, customer: { ...order.customer, phone: '219888877776666' } },
     ]) {
       expect((await api.post('/', { body: bad })).status).toBe(400);
     }

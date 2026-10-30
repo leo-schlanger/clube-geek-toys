@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { toast } from 'sonner'
 
 const mockNavigate = vi.fn()
 // The promotion arrives from the API. These tests predate it and are about the
@@ -233,6 +234,7 @@ describe('ShopCheckout', () => {
 
     await user.type(screen.getByLabelText(/Nome completo/i), 'Maria Silva')
     await user.type(screen.getByLabelText(/^Email/i), 'maria@test.com')
+    await user.type(screen.getByLabelText(/Telefone/i), '21999998888')
     // The acquirer refuses an order with no buyer document, so the field is
     // required and the checkout checks the digits before submitting.
     await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
@@ -324,6 +326,7 @@ describe('ShopCheckout', () => {
 
       await user.type(screen.getByLabelText(/Nome completo/i), 'Maria Silva')
       await user.type(screen.getByLabelText(/^Email/i), 'maria@test.com')
+      await user.type(screen.getByLabelText(/Telefone/i), '21999998888')
       await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
       await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
 
@@ -343,6 +346,32 @@ describe('ShopCheckout', () => {
       expect(payload.shipping).toBeUndefined()
       // No quote is requested: pickup does not depend on a CEP.
       expect(mockedQuote).not.toHaveBeenCalled()
+    })
+
+    /** The PSP refuses the charge without a usable phone, after the order exists. */
+    it('não cria o pedido com telefone sem DDD', async () => {
+      const user = userEvent.setup()
+      render(
+        <MemoryRouter>
+          <ShopCheckout />
+        </MemoryRouter>
+      )
+
+      await user.type(screen.getByLabelText(/Nome completo/i), 'Maria Silva')
+      await user.type(screen.getByLabelText(/^Email/i), 'maria@test.com')
+      await user.type(screen.getByLabelText(/Telefone/i), '99999-8888')
+      await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
+      await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
+
+      const submit = screen
+        .getAllByRole('button')
+        .find((b) => b.getAttribute('type') === 'submit') as HTMLButtonElement
+      await user.click(submit)
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Informe o telefone com DDD, ex.: (21) 99999-9999.')
+      })
+      expect(mockedCreate).not.toHaveBeenCalled()
     })
   })
 
@@ -365,6 +394,7 @@ describe('ShopCheckout', () => {
       )
       await user.type(screen.getByLabelText(/Nome completo/i), 'Lucas Lima')
       await user.type(screen.getByLabelText(/^Email/i), 'lucas@test.com')
+      await user.type(screen.getByLabelText(/Telefone/i), '21999998888')
       await user.type(screen.getByLabelText(/^CPF/i), '52998224725')
       await user.click(screen.getByRole('button', { name: /Retirar na loja/i }))
       await user.click(screen.getByRole('button', { name: /Cartão de crédito/i }))

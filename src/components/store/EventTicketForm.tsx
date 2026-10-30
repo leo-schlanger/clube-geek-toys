@@ -21,6 +21,7 @@ import {
   type ReservationPix,
 } from '../../lib/event-tickets'
 import { formatCPF, validateCPF } from '../../lib/utils'
+import { isValidBrazilianPhone } from '../../lib/sanitize'
 import { useReservationPolling } from '../../hooks/useReservationPolling'
 import { ReservationPixPanel } from './ReservationPixPanel'
 
@@ -154,6 +155,11 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
       toast.error(
         `A meia da pessoa ${unverified + 1} só vale com o CPF de um sócio ativo, no nome da carteirinha.`
       )
+      return
+    }
+    if (!isValidBrazilianPhone(buyer.phone)) {
+      toast.error('Informe o telefone com DDD, ex.: (21) 99999-9999.')
+      document.getElementById('evt-phone')?.focus()
       return
     }
     if (needsDocument && !validateCPF(buyer.document)) {

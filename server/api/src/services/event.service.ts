@@ -445,6 +445,12 @@ export async function createReservation(
   if (provider === 'pagarme' && !isValidBuyerDocument(buyerDocument)) {
     throw new AppError(400, 'Informe um CPF válido para pagar com PIX.', 'INVALID_DOCUMENT');
   }
+  // A buyer new to Pagar.me with no readable phone gets the PIX refused
+  // ("At least one customer phone is required") — the row was already written
+  // and the buyer was told to try again, which could never work.
+  if (provider === 'pagarme' && !pagarme.parseBrazilianPhone(input.buyerPhone)) {
+    throw new AppError(400, 'Informe o telefone com DDD, ex.: (21) 99999-9999.', 'INVALID_PHONE');
+  }
 
   const client = await getClient();
   let reservation: EventReservation;

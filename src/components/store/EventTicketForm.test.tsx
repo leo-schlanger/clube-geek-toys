@@ -80,6 +80,18 @@ describe('EventTicketForm', () => {
     expect(screen.getByLabelText('Nome da pessoa 9')).toBeInTheDocument()
   })
 
+  /** 28/10/2026: 15 digits went through and the PSP refused the PIX for want of a phone. */
+  it('recusa telefone sem DDD válido antes de criar a reserva', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await fillBuyer(user)
+    await user.type(screen.getByLabelText(/Telefone/i), '6666')
+    await user.click(screen.getByRole('button', { name: /Reservar e pagar com PIX/i }))
+
+    expect(createReservationMock).not.toHaveBeenCalled()
+  })
+
   it('envia um ingresso por pessoa e mostra o código da reserva', async () => {
     createReservationMock.mockResolvedValue({
       ok: true,

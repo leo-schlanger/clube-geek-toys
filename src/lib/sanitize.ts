@@ -141,3 +141,16 @@ export function sanitizeLoginForm(data: {
     password: data.password,
   }
 }
+
+/**
+ * Whether a phone is a usable Brazilian number (DDD + 8 or 9 digits).
+ *
+ * Mirrors `parseBrazilianPhone` on the server: the PSP refuses a PIX without a
+ * usable phone, so the form says so before the order exists.
+ */
+export function isValidBrazilianPhone(phone: string | null | undefined): boolean {
+  let digits = (phone ?? '').replace(/\D/g, '')
+  if (digits.startsWith('55') && digits.length > 11) digits = digits.slice(2)
+  if (digits.startsWith('0') && digits.length > 10) digits = digits.slice(1)
+  return digits.length === 10 || digits.length === 11
+}

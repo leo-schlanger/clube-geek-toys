@@ -160,6 +160,9 @@ describe('public', () => {
       { ...body, buyerEmail: 'not-an-email' },
       { ...body, attendees: Array.from({ length: 51 }, () => ({ name: 'Fulano' })) },
       { ...body, attendees: [{ name: 'Fulano', kind: 'vip' }] },
+      // 15 digits: the PSP refused the PIX for want of a phone (28/10/2026).
+      { ...body, buyerPhone: '219888877776666' },
+      { ...body, buyerPhone: '9999-8888' },
     ]) {
       expect((await api.post(`/${EVENT_ID}/reservations`, { body: bad })).status).toBe(400);
     }

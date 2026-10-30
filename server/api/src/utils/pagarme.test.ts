@@ -275,6 +275,7 @@ describe('parseBrazilianPhone', () => {
     ['(21) 99999-8888', { country_code: '55', area_code: '21', number: '999998888' }],
     ['5521999998888', { country_code: '55', area_code: '21', number: '999998888' }],
     ['2133334444', { country_code: '55', area_code: '21', number: '33334444' }],
+    ['(021) 99999-8888', { country_code: '55', area_code: '21', number: '999998888' }],
   ])('entende %s', (input, expected) => {
     expect(parseBrazilianPhone(input as string)).toEqual(expected);
   });
@@ -283,7 +284,7 @@ describe('parseBrazilianPhone', () => {
    * A malformed phone fails the whole order with a 422; a missing one only
    * fails if the account demands it. Null is the safer answer.
    */
-  it.each([['', null], ['123', null], [null, null], ['abc', null]])(
+  it.each([['', null], ['123', null], [null, null], ['abc', null], ['219888877776666', null]])(
     'devolve null para %s em vez de mandar lixo',
     (input, expected) => {
       expect(parseBrazilianPhone(input as string | null)).toBe(expected);

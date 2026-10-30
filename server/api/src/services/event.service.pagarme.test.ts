@@ -278,6 +278,32 @@ describe('createReservation com Pagar.me', () => {
     expect(createOrderMock).not.toHaveBeenCalled();
   });
 
+  // 28/10/2026: a 15-digit phone reached Pagar.me as no phone at all, the PIX
+  // was refused and the buyer was told to "try again".
+  it.each([['(21) 98888-77776666'], ['9999-8888'], ['']])(
+    'recusa telefone ilegível %j antes de gravar qualquer coisa',
+    async (buyerPhone) => {
+      await expect(
+        eventService.createReservation(EVENT_ID, { ...input, buyerPhone })
+      ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_PHONE' });
+      expect(clientQueryMock).not.toHaveBeenCalled();
+      expect(createOrderMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('reserva só de isentos aceita telefone que a operadora recusaria', async () => {
+    wireCreate({ total_cents: 0, payment_provider: null, buyer_document: null });
+
+    await expect(
+      eventService.createReservation(EVENT_ID, {
+        ...input,
+        buyerPhone: '+351 912 345 678',
+        buyerDocument: undefined,
+        attendees: [{ name: 'Bebê Souza', kind: 'free' }],
+      })
+    ).resolves.toBeDefined();
+  });
+
   it('recusa reserva paga sem CPF', async () => {
     await expect(
       eventService.createReservation(EVENT_ID, { ...input, buyerDocument: undefined })

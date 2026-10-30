@@ -255,6 +255,8 @@ export interface PayOrderResult {
   cardLastFour: string | null;
 }
 
+const PHONE_REQUIRED_MESSAGE = 'Informe o telefone com DDD, ex.: (21) 99999-9999.';
+
 /**
  * Create a shop order. Prices and discounts are ALWAYS recomputed server-side
  * from the DB — the client only sends productId + quantity. Stock is validated but only
@@ -287,6 +289,13 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
       : customerDocument.length === 14 && isValidCnpj(customerDocument);
   if (!documentIsValid) {
     throw new AppError(400, 'CPF ou CNPJ inválido.', 'INVALID_DOCUMENT');
+  }
+
+  // Same for the phone: a buyer new to Pagar.me with no readable phone is
+  // refused ("At least one customer phone is required") only after the order,
+  // the stock hold and the coupon already exist.
+  if (!pagarme.parseBrazilianPhone(input.customer.phone)) {
+    throw new AppError(400, PHONE_REQUIRED_MESSAGE, 'INVALID_PHONE');
   }
 
   // Pickup carries no destination: validating an address the customer was never

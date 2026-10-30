@@ -201,7 +201,7 @@ function baseInput(over: Record<string, unknown> = {}) {
     items: [{ productId: 'p1', quantity: 1 }],
     // The acquirer refuses an order with no buyer document, so the checkout
     // now collects a CPF and the service verifies its check digits.
-    customer: { name: 'Laura', email: 'laura@example.com', document: '52998224725' },
+    customer: { name: 'Laura', email: 'laura@example.com', phone: '21999998888', document: '52998224725' },
     shippingAddress: ADDRESS,
     shipping: { quoteToken: 'tok', serviceId: 'pac' },
     paymentMethod: 'pix' as const,
@@ -928,7 +928,9 @@ describe('createOrder — CPF do comprador', () => {
     setupTx({});
 
     await expect(
-      createOrder(baseInput({ customer: { name: 'Laura', email: 'l@e.com', document } }))
+      createOrder(
+        baseInput({ customer: { name: 'Laura', email: 'l@e.com', phone: '21999998888', document } })
+      )
     ).rejects.toThrow('CPF ou CNPJ inválido');
 
     expect(clientQueryMock).not.toHaveBeenCalled();
@@ -940,16 +942,48 @@ describe('createOrder — CPF do comprador', () => {
 
     await expect(
       createOrder(
-        baseInput({ customer: { name: 'Loja', email: 'l@e.com', document: '11.222.333/0001-81' } })
+        baseInput({ customer: { name: 'Loja', email: 'l@e.com', phone: '21999998888', document: '11.222.333/0001-81' } })
       )
     ).resolves.toBeDefined();
   });
+
+  // Pagar.me refuses a first-time customer without a phone — seen on a ticket
+  // PIX on 28/10/2026 with a 15-digit number. Refused before anything is held.
+  it.each([
+    ['ausente', undefined],
+    ['sem DDD', '99999-8888'],
+    ['com dígitos a mais', '(21) 98888-77776666'],
+  ])('recusa telefone %s antes de abrir a transação', async (_label, phone) => {
+    setupTx({});
+
+    await expect(
+      createOrder(
+        baseInput({ customer: { name: 'Laura', email: 'l@e.com', phone, document: '52998224725' } })
+      )
+    ).rejects.toMatchObject({ statusCode: 400, code: 'INVALID_PHONE' });
+
+    expect(clientQueryMock).not.toHaveBeenCalled();
+    expect(pagarmeCreateOrderMock).not.toHaveBeenCalled();
+  });
+
+  it.each([['(21) 99999-8888'], ['+55 21 99999-8888'], ['2133334444']])(
+    'aceita o telefone %s',
+    async (phone) => {
+      setupTx({});
+
+      await expect(
+        createOrder(
+          baseInput({ customer: { name: 'Laura', email: 'l@e.com', phone, document: '52998224725' } })
+        )
+      ).resolves.toBeDefined();
+    }
+  );
 
   it('grava o documento só com dígitos', async () => {
     setupTx({});
 
     await createOrder(
-      baseInput({ customer: { name: 'Laura', email: 'l@e.com', document: '529.982.247-25' } })
+      baseInput({ customer: { name: 'Laura', email: 'l@e.com', phone: '21999998888', document: '529.982.247-25' } })
     );
 
     expect(insertedOrderValues()[COL.customerDocument]).toBe('52998224725');
@@ -1226,7 +1260,7 @@ describe('createOrder — retirada na loja', () => {
   function pickupInput(over: Record<string, unknown> = {}) {
     return {
       items: [{ productId: 'p1', quantity: 1 }],
-      customer: { name: 'Laura', email: 'laura@example.com', document: '52998224725' },
+      customer: { name: 'Laura', email: 'laura@example.com', phone: '21999998888', document: '52998224725' },
       deliveryMethod: 'pickup' as const,
       paymentMethod: 'pix' as const,
       ...over,
@@ -1301,7 +1335,7 @@ describe('createOrder — retirada na loja', () => {
     await expect(
       createOrder({
         items: [{ productId: 'p1', quantity: 1 }],
-        customer: { name: 'Laura', email: 'laura@example.com', document: '52998224725' },
+        customer: { name: 'Laura', email: 'laura@example.com', phone: '21999998888', document: '52998224725' },
         paymentMethod: 'pix',
       } as never)
     ).rejects.toThrow(AppError);
