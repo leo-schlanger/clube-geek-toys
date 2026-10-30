@@ -61,6 +61,7 @@ import {
   checkPaymentStatus,
   checkPixPaymentStatus,
   createSubscriptionPayment,
+  pixSecondsLeft,
 } from './payments'
 
 const mockedApi = vi.mocked(api)
@@ -434,5 +435,19 @@ describe('Payments API client', () => {
         createSubscriptionPayment('club', 'monthly', 'a@b.com', 'Name', 'member-1', 'token_abc')
       ).rejects.toThrow('Timeout')
     })
+  })
+})
+
+describe('pixSecondsLeft', () => {
+  const now = Date.parse('2026-10-30T12:00:00Z')
+
+  it('conta os segundos até o vencimento do código', () => {
+    expect(pixSecondsLeft('2026-10-30T12:10:00Z', now)).toBe(600)
+  })
+
+  it('devolve 0 para código vencido ou sem data legível', () => {
+    expect(pixSecondsLeft('2026-10-30T11:59:00Z', now)).toBe(0)
+    expect(pixSecondsLeft('não é data', now)).toBe(0)
+    expect(pixSecondsLeft(null, now)).toBe(0)
   })
 })

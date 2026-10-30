@@ -26,6 +26,7 @@ import * as pagarme from '../utils/pagarme.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
 import { abandonCardOrder, updateOrderStatus } from './order.service.js';
 import { expireReservation } from './event.service.js';
+import { expireClubPixPayment } from './payment.service.js';
 import { moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
 import { sendOrderRecoveryEmail } from './recovery.service.js';
@@ -87,6 +88,7 @@ interface PendingCharge {
   ref: string;
   orderId: string | null;
   reservationId: string | null;
+  paymentId: string | null;
 }
 
 /**
@@ -99,21 +101,21 @@ interface PendingCharge {
 async function pendingCharges(): Promise<PendingCharge[]> {
   const result = await query(
     `SELECT pagarme_charge_id AS charge_id, 'pedido #' || order_number AS ref,
-            id AS order_id, NULL::uuid AS reservation_id
+            id AS order_id, NULL::uuid AS reservation_id, NULL::uuid AS payment_id
        FROM orders
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
         AND created_at > NOW() - ($1::int * INTERVAL '1 day')
       UNION ALL
      SELECT pagarme_charge_id AS charge_id, 'pagamento ' || id::text AS ref,
-            NULL::uuid AS order_id, NULL::uuid AS reservation_id
+            NULL::uuid AS order_id, NULL::uuid AS reservation_id, id AS payment_id
        FROM payments
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
         AND created_at > NOW() - ($1::int * INTERVAL '1 day')
       UNION ALL
      SELECT pagarme_charge_id AS charge_id, 'reserva ' || code AS ref,
-            NULL::uuid AS order_id, id AS reservation_id
+            NULL::uuid AS order_id, id AS reservation_id, NULL::uuid AS payment_id
        FROM event_reservations
       WHERE status = 'pending'
         AND pagarme_charge_id IS NOT NULL
@@ -126,6 +128,7 @@ async function pendingCharges(): Promise<PendingCharge[]> {
     ref: r.ref as string,
     orderId: (r.order_id as string) ?? null,
     reservationId: (r.reservation_id as string) ?? null,
+    paymentId: (r.payment_id as string) ?? null,
   }));
 }
 
@@ -143,7 +146,7 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
   const rows = await pendingCharges();
   const result: ReconcileResult = { checked: 0, settled: 0, expired: 0, abandoned: 0, failed: 0 };
 
-  for (const { chargeId, ref, orderId, reservationId } of rows) {
+  for (const { chargeId, ref, orderId, reservationId, paymentId } of rows) {
     result.checked += 1;
     try {
       // Deliberately the uncached lookup: settling money must never act on a
@@ -167,6 +170,13 @@ export async function reconcilePendingCharges(): Promise<ReconcileResult> {
           if (await expireReservation(reservationId)) {
             result.expired += 1;
             log.info(`${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — reserva cancelada`);
+          }
+        } else if (isDeadPix(charge) && paymentId) {
+          // The member's screen kept offering this dead code as "Continuar
+          // Pagamento"; failing the row clears it so the next tap issues a new one.
+          if (await expireClubPixPayment(paymentId)) {
+            result.expired += 1;
+            log.info(`${ref}: PIX expirado em ${charge.last_transaction?.expires_at} — pagamento do clube encerrado`);
           }
         }
         continue;

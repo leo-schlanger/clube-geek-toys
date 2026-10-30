@@ -8,7 +8,7 @@ import { PaymentModal } from './PaymentModal'
 import { ContractModal } from './ContractModal'
 import { logger } from '../lib/logger'
 import { updateMember, clearPendingPayment } from '../lib/members'
-import { checkPixPaymentStatus, isPaymentConfigured } from '../lib/payments'
+import { checkPixPaymentStatus, isPaymentConfigured, pixSecondsLeft } from '../lib/payments'
 import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
 import { PLANS, CURRENT_PAYMENT_TYPE, addClubPeriod, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
@@ -41,7 +41,10 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   const [loadingContract, setLoadingContract] = useState(true)
   const [cancelling, setCancelling] = useState(false)
   const [checkingPrevious, setCheckingPrevious] = useState(false)
-  const [hasPendingPayment, setHasPendingPayment] = useState(!!member.pendingPayment)
+  // A Pagar.me code lapses after an hour; an expired one is not offered again.
+  const [hasPendingPayment, setHasPendingPayment] = useState(
+    !!member.pendingPayment && pixSecondsLeft(member.pendingPayment.expiresAt) > 0,
+  )
 
   const plan = PLANS[member.plan as PlanType]
   const price = plan.price
@@ -72,11 +75,8 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
   async function checkPreviousPayment() {
     if (!member.pendingPayment) return
 
-    // A past `expiresAt` is NOT a reason to discard it: the stored EMV is a
-    // static PIX code, still payable, and this blob is the only place it is
-    // kept. Deleting it after 30 minutes left the member with nothing to pay
-    // and no way to get the code back. Only a settled payment clears it below.
-
+    // Asked even when the code has lapsed: a payment made just before expiry
+    // still has to activate the member.
     setCheckingPrevious(true)
     toast.loading('Verificando pagamento anterior...', { id: 'check-prev' })
 
@@ -173,30 +173,32 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Critical Inactive Banner — clearly tells the user benefits are not active yet */}
-        <div className="mb-6 p-4 rounded-lg bg-red-500/15 border-2 border-red-500/50 flex items-start gap-4">
-          <AlertTriangle className="h-6 w-6 text-red-500 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <h2 className="font-bold text-red-100 text-lg flex items-center gap-2">
-              ⚠ ASSINATURA INATIVA
-            </h2>
-            <p className="text-sm text-red-100/90 mt-1">
-              Sua assinatura está <strong>INATIVA</strong> até a confirmação do pagamento.
-              Você <strong>não pode usar os benefícios</strong> (descontos, brindes) enquanto o pagamento estiver pendente.
-            </p>
+        {/* One banner, with the next action on it: on a phone the steps below
+            sit two screens down, and members came back without finding where to pay. */}
+        <div className="mb-8 p-4 rounded-lg bg-warning/15 border-2 border-warning/50 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-6 w-6 text-warning shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <h2 className="font-bold text-foreground text-lg">Falta o pagamento</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Seu cadastro foi feito, mas a assinatura só fica ativa quando o pagamento for
+                confirmado. Até lá os benefícios (descontos, brindes) não valem.
+              </p>
+            </div>
           </div>
-        </div>
-
-        {/* Action Banner */}
-        <div className="mb-8 p-4 rounded-lg bg-yellow-500/20 border border-yellow-500/50 flex items-start gap-4">
-          <Clock className="h-6 w-6 text-yellow-500 shrink-0 mt-0.5" />
-          <div>
-            <h2 className="font-bold text-yellow-200">Complete o pagamento</h2>
-            <p className="text-sm text-yellow-200/80 mt-1">
-              Seu cadastro foi realizado. Complete o pagamento abaixo para ativar sua assinatura
-              e desbloquear todos os benefícios.
-            </p>
-          </div>
+          {!loadingContract && (
+            contract ? (
+              <Button size="lg" className="w-full" onClick={() => setShowPayment(true)}>
+                <CreditCard className="h-5 w-5" />
+                {hasPendingPayment ? 'Continuar pagamento' : 'Pagar agora — PIX ou cartão'}
+              </Button>
+            ) : (
+              <Button size="lg" className="w-full" onClick={() => setShowContract(true)}>
+                <PenTool className="h-5 w-5" />
+                Assinar o contrato e pagar
+              </Button>
+            )
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -342,16 +344,13 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                     {/* Previous payment info */}
                     {hasPendingPayment && member.pendingPayment && (
                       <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-sm">
-                        <p className="font-medium text-blue-400 flex items-center gap-2">
+                        <p className="font-medium text-blue-700 dark:text-blue-300 flex items-center gap-2">
                           <Clock className="h-4 w-4" />
                           PIX pendente encontrado
                         </p>
-                        {/* No time shown: `expiresAt` is 30 min past creation
-                            and the static code does not expire — printing it
-                            only made the member think it was too late. */}
-                        <p className="text-blue-300/80 mt-1">
-                          Valor: {formatCurrency(member.pendingPayment.amount)} — o código
-                          continua válido, é só continuar o pagamento.
+                        <p className="text-muted-foreground mt-1">
+                          Valor: {formatCurrency(member.pendingPayment.amount)} — código válido até{' '}
+                          {new Date(member.pendingPayment.expiresAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}.
                         </p>
                       </div>
                     )}
@@ -390,7 +389,6 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                   <ul className="space-y-1 text-muted-foreground">
                     <li>• PIX (aprovação instantânea)</li>
                     <li>• Cartão de crédito</li>
-                    <li>• Cartão de débito</li>
                   </ul>
                 </div>
               </CardContent>

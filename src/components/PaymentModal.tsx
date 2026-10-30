@@ -21,7 +21,7 @@ import { Badge } from './ui/badge'
 import { Loading } from './ui/loading'
 import { PagarmeCardForm } from './PagarmeCardForm'
 import { BillingAddressFields } from './BillingAddressFields'
-import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../lib/payments'
+import { generatePixPayment, checkPaymentStatus, pixSecondsLeft, type PixPaymentData } from '../lib/payments'
 import {
   billingAddressFromStored,
   billingAddressProblem,
@@ -122,11 +122,10 @@ export function PaymentModal({
   // Check previous pending payment
   useEffect(() => {
     if (initialPendingPayment) {
-      const expiresAt = new Date(initialPendingPayment.expiresAt)
-      // No expiry check on purpose: a static PIX BR Code has no validity
-      // window — `expiresAt` is only how long we keep auto-checking. Refusing
-      // to restore it threw away the member's one copy of a payable code.
-      if (initialPendingPayment.qrCode) {
+      // A Pagar.me code lapses at `expiresAt`; an expired one is not restored,
+      // so the member lands on the method choice and gets a fresh code.
+      const secondsLeft = pixSecondsLeft(initialPendingPayment.expiresAt)
+      if (initialPendingPayment.qrCode && secondsLeft > 0) {
         setPixData({
           paymentIntentId: initialPendingPayment.paymentId,
           clientSecret: '',
@@ -138,7 +137,7 @@ export function PaymentModal({
           amount: initialPendingPayment.amount,
         })
         setMethod('pix')
-        startPixTimer(Math.floor((expiresAt.getTime() - Date.now()) / 1000))
+        startPixTimer(secondsLeft)
         startPixPolling(initialPendingPayment.paymentId)
       }
     }
@@ -153,10 +152,7 @@ export function PaymentModal({
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current)
           if (pollRef.current) clearInterval(pollRef.current)
-          // The code stays payable; only the automatic check stops. Saying
-          // "expired" sent members to generate a second code — and a second
-          // line in `payments` — for a QR that still worked.
-          toast.info('Paramos de verificar automaticamente. O código PIX continua válido.')
+          toast.info('O código PIX expirou. Gere um novo para pagar.')
           return 0
         }
         return prev - 1
@@ -169,7 +165,7 @@ export function PaymentModal({
     let count = 0
     pollRef.current = setInterval(async () => {
       count++
-      if (count > 180) {
+      if (count > 720) {
         if (pollRef.current) clearInterval(pollRef.current)
         return
       }
@@ -232,7 +228,7 @@ export function PaymentModal({
       if (pix) {
         setPixData(pix)
         setMethod('pix')
-        startPixTimer(30 * 60)
+        startPixTimer(pixSecondsLeft(pix.expiresAt) || 30 * 60)
         startPixPolling(pix.paymentIntentId)
 
         if (memberId !== 'temp_member') {
@@ -448,14 +444,37 @@ export function PaymentModal({
           )}
 
           {/* ═══ PIX: Show QR Code ═══ */}
-          {method === 'pix' && pixData && (
+          {method === 'pix' && pixData && timeLeft <= 0 && (
+            <div className="space-y-4 text-center" data-testid="pix-expired">
+              <div className="p-4 rounded-lg bg-warning/15 border border-warning/50 space-y-1">
+                <p className="font-medium flex items-center justify-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Este código PIX expirou
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Nada foi cobrado. Gere um código novo para pagar.
+                </p>
+              </div>
+              <Button
+                size="lg"
+                className="w-full"
+                disabled={loading}
+                onClick={() => { setPixData(null); setMethod(null); void handlePixPayment() }}
+              >
+                {loading ? <Loading size="sm" /> : <><QrCode className="h-4 w-4" />Gerar novo PIX</>}
+              </Button>
+              <Button variant="ghost" onClick={() => { setMethod(null); setPixData(null) }} className="w-full">
+                Escolher outro método
+              </Button>
+            </div>
+          )}
+
+          {method === 'pix' && pixData && timeLeft > 0 && (
             <div className="space-y-4">
               <div className="text-center">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-600 mb-4">
                   <Clock className="h-4 w-4" />
-                  {timeLeft > 0
-                    ? `Verificando o pagamento por ${formatTime(timeLeft)}`
-                    : 'Código válido — avisaremos quando o pagamento cair'}
+                  {`Código válido por ${formatTime(timeLeft)}`}
                 </div>
               </div>
 

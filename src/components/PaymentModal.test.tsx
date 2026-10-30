@@ -17,6 +17,7 @@ vi.mock('qrcode.react', () => ({
 const mockGeneratePixPayment = vi.fn()
 const mockCheckPaymentStatus = vi.fn()
 vi.mock('../lib/payments', () => ({
+  pixSecondsLeft: (iso: string) => Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000)),
   generatePixPayment: (...args: unknown[]) => mockGeneratePixPayment(...args),
   checkPaymentStatus: (...args: unknown[]) => mockCheckPaymentStatus(...args),
 }))
@@ -509,14 +510,12 @@ describe('PaymentModal', () => {
   })
 
   /**
-   * A static PIX BR Code has no validity window — `expiresAt` only says how
-   * long we keep polling. Refusing to restore it threw away the member's one
-   * copy of a payable code and sent them to generate another, which also meant
-   * a second row in `payments` and a second "CGT…" on the bank statement.
+   * A Pagar.me code lapses at `expiresAt` (its charge stays `pending`), so an
+   * expired one is not restored: the member lands on the method choice.
    */
-  it('resumes a pending payment even past its expiry — the code is still payable', () => {
+  it('does not resume a pending PIX past its expiry', () => {
     const pending: PendingPaymentInfo = {
-      paymentId: 'pi_expired',
+      paymentId: 'pay-expired',
       qrCode: 'old-code',
       amount: 39.9,
       expiresAt: new Date(Date.now() - 60000).toISOString(),
@@ -524,7 +523,8 @@ describe('PaymentModal', () => {
     }
 
     renderModal({ initialPendingPayment: pending })
-    expect(screen.getByTestId('qr-code')).toBeInTheDocument()
+    expect(screen.queryByTestId('qr-code')).not.toBeInTheDocument()
+    expect(screen.queryByText('old-code')).not.toBeInTheDocument()
   })
 
   // ── Timer ──

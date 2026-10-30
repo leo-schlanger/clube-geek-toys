@@ -39,6 +39,10 @@ vi.mock('./order.service.js', () => ({
   abandonCardOrder: abandonMock,
 }));
 vi.mock('./event.service.js', () => ({ expireReservation: expireReservationMock }));
+const { expireClubPixMock } = vi.hoisted(() => ({
+  expireClubPixMock: vi.fn(async (..._args: unknown[]) => true),
+}));
+vi.mock('./payment.service.js', () => ({ expireClubPixPayment: expireClubPixMock }));
 const { recoveryMock } = vi.hoisted(() => ({
   recoveryMock: vi.fn(async (..._args: unknown[]) => true),
 }));
@@ -65,7 +69,13 @@ import { closeAbandonedCardOrders, reconcilePendingCharges } from './reconcile.s
 let abandonedRows: { id: string; order_number: number }[] = [];
 
 function pending(
-  ...rows: { charge_id: string; ref: string; order_id?: string; reservation_id?: string }[]
+  ...rows: {
+    charge_id: string;
+    ref: string;
+    order_id?: string;
+    reservation_id?: string;
+    payment_id?: string;
+  }[]
 ) {
   queryMock.mockImplementation(async (sql: string) =>
     sql.includes("payment_method = 'credit_card'")
@@ -310,6 +320,41 @@ describe('PIX expirado', () => {
     await reconcilePendingCharges();
 
     expect(updateStatusMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The member's screen kept offering the dead code as "Continuar Pagamento";
+   * the club row is closed so the next tap issues a new PIX.
+   */
+  it('encerra o pagamento do clube cujo PIX venceu', async () => {
+    pending({ charge_id: 'ch_1', ref: 'pagamento abc', payment_id: 'pay-1' });
+    getChargeMock.mockResolvedValue(expiredPix('ch_1', 3));
+
+    const out = await reconcilePendingCharges();
+
+    expect(out.expired).toBe(1);
+    expect(expireClubPixMock).toHaveBeenCalledWith('pay-1');
+    expect(updateStatusMock).not.toHaveBeenCalled();
+    expect(expireReservationMock).not.toHaveBeenCalled();
+  });
+
+  it('respeita a carência antes de encerrar o pagamento do clube', async () => {
+    pending({ charge_id: 'ch_1', ref: 'pagamento abc', payment_id: 'pay-1' });
+    getChargeMock.mockResolvedValue(expiredPix('ch_1', 0.5));
+
+    await reconcilePendingCharges();
+
+    expect(expireClubPixMock).not.toHaveBeenCalled();
+  });
+
+  it('não encerra o pagamento do clube que foi pago depois do vencimento', async () => {
+    pending({ charge_id: 'ch_1', ref: 'pagamento abc', payment_id: 'pay-1' });
+    getChargeMock.mockResolvedValue({ ...expiredPix('ch_1', 48), status: 'paid' });
+
+    const out = await reconcilePendingCharges();
+
+    expect(out).toMatchObject({ settled: 1, expired: 0 });
+    expect(expireClubPixMock).not.toHaveBeenCalled();
   });
 
   /** A paid charge is settled, never written off, whatever its expiry says. */

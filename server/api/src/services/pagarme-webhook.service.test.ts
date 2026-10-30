@@ -449,6 +449,36 @@ describe('charge.paid — pagamento do clube', () => {
     expect(ran('UPDATE members', "status = 'active'")).toBe(false);
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
+
+  /**
+   * The reconciliation fails a club PIX once its code lapses. A payment that
+   * lands after that still has to activate the member, so the settle must take
+   * any row that is not already paid — `failed` included.
+   */
+  it('liquida o PIX que a conciliação já tinha dado como vencido', async () => {
+    claimWins();
+    route('UPDATE payments', { rows: [{ id: 'pay-1', member_id: 'm1' }], rowCount: 1 });
+    route('FROM members WHERE id = $1 FOR UPDATE', {
+      rows: [
+        {
+          id: 'm1',
+          status: 'pending',
+          expiry_date: null,
+          payment_type: 'annual',
+          email: 'ana@example.com',
+          full_name: 'Ana',
+          plan: 'basic',
+        },
+      ],
+    });
+    getChargeMock.mockResolvedValue(clubCharge);
+
+    await processPagarmeEvent(clubEvent());
+
+    expect(ran('UPDATE payments', "SET status = 'paid'", "status <> 'paid'")).toBe(true);
+    expect(ran('UPDATE payments', "status = 'pending'")).toBe(false);
+    expect(ran('UPDATE members', "status = 'active'")).toBe(true);
+  });
 });
 
 // ─── charge.payment_failed ───────────────────────────────────────────────────

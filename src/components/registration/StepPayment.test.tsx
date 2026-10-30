@@ -51,6 +51,7 @@ vi.mock('lucide-react', () => {
 const mockGeneratePixPayment = vi.fn()
 const mockCheckPaymentStatus = vi.fn()
 vi.mock('../../lib/payments', () => ({
+  pixSecondsLeft: (iso: string) => Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000)),
   generatePixPayment: (...args: unknown[]) => mockGeneratePixPayment(...args),
   checkPaymentStatus: (...args: unknown[]) => mockCheckPaymentStatus(...args),
 }))

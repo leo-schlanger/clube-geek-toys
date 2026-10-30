@@ -716,6 +716,23 @@ não há aprovação real que prove isso; a recusa de 412 continua oferecendo
 
 ---
 
+## 8.10 "O pagamento do clube não funciona" — 30/10/2026
+
+Dois achados, os dois já corrigidos:
+
+- **Código PIX vencido reoferecido.** O QR do clube vale 1 h, mas a cobrança
+  fica `pending` para sempre e o `members.pending_payment` guardava o código.
+  A tela de pagamento pendente oferecia o código morto como "Continuar
+  pagamento". Agora a conciliação encerra o pagamento (`expireClubPixPayment`:
+  `failed` + limpa `pending_payment`) 1 h depois do `expires_at`, e as telas
+  (`PaymentModal`, `StepPayment`, `PendingPaymentScreen`) mostram "Este código
+  PIX expirou" com **Gerar novo PIX**. Um `charge.paid` que chegue depois ainda
+  ativa o membro — o settle aceita qualquer linha não paga.
+- **Telefone ilegível.** O PIX de um ingresso foi recusado com "At least one
+  customer phone is required" depois da reserva gravada. Evento e loja agora
+  recusam telefone sem DDD com 400 `INVALID_PHONE` antes de gravar, e os
+  formulários avisam no campo. `(021) …` e `+55 …` continuam aceitos.
+
 ## 9. Ir para produção
 
 1. `.env` da VPS com as sete variáveis `PAGARME_*`.

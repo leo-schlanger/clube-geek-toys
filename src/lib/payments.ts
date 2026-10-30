@@ -44,6 +44,18 @@ export async function isCardPaymentAvailable(): Promise<boolean> {
 // CALCULATIONS
 // ============================================
 
+/**
+ * Seconds until a PIX code stops being payable (0 when it already has).
+ *
+ * The Pagar.me code expires (`PAGARME_PIX_EXPIRES_IN`, 1 h), and its charge
+ * stays `pending` afterwards, so the screen has to know by itself.
+ */
+export function pixSecondsLeft(expiresAt: string | null | undefined, now = Date.now()): number {
+  const at = expiresAt ? new Date(expiresAt).getTime() : NaN
+  if (!Number.isFinite(at)) return 0
+  return Math.max(0, Math.floor((at - now) / 1000))
+}
+
 export function calculatePlanPrice(_plan: PlanType, _paymentType: PaymentType): number {
   return CLUB_PLAN.price
 }

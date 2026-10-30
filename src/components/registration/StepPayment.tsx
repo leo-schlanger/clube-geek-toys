@@ -32,7 +32,7 @@ import { Card, CardContent } from '../ui/card'
 import { Badge } from '../ui/badge'
 import { PagarmeCardForm } from '../PagarmeCardForm'
 import { BillingAddressFields } from '../BillingAddressFields'
-import { generatePixPayment, checkPaymentStatus, type PixPaymentData } from '../../lib/payments'
+import { generatePixPayment, checkPaymentStatus, pixSecondsLeft, type PixPaymentData } from '../../lib/payments'
 import {
   billingAddressFromStored,
   billingAddressProblem,
@@ -67,9 +67,10 @@ interface StepPaymentProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const PIX_TIMEOUT_SECONDS = 30 * 60
+/** Fallback when the provider does not say; Pagar.me codes live 1 h. */
+const PIX_TIMEOUT_SECONDS = 60 * 60
 const POLL_INTERVAL_MS = 5_000
-const MAX_POLL_COUNT = (PIX_TIMEOUT_SECONDS * 1000) / POLL_INTERVAL_MS // 360 = match timer
+const MAX_POLL_COUNT = (PIX_TIMEOUT_SECONDS * 1000) / POLL_INTERVAL_MS // 720 = match timer
 
 // ---------------------------------------------------------------------------
 // Component
@@ -112,6 +113,7 @@ export function StepPayment({
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [timeLeft, setTimeLeft] = useState(PIX_TIMEOUT_SECONDS)
+  const [pixTotal, setPixTotal] = useState(PIX_TIMEOUT_SECONDS)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -137,10 +139,7 @@ export function StepPayment({
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current)
           if (pollRef.current) clearInterval(pollRef.current)
-          // A static PIX BR Code has no validity window — only the automatic
-          // check stops here. Calling it "expired" pushed people to generate a
-          // second code for a QR that was still perfectly payable.
-          toast.info('Paramos de verificar automaticamente. O código PIX continua válido.')
+          toast.info('O código PIX expirou. Gere um novo para pagar.')
           return 0
         }
         return prev - 1
@@ -220,7 +219,9 @@ export function StepPayment({
       if (pix) {
         setPixData(pix)
         setMethod('pix')
-        startPixTimer(PIX_TIMEOUT_SECONDS)
+        const seconds = pixSecondsLeft(pix.expiresAt) || PIX_TIMEOUT_SECONDS
+        setPixTotal(seconds)
+        startPixTimer(seconds)
         startPixPolling(pix.paymentIntentId)
 
         await savePendingPayment(memberId, {
@@ -342,7 +343,7 @@ export function StepPayment({
 
   // ─── Progress bar ratio ────────────────────────────────────────────────────
 
-  const timerProgress = timeLeft / PIX_TIMEOUT_SECONDS
+  const timerProgress = pixTotal > 0 ? timeLeft / pixTotal : 0
 
   // =========================================================================
   // Render
@@ -491,15 +492,38 @@ export function StepPayment({
       )}
 
       {/* ═══ PIX: QR Code ═══ */}
-      {method === 'pix' && pixData && (
+      {method === 'pix' && pixData && timeLeft <= 0 && (
+        <div className="space-y-4 text-center" data-testid="pix-expired">
+          <div className="p-4 rounded-lg bg-warning/15 border border-warning/50 space-y-1">
+            <p className="font-medium flex items-center justify-center gap-2">
+              <Clock className="h-4 w-4" />
+              Este código PIX expirou
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Nada foi cobrado. Gere um código novo para pagar.
+            </p>
+          </div>
+          <Button
+            size="lg"
+            className="w-full"
+            disabled={loading}
+            onClick={() => { resetMethod(); void handlePixPayment() }}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><QrCode className="h-4 w-4" />Gerar novo PIX</>}
+          </Button>
+          <Button variant="ghost" onClick={resetMethod} className="w-full">
+            Escolher outro método
+          </Button>
+        </div>
+      )}
+
+      {method === 'pix' && pixData && timeLeft > 0 && (
         <div className="space-y-4">
           {/* Timer with progress bar */}
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-600">
               <Clock className="h-4 w-4" />
-              {timeLeft > 0
-                ? `Verificando o pagamento por ${formatTime(timeLeft)}`
-                : 'Código válido — avisaremos quando o pagamento cair'}
+              {`Código válido por ${formatTime(timeLeft)}`}
             </div>
             <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
               <div

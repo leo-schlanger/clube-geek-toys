@@ -835,6 +835,30 @@ async function settleIfPaid(charge: pagarme.PagarmeCharge): Promise<void> {
   }
 }
 
+/**
+ * Close a club PIX that can no longer be paid.
+ *
+ * A Pagar.me PIX lapses after `PAGARME_PIX_EXPIRES_IN` but its charge stays
+ * `pending` forever. The member's `pending_payment` kept that dead code, and
+ * the pending screen offered it again as "Continuar Pagamento". Failing the row
+ * and clearing the blob makes the next tap issue a fresh code. A late `paid`
+ * still settles: the webhook updates any row that is not already paid.
+ */
+export async function expireClubPixPayment(paymentId: string): Promise<boolean> {
+  const result = await query(
+    `UPDATE payments SET status = 'failed', provider_status = 'expired', updated_at = NOW()
+      WHERE id = $1 AND status = 'pending' AND method = 'pix'`,
+    [paymentId],
+  );
+  if ((result.rowCount ?? 0) === 0) return false;
+  await query(
+    `UPDATE members SET pending_payment = NULL, updated_at = NOW()
+      WHERE pending_payment->>'paymentId' = $1`,
+    [paymentId],
+  );
+  return true;
+}
+
 export async function getPaymentStatus(paymentId: string): Promise<{
   id: string;
   status: string;

@@ -124,6 +124,7 @@ import {
   calculateUpgradeCharge,
   findRecentPayment,
   getPaymentStatus,
+  expireClubPixPayment,
 } from './payment.service.js';
 
 const PLAN_PRICE = 159.9;
@@ -1066,6 +1067,30 @@ describe('calculateUpgradeCharge', () => {
 });
 
 // ─── Duplicate guard ─────────────────────────────────────────────────────────
+
+/**
+ * A Pagar.me PIX lapses after an hour but its charge stays `pending`. The
+ * member's saved code kept coming back as "Continuar Pagamento".
+ */
+describe('expireClubPixPayment', () => {
+  it('encerra só o PIX pendente e limpa o código guardado no membro', async () => {
+    route('UPDATE payments', { rowCount: 1 });
+
+    await expect(expireClubPixPayment('pay-1')).resolves.toBe(true);
+
+    expect(ran("UPDATE payments SET status = 'failed'", "status = 'pending'", "method = 'pix'")).toBe(true);
+    expect(ran('UPDATE members SET pending_payment = NULL', "pending_payment->>'paymentId' = $1")).toBe(true);
+    expect(paramsOf('UPDATE members')).toEqual(['pay-1']);
+  });
+
+  it('não mexe no membro quando o pagamento já não estava pendente', async () => {
+    route('UPDATE payments', { rowCount: 0 });
+
+    await expect(expireClubPixPayment('pay-1')).resolves.toBe(false);
+
+    expect(ran('UPDATE members')).toBe(false);
+  });
+});
 
 describe('findRecentPayment', () => {
   it('procura só pagamento PAGO dentro da janela', async () => {

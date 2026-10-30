@@ -29,6 +29,7 @@ const mockIsPaymentConfigured = vi.fn(() => true)
 vi.mock('../lib/payments', () => ({
   checkPixPaymentStatus: (...args: unknown[]) => mockCheckPixPaymentStatus(...args),
   isPaymentConfigured: () => mockIsPaymentConfigured(),
+  pixSecondsLeft: (iso: string) => Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000)),
 }))
 
 const mockGetMemberContract = vi.fn()
@@ -143,16 +144,46 @@ describe('PendingPaymentScreen', () => {
     render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
 
     await waitFor(() => {
-      expect(screen.getByText(/ASSINATURA INATIVA/)).toBeInTheDocument()
+      expect(screen.getByText('Falta o pagamento')).toBeInTheDocument()
     })
   })
 
-  it('should render action banner', async () => {
+  /** On a phone the steps sit two screens down; the banner carries the action. */
+  it('banner leva direto ao pagamento quando o contrato está assinado', async () => {
+    mockGetMemberContract.mockResolvedValue({ id: 'c1', signedAt: '2025-05-01' })
     render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
 
-    await waitFor(() => {
-      expect(screen.getByText('Complete o pagamento')).toBeInTheDocument()
+    fireEvent.click(await screen.findByText('Pagar agora — PIX ou cartão'))
+    expect(screen.getByTestId('payment-modal')).toBeInTheDocument()
+  })
+
+  it('banner leva ao contrato quando ele ainda não foi assinado', async () => {
+    mockGetMemberContract.mockResolvedValue(null)
+    render(<PendingPaymentScreen member={makeMember()} onPaymentSuccess={vi.fn()} />)
+
+    fireEvent.click(await screen.findByText('Assinar o contrato e pagar'))
+    expect(screen.getByTestId('contract-modal')).toBeInTheDocument()
+  })
+
+  /** A Pagar.me code lapses in 1 h; offering it again sent members to a dead QR. */
+  it('não oferece de novo um PIX que já expirou', async () => {
+    const member = makeMember({
+      pendingPayment: {
+        paymentId: 'pix-1',
+        qrCode: 'qr-code-data',
+        amount: 159.9,
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        createdAt: '2025-05-01T00:00:00Z',
+      },
     })
+    mockGetMemberContract.mockResolvedValue({ id: 'c1', signedAt: '2025-05-01' })
+    mockCheckPixPaymentStatus.mockResolvedValue('pending')
+
+    render(<PendingPaymentScreen member={member} onPaymentSuccess={vi.fn()} />)
+
+    expect(await screen.findByText('Pagar Agora')).toBeInTheDocument()
+    expect(screen.queryByText('PIX pendente encontrado')).not.toBeInTheDocument()
+    expect(screen.queryByText('Continuar Pagamento')).not.toBeInTheDocument()
   })
 
   it('should show plan summary with name, price, and member info', async () => {
