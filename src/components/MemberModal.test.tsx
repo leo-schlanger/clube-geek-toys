@@ -308,6 +308,19 @@ describe('MemberModal', () => {
       expect(screen.getByRole('button', { name: 'Ativar sem cobrança' })).toBeInTheDocument()
     })
 
+    /**
+     * At 390px the row squeezed the text into a ~86px column beside the button
+     * and the icon shrank to nothing. jsdom has no layout, so pin the classes.
+     */
+    it('stacks the alert on phones: text first, full-width button below', () => {
+      render(<MemberModal mode="view" member={makeMember({ status: 'pending' })} {...defaultProps} />)
+      const alert = screen.getByTestId('member-pending-alert')
+      expect(alert.className).toMatch(/\bflex-col\b/)
+      expect(alert.className).toMatch(/\bsm:flex-row\b/)
+      expect(alert.querySelector('svg')?.getAttribute('class')).toMatch(/\bshrink-0\b/)
+      expect(screen.getByRole('button', { name: 'Ativar sem cobrança' }).className).toMatch(/\bw-full\b.*\bsm:w-auto\b/)
+    })
+
     /** Since 30/10/2026 a lapsed PIX is `failed`: it was charged, just never paid. */
     it('says the PIX lapsed instead of "no charge" when one was issued', () => {
       const pendingMember = makeMember({

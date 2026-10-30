@@ -863,22 +863,28 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
 
             {/* Pending payment alert */}
             {member && member.status === 'pending' && (
-              <div className="flex items-center gap-3 p-4 bg-yellow-500/10 border border-yellow-500/50 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                <div className="flex-1">
-                  <p className="font-medium text-yellow-700 dark:text-yellow-300">
-                    {member.pendingPixPaymentId ? 'Pagamento pendente' : `Cadastro sem pagamento — ${describeUnpaidSignup(member).label}`}
-                  </p>
-                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
-                    {member.pendingPixPaymentId
-                      ? 'Há um PIX em aberto. Confirme só depois que o valor tiver caído.'
-                      : `${describeUnpaidSignup(member).detail} Ativar libera o clube sem pagamento — só se o dinheiro entrou no caixa.`}
-                  </p>
+              <div
+                className="flex flex-col gap-3 p-4 bg-yellow-500/10 border border-yellow-500/50 rounded-lg sm:flex-row sm:items-center"
+                data-testid="member-pending-alert"
+              >
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-yellow-700 dark:text-yellow-300">
+                      {member.pendingPixPaymentId ? 'Pagamento pendente' : `Cadastro sem pagamento — ${describeUnpaidSignup(member).label}`}
+                    </p>
+                    <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                      {member.pendingPixPaymentId
+                        ? 'Há um PIX em aberto. Confirme só depois que o valor tiver caído.'
+                        : `${describeUnpaidSignup(member).detail} Ativar libera o clube sem pagamento — só se o dinheiro entrou no caixa.`}
+                    </p>
+                  </div>
                 </div>
                 <Button
                   type="button"
                   variant="warning"
                   size="sm"
+                  className="w-full shrink-0 sm:w-auto"
                   onClick={handleActivate}
                   disabled={loading}
                 >
