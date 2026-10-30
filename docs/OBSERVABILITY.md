@@ -114,7 +114,13 @@ em memória: uma API reiniciando em loop manda **um** e-mail, não sessenta.
 
 ## 4. Monitor externo
 
-`.github/workflows/uptime.yml` roda **nos servidores do GitHub** a cada 10 min.
+`.github/workflows/uptime.yml` roda **nos servidores do GitHub**. O `schedule`
+pede a cada 10 min, mas o GitHub segura cron de repositório com pouco movimento:
+**medido em 30/10/2026, 100 execuções de 14 a 30/10 saíram com intervalo mediano
+de 4,0 h** (mínimo 1,6 h, máximo 6,9 h). Na prática, uma VPS que cai pode ficar
+horas sem este alerta. A falha de 27/10 22:42 UTC (três `curl` sem resposta) foi
+caminho de rede GitHub → VPS: o nginx registrou pedidos normalmente no mesmo
+intervalo.
 O `health-check.sh` do cron da VPS continua, mas não enxerga a própria VPS cair;
 este enxerga. O GitHub manda e-mail quando a execução falha (para quem editou o
 `schedule` por último). Falha se:
