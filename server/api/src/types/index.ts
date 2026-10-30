@@ -45,6 +45,8 @@ export interface Member {
    * Absent means the caller did not ask; null means there is no open PIX.
    */
   pendingPixPaymentId?: string | null;
+  /** Newest payment attempt, so a pending signup tells "PIX lapsed" from "never charged". */
+  lastPayment?: { status: string; providerStatus: string | null; method: string | null } | null;
   /** Billing address collected for club charges. Null until the member pays. */
   billingAddress?: {
     cep: string;

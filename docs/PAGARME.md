@@ -732,6 +732,16 @@ Dois achados, os dois já corrigidos:
   customer phone is required" depois da reserva gravada. Evento e loja agora
   recusam telefone sem DDD com 400 `INVALID_PHONE` antes de gravar, e os
   formulários avisam no campo. `(021) …` e `+55 …` continuam aceitos.
+- **Membro pendente caía na página de venda.** `club.*/` e qualquer rota
+  desconhecida mandavam para `/assinar`, inclusive quem já tinha sessão; o
+  banner "Falta o pagamento" só aparecia em `/membro`. Agora `MemberEntry`
+  manda quem tem sessão para a área dele. O e-mail de estorno do clube levava a
+  `/minha-conta`, rota que não existe (caía no mesmo `/assinar`): agora
+  `/membro`, e `email-contract.test.ts` confere o caminho de cada botão.
+- **"Sem cobrança" no painel.** Com o PIX vencido virando `failed`, o cartão
+  "cadastros sem pagamento" passou a misturar quem nunca gerou cobrança com
+  quem deixou o PIX vencer. A listagem de membros traz `lastPayment`, e o
+  painel diz **PIX venceu sem pagamento**, **Cartão recusado** ou **Sem cobrança**.
 
 ## 9. Ir para produção
 

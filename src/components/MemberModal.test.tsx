@@ -304,8 +304,19 @@ describe('MemberModal', () => {
     it('shows an unpaid signup as a charge-less activation', () => {
       const pendingMember = makeMember({ status: 'pending' })
       render(<MemberModal mode="view" member={pendingMember} {...defaultProps} />)
-      expect(screen.getByText('Cadastro sem cobrança')).toBeInTheDocument()
+      expect(screen.getByText('Cadastro sem pagamento — Sem cobrança')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Ativar sem cobrança' })).toBeInTheDocument()
+    })
+
+    /** Since 30/10/2026 a lapsed PIX is `failed`: it was charged, just never paid. */
+    it('says the PIX lapsed instead of "no charge" when one was issued', () => {
+      const pendingMember = makeMember({
+        status: 'pending',
+        lastPayment: { status: 'failed', providerStatus: 'expired', method: 'pix' },
+      } as Partial<Member>)
+      render(<MemberModal mode="view" member={pendingMember} {...defaultProps} />)
+      expect(screen.getByText('Cadastro sem pagamento — PIX venceu sem pagamento')).toBeInTheDocument()
+      expect(screen.getByText(/O PIX foi gerado, venceu e não foi pago/)).toBeInTheDocument()
     })
 
     it('shows the open PIX when one exists', () => {

@@ -37,6 +37,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { describeUnpaidSignup } from '../lib/unpaid-signup'
 
 // Lazy load tab components for code splitting
 const MembersTab = lazy(() => import('../components/admin/MembersTab').then(m => ({ default: m.MembersTab })))
@@ -499,7 +500,7 @@ export default function AdminDashboard() {
                           {unpaidSignups.length} cadastro{unpaidSignups.length > 1 ? 's' : ''} sem pagamento
                         </h3>
                         <p className="text-sm text-yellow-900 dark:text-yellow-100 mt-1">
-                          O cadastro foi criado e nenhuma cobrança existe na Pagar.me. Não há PIX para conferir no extrato — o clube continua pendente até um pagamento ser gerado e cair.
+                          Nenhum destes cadastros tem cobrança em aberto: ou nunca geraram uma, ou o PIX venceu sem pagamento. Não há PIX para conferir no extrato — o clube continua pendente até um pagamento novo ser gerado e cair.
                         </p>
                       </div>
                     </div>
@@ -514,7 +515,7 @@ export default function AdminDashboard() {
                                 {planData.name} · {formatCurrency(CLUB_PLAN.price)}
                               </p>
                             </div>
-                            <span className="shrink-0 text-sm font-medium text-yellow-950 dark:text-yellow-50">Sem cobrança</span>
+                            <span className="shrink-0 text-sm font-medium text-yellow-950 dark:text-yellow-50">{describeUnpaidSignup(m).label}</span>
                           </div>
                         )
                       })}

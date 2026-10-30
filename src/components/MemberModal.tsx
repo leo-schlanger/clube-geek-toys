@@ -18,6 +18,7 @@ import { formatCurrency, formatCPF, formatDate, validateCPF, getStatusLabel } fr
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { toast } from 'sonner'
 import { openContractPdf } from '../lib/contract-storage'
+import { describeUnpaidSignup } from '../lib/unpaid-signup'
 import {
   X,
   User,
@@ -866,12 +867,12 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
                 <div className="flex-1">
                   <p className="font-medium text-yellow-700 dark:text-yellow-300">
-                    {member.pendingPixPaymentId ? 'Pagamento pendente' : 'Cadastro sem cobrança'}
+                    {member.pendingPixPaymentId ? 'Pagamento pendente' : `Cadastro sem pagamento — ${describeUnpaidSignup(member).label}`}
                   </p>
                   <p className="text-sm text-yellow-600 dark:text-yellow-400">
                     {member.pendingPixPaymentId
                       ? 'Há um PIX em aberto. Confirme só depois que o valor tiver caído.'
-                      : 'Nenhuma cobrança foi criada. Ativar libera o clube sem pagamento — só se o dinheiro entrou no caixa.'}
+                      : `${describeUnpaidSignup(member).detail} Ativar libera o clube sem pagamento — só se o dinheiro entrou no caixa.`}
                   </p>
                 </div>
                 <Button

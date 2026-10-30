@@ -74,6 +74,8 @@ export interface Member {
   paymentCount: number
   /** Oldest pending PIX, from the member list. Empty when no charge was created. */
   pendingPixPaymentId?: string | null
+  /** Newest payment attempt, from the member list: tells "PIX lapsed" from "never charged". */
+  lastPayment?: { status: string; providerStatus: string | null; method: string | null } | null
   /** Saved for the next club charge. Empty until the member pays once. */
   billingAddress?: {
     cep: string

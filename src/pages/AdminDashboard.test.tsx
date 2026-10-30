@@ -315,6 +315,35 @@ describe('AdminDashboard', () => {
     expect(screen.getByText('Sem cobrança')).toBeInTheDocument()
   })
 
+  it('tells a lapsed PIX apart from a signup that was never charged', async () => {
+    mockGetAllMembers.mockResolvedValue([
+      {
+        id: 'm-lapsed',
+        fullName: 'Pix Vencido',
+        cpf: '12345678901',
+        email: 'lapsed@test.com',
+        phone: '',
+        plan: 'club',
+        status: 'pending',
+        paymentType: 'annual',
+        startDate: '2026-01-01',
+        expiryDate: '2026-12-31',
+        paymentCount: 0,
+        lastPayment: { status: 'failed', providerStatus: 'expired', method: 'pix' },
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+        userId: 'u9',
+      },
+    ])
+
+    render(<AdminDashboard />)
+    await waitFor(() => {
+      expect(screen.getByText('PIX venceu sem pagamento')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Sem cobrança')).not.toBeInTheDocument()
+    expect(screen.queryByText(/nenhuma cobrança existe/i)).not.toBeInTheDocument()
+  })
+
   it('shows Confirmar Pagamento button only when a PIX is open', async () => {
     mockGetAllMembers.mockResolvedValue([
       {

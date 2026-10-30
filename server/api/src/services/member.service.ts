@@ -36,6 +36,7 @@ function mapMemberRow(row: pg.QueryResultRow): Member {
     activatedByPayment: row.activated_by_payment,
     paymentCount: row.payment_count ?? 0,
     pendingPixPaymentId: row.pending_pix_payment_id ?? null,
+    lastPayment: row.last_payment ?? null,
     billingAddress: readStoredBillingAddress(row.billing_address),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -91,7 +92,12 @@ export async function listMembers(opts: {
              AND p.status = 'pending'
              AND p.method = 'pix'
            ORDER BY p.created_at ASC
-           LIMIT 1) AS pending_pix_payment_id
+           LIMIT 1) AS pending_pix_payment_id,
+         (SELECT json_build_object('status', p.status, 'providerStatus', p.provider_status, 'method', p.method)
+            FROM payments p
+           WHERE p.member_id = members.id
+           ORDER BY p.created_at DESC
+           LIMIT 1) AS last_payment
        FROM members ${where} ORDER BY ${sortColumn} ${sortOrder} LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
       [...params, limit, offset]
     ),
@@ -119,7 +125,12 @@ export async function getMemberById(id: string): Promise<Member | null> {
            AND p.status = 'pending'
            AND p.method = 'pix'
          ORDER BY p.created_at ASC
-         LIMIT 1) AS pending_pix_payment_id
+         LIMIT 1) AS pending_pix_payment_id,
+       (SELECT json_build_object('status', p.status, 'providerStatus', p.provider_status, 'method', p.method)
+          FROM payments p
+         WHERE p.member_id = members.id
+         ORDER BY p.created_at DESC
+         LIMIT 1) AS last_payment
      FROM members WHERE members.id = $1`,
     [id],
   );
