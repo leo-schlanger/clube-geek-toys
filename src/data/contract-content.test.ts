@@ -69,7 +69,6 @@ describe('contract-content', () => {
     expect(text).toContain('LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA')
     expect(text).toContain('69.629.548/0001-00')
     expect(text).toContain('16.772.08-9')
-    expect(text).toContain('são processados na conta de N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA')
   })
 
   it('should describe the single annual plan and its benefits', () => {

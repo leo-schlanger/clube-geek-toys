@@ -99,12 +99,6 @@ senha novos combinados com o `.env`. A etiqueta do Melhor Envio tem a mesma
 espera: `STORE_SENDER.document` só muda junto com a autorização da conta nova
 (`docs/SHOP-ORDERS.md`, remetente).
 
-Enquanto isso durar, os Termos e a seção 1 do contrato de adesão dizem, em uma
-frase, que o PIX e o cartão ainda são processados na conta da empresa anterior
-e que esse pagamento quita o contratado com a LNA. Essa frase sai **no mesmo
-deploy** que gravar as chaves novas: deixá-la depois disso descreve um
-recebimento que já não existe.
-
 ---
 
 ## 2. Como o dinheiro anda

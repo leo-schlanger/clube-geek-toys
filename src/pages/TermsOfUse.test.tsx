@@ -31,13 +31,7 @@ describe('TermsOfUse', () => {
 
   it('renders CNPJ', () => {
     renderPage()
-    expect(screen.getAllByText(/69\.629\.548\/0001-00/).length).toBeGreaterThan(0)
-  })
-
-  it('says card and PIX still settle on the previous account until the new one is in use', () => {
-    renderPage()
-    expect(screen.getByText(/são processados na conta de/)).toBeInTheDocument()
-    expect(screen.getAllByText(/52\.846\.344\/0001-10/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/69\.629\.548\/0001-00/)).toBeInTheDocument()
   })
 
   it('renders all section headings', () => {
