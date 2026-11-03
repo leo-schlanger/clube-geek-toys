@@ -77,6 +77,28 @@ Cadastrar em **Configurações → Webhooks**:
 as credenciais do webhook — os dois falham em silêncio no boot, por isso estão
 no health.
 
+### Titular da conta (03/11/2026)
+
+A loja passou a ser operada pela **LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL
+LTDA**, CNPJ **69.629.548/0001-00**, constituída em 15/10/2026. Termos,
+privacidade, contrato de adesão, rodapé, e-mails e relatórios já usam esse
+CNPJ (`src/lib/company.ts` e `server/api/src/config/company.ts`).
+
+O recebimento **não acompanhou**. As `PAGARME_*` do `.env` continuam sendo as
+da conta anterior. Uma conta Pagar.me nasce presa a um CNPJ: não se troca a
+razão social nas chaves que já existem. Enquanto as chaves novas não forem
+gravadas na VPS, PIX, cartão, clube e ingresso liquidam na conta antiga, e a
+loja segue vendendo. Não apague as chaves atuais para "forçar" a migração: sem
+elas o checkout responde 503.
+
+Quando a conta nova existir, ela tem de ser **PSP**, como a de hoje. Conta
+Gateway só aceita `card_token` na criação do pedido, e este código cobra com
+`card_id`. Chaves de teste (`sk_test_` / `pk_test_`) não liquidam venda real.
+O webhook da conta nova repete a URL e os eventos desta seção, com usuário e
+senha novos combinados com o `.env`. A etiqueta do Melhor Envio tem a mesma
+espera: `STORE_SENDER.document` só muda junto com a autorização da conta nova
+(`docs/SHOP-ORDERS.md`, remetente).
+
 ---
 
 ## 2. Como o dinheiro anda

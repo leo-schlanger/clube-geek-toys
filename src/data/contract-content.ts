@@ -12,7 +12,9 @@ export const CONTRACT_SECTIONS: ContractSection[] = [
   {
     title: '1. SOBRE O CLUBE GEEKPOP & TOYS',
     content: [
-      'O CLUBE GEEKPOP & TOYS é um programa de fidelidade exclusivo da loja GEEKPOP & TOYS, destinado a oferecer vantagens, descontos e benefícios especiais aos seus membros.',
+      'O CLUBE GEEKPOP & TOYS é um programa de fidelidade da loja GEEKPOP & TOYS, destinado a oferecer vantagens, descontos e benefícios especiais aos seus membros.',
+      'O programa é operado por LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA, nome fantasia GEEKPOP, CNPJ 69.629.548/0001-00, inscrição estadual 16.772.08-9 (RJ), NIRE 33.2.1525821-2, com sede na Rua Barata Ribeiro, 181, Loja J, Copacabana, Rio de Janeiro/RJ, CEP 22.011-001.',
+      'Desde 15 de outubro de 2026, a loja e o Clube são operados por essa empresa. Períodos já pagos antes dessa data, quando a operação era identificada como N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA (CNPJ 52.846.344/0001-10), continuam válidos até o fim do período contratado. Novas adesões e renovações são contratadas com a LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA.',
       'A participação no Clube é voluntária e requer a adesão ao plano anual do Clube, mediante pagamento da anuidade correspondente.',
       'O Clube reserva-se o direito de modificar, suspender ou encerrar o programa a qualquer momento, mediante comunicação prévia de 30 (trinta) dias aos membros, por e-mail.',
     ],

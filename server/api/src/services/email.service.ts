@@ -1,4 +1,5 @@
 import { env, adminUrl } from '../config/env.js';
+import { COMPANY } from '../config/company.js';
 import { query } from '../config/database.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
@@ -973,8 +974,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       <!-- Company Info -->
       <div style="text-align:center;color:#475569;font-size:10px;line-height:1.6">
         <p style="margin:0;font-weight:600;color:#64748b">GeekPop &amp; Toys &mdash; Loja de K-pop no Rio de Janeiro</p>
-        <p style="margin:3px 0">CNPJ: 52.846.344/0001-10</p>
-        <p style="margin:3px 0">R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ</p>
+        <p style="margin:3px 0">${COMPANY.legalName}</p>
+        <p style="margin:3px 0">CNPJ: ${COMPANY.cnpj} &bull; IE ${COMPANY.ie}</p>
+        <p style="margin:3px 0">${COMPANY.addressLine}</p>
         <p style="margin:3px 0">(21) 98546-4666 &bull; geeketoys.com.br</p>
         <p style="margin:8px 0 0;color:#334155">Este e-mail foi enviado automaticamente. N&atilde;o responda.</p>
       </div>

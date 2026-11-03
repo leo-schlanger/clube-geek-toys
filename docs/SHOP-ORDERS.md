@@ -358,11 +358,16 @@ lados — a loja despacha com CNPJ, e o canal atacado recebe CNPJ do cliente, de
 modo que uma etiqueta de atacado tinha as duas pontas no campo errado. O
 roteamento é por tamanho: 14 dígitos → `company_document`, 11 → `document`.
 
-O CNPJ (`52.846.344/0001-10`) e o telefone da loja são **constantes no código**,
-em `STORE_SENDER` (`shipping.service.ts`), ao lado do endereço que já morava
-ali. Não são segredo — o CNPJ está no rodapé da loja por exigência do Decreto
-7.962/2013 — e configuração que só existe num servidor é configuração que some
-no dia em que aquele servidor for reconstruído.
+O telefone da loja é constante no código, em `STORE_SENDER`
+(`shipping.service.ts`), ao lado do endereço que já morava ali. O documento do
+remetente **ainda é o CNPJ anterior** (`52.846.344/0001-10`). A vitrine, desde
+03/11/2026, identifica a LNA GEEK POP (`69.629.548/0001-00`, IE `16.772.08-9`).
+Os dois não foram alinhados de propósito: o Melhor Envio recusa um CNPJ que
+não é o da conta autorizada, e essa conta ainda não foi aberta no CNPJ novo.
+Trocar `STORE_SENDER.document` (ou `SHIPPING_ORIGIN_DOCUMENT`) só no mesmo
+passo em que a conta nova for autorizada no painel. Configuração que só existe
+num servidor é configuração que some no dia em que aquele servidor for
+reconstruído.
 
 As quatro variáveis abaixo continuam existindo, agora como **override** (mudança
 de titularidade, endereço de outro CD):

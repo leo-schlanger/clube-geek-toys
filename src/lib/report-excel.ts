@@ -15,6 +15,7 @@ import {
   type OverviewReport,
 } from './reports'
 import { formatRange, reportBasename, revenueTotals } from './report-format'
+import { COMPANY } from './company'
 
 const MONEY = '"R$" #,##0.00;[Red]-"R$" #,##0.00'
 const PERCENT = '0.0%'
@@ -98,6 +99,7 @@ function growth(current: number, previous: number): number | null {
 export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Clube GeekPop & Toys'
+  wb.company = COMPANY.legalName
   wb.created = new Date()
 
   const { sales, club, tickets, margin, products, period } = report
@@ -111,6 +113,10 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
     { key: 'extra', width: 20 },
   ]
   summary.addRow(['GeekPop & Toys — ' + PERIOD_TITLE[period.type]]).font = { bold: true, size: 14, color: { argb: PINK } }
+  summary.addRow([`${COMPANY.legalName} · CNPJ ${COMPANY.cnpj} · IE ${COMPANY.ie}`]).font = {
+    size: 9,
+    color: { argb: 'FF6B7280' },
+  }
   summary.addRow([formatRange(period.type, period.start, period.end)]).font = { italic: true }
   summary.addRow([`Emitido em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`]).font = {
     size: 9,
@@ -385,6 +391,7 @@ export function buildReportWorkbook(report: OverviewReport): ExcelJS.Workbook {
 export function buildMonthlyWorkbook(rows: MonthlyReportData[]): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Clube GeekPop & Toys'
+  wb.company = COMPANY.legalName
   wb.created = new Date()
   const ws = listSheet(wb, 'Vendas por mês', [
     { header: 'Mês', key: 'month', width: 12, numFmt: MONTH },

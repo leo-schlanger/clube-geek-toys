@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { COMPANY, COMPANY_ADDRESS_LINE, PREVIOUS_COMPANY } from '../lib/company'
 
 export default function PrivacyPolicy() {
     return (
@@ -15,15 +16,20 @@ export default function PrivacyPolicy() {
                 <div className="glass p-8 md:p-12 rounded-2xl border border-border shadow-2xl">
                     <h1 className="text-4xl font-heading font-bold mb-8 gradient-text">Política de Privacidade</h1>
                     <div className="prose max-w-none space-y-6 text-muted-foreground">
-                        <p className="text-sm"><strong>Última atualização:</strong> 28 de setembro de 2026</p>
+                        <p className="text-sm"><strong>Última atualização:</strong> 3 de novembro de 2026</p>
 
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Controlador dos Dados</h2>
-                            <p><strong>N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA</strong></p>
-                            <p>Nome Fantasia: <strong>GEEKPOP & TOYS</strong></p>
-                            <p>CNPJ: 52.846.344/0001-10</p>
-                            <p>Endereço: Rua Barata Ribeiro, 181, Loja J - Copacabana, Rio de Janeiro - RJ, CEP 22.011-001</p>
-                            <p>Encarregado de Dados (DPO): <a href="mailto:contato@geeketoys.com.br" className="text-primary hover:underline">contato@geeketoys.com.br</a></p>
+                            <p><strong>{COMPANY.legalName}</strong></p>
+                            <p>Nome fantasia: <strong>{COMPANY.tradeName}</strong> (marca {COMPANY.brand})</p>
+                            <p>CNPJ: {COMPANY.cnpj}</p>
+                            <p>Inscrição estadual (RJ): {COMPANY.ie}</p>
+                            <p>NIRE: {COMPANY.nire}</p>
+                            <p>Endereço: {COMPANY_ADDRESS_LINE}</p>
+                            <p>Encarregado de Dados (DPO): <a href={`mailto:${COMPANY.email}`} className="text-primary hover:underline">{COMPANY.email}</a></p>
+                            <p>
+                                Desde {COMPANY.constitutedOnLabel}, o controlador dos dados das operações da loja, dos eventos e do Clube é esta empresa. Dados já cadastrados na plataforma, tratados antes dessa data por {PREVIOUS_COMPANY.legalName} (CNPJ {PREVIOUS_COMPANY.cnpj}), seguem usados só para as mesmas finalidades, agora sob responsabilidade da {COMPANY.legalName}.
+                            </p>
                         </section>
 
                         <p>Esta política descreve como coletamos, utilizamos, armazenamos e protegemos seus dados pessoais em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018).</p>

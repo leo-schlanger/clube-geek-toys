@@ -62,7 +62,16 @@ describe('contract-content', () => {
 
   // --- Specific content checks ---
 
-  it('should describe the single monthly plan and its benefits', () => {
+  it('names the company that operates the club', () => {
+    const about = CONTRACT_SECTIONS.find(s => s.title.includes('SOBRE O CLUBE'))
+    expect(about).toBeDefined()
+    const text = about!.content.join(' ')
+    expect(text).toContain('LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA')
+    expect(text).toContain('69.629.548/0001-00')
+    expect(text).toContain('16.772.08-9')
+  })
+
+  it('should describe the single annual plan and its benefits', () => {
     const planSection = CONTRACT_SECTIONS.find(s => s.title.includes('PLANO E BENEFÍCIOS'))
     expect(planSection).toBeDefined()
     const allContent = planSection!.content.join(' ')

@@ -391,8 +391,12 @@ describe('buyAndPrintLabel', () => {
     expect(cart.to).not.toHaveProperty('document');
   });
 
-  /** The shop's own CNPJ and phone ship with the code, not only in a VPS .env. */
-  it('preenche o remetente com o CNPJ e o telefone da loja', async () => {
+  /**
+   * Sender CNPJ is still the previous company's, on purpose, until Melhor
+   * Envio is authorized under 69.629.548/0001-00. The storefront already
+   * shows the new one. Aligning this early makes the carrier refuse the label.
+   */
+  it('preenche o remetente com o CNPJ da conta de frete e o telefone da loja', async () => {
     orderMock.mockResolvedValue(order());
     replies(
       { body: { id: 'me_1' } },

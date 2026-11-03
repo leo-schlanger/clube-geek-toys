@@ -26,12 +26,12 @@ describe('TermsOfUse', () => {
 
   it('renders the company name', () => {
     renderPage()
-    expect(screen.getByText(/N\. STANLEY SCHLANGER/)).toBeInTheDocument()
+    expect(screen.getAllByText(/LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA/).length).toBeGreaterThan(0)
   })
 
   it('renders CNPJ', () => {
     renderPage()
-    expect(screen.getByText(/52\.846\.344\/0001-10/)).toBeInTheDocument()
+    expect(screen.getByText(/69\.629\.548\/0001-00/)).toBeInTheDocument()
   })
 
   it('renders all section headings', () => {
@@ -76,7 +76,7 @@ describe('TermsOfUse', () => {
   it('renders last-updated date', () => {
     renderPage()
     expect(screen.getByText(/Última atualização:/)).toBeInTheDocument()
-    expect(screen.getByText(/17 de agosto de 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/3 de novembro de 2026/)).toBeInTheDocument()
   })
 
   it('mentions CDC (Consumer Defense Code)', () => {

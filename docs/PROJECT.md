@@ -6,9 +6,11 @@
 
 | Campo             | Valor                                                            |
 | ----------------- | ---------------------------------------------------------------- |
-| **Razao Social**  | N. Stanley Schlanger Comercio de Artigos em Geral Ltda           |
-| **Nome Fantasia** | GeekPop & Toys                                                   |
-| **CNPJ**          | 52.846.344/0001-10                                               |
+| **Razao Social**  | LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA                   |
+| **Nome Fantasia** | GEEKPOP (marca nos sites: GeekPop & Toys)                        |
+| **CNPJ**          | 69.629.548/0001-00 (desde 15/10/2026)                            |
+| **IE**            | 16.772.08-9 (RJ)                                                 |
+| **NIRE**          | 33.2.1525821-2                                                   |
 | **Endereco**      | R. Barata Ribeiro, 181 - loja J, Copacabana, Rio de Janeiro - RJ |
 | **CEP**           | 22011-001                                                        |
 | **WhatsApp loja** | (11) 91466-2881 — principal (atendentes)                         |

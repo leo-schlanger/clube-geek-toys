@@ -201,7 +201,7 @@ o sistema me diz o que fazer?
       envelhece. Não há e-mail de recuperação nem visibilidade de quanto se
       perde aí.
 - [ ] **BAIXO — Sem nota fiscal.** Nenhuma emissão de NF-e/NFC-e nem campo pra
-      anexar. Com CNPJ ativo (52.846.344/0001-10) e venda a atacado, em algum
+      anexar. Com CNPJ ativo (69.629.548/0001-00, desde 15/10/2026) e venda a atacado, em algum
       momento isso deixa de ser opcional.
 - [x] **BAIXO — `shipped` → `delivered` é 100% manual e sem data.** Não existe _(Resolvido — `syncShipments()` a cada 15 min desde 18/09/2026.)_
       `shipped_at`/`delivered_at`; o card "enviados sem entrega" usa `updated_at`

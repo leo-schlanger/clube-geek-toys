@@ -22,6 +22,7 @@ import { getCanonicalOrigin } from '../../lib/subdomain'
 import { breadcrumbJsonLd } from '../../lib/structured-data'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { CreatorCredit } from '../../components/CreatorCredit'
+import { COMPANY } from '../../lib/company'
 import { Button } from '../../components/ui/button'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { ClubHomePitch } from '../../components/store/ClubPitch'
@@ -310,7 +311,9 @@ export default function ShopHome() {
             They used to live only inside the privacy policy, which does not meet
             "local de destaque e de fácil visualização". */}
         <p className="text-xs">
-          N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA · CNPJ 52.846.344/0001-10
+          {COMPANY.legalName} · {COMPANY.tradeName}
+          <br />
+          CNPJ {COMPANY.cnpj} · IE {COMPANY.ie}
           <br />
           <a href="mailto:contato@geeketoys.com.br" className="hover:underline">
             contato@geeketoys.com.br

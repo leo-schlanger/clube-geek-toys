@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { COMPANY, COMPANY_ADDRESS_LINE, PREVIOUS_COMPANY } from '../lib/company'
 
 export default function TermsOfUse() {
     return (
@@ -15,15 +16,20 @@ export default function TermsOfUse() {
                 <div className="glass p-8 md:p-12 rounded-2xl border border-border shadow-2xl">
                     <h1 className="text-4xl font-heading font-bold mb-8 gradient-text">Termos de Uso</h1>
                     <div className="prose max-w-none space-y-6 text-muted-foreground">
-                        <p className="text-sm"><strong>Última atualização:</strong> 17 de agosto de 2026</p>
+                        <p className="text-sm"><strong>Última atualização:</strong> 3 de novembro de 2026</p>
 
                         <section className="space-y-3 bg-muted/20 p-4 rounded-lg">
                             <h2 className="text-2xl font-semibold text-foreground">Identificação</h2>
-                            <p><strong>N. STANLEY SCHLANGER COMERCIO DE ARTIGOS EM GERAL LTDA</strong></p>
-                            <p>Nome Fantasia: <strong>GEEKPOP & TOYS</strong></p>
-                            <p>CNPJ: 52.846.344/0001-10</p>
-                            <p>Endereço: Rua Barata Ribeiro, 181, Loja J - Copacabana, Rio de Janeiro - RJ, CEP 22.011-001</p>
-                            <p>E-mail: <a href="mailto:contato@geeketoys.com.br" className="text-primary hover:underline">contato@geeketoys.com.br</a></p>
+                            <p><strong>{COMPANY.legalName}</strong></p>
+                            <p>Nome fantasia: <strong>{COMPANY.tradeName}</strong> (marca {COMPANY.brand})</p>
+                            <p>CNPJ: {COMPANY.cnpj}</p>
+                            <p>Inscrição estadual (RJ): {COMPANY.ie}</p>
+                            <p>NIRE: {COMPANY.nire}</p>
+                            <p>Endereço: {COMPANY_ADDRESS_LINE}</p>
+                            <p>E-mail: <a href={`mailto:${COMPANY.email}`} className="text-primary hover:underline">{COMPANY.email}</a></p>
+                            <p>
+                                Desde {COMPANY.constitutedOnLabel}, a loja física, a loja online, os eventos e o Clube de Vantagens são operados por essa empresa. Períodos já pagos antes dessa data, quando a operação era identificada como {PREVIOUS_COMPANY.legalName} (CNPJ {PREVIOUS_COMPANY.cnpj}), continuam válidos até o fim do período contratado. Novas compras, adesões e renovações são feitas com a {COMPANY.legalName}.
+                            </p>
                         </section>
 
                         <p>Ao utilizar os sites da <strong>GeekPop & Toys</strong> e o <strong>Clube de Vantagens</strong>, você concorda com os seguintes termos, elaborados em conformidade com o Código de Defesa do Consumidor (Lei nº 8.078/90), o Decreto nº 7.962/2013 (regulamenta o CDC para o comércio eletrônico), o Marco Civil da Internet (Lei nº 12.965/2014) e a LGPD (Lei nº 13.709/2018):</p>

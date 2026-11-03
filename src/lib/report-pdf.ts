@@ -12,6 +12,7 @@
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib'
 import { LEDGER_KIND_LABEL, LEDGER_STATUS_LABEL, PAYMENT_METHOD_LABEL, type OverviewReport, type OverviewPeriod } from './reports'
 import { formatRange, reportBasename, revenueTotals } from './report-format'
+import { COMPANY } from './company'
 
 // Kept importable from here: the PDF tests and older callers read them from this module.
 export { formatRange, lastDay, reportBasename, revenueTotals, rioDate } from './report-format'
@@ -310,7 +311,7 @@ class Layout {
   /** Page numbers last, when the total is finally known. */
   finish() {
     this.pages.forEach((page, index) => {
-      const label = `GeekPop & Toys - CNPJ 52.846.344/0001-10`
+      const label = `${COMPANY.legalName} - CNPJ ${COMPANY.cnpj}`
       page.drawText(label, { x: MARGIN, y: 28, size: 7.5, font: this.font, color: MUTED })
       const pageLabel = `${index + 1} / ${this.pages.length}`
       page.drawText(pageLabel, {

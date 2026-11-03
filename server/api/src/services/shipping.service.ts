@@ -76,6 +76,12 @@ export function buildPickupAddress(recipientName: string): ShippingAddressInput 
  * is config that goes missing the day that server is rebuilt.
  *
  * `SHIPPING_ORIGIN_DOCUMENT` and `SHIPPING_ORIGIN_PHONE` still override it.
+ *
+ * The storefront identifies LNA GEEK POP (CNPJ 69.629.548/0001-00) since
+ * 15/10/2026. This sender document stays the previous company's CNPJ on
+ * purpose: Melhor Envio refuses a document that is not the one on the
+ * authorized account, and that account has not moved yet. Change it in the
+ * same step as the new authorization, not before.
  */
 export const STORE_SENDER = {
   /** Digits only. 14 = CNPJ, which rides in `company_document`, not `document`. */
