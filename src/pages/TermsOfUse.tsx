@@ -30,6 +30,9 @@ export default function TermsOfUse() {
                             <p>
                                 Desde {COMPANY.constitutedOnLabel}, a loja física, a loja online, os eventos e o Clube de Vantagens são operados por essa empresa. Períodos já pagos antes dessa data, quando a operação era identificada como {PREVIOUS_COMPANY.legalName} (CNPJ {PREVIOUS_COMPANY.cnpj}), continuam válidos até o fim do período contratado. Novas compras, adesões e renovações são feitas com a {COMPANY.legalName}.
                             </p>
+                            <p>
+                                Enquanto a conta de pagamentos da {COMPANY.legalName} (CNPJ {COMPANY.cnpj}) não estiver em uso, o PIX e o cartão das compras, adesões e renovações feitas com ela são processados na conta de {PREVIOUS_COMPANY.legalName} (CNPJ {PREVIOUS_COMPANY.cnpj}), que recebe o valor, e esse pagamento quita o que você contratou com a {COMPANY.legalName}.
+                            </p>
                         </section>
 
                         <p>Ao utilizar os sites da <strong>GeekPop & Toys</strong> e o <strong>Clube de Vantagens</strong>, você concorda com os seguintes termos, elaborados em conformidade com o Código de Defesa do Consumidor (Lei nº 8.078/90), o Decreto nº 7.962/2013 (regulamenta o CDC para o comércio eletrônico), o Marco Civil da Internet (Lei nº 12.965/2014) e a LGPD (Lei nº 13.709/2018):</p>
