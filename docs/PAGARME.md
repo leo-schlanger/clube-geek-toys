@@ -84,20 +84,33 @@ LTDA**, CNPJ **69.629.548/0001-00**, constituída em 15/10/2026. Termos,
 privacidade, contrato de adesão, rodapé, e-mails e relatórios já usam esse
 CNPJ (`src/lib/company.ts` e `server/api/src/config/company.ts`).
 
-O recebimento **não acompanhou**. As `PAGARME_*` do `.env` continuam sendo as
-da conta anterior. Uma conta Pagar.me nasce presa a um CNPJ: não se troca a
-razão social nas chaves que já existem. Enquanto as chaves novas não forem
-gravadas na VPS, PIX, cartão, clube e ingresso liquidam na conta antiga, e a
-loja segue vendendo. Não apague as chaves atuais para "forçar" a migração: sem
-elas o checkout responde 503.
+O recebimento **passou para essa empresa em 05/11/2026**. A chave secreta nova
+está no `.env` da VPS e a API cobra com ela. Uma conta Pagar.me nasce presa a
+um CNPJ: não se troca a razão social nas chaves que já existem, por isso a
+conta anterior continua existindo, só não recebe mais venda nova. A conta nova
+é PSP, como a anterior. Conta Gateway só aceita `card_token` na criação do
+pedido, e este código cobra com `card_id`. Chaves de teste (`sk_test_` /
+`pk_test_`) não liquidam venda real.
 
-Quando a conta nova existir, ela tem de ser **PSP**, como a de hoje. Conta
-Gateway só aceita `card_token` na criação do pedido, e este código cobra com
-`card_id`. Chaves de teste (`sk_test_` / `pk_test_`) não liquidam venda real.
-O webhook da conta nova repete a URL e os eventos desta seção, com usuário e
-senha novos combinados com o `.env`. A etiqueta do Melhor Envio tem a mesma
-espera: `STORE_SENDER.document` só muda junto com a autorização da conta nova
-(`docs/SHOP-ORDERS.md`, remetente).
+Dois passos ainda são no painel da conta nova, porque a API não os devolve:
+
+- **Chave pública** (`pk_…`, em Configurações → Chaves). Sem ela o
+  `GET /payments/config` responde `configured: false` e o formulário de cartão
+  diz que o cartão está indisponível. O PIX não usa essa chave e segue.
+  Não reponha a chave pública da conta anterior: o navegador tokenizaria o
+  cartão na empresa errada.
+- **Webhook**, com a mesma URL e os mesmos eventos desta seção, e com o
+  usuário e a senha que já estão no `.env`. Enquanto o painel não tiver esse
+  cadastro, quem liquida o PIX é a conciliação (até 10 min) e a consulta de
+  status. A transferência automática do recebedor também nasce desligada: o
+  saldo fica na Pagar.me até alguém ligá-la no painel.
+
+A chave secreta anterior ficou só na VPS, fora do git. Um pedido em separação
+foi pago no cartão em 04/11 nessa conta; o estorno dele não sai com a chave
+nova. Os `pagarme_customer_id` gravados nos membros apontavam para a conta
+anterior e foram limpos na troca — o próximo pagamento cria o cliente de novo.
+A etiqueta do Melhor Envio não acompanhou: `STORE_SENDER.document` só muda
+junto com a autorização da conta nova (`docs/SHOP-ORDERS.md`, remetente).
 
 ---
 
