@@ -92,13 +92,14 @@ conta anterior continua existindo, só não recebe mais venda nova. A conta nova
 pedido, e este código cobra com `card_id`. Chaves de teste (`sk_test_` /
 `pk_test_`) não liquidam venda real.
 
-Dois passos ainda são no painel da conta nova, porque a API não os devolve:
+A chave pública e o id da conta entraram no `.env` em 05/11/2026
+(`pk_OMvm0AluVWFBwYqA`, `acc_GZRndJKECXhkmxw0`). Com a pública no ar, o
+`GET /payments/config` volta a responder `configured: true` e o cartão
+tokeniza nessa conta. Não reponha a chave pública da conta anterior: o
+navegador tokenizaria o cartão na empresa errada.
 
-- **Chave pública** (`pk_…`, em Configurações → Chaves). Sem ela o
-  `GET /payments/config` responde `configured: false` e o formulário de cartão
-  diz que o cartão está indisponível. O PIX não usa essa chave e segue.
-  Não reponha a chave pública da conta anterior: o navegador tokenizaria o
-  cartão na empresa errada.
+O que ainda é no painel da conta nova:
+
 - **Webhook**, com a mesma URL e os mesmos eventos desta seção, e com o
   usuário e a senha que já estão no `.env`. Enquanto o painel não tiver esse
   cadastro, quem liquida o PIX é a conciliação (até 10 min) e a consulta de
