@@ -34,8 +34,8 @@ export const STORE_LOCATION = {
   postalCode: '22011-001',
   /** WhatsApp of the Rio counter, the number the shop footer shows. */
   telephone: '+55-21-98546-4666',
-  // OpenStreetMap: the odd side of Rua Barata Ribeiro up to 245 (CEP 22011-001).
-  geo: { latitude: -22.9641, longitude: -43.1785 },
+  // Pin of the Google Business Profile (Leo, 06/11/2026).
+  geo: { latitude: -22.9652592, longitude: -43.1800191 },
   instagram: 'https://www.instagram.com/geeketoys/',
   sameAs: [
     'https://www.instagram.com/geeketoys/',
@@ -43,13 +43,17 @@ export const STORE_LOCATION = {
     'https://www.tiktok.com/@geeketoys',
     'https://geeketoys.com.br',
   ],
-  /** Same hours the pickup instructions show (STORE_PICKUP.hours). */
+  /**
+   * Google Business Profile, Rio time (Leo, 06/11/2026). The pickup text
+   * (STORE_PICKUP.hours, front and API) says the same in words.
+   */
   openingHours: [
     {
-      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-      opens: '10:00',
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+      opens: '09:00',
       closes: '19:00',
     },
+    { dayOfWeek: ['Saturday'], opens: '09:00', closes: '16:00' },
   ],
 } as const
 

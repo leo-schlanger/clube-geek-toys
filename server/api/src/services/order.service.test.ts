@@ -90,7 +90,7 @@ vi.mock('./shipping.service.js', () => ({
     city: 'Rio de Janeiro',
     state: 'RJ',
     cep: '22011001',
-    hours: 'Segunda a sábado, 10h às 19h',
+    hours: 'Segunda a sexta, 9h às 19h; sábado, 9h às 16h',
   },
   buildPickupAddress: (recipientName: string) => ({
     cep: '22011001',

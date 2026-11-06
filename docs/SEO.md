@@ -81,7 +81,12 @@ para a própria URL prendia quem chegasse por engano.
   (Instagram, Facebook `geeketoyscolection`, TikTok, site). O Facebook
   `/geeketoys` que estava lá não é a página da loja. Os fatos vivem em
   `STORE_LOCATION` (`src/lib/company.ts`) e um teste confere o bloco estático
-  contra eles; o horário é o mesmo da retirada (`STORE_PICKUP.hours`).
+  contra eles. **Fonte da verdade: o Perfil da Empresa no Google** (Leo,
+  06/11/2026): telefone +55 21 98546-4666, geo -22.9652592, -43.1800191,
+  seg–sex 09h–19h e sáb 09h–16h (horário do Rio). O texto da retirada
+  (`STORE_PICKUP.hours` no front e `STORE_PICKUP_LOCATION.hours` na API, que
+  vai no e-mail de retirada) diz o mesmo, e o teste trava os três juntos. O
+  WhatsApp (11) do rodapé é o atendimento online, não o telefone da loja.
 - **Páginas por grupo/artista** (BTS, Stray Kids…): não há campo de artista no
   produto, só o nome ("Black Pink" e "Blackpink" convivem). Página por artista
   só com dado limpo: subcategoria por grupo no painel (a listagem já junta a

@@ -41,7 +41,7 @@ export const STORE_PICKUP_LOCATION = {
   city: 'Rio de Janeiro',
   state: 'RJ',
   cep: '22011001',
-  hours: 'Segunda a sábado, 10h às 19h',
+  hours: 'Segunda a sexta, 9h às 19h; sábado, 9h às 16h',
 } as const;
 
 /**

@@ -74,12 +74,20 @@ describe('shop.html Store JSON-LD', () => {
     )
   })
 
-  it('declares the same hours the pickup instructions show', () => {
-    expect(STORE_PICKUP.hours).toBe('Segunda a sábado, 10h às 19h')
+  it('declares the Google Business hours, the same the pickup text shows', () => {
     expect(STORE_LOCATION.openingHours).toEqual([
-      expect.objectContaining({ opens: '10:00', closes: '19:00' }),
+      { dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], opens: '09:00', closes: '19:00' },
+      { dayOfWeek: ['Saturday'], opens: '09:00', closes: '16:00' },
     ])
-    expect(STORE_LOCATION.openingHours[0].dayOfWeek).toHaveLength(6)
+    expect(STORE_PICKUP.hours).toBe('Segunda a sexta, 9h às 19h; sábado, 9h às 16h')
+    expect(STORE_LOCATION.geo).toEqual({ latitude: -22.9652592, longitude: -43.1800191 })
+    expect(STORE_LOCATION.telephone).toBe('+55-21-98546-4666')
+  })
+
+  // The API snapshots the pickup text onto the order and its e-mail.
+  it('says the same pickup hours in the API', () => {
+    const api = readFileSync(resolve(process.cwd(), 'server/api/src/services/shipping.service.ts'), 'utf-8')
+    expect(api).toContain(`hours: '${STORE_PICKUP.hours}'`)
   })
 
   it('keeps the share tags above every script', () => {
