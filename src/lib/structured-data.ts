@@ -11,6 +11,7 @@ import type { Product } from '../types'
 import type { EventConfig } from '../data/event'
 import { eventArt } from '../data/event'
 import { availableStock, hasSellablePrice } from './products'
+import { applyShopPromo, type ShopPromoLike } from './shop-discount'
 
 type JsonLd = Record<string, unknown>
 
@@ -34,9 +35,15 @@ function plainText(text: string, max = 5000): string {
 /**
  * `Product` with its offer. `null` for a product without a sellable price:
  * the shelf shows it as unavailable, and a R$ 0,00 offer is exactly what
- * Google's merchant checks reject.
+ * Google's merchant checks reject. `promo` is the online-shop discount the
+ * page shows and the checkout charges; the offer carries that price.
  */
-export function productJsonLd(product: Product, origin: string): JsonLd | null {
+export function productJsonLd(
+  product: Product,
+  origin: string,
+  promo?: ShopPromoLike | null
+): JsonLd | null {
+  const sale = (price: number) => applyShopPromo(price, promo)?.price ?? price
   const url = `${origin}/produto/${product.slug}`
   const variants = (product.variants ?? []).filter((v) => v.active && hasSellablePrice(v.price))
   const basePrice = product.priceFrom ?? product.price
@@ -52,7 +59,7 @@ export function productJsonLd(product: Product, origin: string): JsonLd | null {
 
   let offers: JsonLd
   if (product.hasVariants && variants.length) {
-    const prices = variants.map((v) => v.price)
+    const prices = variants.map((v) => sale(v.price))
     const anyInStock = variants.some((v) => availableStock(v) > 0)
     offers = {
       '@type': 'AggregateOffer',
@@ -65,7 +72,7 @@ export function productJsonLd(product: Product, origin: string): JsonLd | null {
   } else {
     offers = {
       '@type': 'Offer',
-      price: basePrice.toFixed(2),
+      price: sale(basePrice).toFixed(2),
       availability: availableStock(product) > 0 ? IN_STOCK : OUT_OF_STOCK,
       ...common,
     }

@@ -23,7 +23,7 @@ import {
   listRelatedProducts,
 } from '../../lib/products'
 import { formatCurrency, cn } from '../../lib/utils'
-import { applyShopPromo, formatPercent } from '../../lib/shop-discount'
+import { applyShopPromo, formatPercent, type ShopPromoLike } from '../../lib/shop-discount'
 import { useShopPromo } from '../../hooks/useShopPromo'
 import { useCart } from '../../contexts/CartContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -63,7 +63,7 @@ export default function ProductDetail() {
   const { addItem } = useCart()
   const { user } = useAuth()
   const { isMember } = useShopMember()
-  const { promo } = useShopPromo()
+  const { promo, loading: promoLoading } = useShopPromo()
   const channel = useShopChannel()
   const isWholesale = channel === 'wholesale'
   const { isApproved: isWholesaleApproved } = useWholesaleAccount()
@@ -263,7 +263,9 @@ export default function ProductDetail() {
           path={`/produto/${product.slug}`}
           image={product.images[0]}
           type="product"
-          jsonLd={isWholesale ? undefined : productSeoJsonLd(product)}
+          // Waits for the promotion: a list price in the offer would disagree
+          // with the price on the page.
+          jsonLd={isWholesale || promoLoading ? undefined : productSeoJsonLd(product, promo)}
         />
       )}
       <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
@@ -700,9 +702,9 @@ function productSeoDescription(product: Product): string {
   return `${space > 100 ? cut.slice(0, space) : cut}…`
 }
 
-function productSeoJsonLd(product: Product) {
+function productSeoJsonLd(product: Product, promo: ShopPromoLike) {
   const origin = getCanonicalOrigin()
-  const data = productJsonLd(product, origin)
+  const data = productJsonLd(product, origin, promo)
   return [
     ...(data ? [data] : []),
     breadcrumbJsonLd([{ name: product.name, path: `/produto/${product.slug}` }], origin),

@@ -42,6 +42,23 @@ function variant(price: number, stock: number, active = true): ProductVariant {
 }
 
 describe('productJsonLd', () => {
+  // The page shows the online promotion and the checkout charges it.
+  it('prices the offer with the online promotion the page shows', () => {
+    const promo = { enabled: true, percent: 5 }
+    const single = productJsonLd(product({ price: 7500 }), ORIGIN, promo)
+    expect(single?.offers).toMatchObject({ '@type': 'Offer', price: '7125.00' })
+    const multi = productJsonLd(
+      product({ hasVariants: true, variants: [variant(19.9, 3), variant(30, 0)] }),
+      ORIGIN,
+      promo
+    )
+    // Same rounding as the price on the card (applyShopPromo).
+    expect(multi?.offers).toMatchObject({ lowPrice: '18.90', highPrice: '28.50' })
+    expect(productJsonLd(product({ price: 100 }), ORIGIN, { enabled: false, percent: 5 })?.offers).toMatchObject({
+      price: '100.00',
+    })
+  })
+
   it('describes the product with an absolute image and a BRL offer from the store', () => {
     const data = productJsonLd(product(), ORIGIN)!
     expect(data['@type']).toBe('Product')

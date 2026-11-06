@@ -70,6 +70,11 @@ para a própria URL prendia quem chegasse por engano.
   `CollectionPage` com o `ItemList` dos produtos da página. Categoria vazia ou
   inexistente é `noindex`. Em 06/11/2026 nenhuma categoria tinha descrição no
   painel: preencher melhora a página na hora, sem deploy.
+- **Preço do `Offer` = preço da tela**: a loja mostra a promoção online
+  ("−5% no site") e o checkout cobra esse valor, mas o `Product` declarava o
+  preço de tabela (R$ 7.500 no JSON-LD, R$ 7.125 na página). Agora
+  `productJsonLd` recebe a promoção e aplica `applyShopPromo`, o mesmo cálculo
+  do cartão; enquanto a promoção carrega, o bloco não é emitido.
 - **Alt das fotos de produto**: nome + variação escolhida + posição na galeria
   ("Moletom BTS — Rosa / M — foto 2 de 5"), também nas miniaturas de variação.
 - **`Store` do `shop.html`**: telefone, horário, `geo`, mapa e `sameAs`
