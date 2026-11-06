@@ -75,6 +75,15 @@ para a própria URL prendia quem chegasse por engano.
   preço de tabela (R$ 7.500 no JSON-LD, R$ 7.125 na página). Agora
   `productJsonLd` recebe a promoção e aplica `applyShopPromo`, o mesmo cálculo
   do cartão; enquanto a promoção carrega, o bloco não é emitido.
+- **Preço de 1 unidade = conta do checkout** (qa, 06/11/2026): `applyShopPromo`
+  arredondava o preço unitário (199,90 × 0,95 = 189,91) e o checkout cobra
+  subtotal − desconto arredondado (189,90). Agora `applyShopPromo` usa
+  `resolveShopDiscount` com qty 1, e card, página e `Offer` saem dele. O teste
+  cobre os preços ,90 da loja.
+- **Produto inexistente é `noindex`**: a SPA responde 200 com "Produto não
+  encontrado", que o Google trata como soft 404.
+- **Site institucional no `sameAs`**: `https://geekpoptoys.com.br` (Leo,
+  06/11/2026). Os hosts `geeketoys` (API, club, adm, e-mail) seguem em uso.
 - **Alt das fotos de produto**: nome + variação escolhida + posição na galeria
   ("Moletom BTS — Rosa / M — foto 2 de 5"), também nas miniaturas de variação.
 - **`Store` do `shop.html`**: telefone, horário, `geo`, mapa e `sameAs`

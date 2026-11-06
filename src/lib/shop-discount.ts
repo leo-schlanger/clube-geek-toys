@@ -182,8 +182,11 @@ export function applyShopPromo(
   if (!promo?.enabled || !(promo.percent > 0)) return null
   if (!Number.isFinite(listPrice) || listPrice <= 0) return null
   const percent = Math.min(90, promo.percent)
+  // One unit priced exactly as the checkout prices it (subtotal minus the
+  // rounded discount): 199,90 at 5% is 189,90, not round(189,905) = 189,91.
+  const price = resolveShopDiscount({ subtotal: listPrice, promo: { enabled: true, percent } }).total
   return {
-    price: round2(listPrice * (1 - percent / 100)),
+    price,
     listPrice: round2(listPrice),
     percent,
   }

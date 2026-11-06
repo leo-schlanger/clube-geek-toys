@@ -127,8 +127,24 @@ describe('applyShopPromo', () => {
     expect(applyShopPromo(100, PROMO_5)).toEqual({ price: 95, listPrice: 100, percent: 5 })
   })
 
-  it('rounds to the cent the storefront prints', () => {
-    expect(applyShopPromo(125.9, PROMO_5)?.price).toBe(119.61)
+  // The page, the card and the Offer must show what the checkout charges for
+  // one unit: subtotal minus the rounded discount, as order.service does.
+  it.each([
+    [199.9, 189.9],
+    [99.9, 94.9],
+    [69.9, 66.4],
+    [119.9, 113.9],
+    [349.9, 332.4],
+    [89.9, 85.4],
+    [19.9, 18.9],
+    [599.9, 569.9],
+    [9.9, 9.4],
+    [125.9, 119.6],
+  ])('prices %s at 5%% like the checkout: %s', (list, expected) => {
+    expect(applyShopPromo(list, PROMO_5)?.price).toBe(expected)
+    expect(applyShopPromo(list, PROMO_5)?.price).toBe(
+      resolveShopDiscount({ subtotal: list, promo: PROMO_5 }).total
+    )
   })
 
   it('returns null when there is no promotion, so callers keep their markup', () => {

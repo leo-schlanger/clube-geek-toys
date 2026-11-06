@@ -268,6 +268,10 @@ export default function ProductDetail() {
           jsonLd={isWholesale || promoLoading ? undefined : productSeoJsonLd(product, promo)}
         />
       )}
+      {/* A missing product answers 200 (SPA): without noindex it is a soft 404. */}
+      {notFound && (
+        <SeoHead title="Produto não encontrado" path={`/produto/${slug ?? ''}`} noIndex />
+      )}
       <ShopHeader isMember={isMember && !isWholesale} isWholesale={isWholesale} />
 
       <div className="mx-auto max-w-6xl px-4 py-6">

@@ -41,7 +41,7 @@ export const STORE_LOCATION = {
     'https://www.instagram.com/geeketoys/',
     'https://www.facebook.com/geeketoyscolection/',
     'https://www.tiktok.com/@geeketoys',
-    'https://geeketoys.com.br',
+    'https://geekpoptoys.com.br',
   ],
   /**
    * Google Business Profile, Rio time (Leo, 06/11/2026). The pickup text

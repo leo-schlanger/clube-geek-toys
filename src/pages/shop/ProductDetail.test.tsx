@@ -58,8 +58,13 @@ vi.mock('../../components/store/ShopHeader', () => ({
   ShopHeader: () => <header data-testid="shop-header" />,
 }))
 
+const seoCalls = vi.hoisted(() => [] as Record<string, unknown>[])
+
 vi.mock('../../components/store/SeoHead', () => ({
-  SeoHead: () => null,
+  SeoHead: (props: Record<string, unknown>) => {
+    seoCalls.push(props)
+    return null
+  },
 }))
 
 vi.mock('../../components/store/MemberDiscountBadge', () => ({
@@ -194,7 +199,7 @@ describe('ProductDetail', () => {
     mockedGet.mockResolvedValue(product)
     renderPdp()
     await waitFor(() => {
-      expect(screen.getByText(/119,61/)).toBeInTheDocument()
+      expect(screen.getByText(/119,60/)).toBeInTheDocument()
     })
     expect(screen.getByText(/125,90/)).toBeInTheDocument()
     expect(screen.getByText(/−5% no site/)).toBeInTheDocument()
@@ -207,6 +212,8 @@ describe('ProductDetail', () => {
       expect(screen.getByText(/Produto não encontrado/i)).toBeInTheDocument()
     })
     expect(screen.getByAltText(/Nono.*acenando/)).toBeInTheDocument()
+    // Soft 404: the SPA answers 200, so the page itself must say noindex.
+    expect(seoCalls.at(-1)).toMatchObject({ noIndex: true, path: '/produto/missing' })
   })
 
   it('loads product and adds to cart', async () => {
