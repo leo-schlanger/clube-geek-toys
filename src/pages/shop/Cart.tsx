@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight, ImageOff, Sparkles } from 'lucide-react'
+import { Minus, Plus, Trash2, ArrowRight, ImageOff, Sparkles } from 'lucide-react'
 import { resolveShopDiscount } from '../../lib/shop-discount'
 import { useShopPromo } from '../../hooks/useShopPromo'
 import { formatCurrency } from '../../lib/utils'
 import { useCart } from '../../contexts/CartContext'
 import { ShopHeader } from '../../components/store/ShopHeader'
+import { NonoMascot } from '../../components/store/NonoMascot'
 import { MemberDiscountBadge } from '../../components/store/MemberDiscountBadge'
 import { useShopMember } from '../../components/store/useShopMember'
 import { useWholesaleAccount } from '../../components/store/useWholesaleAccount'
@@ -41,7 +42,7 @@ export default function Cart() {
         {items.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
-              <ShoppingBag className="h-14 w-14 text-muted-foreground" />
+              <NonoMascot size={120} />
               <div>
                 <p className="text-lg font-medium">Seu carrinho está vazio</p>
                 <p className="text-muted-foreground">

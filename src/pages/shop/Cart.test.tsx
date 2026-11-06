@@ -58,6 +58,7 @@ describe('Cart', () => {
     )
     expect(screen.getByText('Meu carrinho')).toBeInTheDocument()
     expect(screen.getByText(/Seu carrinho está vazio/i)).toBeInTheDocument()
+    expect(screen.getByAltText(/Nono.*acenando/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ir às compras/i })).toHaveAttribute('href', '/')
   })
 

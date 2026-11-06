@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Minus, Plus, Trash2, ShoppingBag, ImageOff } from 'lucide-react'
+import { NonoMascot } from './NonoMascot'
 import {
   Sheet,
   SheetContent,
@@ -61,7 +62,7 @@ export function CartDrawer({
 
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-            <ShoppingBag className="h-14 w-14 text-muted-foreground" />
+            <NonoMascot size={104} />
             <div>
               <p className="font-medium">Seu carrinho está vazio</p>
               <p className="text-sm text-muted-foreground">

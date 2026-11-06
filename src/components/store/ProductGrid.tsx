@@ -1,6 +1,6 @@
-import { PackageOpen } from 'lucide-react'
 import type { Product } from '../../types'
 import { ProductCard } from './ProductCard'
+import { NonoMascot } from './NonoMascot'
 import { Skeleton } from '../ui/skeleton'
 
 interface ProductGridProps {
@@ -50,8 +50,8 @@ export function ProductGrid({
   if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-16 text-center">
-        <PackageOpen className="h-12 w-12 text-muted-foreground" />
-        <p className="text-muted-foreground">{emptyMessage}</p>
+        <NonoMascot size={96} />
+        <p className="px-4 text-muted-foreground">{emptyMessage}</p>
       </div>
     )
   }

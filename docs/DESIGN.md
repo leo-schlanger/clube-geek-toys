@@ -354,6 +354,7 @@ linear-gradient(
 6. **Ícones:** Lucide; stroke 2; cor `currentColor` ou `text-primary` / `text-accent`.
 7. **A11y:** ring `focus-visible` = primary; não depender só de cor em status (ícone + label).
 8. **Não inventar hex soltos** em componentes novos — usar tokens Tailwind (`bg-primary`, `text-accent`, `border-border`).
+9. **Mascote Nono** (tigre branco de moletom GeekPop): só na loja, pequeno, e só onde a tela estaria vazia ou agradece — `NonoMascot` com `pose="wave"` (estados vazios, produto não encontrado) ou `pose="heart"` (pagamento confirmado). Fora do formulário de pagamento, do admin e do club. Arquivos em `public/mascot/` (WebP, 2 tamanhos via `srcset`); a arte original fica fora do repo.
 
 ---
 
@@ -376,7 +377,6 @@ remova sem comparar as telas**:
 - Em `@utility`, escreva `-webkit-backdrop-filter` **antes** de
   `backdrop-filter`: na ordem inversa o minificador descarta o padrão e o Chrome
   fica sem desfoque.
-
 
 | Arquivo                                           | Responsabilidade                          |
 | ------------------------------------------------- | ----------------------------------------- |

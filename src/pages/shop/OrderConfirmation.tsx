@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useLocation, Link } from 'react-router-dom'
-import { CheckCircle2, Clock, XCircle, Loader2, ShoppingBag, Home } from 'lucide-react'
+import { Clock, XCircle, Loader2, ShoppingBag, Home } from 'lucide-react'
 import type { OrderStatus } from '../../types'
 import { getOrderStatus, getOrderPix, pixConfirmationCopy, type OrderPixInfo } from '../../lib/orders'
 import { useCart } from '../../contexts/CartContext'
@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/button'
 import { Card, CardContent } from '../../components/ui/card'
 import { PixPaymentPanel } from '../../components/store/PixPaymentPanel'
 import { SeoHead } from '../../components/store/SeoHead'
+import { NonoMascot } from '../../components/store/NonoMascot'
 
 const POLL_INTERVAL_MS = 4000
 const POLL_TIMEOUT_MS = 5 * 60 * 1000 // Stop polling after 5 min
@@ -164,11 +165,11 @@ export default function OrderConfirmation() {
               </>
             ) : isPaid ? (
               <>
-                <CheckCircle2 className="h-16 w-16 text-green-500" />
+                <NonoMascot pose="heart" size={120} />
                 <div>
                   <h1 className="text-2xl font-heading font-bold">Pagamento confirmado!</h1>
                   <p className="text-muted-foreground">
-                    Seu pedido foi recebido com sucesso. Enviamos os detalhes por email.
+                    Obrigado! Seu pedido foi recebido com sucesso. Enviamos os detalhes por email.
                   </p>
                 </div>
               </>

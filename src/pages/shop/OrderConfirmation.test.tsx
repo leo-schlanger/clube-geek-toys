@@ -71,6 +71,8 @@ describe('OrderConfirmation', () => {
       expect(screen.getByText(/Pagamento confirmado/i)).toBeInTheDocument()
     })
     expect(screen.getByText(/#42|#\s*42/i)).toBeTruthy()
+    expect(screen.getByText(/Obrigado!/)).toBeInTheDocument()
+    expect(screen.getByAltText(/Nono.*coração/)).toHaveAttribute('src', '/mascot/nono-heart.webp')
     expect(mockClear).toHaveBeenCalled()
   })
 

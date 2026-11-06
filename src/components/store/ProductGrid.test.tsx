@@ -61,6 +61,7 @@ describe('ProductGrid', () => {
       </MemoryRouter>
     )
     expect(screen.getByText('Vazio custom')).toBeInTheDocument()
+    expect(screen.getByAltText(/Nono.*acenando/)).toHaveAttribute('src', '/mascot/nono-wave.webp')
   })
 
   it('renders products', () => {

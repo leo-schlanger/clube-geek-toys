@@ -35,5 +35,6 @@ describe('CartDrawer', () => {
       </MemoryRouter>
     )
     expect(screen.getByText(/carrinho está vazio/i)).toBeInTheDocument()
+    expect(screen.getByAltText(/Nono.*acenando/)).toBeInTheDocument()
   })
 })

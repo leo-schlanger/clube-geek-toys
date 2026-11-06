@@ -206,6 +206,7 @@ describe('ProductDetail', () => {
     await waitFor(() => {
       expect(screen.getByText(/Produto não encontrado/i)).toBeInTheDocument()
     })
+    expect(screen.getByAltText(/Nono.*acenando/)).toBeInTheDocument()
   })
 
   it('loads product and adds to cart', async () => {

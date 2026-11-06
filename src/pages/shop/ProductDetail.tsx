@@ -41,6 +41,7 @@ import {
   resolveVariantImages,
 } from '../../components/store/VariantPicker'
 import { ProductGrid } from '../../components/store/ProductGrid'
+import { NonoMascot } from '../../components/store/NonoMascot'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { ProductReviews } from '../../components/store/ProductReviews'
 import { ProductVideoSlide, ProductVideoThumb } from '../../components/store/ProductMedia'
@@ -281,7 +282,7 @@ export default function ProductDetail() {
           <ProductDetailSkeleton />
         ) : notFound || !product ? (
           <div className="flex flex-col items-center gap-4 py-20 text-center">
-            <ImageOff className="h-12 w-12 text-muted-foreground" />
+            <NonoMascot size={112} />
             <div>
               <h1 className="text-xl font-semibold">Produto não encontrado</h1>
               <p className="text-muted-foreground">
