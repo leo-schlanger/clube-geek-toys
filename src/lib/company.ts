@@ -25,6 +25,34 @@ export const COMPANY = {
   constitutedOnLabel: '15 de outubro de 2026',
 } as const
 
+/**
+ * Storefront facts for the shop's Store JSON-LD (shop.html). A test keeps the
+ * static block in step with this file.
+ */
+export const STORE_LOCATION = {
+  neighborhood: 'Copacabana',
+  postalCode: '22011-001',
+  /** WhatsApp of the Rio counter, the number the shop footer shows. */
+  telephone: '+55-21-98546-4666',
+  // OpenStreetMap: the odd side of Rua Barata Ribeiro up to 245 (CEP 22011-001).
+  geo: { latitude: -22.9641, longitude: -43.1785 },
+  instagram: 'https://www.instagram.com/geeketoys/',
+  sameAs: [
+    'https://www.instagram.com/geeketoys/',
+    'https://www.facebook.com/geeketoyscolection/',
+    'https://www.tiktok.com/@geeketoys',
+    'https://geeketoys.com.br',
+  ],
+  /** Same hours the pickup instructions show (STORE_PICKUP.hours). */
+  openingHours: [
+    {
+      dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      opens: '10:00',
+      closes: '19:00',
+    },
+  ],
+} as const
+
 export const COMPANY_ADDRESS_LINE =
   'Rua Barata Ribeiro, 181, Loja J - Copacabana, Rio de Janeiro - RJ, CEP 22.011-001'
 

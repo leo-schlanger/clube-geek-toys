@@ -19,7 +19,8 @@ import { EventPromoCard } from '../../components/store/EventPromoCard'
 import { useShopMember } from '../../components/store/useShopMember'
 import { SeoHead, SHOP_DEFAULT_SEO } from '../../components/store/SeoHead'
 import { getCanonicalOrigin } from '../../lib/subdomain'
-import { breadcrumbJsonLd } from '../../lib/structured-data'
+import { breadcrumbJsonLd, collectionPageJsonLd } from '../../lib/structured-data'
+import { categoryIntro, categoryTitle, clip } from '../../lib/shop-seo-text'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
 import { CreatorCredit } from '../../components/CreatorCredit'
 import { COMPANY } from '../../lib/company'
@@ -153,6 +154,14 @@ export default function ShopHome() {
   if (search) heading = `Resultados para "${search}"`
   else if (activeCategory) heading = activeCategory.name
 
+  const categoryPath = activeCategory
+    ? `/categoria/${activeCategory.slug}${page > 1 ? `?page=${page}` : ''}`
+    : ''
+  const intro = activeCategory && !search ? categoryIntro(activeCategory) : ''
+  // An empty or unknown category is a thin page: keep it out of the index.
+  const emptyCategory =
+    !!categorySlug && !search && !categoriesLoading && (!activeCategory || (!loading && total === 0))
+
   return (
     <div className="min-h-screen bg-background">
       <SeoHead
@@ -160,25 +169,29 @@ export default function ShopHome() {
           search
             ? `Busca: ${search}`
             : activeCategory
-              ? activeCategory.name
+              ? categoryTitle(activeCategory.name, page)
               : SHOP_DEFAULT_SEO.title
         }
-        description={
-          activeCategory
-            ? activeCategory.description?.trim() ||
-              `${activeCategory.name} na GeekPop & Toys, loja de K-pop em Copacabana (RJ). Envio pelos Correios para todo o Brasil, PIX ou cartão.`
-            : SHOP_DEFAULT_SEO.description
-        }
+        description={activeCategory ? clip(categoryIntro(activeCategory)) : SHOP_DEFAULT_SEO.description}
         // Each results page is its own page to Google; page 2 pointing at
         // page 1 would hide every product past the first screen.
         path={`${categorySlug ? `/categoria/${categorySlug}` : '/'}${page > 1 ? `?page=${page}` : ''}`}
         // Search results are endless near-duplicates of the catalogue.
-        noIndex={!!search}
+        noIndex={!!search || emptyCategory}
         jsonLd={
           activeCategory && !search
             ? [
                 breadcrumbJsonLd(
                   [{ name: activeCategory.name, path: `/categoria/${activeCategory.slug}` }],
+                  getCanonicalOrigin()
+                ),
+                collectionPageJsonLd(
+                  {
+                    name: categoryTitle(activeCategory.name, page),
+                    description: intro,
+                    path: categoryPath,
+                  },
+                  loading ? [] : products,
                   getCanonicalOrigin()
                 ),
               ]
@@ -261,6 +274,9 @@ export default function ShopHome() {
             </div>
             <ProductSortSelect value={sort} onChange={setSort} />
           </div>
+          {intro && (
+            <p className="mb-4 max-w-3xl text-sm text-muted-foreground">{intro}</p>
+          )}
           <ProductGrid
             products={products}
             loading={loading}

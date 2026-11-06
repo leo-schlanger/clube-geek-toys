@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sitemap index of the shop. nginx serves it as /sitemap.xml on shop.* only;
+  /sitemap.xml on club.* is still the club's own static sitemap.
+-->
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://shop.geekpoptoys.com.br/sitemap-shop.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://shop.geekpoptoys.com.br/sitemap-products.xml</loc>
+  </sitemap>
+</sitemapindex>

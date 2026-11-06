@@ -150,3 +150,39 @@ export function eventJsonLd(event: EventConfig, origin: string): JsonLd {
       : {}),
   }
 }
+
+/**
+ * `CollectionPage` for a category page, listing the products on this page of
+ * results (the ones the visitor sees), each by its canonical URL.
+ */
+export function collectionPageJsonLd(
+  page: { name: string; description: string; path: string },
+  products: Pick<Product, 'name' | 'slug'>[],
+  origin: string
+): JsonLd {
+  const url = `${origin}${page.path}`
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': `${url}#collection`,
+    name: page.name,
+    description: plainText(page.description, 500),
+    url,
+    inLanguage: 'pt-BR',
+    isPartOf: { '@id': `${origin}/#website` },
+    ...(products.length
+      ? {
+          mainEntity: {
+            '@type': 'ItemList',
+            numberOfItems: products.length,
+            itemListElement: products.map((p, i) => ({
+              '@type': 'ListItem',
+              position: i + 1,
+              url: `${origin}/produto/${p.slug}`,
+              name: p.name,
+            })),
+          },
+        }
+      : {}),
+  }
+}

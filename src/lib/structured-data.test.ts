@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Product, ProductVariant } from '../types'
 import { FALLBACK_EVENT } from '../data/event'
-import { breadcrumbJsonLd, eventJsonLd, productJsonLd } from './structured-data'
+import { breadcrumbJsonLd, collectionPageJsonLd, eventJsonLd, productJsonLd } from './structured-data'
 
 const ORIGIN = 'https://shop.geekpoptoys.com.br'
 
@@ -113,5 +113,35 @@ describe('eventJsonLd', () => {
     expect(data.location).toMatchObject({ name: 'Mar Palace Copacabana Hotel' })
     expect(data.offers).toMatchObject({ price: '20.00', priceCurrency: 'BRL' })
     expect(data.image).toEqual([`${ORIGIN}/og-image.png`])
+  })
+})
+
+describe('collectionPageJsonLd', () => {
+  it('lists the products on the page by canonical URL', () => {
+    const block = collectionPageJsonLd(
+      { name: 'K-pop', description: 'Álbuns\n e photocards.', path: '/categoria/k-pop' },
+      [product(), product({ name: 'Lightstick', slug: 'lightstick' })],
+      ORIGIN
+    )
+    expect(block).toMatchObject({
+      '@type': 'CollectionPage',
+      '@id': `${ORIGIN}/categoria/k-pop#collection`,
+      url: `${ORIGIN}/categoria/k-pop`,
+      description: 'Álbuns e photocards.',
+      isPartOf: { '@id': `${ORIGIN}/#website` },
+      mainEntity: {
+        '@type': 'ItemList',
+        numberOfItems: 2,
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, url: `${ORIGIN}/produto/album-proof`, name: 'Álbum Proof' },
+          { '@type': 'ListItem', position: 2, url: `${ORIGIN}/produto/lightstick` },
+        ],
+      },
+    })
+  })
+
+  it('omits the list while nothing is loaded', () => {
+    const block = collectionPageJsonLd({ name: 'K-pop', description: 'x', path: '/categoria/k-pop' }, [], ORIGIN)
+    expect(block).not.toHaveProperty('mainEntity')
   })
 })

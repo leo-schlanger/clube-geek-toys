@@ -51,6 +51,38 @@ saíram do stub e passaram para o front:
 O stub não tem mais meta refresh: só robô de preview chega nele, e o refresh
 para a própria URL prendia quem chegasse por engano.
 
+## Revisão de 06/11/2026: sitemap, categorias, fotos e loja física
+
+- **`/sitemap.xml` no `shop.*` devolvia o sitemap do clube** (6 URLs `club.*`):
+  o arquivo `public/sitemap.xml` é do clube, e a raiz é a mesma nos dois hosts.
+  Agora o bloco `shop` do nginx tem `location = /sitemap.xml`, que serve
+  `public/sitemap-index-shop.xml` — um índice com `sitemap-shop.xml` (estáticas)
+  e `sitemap-products.xml` (API). No `club.*` nada mudou.
+- **`sitemap-products.xml`** (`utils/sitemap-xml.ts`): cada produto leva as suas
+  fotos em `<image:image>` (as do produto e as das variações ativas, sem repetir),
+  e o `lastmod` acompanha a variação mais recente. Categoria só entra se lista
+  algum produto ativo (inclui as subcategorias, como a listagem), com `lastmod`
+  do produto mais novo dela.
+- **Página de categoria** (`/categoria/:slug`): título próprio (página 2+ diz
+  "— página N"), `H1`, parágrafo de introdução visível e description a partir
+  dele (`lib/shop-seo-text.ts`: a descrição do painel quando existe; senão uma
+  frase com o nome da categoria e os fatos da loja), `BreadcrumbList` +
+  `CollectionPage` com o `ItemList` dos produtos da página. Categoria vazia ou
+  inexistente é `noindex`. Em 06/11/2026 nenhuma categoria tinha descrição no
+  painel: preencher melhora a página na hora, sem deploy.
+- **Alt das fotos de produto**: nome + variação escolhida + posição na galeria
+  ("Moletom BTS — Rosa / M — foto 2 de 5"), também nas miniaturas de variação.
+- **`Store` do `shop.html`**: telefone, horário, `geo`, mapa e `sameAs`
+  (Instagram, Facebook `geeketoyscolection`, TikTok, site). O Facebook
+  `/geeketoys` que estava lá não é a página da loja. Os fatos vivem em
+  `STORE_LOCATION` (`src/lib/company.ts`) e um teste confere o bloco estático
+  contra eles; o horário é o mesmo da retirada (`STORE_PICKUP.hours`).
+- **Páginas por grupo/artista** (BTS, Stray Kids…): não há campo de artista no
+  produto, só o nome ("Black Pink" e "Blackpink" convivem). Página por artista
+  só com dado limpo: subcategoria por grupo no painel (a listagem já junta a
+  subcategoria na categoria-mãe) — aí cada grupo ganha URL, sitemap e
+  `CollectionPage` sem código novo.
+
 ## Regras
 
 - **Rota pública nova da loja**: decida o preview dela no nginx (bloco `shop`) e
@@ -70,6 +102,11 @@ para a própria URL prendia quem chegasse por engano.
 # O que o WhatsApp recebe (tags no topo, charset, foto)
 curl -s -A 'WhatsApp/2.23.20.0' https://shop.geeketoys.com.br/ | head -20
 curl -s -A 'WhatsApp/2.23.20.0' https://shop.geeketoys.com.br/categoria/photocards | head -20
+
+# Sitemaps: índice só no shop.*, clube intacto
+curl -s https://shop.geekpoptoys.com.br/sitemap.xml   # <sitemapindex>
+curl -s https://club.geeketoys.com.br/sitemap.xml     # urlset do clube
+curl -s https://shop.geekpoptoys.com.br/sitemap-products.xml | grep -c '<image:loc>'
 
 # O que o Google recebe (tem de ser a SPA, não o stub)
 curl -s -A 'Googlebot/2.1' https://shop.geeketoys.com.br/produto/<slug> | grep -c 'id="root"'

@@ -40,6 +40,7 @@ import {
   matchVariant,
   resolveVariantImages,
 } from '../../components/store/VariantPicker'
+import { productPhotoAlt } from '../../lib/shop-seo-text'
 import { ProductGrid } from '../../components/store/ProductGrid'
 import { NonoMascot } from '../../components/store/NonoMascot'
 import { PaymentTrustBadges } from '../../components/store/PaymentTrustBadges'
@@ -318,7 +319,12 @@ export default function ProductDetail() {
                     >
                       <HoverZoom
                         src={current.url}
-                        alt={matched ? `${product.name} — ${matched.name}` : product.name}
+                        alt={productPhotoAlt(
+                          product.name,
+                          matched?.name,
+                          activeIndex,
+                          displayImages.length
+                        )}
                       />
                     </button>
                     <ZoomHint />
@@ -384,7 +390,7 @@ export default function ProductDetail() {
                       {item.type === 'image' ? (
                         <img
                           src={item.url}
-                          alt={`${product.name} ${i + 1}`}
+                          alt={productPhotoAlt(product.name, matched?.name, i, displayImages.length)}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -399,7 +405,7 @@ export default function ProductDetail() {
                 <ProductImageViewer
                   images={displayImages}
                   index={activeIndex}
-                  alt={matched ? `${product.name} — ${matched.name}` : product.name}
+                  alt={productPhotoAlt(product.name, matched?.name)}
                   onIndexChange={setActiveImage}
                   onClose={() => setViewerOpen(false)}
                 />

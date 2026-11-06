@@ -9,6 +9,7 @@ import type {
   ProductVideo,
 } from '../types/index.js';
 import { renderShareHtml, toDescription } from '../utils/share-html.js';
+import { collectImages, renderProductSitemapXml } from '../utils/sitemap-xml.js';
 
 // ─── Image caps ──────────────────────────────────────────────────────────────
 
@@ -1106,64 +1107,51 @@ export async function buildCategoryShareHtml(
 
 /** Absolute product and category URLs for search engines (shop host). */
 export async function buildProductSitemapXml(shopBaseUrl: string): Promise<string> {
-  const base = shopBaseUrl.replace(/\/$/, '');
+  // lastmod and the photo list follow the variants too: a new colour with its
+  // own photo changes the page without touching the product row.
   const result = await query(
-    `SELECT slug, updated_at FROM products
-     WHERE active = TRUE
-       AND name NOT ILIKE 'checkup%'
-       AND slug NOT ILIKE 'checkup%'
-     ORDER BY updated_at DESC
+    `SELECT p.slug,
+            GREATEST(p.updated_at, MAX(v.updated_at)) AS updated_at,
+            p.images,
+            COALESCE(jsonb_agg(v.images ORDER BY v.sort_order) FILTER (WHERE v.id IS NOT NULL),
+                     '[]'::jsonb) AS variant_images
+     FROM products p
+     LEFT JOIN product_variants v ON v.product_id = p.id AND v.active = TRUE
+     WHERE p.active = TRUE
+       AND p.name NOT ILIKE 'checkup%'
+       AND p.slug NOT ILIKE 'checkup%'
+     GROUP BY p.id
+     ORDER BY 2 DESC
      LIMIT 5000`
   );
-  // Category landing pages were in no sitemap at all, though `/categoria/:slug`
-  // is the page that ranks for "photocard", "album kpop" and the like.
+  // Same matching as the listing (any of the product's categories, and a parent
+  // lists its subcategories). An empty category page is thin content, so only
+  // categories that list something are submitted; lastmod moves with them.
   const categories = await query(
-    `SELECT slug, updated_at FROM categories WHERE active = TRUE ORDER BY sort_order, name`
+    `SELECT c.slug, GREATEST(c.updated_at, MAX(p.updated_at)) AS updated_at
+     FROM categories c
+     JOIN categories cf ON cf.id = c.id OR cf.parent_id = c.id
+     JOIN product_categories pc ON pc.category_id = cf.id
+     JOIN products p ON p.id = pc.product_id
+       AND p.active = TRUE
+       AND p.name NOT ILIKE 'checkup%'
+       AND p.slug NOT ILIKE 'checkup%'
+     WHERE c.active = TRUE
+     GROUP BY c.id
+     ORDER BY c.sort_order, c.name`
   );
-  const urls = result.rows
-    .map((r) => {
-      const lastmod = r.updated_at
-        ? new Date(r.updated_at as string).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
-      return `  <url>
-    <loc>${base}/produto/${r.slug}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>`;
-    })
-    .join('\n');
-
-  const categoryUrls = categories.rows
-    .map((r) => {
-      const lastmod = r.updated_at
-        ? new Date(r.updated_at as string).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
-      return `  <url>
-    <loc>${base}/categoria/${r.slug}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>`;
-    })
-    .join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${base}/</loc>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${base}/evento</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-${categoryUrls}
-${urls}
-</urlset>
-`;
+  return renderProductSitemapXml(
+    shopBaseUrl,
+    result.rows.map((r) => ({
+      slug: r.slug as string,
+      updatedAt: r.updated_at as Date | string | null,
+      images: collectImages(r.images, r.variant_images),
+    })),
+    categories.rows.map((r) => ({
+      slug: r.slug as string,
+      updatedAt: r.updated_at as Date | string | null,
+    }))
+  );
 }
 
 /**

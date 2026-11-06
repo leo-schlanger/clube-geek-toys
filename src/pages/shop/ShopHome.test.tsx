@@ -29,8 +29,13 @@ vi.mock('../../components/store/EventPromoCard', () => ({
   EventPromoCard: () => <div data-testid="event-promo">Evento</div>,
 }))
 
+const seo = vi.hoisted(() => ({ last: null as null | Record<string, unknown> }))
+
 vi.mock('../../components/store/SeoHead', () => ({
-  SeoHead: () => null,
+  SeoHead: (props: Record<string, unknown>) => {
+    seo.last = props
+    return null
+  },
   SHOP_DEFAULT_SEO: { title: 'Loja', description: 'desc' },
 }))
 
@@ -130,6 +135,66 @@ describe('ShopHome', () => {
   it('makes the category name the page heading', async () => {
     renderHome('/categoria/musica')
     expect(await screen.findByRole('heading', { level: 1, name: 'Música' })).toBeInTheDocument()
+  })
+
+  describe('category SEO', () => {
+    type Block = Record<string, unknown>
+
+    it('writes an intro from the name, a unique title and CollectionPage + BreadcrumbList', async () => {
+      renderHome('/categoria/musica')
+      expect(
+        await screen.findByText(/^Música na GeekPop & Toys, loja geek e de K-pop em Copacabana/)
+      ).toBeInTheDocument()
+      await waitFor(() => {
+        const blocks = (seo.last?.jsonLd ?? []) as Block[]
+        const collection = blocks.find((b) => b['@type'] === 'CollectionPage')
+        expect(collection?.mainEntity).toMatchObject({
+          '@type': 'ItemList',
+          numberOfItems: 1,
+          itemListElement: [{ position: 1, url: expect.stringMatching(/\/produto\/pc-bts$/) }],
+        })
+      })
+      const blocks = seo.last?.jsonLd as Block[]
+      expect(blocks.map((b) => b['@type'])).toEqual(['BreadcrumbList', 'CollectionPage'])
+      expect(seo.last?.title).toBe('Música')
+      expect(seo.last?.description).toMatch(/^Música na GeekPop & Toys/)
+      expect(String(seo.last?.description).length).toBeLessThanOrEqual(160)
+      expect(seo.last?.noIndex).toBe(false)
+    })
+
+    it('uses the description typed in the panel when there is one', async () => {
+      mockedCats.mockResolvedValue([
+        {
+          id: 'c1',
+          name: 'Música',
+          slug: 'musica',
+          description: 'Álbuns e CDs  de K-pop,\nlacrados.',
+          active: true,
+          sortOrder: 0,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ])
+      renderHome('/categoria/musica')
+      expect(await screen.findByText('Álbuns e CDs de K-pop, lacrados.')).toBeInTheDocument()
+    })
+
+    it('numbers the title of page 2', async () => {
+      mockedList.mockResolvedValue({ products: [sampleProduct], total: 40, page: 2, limit: 24 })
+      renderHome('/categoria/musica?page=2')
+      await waitFor(() => expect(seo.last?.title).toBe('Música — página 2'))
+    })
+
+    it('keeps an empty category out of the index', async () => {
+      mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
+      renderHome('/categoria/musica')
+      await waitFor(() => expect(seo.last?.noIndex).toBe(true))
+    })
+
+    it('keeps an unknown category out of the index', async () => {
+      renderHome('/categoria/nao-existe')
+      await waitFor(() => expect(seo.last?.noIndex).toBe(true))
+    })
   })
 
   it('shows search heading from query string', async () => {

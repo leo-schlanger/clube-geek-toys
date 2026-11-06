@@ -253,13 +253,16 @@ describe('ProductDetail', () => {
     })
 
     // Preselects the first option, showing that variant's gallery
-    const main = screen.getByRole('img', { name: /Bolsa colorida/i })
+    const main = within(screen.getByRole('button', { name: 'Ampliar foto' })).getByRole('img')
     expect(main.getAttribute('src')).toBe('https://example.com/rosa.jpg')
+    // Alt carries the product and the chosen variation, for search and screen readers.
+    expect(main).toHaveAttribute('alt', 'Bolsa colorida — Rosa')
 
     fireEvent.click(screen.getByRole('button', { name: /Preto/i }))
     await waitFor(() => {
-      const after = screen.getByRole('img', { name: /Bolsa colorida/i })
+      const after = within(screen.getByRole('button', { name: 'Ampliar foto' })).getByRole('img')
       expect(after.getAttribute('src')).toBe('https://example.com/preto.jpg')
+      expect(after).toHaveAttribute('alt', 'Bolsa colorida — Preto')
     })
   })
 

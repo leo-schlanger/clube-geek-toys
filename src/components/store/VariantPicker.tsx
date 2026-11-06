@@ -3,6 +3,7 @@ import type { Product, ProductVariant } from '../../types'
 import { cn } from '../../lib/utils'
 import { formatCurrency } from '../../lib/utils'
 import { availableStock } from '../../lib/products'
+import { productPhotoAlt } from '../../lib/shop-seo-text'
 
 interface VariantPickerProps {
   product: Product
@@ -147,7 +148,7 @@ export function VariantPicker({
                       {thumb ? (
                         <img
                           src={thumb}
-                          alt={opt}
+                          alt={productPhotoAlt(product.name, opt)}
                           className="h-full w-full object-cover"
                         />
                       ) : (
