@@ -71,7 +71,9 @@ vi.mock('../components/PendingPaymentScreen', () => ({
 }))
 
 vi.mock('../components/member/MembershipCard', () => ({
-  MembershipCard: () => <div data-testid="membership-card">Membership Card</div>,
+  MembershipCard: ({ showMascot }: { showMascot?: boolean }) => (
+    <div data-testid="membership-card" data-mascot={String(showMascot)}>Membership Card</div>
+  ),
 }))
 
 vi.mock('../components/member/DiscountStrip', () => ({
@@ -257,6 +259,27 @@ describe('MemberDashboard', () => {
   })
 
   // ─── No member state ──────────────────────────────────────
+
+  // One Nono per screen: the welcome's heart replaces the card's while it shows.
+  it('greets a member activated this week and hides the card Nono meanwhile', async () => {
+    mockGetMemberByUserId.mockResolvedValue({ ...activeMember, activatedAt: new Date().toISOString() })
+    render(<MemberDashboard />)
+    expect(await screen.findByTestId('welcome-celebration')).toBeInTheDocument()
+    expect(screen.getByTestId('membership-card')).toHaveAttribute('data-mascot', 'false')
+  })
+
+  it('does not greet an old member, and the card keeps its Nono', async () => {
+    mockGetMemberByUserId.mockResolvedValue({ ...activeMember, activatedAt: '2026-01-01T12:00:00Z' })
+    render(<MemberDashboard />)
+    expect(await screen.findByTestId('membership-card')).toHaveAttribute('data-mascot', 'true')
+    expect(screen.queryByTestId('welcome-celebration')).not.toBeInTheDocument()
+  })
+
+  it('shows Nono waving when there is no membership', async () => {
+    mockGetMemberByUserId.mockResolvedValue(null)
+    render(<MemberDashboard />)
+    expect(await screen.findByAltText(/Nono.*acenando/)).toBeInTheDocument()
+  })
 
   it('shows "Nenhuma assinatura encontrada" when member is null', async () => {
     mockGetMemberByUserId.mockResolvedValue(null)

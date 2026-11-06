@@ -161,4 +161,13 @@ describe('Subscribe', () => {
     render(<Subscribe />)
     expect(screen.getByTestId('radio-mini-player')).toBeInTheDocument()
   })
+
+  // CONANDA 163/2014: the mascot invites, the plan card sells.
+  it('Nono invites to the club with no price or discount in the bubble', () => {
+    render(<Subscribe />)
+    const bubble = screen.getByRole('note')
+    expect(bubble).toHaveTextContent('Vem fazer parte do clube!')
+    expect(bubble.textContent).not.toMatch(/R\$|%|desconto|grátis|promo/i)
+    expect(document.querySelector('img[src="/mascot/nono-standing.webp"]')).not.toBeNull()
+  })
 })

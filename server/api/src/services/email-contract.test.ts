@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
@@ -261,6 +263,19 @@ describe('integridade dos templates', () => {
     await render('welcome');
     const body = JSON.parse((fetchMock.mock.calls[0]![1] as { body: string }).body);
     expect(body.from).toBe('contato@geeketoys.com.br');
+  });
+
+  // The mascot is a PNG (Outlook does not render WebP) on the club host,
+  // absolute, with alt and a fixed width.
+  it('o boas-vindas traz o Nono do clube, com URL absoluta, alt e largura fixa', async () => {
+    const { html } = await render('welcome');
+    expect(html).toMatch(
+      /<img src="https:\/\/club\.geeketoys\.com\.br\/mascot\/nono-heart-email\.png" alt="Nono[^"]+" width="96"/
+    );
+  });
+
+  it('o Nono do e-mail existe no public/', () => {
+    expect(existsSync(resolve(process.cwd(), 'public/mascot/nono-heart-email.png'))).toBe(true);
   });
 
   it('as variáveis são escapadas: nada de HTML vindo do cadastro', async () => {

@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import { CheckCircle, XCircle, Clock, Home, RefreshCw, Loader2 } from 'lucide-react'
+import { XCircle, Clock, Home, RefreshCw, Loader2 } from 'lucide-react'
 import { checkPaymentStatus } from '../lib/payments'
+import { NonoMascot } from '../components/store/NonoMascot'
 
 type ResultType = 'success' | 'error' | 'pending'
 
@@ -14,7 +15,7 @@ interface PaymentResultProps {
 // Configuration for each result type
 const resultConfig = {
   success: {
-    icon: <CheckCircle className="h-20 w-20 text-green-500" />,
+    icon: <NonoMascot pose="heart" size={120} eager />,
     title: 'Pagamento Confirmado!',
     description: 'Sua assinatura foi ativada com sucesso.',
     color: 'bg-green-50 dark:bg-green-900/20',

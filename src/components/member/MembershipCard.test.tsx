@@ -148,4 +148,22 @@ describe('MembershipCard', () => {
     expect(screen.getByText('Nome do Membro')).toBeInTheDocument()
     expect(screen.getByText(/Válido até/)).toBeInTheDocument()
   })
+
+  describe('Nono', () => {
+    it('sits on the front, tiny and decorative, away from the QR on the back', () => {
+      const { container } = render(<MembershipCard member={createMember()} />)
+      const nono = container.querySelector('img[src="/mascot/nono-glasses.webp"]')
+      expect(nono).not.toBeNull()
+      expect(nono).toHaveAttribute('alt', '')
+      expect(nono).toHaveAttribute('width', '44')
+      // Front face: same face as the name, not the one with the QR.
+      const back = container.querySelector('[style*="rotateY(180deg)"][style*="backface"]')
+      expect(back?.contains(nono!)).toBe(false)
+    })
+
+    it('can be turned off when another Nono is on the screen', () => {
+      const { container } = render(<MembershipCard member={createMember()} showMascot={false} />)
+      expect(container.querySelector('img[src^="/mascot/"]')).toBeNull()
+    })
+  })
 })

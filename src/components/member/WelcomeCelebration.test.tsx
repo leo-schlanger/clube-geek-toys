@@ -87,6 +87,14 @@ describe('WelcomeCelebration', () => {
     expect(screen.queryByText('Bem-vindo(a), Carlos!')).not.toBeInTheDocument()
   })
 
+  it('shows Nono with the heart and tells the dashboard when dismissed', () => {
+    const onDismiss = vi.fn()
+    render(<WelcomeCelebration memberName="Carlos" memberId="m-1" onDismiss={onDismiss} />)
+    expect(screen.getByAltText(/Nono.*coração/)).toHaveAttribute('src', '/mascot/nono-heart.webp')
+    fireEvent.click(screen.getByText('Vamos lá!'))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
   it('fires confetti on mount', async () => {
     const confetti = (await import('canvas-confetti')).default
     render(<WelcomeCelebration memberName="Carlos" memberId="m-1" />)

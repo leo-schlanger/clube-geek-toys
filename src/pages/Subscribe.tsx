@@ -14,6 +14,7 @@ import {
   memberSavingsOn,
 } from '../lib/club-value'
 import { useActiveEvent } from '../hooks/useActiveEvent'
+import { NonoMascot } from '../components/store/NonoMascot'
 import {
   Check,
   Sparkles,
@@ -238,6 +239,18 @@ export default function Subscribe() {
       {/* Plan */}
       <section id="plano" className="py-12 sm:py-16 px-4 sm:px-6 border-t border-border/30 scroll-mt-20">
         <div className="text-center mb-8">
+          {/* Mascot invite. The bubble never carries price or discount
+              (CONANDA 163/2014): the offer stays in the plan card. */}
+          <div className="mb-6 flex items-end justify-center gap-3">
+            <NonoMascot pose="standing" size={96} decorative />
+            <p
+              className="relative mb-8 rounded-2xl rounded-bl-sm border border-primary/30 bg-card px-4 py-2.5 text-sm font-semibold shadow-sm sm:text-base"
+              role="note"
+              aria-label="Nono, o tigre da GeekPop, diz: Vem fazer parte do clube!"
+            >
+              Vem fazer parte do clube!
+            </p>
+          </div>
           <h2 className="font-heading text-2xl sm:text-3xl font-bold mb-2">Plano do Clube</h2>
           <p className="text-sm text-muted-foreground">Um plano só, anual, com tudo incluso.</p>
         </div>

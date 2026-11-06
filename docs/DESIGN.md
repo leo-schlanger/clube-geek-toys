@@ -354,7 +354,10 @@ linear-gradient(
 6. **Ícones:** Lucide; stroke 2; cor `currentColor` ou `text-primary` / `text-accent`.
 7. **A11y:** ring `focus-visible` = primary; não depender só de cor em status (ícone + label).
 8. **Não inventar hex soltos** em componentes novos — usar tokens Tailwind (`bg-primary`, `text-accent`, `border-border`).
-9. **Mascote Nono** (tigre branco de moletom GeekPop): só na loja, pequeno, e só onde a tela estaria vazia ou agradece — `NonoMascot` com `pose="wave"` (estados vazios, produto não encontrado) ou `pose="heart"` (pagamento confirmado). Fora do formulário de pagamento, do admin e do club. Arquivos em `public/mascot/` (WebP, 2 tamanhos via `srcset`); a arte original fica fora do repo.
+9. **Mascote Nono** (tigre branco de moletom GeekPop): pequeno, **um por tela**, só onde a tela estaria vazia, convida ou agradece — `NonoMascot` (`wave`, `heart`, `standing`, `glasses`). Arquivos em `public/mascot/` (WebP, 2 tamanhos via `srcset`; o e-mail usa `nono-heart-email.png`, porque o Outlook não mostra WebP); a arte original fica fora do repo.
+   - **Loja**: `wave` nos estados vazios e produto não encontrado; `heart` no pagamento confirmado.
+   - **Clube** (06/11/2026): `standing` com balão de fala em HTML antes do cartão do plano em `/assinar` — o balão nunca leva preço, desconto ou promoção (CONANDA 163/2014), o preço fica no cartão; `heart` em `/pagamento/sucesso`, nas boas-vindas do `/membro` (só até 7 dias depois da ativação e enquanto não for fechada — `lib/welcome.ts`) e no topo do e-mail `welcome`; `glasses` de 44 px na frente da carteirinha, à direita do número (o QR fica no verso), escondido enquanto as boas-vindas aparecem; `wave` em "Nenhuma assinatura encontrada".
+   - **Nunca**: formulários de cadastro, cartão ou PIX, "Falta o pagamento", `/verificar/:id`, login e recuperar senha, admin e PDV.
 
 ---
 

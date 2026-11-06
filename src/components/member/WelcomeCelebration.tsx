@@ -2,20 +2,20 @@ import { useEffect, useState, useRef } from 'react'
 import { MEMBER_DISCOUNT_PERCENT } from '../../types'
 import confetti from 'canvas-confetti'
 import { motion, AnimatePresence } from 'framer-motion'
-import { PartyPopper, Star, X } from 'lucide-react'
+import { Star, X } from 'lucide-react'
 import { Button } from '../ui/button'
-
-const WELCOME_SEEN_KEY = 'clube_geek_welcome_seen'
+import { NonoMascot } from '../store/NonoMascot'
+import { markWelcomeSeen, welcomeStorageKey } from '../../lib/welcome'
 
 interface WelcomeCelebrationProps {
   memberName: string
   memberId: string
+  onDismiss?: () => void
 }
 
-export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationProps) {
-  const storageKey = `${WELCOME_SEEN_KEY}_${memberId}`
+export function WelcomeCelebration({ memberName, memberId, onDismiss }: WelcomeCelebrationProps) {
   const [visible, setVisible] = useState(
-    () => !localStorage.getItem(storageKey)
+    () => !localStorage.getItem(welcomeStorageKey(memberId))
   )
   const firedRef = useRef(false)
 
@@ -40,8 +40,9 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
   }, [visible])
 
   function dismiss() {
-    localStorage.setItem(storageKey, '1')
+    markWelcomeSeen(memberId)
     setVisible(false)
+    onDismiss?.()
   }
 
   const firstName = memberName?.split(' ')[0] || 'Membro'
@@ -81,9 +82,9 @@ export function WelcomeCelebration({ memberName, memberId }: WelcomeCelebrationP
             initial={{ rotate: -20, scale: 0 }}
             animate={{ rotate: 0, scale: 1 }}
             transition={{ type: 'spring', delay: 0.2, stiffness: 200 }}
-            className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary/20 mb-4"
+            className="mb-3 inline-flex justify-center"
           >
-            <PartyPopper className="h-8 w-8 text-primary" />
+            <NonoMascot pose="heart" size={104} eager />
           </motion.div>
 
           {/* Welcome text */}

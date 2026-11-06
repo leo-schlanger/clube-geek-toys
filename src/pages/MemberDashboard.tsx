@@ -10,6 +10,8 @@ import { DiscountStrip } from '../components/member/DiscountStrip'
 import { QuickActions } from '../components/member/QuickActions'
 import { OnboardingGuide } from '../components/member/OnboardingGuide'
 import { WelcomeCelebration } from '../components/member/WelcomeCelebration'
+import { NonoMascot } from '../components/store/NonoMascot'
+import { isWelcomePending } from '../lib/welcome'
 import { BenefitsSection } from '../components/member/BenefitsSection'
 import { SubscriptionCard } from '../components/member/SubscriptionCard'
 import { AccountSection } from '../components/member/AccountSection'
@@ -43,6 +45,7 @@ export default function MemberDashboard() {
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [contract, setContract] = useState<Contract | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -132,8 +135,8 @@ export default function MemberDashboard() {
             <div className="mx-auto mb-4">
               <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-40 mx-auto" />
             </div>
-            <div className="mx-auto mb-4 p-4 bg-warning/20 rounded-full w-fit">
-              <AlertTriangle className="h-12 w-12 text-warning" />
+            <div className="mx-auto mb-2">
+              <NonoMascot pose="wave" size={104} />
             </div>
             <CardTitle className="font-heading">Nenhuma assinatura encontrada</CardTitle>
             <CardDescription>
@@ -164,6 +167,7 @@ export default function MemberDashboard() {
     )
   }
 
+  const welcomePending = !welcomeDismissed && isWelcomePending(member)
   const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
   const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
   const isExpired = daysUntilExpiry <= 0
@@ -242,7 +246,8 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        <MembershipCard member={member} />
+        {/* One Nono per screen: the welcome's heart while it shows, else the card's. */}
+        <MembershipCard member={member} showMascot={!welcomePending} />
 
         <DiscountStrip />
 
@@ -252,7 +257,13 @@ export default function MemberDashboard() {
           onEditProfile={() => setModal('profile')}
         />
 
-        <WelcomeCelebration memberName={member.fullName} memberId={member.id} />
+        {welcomePending && (
+          <WelcomeCelebration
+            memberName={member.fullName}
+            memberId={member.id}
+            onDismiss={() => setWelcomeDismissed(true)}
+          />
+        )}
 
         <OnboardingGuide memberStartDate={member.startDate} />
 

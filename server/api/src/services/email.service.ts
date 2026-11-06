@@ -268,6 +268,9 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       subject: 'Bem-vindo ao Clube GeekPop & Toys! 🎮',
       preheader: `${name}, você agora é membro do ${planLabel(v.plan)}!`,
       body: `
+        <div style="text-align:center;margin:0 0 8px">
+          <img src="${frontendUrl}/mascot/nono-heart-email.png" alt="Nono, o tigre da GeekPop, abraçando um coração" width="96" height="97" style="display:inline-block;width:96px;height:97px;border:0" />
+        </div>
         <h2 style="color:#F04080;margin:0 0 12px">Bem-vindo, ${name}! 🎮</h2>
         <p>Sua conta no <strong>Clube GeekPop & Toys</strong> foi ativada com sucesso. Você agora faz parte da nossa comunidade geek!</p>
         <p style="margin:16px 0 8px;font-weight:600;color:#fff">O que você ganha como membro:</p>

@@ -57,6 +57,11 @@ describe('PaymentResult', () => {
       })
     })
 
+    it('greets with Nono and the heart', async () => {
+      render(<PaymentResult type="success" />)
+      expect(await screen.findByAltText(/Nono.*coração/)).toHaveAttribute('src', '/mascot/nono-heart.webp')
+    })
+
     it('renders the success description', async () => {
       render(<PaymentResult type="success" />)
       await waitFor(() => {

@@ -5,6 +5,7 @@ import { formatCPF, getStatusLabel } from '../../lib/utils'
 import { isMemberActive } from '../../lib/members'
 import { getMemberVerifyUrl } from '../../lib/subdomain'
 import { toast } from 'sonner'
+import { NonoMascot } from '../store/NonoMascot'
 import {
   Sparkles,
   Copy,
@@ -57,9 +58,11 @@ function formatMemberNumber(id: string): string {
 
 interface MembershipCardProps {
   member: Member
+  /** Tiny Nono on the front; off when another Nono is on the screen. */
+  showMascot?: boolean
 }
 
-export function MembershipCard({ member }: MembershipCardProps) {
+export function MembershipCard({ member, showMascot = true }: MembershipCardProps) {
   const [flipped, setFlipped] = useState(false)
   const [copied, setCopied] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -139,6 +142,17 @@ export function MembershipCard({ member }: MembershipCardProps) {
                 animation: 'shimmer 5s ease-in-out infinite',
               }}
             />
+
+            {/* Nono on the front only, right of the member number: clear of
+                the badge, the name, the expiry and the QR on the back. */}
+            {showMascot && (
+              <NonoMascot
+                pose="glasses"
+                size={44}
+                decorative
+                className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 drop-shadow-md sm:right-6"
+              />
+            )}
 
             {/* Card Content */}
             <div className="relative h-full p-5 sm:p-6 flex flex-col justify-between">
