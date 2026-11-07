@@ -134,7 +134,7 @@ describe('Login', () => {
   it('renders the login form with email and password fields', () => {
     render(<Login />)
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/senha/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^senha$/i)).toBeInTheDocument()
     expect(getSubmitButton()).toBeInTheDocument()
   })
 
@@ -186,7 +186,7 @@ describe('Login', () => {
     render(<Login />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'USER@EMAIL.COM')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'mypassword')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'mypassword')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -199,7 +199,7 @@ describe('Login', () => {
     render(<Login />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'user@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'password123')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'password123')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -213,7 +213,7 @@ describe('Login', () => {
     render(<Login />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'user@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'wrongpassword')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'wrongpassword')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -227,7 +227,7 @@ describe('Login', () => {
     render(<Login />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'user@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'wrongpw')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'wrongpw')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -243,7 +243,7 @@ describe('Login', () => {
     render(<Login />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'user@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'wrongpw')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'wrongpw')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -256,7 +256,7 @@ describe('Login', () => {
     render(<Login />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'user@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'password')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'password')
     fireEvent.click(screen.getByRole('button', { name: /aguarde/i }))
 
     await waitFor(() => {
@@ -320,7 +320,7 @@ describe('Login', () => {
   it('toggles password visibility', async () => {
     render(<Login />)
 
-    const passwordInput = screen.getByLabelText(/senha/i)
+    const passwordInput = screen.getByLabelText(/^senha$/i)
     expect(passwordInput).toHaveAttribute('type', 'password')
 
     // The toggle button is inside a div.relative wrapping the password input

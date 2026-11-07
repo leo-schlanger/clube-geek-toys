@@ -88,6 +88,6 @@ describe('FormFieldFeedback', () => {
 
   it('should have success styling', () => {
     const { container } = render(<FormFieldFeedback success />)
-    expect(container.firstChild).toHaveClass('text-green-500')
+    expect(container.firstChild).toHaveClass('text-green-700', 'dark:text-green-500')
   })
 })

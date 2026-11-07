@@ -19,9 +19,9 @@ export function TicketCard({ ticket }: { ticket: PublicTicket }) {
   const usedAt = ticket.usedAt ? new Date(ticket.usedAt) : null
   const tone =
     ticket.status === 'valid'
-      ? { border: 'border-green-500/60', bg: 'bg-green-500/10', text: 'text-green-500', Icon: CheckCircle2 }
+      ? { border: 'border-green-500/60', bg: 'bg-green-500/10', text: 'text-green-700 dark:text-green-500', Icon: CheckCircle2 }
       : ticket.status === 'used'
-        ? { border: 'border-amber-500/60', bg: 'bg-amber-500/10', text: 'text-amber-500', Icon: Clock }
+        ? { border: 'border-amber-500/60', bg: 'bg-amber-500/10', text: 'text-amber-700 dark:text-amber-500', Icon: Clock }
         : ticket.status === 'cancelled'
           ? { border: 'border-destructive/60', bg: 'bg-destructive/10', text: 'text-destructive', Icon: XCircle }
           : { border: 'border-border', bg: 'bg-muted/40', text: 'text-muted-foreground', Icon: Clock }

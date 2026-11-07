@@ -76,12 +76,12 @@ describe('Button', () => {
 
   it('should render success variant', () => {
     render(<Button variant="success">OK</Button>)
-    expect(screen.getByRole('button')).toHaveClass('bg-green-500')
+    expect(screen.getByRole('button')).toHaveClass('bg-success', 'text-success-foreground')
   })
 
   it('should render warning variant', () => {
     render(<Button variant="warning">Warn</Button>)
-    expect(screen.getByRole('button')).toHaveClass('bg-yellow-500')
+    expect(screen.getByRole('button')).toHaveClass('bg-warning', 'text-warning-foreground')
   })
 
   // --- Sizes ---

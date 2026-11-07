@@ -29,4 +29,18 @@ describe('ThemeToggle layout', () => {
     fireEvent.click(screen.getByRole('button', { name: /Escuro/i }))
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
+
+  it('icon toggle starts on Sistema and cycles Claro → Escuro → Sistema with a 44px target', () => {
+    wrap(<ThemeToggle variant="icon" />)
+    const button = screen.getByRole('button', { name: /Tema: Sistema/ })
+    expect(button).toHaveClass('h-11', 'w-11')
+    // setup.ts replaces localStorage with vi.fn()s: assert what was written
+    fireEvent.click(button)
+    expect(localStorage.setItem).toHaveBeenLastCalledWith('geekpop-theme', 'light')
+    fireEvent.click(screen.getByRole('button', { name: /Tema: Claro/ }))
+    expect(localStorage.setItem).toHaveBeenLastCalledWith('geekpop-theme', 'dark')
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: /Tema: Escuro/ }))
+    expect(localStorage.setItem).toHaveBeenLastCalledWith('geekpop-theme', 'system')
+  })
 })

@@ -83,11 +83,11 @@ export function ChurnMetrics({ data, loading }: ChurnMetricsProps) {
           <div className="p-3 bg-muted rounded-lg">
             <div className="text-sm text-muted-foreground">Taxa Atual</div>
             <div className="flex items-center gap-2">
-              <span className={`text-2xl font-bold ${metrics.currentRate > 5 ? 'text-red-500' : metrics.currentRate > 2 ? 'text-yellow-500' : 'text-green-500'}`}>
+              <span className={`text-2xl font-bold ${metrics.currentRate > 5 ? 'text-red-500' : metrics.currentRate > 2 ? 'text-yellow-700 dark:text-yellow-500' : 'text-green-700 dark:text-green-500'}`}>
                 {metrics.currentRate}%
               </span>
               {metrics.trend !== 0 && (
-                <span className={`flex items-center text-xs ${metrics.trend > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                <span className={`flex items-center text-xs ${metrics.trend > 0 ? 'text-red-500' : 'text-green-700 dark:text-green-500'}`}>
                   {metrics.trend > 0 ? (
                     <TrendingUp className="h-3 w-3" />
                   ) : (

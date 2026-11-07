@@ -225,7 +225,7 @@ export function ProfileEditModal({ member, onClose, onSuccess }: ProfileEditModa
                 <p className="text-sm text-destructive">{errors.email.message}</p>
               )}
               {emailChanged && (
-                <p className="text-sm text-warning flex items-center gap-1">
+                <p className="text-sm text-amber-700 dark:text-warning flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" />
                   Alterar email requer sua senha atual
                 </p>

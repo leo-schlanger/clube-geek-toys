@@ -226,7 +226,7 @@ export function EventTicketForm({ event = FALLBACK_EVENT }: Props) {
         className="scroll-mt-28 rounded-2xl border border-green-500/40 bg-card p-6 md:p-8"
       >
         <div className="mb-4 flex items-start gap-3">
-          <div className="rounded-xl bg-green-500/15 p-2.5 text-green-500">
+          <div className="rounded-xl bg-green-500/15 p-2.5 text-green-700 dark:text-green-500">
             <CheckCircle2 className="h-6 w-6" />
           </div>
           <div>

@@ -188,7 +188,7 @@ export default function TicketPage({ mode }: Props) {
 
             {reservation?.status === 'confirmed' && (
               <div className="flex gap-3 rounded-2xl border border-green-500/40 bg-green-500/10 p-4 text-sm print:hidden">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-500" />
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700 dark:text-green-500" />
                 <p>
                   <strong>Pagamento confirmado.</strong> Os ingressos abaixo já valem na entrada —
                   cada QR Code uma única vez.

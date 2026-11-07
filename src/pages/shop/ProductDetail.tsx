@@ -492,7 +492,7 @@ export default function ProductDetail() {
                       <Badge className="bg-primary">−25% atacado</Badge>
                       <span className="text-sm">
                         Seu preço atacado:{' '}
-                        <strong className="text-green-600">
+                        <strong className="text-green-700 dark:text-green-600">
                           {formatCurrency(wholesalePrice)}
                         </strong>
                       </span>
@@ -515,7 +515,7 @@ export default function ProductDetail() {
                     <MemberDiscountBadge />
                     <span className="text-sm">
                       Seu preço de membro:{' '}
-                      <strong className="text-green-600">{formatCurrency(memberPrice)}</strong>
+                      <strong className="text-green-700 dark:text-green-600">{formatCurrency(memberPrice)}</strong>
                     </span>
                   </div>
                 ) : (
@@ -561,11 +561,11 @@ export default function ProductDetail() {
                 ) : unpriced ? (
                   <Badge variant="secondary">Indisponível — sem preço definido</Badge>
                 ) : displayStock <= 5 ? (
-                  <span className="text-yellow-600">
+                  <span className="text-yellow-700 dark:text-yellow-600">
                     Últimas {displayStock} unidades!
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1 text-green-600">
+                  <span className="flex items-center gap-1 text-green-700 dark:text-green-600">
                     <Check className="h-4 w-4" /> Em estoque
                   </span>
                 )}
@@ -628,7 +628,7 @@ export default function ProductDetail() {
               </div>
 
               <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                <ShieldCheck className="h-4 w-4 text-green-500" />
+                <ShieldCheck className="h-4 w-4 text-green-700 dark:text-green-500" />
                 Compra segura. Frete pelos Correios. Pagamento via PIX ou cartão.
               </div>
 

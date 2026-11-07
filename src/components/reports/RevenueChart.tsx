@@ -70,7 +70,7 @@ export function RevenueChart({ data, loading }: RevenueChartProps) {
           <div className="text-left sm:text-right space-y-1">
             <div>
               <p className="text-sm text-muted-foreground">Total no período</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(total)}</p>
+              <p className="text-2xl font-bold text-green-700 dark:text-green-600">{formatCurrency(total)}</p>
             </div>
             <p className="text-xs text-muted-foreground">
               Loja {formatCurrency(totalShop)} · Ingressos {formatCurrency(totalTickets)} · Clube{' '}

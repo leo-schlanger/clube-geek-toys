@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CLUB_PLAN, MEMBER_DISCOUNT_PERCENT } from '../types'
 import { Button } from '../components/ui/button'
+import { ThemeToggle } from '../components/ThemeToggle'
 import { Card, CardContent, CardFooter } from '../components/ui/card'
 import { formatCurrency } from '../lib/utils'
 import { getShopUrl } from '../lib/subdomain'
@@ -113,10 +114,11 @@ export default function Subscribe() {
           <Link to="/" className="flex items-center gap-2">
             <img src="/logo-vip.png" alt="GeekPop & Toys" className="h-10 sm:h-12" />
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             <a href={shopUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground hidden sm:inline transition-colors">
               Visite a loja
             </a>
+            <ThemeToggle variant="icon" />
             <Link to="/login">
               <Button variant="outline" size="sm" className="border-primary/50 hover:border-primary text-xs sm:text-sm">
                 Entrar
@@ -175,7 +177,7 @@ export default function Subscribe() {
             </a>
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-500" /> Garantia de 7 dias</span>
+              <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-700 dark:text-green-500" /> Garantia de 7 dias</span>
               <span className="flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-primary" /> Ativação imediata</span>
               <span className="flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-accent" /> PIX ou cartão</span>
             </div>
@@ -199,7 +201,7 @@ export default function Subscribe() {
                 <p className="mt-1 text-2xl font-bold">
                   {formatCurrency(ex.price - memberSavingsOn(ex.price))}
                 </p>
-                <p className="text-xs font-semibold text-green-400">
+                <p className="text-xs font-semibold text-green-700 dark:text-green-400">
                   você guarda {formatCurrency(memberSavingsOn(ex.price))}
                 </p>
               </div>
@@ -270,7 +272,7 @@ export default function Subscribe() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold">{CLUB_PLAN.name}</h3>
-                  <span className="text-green-400 font-semibold text-sm">{CLUB_PLAN.discount}% em qualquer produto</span>
+                  <span className="text-green-700 dark:text-green-400 font-semibold text-sm">{CLUB_PLAN.discount}% em qualquer produto</span>
                 </div>
               </div>
 
@@ -292,7 +294,7 @@ export default function Subscribe() {
                   'Garantia de 7 dias com reembolso integral',
                 ].map((benefit) => (
                   <li key={benefit} className="flex items-start gap-2.5 text-sm">
-                    <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                    <Check className="h-4 w-4 text-green-700 dark:text-green-500 mt-0.5 shrink-0" />
                     <span className="text-muted-foreground">{benefit}</span>
                   </li>
                 ))}
@@ -318,7 +320,7 @@ export default function Subscribe() {
       <section className="py-12 px-4 sm:px-6 border-t border-border/30">
         <div className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-5 rounded-2xl border border-green-500/30 bg-green-500/5 p-6 text-center sm:text-left">
           <div className="p-4 rounded-full bg-green-500/10 border border-green-500/20 shrink-0">
-            <Shield className="h-8 w-8 text-green-500" />
+            <Shield className="h-8 w-8 text-green-700 dark:text-green-500" />
           </div>
           <div>
             <h2 className="font-heading text-xl font-bold mb-1">Risco zero: 7 dias para desistir</h2>
@@ -364,8 +366,8 @@ export default function Subscribe() {
             </Button>
           </Link>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-500" /> Pagamento seguro</span>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-green-500" /> Sem mensalidade</span>
+            <span className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5 text-green-700 dark:text-green-500" /> Pagamento seguro</span>
+            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-green-700 dark:text-green-500" /> Sem mensalidade</span>
             <span className="flex items-center gap-1.5"><ShoppingBag className="h-3.5 w-3.5 text-primary" /> {MEMBER_DISCOUNT_PERCENT}% desde o 1º dia</span>
           </div>
         </div>
@@ -485,7 +487,7 @@ function SavingsCalculator({ ticketPrice }: { ticketPrice: number }) {
             <p className="text-sm text-muted-foreground">Você economiza no ano</p>
             <p className="text-3xl font-extrabold tabular-nums">{formatCurrency(year.totalSavings)}</p>
             {paysOff ? (
-              <p className="mt-1 text-sm font-semibold text-green-400">
+              <p className="mt-1 text-sm font-semibold text-green-700 dark:text-green-400">
                 O clube se paga e ainda sobram {formatCurrency(year.net)} no seu bolso.
               </p>
             ) : (

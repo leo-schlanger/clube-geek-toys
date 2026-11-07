@@ -154,7 +154,7 @@ export default function Cart() {
 
                     {discount.amount > 0 ? (
                       <>
-                        <div className="flex items-center justify-between text-green-600">
+                        <div className="flex items-center justify-between text-green-700 dark:text-green-600">
                           <span className="flex items-center gap-1.5">
                             {discount.reason === 'member_10' ? (
                               <MemberDiscountBadge />

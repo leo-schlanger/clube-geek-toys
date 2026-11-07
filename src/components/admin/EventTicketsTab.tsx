@@ -268,7 +268,7 @@ export function EventTicketsTab({ initialFilter }: { initialFilter?: string } = 
                 role="status"
                 className="flex items-start gap-3 rounded-xl border-2 border-amber-500/60 bg-amber-500/10 p-3 text-sm"
               >
-                <History className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                <History className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-500" />
                 <p>
                   <strong>Histórico.</strong> Este evento já aconteceu (
                   {formatEventDay(selectedEvent.startsAt)}). Os ingressos dele não valem para
@@ -277,7 +277,7 @@ export function EventTicketsTab({ initialFilter }: { initialFilter?: string } = 
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                <span className="mr-2 rounded bg-green-500/15 px-2 py-0.5 text-xs font-semibold text-green-500">
+                <span className="mr-2 rounded bg-green-500/15 px-2 py-0.5 text-xs font-semibold text-green-700 dark:text-green-500">
                   Próximo evento
                 </span>
                 {formatEventDay(selectedEvent.startsAt)}
@@ -302,7 +302,7 @@ export function EventTicketsTab({ initialFilter }: { initialFilter?: string } = 
             label: 'Já entraram',
             hint: 'passaram pela portaria',
             value: summary.ticketsUsed,
-            tone: 'text-blue-400',
+            tone: 'text-blue-600 dark:text-blue-400',
           },
           selectedOver
             ? {
@@ -315,13 +315,13 @@ export function EventTicketsTab({ initialFilter }: { initialFilter?: string } = 
                 label: 'Ainda vão entrar',
                 hint: 'pagos, esperando o dia',
                 value: summary.ticketsValid,
-                tone: 'text-green-500',
+                tone: 'text-green-700 dark:text-green-500',
               },
           {
             label: 'Aguardando pagamento',
             hint: 'PIX gerado, ainda não pago',
             value: summary.pending,
-            tone: 'text-amber-500',
+            tone: 'text-amber-700 dark:text-amber-500',
           },
         ].map((item) => (
           <Card key={item.label}>
@@ -518,8 +518,8 @@ export function EventTicketsTab({ initialFilter }: { initialFilter?: string } = 
                                 <span
                                   className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                                     ticket.memberId
-                                      ? 'bg-green-500/15 text-green-500'
-                                      : 'bg-amber-500/20 text-amber-500'
+                                      ? 'bg-green-500/15 text-green-700 dark:text-green-500'
+                                      : 'bg-amber-500/20 text-amber-700 dark:text-amber-500'
                                   }`}
                                 >
                                   {ticket.memberId ? 'Sócio conferido' : 'Meia sem sócio conferido'}

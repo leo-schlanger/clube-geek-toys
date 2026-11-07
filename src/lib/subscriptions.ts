@@ -255,8 +255,8 @@ export function getSubscriptionStatusLabel(status: SubscriptionStatus): string {
 
 export function getSubscriptionStatusColor(status: SubscriptionStatus): string {
   const colors: Record<SubscriptionStatus, string> = {
-    pending: 'text-yellow-500',
-    authorized: 'text-green-500',
+    pending: 'text-yellow-700 dark:text-yellow-500',
+    authorized: 'text-green-700 dark:text-green-500',
     paused: 'text-orange-500',
     cancelled: 'text-red-500',
   }

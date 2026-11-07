@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -14,8 +14,8 @@
 }
 
 @theme {
-  --font-heading: 'Outfit', 'Space Grotesk', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-heading: "Outfit", "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
 
   /* Tailwind 3 line heights. v4 writes them as ratios of the font size, so a
      child with a smaller text-[..] inherited a shorter line than before. */
@@ -272,7 +272,7 @@
 
   /* v4 preflight gives buttons the default cursor; v3 showed the pointer. */
   button:not(:disabled),
-  [role='button']:not(:disabled) {
+  [role="button"]:not(:disabled) {
     cursor: pointer;
   }
 }
@@ -310,7 +310,6 @@
     background: hsl(240 12% 10% / 0.85);
   }
 }
-
 
 /*
   =============================================================================
@@ -350,7 +349,7 @@
     --accent: 45 97% 50%;
     --accent-foreground: 240 20% 12%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
 
     /* Soft pink borders (moldura da marca) */
@@ -360,46 +359,45 @@
 
     --radius: 0.75rem;
 
-    --success: 142 76% 36%;
+    --success: 142 72% 29%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 5%;
   }
 
-  /* Dark — mesma marca (Hot Pink / Pop Yellow), superfícies escuras */
+  /* Dark: same tokens as the home site (geek-toys-home/src/index.css). The pink
+     lightens because #F04080 on a dark surface is heavy for small text. */
   .dark {
-    --background: 240 15% 7%;
+    --background: 240 18% 8%;
     --foreground: 330 20% 96%;
 
-    --card: 240 12% 10%;
+    --card: 240 16% 11%;
     --card-foreground: 330 20% 96%;
 
-    --popover: 240 12% 10%;
+    --popover: 240 16% 11%;
     --popover-foreground: 330 20% 96%;
 
-    /* Hot Pink mantido */
-    --primary: 340 85% 59%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 340 85% 65%;
+    --primary-foreground: 240 20% 10%;
 
-    --secondary: 330 20% 14%;
-    --secondary-foreground: 330 40% 90%;
+    --secondary: 330 20% 18%;
+    --secondary-foreground: 330 30% 92%;
 
-    --muted: 240 10% 14%;
-    --muted-foreground: 240 8% 65%;
+    --muted: 240 12% 16%;
+    --muted-foreground: 330 10% 68%;
 
-    /* Pop Yellow mantido */
-    --accent: 45 97% 50%;
+    --accent: 45 95% 55%;
     --accent-foreground: 240 20% 10%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 75% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 330 12% 20%;
-    --input: 330 12% 16%;
-    --ring: 340 85% 59%;
+    --border: 330 15% 24%;
+    --input: 330 12% 22%;
+    --ring: 340 85% 65%;
 
     --success: 142 70% 40%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 240 20% 10%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 5%;
   }

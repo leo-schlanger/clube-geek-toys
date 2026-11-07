@@ -187,9 +187,9 @@ export default function OrderConfirmation() {
               /* Pending (PIX awaiting confirmation) or timed out */
               <>
                 <div className="relative">
-                  <Clock className="h-16 w-16 text-yellow-500" />
+                  <Clock className="h-16 w-16 text-yellow-700 dark:text-yellow-500" />
                   {!timedOut && (
-                    <Loader2 className="absolute -right-1 -top-1 h-5 w-5 animate-spin text-yellow-500" />
+                    <Loader2 className="absolute -right-1 -top-1 h-5 w-5 animate-spin text-yellow-700 dark:text-yellow-500" />
                   )}
                 </div>
                 <div>

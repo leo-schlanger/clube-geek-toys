@@ -622,7 +622,7 @@ export function OrderDetailModal({ orderId, onClose, onChanged }: OrderDetailMod
                   <span>{formatCurrency(order.subtotal)}</span>
                 </div>
                 {order.discount > 0 && (
-                  <div className="flex justify-between text-green-600">
+                  <div className="flex justify-between text-green-700 dark:text-green-600">
                     <span>Desconto{order.discountReason ? ` (${order.discountReason})` : ''}</span>
                     <span>−{formatCurrency(order.discount)}</span>
                   </div>

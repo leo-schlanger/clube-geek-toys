@@ -249,7 +249,7 @@ export default function MyOrderDetail() {
                     <span className="tabular-nums">{formatCurrency(order.subtotal)}</span>
                   </div>
                   {order.discount > 0 && (
-                    <div className="flex justify-between text-green-600">
+                    <div className="flex justify-between text-green-700 dark:text-green-600">
                       <span>Desconto</span>
                       <span className="tabular-nums">-{formatCurrency(order.discount)}</span>
                     </div>

@@ -11,6 +11,7 @@ import { CookieConsent } from './components/CookieConsent'
 import { ConfirmProvider } from './hooks/useConfirm'
 import { CartProvider } from './contexts/CartContext'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
+import { ThemeCornerLayout } from './components/ThemeCornerLayout'
 import { getAppMode, getLoginRedirectPath } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
 import { ShopPromoBanner } from './components/store/ShopPromoBanner'
@@ -232,16 +233,17 @@ function MemberRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/assinar" element={<Subscribe />} />
-      <Route path="/cadastro" element={<Register />} />
-      <Route path="/recuperar-senha" element={<ForgotPassword />} />
-      <Route path="/verificar-email" element={<VerifyEmail />} />
+      <Route element={<ThemeCornerLayout />}>
+        <Route path="/cadastro" element={<Register />} />
+        <Route path="/recuperar-senha" element={<ForgotPassword />} />
+        <Route path="/verificar-email" element={<VerifyEmail />} />
+        <Route path="/pagamento/sucesso" element={<PaymentResult type="success" />} />
+        <Route path="/pagamento/erro" element={<PaymentResult type="error" />} />
+        <Route path="/pagamento/pendente" element={<PaymentResult type="pending" />} />
+      </Route>
       <Route path="/verificar/:id" element={<MemberVerify />} />
       <Route path="/termos" element={<TermsOfUse />} />
       <Route path="/privacidade" element={<PrivacyPolicy />} />
-
-      <Route path="/pagamento/sucesso" element={<PaymentResult type="success" />} />
-      <Route path="/pagamento/erro" element={<PaymentResult type="error" />} />
-      <Route path="/pagamento/pendente" element={<PaymentResult type="pending" />} />
 
       <Route
         path="/membro"

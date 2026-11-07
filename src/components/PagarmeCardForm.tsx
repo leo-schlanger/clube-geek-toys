@@ -403,7 +403,7 @@ export function PagarmeCardForm({
       )}
 
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Lock className="h-3.5 w-3.5 text-green-500" />
+        <Lock className="h-3.5 w-3.5 text-green-700 dark:text-green-500" />
         <span>
           Os dados do cartão vão direto para a Pagar.me. Nossos servidores não recebem nem guardam
           o número.

@@ -74,7 +74,7 @@ export function ClubHomePitch() {
               {MEMBER_TICKET_DISCOUNT_PERCENT}% nos ingressos dos eventos
             </li>
             <li className="flex items-center gap-2">
-              <Shield className="h-4 w-4 shrink-0 text-green-500" />
+              <Shield className="h-4 w-4 shrink-0 text-green-700 dark:text-green-500" />
               7 dias para desistir com reembolso integral
             </li>
           </ul>

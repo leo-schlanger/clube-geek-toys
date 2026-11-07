@@ -95,7 +95,7 @@ describe('AdminLogin', () => {
   it('renders the admin login form with email and password fields', () => {
     render(<AdminLogin />)
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/senha/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^senha$/i)).toBeInTheDocument()
     expect(getSubmitButton()).toBeInTheDocument()
   })
 
@@ -135,7 +135,7 @@ describe('AdminLogin', () => {
     render(<AdminLogin />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'ADMIN@TEST.COM')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'password123')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'password123')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -148,7 +148,7 @@ describe('AdminLogin', () => {
     render(<AdminLogin />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'pass')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'pass')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -162,7 +162,7 @@ describe('AdminLogin', () => {
     render(<AdminLogin />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'wrong')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'wrong')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -178,7 +178,7 @@ describe('AdminLogin', () => {
     render(<AdminLogin />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'wrong')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'wrong')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -191,7 +191,7 @@ describe('AdminLogin', () => {
     render(<AdminLogin />)
 
     await userEvent.type(screen.getByLabelText(/email/i), 'admin@test.com')
-    await userEvent.type(screen.getByLabelText(/senha/i), 'pass')
+    await userEvent.type(screen.getByLabelText(/^senha$/i), 'pass')
     fireEvent.click(getSubmitButton())
 
     await waitFor(() => {
@@ -226,7 +226,7 @@ describe('AdminLogin', () => {
 
   it('toggles password visibility', () => {
     render(<AdminLogin />)
-    const passwordInput = screen.getByLabelText(/senha/i)
+    const passwordInput = screen.getByLabelText(/^senha$/i)
     expect(passwordInput).toHaveAttribute('type', 'password')
 
     const wrapper = passwordInput.closest('.relative')

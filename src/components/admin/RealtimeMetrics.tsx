@@ -38,7 +38,7 @@ function TrendIndicator({ trend, label }: TrendIndicatorProps) {
 
   const isUp = trend.direction === 'up'
   const Icon = isUp ? TrendingUp : TrendingDown
-  const colorClass = isUp ? 'text-green-500' : 'text-red-500'
+  const colorClass = isUp ? 'text-green-700 dark:text-green-500' : 'text-red-500'
 
   return (
     <span className={`flex items-center gap-1 text-xs ${colorClass}`}>
@@ -154,7 +154,7 @@ export function RealtimeMetrics() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="gap-1">
-            <Zap className="h-3 w-3 text-green-500" />
+            <Zap className="h-3 w-3 text-green-700 dark:text-green-500" />
             Live
           </Badge>
           {lastUpdate && (
@@ -181,7 +181,7 @@ export function RealtimeMetrics() {
           subtitle={`${Math.round((stats.activeMembers / Math.max(stats.totalMembers, 1)) * 100)}% do total`}
           icon={<UserCheck className="h-5 w-5" />}
           trend={trends.activeMembers}
-          colorClass="text-green-500"
+          colorClass="text-green-700 dark:text-green-500"
         />
         {/* Loja + clube + ingressos. It once showed the club alone, under a
             "projeção" label, and read close to zero in a month of shop sales. */}
@@ -190,14 +190,14 @@ export function RealtimeMetrics() {
           value={formatCurrency(stats.monthlyRevenue)}
           subtitle="Loja, clube e ingressos"
           icon={<DollarSign className="h-5 w-5" />}
-          colorClass="text-emerald-500"
+          colorClass="text-emerald-700 dark:text-emerald-500"
         />
         <StatCard
           title="Receita Hoje"
           value={formatCurrency(stats.todayRevenue)}
           subtitle={`Ontem: ${formatCurrency(stats.yesterdayRevenue)}`}
           icon={<DollarSign className="h-5 w-5" />}
-          colorClass="text-emerald-500"
+          colorClass="text-emerald-700 dark:text-emerald-500"
           highlight={stats.todayRevenue > 0}
         />
       </div>
@@ -209,7 +209,7 @@ export function RealtimeMetrics() {
           value={stats.pendingMembers}
           subtitle={stats.pendingMembers > 0 ? 'Preencheram e ainda não pagaram' : 'Nenhum pendente'}
           icon={<Clock className="h-5 w-5" />}
-          colorClass="text-yellow-500"
+          colorClass="text-yellow-700 dark:text-yellow-500"
           highlight={stats.pendingMembers > 0}
         />
         <StatCard
@@ -233,7 +233,7 @@ export function RealtimeMetrics() {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${health.ok ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+            <div className={`p-2 rounded-lg ${health.ok ? 'bg-green-500/10 text-green-700 dark:text-green-500' : 'bg-red-500/10 text-red-500'}`}>
               <HeartPulse className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">

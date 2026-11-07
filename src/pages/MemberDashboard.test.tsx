@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 
 // ---------------------------------------------------------------------------
 // Mocks — declared before importing the component
@@ -58,6 +58,7 @@ vi.mock('lucide-react', () => {
     Moon: icon,
     Sun: icon,
     Monitor: icon,
+    UserRound: icon,
   }
 })
 
@@ -176,6 +177,23 @@ describe('MemberDashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
     })
+  })
+
+  it('keeps sign out inside a labelled 44px account menu', async () => {
+    // Radix positions the menu with ResizeObserver; setup's mock is not constructible
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    })
+    render(<MemberDashboard />)
+    const trigger = await screen.findByRole('button', { name: 'Menu da conta' })
+    expect(trigger).toHaveClass('h-11', 'w-11')
+    expect(screen.queryByText('Sair')).not.toBeInTheDocument()
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    fireEvent.click(await screen.findByText('Sair'))
+    expect(mockSignOut).toHaveBeenCalled()
+    vi.unstubAllGlobals()
   })
 
   it('renders the membership card section', async () => {

@@ -66,13 +66,13 @@ export default function MemberVerify() {
             }`}
           >
             {isCurrent ? (
-              <CheckCircle className="h-16 w-16 mx-auto text-green-500" />
+              <CheckCircle className="h-16 w-16 mx-auto text-green-700 dark:text-green-500" />
             ) : (
               <AlertTriangle className="h-16 w-16 mx-auto text-red-500" />
             )}
             <p
               className={`text-3xl font-heading font-extrabold tracking-wide ${
-                isCurrent ? 'text-green-500' : 'text-red-500'
+                isCurrent ? 'text-green-700 dark:text-green-500' : 'text-red-500'
               }`}
             >
               {isCurrent ? 'EM DIA' : 'NÃO ESTÁ EM DIA'}

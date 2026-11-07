@@ -53,9 +53,9 @@ export function PDVDoor() {
           {stats && (
             <div className="grid grid-cols-3 gap-2 text-center">
               {[
-                { label: 'Já entraram', value: stats.used, tone: 'text-blue-400' },
-                { label: 'Ainda vão entrar', value: stats.valid, tone: 'text-green-500' },
-                { label: 'Aguardando pagamento', value: stats.pending, tone: 'text-amber-500' },
+                { label: 'Já entraram', value: stats.used, tone: 'text-blue-600 dark:text-blue-400' },
+                { label: 'Ainda vão entrar', value: stats.valid, tone: 'text-green-700 dark:text-green-500' },
+                { label: 'Aguardando pagamento', value: stats.pending, tone: 'text-amber-700 dark:text-amber-500' },
               ].map((item) => (
                 <div key={item.label} className="rounded-lg border border-border p-2">
                   <p className={`font-heading text-2xl font-extrabold ${item.tone}`}>

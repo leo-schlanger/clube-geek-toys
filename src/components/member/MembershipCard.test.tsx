@@ -73,14 +73,14 @@ describe('MembershipCard', () => {
     expect(numberEl).toBeInTheDocument()
   })
 
-  it('shows "Ver QR Code" button initially', () => {
+  it('shows "Mostrar QR na portaria" as a 44px button initially', () => {
     render(<MembershipCard member={createMember()} />)
-    expect(screen.getByText('Ver QR Code')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Mostrar QR na portaria/ })).toHaveClass('h-11')
   })
 
   it('flips the card on click and shows "Ver carteirinha"', () => {
     render(<MembershipCard member={createMember()} />)
-    fireEvent.click(screen.getByText('Ver QR Code'))
+    fireEvent.click(screen.getByText('Mostrar QR na portaria'))
     expect(screen.getByText('Ver carteirinha')).toBeInTheDocument()
   })
 
@@ -119,7 +119,7 @@ describe('MembershipCard', () => {
   it('copies member ID when ID button is clicked', async () => {
     const { toast } = await import('sonner')
     render(<MembershipCard member={createMember({ id: 'test-id-123' })} />)
-    fireEvent.click(screen.getByText('ID'))
+    fireEvent.click(screen.getByText('Copiar ID'))
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('test-id-123')
     expect(toast.success).toHaveBeenCalledWith('ID copiado!')
   })

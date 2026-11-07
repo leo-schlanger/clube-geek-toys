@@ -218,7 +218,7 @@ export function ProductsTab() {
             <CardDescription>
               Gerencie o catálogo da loja
               {missingPhotoCount > 0 && (
-                <span className="mt-1 block text-amber-600 dark:text-amber-400 font-medium">
+                <span className="mt-1 block text-amber-700 dark:text-amber-400 font-medium">
                   {missingPhotoCount} produto(s) ativo(s) sem foto — edite e envie as imagens.
                 </span>
               )}
@@ -335,12 +335,12 @@ export function ProductsTab() {
                         {hasPhoto ? (
                           <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <ImageOff className="h-5 w-5 text-amber-600" />
+                          <ImageOff className="h-5 w-5 text-amber-700 dark:text-amber-600" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="flex items-center gap-1 font-medium leading-snug">
-                          {product.featured && <Star className="h-3.5 w-3.5 shrink-0 text-yellow-500" />}
+                          {product.featured && <Star className="h-3.5 w-3.5 shrink-0 text-yellow-700 dark:text-yellow-500" />}
                           <span className="line-clamp-2">{product.name}</span>
                         </p>
                         <p className="mt-0.5 text-sm font-semibold">{formatCurrency(product.price)}</p>
@@ -442,19 +442,19 @@ export function ProductsTab() {
                           {hasPhoto ? (
                             <img src={product.images[0]} alt="" className="h-full w-full object-cover" />
                           ) : (
-                            <ImageOff className="h-5 w-5 text-amber-600" />
+                            <ImageOff className="h-5 w-5 text-amber-700 dark:text-amber-600" />
                           )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium line-clamp-2" title={product.name}>
-                            {product.featured && <Star className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-yellow-500" />}
+                            {product.featured && <Star className="mr-1 inline h-3.5 w-3.5 align-[-2px] text-yellow-700 dark:text-yellow-500" />}
                             {product.name}
                           </p>
                           {product.sku && (
                             <p className="text-xs text-muted-foreground font-mono">{product.sku}</p>
                           )}
                           {product.active && !hasPhoto && (
-                            <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                            <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
                               Sem foto — clique em editar para enviar
                             </p>
                           )}

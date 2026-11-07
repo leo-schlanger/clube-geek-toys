@@ -228,9 +228,9 @@ export function StepPersonalData({
       case "loading":
         return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       case "valid":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" />
       case "warning":
-        return <HelpCircle className="h-4 w-4 text-yellow-500" />
+        return <HelpCircle className="h-4 w-4 text-yellow-700 dark:text-yellow-500" />
       case "error":
         return <XCircle className="h-4 w-4 text-red-500" />
       default:
@@ -315,8 +315,8 @@ export function StepPersonalData({
             <p
               className={cn(
                 "text-xs",
-                cpfStatus === "valid" && "text-green-500",
-                cpfStatus === "warning" && "text-yellow-500",
+                cpfStatus === "valid" && "text-green-700 dark:text-green-500",
+                cpfStatus === "warning" && "text-yellow-700 dark:text-yellow-500",
                 cpfStatus === "error" && "text-red-500"
               )}
             >

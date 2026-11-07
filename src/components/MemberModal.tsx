@@ -453,9 +453,9 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                     {!validatingCpf && cpfValidation && (
                       cpfValidation.valid ? (
                         cpfValidation.exists === true ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" />
                         ) : cpfValidation.exists === null ? (
-                          <HelpCircle className="h-4 w-4 text-yellow-500" />
+                          <HelpCircle className="h-4 w-4 text-yellow-700 dark:text-yellow-500" />
                         ) : (
                           <XCircle className="h-4 w-4 text-red-500" />
                         )
@@ -472,8 +472,8 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                   <p className={`text-xs ${
                     cpfValidation.valid
                       ? cpfValidation.exists === true
-                        ? 'text-green-600'
-                        : 'text-yellow-600'
+                        ? 'text-green-700 dark:text-green-600'
+                        : 'text-yellow-700 dark:text-yellow-600'
                       : 'text-red-500'
                   }`}>
                     {cpfValidation.message}
@@ -537,9 +537,9 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                       className={`p-2 rounded-lg border-2 text-sm transition-all ${
                         selectedStatus === status
                           ? status === 'active'
-                            ? 'border-green-500 bg-green-500/10 text-green-600'
+                            ? 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-600'
                             : status === 'pending'
-                            ? 'border-yellow-500 bg-yellow-500/10 text-yellow-600'
+                            ? 'border-yellow-500 bg-yellow-500/10 text-yellow-700 dark:text-yellow-600'
                             : 'border-red-500 bg-red-500/10 text-red-600'
                           : 'border-border hover:border-primary/50'
                       }`}
@@ -868,12 +868,12 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                 data-testid="member-pending-alert"
               >
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-500" />
+                  <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-700 dark:text-yellow-500" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-yellow-700 dark:text-yellow-300">
                       {member.pendingPixPaymentId ? 'Pagamento pendente' : `Cadastro sem pagamento — ${describeUnpaidSignup(member).label}`}
                     </p>
-                    <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    <p className="text-sm text-yellow-700 dark:text-yellow-400">
                       {member.pendingPixPaymentId
                         ? 'Há um PIX em aberto. Confirme só depois que o valor tiver caído.'
                         : `${describeUnpaidSignup(member).detail} Ativar libera o clube sem pagamento — só se o dinheiro entrou no caixa.`}

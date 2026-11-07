@@ -130,7 +130,7 @@ export default function ShopLogin() {
             <CardTitle className="font-heading text-2xl">Entrar</CardTitle>
             <CardDescription>
               Login é opcional — entre para ganhar{' '}
-              <strong className="text-green-600">{MEMBER_DISCOUNT_PERCENT}% de desconto</strong> de membro.
+              <strong className="text-green-700 dark:text-green-600">{MEMBER_DISCOUNT_PERCENT}% de desconto</strong> de membro.
             </CardDescription>
           </CardHeader>
 
@@ -171,7 +171,7 @@ export default function ShopLogin() {
                   <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
                   <div className="text-sm">
                     <p className="font-medium text-red-500">Conta bloqueada</p>
-                    <p className="text-xs text-red-400">
+                    <p className="text-xs text-red-600 dark:text-red-400">
                       Tente novamente em{' '}
                       <span className="font-mono tabular-nums">{formatTime(lockoutTime)}</span>
                     </p>
@@ -203,6 +203,7 @@ export default function ShopLogin() {
                 <div className="relative">
                   <Input
                     id="password"
+                    className="pr-11"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="********"
                     value={password}
@@ -213,7 +214,8 @@ export default function ShopLogin() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                     disabled={isLocked}
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

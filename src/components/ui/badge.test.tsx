@@ -37,12 +37,12 @@ describe('Badge', () => {
 
   it('should render success variant', () => {
     const { container } = render(<Badge variant="success">OK</Badge>)
-    expect(container.firstChild).toHaveClass('bg-green-500')
+    expect(container.firstChild).toHaveClass('bg-success', 'text-success-foreground')
   })
 
   it('should render warning variant', () => {
     const { container } = render(<Badge variant="warning">Warn</Badge>)
-    expect(container.firstChild).toHaveClass('bg-yellow-500')
+    expect(container.firstChild).toHaveClass('bg-warning', 'text-warning-foreground')
   })
 
   it('should render club variant', () => {

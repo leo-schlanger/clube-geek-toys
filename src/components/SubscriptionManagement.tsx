@@ -165,11 +165,11 @@ export function SubscriptionManagement({
   function getPaymentStatusIcon(status: string) {
     switch (status) {
       case 'approved':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" />
       case 'rejected':
         return <XCircle className="h-4 w-4 text-red-500" />
       default:
-        return <Clock className="h-4 w-4 text-yellow-500" />
+        return <Clock className="h-4 w-4 text-yellow-700 dark:text-yellow-500" />
     }
   }
 
@@ -210,7 +210,7 @@ export function SubscriptionManagement({
           <div className="text-center py-4 space-y-4">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <RefreshCw className="h-4 w-4 text-green-500" />
+                <RefreshCw className="h-4 w-4 text-green-700 dark:text-green-500" />
                 <span>Cobrança automática</span>
               </div>
               <div className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export function SubscriptionManagement({
                 <span>Benefícios garantidos</span>
               </div>
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-yellow-500" />
+                <Sparkles className="h-4 w-4 text-yellow-700 dark:text-yellow-500" />
                 <span>Cancele quando quiser</span>
               </div>
             </div>
@@ -298,7 +298,7 @@ export function SubscriptionManagement({
             <div className="p-4 bg-muted/50 rounded-xl border border-border/50 hover:border-border transition-colors">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <Calendar className="h-4 w-4 text-green-500" />
+                  <Calendar className="h-4 w-4 text-green-700 dark:text-green-500" />
                 </div>
                 <span className="text-sm font-medium text-muted-foreground">Próxima cobrança</span>
               </div>
@@ -351,12 +351,12 @@ export function SubscriptionManagement({
           {/* Failed payments warning */}
           {subscription.failedPayments > 0 && (
             <div className="flex items-start gap-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+              <AlertCircle className="h-5 w-5 text-yellow-700 dark:text-yellow-500 shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-yellow-600 dark:text-yellow-400">
+                <p className="font-medium text-yellow-700 dark:text-yellow-400">
                   Problema com cobrança
                 </p>
-                <p className="text-sm text-yellow-600/80 dark:text-yellow-400/80">
+                <p className="text-sm text-yellow-700/80 dark:text-yellow-400/80">
                   Houve {subscription.failedPayments} tentativa(s) de cobrança sem sucesso.
                   Por favor, atualize seu cartão.
                 </p>
@@ -502,7 +502,7 @@ export function SubscriptionManagement({
                           {getPaymentStatusLabel(payment.status)}
                         </Badge>
                         {index === 0 && payment.status === 'approved' && (
-                          <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                          <p className="text-xs text-green-700 dark:text-green-400 mt-1">
                             Mais recente
                           </p>
                         )}
@@ -530,7 +530,7 @@ export function SubscriptionManagement({
               }
             `}>
               {confirmAction === 'pause' && <Pause className="h-7 w-7 text-orange-500" />}
-              {confirmAction === 'resume' && <Play className="h-7 w-7 text-green-500" />}
+              {confirmAction === 'resume' && <Play className="h-7 w-7 text-green-700 dark:text-green-500" />}
               {confirmAction === 'cancel' && <XCircle className="h-7 w-7 text-red-500" />}
             </div>
             <DialogTitle className="text-xl">
@@ -564,8 +564,8 @@ export function SubscriptionManagement({
 
           {confirmAction === 'resume' && (
             <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
-              <CheckCircle className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-green-600 dark:text-green-400">
+              <CheckCircle className="h-5 w-5 text-green-700 dark:text-green-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-green-700 dark:text-green-400">
                 Sua próxima cobrança será processada automaticamente na data agendada.
               </p>
             </div>

@@ -128,7 +128,7 @@ export default function AdminLogin() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {isLocked && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
+              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 text-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <ShieldAlert className="h-4 w-4" />
                   <span className="font-medium">Conta bloqueada</span>
@@ -140,7 +140,7 @@ export default function AdminLogin() {
             )}
 
             {formError && !isLocked && (
-              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-400 text-sm">
+              <div className="p-3 rounded-md bg-red-500/10 border border-red-500/50 text-red-600 dark:text-red-400 text-sm">
                 {formError}
               </div>
             )}
@@ -172,6 +172,7 @@ export default function AdminLogin() {
               <div className="relative">
                 <Input
                   id="password"
+                  className="pr-11"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
@@ -182,7 +183,8 @@ export default function AdminLogin() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                   disabled={isSubmitting || isLocked}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}

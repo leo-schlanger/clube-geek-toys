@@ -206,7 +206,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-yellow-500" />
+                <Clock className="h-5 w-5 text-yellow-700 dark:text-yellow-500" />
                 Resumo do Pedido
               </CardTitle>
               <CardDescription>
@@ -239,7 +239,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                 <ul className="space-y-1.5">
                   {plan.benefits.slice(0, 4).map((benefit, index) => (
                     <li key={index} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                      <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500 shrink-0" />
                       <span>{benefit}</span>
                     </li>
                   ))}
@@ -289,7 +289,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                   </div>
                 ) : contract ? (
                   <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    <CheckCircle className="h-5 w-5 text-green-700 dark:text-green-500" />
                     <div>
                       <p className="font-medium text-green-700 dark:text-green-400">Contrato Assinado</p>
                       <p className="text-sm text-muted-foreground">
@@ -300,7 +300,7 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
                 ) : (
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                      <AlertTriangle className="h-5 w-5 text-yellow-700 dark:text-yellow-500" />
                       <div>
                         <p className="font-medium text-yellow-700 dark:text-yellow-400">Contrato Pendente</p>
                         <p className="text-sm text-muted-foreground">

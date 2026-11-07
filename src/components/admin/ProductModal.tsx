@@ -1478,7 +1478,7 @@ export function ProductModal({
                       onChange={(e) => update("compareAtPrice", e.target.value)}
                     />
                     {showDiscountHint && (
-                      <p className="text-xs text-green-600">
+                      <p className="text-xs text-green-700 dark:text-green-600">
                         Desconto de{" "}
                         {Math.round((1 - priceNum / compareNum) * 100)}% ·{" "}
                         <span className="line-through text-muted-foreground">
@@ -1508,7 +1508,7 @@ export function ProductModal({
                     <p
                       className={
                         marginValue >= 0
-                          ? "text-xs text-green-600"
+                          ? "text-xs text-green-700 dark:text-green-600"
                           : "text-xs text-destructive"
                       }
                     >
@@ -1574,7 +1574,7 @@ export function ProductModal({
                     />
                     <div>
                       <p className="text-sm font-medium flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5 text-yellow-500" /> Destaque
+                        <Star className="h-3.5 w-3.5 text-yellow-700 dark:text-yellow-500" /> Destaque
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Aparece em destaque

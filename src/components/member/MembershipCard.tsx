@@ -13,7 +13,9 @@ import {
   CheckCircle,
   RotateCcw,
   Wifi,
+  QrCode,
 } from 'lucide-react'
+import { Button } from '../ui/button'
 
 // ─── Plan Visuals ──────────────────────────────────────────────────────────────
 
@@ -304,17 +306,17 @@ export function MembershipCard({ member, showMascot = true }: MembershipCardProp
                 Escaneie para ver se o membro está em dia
               </p>
 
-              {/* Discount badge */}
+              {/* Discount badge: solid dark plate, the gradient turns yellow right behind it */}
               <div className="w-full">
                 <div
                   className="text-center py-1.5 rounded-lg"
                   style={{
-                    background: 'rgba(74, 222, 128, 0.1)',
-                    border: '1px solid rgba(74, 222, 128, 0.25)',
+                    background: 'rgba(10, 6, 12, 0.72)',
+                    border: '1px solid rgba(74, 222, 128, 0.45)',
                   }}
                 >
-                  <span className="text-sm font-bold text-green-400">{CLUB_PLAN.discount}%</span>
-                  <span className="text-[9px] text-green-400/70 ml-1">em qualquer produto</span>
+                  <span className="text-sm font-bold text-green-300">{CLUB_PLAN.discount}%</span>
+                  <span className="text-[10px] text-green-100 ml-1">em qualquer produto</span>
                 </div>
               </div>
 
@@ -339,27 +341,30 @@ export function MembershipCard({ member, showMascot = true }: MembershipCardProp
       </div>
 
       {/* ── Actions below card ── */}
-      <div className="mt-3 flex items-center justify-between">
-        <button
+      <div className="mt-3 space-y-2">
+        <Button
+          type="button"
           onClick={() => setFlipped(!flipped)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="h-11 w-full text-sm font-semibold"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
-          {flipped ? 'Ver carteirinha' : 'Ver QR Code'}
-        </button>
-        <div className="flex items-center gap-1">
+          {flipped ? <RotateCcw className="h-4 w-4" /> : <QrCode className="h-4 w-4" />}
+          {flipped ? 'Ver carteirinha' : 'Mostrar QR na portaria'}
+        </Button>
+        <div className="grid grid-cols-2 gap-2">
           <button
+            type="button"
             onClick={copyMemberId}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            {copied ? <CheckCircle className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-            ID
+            {copied ? <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" /> : <Copy className="h-4 w-4" />}
+            Copiar ID
           </button>
           <button
+            type="button"
             onClick={shareCard}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <Share2 className="h-3.5 w-3.5" />
+            <Share2 className="h-4 w-4" />
             Compartilhar
           </button>
         </div>

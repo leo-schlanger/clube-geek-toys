@@ -142,14 +142,14 @@ export function ticketSituation(
     case 'used':
       return {
         label: ticket.usedAt ? `Entrou ${dayAndTime(ticket.usedAt)}` : 'Já entrou',
-        tone: 'text-blue-400',
+        tone: 'text-blue-600 dark:text-blue-400',
       }
     case 'valid':
       return eventOver
         ? { label: 'Não compareceu', tone: 'text-muted-foreground' }
-        : { label: 'Pago — ainda não entrou', tone: 'text-green-500' }
+        : { label: 'Pago — ainda não entrou', tone: 'text-green-700 dark:text-green-500' }
     case 'pending':
-      return { label: 'Aguardando pagamento', tone: 'text-amber-500' }
+      return { label: 'Aguardando pagamento', tone: 'text-amber-700 dark:text-amber-500' }
     default:
       return { label: 'Cancelado', tone: 'text-muted-foreground line-through' }
   }

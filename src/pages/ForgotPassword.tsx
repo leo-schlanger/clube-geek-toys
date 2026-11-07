@@ -60,7 +60,7 @@ function RequestResetForm() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-4 bg-green-500/20 rounded-full w-fit">
-              <CheckCircle className="h-12 w-12 text-green-500" />
+              <CheckCircle className="h-12 w-12 text-green-700 dark:text-green-500" />
             </div>
             <CardTitle className="text-2xl">Email Enviado!</CardTitle>
             <CardDescription>
@@ -237,7 +237,7 @@ function ResetPasswordForm({ token }: { token: string }) {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-4 bg-green-500/20 rounded-full w-fit">
-              <CheckCircle className="h-12 w-12 text-green-500" />
+              <CheckCircle className="h-12 w-12 text-green-700 dark:text-green-500" />
             </div>
             <CardTitle className="text-2xl">Senha Redefinida!</CardTitle>
             <CardDescription>
@@ -297,7 +297,8 @@ function ResetPasswordForm({ token }: { token: string }) {
                 />
                 <button
                   type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                  className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground"
                   onClick={() => setShowPassword(!showPassword)}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -324,8 +325,8 @@ function ResetPasswordForm({ token }: { token: string }) {
                       <span className={`text-xs ${
                         passwordStrength.score <= 1 ? 'text-red-500' :
                         passwordStrength.score === 2 ? 'text-orange-500' :
-                        passwordStrength.score === 3 ? 'text-yellow-600' :
-                        'text-green-600'
+                        passwordStrength.score === 3 ? 'text-yellow-700 dark:text-yellow-600' :
+                        'text-green-700 dark:text-green-600'
                       }`}>
                         {passwordStrength.label}
                       </span>

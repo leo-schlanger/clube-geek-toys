@@ -111,7 +111,7 @@ describe('ShopLogin', () => {
       </MemoryRouter>
     )
     await user.type(screen.getByLabelText(/email/i), 'membro@test.com')
-    await user.type(screen.getByLabelText(/senha/i), 'Senha123')
+    await user.type(screen.getByLabelText(/^senha$/i), 'Senha123')
     const submit = screen.getAllByRole('button').find((b) => b.getAttribute('type') === 'submit')
     expect(submit).toBeTruthy()
     await user.click(submit!)
@@ -129,7 +129,7 @@ describe('ShopLogin', () => {
       </MemoryRouter>
     )
     await user.type(screen.getByLabelText(/email/i), 'x@y.com')
-    await user.type(screen.getByLabelText(/senha/i), 'wrong')
+    await user.type(screen.getByLabelText(/^senha$/i), 'wrong')
     const submit = screen.getAllByRole('button').find((b) => b.getAttribute('type') === 'submit')
     await user.click(submit!)
     await waitFor(() => {

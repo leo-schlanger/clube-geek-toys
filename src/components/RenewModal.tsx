@@ -74,7 +74,7 @@ export function RenewModal({ member, onClose, onSuccess }: RenewModalProps) {
             <ul className="space-y-1.5">
               {CLUB_PLAN.benefits.map((benefit, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                  <Check className="h-4 w-4 text-green-700 dark:text-green-500 mt-0.5 shrink-0" />
                   {benefit}
                 </li>
               ))}

@@ -135,7 +135,7 @@ export function MembersChart({ data, planDistribution, loading }: MembersChartPr
               </div>
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground">Receita paga (total)</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-2xl font-bold text-green-700 dark:text-green-600">
                   {formatCurrency(plan.revenue)}
                 </p>
               </div>

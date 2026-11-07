@@ -291,7 +291,7 @@ export function ActionCenter({ onNavigate }: ActionCenterProps) {
       <CardContent>
         {pending.length === 0 ? (
           <div className="flex items-center gap-3 py-6 text-muted-foreground">
-            <CheckCircle2 className="h-6 w-6 text-green-500 shrink-0" />
+            <CheckCircle2 className="h-6 w-6 text-green-700 dark:text-green-500 shrink-0" />
             <div>
               <p className="text-sm font-medium text-foreground">Nada pendente</p>
               <p className="text-xs">Sem PIX a confirmar, pedidos parados, perguntas ou estoque no mínimo.</p>

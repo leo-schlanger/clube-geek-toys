@@ -148,9 +148,9 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
           {contract ? (
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                <CheckCircle className="h-5 w-5 text-green-700 dark:text-green-500 shrink-0" />
                 <div>
-                  <p className="font-medium text-green-400">Contrato Assinado</p>
+                  <p className="font-medium text-green-700 dark:text-green-400">Contrato Assinado</p>
                   <p className="text-sm text-muted-foreground">
                     Assinado em {new Date(contract.signedAt).toLocaleDateString('pt-BR', {
                       day: '2-digit',

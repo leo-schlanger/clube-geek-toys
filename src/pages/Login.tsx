@@ -240,7 +240,7 @@ export default function Login() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-red-500 text-sm">Conta bloqueada</p>
-                        <p className="text-xs text-red-400 mt-0.5">
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
                           Muitas tentativas falhas. Tente novamente em:
                         </p>
                         <span className="mt-1.5 inline-flex items-center rounded-md bg-red-500/20 px-2.5 py-1 text-sm font-mono font-semibold text-red-500 tabular-nums">
@@ -297,6 +297,7 @@ export default function Login() {
                   <div className="relative">
                     <Input
                       id="password"
+                      className="pr-11"
                       type={showPassword ? 'text' : 'password'}
                       placeholder="********"
                       value={password}
@@ -307,7 +308,8 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                       disabled={isLocked}
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -316,7 +318,7 @@ export default function Login() {
                 </div>
 
                 <div className="text-right">
-                  <Link to="/recuperar-senha" className="text-sm text-primary hover:underline">
+                  <Link to="/recuperar-senha" className="inline-flex min-h-11 items-center text-sm text-primary hover:underline">
                     Esqueceu a senha?
                   </Link>
                 </div>
@@ -351,7 +353,7 @@ export default function Login() {
                   </p>
                   <Link
                     to="/assinar"
-                    className="mt-1 inline-block text-sm font-semibold text-primary hover:underline"
+                    className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
                   >
                     Criar conta e assinar
                   </Link>

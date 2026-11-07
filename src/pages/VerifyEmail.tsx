@@ -182,7 +182,7 @@ export default function VerifyEmail() {
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 p-4 rounded-full bg-green-500/10">
-              <CheckCircle className="h-12 w-12 text-green-500" />
+              <CheckCircle className="h-12 w-12 text-green-700 dark:text-green-500" />
             </div>
             <CardTitle className="text-2xl">Email Verificado!</CardTitle>
             <CardDescription>
@@ -249,7 +249,7 @@ export default function VerifyEmail() {
           {message && (
             <div className={`p-3 rounded-md text-sm ${
               message.type === 'success'
-                ? 'bg-green-500/10 border border-green-500/50 text-green-600'
+                ? 'bg-green-500/10 border border-green-500/50 text-green-700 dark:text-green-600'
                 : 'bg-red-500/10 border border-red-500/50 text-red-600'
             }`}>
               {message.text}

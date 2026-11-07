@@ -421,7 +421,7 @@ export function PaymentModal({
               <p className="text-sm font-medium text-center text-muted-foreground">Escolha o método de pagamento:</p>
               <div className="grid grid-cols-2 gap-3">
                 <Button variant="outline" size="lg" onClick={handlePixPayment} disabled={loading} className="h-auto py-4 flex-col gap-2">
-                  <QrCode className="h-6 w-6 text-green-500" />
+                  <QrCode className="h-6 w-6 text-green-700 dark:text-green-500" />
                   <span>PIX</span>
                   <span className="text-xs text-muted-foreground">QR Code na hora</span>
                 </Button>
@@ -472,7 +472,7 @@ export function PaymentModal({
           {method === 'pix' && pixData && timeLeft > 0 && (
             <div className="space-y-4">
               <div className="text-center">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-600 mb-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-700 dark:text-green-600 mb-4">
                   <Clock className="h-4 w-4" />
                   {`Código válido por ${formatTime(timeLeft)}`}
                 </div>
@@ -495,7 +495,7 @@ export function PaymentModal({
                     className="flex-1 text-xs bg-muted rounded px-3 py-2 font-mono truncate"
                   />
                   <Button variant="outline" size="sm" onClick={handleCopyCode}>
-                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                    {copied ? <Check className="h-4 w-4 text-green-700 dark:text-green-500" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -513,7 +513,7 @@ export function PaymentModal({
               </div>
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Shield className="h-4 w-4 text-green-500" />
+                <Shield className="h-4 w-4 text-green-700 dark:text-green-500" />
                 <span>
                   A confirmação é automática: assim que o PIX cair, sua conta é ativada. Não é
                   preciso enviar comprovante.

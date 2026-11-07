@@ -450,7 +450,7 @@ export function StepPayment({
               disabled={loading}
               className="h-auto py-6 flex-col gap-2"
             >
-              <QrCode className="h-8 w-8 text-green-500" />
+              <QrCode className="h-8 w-8 text-green-700 dark:text-green-500" />
               <span className="font-medium">PIX</span>
               <span className="text-xs text-muted-foreground">QR Code na hora</span>
             </Button>
@@ -521,7 +521,7 @@ export function StepPayment({
         <div className="space-y-4">
           {/* Timer with progress bar */}
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-600">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 rounded-full text-sm text-green-700 dark:text-green-600">
               <Clock className="h-4 w-4" />
               {`Código válido por ${formatTime(timeLeft)}`}
             </div>
@@ -553,7 +553,7 @@ export function StepPayment({
               />
               <Button variant="outline" size="sm" onClick={handleCopyCode}>
                 {copied ? (
-                  <Check className="h-4 w-4 text-green-500" />
+                  <Check className="h-4 w-4 text-green-700 dark:text-green-500" />
                 ) : (
                   <Copy className="h-4 w-4" />
                 )}
@@ -577,7 +577,7 @@ export function StepPayment({
 
           {/* Security badge */}
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Shield className="h-4 w-4 text-green-500 shrink-0" />
+            <Shield className="h-4 w-4 text-green-700 dark:text-green-500 shrink-0" />
             <span>A confirmação é automática: não é preciso enviar comprovante.</span>
           </div>
 

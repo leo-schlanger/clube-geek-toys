@@ -49,7 +49,7 @@ export function FormFeedback({
       {state === "success" && (
         <>
           <SuccessAnimation />
-          <p className="text-sm font-medium text-green-600">{successText}</p>
+          <p className="text-sm font-medium text-green-700 dark:text-green-600">{successText}</p>
         </>
       )}
 
@@ -77,7 +77,7 @@ export function FormFieldFeedback({ error, success, className }: FormFieldFeedba
       className={cn(
         "text-sm mt-1 flex items-center gap-1",
         error && "text-red-500 animate-shake",
-        success && "text-green-500",
+        success && "text-green-700 dark:text-green-500",
         className
       )}
     >

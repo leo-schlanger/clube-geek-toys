@@ -98,7 +98,7 @@ function Kpi({
       <p className={`mt-1 font-bold tabular-nums ${emphasis ? 'text-2xl' : 'text-lg'}`}>{value}</p>
       {delta !== undefined && delta !== null && (
         <p
-          className={`mt-0.5 flex items-center gap-1 text-xs ${delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+          className={`mt-0.5 flex items-center gap-1 text-xs ${delta >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
         >
           {delta >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
           {delta >= 0 ? '+' : ''}
@@ -284,7 +284,7 @@ function SalesLedger({ report }: { report: OverviewReport }) {
           </Button>
         )}
         {report.ledger.truncated && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
+          <p className="text-xs text-amber-700 dark:text-amber-400">
             O período tem mais vendas do que a lista mostra. Escolha um intervalo menor para ver todas.
           </p>
         )}

@@ -174,7 +174,7 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
       return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
     }
     if (emailValidation?.valid) {
-      return <CheckCircle className="h-4 w-4 text-green-500" />
+      return <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500" />
     }
     if (emailValidation && !emailValidation.valid) {
       return <XCircle className="h-4 w-4 text-red-500" />
@@ -196,19 +196,21 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Criar Conta</CardTitle>
           <CardDescription>
-            Escolha como deseja se cadastrar
+            {GOOGLE_CLIENT_ID ? 'Escolha como deseja se cadastrar' : 'Cadastre-se com seu e-mail e uma senha'}
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* ---- Google sign-in ---- */}
-          <div className="rounded-lg bg-muted/50 p-4">
-            <GoogleSignInButton
-              label="Cadastro rapido com Google"
-              onSuccess={onGoogleSuccess}
-              disabled={loading}
-            />
-          </div>
+          {/* ---- Google sign-in (only when configured; otherwise an empty grey box) ---- */}
+          {GOOGLE_CLIENT_ID && (
+            <div className="rounded-lg bg-muted/50 p-4">
+              <GoogleSignInButton
+                label="Cadastro rápido com Google"
+                onSuccess={onGoogleSuccess}
+                disabled={loading}
+              />
+            </div>
+          )}
 
           {/* ---- Divider (only when Google is configured) ---- */}
           {GOOGLE_CLIENT_ID && (
@@ -267,7 +269,7 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
                 <button
                   type="button"
                   tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setShowPassword((v) => !v)}
                   aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
                 >
@@ -287,11 +289,11 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
                       return (
                         <li key={rule.label} className="flex items-center gap-2">
                           {met ? (
-                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                            <CheckCircle className="h-3.5 w-3.5 text-green-700 dark:text-green-500" />
                           ) : (
                             <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-muted-foreground text-[8px] text-muted-foreground" />
                           )}
-                          <span className={met ? 'text-green-500' : 'text-muted-foreground'}>
+                          <span className={met ? 'text-green-700 dark:text-green-500' : 'text-muted-foreground'}>
                             {rule.label}
                           </span>
                         </li>
@@ -300,11 +302,11 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
                     return (
                       <li key={rule.label} className="flex items-center gap-2">
                         {met ? (
-                          <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                          <CheckCircle className="h-3.5 w-3.5 text-green-700 dark:text-green-500" />
                         ) : (
                           <XCircle className="h-3.5 w-3.5 text-red-500" />
                         )}
-                        <span className={met ? 'text-green-500' : 'text-red-500'}>
+                        <span className={met ? 'text-green-700 dark:text-green-500' : 'text-red-500'}>
                           {rule.label}
                         </span>
                       </li>
@@ -329,7 +331,7 @@ export function StepAccount({ onNext, onGoogleSuccess, loading, defaultEmail }: 
                 <button
                   type="button"
                   tabIndex={-1}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => setShowConfirm((v) => !v)}
                   aria-label={showConfirm ? 'Esconder senha' : 'Mostrar senha'}
                 >

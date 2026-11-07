@@ -18,7 +18,7 @@ export function BenefitsSection() {
               key={index}
               className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors"
             >
-              <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+              <CheckCircle className="h-4 w-4 text-green-700 dark:text-green-500 mt-0.5 shrink-0" />
               <span className="text-sm">{benefit}</span>
             </li>
           ))}

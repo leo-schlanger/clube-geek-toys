@@ -850,7 +850,7 @@ export default function ShopCheckout() {
                       />
                       <Button type="button" variant="outline" size="icon" onClick={copyEmv}>
                         {copied ? (
-                          <Check className="h-4 w-4 text-green-500" />
+                          <Check className="h-4 w-4 text-green-700 dark:text-green-500" />
                         ) : (
                           <Copy className="h-4 w-4" />
                         )}
@@ -913,7 +913,7 @@ export default function ShopCheckout() {
                       <span className="tabular-nums">{formatCurrency(order.subtotal)}</span>
                     </div>
                     {order.discount > 0 && (
-                      <div className="flex justify-between text-green-600">
+                      <div className="flex justify-between text-green-700 dark:text-green-600">
                         <span>
                           {describeDiscountReason(
                             order.discountReason,
@@ -924,7 +924,7 @@ export default function ShopCheckout() {
                       </div>
                     )}
                     {(order.storeCreditApplied ?? 0) > 0 && (
-                      <p className="text-xs text-green-600">
+                      <p className="text-xs text-green-700 dark:text-green-600">
                         Inclui {formatCurrency(order.storeCreditApplied!)} de crédito de loja
                       </p>
                     )}
@@ -953,7 +953,7 @@ export default function ShopCheckout() {
                       <span className="tabular-nums">{formatCurrency(subtotal)}</span>
                     </div>
                     {discount.amount > 0 && (
-                      <div className="flex items-center justify-between text-green-600">
+                      <div className="flex items-center justify-between text-green-700 dark:text-green-600">
                         {discount.reason === 'member_10' ? (
                           <MemberDiscountBadge />
                         ) : (
@@ -978,7 +978,7 @@ export default function ShopCheckout() {
                       }
                     />}
                     {user && storeCreditBalance > 0 && (
-                      <label className="flex items-center justify-between gap-2 text-green-600 cursor-pointer">
+                      <label className="flex items-center justify-between gap-2 text-green-700 dark:text-green-600 cursor-pointer">
                         <span className="flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"

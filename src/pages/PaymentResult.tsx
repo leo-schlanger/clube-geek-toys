@@ -29,7 +29,7 @@ const resultConfig = {
     borderColor: 'border-red-500',
   },
   pending: {
-    icon: <Clock className="h-20 w-20 text-yellow-500" />,
+    icon: <Clock className="h-20 w-20 text-yellow-700 dark:text-yellow-500" />,
     title: 'Pagamento Pendente',
     description: 'Seu pagamento está sendo processado. Você receberá uma confirmação em breve.',
     color: 'bg-yellow-50 dark:bg-yellow-900/20',

@@ -356,7 +356,7 @@ export default function PDV() {
                       <hr />
                       {/* Discount Highlight */}
                       <div className="flex flex-col items-center justify-center gap-2 p-6 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
-                        <div className="flex items-center gap-2 text-green-600">
+                        <div className="flex items-center gap-2 text-green-700 dark:text-green-600">
                           <Percent className="h-8 w-8" />
                           <span className="text-4xl sm:text-5xl font-bold">
                             {CLUB_PLAN.discount}%
@@ -371,7 +371,7 @@ export default function PDV() {
 
                   {!result.isValid && (
                     <div className="flex items-center gap-2 p-4 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                      <AlertTriangle className="h-5 w-5 text-yellow-700 dark:text-yellow-600" />
                       <p className="text-sm text-yellow-700 dark:text-yellow-300">
                         Cliente precisa renovar a assinatura para usar o desconto
                       </p>

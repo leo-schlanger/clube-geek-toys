@@ -60,32 +60,46 @@ Usar **apenas** em vitrines, filtros de coleção K-pop e ilustrações — não
 
 ### 2.3 Semânticas (produto digital)
 
-| Token       | Hex       | HSL           | Uso                        |
-| ----------- | --------- | ------------- | -------------------------- |
-| Success     | `#16A149` | `142 76% 36%` | Pagamento ok, status ativo |
-| Warning     | `#F49E0A` | `38 92% 50%`  | Pendente, expirando        |
-| Destructive | `#EE4444` | `0 84% 60%`   | Erro, cancelamento         |
-| Info        | `#3B82F6` | `217 91% 60%` | Avisos neutros (admin)     |
+| Token       | Claro (`:root`)                           | Escuro (`.dark`)                      | Uso                        |
+| ----------- | ----------------------------------------- | ------------------------------------- | -------------------------- |
+| Success     | `142 72% 29%` `#157F3C`, texto branco     | `142 70% 40%` `#1FAD53`, texto escuro | Pagamento ok, status ativo |
+| Warning     | `38 92% 50%` `#F59F0A`, texto quase preto | igual                                 | Pendente, expirando        |
+| Destructive | `0 84% 55%` `#ED2C2C`                     | `0 75% 58%` `#E44444`                 | Erro, cancelamento         |
+| Info        | `#3B82F6` (Tailwind blue)                 | —                                     | Avisos neutros (admin)     |
+
+`Button`/`Badge` `success` e `warning` usam esses tokens (`bg-warning text-warning-foreground`); branco sobre amarelo era ilegível (07/11/2026).
+**Texto de status** (verde, amarelo, âmbar, esmeralda, vermelho, azul) leva sempre o par claro/escuro: `text-green-700 dark:text-green-500`, `text-red-600 dark:text-red-400`. Os tons 400–600 sozinhos somem no fundo branco (verde-400 sobre branco = 1,9:1). `text-warning` como texto: `text-amber-700 dark:text-warning`.
 
 ### 2.4 Superfícies — tema light / dark (app)
 
-O produto digital (**club / admin / shop**, mesmo bundle) suporta **tema light e dark** com preferência do usuário (`light` | `dark` | `system`), salva em `localStorage` (`geekpop-theme`). Toggle em loja, membro, admin, login e PDV.
+O produto digital (**club / admin / shop**, mesmo bundle) tem **tema claro e escuro** com preferência `light` | `dark` | `system`, salva em `localStorage` (`geekpop-theme`, a mesma chave do site institucional).
 
-**Arquivo de verdade no código:** `src/index.css` (`:root` + `.dark` CSS variables) + `ThemeProvider` + mapa Tailwind (`darkMode: class`).
+- **Omissão: `system`** (desde 07/11/2026, igual ao `geek-toys-home`): segue o `prefers-color-scheme` do aparelho até a pessoa escolher. Antes era sempre claro.
+- **Sem flash:** `public/boot.js` aplica `.dark` antes da primeira pintura. É um arquivo externo e síncrono no `<head>` de `index.html` e `shop.html`, e não um script inline, porque a CSP das SPAs não tem `'unsafe-inline'` em `script-src` (ver o comentário no próprio arquivo).
+- **Seletor:** `ThemeToggle variant="icon"` é um botão de 44 px que gira Claro → Escuro → Sistema (o ícone mostra o modo atual); `variant="segmented"` mostra os três (admin). Está na loja, `/assinar`, `/login`, `/membro`, admin, PDV, e no canto de `/cadastro`, `/recuperar-senha`, `/verificar-email` e `/pagamento/*` (`ThemeCornerLayout`).
 
-| Token CSS            | Valor atual            | Hex       | Papel                 |
-| -------------------- | ---------------------- | --------- | --------------------- |
-| `--background`       | `330 40% 99%`          | `#FDFBFC` | Fundo da página       |
-| `--foreground`       | `240 20% 12%`          | `#181825` | Texto principal       |
-| `--card`             | `0 0% 100%`            | `#FFFFFF` | Cards, painéis        |
-| `--secondary`        | `330 55% 96%`          | `#FAEFF5` | Faixas / superfícies  |
-| `--muted`            | `330 25% 95%`          | `#F5EFF2` | Superfície secundária |
-| `--muted-foreground` | `240 8% 42%`           | `#636374` | Texto auxiliar        |
-| `--border`           | `330 18% 24%`          | `#48323D` | Bordas (tom rosa)     |
-| `--input`            | `330 15% 15%`          | `#2B2026` | Campos                |
-| `--primary`          | **alvo** `340 85% 59%` | `#F04080` | Marca (ver §6 gaps)   |
-| `--accent`           | **alvo** `45 97% 50%`  | `#FCBE04` | Amarelo pop           |
-| `--ring`             | = primary              |           | Focus ring            |
+**Arquivo de verdade no código:** `src/index.css` (`:root` + `.dark`) + `ThemeProvider` (`src/contexts/ThemeContext.tsx`).
+
+**Paleta igual à dos outros sites** (decisão do Leo, 07/11/2026: «a paleta deveria ser a mesma e sem questionamentos»). O `.dark` copia token a token o de `geek-toys-home/src/index.css`; mudou lá, muda aqui. O claro já era igual (o rosa continua `#F04080` com texto branco).
+
+| Token CSS                | Claro (`:root`)         | Escuro (`.dark`) = home | Papel                 |
+| ------------------------ | ----------------------- | ----------------------- | --------------------- |
+| `--background`           | `330 40% 99%` `#FDFBFC` | `240 18% 8%` `#111118`  | Fundo da página       |
+| `--foreground`           | `240 20% 12%` `#181825` | `330 20% 96%` `#F7F3F5` | Texto principal       |
+| `--card`/`--popover`     | `0 0% 100%`             | `240 16% 11%` `#181821` | Cards, painéis        |
+| `--primary`              | `340 85% 59%` `#F04080` | `340 85% 65%` `#F25A8C` | Marca                 |
+| `--primary-foreground`   | `0 0% 100%`             | `240 20% 10%` `#14141F` | Texto sobre o rosa    |
+| `--secondary`            | `330 55% 96%`           | `330 20% 18%`           | Faixas / superfícies  |
+| `--secondary-foreground` | `330 50% 28%`           | `330 30% 92%`           |                       |
+| `--muted`                | `330 25% 95%`           | `240 12% 16%`           | Superfície secundária |
+| `--muted-foreground`     | `240 8% 42%`            | `330 10% 68%`           | Texto auxiliar        |
+| `--accent`               | `45 97% 50%` `#FCBE04`  | `45 95% 55%` `#F9C31F`  | Amarelo pop           |
+| `--accent-foreground`    | `240 20% 12%`           | `240 20% 10%`           |                       |
+| `--border`               | `340 45% 88%`           | `330 15% 24%`           | Bordas                |
+| `--input`                | `340 30% 94%`           | `330 12% 22%`           | Campos                |
+| `--ring`                 | = primary               | = primary               | Focus ring            |
+
+`theme-color` do navegador: `#F04080` no claro, `#111118` no escuro (o `ThemeProvider` troca).
 
 ### 2.5 Superfícies — tema claro (marketing / e-mail opcional)
 
@@ -279,50 +293,9 @@ Todos os gaps da peça de marca foram aplicados no SPA (club / admin / shop comp
 
 ---
 
-## 7. Tokens CSS canônicos (alvo)
+## 7. Tokens CSS canônicos
 
-Valores recomendados para `src/index.css` após o alinhamento:
-
-```css
-:root {
-  --background: 0 0% 5.1%;
-  --foreground: 0 0% 96.1%;
-
-  --card: 240 33% 11.4%;
-  --card-foreground: 0 0% 96.1%;
-
-  --popover: 240 33% 11.4%;
-  --popover-foreground: 0 0% 96.1%;
-
-  /* Hot Pink — GeekPop */
-  --primary: 340 85% 59%;
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 240 33% 11.4%;
-  --secondary-foreground: 0 0% 96.1%;
-
-  --muted: 240 10% 20%;
-  --muted-foreground: 240 10% 69%;
-
-  /* Pop Yellow — Toys */
-  --accent: 45 97% 50%;
-  --accent-foreground: 0 0% 8%;
-
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 100%;
-
-  --border: 340 18% 24%;
-  --input: 340 15% 15%;
-  --ring: 340 85% 59%;
-
-  --radius: 0.75rem;
-
-  --success: 142 76% 36%;
-  --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 0 0% 5%;
-}
-```
+Os valores vivos estão em `src/index.css` e na tabela do §2.4 (`:root` = claro, `.dark` = o mesmo do `geek-toys-home`). Este capítulo trazia um bloco "alvo" de agosto, todo escuro, que já não batia com o código e foi tirado em 07/11/2026.
 
 ### Gradiente da carteirinha (alvo)
 

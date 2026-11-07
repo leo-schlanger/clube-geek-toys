@@ -477,8 +477,8 @@ describe('getSubscriptionStatusLabel', () => {
 
 describe('getSubscriptionStatusColor', () => {
   it('should return correct CSS classes', () => {
-    expect(getSubscriptionStatusColor('pending')).toBe('text-yellow-500')
-    expect(getSubscriptionStatusColor('authorized')).toBe('text-green-500')
+    expect(getSubscriptionStatusColor('pending')).toBe('text-yellow-700 dark:text-yellow-500')
+    expect(getSubscriptionStatusColor('authorized')).toBe('text-green-700 dark:text-green-500')
     expect(getSubscriptionStatusColor('paused')).toBe('text-orange-500')
     expect(getSubscriptionStatusColor('cancelled')).toBe('text-red-500')
   })

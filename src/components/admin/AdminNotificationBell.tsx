@@ -39,8 +39,8 @@ const POLL_INTERVAL_MS = 60_000
 
 /** Rows written by admin-notification.service; anything else falls back. */
 const KIND_ICON: Record<string, React.ReactNode> = {
-  payment_received: <CreditCard className="h-4 w-4 text-green-500" />,
-  payment_pending: <Hourglass className="h-4 w-4 text-yellow-500" />,
+  payment_received: <CreditCard className="h-4 w-4 text-green-700 dark:text-green-500" />,
+  payment_pending: <Hourglass className="h-4 w-4 text-yellow-700 dark:text-yellow-500" />,
   payment_failed: <AlertTriangle className="h-4 w-4 text-red-500" />,
   payment_refunded: <RotateCcw className="h-4 w-4 text-orange-500" />,
   payment_chargeback: <ShieldAlert className="h-4 w-4 text-red-500" />,

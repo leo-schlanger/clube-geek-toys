@@ -37,8 +37,8 @@ function readStored(): ThemePreference {
   } catch {
     /* ignore */
   }
-  // Default: light (marca / site institucional)
-  return 'light'
+  // Default: follow the OS, like the home site
+  return 'system'
 }
 
 function applyDomTheme(resolved: ResolvedTheme) {
@@ -48,13 +48,13 @@ function applyDomTheme(resolved: ResolvedTheme) {
   // theme-color for mobile browser chrome
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) {
-    meta.setAttribute('content', resolved === 'dark' ? '#12121A' : '#F04080')
+    meta.setAttribute('content', resolved === 'dark' ? '#111118' : '#F04080')
   }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<ThemePreference>(() =>
-    typeof window !== 'undefined' ? readStored() : 'light'
+    typeof window !== 'undefined' ? readStored() : 'system'
   )
   const [system, setSystem] = useState<ResolvedTheme>(() =>
     typeof window !== 'undefined' ? getSystemTheme() : 'light'
@@ -99,7 +99,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
 /** Fallback for unit tests / edge renders outside ThemeProvider. */
 const THEME_FALLBACK: ThemeContextValue = {
-  theme: 'light',
+  theme: 'system',
   resolved: 'light',
   setTheme: () => {},
   toggle: () => {},

@@ -107,7 +107,7 @@ export function RegistrationStepper({
                 <span
                   className={cn(
                     "hidden text-xs font-medium sm:block",
-                    isCompleted && "text-green-500",
+                    isCompleted && "text-green-700 dark:text-green-500",
                     isActive && "text-primary",
                     isPending && "text-muted-foreground"
                   )}

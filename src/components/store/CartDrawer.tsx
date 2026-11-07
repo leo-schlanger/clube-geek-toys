@@ -162,7 +162,7 @@ export function CartDrawer({
                 </div>
                 {discount.amount > 0 && (
                   <>
-                    <div className="flex justify-between text-green-600">
+                    <div className="flex justify-between text-green-700 dark:text-green-600">
                       <span>{discount.label}</span>
                       <span className="tabular-nums">-{formatCurrency(discount.amount)}</span>
                     </div>

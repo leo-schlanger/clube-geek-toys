@@ -18,12 +18,12 @@ import {
 import { getMemberLogs, type AuditLog } from '../lib/logs'
 
 const ACTION_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  member_activated: { label: 'Assinatura Ativada', color: 'text-green-500', icon: UserCheck },
+  member_activated: { label: 'Assinatura Ativada', color: 'text-green-700 dark:text-green-500', icon: UserCheck },
   member_created: { label: 'Cadastro Realizado', color: 'text-blue-500', icon: UserPlus },
-  member_updated: { label: 'Dados Atualizados', color: 'text-yellow-500', icon: FileText },
+  member_updated: { label: 'Dados Atualizados', color: 'text-yellow-700 dark:text-yellow-500', icon: FileText },
   member_deactivated: { label: 'Assinatura Cancelada', color: 'text-red-500', icon: UserX },
   payment_created: { label: 'Pagamento Iniciado', color: 'text-blue-500', icon: CreditCard },
-  payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-500', icon: CheckCircle },
+  payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-700 dark:text-green-500', icon: CheckCircle },
   payment_failed: { label: 'Pagamento Falhou', color: 'text-red-500', icon: XCircle },
 }
 

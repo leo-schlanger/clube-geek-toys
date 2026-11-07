@@ -28,8 +28,16 @@ import {
   RefreshCw,
   AlertTriangle,
   Mail,
+  UserRound,
 } from 'lucide-react'
 import { ThemeToggle } from '../components/ThemeToggle'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu'
 
 // Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
 const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
@@ -183,12 +191,25 @@ export default function MemberDashboard() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle variant="icon" />
-            <Button variant="ghost" size="icon" onClick={() => setModal('profile')} title="Editar Perfil">
-              <Settings className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
-              <LogOut className="h-5 w-5" />
-            </Button>
+            {/* Sign out lives in the menu: a bare icon next to the others was too easy to hit by mistake */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-11 w-11" aria-label="Menu da conta" title="Menu da conta">
+                  <UserRound className="h-5 w-5" aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-48">
+                <DropdownMenuItem className="min-h-11 gap-2" onSelect={() => setModal('profile')}>
+                  <Settings className="h-4 w-4" aria-hidden />
+                  Editar perfil
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="min-h-11 gap-2" onSelect={() => signOut()}>
+                  <LogOut className="h-4 w-4" aria-hidden />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

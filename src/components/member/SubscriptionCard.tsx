@@ -93,7 +93,7 @@ export function SubscriptionCard({ member, subscription, onSubscriptionChange }:
           {subscription.failedPayments > 0 && (
             <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg">
               <AlertTriangle className="h-4 w-4 text-warning" />
-              <span className="text-sm text-warning">
+              <span className="text-sm text-amber-700 dark:text-warning">
                 {subscription.failedPayments} tentativa(s) de cobrança falharam
               </span>
             </div>

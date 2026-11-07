@@ -11,19 +11,36 @@
  * like Vite bundles).
  */
 (function () {
-  // Anti-FOUC: light is default; dark only if the user chose it.
+  // Anti-FOUC: default is 'system' (follows the OS), same as the home site.
   try {
     var k = 'geekpop-theme';
-    var t = localStorage.getItem(k) || 'light';
+    var t = localStorage.getItem(k) || 'system';
     var dark =
       t === 'dark' ||
       (t === 'system' &&
         window.matchMedia &&
         window.matchMedia('(prefers-color-scheme: dark)').matches);
-    if (dark) document.documentElement.classList.add('dark');
-    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    var root = document.documentElement;
+    if (dark) {
+      root.classList.add('dark');
+      // read by the inline #initial-loader, which paints before any CSS loads
+      root.style.setProperty('--boot-bg', '#111118');
+      root.style.setProperty('--boot-pink', '#F25A8C');
+    }
+    root.style.colorScheme = dark ? 'dark' : 'light';
   } catch (e) {
-    /* localStorage blocked — stay on the light theme */
+    /* localStorage blocked: fall back to the OS preference */
+    try {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        var r = document.documentElement;
+        r.classList.add('dark');
+        r.style.setProperty('--boot-bg', '#111118');
+        r.style.setProperty('--boot-pink', '#F25A8C');
+        r.style.colorScheme = 'dark';
+      }
+    } catch (e2) {
+      /* ignore */
+    }
   }
 
   window.addEventListener('DOMContentLoaded', function () {

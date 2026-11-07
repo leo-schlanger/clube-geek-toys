@@ -128,10 +128,25 @@ describe('StepAccount', () => {
       ).toBeInTheDocument()
     })
 
-    it('renders the Google Sign-In button', () => {
+    it('hides the Google block when VITE_GOOGLE_CLIENT_ID is not set', () => {
       renderStep()
 
-      expect(screen.getByTestId('google-signin')).toBeInTheDocument()
+      expect(screen.queryByTestId('google-signin')).not.toBeInTheDocument()
+      expect(screen.getByText(/cadastre-se com seu e-mail e uma senha/i)).toBeInTheDocument()
+    })
+
+    it('renders the Google Sign-In button when the client id is set', async () => {
+      vi.resetModules()
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id')
+      try {
+        const { StepAccount: WithGoogle } = await import('./StepAccount')
+        render(<WithGoogle {...defaultProps} loading />)
+        expect(screen.getByTestId('google-signin')).toHaveTextContent('Cadastro rápido com Google')
+        expect(screen.getByTestId('google-signin')).toBeDisabled()
+        expect(screen.getByText(/escolha como deseja se cadastrar/i)).toBeInTheDocument()
+      } finally {
+        vi.unstubAllEnvs()
+      }
     })
 
     it('renders the card title and description', () => {
@@ -143,7 +158,7 @@ describe('StepAccount', () => {
         screen.getByRole('heading', { name: /criar conta/i })
       ).toBeInTheDocument()
       expect(
-        screen.getByText(/escolha como deseja se cadastrar/i)
+        screen.getByText(/cadastre-se com seu e-mail e uma senha/i)
       ).toBeInTheDocument()
     })
 
@@ -231,12 +246,6 @@ describe('StepAccount', () => {
 
       const submitButton = screen.getByRole('button', { name: /criar conta/i })
       expect(submitButton).toBeDisabled()
-    })
-
-    it('disables Google Sign-In button when loading is true', () => {
-      renderStep({ loading: true })
-
-      expect(screen.getByTestId('google-signin')).toBeDisabled()
     })
 
     it('does not disable submit button when loading is false', () => {
@@ -559,12 +568,18 @@ describe('StepAccount', () => {
     it('calls onGoogleSuccess when Google button is clicked', async () => {
       const onGoogleSuccess = vi.fn()
       const user = userEvent.setup()
-      renderStep({ onGoogleSuccess })
+      vi.resetModules()
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id')
+      try {
+        const { StepAccount: WithGoogle } = await import('./StepAccount')
+        render(<WithGoogle {...defaultProps} onGoogleSuccess={onGoogleSuccess} />)
 
-      const googleButton = screen.getByTestId('google-signin')
-      await user.click(googleButton)
+        await user.click(screen.getByTestId('google-signin'))
 
-      expect(onGoogleSuccess).toHaveBeenCalledWith({ email: 'google@test.com' })
+        expect(onGoogleSuccess).toHaveBeenCalledWith({ email: 'google@test.com' })
+      } finally {
+        vi.unstubAllEnvs()
+      }
     })
   })
 })

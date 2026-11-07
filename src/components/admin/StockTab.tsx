@@ -220,7 +220,7 @@ export function StockTab({ initialFilter }: { initialFilter?: string } = {}) {
             </Badge>
             <Badge
               variant="outline"
-              className={summary.low > 0 ? 'border-amber-500/50 text-amber-600' : ''}
+              className={summary.low > 0 ? 'border-amber-500/50 text-amber-700 dark:text-amber-600' : ''}
             >
               {summary.low} acabando
             </Badge>
@@ -528,7 +528,7 @@ export function StockTab({ initialFilter }: { initialFilter?: string } = {}) {
                       </div>
                       <div className="shrink-0 text-right">
                         <p
-                          className={`font-medium ${m.quantity < 0 ? 'text-red-500' : 'text-green-600'}`}
+                          className={`font-medium ${m.quantity < 0 ? 'text-red-500' : 'text-green-700 dark:text-green-600'}`}
                         >
                           {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
                         </p>

@@ -103,7 +103,7 @@ export function MelhorEnvioCard() {
             <p className="flex items-start gap-2 text-sm">
               {ok ? (
                 <>
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-500" />
                   <span>
                     Conectado e com permissão para comprar etiqueta.
                     {status.expiresAt && (
@@ -115,7 +115,7 @@ export function MelhorEnvioCard() {
                 </>
               ) : connectedButLimited ? (
                 <>
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-500" />
                   <span>
                     <strong>Conectado, mas sem permissão para comprar etiqueta.</strong>
                     <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -126,14 +126,14 @@ export function MelhorEnvioCard() {
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-500" />
                   <span>Ainda não autorizado.</span>
                 </>
               )}
             </p>
 
             {status.sandbox && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-xs text-amber-700 dark:text-amber-400">
                 Em modo sandbox: nada é cobrado e nenhuma etiqueta vale para postagem.
               </p>
             )}

@@ -4,43 +4,43 @@ import { useTheme, type ThemePreference } from '../contexts/ThemeContext'
 import { cn } from '../lib/utils'
 
 type Props = {
-  /** compact = icon only; full = light/dark/system. */
+  /** icon = one button cycling the three modes; segmented = all three side by side. */
   variant?: 'icon' | 'segmented'
   className?: string
 }
 
+const OPTIONS: { id: ThemePreference; label: string; icon: React.ElementType }[] = [
+  { id: 'light', label: 'Claro', icon: Sun },
+  { id: 'dark', label: 'Escuro', icon: Moon },
+  { id: 'system', label: 'Sistema', icon: Monitor },
+]
+
 /**
- * Controle de tema light / dark / system.
- * Preference stored in localStorage (`geekpop-theme`).
+ * Light / dark / system theme control.
+ * Preference stored in localStorage (`geekpop-theme`); default is system.
  */
 export function ThemeToggle({ variant = 'icon', className }: Props) {
-  const { theme, resolved, setTheme, toggle } = useTheme()
+  const { theme, setTheme } = useTheme()
 
   if (variant === 'icon') {
+    // One button cycling light → dark → system, like the home site's compact toggle
+    const current = OPTIONS.find((o) => o.id === theme) ?? OPTIONS[2]
+    const next = OPTIONS[(OPTIONS.indexOf(current) + 1) % OPTIONS.length]
+    const Icon = current.icon
     return (
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        onClick={toggle}
-        className={className}
-        title={resolved === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-        aria-label={resolved === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+        onClick={() => setTheme(next.id)}
+        className={cn('h-11 w-11', className)}
+        title={`Tema: ${current.label}`}
+        aria-label={`Tema: ${current.label}. Mudar para ${next.label}`}
       >
-        {resolved === 'dark' ? (
-          <Sun className="h-5 w-5" />
-        ) : (
-          <Moon className="h-5 w-5" />
-        )}
+        <Icon className="h-5 w-5" aria-hidden />
       </Button>
     )
   }
-
-  const options: { id: ThemePreference; label: string; icon: React.ElementType }[] = [
-    { id: 'light', label: 'Claro', icon: Sun },
-    { id: 'dark', label: 'Escuro', icon: Moon },
-    { id: 'system', label: 'Sistema', icon: Monitor },
-  ]
 
   return (
     <div
@@ -52,7 +52,7 @@ export function ThemeToggle({ variant = 'icon', className }: Props) {
         className
       )}
     >
-      {options.map(({ id, label, icon: Icon }) => {
+      {OPTIONS.map(({ id, label, icon: Icon }) => {
         const active = theme === id
         return (
           <button

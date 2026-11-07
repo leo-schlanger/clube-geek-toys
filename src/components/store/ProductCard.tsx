@@ -173,7 +173,7 @@ export function ProductCard({
                 <Badge variant="outline" className="text-xs">
                   −25% atacado
                 </Badge>
-                <span className="text-sm font-semibold text-green-600">
+                <span className="text-sm font-semibold text-green-700 dark:text-green-600">
                   {formatCurrency(wholesalePrice)}
                 </span>
               </div>
@@ -185,7 +185,7 @@ export function ProductCard({
           ) : isMember ? (
             <div className="flex items-center gap-2">
               <MemberDiscountBadge />
-              <span className="text-sm font-semibold text-green-600">
+              <span className="text-sm font-semibold text-green-700 dark:text-green-600">
                 {formatCurrency(memberPrice)}
               </span>
             </div>

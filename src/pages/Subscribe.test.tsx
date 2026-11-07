@@ -27,6 +27,9 @@ vi.mock('framer-motion', () => ({
 vi.mock('lucide-react', () => {
   const icon = ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <span {...props}>{children}</span>
   return {
+    Sun: icon,
+    Moon: icon,
+    Monitor: icon,
     Check: icon,
     X: icon,
     Sparkles: icon,

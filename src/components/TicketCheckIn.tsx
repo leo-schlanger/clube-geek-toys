@@ -106,14 +106,14 @@ export function TicketCheckIn({ onChecked, children }: TicketCheckInProps) {
           >
             <div className="flex items-start gap-3">
               {lastCheckIn.ok ? (
-                <CheckCircle2 className="h-8 w-8 shrink-0 text-green-500" />
+                <CheckCircle2 className="h-8 w-8 shrink-0 text-green-700 dark:text-green-500" />
               ) : (
                 <XCircle className="h-8 w-8 shrink-0 text-destructive" />
               )}
               <div>
                 <p
                   className={`font-heading text-lg font-bold ${
-                    lastCheckIn.ok ? 'text-green-500' : 'text-destructive'
+                    lastCheckIn.ok ? 'text-green-700 dark:text-green-500' : 'text-destructive'
                   }`}
                 >
                   {lastCheckIn.ok ? 'ENTRADA LIBERADA' : 'ENTRADA NEGADA'}

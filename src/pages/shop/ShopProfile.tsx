@@ -607,9 +607,9 @@ export default function ShopProfile() {
                         <span
                           className={
                             reservation.status === 'pending'
-                              ? 'font-medium text-yellow-600'
+                              ? 'font-medium text-yellow-700 dark:text-yellow-600'
                               : reservation.status === 'confirmed'
-                                ? 'font-medium text-green-600'
+                                ? 'font-medium text-green-700 dark:text-green-600'
                                 : 'text-muted-foreground'
                           }
                         >
