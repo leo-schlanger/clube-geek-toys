@@ -48,6 +48,19 @@ export async function getCardToken(): Promise<CardToken | null> {
   return result.data ?? null
 }
 
+export interface MemberActivity {
+  id: string
+  action: string
+  timestamp: string
+}
+
+/** The signed-in member's own timeline. Throws on failure, so the UI never reads an error as "no activity". */
+export async function getMyActivity(limit = 20): Promise<MemberActivity[]> {
+  const result = await api.get<MemberActivity[]>(`/members/me/activity?limit=${limit}`)
+  if (result.error) throw new Error(result.error)
+  return result.data ?? []
+}
+
 /**
  * Needs the session the signup creates first: the endpoint stopped answering
  * anonymous callers, who could probe whether a CPF belongs to a member.

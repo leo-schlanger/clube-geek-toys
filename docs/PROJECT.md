@@ -412,18 +412,19 @@ As tabelas abaixo suportam a loja e-commerce em `shop.geeketoys.com.br`.
 
 ### Members (`/members`)
 
-| Metodo | Endpoint                    | Descricao                                 | Auth                   |
-| ------ | --------------------------- | ----------------------------------------- | ---------------------- |
-| GET    | `/members/cpf-exists/:cpf`  | Verifica se CPF ja esta cadastrado        | Publico (rate-limited) |
-| GET    | `/members`                  | Lista membros (paginacao, filtros, busca) | admin/seller           |
-| GET    | `/members/me`               | Perfil do membro autenticado              | JWT                    |
-| GET    | `/members/count`            | Total de membros                          | admin/seller           |
-| GET    | `/members/by-cpf/:cpf`      | Busca membro por CPF                      | admin/seller           |
-| GET    | `/members/:id`              | Detalhes do membro                        | admin/seller/owner     |
-| GET    | `/members/:id/payments`     | Pagamentos do membro                      | admin/seller           |
-| GET    | `/members/:id/subscription` | Assinatura do membro                      | admin/seller           |
-| POST   | `/members`                  | Criar perfil de membro                    | JWT                    |
-| PATCH  | `/members/:id`              | Atualizar dados do membro                 | admin/seller/owner     |
+| Metodo | Endpoint                    | Descricao                                                                                        | Auth                   |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------- |
+| GET    | `/members/cpf-exists/:cpf`  | Verifica se CPF ja esta cadastrado                                                               | Publico (rate-limited) |
+| GET    | `/members`                  | Lista membros (paginacao, filtros, busca)                                                        | admin/seller           |
+| GET    | `/members/me`               | Perfil do membro autenticado                                                                     | JWT                    |
+| GET    | `/members/me/activity`      | Histórico do próprio membro (só ação e data, lista fechada de ações; o `/logs/audit` é de admin) | JWT                    |
+| GET    | `/members/count`            | Total de membros                                                                                 | admin/seller           |
+| GET    | `/members/by-cpf/:cpf`      | Busca membro por CPF                                                                             | admin/seller           |
+| GET    | `/members/:id`              | Detalhes do membro                                                                               | admin/seller/owner     |
+| GET    | `/members/:id/payments`     | Pagamentos do membro                                                                             | admin/seller           |
+| GET    | `/members/:id/subscription` | Assinatura do membro                                                                             | admin/seller           |
+| POST   | `/members`                  | Criar perfil de membro                                                                           | JWT                    |
+| PATCH  | `/members/:id`              | Atualizar dados do membro                                                                        | admin/seller/owner     |
 
 ### Payments (`/pix`, `/checkout`, `/payment`, `/payments`)
 

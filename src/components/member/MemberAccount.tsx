@@ -77,7 +77,7 @@ export function MemberAccount({
         <AccountSection member={member} contract={contract} onEditProfile={onEditProfile} only="contract" />
       </Row>
       <Row icon={History} title="Histórico" subtitle="O que aconteceu na sua conta">
-        <MemberActivityHistory memberId={member.id} limit={5} />
+        <MemberActivityHistory limit={5} />
       </Row>
     </section>
   )

@@ -15,21 +15,32 @@ import {
   XCircle,
   FileText,
 } from 'lucide-react'
-import { getMemberLogs, type AuditLog } from '../lib/logs'
+import { getMyActivity, type MemberActivity } from '../lib/members'
 
+// Keys are the audit actions GET /members/me/activity lets through (MEMBER_VISIBLE_ACTIONS).
+const GREEN = 'text-green-700 dark:text-green-500'
+const BLUE = 'text-blue-700 dark:text-blue-400'
+const AMBER = 'text-amber-700 dark:text-amber-500'
+const RED = 'text-red-700 dark:text-red-400'
 const ACTION_CONFIG: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  member_activated: { label: 'Assinatura Ativada', color: 'text-green-700 dark:text-green-500', icon: UserCheck },
-  member_created: { label: 'Cadastro Realizado', color: 'text-blue-500', icon: UserPlus },
-  member_updated: { label: 'Dados Atualizados', color: 'text-yellow-700 dark:text-yellow-500', icon: FileText },
-  member_deactivated: { label: 'Assinatura Cancelada', color: 'text-red-500', icon: UserX },
-  payment_created: { label: 'Pagamento Iniciado', color: 'text-blue-500', icon: CreditCard },
-  payment_confirmed: { label: 'Pagamento Confirmado', color: 'text-green-700 dark:text-green-500', icon: CheckCircle },
-  payment_failed: { label: 'Pagamento Falhou', color: 'text-red-500', icon: XCircle },
+  'member.activated': { label: 'Assinatura ativada', color: GREEN, icon: UserCheck },
+  'member.updated': { label: 'Dados atualizados', color: AMBER, icon: FileText },
+  'profile.updated': { label: 'Perfil atualizado', color: AMBER, icon: FileText },
+  member_expired: { label: 'Assinatura vencida', color: RED, icon: UserX },
+  contract_signed: { label: 'Contrato assinado', color: BLUE, icon: UserPlus },
+  'payment.pix_created': { label: 'PIX gerado', color: BLUE, icon: CreditCard },
+  'payment.card_created': { label: 'Pagamento com cartão iniciado', color: BLUE, icon: CreditCard },
+  'payment.pix_confirmed': { label: 'Pagamento confirmado', color: GREEN, icon: CheckCircle },
+  'payment.received': { label: 'Pagamento confirmado', color: GREEN, icon: CheckCircle },
+  'payment.failed': { label: 'Pagamento não aprovado', color: RED, icon: XCircle },
+  'payment.refunded': { label: 'Pagamento estornado', color: AMBER, icon: XCircle },
+  'subscription.cancelled': { label: 'Recorrência cancelada', color: RED, icon: UserX },
+  'subscription.canceled': { label: 'Recorrência cancelada', color: RED, icon: UserX },
 }
 
 function getActionConfig(action: string) {
   return ACTION_CONFIG[action] ?? {
-    label: action.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+    label: 'Atualização na conta',
     color: 'text-muted-foreground',
     icon: Clock,
   }
@@ -58,25 +69,35 @@ function formatRelativeTime(dateString: string): string {
 }
 
 interface MemberActivityHistoryProps {
-  memberId: string
   /** Max items to fetch and display. When set, the "show all" toggle is hidden. */
   limit?: number
 }
 
-export function MemberActivityHistory({ memberId, limit }: MemberActivityHistoryProps) {
-  const [logs, setLogs] = useState<AuditLog[]>([])
+/** The signed-in member's own timeline (GET /members/me/activity). */
+export function MemberActivityHistory({ limit }: MemberActivityHistoryProps) {
+  const [logs, setLogs] = useState<MemberActivity[]>([])
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
   const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
-    async function fetchLogs() {
-      setLoading(true)
-      const memberLogs = await getMemberLogs(memberId, limit ?? 20)
-      setLogs(memberLogs)
-      setLoading(false)
+    let cancelled = false
+    getMyActivity(limit ?? 20)
+      .then((items) => {
+        if (cancelled) return
+        setLogs(items)
+        setFailed(false)
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
     }
-    fetchLogs()
-  }, [memberId, limit])
+  }, [limit])
 
   const displayedLogs = limit ? logs : (showAll ? logs : logs.slice(0, 5))
 
@@ -108,7 +129,11 @@ export function MemberActivityHistory({ memberId, limit }: MemberActivityHistory
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {logs.length === 0 ? (
+        {failed ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Não foi possível carregar o histórico agora. Tente de novo mais tarde.
+          </p>
+        ) : logs.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground">
             <History className="h-12 w-12 mx-auto mb-2 opacity-30" />
             <p>Nenhuma atividade registrada ainda</p>

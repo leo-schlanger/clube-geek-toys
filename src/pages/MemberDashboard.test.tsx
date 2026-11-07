@@ -19,6 +19,7 @@ vi.mock('../lib/logger', () => ({
 const mockGetMemberByUserId = vi.fn()
 vi.mock('../lib/members', () => ({
   getMemberByUserId: (...args: unknown[]) => mockGetMemberByUserId(...args),
+  getMyActivity: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('../lib/contract-storage', () => ({

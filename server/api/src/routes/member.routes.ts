@@ -5,6 +5,7 @@ import { cpfLookupLimiter, defaultLimiter, publicLookupLimiter } from '../middle
 import { z } from 'zod';
 import * as memberService from '../services/member.service.js';
 import * as paymentService from '../services/payment.service.js';
+import * as logService from '../services/log.service.js';
 import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { CLUB_PLAN_PAYMENT_TYPE, MEMBER_SHOP_DISCOUNT } from '../types/index.js';
@@ -152,6 +153,21 @@ memberRouter.get('/me/card-token', async (req, res, next) => {
     }
     res.set('Cache-Control', 'no-store');
     res.json({ memberId: member.id, ...issueCardToken(member.id) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /members/me/activity — the owner's own timeline (no details, no staff data)
+memberRouter.get('/me/activity', async (req, res, next) => {
+  try {
+    const member = await memberService.getMemberByUserId(req.user!.userId);
+    if (!member) {
+      res.status(404).json({ error: 'Membro não encontrado' });
+      return;
+    }
+    const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    res.json(await logService.getMemberActivity(member.id, limit));
   } catch (err) {
     next(err);
   }

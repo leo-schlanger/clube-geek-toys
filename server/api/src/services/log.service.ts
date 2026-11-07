@@ -17,6 +17,37 @@ export async function getAuditLogs(opts: { memberId?: string; limit: number }) {
   return result.rows.map(mapAuditRow);
 }
 
+/**
+ * Actions a member may see about their own account. Anything else (staff
+ * actions, internal bookkeeping) stays out, and so do details and actor ids.
+ */
+export const MEMBER_VISIBLE_ACTIONS = [
+  'member.activated',
+  'member.updated',
+  'member_expired',
+  'profile.updated',
+  'contract_signed',
+  'payment.pix_created',
+  'payment.card_created',
+  'payment.pix_confirmed',
+  'payment.received',
+  'payment.failed',
+  'payment.refunded',
+  'subscription.cancelled',
+  'subscription.canceled',
+] as const;
+
+/** A member's own timeline: id, action and time only. */
+export async function getMemberActivity(memberId: string, limit: number) {
+  const result = await query(
+    `SELECT id, action, timestamp FROM audit_logs
+      WHERE member_id = $1 AND action = ANY($2::text[])
+      ORDER BY timestamp DESC LIMIT $3`,
+    [memberId, MEMBER_VISIBLE_ACTIONS, limit]
+  );
+  return result.rows.map((row) => ({ id: row.id, action: row.action, timestamp: row.timestamp }));
+}
+
 export async function getEmailLogs(opts: { memberId?: string; limit: number }) {
   if (opts.memberId) {
     const result = await query(

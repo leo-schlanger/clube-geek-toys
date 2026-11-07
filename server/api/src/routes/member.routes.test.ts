@@ -11,7 +11,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../config/env.js', async () => (await import('../test-support/env.js')).envModule);
 vi.mock('../middleware/rate-limit.js', async () => (await import('../test-support/env.js')).rateLimitModule);
-vi.mock('../services/log.service.js', () => ({ createErrorLog: vi.fn(async () => {}) }));
+// Real getMemberActivity over the mocked `query`, so the test sees the SQL.
+vi.mock('../services/log.service.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/log.service.js')>()),
+  createErrorLog: vi.fn(async () => {}),
+}));
 
 const { members, payments, queryMock } = vi.hoisted(() => ({
   members: {
@@ -158,6 +162,34 @@ describe('authenticated', () => {
     expect((await api.get(`/${ID}`, { as: 'member' })).status).toBe(200);
     members.getMemberById.mockResolvedValue(null);
     expect((await api.get(`/${ID}`, { as: 'admin' })).status).toBe(404);
+  });
+});
+
+describe('own activity', () => {
+  it("returns only the caller's own timeline, without details or actor ids", async () => {
+    members.getMemberByUserId.mockResolvedValue(own);
+    queryMock.mockResolvedValue({
+      rows: [{ id: 'a1', action: 'payment.pix_confirmed', timestamp: '2026-11-01T12:00:00Z', details: { actor: 'staff' }, user_id: 'u-staff' }],
+    });
+    const res = await api.get('/me/activity?memberId=someone-else&limit=999', { as: 'member' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([{ id: 'a1', action: 'payment.pix_confirmed', timestamp: '2026-11-01T12:00:00Z' }]);
+    expect(members.getMemberByUserId).toHaveBeenCalledWith('user-member');
+    const [sql, params] = queryMock.mock.calls[0];
+    expect(sql).toMatch(/SELECT id, action, timestamp FROM audit_logs/);
+    expect(sql).toMatch(/action = ANY/);
+    // The query string cannot pick another member, and the cap holds.
+    expect(params[0]).toBe(ID);
+    expect(params[1]).toContain('member.activated');
+    expect(params[1]).not.toContain('order.status_changed');
+    expect(params[2]).toBe(50);
+  });
+
+  it('needs a login, and a user without a member record gets 404', async () => {
+    expect((await api.get('/me/activity')).status).toBe(401);
+    members.getMemberByUserId.mockResolvedValue(null);
+    expect((await api.get('/me/activity', { as: 'member' })).status).toBe(404);
+    expect(queryMock).not.toHaveBeenCalled();
   });
 });
 
