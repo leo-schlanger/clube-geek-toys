@@ -185,7 +185,7 @@ Arquivos em `server/ops/`, instalados à mão (ver `DEPLOY.md` §11):
 alheio (`isForeignNoise`): `Rejected` com `ServiceWorkerContainer.register` no
 stack (extensão ou antivírus que embrulha o `register`) e
 `window.webkit.messageHandlers` (navegador interno do Instagram no iOS). O
-service worker agora é registrado por `src/lib/register-sw.ts`, com `.catch`.
+service worker agora é registrado por `src/lib/register-sw.ts`, com `.catch`. Desde 07/11/2026 ele também cuida da atualização: o worker novo assume sozinho (`skipWaiting` + `clientsClaim` no `vite.config.ts`) e a aba aberta só recarrega fora de checkout, pagamento, cadastro, login, área do membro e painéis (`isSafeToReload`).
 
 ## 6. Login
 

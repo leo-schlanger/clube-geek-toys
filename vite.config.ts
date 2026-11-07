@@ -47,6 +47,13 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // The new worker takes over at once. Without these the generated
+        // sw.js only skipped waiting on a SKIP_WAITING message nobody sent,
+        // and an update sat "waiting" until every tab and the PWA closed.
+        // Open tabs reload only where it is safe (src/lib/register-sw.ts).
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         // Omit `jpg`: the 35 photos in `public/eventos/` used to join the
         // precache and the SW downloaded 11.2 MB on every first visit,
         // including 4G users who only wanted a product. Photos are content,
