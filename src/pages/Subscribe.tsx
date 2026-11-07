@@ -120,7 +120,7 @@ export default function Subscribe() {
             </a>
             <ThemeToggle variant="icon" />
             <Link to="/login">
-              <Button variant="outline" size="sm" className="border-primary/50 hover:border-primary text-xs sm:text-sm">
+              <Button variant="outline" size="sm" className="h-11 border-primary/50 hover:border-primary text-xs sm:text-sm">
                 Entrar
               </Button>
             </Link>

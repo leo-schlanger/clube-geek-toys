@@ -37,9 +37,9 @@ describe('CookieConsent', () => {
     vi.useRealTimers()
   })
 
-  function renderConsent() {
+  function renderConsent(path = '/') {
     return render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <CookieConsent />
       </MemoryRouter>
     )
@@ -69,6 +69,28 @@ describe('CookieConsent', () => {
     })
 
     expect(screen.getByText('Este site utiliza cookies')).toBeInTheDocument()
+  })
+
+  // On a phone the banner covered the submit button of the login form
+  it.each(['/login', '/entrar', '/cadastro', '/recuperar-senha', '/checkout', '/atacado/checkout'])(
+    'sits at the top on the form screen %s, without padding the page',
+    async (path) => {
+      renderConsent(path)
+      await act(async () => {
+        vi.advanceTimersByTime(1500)
+      })
+      const banner = screen.getByText('Este site utiliza cookies').closest('.fixed')
+      expect(banner).toHaveClass('top-0')
+      expect(document.body.style.paddingBottom).toBe('')
+    }
+  )
+
+  it('sits at the bottom elsewhere', async () => {
+    renderConsent('/produto/x')
+    await act(async () => {
+      vi.advanceTimersByTime(1500)
+    })
+    expect(screen.getByText('Este site utiliza cookies').closest('.fixed')).toHaveClass('bottom-0')
   })
 
   it('does not show if consent already exists in localStorage', async () => {

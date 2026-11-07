@@ -1,21 +1,30 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from './ui/button'
 import { Cookie, X } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { loadAnalytics } from '../lib/analytics'
 import { isAdminSubdomain } from '../lib/subdomain'
 
 const COOKIE_CONSENT_KEY = 'clube_geek_cookie_consent'
 
+// Form screens keep their submit button low on a phone: the banner goes to the
+// top there, so the first screen never hides "Entrar" or "Finalizar".
+const FORM_ROUTE = /^\/(login|entrar|cadastro|recuperar-senha|verificar-email|checkout|atacado\/(entrar|cadastro|checkout))\/?$/
+
+function cookieBannerAtTop(pathname: string): boolean {
+  return FORM_ROUTE.test(pathname)
+}
+
 export function CookieConsent() {
   const [visible, setVisible] = useState(false)
   const bannerRef = useRef<HTMLDivElement>(null)
+  const atTop = cookieBannerAtTop(useLocation().pathname)
 
   // While the banner is up, pad the page by its height so nothing (the
   // login button, a form's last field) stays stuck behind it.
   useEffect(() => {
     const el = bannerRef.current
-    if (!visible || !el) return
+    if (!visible || !el || atTop) return
     const body = document.body
     const previous = body.style.paddingBottom
     const sync = () => {
@@ -27,7 +36,7 @@ export function CookieConsent() {
       window.removeEventListener('resize', sync)
       body.style.paddingBottom = previous
     }
-  }, [visible])
+  }, [visible, atTop])
 
   useEffect(() => {
     // The staff panel keeps only the login (essential) and never loads
@@ -65,7 +74,9 @@ export function CookieConsent() {
   return (
     <div
       ref={bannerRef}
-      className="fixed bottom-0 left-0 right-0 z-9998 p-2 sm:p-4 animate-in slide-in-from-bottom duration-300"
+      className={`fixed left-0 right-0 z-9998 p-2 sm:p-4 animate-in duration-300 ${
+        atTop ? 'top-0 slide-in-from-top' : 'bottom-0 slide-in-from-bottom'
+      }`}
     >
       <div className="mx-auto max-w-xl bg-card border border-border rounded-xl shadow-2xl p-3 sm:p-5">
         <div className="flex items-start gap-2 sm:gap-3">

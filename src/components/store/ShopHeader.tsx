@@ -141,13 +141,13 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
                   value={term}
                   onChange={(e) => setTerm(e.target.value)}
                   placeholder={searchPlaceholder}
-                  className="h-10 border-0 bg-transparent pl-9 pr-2 shadow-none focus-visible:ring-0"
+                  className="h-11 border-0 bg-transparent pl-9 pr-2 shadow-none focus-visible:ring-0"
                   aria-label="Buscar produtos"
                 />
               </div>
               <Button
                 type="submit"
-                className="h-10 shrink-0 rounded-none rounded-r-[4px] px-4 text-sm font-semibold"
+                className="h-11 shrink-0 rounded-none rounded-r-[4px] px-4 text-sm font-semibold"
                 aria-label="Pesquisar"
               >
                 <Search className="h-4 w-4 sm:mr-1.5" />
@@ -254,13 +254,13 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="h-10 border-0 bg-transparent pl-9 pr-2 shadow-none focus-visible:ring-0"
+                className="h-11 border-0 bg-transparent pl-9 pr-2 shadow-none focus-visible:ring-0"
                 aria-label="Buscar produtos"
               />
             </div>
             <Button
               type="submit"
-              className="h-10 shrink-0 rounded-none rounded-r-[4px] px-3.5 font-semibold"
+              className="h-11 shrink-0 rounded-none rounded-r-[4px] px-3.5 font-semibold"
               aria-label="Pesquisar"
             >
               <Search className="h-4 w-4" />
