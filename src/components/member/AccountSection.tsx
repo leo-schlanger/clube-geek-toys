@@ -94,7 +94,7 @@ export function AccountSection({ member, contract, onEditProfile, only }: Accoun
               <User className="h-5 w-5" />
               Meus Dados
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={onEditProfile}>
+            <Button variant="ghost" size="sm" className="h-11" onClick={onEditProfile}>
               <Edit className="h-4 w-4" />
               Editar
             </Button>
@@ -169,7 +169,7 @@ export function AccountSection({ member, contract, onEditProfile, only }: Accoun
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="h-11 flex-1"
                   onClick={() => {
                     openContractPdf(contract.pdfUrl).catch(() => toast.error('Não foi possível abrir o contrato'))
                   }}
@@ -180,7 +180,7 @@ export function AccountSection({ member, contract, onEditProfile, only }: Accoun
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="h-11 flex-1"
                   onClick={handleResendContract}
                   disabled={resendingContract}
                 >
@@ -205,6 +205,7 @@ export function AccountSection({ member, contract, onEditProfile, only }: Accoun
               <Button
                 variant="outline"
                 size="sm"
+                className="h-11"
                 onClick={handleDownloadAdhesion}
                 disabled={downloadingAdhesion}
               >
