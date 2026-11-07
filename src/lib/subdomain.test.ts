@@ -426,3 +426,22 @@ describe('getMemberVerifyUrl', () => {
     expect(getMemberVerifyUrl('abcd', null)).toBe(`${CANONICAL_ORIGINS.club}/verificar/abcd`)
   })
 })
+
+describe('parseMemberVerifyUrl', () => {
+  const ID = 'abcd1234-5678-9012-3456-789012345678'
+
+  it('reads back what getMemberVerifyUrl writes, with and without token', async () => {
+    const { getMemberVerifyUrl, parseMemberVerifyUrl } = await loadModule()
+    expect(parseMemberVerifyUrl(getMemberVerifyUrl(ID, 'mgz1.a_b-c'))).toEqual({ id: ID, token: 'mgz1.a_b-c' })
+    expect(parseMemberVerifyUrl(getMemberVerifyUrl(ID))).toEqual({ id: ID, token: null })
+  })
+
+  it('accepts any host and extra params, and rejects what is not a card URL', async () => {
+    const { parseMemberVerifyUrl } = await loadModule()
+    expect(parseMemberVerifyUrl(` https://club.geekpoptoys.com.br/verificar/${ID}?x=1&t=abc#top `)).toEqual({ id: ID, token: 'abc' })
+    expect(parseMemberVerifyUrl(`https://club.geeketoys.com.br/verificar/${ID}?t=`)).toEqual({ id: ID, token: null })
+    expect(parseMemberVerifyUrl(`https://club.geeketoys.com.br/verificar/${ID}x`)).toBeNull()
+    expect(parseMemberVerifyUrl('https://shop.geekpoptoys.com.br/ingresso/T-AAAA-BBBB-CCCC')).toBeNull()
+    expect(parseMemberVerifyUrl('{"cpf":"12345678901"}')).toBeNull()
+  })
+})

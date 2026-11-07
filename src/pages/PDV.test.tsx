@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 // ---------------------------------------------------------------------------
@@ -21,10 +21,12 @@ vi.mock('../lib/logger', () => ({
 const mockGetMemberByCPF = vi.fn()
 const mockGetMemberById = vi.fn()
 const mockIsMemberActive = vi.fn()
+const mockVerifyMemberCard = vi.fn()
 vi.mock('../lib/members', () => ({
   getMemberByCPF: (...args: unknown[]) => mockGetMemberByCPF(...args),
   getMemberById: (...args: unknown[]) => mockGetMemberById(...args),
   isMemberActive: (...args: unknown[]) => mockIsMemberActive(...args),
+  verifyMemberCard: (...args: unknown[]) => mockVerifyMemberCard(...args),
 }))
 
 vi.mock('../lib/utils', async (importOriginal) => {
@@ -67,6 +69,7 @@ vi.mock('lucide-react', () => {
     Moon: icon,
     Sun: icon,
     Monitor: icon,
+    Smartphone: icon,
   }
 })
 
@@ -74,13 +77,16 @@ vi.mock('../components/ui/loading', () => ({
   Loading: ({ text }: { text?: string }) => <div data-testid="loading">{text || 'Loading...'}</div>,
 }))
 
+const CARD_ID = 'abcd1234-5678-9012-3456-789012345678'
+const scanUrl = vi.hoisted(() => ({ value: '' }))
+
 vi.mock('../components/QRScanner', () => ({
   QRScanner: ({ onScan, onClose }: { onScan: (d: string) => void; onClose: () => void }) => (
     <div data-testid="qr-scanner">
       <button data-testid="qr-scan-trigger" onClick={() => onScan('{"cpf":"12345678901"}')}>Scan</button>
       <button
         data-testid="qr-scan-url"
-        onClick={() => onScan('https://club.geeketoys.com.br/verificar/abcd1234-5678-9012-3456-789012345678')}
+        onClick={() => onScan(scanUrl.value)}
       >
         Scan URL
       </button>
@@ -135,6 +141,8 @@ describe('PDV', () => {
     vi.clearAllMocks()
     mockGetMemberByCPF.mockResolvedValue(activeMember)
     mockIsMemberActive.mockReturnValue(true)
+    mockVerifyMemberCard.mockResolvedValue(null)
+    scanUrl.value = `https://club.geeketoys.com.br/verificar/${CARD_ID}`
   })
 
   // ─── Header ────────────────────────────────────────────────
@@ -321,9 +329,68 @@ describe('PDV', () => {
     fireEvent.click(screen.getByTestId('qr-scan-url'))
 
     await waitFor(() => {
-      expect(mockGetMemberById).toHaveBeenCalledWith('abcd1234-5678-9012-3456-789012345678')
+      expect(mockGetMemberById).toHaveBeenCalledWith(CARD_ID)
       expect(screen.getByText('EM DIA — pode aplicar o desconto!')).toBeInTheDocument()
     })
+  })
+
+  // ─── Anti-print token: a warning, never a block ──────────
+
+  async function scanCard(url: string, token: string | null) {
+    scanUrl.value = url
+    mockGetMemberById.mockResolvedValue(activeMember)
+    mockVerifyMemberCard.mockResolvedValue(token ? { isCurrent: true, token } : { isCurrent: true })
+    render(<PDV />)
+    fireEvent.click(screen.getByText('Scanner QR'))
+    fireEvent.click(screen.getByTestId('qr-scan-url'))
+    await screen.findByText('EM DIA — pode aplicar o desconto!')
+  }
+
+  it('passes the QR token to the same check /verificar uses, and a fresh QR shows no warning', async () => {
+    await scanCard(`https://club.geeketoys.com.br/verificar/${CARD_ID}?t=abc.DEF-_`, 'valid')
+    expect(mockVerifyMemberCard).toHaveBeenCalledWith(CARD_ID, 'abc.DEF-_')
+    expect(screen.queryByText('QR antigo (possível print)')).not.toBeInTheDocument()
+  })
+
+  it.each(['expired', 'invalid'])('warns on a %s token but still shows the member', async (token) => {
+    await scanCard(`https://club.geeketoys.com.br/verificar/${CARD_ID}?t=old`, token)
+    expect(screen.getByRole('alert')).toHaveTextContent('QR antigo (possível print)')
+    expect(screen.getByText('Member Test')).toBeInTheDocument()
+  })
+
+  it('warns on a QR without token (print of an old card), on the mirror domain too', async () => {
+    await scanCard(`https://club.geekpoptoys.com.br/verificar/${CARD_ID}`, 'missing')
+    expect(mockVerifyMemberCard).toHaveBeenCalledWith(CARD_ID, null)
+    expect(screen.getByRole('alert')).toHaveTextContent('QR antigo (possível print)')
+  })
+
+  it('an API without the check, or a failed check, flags nothing and still verifies', async () => {
+    await scanCard(`https://club.geeketoys.com.br/verificar/${CARD_ID}?t=x`, null)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    cleanup()
+    mockVerifyMemberCard.mockRejectedValue(new Error('429'))
+    render(<PDV />)
+    fireEvent.click(screen.getByText('Scanner QR'))
+    fireEvent.click(screen.getByTestId('qr-scan-url'))
+    await screen.findByText('EM DIA — pode aplicar o desconto!')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('warns on the old JSON QR, which has no token', async () => {
+    render(<PDV />)
+    fireEvent.click(screen.getByText('Scanner QR'))
+    fireEvent.click(screen.getByTestId('qr-scan-trigger'))
+    await screen.findByText('EM DIA — pode aplicar o desconto!')
+    expect(screen.getByRole('alert')).toHaveTextContent('QR antigo (possível print)')
+  })
+
+  it('a CPF search is not a QR and shows no warning', async () => {
+    render(<PDV />)
+    fireEvent.change(screen.getByPlaceholderText('Digite o CPF...'), { target: { value: '12345678901' } })
+    fireEvent.submit(screen.getByPlaceholderText('Digite o CPF...').closest('form')!)
+    await screen.findByText('EM DIA — pode aplicar o desconto!')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(mockVerifyMemberCard).not.toHaveBeenCalled()
   })
 })
 

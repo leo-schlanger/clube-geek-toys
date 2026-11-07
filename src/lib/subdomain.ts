@@ -199,6 +199,25 @@ export function getMemberVerifyUrl(memberId: string, token?: string | null): str
   return token ? `${base}?t=${encodeURIComponent(token)}` : base
 }
 
+const MEMBER_VERIFY_RE = /\/verificar\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:[/?#]|$)/i
+
+/** Inverse of `getMemberVerifyUrl` for a scanned QR, on any host. `token` is null when absent. */
+export function parseMemberVerifyUrl(scanned: string): { id: string; token: string | null } | null {
+  const text = scanned.trim()
+  const match = text.match(MEMBER_VERIFY_RE)
+  if (!match) return null
+  const query = text.match(/[?&]t=([^&#\s]*)/)
+  let token: string | null = null
+  if (query?.[1]) {
+    try {
+      token = decodeURIComponent(query[1])
+    } catch {
+      token = query[1]
+    }
+  }
+  return { id: match[1], token }
+}
+
 /** Canonical origin of the current app, used by canonical and og:url. */
 export function getCanonicalOrigin(): string {
   return getAppMode() === 'shop' ? CANONICAL_ORIGINS.shop : CANONICAL_ORIGINS.club

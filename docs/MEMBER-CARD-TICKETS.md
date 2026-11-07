@@ -47,12 +47,23 @@ girava saiu.
   o aviso de QR antigo.
 - Carteirinha vencida: cartão em cinza e **QR pausado até renovar** (decisão do
   Leo, 07/11/2026); o botão Renovar fica em destaque no aviso do topo.
-- O PDV (modo Portaria) lê o id do mesmo QR (`/verificar/<uuid>` com ou sem `?t=`).
+- O PDV também avisa (07/11/2026). Quem lê a carteirinha no PDV é o modo
+  **Scanner QR**; o modo **Portaria** (`TicketCheckIn`) só lê ingresso. O
+  scanner extrai id e `t` com `parseMemberVerifyUrl` (`lib/subdomain.ts`, inverso
+  de `getMemberVerifyUrl`, aceita os dois domínios) e chama o mesmo
+  `verifyMemberCard(id, t)` de `/verificar`, em paralelo com a ficha do membro.
+  Fora de `valid` aparece o mesmo aviso (`components/OldQrWarning.tsx`, um só
+  componente para as duas telas), acima do resultado: **aviso, não bloqueio** —
+  o desconto continua a depender só da situação no banco. QR sem `t` e o QR JSON
+  antigo (só CPF) contam como `missing`; busca por CPF não é QR e não avisa. Se a
+  conferência do token falhar (rede, 429 — o limite é 15/min por IP), o PDV
+  segue sem aviso.
 
 Testes: `card-token.test.ts` (válido, vencido, adulterado, de outro membro,
 ausente, tempo constante), `member.routes.test.ts` (HTTP real: vencido com token
 válido continua vencido, dono recebe o token, anônimo 401), `CardQrDialog.test.tsx`
-(renovação e Wake Lock) e `MemberVerify.test.tsx` (aviso).
+(renovação e Wake Lock), `MemberVerify.test.tsx` (aviso) e `PDV.test.tsx`
+(valid/expired/invalid/missing, JSON antigo, falha da conferência, busca por CPF).
 
 ### Validado em produção
 

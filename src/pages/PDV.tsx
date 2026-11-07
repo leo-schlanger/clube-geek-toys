@@ -10,8 +10,16 @@ import { Loading } from '../components/ui/loading'
 import { QRScanner } from '../components/QRScanner'
 import { CLUB_PLAN, type Member } from '../types'
 import { formatCPF, getStatusLabel, validateCPF } from '../lib/utils'
-import { getMemberByCPF, getMemberById, isMemberActive } from '../lib/members'
+import {
+  getMemberByCPF,
+  getMemberById,
+  isMemberActive,
+  verifyMemberCard,
+  type CardTokenCheck,
+} from '../lib/members'
+import { parseMemberVerifyUrl } from '../lib/subdomain'
 import { PDVDoor } from '../components/PDVDoor'
+import { OldQrWarning } from '../components/OldQrWarning'
 
 // Validation schema for the member QR code
 const qrCodeSchema = z.object({
@@ -40,6 +48,8 @@ interface VerificationResult {
   member: Member | null
   isValid: boolean
   message: string
+  /** Anti-print check of a scanned QR; absent for a CPF search. */
+  qrToken?: CardTokenCheck
 }
 
 export default function PDV() {
@@ -60,18 +70,17 @@ export default function PDV() {
     setResult(null)
 
     try {
-      const urlMatch = data.match(
-        /\/verificar\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i,
-      )
-      if (urlMatch) {
-        await verifyMemberById(urlMatch[1])
+      const card = parseMemberVerifyUrl(data)
+      if (card) {
+        await verifyMemberById(card.id, card.token)
         return
       }
 
       const parsed = JSON.parse(data)
       const qrData = qrCodeSchema.parse(parsed)
 
-      await verifyMember(qrData.cpf)
+      // The pre-URL JSON QR never carried a token: it is a static image.
+      await verifyMember(qrData.cpf, 'missing')
     } catch (error) {
       // Separate validation errors from everything else
       if (error instanceof z.ZodError) {
@@ -123,7 +132,7 @@ export default function PDV() {
     }
   }
 
-  function applyVerification(member: Member) {
+  function applyVerification(member: Member, qrToken?: CardTokenCheck) {
     const isActive = isMemberActive(member)
     const isExpired = new Date(member.expiryDate) < new Date()
 
@@ -135,11 +144,20 @@ export default function PDV() {
         : isExpired
           ? 'NÃO ESTÁ EM DIA — assinatura expirada'
           : 'NÃO ESTÁ EM DIA — assinatura pendente',
+      qrToken,
     })
   }
 
-  async function verifyMemberById(id: string) {
-    const member = await getMemberById(id)
+  async function verifyMemberById(id: string, token: string | null) {
+    // Same public check as /verificar, only for its token verdict. A failure
+    // there leaves the verdict unknown, never blocks the lookup.
+    const [member, card] = await Promise.all([
+      getMemberById(id),
+      verifyMemberCard(id, token).catch((error) => {
+        logger.warn('Card token check failed:', error)
+        return null
+      }),
+    ])
     if (!member) {
       setResult({
         member: null,
@@ -148,13 +166,13 @@ export default function PDV() {
       })
       return
     }
-    applyVerification(member)
+    applyVerification(member, card?.token)
   }
 
   /**
    * Verify member by CPF
    */
-  async function verifyMember(cpf: string) {
+  async function verifyMember(cpf: string, qrToken?: CardTokenCheck) {
     // A mistyped CPF used to go to the server and come back "não encontrado",
     // which reads as "not a member" to the person at the counter.
     if (!validateCPF(cpf)) {
@@ -173,7 +191,7 @@ export default function PDV() {
         return
       }
 
-      applyVerification(member)
+      applyVerification(member, qrToken)
     } catch (error) {
       logger.error('Error verifying member:', error)
       setResult({
@@ -297,6 +315,8 @@ export default function PDV() {
               }`}
           >
             <CardContent className="py-8">
+              {result.member && <OldQrWarning token={result.qrToken} className="mb-6" />}
+
               {/* Status Icon */}
               <div className="flex justify-center mb-6">
                 {result.isValid ? (
