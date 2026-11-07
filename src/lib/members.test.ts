@@ -23,6 +23,7 @@ import {
   getMemberByCPF,
   isCPFRegistered,
   verifyMemberCard,
+  getCardToken,
   getMemberByUserId,
   getMemberById,
   getAllMembers,
@@ -128,6 +129,22 @@ describe('Members API client', () => {
       mockedApi.get.mockResolvedValue({ data: undefined, status: 404 })
       const result = await verifyMemberCard('abcd1234-5678-9012-3456-789012345678')
       expect(result).toBeNull()
+    })
+  })
+
+  describe('anti-print card token', () => {
+    it('verifyMemberCard forwards the QR token', async () => {
+      mockedApi.get.mockResolvedValue({ data: { isCurrent: true, token: 'valid' }, status: 200 })
+      await verifyMemberCard('abcd', 'mgz1.a b')
+      expect(mockedApi.get).toHaveBeenCalledWith('/members/verify/abcd?t=mgz1.a%20b', { skipAuth: true })
+    })
+
+    it('getCardToken asks the owner endpoint and returns null on failure', async () => {
+      mockedApi.get.mockResolvedValueOnce({ data: { memberId: 'm', token: 't', expiresAt: 'x' }, status: 200 })
+      expect(await getCardToken()).toEqual({ memberId: 'm', token: 't', expiresAt: 'x' })
+      expect(mockedApi.get).toHaveBeenLastCalledWith('/members/me/card-token')
+      mockedApi.get.mockResolvedValueOnce({ error: 'x', status: 500 })
+      expect(await getCardToken()).toBeNull()
     })
   })
 

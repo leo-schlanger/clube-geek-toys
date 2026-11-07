@@ -15,6 +15,9 @@ export async function getMemberByCPF(cpf: string): Promise<Member | null> {
   return result.data || null
 }
 
+/** 'valid' = QR opened on the member's phone in the last minutes; anything else may be a screenshot. */
+export type CardTokenCheck = 'valid' | 'expired' | 'invalid' | 'missing'
+
 export interface MemberCardPublic {
   fullName: string
   status: string
@@ -22,12 +25,27 @@ export interface MemberCardPublic {
   isCurrent: boolean
   discountPercent: number
   planName: string
+  /** Absent on an API older than the anti-print token. */
+  token?: CardTokenCheck
 }
 
 /** Public card check — no auth. Used by /verificar/:id and phone-camera QR scans. */
-export async function verifyMemberCard(id: string): Promise<MemberCardPublic | null> {
-  const result = await api.get<MemberCardPublic>(`/members/verify/${id}`, { skipAuth: true })
+export async function verifyMemberCard(id: string, token?: string | null): Promise<MemberCardPublic | null> {
+  const qs = token ? `?t=${encodeURIComponent(token)}` : ''
+  const result = await api.get<MemberCardPublic>(`/members/verify/${id}${qs}`, { skipAuth: true })
   return result.data || null
+}
+
+export interface CardToken {
+  memberId: string
+  token: string
+  expiresAt: string
+}
+
+/** Short-lived token for the owner's QR; the full-screen QR renews it before it expires. */
+export async function getCardToken(): Promise<CardToken | null> {
+  const result = await api.get<CardToken>('/members/me/card-token')
+  return result.data ?? null
 }
 
 /**

@@ -65,12 +65,12 @@ describe('WelcomeCelebration', () => {
 
   it('renders the action button', () => {
     render(<WelcomeCelebration memberName="Carlos" memberId="m-1" />)
-    expect(screen.getByText('Vamos lá!')).toBeInTheDocument()
+    expect(screen.getByText('Ver minha carteirinha')).toBeInTheDocument()
   })
 
   it('dismisses and persists when button is clicked', () => {
     render(<WelcomeCelebration memberName="Carlos" memberId="m-1" />)
-    fireEvent.click(screen.getByText('Vamos lá!'))
+    fireEvent.click(screen.getByText('Ver minha carteirinha'))
     expect(localStorage.setItem).toHaveBeenCalledWith('clube_geek_welcome_seen_m-1', '1')
   })
 
@@ -91,7 +91,7 @@ describe('WelcomeCelebration', () => {
     const onDismiss = vi.fn()
     render(<WelcomeCelebration memberName="Carlos" memberId="m-1" onDismiss={onDismiss} />)
     expect(screen.getByAltText(/Nono.*coração/)).toHaveAttribute('src', '/mascot/nono-heart.webp')
-    fireEvent.click(screen.getByText('Vamos lá!'))
+    fireEvent.click(screen.getByText('Ver minha carteirinha'))
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 

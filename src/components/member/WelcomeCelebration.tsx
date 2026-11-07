@@ -11,9 +11,11 @@ interface WelcomeCelebrationProps {
   memberName: string
   memberId: string
   onDismiss?: () => void
+  /** CTA: scroll to the card and focus its QR button. */
+  onViewCard?: () => void
 }
 
-export function WelcomeCelebration({ memberName, memberId, onDismiss }: WelcomeCelebrationProps) {
+export function WelcomeCelebration({ memberName, memberId, onDismiss, onViewCard }: WelcomeCelebrationProps) {
   const [visible, setVisible] = useState(
     () => !localStorage.getItem(welcomeStorageKey(memberId))
   )
@@ -61,9 +63,9 @@ export function WelcomeCelebration({ memberName, memberId, onDismiss }: WelcomeC
           <button
             onClick={dismiss}
             aria-label="Fechar"
-            className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
+            className="absolute top-1 right-1 flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-foreground"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
 
           {/* Decorative stars */}
@@ -103,8 +105,8 @@ export function WelcomeCelebration({ memberName, memberId, onDismiss }: WelcomeC
             transition={{ delay: 0.45 }}
             className="text-muted-foreground text-sm mb-4 max-w-sm mx-auto"
           >
-            Sua conta no Clube GeekPop & Toys está ativa!
-            Aproveite {MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto e os benefícios do clube.
+            Sua conta no Clube GeekPop & Toys está ativa! Sua carteirinha já vale: mostre o QR no balcão ou
+            entre na loja online logada, e os {MEMBER_DISCOUNT_PERCENT}% de desconto aparecem sozinhos.
           </motion.p>
 
           <motion.div
@@ -112,8 +114,14 @@ export function WelcomeCelebration({ memberName, memberId, onDismiss }: WelcomeC
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
-            <Button onClick={dismiss} className="btn-glow">
-              Vamos lá!
+            <Button
+              onClick={() => {
+                dismiss()
+                onViewCard?.()
+              }}
+              className="btn-glow h-12 px-6 text-[19px] font-bold"
+            >
+              Ver minha carteirinha
             </Button>
           </motion.div>
         </motion.div>

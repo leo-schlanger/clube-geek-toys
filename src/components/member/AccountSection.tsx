@@ -26,9 +26,11 @@ interface AccountSectionProps {
   member: Member
   contract: Contract | null
   onEditProfile: () => void
+  /** Render one of the two cards; both by default. */
+  only?: 'data' | 'contract'
 }
 
-export function AccountSection({ member, contract, onEditProfile }: AccountSectionProps) {
+export function AccountSection({ member, contract, onEditProfile, only }: AccountSectionProps) {
   const [resendingContract, setResendingContract] = useState(false)
   const [downloadingAdhesion, setDownloadingAdhesion] = useState(false)
   const plan = PLANS[member.plan as PlanType]
@@ -84,6 +86,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
   return (
     <div className="space-y-6">
       {/* Personal Data */}
+      {only !== 'contract' && (
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -132,8 +135,10 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Contract */}
+      {only !== 'data' && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -216,6 +221,7 @@ export function AccountSection({ member, contract, onEditProfile }: AccountSecti
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }

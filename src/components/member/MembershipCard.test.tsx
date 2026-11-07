@@ -52,10 +52,9 @@ describe('MembershipCard', () => {
     expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
   })
 
-  it('displays formatted expiry date', () => {
-    render(<MembershipCard member={createMember({ expiryDate: '2026-12-31' })} />)
-    // Format: MM/YY
-    expect(screen.getByText('12/26')).toBeInTheDocument()
+  it('displays the expiry date in full (dd/mm/aaaa)', () => {
+    render(<MembershipCard member={createMember({ expiryDate: '2026-12-31T15:00:00Z' })} />)
+    expect(screen.getByText('31/12/2026')).toBeInTheDocument()
   })
 
   it('displays dash when no expiry date', () => {
@@ -73,47 +72,33 @@ describe('MembershipCard', () => {
     expect(numberEl).toBeInTheDocument()
   })
 
-  it('shows "Mostrar QR na portaria" as a 44px button initially', () => {
+  it('opens the full-screen QR from a large primary button', () => {
+    const onShowQr = vi.fn()
+    render(<MembershipCard member={createMember()} onShowQr={onShowQr} />)
+    const button = screen.getByRole('button', { name: /Mostrar QR na portaria/ })
+    expect(button).toHaveClass('h-14')
+    fireEvent.click(button)
+    expect(onShowQr).toHaveBeenCalled()
+  })
+
+  it('has no QR on the card itself (a static QR could be printed)', () => {
+    render(<MembershipCard member={createMember()} onShowQr={() => {}} />)
+    expect(screen.queryByTestId('qr-code')).not.toBeInTheDocument()
+  })
+
+  it('paused (expired): grey card and the QR button disabled', () => {
+    const onShowQr = vi.fn()
+    render(<MembershipCard member={createMember()} paused onShowQr={onShowQr} />)
+    expect(screen.getByTestId('card-face')).toHaveClass('grayscale')
+    const button = screen.getByRole('button', { name: /QR pausado até renovar/ })
+    expect(button).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Mostrar QR/ })).not.toBeInTheDocument()
+  })
+
+  it('Copiar ID and Compartilhar are 44px targets', () => {
     render(<MembershipCard member={createMember()} />)
-    expect(screen.getByRole('button', { name: /Mostrar QR na portaria/ })).toHaveClass('h-11')
-  })
-
-  it('flips the card on click and shows "Ver carteirinha"', () => {
-    render(<MembershipCard member={createMember()} />)
-    fireEvent.click(screen.getByText('Mostrar QR na portaria'))
-    expect(screen.getByText('Ver carteirinha')).toBeInTheDocument()
-  })
-
-  it('renders QR code on the back of the card pointing at the public verify URL', () => {
-    const member = createMember()
-    render(<MembershipCard member={member} />)
-    const qr = screen.getByTestId('qr-code')
-    expect(qr).toBeInTheDocument()
-    expect(qr.getAttribute('data-value')).toBe(
-      `https://club.geeketoys.com.br/verificar/${member.id}`,
-    )
-  })
-
-  it('shows the single 10% discount badge on the back', () => {
-    render(<MembershipCard member={createMember()} />)
-    expect(screen.getByText('10%')).toBeInTheDocument()
-    expect(screen.getByText('em qualquer produto')).toBeInTheDocument()
-  })
-
-  it('displays masked CPF on the back', () => {
-    render(<MembershipCard member={createMember({ cpf: '12345678900' })} />)
-    // maskCPF: formatCPF then replace first two groups with ***. ***
-    expect(screen.getByText(/CPF: \*\*\*\. \*\*\*/)).toBeInTheDocument()
-  })
-
-  it('shows EM DIA on the back for an active current member', () => {
-    render(<MembershipCard member={createMember({ status: 'active' })} />)
-    expect(screen.getByText('EM DIA')).toBeInTheDocument()
-  })
-
-  it('shows pending status label', () => {
-    render(<MembershipCard member={createMember({ status: 'pending' })} />)
-    expect(screen.getByText('Pendente')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Copiar ID/ })).toHaveClass('h-11')
+    expect(screen.getByRole('button', { name: /Compartilhar/ })).toHaveClass('h-11')
   })
 
   it('copies member ID when ID button is clicked', async () => {
@@ -138,11 +123,6 @@ describe('MembershipCard', () => {
     expect(toast.success).toHaveBeenCalledWith('ID copiado!')
   })
 
-  it('renders scan instruction text', () => {
-    render(<MembershipCard member={createMember()} />)
-    expect(screen.getByText('Escaneie para ver se o membro está em dia')).toBeInTheDocument()
-  })
-
   it('renders labels for front of card', () => {
     render(<MembershipCard member={createMember()} />)
     expect(screen.getByText('Nome do Membro')).toBeInTheDocument()
@@ -150,15 +130,12 @@ describe('MembershipCard', () => {
   })
 
   describe('Nono', () => {
-    it('sits on the front, tiny and decorative, away from the QR on the back', () => {
+    it('sits on the card, tiny and decorative', () => {
       const { container } = render(<MembershipCard member={createMember()} />)
       const nono = container.querySelector('img[src="/mascot/nono-glasses.webp"]')
       expect(nono).not.toBeNull()
       expect(nono).toHaveAttribute('alt', '')
       expect(nono).toHaveAttribute('width', '44')
-      // Front face: same face as the name, not the one with the QR.
-      const back = container.querySelector('[style*="rotateY(180deg)"][style*="backface"]')
-      expect(back?.contains(nono!)).toBe(false)
     })
 
     it('can be turned off when another Nono is on the screen', () => {

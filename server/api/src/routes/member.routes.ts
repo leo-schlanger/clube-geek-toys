@@ -8,6 +8,7 @@ import * as paymentService from '../services/payment.service.js';
 import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { CLUB_PLAN_PAYMENT_TYPE, MEMBER_SHOP_DISCOUNT } from '../types/index.js';
+import { checkCardToken, issueCardToken } from '../utils/card-token.js';
 
 export const memberRouter = Router();
 
@@ -33,6 +34,9 @@ memberRouter.get('/cpf-exists/:cpf', authenticate, cpfLookupLimiter, async (req,
 
 // Public card check: phone-camera scan of the membership QR.
 // Returns only what a physical card would show — never CPF, email or user id.
+// Status always comes from the database; `token` says whether the QR was opened
+// on the member's phone just now ('valid') or is old/printed/forged. Cards
+// printed before tokens existed come back 'missing' and still verify.
 memberRouter.get('/verify/:id', publicLookupLimiter, async (req, res, next) => {
   try {
     const id = String(req.params.id || '');
@@ -58,6 +62,7 @@ memberRouter.get('/verify/:id', publicLookupLimiter, async (req, res, next) => {
       isCurrent,
       discountPercent: Math.round(MEMBER_SHOP_DISCOUNT * 100),
       planName: 'Clube GeekPop & Toys',
+      token: checkCardToken(id, req.query.t),
     });
   } catch (err) {
     next(err);
@@ -132,6 +137,21 @@ memberRouter.get('/me', async (req, res, next) => {
       return;
     }
     res.json(member);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /members/me/card-token — short-lived token for the owner's QR
+memberRouter.get('/me/card-token', async (req, res, next) => {
+  try {
+    const member = await memberService.getMemberByUserId(req.user!.userId);
+    if (!member) {
+      res.status(404).json({ error: 'Membro não encontrado' });
+      return;
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json({ memberId: member.id, ...issueCardToken(member.id) });
   } catch (err) {
     next(err);
   }

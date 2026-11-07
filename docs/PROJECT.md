@@ -877,9 +877,9 @@ clube-geek-toys/
 │   │   ├── member/                      # Componentes do dashboard membro
 │   │   │   ├── MembershipCard.tsx
 │   │   │   ├── AccountSection.tsx, BenefitsSection.tsx
-│   │   │   ├── SubscriptionCard.tsx, DiscountStrip.tsx
-│   │   │   ├── OnboardingGuide.tsx
-│   │   │   └── QuickActions.tsx
+│   │   │   ├── SubscriptionCard.tsx, CardQrDialog.tsx (QR com token)
+│   │   │   ├── MemberDiscount.tsx, MemberEvents.tsx, MemberOrders.tsx
+│   │   │   └── MemberAccount.tsx, RenewNotice.tsx, StatusChip.tsx
 │   │   ├── registration/                # Stepper de cadastro
 │   │   │   ├── RegistrationStepper.tsx
 │   │   │   ├── StepAccount.tsx, StepPersonalData.tsx

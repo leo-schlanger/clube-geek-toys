@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { CheckCircle, XCircle, AlertTriangle, Smartphone } from 'lucide-react'
 import { verifyMemberCard, type MemberCardPublic } from '../lib/members'
 import { LoadingPage } from '../components/ui/loading'
 
@@ -12,6 +12,8 @@ function formatExpiry(iso: string): string {
 
 export default function MemberVerify() {
   const { id } = useParams<{ id: string }>()
+  const [params] = useSearchParams()
+  const token = params.get('t')
   const [card, setCard] = useState<MemberCardPublic | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,7 +27,7 @@ export default function MemberVerify() {
         return
       }
       try {
-        const data = await verifyMemberCard(id)
+        const data = await verifyMemberCard(id, token)
         if (cancelled) return
         if (!data) {
           setError('Carteirinha não encontrada')
@@ -40,16 +42,30 @@ export default function MemberVerify() {
     }
     load()
     return () => { cancelled = true }
-  }, [id])
+  }, [id, token])
 
   if (loading) return <LoadingPage />
 
   const isCurrent = card?.isCurrent === true
+  // Status comes from the database either way; this only says whether the QR
+  // was opened on the member's phone just now. An API without the check sends
+  // no `token`, and then nothing is flagged.
+  const oldQr = card != null && card.token != null && card.token !== 'valid'
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm text-center space-y-6">
         <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-16 mx-auto" />
+
+        {oldQr && (
+          <div role="alert" className="rounded-2xl border-2 border-warning bg-warning/15 p-4 text-left">
+            <p className="flex items-center gap-2 font-heading text-lg font-extrabold">
+              <Smartphone className="h-6 w-6 shrink-0" aria-hidden />
+              QR antigo (possível print)
+            </p>
+            <p className="mt-1 text-sm">Peça para abrir a carteirinha no celular e mostrar o QR de novo.</p>
+          </div>
+        )}
 
         {error || !card ? (
           <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-8 space-y-3">
@@ -61,18 +77,18 @@ export default function MemberVerify() {
           <div
             className={`rounded-2xl border-2 p-8 space-y-4 ${
               isCurrent
-                ? 'border-green-500 bg-green-500/10'
-                : 'border-red-500 bg-red-500/10'
+                ? 'border-success bg-success/10'
+                : 'border-destructive bg-destructive/10'
             }`}
           >
             {isCurrent ? (
               <CheckCircle className="h-16 w-16 mx-auto text-green-700 dark:text-green-500" />
             ) : (
-              <AlertTriangle className="h-16 w-16 mx-auto text-red-500" />
+              <AlertTriangle className="h-16 w-16 mx-auto text-destructive" />
             )}
             <p
               className={`text-3xl font-heading font-extrabold tracking-wide ${
-                isCurrent ? 'text-green-700 dark:text-green-500' : 'text-red-500'
+                isCurrent ? 'text-green-700 dark:text-green-500' : 'text-destructive'
               }`}
             >
               {isCurrent ? 'EM DIA' : 'NÃO ESTÁ EM DIA'}

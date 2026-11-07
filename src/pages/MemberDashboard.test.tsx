@@ -59,6 +59,7 @@ vi.mock('lucide-react', () => {
     Sun: icon,
     Monitor: icon,
     UserRound: icon,
+    XCircle: icon,
   }
 })
 
@@ -72,21 +73,18 @@ vi.mock('../components/PendingPaymentScreen', () => ({
 }))
 
 vi.mock('../components/member/MembershipCard', () => ({
-  MembershipCard: ({ showMascot }: { showMascot?: boolean }) => (
-    <div data-testid="membership-card" data-mascot={String(showMascot)}>Membership Card</div>
+  MembershipCard: ({ showMascot, paused, onShowQr, below }: { showMascot?: boolean; paused?: boolean; onShowQr?: () => void; below?: React.ReactNode }) => (
+    <div data-testid="membership-card" data-mascot={String(showMascot)} data-paused={String(paused)}>
+      {below}
+      <button type="button" onClick={onShowQr}>
+        Mostrar QR na portaria
+      </button>
+    </div>
   ),
 }))
 
-vi.mock('../components/member/DiscountStrip', () => ({
-  DiscountStrip: () => <div data-testid="discount-strip">Discount Strip</div>,
-}))
-
-vi.mock('../components/member/QuickActions', () => ({
-  QuickActions: () => <div data-testid="quick-actions">Quick Actions</div>,
-}))
-
-vi.mock('../components/member/OnboardingGuide', () => ({
-  OnboardingGuide: () => <div data-testid="onboarding-guide">Onboarding Guide</div>,
+vi.mock('../components/member/CardQrDialog', () => ({
+  CardQrDialog: ({ open }: { open: boolean }) => (open ? <div data-testid="qr-dialog">QR</div> : null),
 }))
 
 vi.mock('../components/member/WelcomeCelebration', () => ({
@@ -97,16 +95,22 @@ vi.mock('../components/member/BenefitsSection', () => ({
   BenefitsSection: () => <div data-testid="benefits-section">Benefits</div>,
 }))
 
-vi.mock('../components/member/SubscriptionCard', () => ({
-  SubscriptionCard: () => <div data-testid="subscription-card">Subscription</div>,
+vi.mock('../components/member/MemberDiscount', () => ({
+  MemberDiscount: ({ paused }: { paused?: boolean }) => (
+    <div data-testid="member-discount" data-paused={String(paused)}>Discount</div>
+  ),
 }))
 
-vi.mock('../components/member/AccountSection', () => ({
-  AccountSection: () => <div data-testid="account-section">Account Section</div>,
+vi.mock('../components/member/MemberEvents', () => ({
+  MemberEvents: () => <div data-testid="member-events">Events</div>,
 }))
 
-vi.mock('../components/MemberActivityHistory', () => ({
-  MemberActivityHistory: () => <div data-testid="activity-history">Activity History</div>,
+vi.mock('../components/member/MemberOrders', () => ({
+  MemberOrders: () => <div data-testid="member-orders">Orders</div>,
+}))
+
+vi.mock('../components/member/MemberAccount', () => ({
+  MemberAccount: () => <div data-testid="member-account">Account</div>,
 }))
 
 // Lazy-loaded modals
@@ -172,11 +176,10 @@ describe('MemberDashboard', () => {
 
   // ─── Active member dashboard ───────────────────────────────
 
-  it('renders header with logo text', async () => {
+  it('greets the member by first name', async () => {
     render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByText('Clube GeekPop & Toys')).toBeInTheDocument()
-    })
+    expect(await screen.findByRole('heading', { name: 'Olá, Test' })).toBeInTheDocument()
+    expect(screen.getByText(/^Em dia · faltam \d+ dias$/)).toBeInTheDocument()
   })
 
   it('keeps sign out inside a labelled 44px account menu', async () => {
@@ -203,46 +206,18 @@ describe('MemberDashboard', () => {
     })
   })
 
-  it('renders the discount strip section', async () => {
+  it('renders every block of the panel', async () => {
     render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('discount-strip')).toBeInTheDocument()
-    })
+    await screen.findByTestId('membership-card')
+    for (const id of ['member-discount', 'member-events', 'member-orders', 'benefits-section', 'member-account']) {
+      expect(screen.getByTestId(id)).toBeInTheDocument()
+    }
   })
 
-  it('renders the quick actions', async () => {
+  it('opens the full-screen QR from the card', async () => {
     render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('quick-actions')).toBeInTheDocument()
-    })
-  })
-
-  it('renders the benefits section', async () => {
-    render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('benefits-section')).toBeInTheDocument()
-    })
-  })
-
-  it('renders the subscription card', async () => {
-    render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('subscription-card')).toBeInTheDocument()
-    })
-  })
-
-  it('renders the account section', async () => {
-    render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('account-section')).toBeInTheDocument()
-    })
-  })
-
-  it('renders the activity history', async () => {
-    render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('activity-history')).toBeInTheDocument()
-    })
+    fireEvent.click(await screen.findByText('Mostrar QR na portaria'))
+    expect(screen.getByTestId('qr-dialog')).toBeInTheDocument()
   })
 
   it('does not render any points sections', async () => {
@@ -346,15 +321,28 @@ describe('MemberDashboard', () => {
 
   // ─── Expiry alert ─────────────────────────────────────────
 
-  it('shows expired alert when membership is expired', async () => {
-    mockGetMemberByUserId.mockResolvedValue({
-      ...activeMember,
-      expiryDate: '2020-01-01',
-    })
-
+  it('expired: red notice, card paused (QR off), discount paused', async () => {
+    mockGetMemberByUserId.mockResolvedValue({ ...activeMember, expiryDate: '2020-01-01' })
     render(<MemberDashboard />)
-    await waitFor(() => {
-      expect(screen.getByText('Sua assinatura expirou!')).toBeInTheDocument()
-    })
+    expect(await screen.findByText(/Sua carteirinha venceu em/)).toBeInTheDocument()
+    expect(screen.getByText('Sua carteirinha está vencida.')).toBeInTheDocument()
+    expect(screen.getByTestId('membership-card')).toHaveAttribute('data-paused', 'true')
+    expect(screen.getByTestId('member-discount')).toHaveAttribute('data-paused', 'true')
+    expect(screen.getByRole('button', { name: /Renovar/ })).toBeInTheDocument()
+  })
+
+  it('an inactive status pauses the card even with a future date', async () => {
+    mockGetMemberByUserId.mockResolvedValue({ ...activeMember, status: 'inactive' })
+    render(<MemberDashboard />)
+    expect(await screen.findByTestId('membership-card')).toHaveAttribute('data-paused', 'true')
+  })
+
+  it('within 30 days: amber notice with Renovar, card still active', async () => {
+    const soon = new Date(Date.now() + 12 * 86_400_000 - 3_600_000).toISOString()
+    mockGetMemberByUserId.mockResolvedValue({ ...activeMember, expiryDate: soon })
+    render(<MemberDashboard />)
+    expect(await screen.findByText('Sua carteirinha vence em 12 dias')).toBeInTheDocument()
+    expect(screen.getByText('Vence em 12 dias')).toBeInTheDocument()
+    expect(screen.getByTestId('membership-card')).toHaveAttribute('data-paused', 'false')
   })
 })

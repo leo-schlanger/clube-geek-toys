@@ -32,6 +32,7 @@ vi.mock('../services/payment.service.js', () => payments);
 vi.mock('../config/database.js', () => ({ query: queryMock }));
 
 import { memberRouter } from './member.routes.js';
+import { issueCardToken } from '../utils/card-token.js';
 import { routerClient } from '../test-support/http.js';
 
 const api = routerClient('/members', memberRouter);
@@ -75,6 +76,65 @@ describe('public', () => {
     members.getMemberById.mockResolvedValue(null);
     expect((await api.get(`/verify/${ID}`)).status).toBe(404);
     expect((await api.get('/verify/not-an-id')).status).toBe(400);
+  });
+
+  describe('anti-print token on the card QR', () => {
+    const current = { ...own, status: 'active', expiryDate: new Date(Date.now() + 86_400_000).toISOString() };
+
+    it('a fresh token from the owner verifies as valid', async () => {
+      members.getMemberById.mockResolvedValue(current);
+      const { token } = issueCardToken(ID);
+      const res = await api.get(`/verify/${ID}?t=${encodeURIComponent(token)}`);
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ isCurrent: true, token: 'valid' });
+    });
+
+    it('an expired token (a screenshot) still shows the status, flagged as old', async () => {
+      members.getMemberById.mockResolvedValue(current);
+      const { token } = issueCardToken(ID, Date.now() - 6 * 60_000);
+      const res = await api.get(`/verify/${ID}?t=${encodeURIComponent(token)}`);
+      expect(res.body).toMatchObject({ isCurrent: true, token: 'expired' });
+    });
+
+    it('a tampered token or one from another card is invalid', async () => {
+      members.getMemberById.mockResolvedValue(current);
+      const { token } = issueCardToken(ID);
+      const tampered = token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A');
+      expect((await api.get(`/verify/${ID}?t=${encodeURIComponent(tampered)}`)).body.token).toBe('invalid');
+      const other = issueCardToken('9b2c1a10-0000-4000-8000-000000000abc').token;
+      expect((await api.get(`/verify/${ID}?t=${encodeURIComponent(other)}`)).body.token).toBe('invalid');
+    });
+
+    it('an old card without a token keeps working, marked missing', async () => {
+      members.getMemberById.mockResolvedValue(current);
+      expect((await api.get(`/verify/${ID}`)).body).toMatchObject({ isCurrent: true, token: 'missing' });
+    });
+
+    it('a valid token never makes an expired membership pass', async () => {
+      members.getMemberById.mockResolvedValue({ ...own, status: 'active', expiryDate: '2020-01-01' });
+      const { token } = issueCardToken(ID);
+      expect((await api.get(`/verify/${ID}?t=${encodeURIComponent(token)}`)).body).toMatchObject({
+        isCurrent: false,
+        token: 'valid',
+      });
+      members.getMemberById.mockResolvedValue({ ...current, status: 'inactive' });
+      expect((await api.get(`/verify/${ID}?t=${encodeURIComponent(token)}`)).body.isCurrent).toBe(false);
+    });
+
+    it('the owner gets a token for their own card only; anonymous gets 401', async () => {
+      members.getMemberByUserId.mockResolvedValue(own);
+      const res = await api.get('/me/card-token', { as: 'member' });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('cache-control')).toBe('no-store');
+      expect(res.body.memberId).toBe(ID);
+      expect(members.getMemberByUserId).toHaveBeenCalledWith('user-member');
+      members.getMemberById.mockResolvedValue(current);
+      expect((await api.get(`/verify/${ID}?t=${encodeURIComponent(res.body.token)}`)).body.token).toBe('valid');
+
+      expect((await api.get('/me/card-token')).status).toBe(401);
+      members.getMemberByUserId.mockResolvedValue(null);
+      expect((await api.get('/me/card-token', { as: 'member' })).status).toBe(404);
+    });
   });
 });
 

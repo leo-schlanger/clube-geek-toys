@@ -419,4 +419,10 @@ describe('getMemberVerifyUrl', () => {
       `${CANONICAL_ORIGINS.club}/verificar/abcd1234-5678-9012-3456-789012345678`,
     )
   })
+
+  it('appends the anti-print token, encoded', async () => {
+    const { getMemberVerifyUrl, CANONICAL_ORIGINS } = await loadModule()
+    expect(getMemberVerifyUrl('abcd', 'mgz1.a_b-c')).toBe(`${CANONICAL_ORIGINS.club}/verificar/abcd?t=mgz1.a_b-c`)
+    expect(getMemberVerifyUrl('abcd', null)).toBe(`${CANONICAL_ORIGINS.club}/verificar/abcd`)
+  })
 })

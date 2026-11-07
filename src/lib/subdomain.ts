@@ -190,9 +190,13 @@ export const CANONICAL_ORIGINS = {
   club: 'https://club.geeketoys.com.br',
 } as const
 
-/** Public URL encoded in the membership QR so any phone camera can open it. */
-export function getMemberVerifyUrl(memberId: string): string {
-  return `${CANONICAL_ORIGINS.club}/verificar/${memberId}`
+/**
+ * Public URL encoded in the membership QR so any phone camera can open it.
+ * `token` is the short-lived anti-print proof from `/members/me/card-token`.
+ */
+export function getMemberVerifyUrl(memberId: string, token?: string | null): string {
+  const base = `${CANONICAL_ORIGINS.club}/verificar/${memberId}`
+  return token ? `${base}?t=${encodeURIComponent(token)}` : base
 }
 
 /** Canonical origin of the current app, used by canonical and og:url. */

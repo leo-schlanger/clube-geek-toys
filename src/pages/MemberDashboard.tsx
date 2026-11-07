@@ -1,23 +1,27 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { logger } from '../lib/logger'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
 import { LoadingPage } from '../components/ui/loading'
 import { PendingPaymentScreen } from '../components/PendingPaymentScreen'
-import { MembershipCard } from '../components/member/MembershipCard'
-import { DiscountStrip } from '../components/member/DiscountStrip'
-import { QuickActions } from '../components/member/QuickActions'
-import { OnboardingGuide } from '../components/member/OnboardingGuide'
 import { WelcomeCelebration } from '../components/member/WelcomeCelebration'
 import { NonoMascot } from '../components/store/NonoMascot'
 import { isWelcomePending } from '../lib/welcome'
 import { BenefitsSection } from '../components/member/BenefitsSection'
-import { SubscriptionCard } from '../components/member/SubscriptionCard'
-import { AccountSection } from '../components/member/AccountSection'
-import { MemberActivityHistory } from '../components/MemberActivityHistory'
+import { MembershipCard } from '../components/member/MembershipCard'
+import { CardQrDialog } from '../components/member/CardQrDialog'
+import { StatusChip } from '../components/member/StatusChip'
+import { MemberDiscount } from '../components/member/MemberDiscount'
+import { MemberEvents } from '../components/member/MemberEvents'
+import { MemberOrders } from '../components/member/MemberOrders'
+import { MemberAccount } from '../components/member/MemberAccount'
+import { RenewNotice } from '../components/member/RenewNotice'
+import { SectionErrorBoundary } from '../components/ui/section-error-boundary'
+import { cardChipLabel, cardState, dayMonth, formatMemberNumber, longDate, plural } from '../lib/member-card-state'
+import { formatCurrency } from '../lib/utils'
+import { CLUB_PLAN, MEMBER_DISCOUNT_PERCENT } from '../types'
 import type { Member, Subscription, Contract } from '../types'
-import { calculateDaysUntilExpiry } from '../lib/utils'
 import { getMemberByUserId } from '../lib/members'
 import { getMemberContract } from '../lib/contract-storage'
 import { getActiveSubscriptionByMemberId } from '../lib/subscriptions'
@@ -54,6 +58,9 @@ export default function MemberDashboard() {
   const [contract, setContract] = useState<Contract | null>(null)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [welcomeDismissed, setWelcomeDismissed] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
+  const cardAnchor = useRef<HTMLDivElement>(null)
+  const qrButton = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (user) {
@@ -176,20 +183,51 @@ export default function MemberDashboard() {
   }
 
   const welcomePending = !welcomeDismissed && isWelcomePending(member)
-  const daysUntilExpiry = calculateDaysUntilExpiry(new Date(member.expiryDate))
-  const isExpiringSoon = daysUntilExpiry <= 7 && daysUntilExpiry > 0
-  const isExpired = daysUntilExpiry <= 0
+  const state = cardState(member)
+  const paused = state.kind === 'expired'
+  const firstName = member.fullName?.split(' ')[0] || 'membro'
+
+  const viewCard = () => {
+    cardAnchor.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    qrButton.current?.focus({ preventScroll: true })
+  }
+
+  const chipTone = state.kind === 'expired' ? 'destructive' : state.kind === 'soon' ? 'warning' : 'success'
+
+  // Left column on desktop (sticky): card, chip, QR, discount
+  const cardColumn = (
+    <div className="space-y-4 lg:sticky lg:top-[88px]">
+      <div ref={cardAnchor} className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Sua carteirinha</p>
+        {/* One Nono per screen: the welcome's heart while it shows, else the card's. */}
+        <MembershipCard
+          ref={qrButton}
+          member={member}
+          showMascot={!welcomePending}
+          paused={paused}
+          onShowQr={() => setQrOpen(true)}
+          below={
+            <div className="space-y-1">
+              <StatusChip tone={chipTone}>{cardChipLabel(state)}</StatusChip>
+              <p className="text-sm text-muted-foreground">Válida até {longDate(member.expiryDate)}</p>
+            </div>
+          }
+        />
+      </div>
+      <MemberDiscount paused={paused} />
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen bg-background pb-10">
       {/* Header */}
       <header className="glass border-b border-border sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between px-4 py-2 lg:px-8">
           <div className="flex items-center gap-3">
             <img src="/logo-vip.png" alt="GeekPop & Toys" className="h-10" />
-            <span className="text-lg font-heading font-bold text-foreground hidden sm:block">Clube GeekPop & Toys</span>
+            <span className="font-heading text-lg font-bold text-foreground">Clube</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <ThemeToggle variant="icon" />
             {/* Sign out lives in the menu: a bare icon next to the others was too easy to hit by mistake */}
             <DropdownMenu>
@@ -201,7 +239,11 @@ export default function MemberDashboard() {
               <DropdownMenuContent align="end" className="min-w-48">
                 <DropdownMenuItem className="min-h-11 gap-2" onSelect={() => setModal('profile')}>
                   <Settings className="h-4 w-4" aria-hidden />
-                  Editar perfil
+                  Meu perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem className="min-h-11 gap-2" onSelect={() => setModal('renew')}>
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  Renovar
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="min-h-11 gap-2" onSelect={() => signOut()}>
@@ -214,18 +256,24 @@ export default function MemberDashboard() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+      <main className="mx-auto max-w-[1120px] space-y-4 px-4 py-5 lg:space-y-6 lg:px-8">
+        <div>
+          <h1 className="font-heading text-[26px] font-extrabold leading-tight lg:text-[30px]">Olá, {firstName}</h1>
+          <p className="text-sm text-muted-foreground">
+            {paused ? 'Sua carteirinha está vencida.' : 'Sua carteirinha e seus descontos, tudo aqui.'}
+          </p>
+        </div>
+
         {/* Email Verification Banner */}
         {!emailVerified && (
-          <div className="p-4 rounded-xl bg-primary/10 border border-primary/30 flex items-center gap-3">
-            <Mail className="h-5 w-5 text-primary shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm">
-                <strong>Verifique seu email</strong> — Confirme para garantir acesso completo à sua conta.
-              </p>
-            </div>
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
+            <Mail className="h-5 w-5 shrink-0 text-primary" />
+            <p className="min-w-0 flex-1 text-sm">
+              <strong>Verifique seu email</strong> — Confirme para garantir acesso completo à sua conta.
+            </p>
             <Button
-              size="sm"
+              variant="outline"
+              className="h-11"
               onClick={async () => {
                 const result = await sendVerificationEmail()
                 if (result.success) toast.success('Email de verificação enviado!')
@@ -237,73 +285,63 @@ export default function MemberDashboard() {
           </div>
         )}
 
-        {/* Expiry Alert */}
-        {(isExpired || isExpiringSoon) && (
-          <div
-            className={`p-4 rounded-xl flex items-center gap-3 ${
-              isExpired
-                ? 'bg-destructive/15 border-2 border-destructive/50'
-                : 'bg-warning/15 border-2 border-warning/50'
-            }`}
-          >
-            <AlertTriangle className={`h-5 w-5 shrink-0 ${isExpired ? 'text-destructive animate-pulse' : 'text-warning'}`} />
-            <div className="flex-1">
-              {isExpired ? (
-                <>
-                  <strong>Sua assinatura expirou!</strong>
-                  <p className="text-sm opacity-80">Renove agora para continuar aproveitando os benefícios.</p>
-                </>
-              ) : (
-                <>
-                  <strong>Faltam {daysUntilExpiry} dias para expirar</strong>
-                  <p className="text-sm opacity-80">Renove agora e não perca seus benefícios.</p>
-                </>
-              )}
-            </div>
-            <Button variant="warning" size="sm" className="btn-glow shrink-0" onClick={() => setModal('renew')}>
-              <RefreshCw className="h-4 w-4" />
-              Renovar
-            </Button>
-          </div>
-        )}
-
-        {/* One Nono per screen: the welcome's heart while it shows, else the card's. */}
-        <MembershipCard member={member} showMascot={!welcomePending} />
-
-        <DiscountStrip />
-
-        <QuickActions
-          member={member}
-          onRenew={() => setModal('renew')}
-          onEditProfile={() => setModal('profile')}
-        />
-
-        {welcomePending && (
-          <WelcomeCelebration
-            memberName={member.fullName}
-            memberId={member.id}
-            onDismiss={() => setWelcomeDismissed(true)}
+        {/* One notice at a time, above the card */}
+        {paused ? (
+          <RenewNotice
+            tone="destructive"
+            title={`Sua carteirinha venceu em ${dayMonth(member.expiryDate)}`}
+            text={`O desconto de ${MEMBER_DISCOUNT_PERCENT}% e a meia nos eventos estão pausados. Renove por ${formatCurrency(CLUB_PLAN.price)} e volta na hora.`}
+            onRenew={() => setModal('renew')}
           />
+        ) : state.kind === 'soon' ? (
+          <RenewNotice
+            tone="warning"
+            title={`Sua carteirinha vence em ${plural(state.days, 'dia', 'dias')}`}
+            text="Renove agora: o novo ano começa no fim do atual, sem perder nenhum dia."
+            onRenew={() => setModal('renew')}
+          />
+        ) : (
+          welcomePending && (
+            <WelcomeCelebration
+              memberName={member.fullName}
+              memberId={member.id}
+              onDismiss={() => setWelcomeDismissed(true)}
+              onViewCard={viewCard}
+            />
+          )
         )}
 
-        <OnboardingGuide memberStartDate={member.startDate} />
+        <div className="grid gap-4 lg:grid-cols-[420px_1fr] lg:items-start lg:gap-6">
+          <div className="min-w-0">{cardColumn}</div>
+          <div className="min-w-0 space-y-4 lg:space-y-6">
+            <SectionErrorBoundary fallbackMessage="Não deu para carregar os eventos agora.">
+              <MemberEvents paused={paused} />
+            </SectionErrorBoundary>
+            <SectionErrorBoundary fallbackMessage="Não deu para carregar suas compras agora.">
+              <MemberOrders />
+            </SectionErrorBoundary>
+            <BenefitsSection />
+            <MemberAccount
+              member={member}
+              contract={contract}
+              subscription={subscription}
+              showEarlyRenew={state.kind === 'active'}
+              onEditProfile={() => setModal('profile')}
+              onRenew={() => setModal('renew')}
+              onSubscriptionChange={fetchMemberData}
+            />
+          </div>
+        </div>
+      </main>
 
-        <BenefitsSection />
-
-        <SubscriptionCard
-          member={member}
-          subscription={subscription}
-          onSubscriptionChange={fetchMemberData}
-        />
-
-        <AccountSection
-          member={member}
-          contract={contract}
-          onEditProfile={() => setModal('profile')}
-        />
-
-        <MemberActivityHistory memberId={member.id} limit={5} />
-      </div>
+      <CardQrDialog
+        open={qrOpen && !paused}
+        onOpenChange={setQrOpen}
+        memberId={member.id}
+        fullName={member.fullName}
+        displayNumber={formatMemberNumber(member.id).replace(/\s+/g, ' ')}
+        expiryDate={member.expiryDate}
+      />
 
       {/* Modals — lazy-loaded */}
       <Suspense fallback={null}>

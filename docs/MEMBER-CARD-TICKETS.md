@@ -9,15 +9,50 @@ associado, as interações por QR Code e os ingressos de evento.
 
 ### Como funciona
 
-O QR da carteirinha (`MembershipCard.tsx`) codifica uma **URL real**:
+O QR da carteirinha codifica uma **URL real**:
 
 ```
-https://club.geeketoys.com.br/verificar/{memberId}
+https://club.geeketoys.com.br/verificar/{memberId}?t={token}
 ```
 
 Quem escaneia com a câmera do celular — sem app nenhum — abre a página pública
 `/verificar/:id`, que chama `GET /members/verify/:id` e mostra nome, situação,
 validade e o desconto vigente.
+
+### QR que vale só no celular do membro (anti-print, 07/11/2026)
+
+O QR só aparece no botão **Mostrar QR na portaria** do painel, em tela cheia
+(`CardQrDialog.tsx`, fundo branco nos dois temas, tela mantida acesa por Wake
+Lock quando o aparelho deixa). A carteirinha em si não tem mais QR — o verso que
+girava saiu.
+
+- O `t` é um token curto emitido por `GET /members/me/card-token` (só o dono,
+  com sessão; `Cache-Control: no-store`): data de emissão + HMAC-SHA256 do id do
+  membro e da data, truncado em 128 bits. A chave é derivada do `HMAC_SECRET`
+  que já existe, com rótulo próprio (`member-card-qr-v1`) — nenhuma variável nova.
+  Código: `server/api/src/utils/card-token.ts`.
+- Vale **5 minutos** (tolera 60 s de relógio adiantado). A tela renova o token
+  1 minuto antes de vencer e quando a aba volta ao primeiro plano.
+- `/verificar/:id` **sempre** lê a situação no banco; o token só acrescenta
+  `token: 'valid' | 'expired' | 'invalid' | 'missing'` na resposta. Fora de
+  `valid`, a página mostra em destaque **«QR antigo (possível print) — peça para
+  abrir a carteirinha no celular»**, sem esconder o resultado. Token válido não
+  faz carteirinha vencida passar.
+- A assinatura é comparada como texto e em tempo constante
+  (`crypto.timingSafeEqual`) — comparar bytes decodificados aceitaria duas grafias
+  do último caractere base64url.
+- QR antigo, sem `t` (prints e carteirinhas anteriores a 07/11), continua
+  abrindo a página: aparece como `missing`, com o mesmo aviso.
+- Sem rede, a tela ainda mostra o QR (sem token) e avisa que a portaria pode ver
+  o aviso de QR antigo.
+- Carteirinha vencida: cartão em cinza e **QR pausado até renovar** (decisão do
+  Leo, 07/11/2026); o botão Renovar fica em destaque no aviso do topo.
+- O PDV (modo Portaria) lê o id do mesmo QR (`/verificar/<uuid>` com ou sem `?t=`).
+
+Testes: `card-token.test.ts` (válido, vencido, adulterado, de outro membro,
+ausente, tempo constante), `member.routes.test.ts` (HTTP real: vencido com token
+válido continua vencido, dono recebe o token, anônimo 401), `CardQrDialog.test.tsx`
+(renovação e Wake Lock) e `MemberVerify.test.tsx` (aviso).
 
 ### Validado em produção
 
@@ -35,8 +70,9 @@ ou velha.
 
 ### O que a rota expõe
 
-Nome, situação, validade, desconto e nome do plano. Nada de CPF, e-mail ou
-telefone. O id é UUID — não dá para varrer.
+Nome, situação, validade, desconto, nome do plano e o resultado do token
+(`valid`/`expired`/`invalid`/`missing`). Nada de CPF, e-mail ou telefone. O id
+é UUID — não dá para varrer.
 
 ---
 

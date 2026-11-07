@@ -203,13 +203,15 @@ Base **shadcn/ui** + CVA. Cores via tokens CSS (`bg-primary`, `text-muted-foregr
 
 ### 5.2 Domínio — membro
 
-| Componente                                                        | Arquivo                         | Cores / estilo                                                              |
-| ----------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------- |
-| **MembershipCard**                                                | `member/MembershipCard.tsx`     | **Gradiente roxo metálico** (`#6d28d9`, glow `#7c3aed`) — **fora da marca** |
-| SubscriptionCard                                                  | `member/SubscriptionCard.tsx`   | `border-primary`, ícones primary                                            |
-| WelcomeCelebration                                                | `member/WelcomeCelebration.tsx` | Confetti com pink/gold + primary                                            |
-| DiscountStrip                                                     | `member/DiscountStrip.tsx`      | Destaque de 10%                                                             |
-| BenefitsSection / QuickActions / AccountSection / OnboardingGuide | `member/*`                      | Tokens + primary                                                            |
+| Componente                                                                                 | Arquivo                         | Cores / estilo                                                                                                   |
+| ------------------------------------------------------------------------------------------ | ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **MembershipCard**                                                                         | `member/MembershipCard.tsx`     | Só a frente (gradiente rosa → amarelo da marca); cinza com `paused` (vencida). O verso com QR saiu em 07/11/2026 |
+| CardQrDialog                                                                               | `member/CardQrDialog.tsx`       | QR em tela cheia, fundo branco nos dois temas, moldura rosa, token anti-print renovado sozinho                   |
+| StatusChip                                                                                 | `member/StatusChip.tsx`         | Texto `foreground` + bolinha/fundo/borda na cor do estado (nunca texto colorido)                                 |
+| MemberSection / MemberDiscount / MemberEvents / MemberOrders / MemberAccount / RenewNotice | `member/*`                      | Painel do membro (Fase 2a, 07/11/2026): h2 com ícone `text-primary`, `p-4 rounded-xl`                            |
+| SubscriptionCard                                                                           | `member/SubscriptionCard.tsx`   | Só aparece para quem ainda tem assinatura recorrente antiga                                                      |
+| WelcomeCelebration                                                                         | `member/WelcomeCelebration.tsx` | Confetti com pink/gold + primary; CTA «Ver minha carteirinha»                                                    |
+| BenefitsSection / AccountSection                                                           | `member/*`                      | Tokens + primary                                                                                                 |
 
 ### 5.3 Domínio — admin / PDV / relatórios
 
