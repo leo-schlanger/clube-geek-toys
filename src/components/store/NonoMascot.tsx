@@ -1,8 +1,8 @@
 import { cn } from '../../lib/utils'
 
 /**
- * Nono, the GeekPop tiger. Decorative, one per screen. Shop: empty states and
- * the post-purchase page. Club: /assinar, welcome, the card and the empty
+ * Nono, the GeekPop tiger. Decorative, one per screen. Shop: empty states,
+ * the post-purchase page and the club call in the home hero. Club: /assinar, welcome, the card and the empty
  * member state. Never in sign-up, card or PIX forms, login, admin or PDV.
  */
 const POSES = {

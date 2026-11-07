@@ -110,6 +110,26 @@ describe('ShopHome', () => {
     expect(mockedList).toHaveBeenCalled()
   })
 
+  it('puts the club call in the home hero, with Nono', async () => {
+    renderHome('/')
+    expect(screen.getByRole('heading', { name: 'Associe-se e tenha vantagens incríveis' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('club-hero-nono')).toBeInTheDocument())
+  })
+
+  it('drops the hero Nono when the empty catalogue shows its own', async () => {
+    mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
+    renderHome('/')
+    await waitFor(() => expect(mockedList).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByTestId('club-hero-nono')).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Associe-se e tenha vantagens incríveis' })).toBeInTheDocument()
+  })
+
+  it('leaves the club call out of category pages', async () => {
+    renderHome('/categoria/musica')
+    await waitFor(() => expect(mockedList).toHaveBeenCalled())
+    expect(screen.queryByText('Associe-se e tenha vantagens incríveis')).not.toBeInTheDocument()
+  })
+
 
   it('renders the catalog sort control on the home grid', async () => {
     renderHome('/')

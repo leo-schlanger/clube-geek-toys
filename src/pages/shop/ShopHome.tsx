@@ -27,6 +27,7 @@ import { COMPANY } from '../../lib/company'
 import { Button } from '../../components/ui/button'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { ClubHomePitch } from '../../components/store/ClubPitch'
+import { ClubHeroCall } from '../../components/store/ClubHeroCall'
 
 /**
  * Main storefront, serving both "/" and "/categoria/:slug", and reading
@@ -39,7 +40,7 @@ export default function ShopHome() {
   const sort = parseProductSort(searchParams.get('sort'))
   const page = parseCatalogPage(searchParams.get('page'))
 
-  const { isMember } = useShopMember()
+  const { isMember, loading: memberLoading } = useShopMember()
   const { visible: eventVisible } = useActiveEvent()
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -203,36 +204,33 @@ export default function ShopHome() {
       <div className="mx-auto max-w-6xl px-4 py-6">
         {/* Hero — unfiltered home only */}
         {!categorySlug && !search && (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-primary/20 bg-linear-to-br/srgb from-primary/15 via-background to-accent/10 p-6 sm:p-10">
-            <div className="max-w-xl">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+          <section className="mb-8 grid gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-linear-to-br/srgb from-primary/15 via-background to-accent/10 p-4 sm:p-8 md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-center md:gap-8 lg:p-10">
+            <div className="min-w-0 px-1 sm:px-0">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-pink-700 dark:text-primary">
                 <Sparkles className="h-3.5 w-3.5" />
                 Loja de K-pop no Rio de Janeiro
               </span>
               <h1 className="mt-3 text-2xl font-heading font-bold sm:text-4xl">
                 Photocards, Merch e Cultura Geek e Kpop
               </h1>
-              <p className="mt-2 text-muted-foreground">
-                Envio pelos Correios para todo o Brasil. Membros do clube ganham{' '}
-                <strong className="text-accent">10% de desconto</strong> em qualquer produto.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button asChild size="sm" variant="outline" className="gap-2 border-primary/40">
-                  <a href="https://club.geeketoys.com.br/assinar" target="_blank" rel="noopener noreferrer">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Entrar no Clube
-                  </a>
+              <p className="mt-2 text-muted-foreground">Envio pelos Correios para todo o Brasil.</p>
+              {eventVisible && (
+                <Button asChild className="mt-4 min-h-11 gap-2">
+                  <Link to="/evento">
+                    <Ticket className="h-4 w-4" />
+                    Evento &amp; ingressos
+                  </Link>
                 </Button>
-                {eventVisible && (
-                  <Button asChild className="gap-2" size="sm">
-                    <Link to="/evento">
-                      <Ticket className="h-4 w-4" />
-                      Evento &amp; ingressos
-                    </Link>
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
+            {/* The club up front (Norberto, 07/11/2026). One Nono per screen:
+                the empty catalogue already shows one. */}
+            <ClubHeroCall
+              className="min-w-0"
+              isMember={isMember}
+              loading={memberLoading}
+              showMascot={loading || products.length > 0}
+            />
           </section>
         )}
 
