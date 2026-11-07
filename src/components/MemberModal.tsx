@@ -14,7 +14,7 @@ import { Loading } from './ui/loading'
 import { PLANS, CURRENT_PAYMENT_TYPE, paymentTypeLabel, type Member, type MemberStatus, type MemberWithSubscription } from '../types'
 import { createMember, updateMember, activateMember } from '../lib/members'
 import { api } from '../lib/api-client'
-import { formatCurrency, formatCPF, formatDate, validateCPF, getStatusLabel } from '../lib/utils'
+import { formatCurrency, formatCPF, validateCPF, getStatusLabel } from '../lib/utils'
 import { fullCPFValidation, type CPFValidationResult } from '../lib/cpf-validation'
 import { toast } from 'sonner'
 import { openContractPdf } from '../lib/contract-storage'
@@ -42,6 +42,7 @@ import {
   Play,
   Ban,
 } from 'lucide-react'
+import { formatCivilDate } from '../lib/club-date'
 
 // Validation schema
 const memberSchema = z.object({
@@ -375,7 +376,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                 </div>
                 <div className="text-sm text-muted-foreground">
                   <Calendar className="inline h-4 w-4" />
-                  Expira: {formatDate(member.expiryDate)}
+                  Expira: {formatCivilDate(member.expiryDate)}
                 </div>
               </div>
             )}
@@ -559,7 +560,7 @@ export function MemberModal({ mode, member, onClose, onSuccess }: MemberModalPro
                   <div>
                     <span className="text-muted-foreground">Membro desde:</span>
                     <span className="ml-2 font-medium">
-                      {formatDate(localMember.startDate)}
+                      {formatCivilDate(localMember.startDate)}
                     </span>
                   </div>
                   <div>

@@ -131,11 +131,19 @@ export const CLUB_PLAN_PAYMENT_TYPE: PaymentType = 'annual';
 export const CLUB_PLAN_FREQUENCY_TYPE: SubscriptionFrequencyType = 'years';
 export const CLUB_PLAN_INTERVAL: 'month' | 'year' = 'year';
 
-/** End of one paid period starting at `from`. */
-export function addClubPeriod(from: Date): Date {
-  const end = new Date(from);
-  end.setFullYear(end.getFullYear() + 1);
-  return end;
+/** Last valid day of one paid period starting on civil date `from` ('YYYY-MM-DD'). */
+export function addClubPeriod(from: string): string {
+  const [y, m, d] = from.split('-').map(Number);
+  return new Date(Date.UTC(y + 1, m - 1, d, 12)).toISOString().slice(0, 10);
+}
+
+/**
+ * Last valid day after a payment: a renewal extends from the current expiry
+ * while it still holds (no day is lost); anything else starts from Rio's today.
+ */
+export function nextClubExpiry(opts: { status: string; currentExpiry: string | null; today: string }): string {
+  const renewing = opts.status === 'active' && opts.currentExpiry !== null && opts.currentExpiry >= opts.today;
+  return addClubPeriod(renewing ? (opts.currentExpiry as string) : opts.today);
 }
 
 // Active-member shop discount, applied server-side at checkout.

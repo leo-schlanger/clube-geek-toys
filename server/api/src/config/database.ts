@@ -4,7 +4,11 @@ import { moduleLogger } from '../config/logger.js';
 
 const log = moduleLogger('database');
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// DATE (oid 1082) stays 'YYYY-MM-DD'. The default parser makes a Date at local
+// midnight, which JSON sends as '...T00:00:00.000Z' and Rio reads as the day before.
+types.setTypeParser(1082, (value: string) => value);
 
 export const pool = new Pool({
   connectionString: env.DATABASE_URL,

@@ -46,6 +46,7 @@ import {
   retailDiscountCandidates,
 } from './promo.service.js';
 import { moduleLogger } from '../config/logger.js';
+import { TODAY_RIO_SQL } from '../utils/club-date.js';
 
 const log = moduleLogger('order');
 
@@ -397,7 +398,7 @@ export async function createOrder(input: CreateOrderInput, user?: JwtPayload): P
     const mid = await getMemberIdForUser(user.userId);
     if (mid) {
       const m = await query(
-        `SELECT id FROM members WHERE id = $1 AND status = 'active' AND expiry_date >= CURRENT_DATE`,
+        `SELECT id FROM members WHERE id = $1 AND status = 'active' AND expiry_date >= ${TODAY_RIO_SQL}`,
         [mid]
       );
       if (m.rows.length > 0) memberId = mid;

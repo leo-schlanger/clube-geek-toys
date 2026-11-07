@@ -9,6 +9,7 @@ import { sendTemplateEmail } from './email.service.js';
 import { addClubPeriod, type Member } from '../types/index.js';
 import { readStoredBillingAddress } from '../utils/billing-address.js';
 import { moduleLogger } from '../config/logger.js';
+import { rioToday, toDateOnly } from '../utils/club-date.js';
 
 const log = moduleLogger('member');
 
@@ -26,8 +27,8 @@ function mapMemberRow(row: pg.QueryResultRow): Member {
     plan: row.plan,
     status: row.status,
     paymentType: row.payment_type,
-    startDate: row.start_date,
-    expiryDate: row.expiry_date,
+    startDate: toDateOnly(row.start_date),
+    expiryDate: toDateOnly(row.expiry_date),
     pendingPayment: row.pending_payment,
     subscriptionId: row.subscription_id,
     subscriptionStatus: row.subscription_status,
@@ -345,17 +346,17 @@ export async function updateMember(
     data.expiryDate == null &&
     !before.expiry_date
   ) {
-    const start = new Date();
-    const expiry = addClubPeriod(start);
+    const now = new Date();
+    const start = rioToday(now);
     if (data.startDate == null && !before.start_date) {
       setClauses.push(`start_date = $${paramIndex++}`);
-      values.push(start.toISOString().slice(0, 10));
+      values.push(start);
     }
     setClauses.push(`expiry_date = $${paramIndex++}`);
-    values.push(expiry.toISOString().slice(0, 10));
+    values.push(addClubPeriod(start));
     if (data.activatedAt == null && !before.activated_at) {
       setClauses.push(`activated_at = $${paramIndex++}`);
-      values.push(start.toISOString());
+      values.push(now.toISOString());
     }
     if (data.activatedByPayment == null && !before.activated_by_payment) {
       setClauses.push(`activated_by_payment = $${paramIndex++}`);

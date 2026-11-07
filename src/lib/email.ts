@@ -8,6 +8,7 @@
 import { api } from './api-client'
 import { logger } from './logger'
 import { fetchContractPdf } from './contract-storage'
+import { formatCivilDate } from './club-date'
 
 export interface EmailResponse {
   success: boolean
@@ -71,7 +72,7 @@ export async function sendPaymentConfirmedEmail(
       name,
       amount: amount.toFixed(2).replace('.', ','),
       plan,
-      expiry_date: new Date(expiryDate).toLocaleDateString('pt-BR'),
+      expiry_date: formatCivilDate(expiryDate),
     },
     memberId,
   })
@@ -102,7 +103,7 @@ export async function sendRenewalReminderEmail(
     to: email,
     variables: {
       name,
-      expiry_date: new Date(expiryDate).toLocaleDateString('pt-BR'),
+      expiry_date: formatCivilDate(expiryDate),
     },
     memberId,
   })

@@ -10,6 +10,7 @@ import { query } from '../config/database.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { CLUB_PLAN_PAYMENT_TYPE, MEMBER_SHOP_DISCOUNT } from '../types/index.js';
 import { checkCardToken, issueCardToken } from '../utils/card-token.js';
+import { isExpiryCurrent } from '../utils/club-date.js';
 
 export const memberRouter = Router();
 
@@ -50,12 +51,8 @@ memberRouter.get('/verify/:id', publicLookupLimiter, async (req, res, next) => {
       res.status(404).json({ error: 'Carteirinha não encontrada' });
       return;
     }
-    const expiry = member.expiryDate ? new Date(member.expiryDate) : null;
-    const isCurrent =
-      member.status === 'active' &&
-      expiry !== null &&
-      !Number.isNaN(expiry.getTime()) &&
-      expiry >= new Date();
+    // The expiry day itself counts, until 23:59:59 in Rio.
+    const isCurrent = member.status === 'active' && isExpiryCurrent(member.expiryDate);
     res.json({
       fullName: member.fullName,
       status: member.status,

@@ -4,12 +4,8 @@ import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { verifyMemberCard, type MemberCardPublic } from '../lib/members'
 import { LoadingPage } from '../components/ui/loading'
 import { OldQrWarning } from '../components/OldQrWarning'
+import { formatCivilDate } from '../lib/club-date'
 
-function formatExpiry(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('pt-BR')
-}
 
 export default function MemberVerify() {
   const { id } = useParams<{ id: string }>()
@@ -90,7 +86,7 @@ export default function MemberVerify() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-lg bg-background/60 p-3">
                 <p className="text-[10px] uppercase text-muted-foreground">Válido até</p>
-                <p className="font-semibold">{formatExpiry(card.expiryDate)}</p>
+                <p className="font-semibold">{formatCivilDate(card.expiryDate)}</p>
               </div>
               <div className="rounded-lg bg-background/60 p-3">
                 <p className="text-[10px] uppercase text-muted-foreground">Desconto</p>

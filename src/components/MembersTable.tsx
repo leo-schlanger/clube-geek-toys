@@ -29,6 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu'
+import { formatCivilDate, isExpiryCurrent } from '../lib/club-date'
 
 interface MembersTableProps {
   members: Member[]
@@ -202,10 +203,10 @@ export function MembersTable({
         render: (member) => {
           // A signup that never paid has no expiry; new Date(null) printed 31/12/1969.
           if (!member.expiryDate) return <span className="text-muted-foreground">—</span>
-          const isExpired = new Date(member.expiryDate) < new Date()
+          const isExpired = !isExpiryCurrent(member.expiryDate)
           return (
-            <span className={isExpired ? 'text-red-500 font-medium' : ''}>
-              {new Date(member.expiryDate).toLocaleDateString('pt-BR')}
+            <span className={isExpired ? 'text-red-700 dark:text-red-400 font-medium' : ''}>
+              {formatCivilDate(member.expiryDate)}
             </span>
           )
         },
@@ -345,7 +346,7 @@ export function MembersTable({
       m.phone,
       PLANS[m.plan].name,
       getStatusLabel(m.status),
-      m.expiryDate ? new Date(m.expiryDate).toLocaleDateString('pt-BR') : '',
+      m.expiryDate ? formatCivilDate(m.expiryDate) : '',
     ])
     return [headers, ...rows]
   }, [])

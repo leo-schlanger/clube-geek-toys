@@ -101,23 +101,6 @@ export function getStatusLabel(status: string): string {
 }
 
 /**
- * Calculate days until expiry date
- */
-export function calculateDaysUntilExpiry(expiryDate: Date): number {
-  const today = new Date()
-  const expiry = new Date(expiryDate)
-  const diffTime = expiry.getTime() - today.getTime()
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-}
-
-/**
- * Check if date is expired
- */
-export function isExpired(expiryDate: Date): boolean {
-  return new Date(expiryDate) < new Date()
-}
-
-/**
  * Format date to Brazilian format
  */
 export function formatDate(date: string | Date | null | undefined): string {

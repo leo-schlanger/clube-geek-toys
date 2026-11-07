@@ -939,7 +939,7 @@ describe('invoice.paid — renovação da assinatura', () => {
 
     await processPagarmeEvent(invoiceEvent());
 
-    expect(ran('GREATEST(COALESCE(expiry_date, CURRENT_DATE), CURRENT_DATE)')).toBe(true);
+    expect(ran("GREATEST(COALESCE(expiry_date, (NOW() AT TIME ZONE 'America/Sao_Paulo')::date), (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)")).toBe(true);
   });
 
   it('zera as falhas e grava a próxima cobrança', async () => {

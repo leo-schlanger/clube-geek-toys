@@ -8,7 +8,8 @@ import { restoreCreditForOrder } from './store-credit.service.js';
 import { env } from '../config/env.js';
 import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
-import { CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
+import { CLUB_PLAN_PAYMENT_TYPE, nextClubExpiry } from '../types/index.js';
+import { TODAY_RIO_SQL, formatDateBR, rioToday, toDateOnly } from '../utils/club-date.js';
 
 const log = moduleLogger('webhook');
 
@@ -531,13 +532,13 @@ async function handleInvoicePaid(
   // subscription invoice used to compute `NULL + interval = NULL` — leaving a
   // paying member `active` with no expiry, which reads as expired everywhere it
   // matters: the 10% shop discount (`order.service.ts`) and the digital card
-  // (`member.routes.ts`) both require `expiry_date >= CURRENT_DATE`. A member
+  // (`member.routes.ts`) both require `expiry_date >= TODAY_RIO_SQL`. A member
   // returning after a lapse hit the same wall from the other side, extending a
   // date already months in the past. Anchor on today whenever the stored date
   // is missing or stale — the one-off payment path already does this.
   await client.query(
     `UPDATE members
-        SET expiry_date = GREATEST(COALESCE(expiry_date, CURRENT_DATE), CURRENT_DATE) + $2::interval,
+        SET expiry_date = GREATEST(COALESCE(expiry_date, ${TODAY_RIO_SQL}), ${TODAY_RIO_SQL}) + $2::interval,
             status = 'active',
             payment_count = payment_count + 1
       WHERE id = $1`,
@@ -550,7 +551,7 @@ async function handleInvoicePaid(
     [member.id]
   );
   const nextPayment = updatedMember.rows[0]?.expiry_date
-    ? new Date(updatedMember.rows[0].expiry_date).toLocaleDateString('pt-BR')
+    ? formatDateBR(updatedMember.rows[0].expiry_date)
     : '—';
 
   pendingEmails.push({
@@ -741,22 +742,16 @@ async function activateMember(
 
   const member = memberLookup.rows[0];
   const beforeStatus = member.status;
-  const now = new Date();
-
-  // For renewals: extend from current expiry so member doesn't lose remaining days.
-  // For new activations (pending/expired): start from today.
-  const currentExpiry = member.expiry_date ? new Date(member.expiry_date) : null;
-  const isRenewal = member.status === 'active' && currentExpiry && currentExpiry > now;
-  const baseDate = isRenewal ? currentExpiry : now;
-
-  const expiryDate = addClubPeriod(baseDate);
+  const today = rioToday();
+  // Renewal extends from the current expiry so no day is lost; else from today.
+  const expiryDate = nextClubExpiry({ status: member.status, currentExpiry: toDateOnly(member.expiry_date), today });
 
   await client.query(
     `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
      activated_at = COALESCE(activated_at, NOW()), activated_by_payment = $3, pending_payment = NULL,
      payment_count = payment_count + 1, payment_type = $5
      WHERE id = $4`,
-    [now.toISOString().split('T')[0], expiryDate.toISOString().split('T')[0], paymentRef, member.id, CLUB_PLAN_PAYMENT_TYPE]
+    [today, expiryDate, paymentRef, member.id, CLUB_PLAN_PAYMENT_TYPE]
   );
 
   await auditLog(
@@ -766,7 +761,7 @@ async function activateMember(
       paymentRef,
       amount,
       before: { status: beforeStatus },
-      after: { status: 'active', expiryDate: expiryDate.toISOString().split('T')[0] },
+      after: { status: 'active', expiryDate },
     },
     member.id,
   );
@@ -785,7 +780,7 @@ async function activateMember(
         name: m.full_name,
         amount: amount.toFixed(2).replace('.', ','),
         plan: m.plan,
-        expiry_date: expiryDate.toLocaleDateString('pt-BR'),
+        expiry_date: formatDateBR(expiryDate),
       },
       member_id: m.id,
     });

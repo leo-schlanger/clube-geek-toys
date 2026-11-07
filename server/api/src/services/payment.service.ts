@@ -9,7 +9,7 @@ import { notifyAdminsOfPaymentAsync } from './admin-notification.service.js';
 import { AppError } from '../middleware/error-handler.js';
 import { isValidCPF } from '../utils/cpf.js';
 import { isValidCnpj } from '../utils/cnpj.js';
-import { CLUB_PLAN_PRICE, CLUB_PLAN_PAYMENT_TYPE, addClubPeriod } from '../types/index.js';
+import { CLUB_PLAN_PRICE, CLUB_PLAN_PAYMENT_TYPE, nextClubExpiry } from '../types/index.js';
 import {
   SAVE_MEMBER_BILLING_ADDRESS_SQL,
   billingAddressJson,
@@ -24,6 +24,7 @@ import { cancelSubscription } from './subscription.service.js';
 import { STORE_PICKUP_LOCATION } from './shipping.service.js';
 import crypto from 'crypto';
 import { moduleLogger } from '../config/logger.js';
+import { formatDateBR, rioToday, toDateOnly } from '../utils/club-date.js';
 
 const log = moduleLogger('payment');
 
@@ -467,16 +468,11 @@ export async function confirmPixPayment(opts: {
     );
     if (memberLookup.rows.length > 0) {
       const member = memberLookup.rows[0];
-      const now = new Date();
+      const today = rioToday();
 
-      // For renewals: extend from the current expiry date (not today), so the member
-      // doesn't lose remaining days. For new activations: start from today.
-      const currentExpiry = member.expiry_date ? new Date(member.expiry_date) : null;
-      const isRenewal = member.status === 'active' && currentExpiry && currentExpiry > now;
-      const baseDate = isRenewal ? currentExpiry : now;
-
-      // New charges buy the current plan period, whatever the member paid before.
-      const expiryDate = addClubPeriod(baseDate);
+      // Renewals extend from the current expiry (no day lost); new activations
+      // start from Rio's today. New charges buy the current plan period.
+      const expiryDate = nextClubExpiry({ status: member.status, currentExpiry: toDateOnly(member.expiry_date), today });
 
       await query(
         `UPDATE members SET status = 'active', start_date = COALESCE(start_date, $1), expiry_date = $2,
@@ -484,8 +480,8 @@ export async function confirmPixPayment(opts: {
          auto_renewal = FALSE, payment_count = payment_count + 1, payment_type = $5
          WHERE id = $4`,
         [
-          now.toISOString().split('T')[0],
-          expiryDate.toISOString().split('T')[0],
+          today,
+          expiryDate,
           opts.paymentId,
           payment.memberId,
           CLUB_PLAN_PAYMENT_TYPE,
@@ -506,7 +502,7 @@ export async function confirmPixPayment(opts: {
             name: m.full_name as string,
             amount: payment.amount.toFixed(2).replace('.', ','),
             plan: m.plan as string,
-            expiry_date: expiryDate.toLocaleDateString('pt-BR'),
+            expiry_date: formatDateBR(expiryDate),
           },
           member_id: payment.memberId as string,
         }).catch((err: unknown) => log.error({ err }, 'Confirmation email error'));

@@ -208,7 +208,7 @@ describe('createReservation', () => {
 
     const memberLookup = queryMock.mock.calls.find(([sql]) => String(sql).includes('FROM members'))!;
     expect(String(memberLookup[0])).toContain("status = 'active'");
-    expect(String(memberLookup[0])).toContain('expiry_date >= CURRENT_DATE');
+    expect(String(memberLookup[0])).toContain("expiry_date >= (NOW() AT TIME ZONE 'America/Sao_Paulo')::date");
     expect(memberLookup[1]).toEqual(['52998224725']);
 
     queryMock.mockImplementation(async (sql: string) => {

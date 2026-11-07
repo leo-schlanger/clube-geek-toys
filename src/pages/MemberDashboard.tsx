@@ -18,7 +18,7 @@ import { MemberOrders } from '../components/member/MemberOrders'
 import { MemberAccount } from '../components/member/MemberAccount'
 import { RenewNotice } from '../components/member/RenewNotice'
 import { SectionErrorBoundary } from '../components/ui/section-error-boundary'
-import { cardChipLabel, cardState, dayMonth, formatMemberNumber, longDate, plural } from '../lib/member-card-state'
+import { cardChipLabel, cardState, civilDayMonth, formatMemberNumber, longDate, plural } from '../lib/member-card-state'
 import { formatCurrency } from '../lib/utils'
 import { CLUB_PLAN, MEMBER_DISCOUNT_PERCENT } from '../types'
 import type { Member, Subscription, Contract } from '../types'
@@ -289,14 +289,14 @@ export default function MemberDashboard() {
         {paused ? (
           <RenewNotice
             tone="destructive"
-            title={`Sua carteirinha venceu em ${dayMonth(member.expiryDate)}`}
+            title={`Sua carteirinha venceu em ${civilDayMonth(member.expiryDate)}`}
             text={`O desconto de ${MEMBER_DISCOUNT_PERCENT}% e a meia nos eventos estão pausados. Renove por ${formatCurrency(CLUB_PLAN.price)} e volta na hora.`}
             onRenew={() => setModal('renew')}
           />
         ) : state.kind === 'soon' ? (
           <RenewNotice
             tone="warning"
-            title={`Sua carteirinha vence em ${plural(state.days, 'dia', 'dias')}`}
+            title={state.days === 0 ? 'Sua carteirinha vence hoje' : `Sua carteirinha vence em ${plural(state.days, 'dia', 'dias')}`}
             text="Renove agora: o novo ano começa no fim do atual, sem perder nenhum dia."
             onRenew={() => setModal('renew')}
           />

@@ -148,8 +148,9 @@ function receiptTotalsSql(start: string, end: string): string {
  * expired in July and had a phone number fixed in October left "in October".
  * An expiry has its date; only a manual deactivation falls back to the edit.
  */
+// `expiry_date` is the last valid day, so the member leaves at the start of the next one.
 const MEMBER_EXIT_AT = `CASE WHEN status = 'expired' AND expiry_date IS NOT NULL
-    THEN ${toInstant('expiry_date::timestamp')} ELSE updated_at END`;
+    THEN ${toInstant('(expiry_date + 1)::timestamp')} ELSE updated_at END`;
 
 export async function getDailyReport() {
   const [day, receipts, members] = await Promise.all([
@@ -906,7 +907,7 @@ export async function getOverviewReport(
            WHERE activated_at >= $1 AND activated_at < $2)::int AS new_members,
          (SELECT COUNT(*) FROM members WHERE status = 'active')::int AS active_members,
          (SELECT COUNT(*) FROM members
-           WHERE status = 'expired' AND expiry_date >= ${localDate('$1')} AND expiry_date < ${localDate('$2')})::int AS expired_in_period`,
+           WHERE status = 'expired' AND expiry_date + 1 >= ${localDate('$1')} AND expiry_date + 1 < ${localDate('$2')})::int AS expired_in_period`,
       win
     ),
     // Ranked by revenue, not units: the manager reorders by what pays, and a

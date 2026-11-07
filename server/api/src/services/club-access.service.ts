@@ -1,4 +1,5 @@
 import { CLUB_PLAN_PRICE } from '../types/index.js';
+import { TODAY_RIO_SQL } from '../utils/club-date.js';
 
 /** Anything with a `query` — the pool helper or a transaction client. */
 interface Db {
@@ -36,14 +37,14 @@ export async function revokeRefundedPeriod(
   const result = await db.query(
     `UPDATE members
         SET expiry_date = CASE
-              WHEN (expiry_date - $2::interval)::date > CURRENT_DATE
+              WHEN (expiry_date - $2::interval)::date >= ${TODAY_RIO_SQL}
                 THEN (expiry_date - $2::interval)::date
-              ELSE CURRENT_DATE END,
+              ELSE ${TODAY_RIO_SQL} END,
             status = CASE
-              WHEN (expiry_date - $2::interval)::date > CURRENT_DATE THEN status
+              WHEN (expiry_date - $2::interval)::date >= ${TODAY_RIO_SQL} THEN status
               ELSE 'inactive' END,
             auto_renewal = CASE
-              WHEN (expiry_date - $2::interval)::date > CURRENT_DATE THEN auto_renewal
+              WHEN (expiry_date - $2::interval)::date >= ${TODAY_RIO_SQL} THEN auto_renewal
               ELSE FALSE END,
             payment_count = GREATEST(payment_count - 1, 0),
             updated_at = NOW()

@@ -18,6 +18,7 @@ import {
   type CardTokenCheck,
 } from '../lib/members'
 import { parseMemberVerifyUrl } from '../lib/subdomain'
+import { formatCivilDate, isExpiryCurrent } from '../lib/club-date'
 import { PDVDoor } from '../components/PDVDoor'
 import { OldQrWarning } from '../components/OldQrWarning'
 
@@ -39,7 +40,6 @@ import {
   User,
   RefreshCw,
   LogOut,
-  Percent,
   Ticket,
 } from 'lucide-react'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -134,7 +134,7 @@ export default function PDV() {
 
   function applyVerification(member: Member, qrToken?: CardTokenCheck) {
     const isActive = isMemberActive(member)
-    const isExpired = new Date(member.expiryDate) < new Date()
+    const isExpired = !isExpiryCurrent(member.expiryDate)
 
     setResult({
       member,
@@ -366,7 +366,7 @@ export default function PDV() {
                     <div>
                       <p className="text-sm text-muted-foreground">Validade</p>
                       <p className="font-medium">
-                        {new Date(result.member.expiryDate).toLocaleDateString('pt-BR')}
+                        {formatCivilDate(result.member.expiryDate)}
                       </p>
                     </div>
                   </div>
@@ -376,12 +376,9 @@ export default function PDV() {
                       <hr />
                       {/* Discount Highlight */}
                       <div className="flex flex-col items-center justify-center gap-2 p-6 bg-green-100 dark:bg-green-900/30 rounded-lg text-center">
-                        <div className="flex items-center gap-2 text-green-700 dark:text-green-600">
-                          <Percent className="h-8 w-8" />
-                          <span className="text-4xl sm:text-5xl font-bold">
-                            {CLUB_PLAN.discount}%
-                          </span>
-                        </div>
+                        <span className="text-4xl sm:text-5xl font-bold text-green-700 dark:text-green-500">
+                          {CLUB_PLAN.discount}%
+                        </span>
                         <p className="text-base sm:text-lg font-semibold text-green-700 dark:text-green-300">
                           de desconto em qualquer produto
                         </p>

@@ -19,6 +19,7 @@ import { isValidCnpj } from '../utils/cnpj.js';
 import { STORE_PICKUP_LOCATION } from './shipping.service.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
 import { moduleLogger } from '../config/logger.js';
+import { TODAY_RIO_SQL } from '../utils/club-date.js';
 
 const log = moduleLogger('event');
 
@@ -323,7 +324,7 @@ async function requireMemberDiscount(
 
   const found = await query(
     `SELECT id, full_name FROM members
-      WHERE cpf = $1 AND status = 'active' AND expiry_date >= CURRENT_DATE`,
+      WHERE cpf = $1 AND status = 'active' AND expiry_date >= ${TODAY_RIO_SQL}`,
     [document]
   );
   const member = found.rows[0] as { id: string; full_name: string } | undefined;

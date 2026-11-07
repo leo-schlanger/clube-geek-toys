@@ -27,11 +27,10 @@ export function paymentTypeSuffix(type: PaymentType): '/mês' | '/ano' {
  */
 export const CURRENT_PAYMENT_TYPE: PaymentType = 'annual'
 
-/** End of one paid period starting at `from`. Mirrors the API's `addClubPeriod`. */
-export function addClubPeriod(from: Date): Date {
-  const end = new Date(from)
-  end.setFullYear(end.getFullYear() + 1)
-  return end
+/** Last valid day of one paid period starting on civil date `from` ('YYYY-MM-DD'). Mirrors the API's `addClubPeriod`. */
+export function addClubPeriod(from: string): string {
+  const [y, m, d] = from.split('-').map(Number)
+  return new Date(Date.UTC(y + 1, m - 1, d, 12)).toISOString().slice(0, 10)
 }
 
 // Payment status

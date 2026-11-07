@@ -458,6 +458,13 @@ describe('Members API client', () => {
   // ---- isMemberActive ----
 
   describe('isMemberActive', () => {
+    it('counts the expiry day until 23:59:59 in Rio, not until 21:00', () => {
+      const member = makeMember({ status: 'active', expiryDate: '2027-11-07' })
+      expect(isMemberActive(member, new Date('2027-11-07T21:30:00-03:00'))).toBe(true)
+      expect(isMemberActive(member, new Date('2027-11-07T23:59:59-03:00'))).toBe(true)
+      expect(isMemberActive(member, new Date('2027-11-08T00:00:00-03:00'))).toBe(false)
+    })
+
     it('should return true for active member with future expiry', () => {
       const member = makeMember({
         status: 'active',

@@ -1,5 +1,6 @@
 import { api } from './api-client'
 import { CLUB_PLAN, addClubPeriod } from '../types'
+import { isExpiryCurrent, rioToday } from './club-date'
 import type { Member, MemberFormData, PendingPaymentInfo } from '../types'
 
 export interface PaginatedResult<T> {
@@ -183,25 +184,21 @@ export async function updateMember(
  * these fields are absent.
  */
 export async function activateMember(id: string): Promise<boolean> {
-  const start = new Date()
-  const expiry = addClubPeriod(start)
+  const now = new Date()
+  const start = rioToday(now)
   return updateMember(id, {
     status: 'active',
-    startDate: start.toISOString().slice(0, 10),
-    expiryDate: expiry.toISOString().slice(0, 10),
-    activatedAt: start.toISOString(),
+    startDate: start,
+    expiryDate: addClubPeriod(start),
+    activatedAt: now.toISOString(),
     activatedByPayment: 'admin_manual',
     pendingPayment: null,
   } as Partial<Member>)
 }
 
-/** Active means both the status and the expiry date agree. */
-export function isMemberActive(member: Member): boolean {
-  if (member.status !== 'active') return false
-  if (!member.expiryDate) return false
-  const expiryDate = new Date(member.expiryDate)
-  if (Number.isNaN(expiryDate.getTime())) return false
-  return expiryDate >= new Date()
+/** Active means both the status and the expiry date agree; the expiry day itself counts, in Rio. */
+export function isMemberActive(member: Member, now: Date = new Date()): boolean {
+  return member.status === 'active' && isExpiryCurrent(member.expiryDate, now)
 }
 
 

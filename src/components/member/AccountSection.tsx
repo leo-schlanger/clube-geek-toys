@@ -21,6 +21,7 @@ import {
   CheckCircle,
   Edit,
 } from 'lucide-react'
+import { formatCivilDate } from '../../lib/club-date'
 
 interface AccountSectionProps {
   member: Member
@@ -121,7 +122,7 @@ export function AccountSection({ member, contract, onEditProfile, only }: Accoun
               <div className="min-w-0">
                 <p className="text-[10px] text-muted-foreground uppercase">Membro desde</p>
                 <p className="text-sm font-medium">
-                  {new Date(member.startDate).toLocaleDateString('pt-BR')}
+                  {formatCivilDate(member.startDate)}
                 </p>
               </div>
             </div>

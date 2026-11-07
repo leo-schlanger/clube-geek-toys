@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   cn,
   formatCurrency,
@@ -7,8 +7,6 @@ import {
   validateCPF,
   getStatusColor,
   getStatusLabel,
-  calculateDaysUntilExpiry,
-  isExpired,
   formatDate,
   generateId,
 } from './utils'
@@ -231,75 +229,6 @@ describe('getStatusLabel', () => {
 
   it('should return empty string for empty string', () => {
     expect(getStatusLabel('')).toBe('')
-  })
-})
-
-// ── calculateDaysUntilExpiry ─────────────────────────────────────
-
-describe('calculateDaysUntilExpiry', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('should calculate positive days until future date', () => {
-    vi.setSystemTime(new Date('2024-01-01T00:00:00Z'))
-    const futureDate = new Date('2024-01-11T00:00:00Z')
-    expect(calculateDaysUntilExpiry(futureDate)).toBe(10)
-  })
-
-  it('should calculate negative days for past date', () => {
-    vi.setSystemTime(new Date('2024-01-11T00:00:00Z'))
-    const pastDate = new Date('2024-01-01T00:00:00Z')
-    expect(calculateDaysUntilExpiry(pastDate)).toBe(-10)
-  })
-
-  it('should return 1 when expiry is at end of same day', () => {
-    vi.setSystemTime(new Date('2024-01-01T00:00:00Z'))
-    const sameDay = new Date('2024-01-01T23:59:59Z')
-    expect(calculateDaysUntilExpiry(sameDay)).toBe(1)
-  })
-
-  it('should handle exact same timestamp', () => {
-    vi.setSystemTime(new Date('2024-06-15T12:00:00Z'))
-    const same = new Date('2024-06-15T12:00:00Z')
-    expect(calculateDaysUntilExpiry(same)).toBe(0)
-  })
-})
-
-// ── isExpired ────────────────────────────────────────────────────
-
-describe('isExpired', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('should return true for past date', () => {
-    vi.setSystemTime(new Date('2024-01-11'))
-    expect(isExpired(new Date('2024-01-01'))).toBe(true)
-  })
-
-  it('should return false for future date', () => {
-    vi.setSystemTime(new Date('2024-01-01'))
-    expect(isExpired(new Date('2024-01-11'))).toBe(false)
-  })
-
-  it('should return true for date just before now', () => {
-    vi.setSystemTime(new Date('2024-01-11T12:00:00Z'))
-    expect(isExpired(new Date('2024-01-11T11:59:59Z'))).toBe(true)
-  })
-
-  it('should return false for date at exact same time', () => {
-    vi.setSystemTime(new Date('2024-01-11T12:00:00Z'))
-    // new Date(expiryDate) < new Date() is false when equal
-    expect(isExpired(new Date('2024-01-11T12:00:00Z'))).toBe(false)
   })
 })
 

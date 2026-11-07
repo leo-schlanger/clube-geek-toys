@@ -6,7 +6,7 @@ import { Button } from '../ui/button'
 import { StatusChip } from './StatusChip'
 import { getCardToken } from '../../lib/members'
 import { getMemberVerifyUrl } from '../../lib/subdomain'
-import { shortDate } from '../../lib/member-card-state'
+import { civilShortDate } from '../../lib/member-card-state'
 
 /** Renew this long before the token expires, so a scan never lands on a stale one. */
 const RENEW_MARGIN_MS = 60_000
@@ -129,7 +129,7 @@ export function CardQrDialog({ open, onOpenChange, memberId, fullName, displayNu
 
             <p className="mt-5 font-heading text-2xl font-extrabold">{fullName}</p>
             <StatusChip tone="success" className="mt-2 text-neutral-900">
-              Em dia · válida até {shortDate(expiryDate)}
+              Em dia · válida até {civilShortDate(expiryDate)}
             </StatusChip>
             <p className="mt-2 font-mono text-base font-bold tracking-[0.2em]">{displayNumber}</p>
 

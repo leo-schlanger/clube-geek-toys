@@ -10,6 +10,7 @@ import { syncShipments } from './label.service.js';
 import { sendClubSignupReminders } from './recovery.service.js';
 import { moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
+import { TODAY_RIO_SQL, formatDateBR } from '../utils/club-date.js';
 
 const log = moduleLogger('cron');
 
@@ -279,7 +280,7 @@ async function sendRenewalReminders() {
     `SELECT m.id, m.full_name, m.email, m.plan, m.expiry_date
      FROM members m
      WHERE m.status = 'active'
-       AND m.expiry_date BETWEEN CURRENT_DATE + INTERVAL '5 days' AND CURRENT_DATE + INTERVAL '8 days'
+       AND m.expiry_date BETWEEN ${TODAY_RIO_SQL} + 5 AND ${TODAY_RIO_SQL} + 8
        AND m.auto_renewal = FALSE
        AND NOT EXISTS (
          SELECT 1 FROM email_logs el
@@ -298,7 +299,7 @@ async function sendRenewalReminders() {
         variables: {
           name: member.full_name,
           plan: member.plan,
-          expiry_date: new Date(member.expiry_date).toLocaleDateString('pt-BR'),
+          expiry_date: formatDateBR(member.expiry_date),
         },
         member_id: member.id,
       });
@@ -324,7 +325,7 @@ async function expireMembers() {
     `UPDATE members SET status = 'expired'
      WHERE status = 'active'
        AND expiry_date IS NOT NULL
-       AND expiry_date < CURRENT_DATE
+       AND expiry_date < ${TODAY_RIO_SQL}
        AND (auto_renewal = FALSE OR subscription_status = 'paused')
      RETURNING id, full_name, email`
   );

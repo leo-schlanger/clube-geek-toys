@@ -461,7 +461,7 @@ describe('invoice.paid', () => {
     await processStripeEvent(event('invoice.paid', invoice()));
 
     expect(
-      ran('UPDATE members', 'GREATEST(COALESCE(expiry_date, CURRENT_DATE), CURRENT_DATE)')
+      ran('UPDATE members', "GREATEST(COALESCE(expiry_date, (NOW() AT TIME ZONE 'America/Sao_Paulo')::date), (NOW() AT TIME ZONE 'America/Sao_Paulo')::date)")
     ).toBe(true);
     expect(paramsOf('UPDATE members', 'GREATEST')?.[1]).toBe('1 month');
   });

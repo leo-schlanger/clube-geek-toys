@@ -34,7 +34,6 @@ vi.mock('../lib/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/utils')>()
   return {
     ...actual,
-    calculateDaysUntilExpiry: (d: Date) => Math.ceil((d.getTime() - Date.now()) / 86400000),
   }
 })
 

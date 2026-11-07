@@ -12,6 +12,7 @@ import { checkPixPaymentStatus, isPaymentConfigured, pixSecondsLeft } from '../l
 import { getMemberContract } from '../lib/contract-storage'
 import { useAuth } from '../contexts/AuthContext'
 import { PLANS, CURRENT_PAYMENT_TYPE, addClubPeriod, paymentTypeLabel, paymentTypeSuffix, type Member, type PlanType, type Contract } from '../types'
+import { rioToday } from '../lib/club-date'
 import { formatCurrency } from '../lib/utils'
 import { toast } from 'sonner'
 import {
@@ -108,16 +109,15 @@ export function PendingPaymentScreen({ member, onPaymentSuccess }: PendingPaymen
 
   async function handlePaymentSuccess() {
     // Calculate new expiry date
-    const now = new Date()
-    const newExpiry = addClubPeriod(now)
+    const start = rioToday()
 
     // Update member status to active. `updateMember` throws on refusal — the
     // money is already in, so a failure here has to be visible, not swallowed.
     try {
       await updateMember(member.id, {
         status: 'active',
-        startDate: now.toISOString().split('T')[0],
-        expiryDate: newExpiry.toISOString().split('T')[0],
+        startDate: start,
+        expiryDate: addClubPeriod(start),
       })
       toast.success('Pagamento confirmado! Bem-vindo ao Clube GeekPop & Toys!')
       setShowPayment(false)

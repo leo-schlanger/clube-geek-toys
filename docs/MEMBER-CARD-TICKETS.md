@@ -65,6 +65,30 @@ válido continua vencido, dono recebe o token, anônimo 401), `CardQrDialog.test
 (renovação e Wake Lock), `MemberVerify.test.tsx` (aviso) e `PDV.test.tsx`
 (valid/expired/invalid/missing, JSON antigo, falha da conferência, busca por CPF).
 
+### Validade é data civil, no relógio do Rio (07/11/2026)
+
+`members.expiry_date` é o **último dia válido, inclusive, até 23:59:59 em
+America/Sao_Paulo**; `start_date` também é data sem hora. Antes, o `pg`
+transformava o `DATE` num instante à meia-noite UTC (`2027-11-07T00:00:00.000Z`),
+o painel, o `/verificar` e o PDV mostravam o dia anterior, e a vigência acabava
+às 21:00 do Rio da véspera, porque `CURRENT_DATE` e `new Date()` são UTC.
+
+- O `pg` devolve `DATE` como texto `YYYY-MM-DD` (`config/database.ts`,
+  oid 1082), e o `mapRow` do membro passa por `toDateOnly`.
+- Servidor: `utils/club-date.ts`. `TODAY_RIO_SQL` substitui `CURRENT_DATE`
+  (desconto da loja, meia do ingresso, lembrete, cron de expiração, renovação
+  por assinatura, estorno), `isExpiryCurrent` no `/verificar`, `rioToday` +
+  `nextClubExpiry`/`addClubPeriod` (texto → texto) na ativação e na renovação.
+  Relatórios: a saída do membro conta do dia **seguinte** ao último válido.
+- Front: `src/lib/club-date.ts` (`formatCivilDate`, `isExpiryCurrent`,
+  `daysUntilExpiry`), usado por `isMemberActive`, `cardState`
+  («Vence hoje» no último dia), carteirinha, painel, PDV, tabela de membros e
+  e-mails. Nunca formate essas colunas com `new Date(...)` + fuso.
+- O cron de expiração (03:00 do Rio) não expirava um dia antes; agora não
+  depende da hora em que corre.
+- `club-date.test.ts` (dos dois lados) prende 21:00, 23:59:59 e 00:00 do Rio, e
+  falha se um service voltar a comparar data de membro com `CURRENT_DATE`.
+
 ### Validado em produção
 
 | Verificação               | Resultado                                         |

@@ -1,6 +1,6 @@
 import { useState, useCallback, forwardRef, type ReactNode } from 'react'
 import { PLANS, type Member, type PlanType } from '../../types'
-import { formatMemberNumber, shortDate } from '../../lib/member-card-state'
+import { civilShortDate, formatMemberNumber } from '../../lib/member-card-state'
 import { cn } from '../../lib/utils'
 import { toast } from 'sonner'
 import { NonoMascot } from '../store/NonoMascot'
@@ -222,7 +222,7 @@ export const MembershipCard = forwardRef<HTMLButtonElement, MembershipCardProps>
                 className="text-sm font-bold tabular-nums"
                 style={{ color: style.text }}
               >
-                {member.expiryDate ? shortDate(member.expiryDate) : '—'}
+                {member.expiryDate ? civilShortDate(member.expiryDate) : '—'}
               </p>
             </div>
           </div>

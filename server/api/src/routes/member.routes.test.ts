@@ -82,6 +82,21 @@ describe('public', () => {
     expect((await api.get('/verify/not-an-id')).status).toBe(400);
   });
 
+  it('the expiry day is current until 23:59:59 in Rio (UTC already says tomorrow)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      members.getMemberById.mockResolvedValue({ ...own, status: 'active', expiryDate: '2027-11-07' });
+      vi.setSystemTime(new Date('2027-11-07T21:30:00-03:00'));
+      expect((await api.get(`/verify/${ID}`)).body).toMatchObject({ isCurrent: true, expiryDate: '2027-11-07' });
+      vi.setSystemTime(new Date('2027-11-07T23:59:59-03:00'));
+      expect((await api.get(`/verify/${ID}`)).body.isCurrent).toBe(true);
+      vi.setSystemTime(new Date('2027-11-08T00:00:00-03:00'));
+      expect((await api.get(`/verify/${ID}`)).body.isCurrent).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   describe('anti-print token on the card QR', () => {
     const current = { ...own, status: 'active', expiryDate: new Date(Date.now() + 86_400_000).toISOString() };
 
