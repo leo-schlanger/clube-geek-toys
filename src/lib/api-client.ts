@@ -4,6 +4,7 @@
  */
 
 import { logger } from './logger'
+import { OUTCOME_UNKNOWN_MESSAGE } from './constants'
 
 /**
  * Resolve the API base URL for the current host. The club runs on two mirror
@@ -24,6 +25,29 @@ const API_URL = resolveApiUrl()
 const DEFAULT_TIMEOUT = 15000
 const MAX_RETRIES = 3
 const BASE_DELAY = 1000
+
+/**
+ * Writes that charge, refund or spend money. A lost response does not mean the
+ * server did nothing, so these leave the browser once per user action; the
+ * server locks handle the next click. New money route: add it here.
+ */
+const ONE_SHOT_WRITES = [
+  /^\/orders$/,
+  /^\/orders\/[^/]+\/(pay-card|abandon|label|confirm-pix|refund)$/,
+  /^\/pix\/create$/,
+  /^\/checkout\/card\/create$/,
+  /^\/subscription\/create$/,
+  /^\/subscription\/[^/]+\/update-payment-method$/,
+  /^\/payments\/[^/]+\/(confirm|refund)$/,
+  /^\/events\/[^/]+\/reservations$/,
+  /^\/events\/admin\/reservations\/[^/]+\/(confirm|cancel)$/,
+]
+
+function isOneShotWrite(method: string | undefined, path: string): boolean {
+  if (!method || method.toUpperCase() === 'GET') return false
+  const pathname = path.split('?')[0]
+  return ONE_SHOT_WRITES.some((pattern) => pattern.test(pathname))
+}
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'clube_geek_access_token'
@@ -285,9 +309,10 @@ export async function apiRequest<T = unknown>(
   }
 
   const url = `${API_URL}${path}`
+  const oneShot = isOneShotWrite(fetchOptions.method, path)
 
   try {
-    const response = noRetry
+    const response = noRetry || oneShot
       ? await fetchWithTimeout(url, fetchOptions, timeout)
       : await fetchWithRetry(url, fetchOptions, MAX_RETRIES, timeout)
 
@@ -328,6 +353,10 @@ export async function apiRequest<T = unknown>(
     const data = await response.json().catch(() => null)
 
     if (!response.ok) {
+      // A gateway error page says nothing about whether the handler ran.
+      if (oneShot && response.status >= 500 && !data?.error) {
+        return { error: OUTCOME_UNKNOWN_MESSAGE, status: response.status }
+      }
       return {
         error: withRequestId(data?.error || `Erro: ${response.status}`, data?.requestId),
         code: data?.code,
@@ -339,6 +368,7 @@ export async function apiRequest<T = unknown>(
     return { data, status: response.status }
   } catch (error) {
     logger.error(`API request failed: ${path}`, error)
+    if (oneShot) return { error: OUTCOME_UNKNOWN_MESSAGE, status: 0 }
     let message = 'Erro de comunicação com o servidor.'
     if (error instanceof Error) {
       if (error.name === 'AbortError' || error.message.includes('timeout')) {

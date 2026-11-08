@@ -35,6 +35,7 @@ import {
   type PaymentConfig,
 } from '../lib/pagarme'
 import { ErrorTracker } from '../lib/error-tracking'
+import { OUTCOME_UNKNOWN_MESSAGE } from '../lib/constants'
 import { isValidCPFFormat } from '../lib/cpf-validation'
 import { isValidCnpj } from '../lib/cnpj'
 import { formatCurrency } from '../lib/utils'
@@ -252,7 +253,8 @@ export function PagarmeCardForm({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Não foi possível processar o cartão.'
       setFormError(message)
-      if (tokenized) setDeclined(true)
+      // Unknown outcome is not a decline: offering PIX here could mean paying twice.
+      if (tokenized && message !== OUTCOME_UNKNOWN_MESSAGE) setDeclined(true)
       // A refused charge is logged by the API; a refused tokenization only exists here.
       else ErrorTracker.captureMessage(`Card tokenization failed: ${message}`, 'warning')
       // The parent charge failed after tokenization: let them try again.

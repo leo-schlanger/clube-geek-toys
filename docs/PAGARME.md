@@ -98,13 +98,12 @@ A chave pública e o id da conta entraram no `.env` em 05/11/2026
 tokeniza nessa conta. Não reponha a chave pública da conta anterior: o
 navegador tokenizaria o cartão na empresa errada.
 
-O que ainda é no painel da conta nova:
+O **webhook da conta nova já entrega** (visto em 08/11/2026): os eventos chegam
+desde 06/11, e o `charge.paid` do primeiro cartão aprovado nessa conta (07/11)
+veio por ele. A conciliação segue como rede.
 
-- **Webhook**, com a mesma URL e os mesmos eventos desta seção, e com o
-  usuário e a senha que já estão no `.env`. Enquanto o painel não tiver esse
-  cadastro, quem liquida o PIX é a conciliação (até 10 min) e a consulta de
-  status. A transferência automática do recebedor também nasce desligada: o
-  saldo fica na Pagar.me até alguém ligá-la no painel.
+O que ainda é no painel da conta nova: a transferência automática do recebedor
+nasce desligada, e o saldo fica na Pagar.me até alguém ligá-la.
 
 A chave secreta anterior ficou só na VPS, fora do git. Um pedido em separação
 foi pago no cartão em 04/11 nessa conta; o estorno dele não sai com a chave
@@ -778,6 +777,31 @@ Dois achados, os dois já corrigidos:
   "cadastros sem pagamento" passou a misturar quem nunca gerou cobrança com
   quem deixou o PIX vencer. A listagem de membros traz `lastPayment`, e o
   painel diz **PIX venceu sem pagamento**, **Cartão recusado** ou **Sem cobrança**.
+
+## 8.11 Cobrança repetida pelo navegador e os 412 do clube — 08/11/2026
+
+**Cobrança não se repete sozinha.** O `fetchWithRetry` repetia todo POST até 3
+vezes em cerca de 3 s, com o mesmo token, em falha de rede ou 5xx. A etiqueta de
+05/11 mostra o padrão no log: 9 respostas 502 em três rajadas. Agora
+`ONE_SHOT_WRITES` (`src/lib/api-client.ts`) lista o que cobra, estorna ou gasta
+dinheiro, e essas chamadas saem **uma vez** por clique. Rota nova de dinheiro
+entra na lista; GET continua repetindo.
+
+Falha de rede e página de erro sem corpo viram `OUTCOME_UNKNOWN_MESSAGE`, que
+pede para conferir antes de tentar de novo, porque a resposta perdida não diz
+que nada aconteceu. Nesse caso o formulário **não** oferece "Pagar com PIX": o
+botão serve à recusa, que é um resultado conhecido. Quem clica de novo cai nas
+travas do servidor (`card_payment_started_at`, `claimClubCardAttempt`,
+`label_purchase_started_at`).
+
+**Os 412 do clube em set/out provavelmente vieram da falta de endereço.** São 7
+recusas ao salvar o cartão antes da correção de 17/10, e o §8.9 as atribuiu ao
+banco. Os três cadastros de outubro seguem sem `billing_address`, e a medição de
+17/10 mostrou 412 sem endereço. Depois da correção houve **um** 412 (08/11), com
+o cliente completo na conta nova: amostra pequena demais para dizer se ainda há
+algo sistemático. O corpo do 412 não traz código da adquirente.
+
+---
 
 ## 9. Ir para produção
 

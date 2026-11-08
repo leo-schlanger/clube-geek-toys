@@ -26,6 +26,7 @@ vi.mock('../lib/error-tracking', () => ({
 }))
 
 import { PagarmeCardForm } from './PagarmeCardForm'
+import { OUTCOME_UNKNOWN_MESSAGE } from '../lib/constants'
 
 function fillCard(expiry: string) {
   fireEvent.change(screen.getByLabelText('Número do cartão'), {
@@ -145,6 +146,32 @@ describe('PagarmeCardForm exit report', () => {
 
     window.dispatchEvent(new Event('pagehide'))
     expect(exitReports()[0][2]).toMatchObject({ attempts: 1, declined: true })
+  })
+
+  it('does not offer PIX when the outcome of the charge is unknown', async () => {
+    const onToken = vi.fn(async (..._args: unknown[]) => {
+      throw new Error(OUTCOME_UNKNOWN_MESSAGE)
+    })
+    render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+    await ready()
+    fillCard('12/30')
+    fireEvent.click(screen.getByRole('button', { name: /Pagar/ }))
+
+    expect(await screen.findByText(OUTCOME_UNKNOWN_MESSAGE)).toBeInTheDocument()
+    expect(onToken).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: /Pagar com PIX/ })).not.toBeInTheDocument()
+  })
+
+  it('still offers PIX after a real refusal', async () => {
+    const onToken = vi.fn(async (..._args: unknown[]) => {
+      throw new Error('Cartão recusado')
+    })
+    render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+    await ready()
+    fillCard('12/30')
+    fireEvent.click(screen.getByRole('button', { name: /Pagar/ }))
+
+    expect(await screen.findByRole('button', { name: /Pagar com PIX/ })).toBeInTheDocument()
   })
 
   it("does not report StrictMode's development remount", async () => {

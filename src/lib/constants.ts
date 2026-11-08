@@ -100,3 +100,7 @@ export const MESSAGES = {
     COPIED: 'Copiado!',
   },
 } as const
+
+/** Shown when a money write may or may not have gone through. */
+export const OUTCOME_UNKNOWN_MESSAGE =
+  'A resposta não chegou e a operação pode ter sido concluída. Confira antes de tentar de novo.'

@@ -33,6 +33,7 @@ import {
   api,
   API_URL,
 } from './api-client'
+import { OUTCOME_UNKNOWN_MESSAGE } from './constants'
 
 // =============================================================================
 // Helpers
@@ -573,6 +574,103 @@ describe('noRetry option', () => {
     // 500 is not ok, falls through to error parsing
     expect(result.status).toBe(500)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// =============================================================================
+// 9b. MONEY WRITES LEAVE THE BROWSER ONCE
+// =============================================================================
+
+describe('money writes are never repeated', () => {
+  beforeEach(() => {
+    localStorage.getItem.mockReturnValue(null)
+  })
+
+  const MONEY_WRITES: [string, 'post' | 'put'][] = [
+    ['/orders', 'post'],
+    ['/orders/abc/pay-card', 'post'],
+    ['/orders/abc/abandon', 'post'],
+    ['/orders/abc/label', 'post'],
+    ['/orders/abc/confirm-pix', 'post'],
+    ['/orders/abc/refund', 'post'],
+    ['/pix/create', 'post'],
+    ['/checkout/card/create', 'post'],
+    ['/subscription/create', 'post'],
+    ['/subscription/abc/update-payment-method', 'put'],
+    ['/payments/abc/confirm', 'post'],
+    ['/payments/abc/refund', 'post'],
+    ['/events/halloween-kpop/reservations', 'post'],
+    ['/events/admin/reservations/abc/confirm', 'post'],
+    ['/events/admin/reservations/abc/cancel', 'post'],
+  ]
+
+  it.each(MONEY_WRITES)('%s: one request on a network failure', async (path, method) => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const result = await api[method](path, {})
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.status).toBe(0)
+    expect(result.error).toBe(OUTCOME_UNKNOWN_MESSAGE)
+  })
+
+  it.each(MONEY_WRITES)('%s: one request on a 502 page', async (path, method) => {
+    fetchMock.mockResolvedValue(mockResponse(502, null))
+
+    const result = await api[method](path, {})
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.status).toBe(502)
+    expect(result.error).toBe(OUTCOME_UNKNOWN_MESSAGE)
+  })
+
+  it('does not wait out a 429 and repeat the charge', async () => {
+    fetchMock.mockResolvedValue(mockResponse(429, { error: 'Muitas tentativas' }, { 'Retry-After': '1' }))
+
+    const result = await api.post('/orders/abc/pay-card', {})
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.error).toContain('Muitas tentativas')
+  })
+
+  it('keeps the message the API wrote for a 5xx', async () => {
+    fetchMock.mockResolvedValue(mockResponse(502, { error: 'Não foi possível gerar o PIX agora.' }))
+
+    const result = await api.post('/pix/create', {})
+
+    expect(result.error).toContain('Não foi possível gerar o PIX agora.')
+  })
+
+  it('still repeats reads of the same routes', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(mockResponse(500, null))
+      .mockResolvedValueOnce(mockResponse(200, { status: 'paid' }))
+
+    const result = await api.get('/orders/abc/status')
+
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(result.data).toEqual({ status: 'paid' })
+  })
+
+  it('still repeats a GET on a path shaped like a money write', async () => {
+    fetchMock
+      .mockResolvedValueOnce(mockResponse(500, null))
+      .mockResolvedValueOnce(mockResponse(200, []))
+
+    await api.get('/orders')
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('still repeats other writes', async () => {
+    fetchMock
+      .mockResolvedValueOnce(mockResponse(500, null))
+      .mockResolvedValueOnce(mockResponse(200, { ok: true }))
+
+    await api.post('/contracts', {})
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })
 
