@@ -790,7 +790,10 @@ entra na lista; GET continua repetindo.
 Falha de rede e página de erro sem corpo viram `OUTCOME_UNKNOWN_MESSAGE`, que
 pede para conferir antes de tentar de novo, porque a resposta perdida não diz
 que nada aconteceu. Nesse caso o formulário **não** oferece "Pagar com PIX": o
-botão serve à recusa, que é um resultado conhecido. Quem clica de novo cai nas
+botão serve à recusa, que é um resultado conhecido. Só a recusa da tentativa
+atual o mostra, e depois de uma resposta perdida ele não volta naquele
+formulário, mesmo que a tentativa seguinte seja recusada. O registro em
+`error_logs` é `Card charge outcome unknown`. Quem clica de novo cai nas
 travas do servidor (`card_payment_started_at`, `claimClubCardAttempt`,
 `label_purchase_started_at`).
 

@@ -111,6 +111,8 @@ export function PagarmeCardForm({
   const attemptsRef = useRef(0)
   const filledRef = useRef<string[]>([])
   const declinedRef = useRef(false)
+  // Sticky on purpose: a charge that may have gone through rules out PIX on this form.
+  const outcomeUnknownRef = useRef(false)
   const logContextRef = useRef(logContext)
   filledRef.current = [
     number && 'number',
@@ -224,6 +226,8 @@ export function PagarmeCardForm({
       return
     }
 
+    // Only the refusal of this attempt may offer PIX.
+    setDeclined(false)
     setSubmitting(true)
     let tokenized = false
     try {
@@ -253,10 +257,15 @@ export function PagarmeCardForm({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Não foi possível processar o cartão.'
       setFormError(message)
-      // Unknown outcome is not a decline: offering PIX here could mean paying twice.
-      if (tokenized && message !== OUTCOME_UNKNOWN_MESSAGE) setDeclined(true)
-      // A refused charge is logged by the API; a refused tokenization only exists here.
-      else ErrorTracker.captureMessage(`Card tokenization failed: ${message}`, 'warning')
+      // A refused charge is logged by the API; these two only exist here.
+      if (!tokenized) {
+        ErrorTracker.captureMessage(`Card tokenization failed: ${message}`, 'warning')
+      } else if (message === OUTCOME_UNKNOWN_MESSAGE) {
+        outcomeUnknownRef.current = true
+        ErrorTracker.captureMessage('Card charge outcome unknown', 'warning', logContextRef.current)
+      } else if (!outcomeUnknownRef.current) {
+        setDeclined(true)
+      }
       // The parent charge failed after tokenization: let them try again.
       setSubmitting(false)
       return

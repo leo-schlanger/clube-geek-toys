@@ -174,6 +174,92 @@ describe('PagarmeCardForm exit report', () => {
     expect(await screen.findByRole('button', { name: /Pagar com PIX/ })).toBeInTheDocument()
   })
 
+  describe('after several attempts', () => {
+    const PAY = /^Pagar(?! com PIX)/
+    const PIX = /Pagar com PIX/
+    const REFUSED = 'Cartão recusado'
+
+    async function attempt(expected: string) {
+      fillCard('12/30')
+      fireEvent.click(screen.getByRole('button', { name: PAY }))
+      expect(await screen.findByText(expected)).toBeInTheDocument()
+      await waitFor(() => expect(screen.getByRole('button', { name: PAY })).toBeEnabled())
+    }
+
+    function failing(...messages: string[]) {
+      const onToken = vi.fn(async (..._args: unknown[]) => {})
+      for (const message of messages) onToken.mockRejectedValueOnce(new Error(message))
+      return onToken
+    }
+
+    beforeEach(() => captureMessage.mockClear())
+
+    it('refusal, then a lost response: no PIX', async () => {
+      const onToken = failing(REFUSED, OUTCOME_UNKNOWN_MESSAGE)
+      render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+      await ready()
+
+      await attempt(REFUSED)
+      expect(screen.getByRole('button', { name: PIX })).toBeInTheDocument()
+
+      await attempt(OUTCOME_UNKNOWN_MESSAGE)
+      expect(onToken).toHaveBeenCalledTimes(2)
+      expect(screen.queryByRole('button', { name: PIX })).not.toBeInTheDocument()
+    })
+
+    it('refusal, then another refusal: PIX', async () => {
+      const onToken = failing(REFUSED, 'Saldo insuficiente')
+      render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+      await ready()
+
+      await attempt(REFUSED)
+      await attempt('Saldo insuficiente')
+      expect(screen.getByRole('button', { name: PIX })).toBeInTheDocument()
+    })
+
+    it('a lost response rules out PIX even if a later attempt is refused', async () => {
+      const onToken = failing(OUTCOME_UNKNOWN_MESSAGE, REFUSED)
+      render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+      await ready()
+
+      await attempt(OUTCOME_UNKNOWN_MESSAGE)
+      await attempt(REFUSED)
+      expect(screen.queryByRole('button', { name: PIX })).not.toBeInTheDocument()
+    })
+
+    it('a typo after a refusal keeps PIX on offer', async () => {
+      const onToken = failing(REFUSED)
+      render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+      await ready()
+
+      await attempt(REFUSED)
+      fireEvent.click(screen.getByRole('button', { name: PAY }))
+      expect(await screen.findByText('Validade inválida ou vencida.')).toBeInTheDocument()
+      expect(onToken).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: PIX })).toBeInTheDocument()
+    })
+
+    it('logs a lost response as such, not as a tokenization failure', async () => {
+      const onToken = failing(OUTCOME_UNKNOWN_MESSAGE)
+      render(
+        <PagarmeCardForm
+          amount={100}
+          onToken={onToken}
+          onSwitchToPix={vi.fn()}
+          logContext={{ flow: 'club-signup' }}
+        />
+      )
+      await ready()
+
+      await attempt(OUTCOME_UNKNOWN_MESSAGE)
+      expect(captureMessage).toHaveBeenCalledWith('Card charge outcome unknown', 'warning', {
+        flow: 'club-signup',
+      })
+      const texts = captureMessage.mock.calls.map((call: unknown[]) => String(call[0]))
+      expect(texts.some((text: string) => text.includes('tokenization'))).toBe(false)
+    })
+  })
+
   it("does not report StrictMode's development remount", async () => {
     render(
       <StrictMode>
