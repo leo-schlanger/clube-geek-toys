@@ -15,6 +15,7 @@ import { env } from '../config/env.js';
 import { query } from '../config/database.js';
 import { AppError } from '../middleware/error-handler.js';
 import { moduleLogger } from '../config/logger.js';
+import { providerBodyForLog } from './log-safe.js';
 
 const log = moduleLogger('pagarme');
 
@@ -406,7 +407,7 @@ async function request<T>(
   if (!response.ok) {
     const providerMessage =
       (parsed as { message?: string } | null)?.message ?? `HTTP ${response.status}`;
-    log.error(`${method} ${path} → ${response.status}: ${JSON.stringify(parsed)?.slice(0, 800)}`);
+    log.error(`${method} ${path} → ${response.status}: ${providerBodyForLog(parsed)}`);
     throw new PagarmeError(
       response.status,
       `Pagar.me ${method} ${path}: ${providerMessage}`,

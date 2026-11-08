@@ -3,6 +3,7 @@ import { query, getClient } from '../config/database.js';
 import { env, adminUrl } from '../config/env.js';
 import { AppError } from '../middleware/error-handler.js';
 import { getStripe } from '../utils/stripe.js';
+import { providerOrderForLog } from '../utils/log-safe.js';
 import { generatePixEMV, type PixQRData } from '../utils/pix.js';
 import * as pagarme from '../utils/pagarme.js';
 import { getMemberIdForUser } from '../middleware/ownership.js';
@@ -915,7 +916,10 @@ async function createPagarmePixCharge(order: Order, document: string): Promise<P
   const charge = created.charges?.[0];
   const tx = charge?.last_transaction;
   if (!charge || !tx?.qr_code) {
-    log.error({ detail: JSON.stringify(created).slice(0, 800) }, 'Pagar.me order without qr_code');
+    log.error(
+      { orderId: order.id, ...providerOrderForLog(created) },
+      'Pagar.me order without qr_code',
+    );
     throw new AppError(
       502,
       'Não foi possível gerar o QR Code PIX agora. Tente novamente em instantes.',

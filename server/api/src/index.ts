@@ -24,6 +24,7 @@ import { auditRouter } from './routes/audit.routes.js';
 import { productRouter } from './routes/product.routes.js';
 import { promoRouter } from './routes/promo.routes.js';
 import { orderRouter } from './routes/order.routes.js';
+import { redactLogPath } from './utils/log-safe.js';
 import { shippingRouter } from './routes/shipping.routes.js';
 import { reviewRouter } from './routes/review.routes.js';
 import { wholesaleRouter } from './routes/wholesale.routes.js';
@@ -74,7 +75,7 @@ app.use(
       req: (req: { id: unknown; method: string; url: string; remoteAddress?: string; headers: Record<string, string | undefined> }) => ({
         id: req.id,
         method: req.method,
-        path: String(req.url).split('?')[0],
+        path: redactLogPath(String(req.url).split('?')[0]),
         ip: req.headers['x-real-ip'] ?? req.remoteAddress,
         ua: req.headers['user-agent']?.slice(0, 160),
       }),

@@ -216,3 +216,7 @@ service worker agora é registrado por `src/lib/register-sw.ts`, com `.catch`. D
 
 `npm audit` de produção entrou no CI (nível `high`), e o Dependabot abre PRs
 semanais agrupados (`.github/dependabot.yml`).
+
+## Dado pessoal fora do log (08/11/2026)
+
+O log serve para achar a falha, não a pessoa. `redactLogPath` (`server/api/src/utils/log-safe.ts`) e o `map` do `nginx.conf` trocam o CPF de `/members/cpf-exists/` e `/members/by-cpf/` por `:cpf`; as rotas continuam iguais. Corpo da Pagar.me em log passa por `scrubForLog`, que censura nome, e-mail, documento, telefone e endereço e mantém ids, status e mensagens. Log de pedido sem QR leva o id local (`orderId`, `reservationId`, `code`/`metadata`) e os ids da Pagar.me. O journald guarda 30 dias: linha antiga some sozinha.

@@ -5,6 +5,7 @@ import { createErrorLog } from '../services/log.service.js';
 import { mapStripeDeclineMessage } from '../utils/stripe.js';
 import { moduleLogger } from '../config/logger.js';
 import { record5xx } from '../services/ops-alert.service.js';
+import { redactLogPath } from '../utils/log-safe.js';
 
 const log = moduleLogger('error-handler');
 
@@ -66,7 +67,7 @@ export function errorHandler(
       severity: 'error',
       message: `Stripe: ${err.message}`,
       source: 'backend',
-      context: { requestId, path: req.path, method: req.method, type: err.type, code: err.code, decline_code: (err as { decline_code?: string }).decline_code },
+      context: { requestId, path: redactLogPath(req.path), method: req.method, type: err.type, code: err.code, decline_code: (err as { decline_code?: string }).decline_code },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     }).catch(() => { /* noop */ });
@@ -110,7 +111,7 @@ export function errorHandler(
       severity: ours ? 'error' : 'warning',
       message: err.message,
       source: 'backend',
-      context: { requestId, path: req.path, method: req.method, providerStatus: err.httpStatus },
+      context: { requestId, path: redactLogPath(req.path), method: req.method, providerStatus: err.httpStatus },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     }).catch(() => { /* noop */ });
@@ -131,7 +132,7 @@ export function errorHandler(
   }
 
   rlog.error({ err }, 'unhandled error');
-  record5xx(req.path);
+  record5xx(redactLogPath(req.path));
 
   // Persist unexpected errors to error_logs
   createErrorLog({
@@ -139,7 +140,7 @@ export function errorHandler(
     message: err.message || 'Unknown error',
     stack: err.stack,
     source: 'backend',
-    context: { requestId, path: req.path, method: req.method },
+    context: { requestId, path: redactLogPath(req.path), method: req.method },
     ipAddress: req.ip,
     userAgent: req.headers['user-agent'],
   }).catch(() => { /* silently fail — can't log errors about logging */ });

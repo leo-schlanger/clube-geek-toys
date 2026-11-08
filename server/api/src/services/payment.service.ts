@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { env } from '../config/env.js';
 import { getStripe, mapStripePaymentStatus } from '../utils/stripe.js';
+import { providerOrderForLog } from '../utils/log-safe.js';
 import { type PixQRData } from '../utils/pix.js';
 import * as pagarme from '../utils/pagarme.js';
 import { processPagarmeEvent } from './pagarme-webhook.service.js';
@@ -248,7 +249,7 @@ function requirePixTransaction(order: pagarme.PagarmeOrder): {
   const charge = order.charges?.[0];
   const tx = charge?.last_transaction;
   if (!charge || !tx?.qr_code) {
-    log.error({ detail: JSON.stringify(order).slice(0, 800) }, 'Pagar.me order without qr_code');
+    log.error(providerOrderForLog(order), 'Pagar.me order without qr_code');
     throw new AppError(
       502,
       'Não foi possível gerar o QR Code PIX agora. Tente novamente em instantes.',

@@ -19,7 +19,7 @@ vi.mock('../services/ops-alert.service.js', () => ({ record5xx: record5xxMock })
 import { errorHandler, AppError } from './error-handler.js';
 import { PagarmeError } from '../utils/pagarme.js';
 
-function run(err: Error) {
+function run(err: Error, path = '/events/x/reservations') {
   const res = {
     statusCode: 0,
     body: undefined as unknown,
@@ -32,7 +32,7 @@ function run(err: Error) {
       return this;
     },
   };
-  const req = { path: '/events/x/reservations', method: 'POST', headers: {}, ip: '1.1.1.1' };
+  const req = { path, method: 'POST', headers: {}, ip: '1.1.1.1' };
   errorHandler(err, req as unknown as Request, res as unknown as Response, () => {});
   return res;
 }
@@ -40,6 +40,17 @@ function run(err: Error) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+describe('errorHandler — CPF no caminho', () => {
+  it('error_logs guarda a rota sem o CPF, com o requestId e a mensagem', () => {
+    run(new Error('boom'), '/members/cpf-exists/52998224725');
+    const entry = createErrorLogMock.mock.calls[0][0] as { message: string; context: { path: string } };
+    expect(entry.context.path).toBe('/members/cpf-exists/:cpf');
+    expect(entry.message).toBe('boom');
+    expect(JSON.stringify(entry)).not.toContain('52998224725');
+    expect(record5xxMock).toHaveBeenCalledWith('/members/cpf-exists/:cpf');
+  });
 });
 
 describe('errorHandler — Pagar.me', () => {

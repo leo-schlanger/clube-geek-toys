@@ -11,6 +11,7 @@ import {
 } from '../config/events.js';
 import { getEventById, toDefinition } from './event-config.service.js';
 import { auditLog } from '../utils/audit.js';
+import { providerOrderForLog } from '../utils/log-safe.js';
 import { sendTemplateEmail } from './email.service.js';
 import { generatePixEMV, generatePixTxId } from '../utils/pix.js';
 import * as pagarme from '../utils/pagarme.js';
@@ -629,7 +630,10 @@ async function createReservationPixCharge(
   const charge = created.charges?.[0];
   const tx = charge?.last_transaction;
   if (!charge || !tx?.qr_code) {
-    log.error({ detail: JSON.stringify(created).slice(0, 800) }, 'Pagar.me order without qr_code');
+    log.error(
+      { reservationId: reservation.id, ...providerOrderForLog(created) },
+      'Pagar.me order without qr_code'
+    );
     throw new AppError(
       502,
       'Não foi possível gerar o PIX agora. Tente novamente em instantes.',
