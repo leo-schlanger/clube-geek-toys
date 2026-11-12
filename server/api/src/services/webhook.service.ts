@@ -237,7 +237,7 @@ async function handleChargeRefunded(
   const updated = await client.query(
     `UPDATE orders SET status = 'refunded', updated_at = NOW()
       WHERE stripe_payment_intent_id = $1 AND status <> 'refunded'
-      RETURNING id, order_number, status, store_credit_applied`,
+      RETURNING id, order_number, status, store_credit_applied, customer_email`,
     [paymentIntentId]
   );
   const row = updated.rows[0];
@@ -264,6 +264,7 @@ async function handleChargeRefunded(
     amount: charge.amount_refunded / 100,
     method: 'credit_card',
     link: '/admin?tab=orders',
+    customerEmail: (row.customer_email as string) ?? null,
     detail: 'Estorno feito no painel do Stripe (cobrança anterior à migração).',
     chargeId: paymentIntentId,
   });

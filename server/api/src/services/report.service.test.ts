@@ -134,7 +134,7 @@ describe('getActionItems', () => {
     expect(filtered).toHaveLength(7);
     for (const [sql, params] of filtered) {
       expect(sql).toMatch(/NOT \(lower\(COALESCE\((customer_email|buyer_email|email), ''\)\) LIKE ANY/);
-      expect(params[0]).toContain('e2e-member@geeketoys.com.br');
+      expect(params[0]).toContain('e2e-%@geeketoys.com.br');
     }
     expect(filtered.some(([sql]) => /FROM members/.test(sql))).toBe(true);
     expect(filtered.some(([sql]) => /FROM event_reservations/.test(sql))).toBe(true);

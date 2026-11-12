@@ -4,10 +4,11 @@
  * Their orders and payments run the real flow (the customer e-mail still goes
  * out, so the qa can check it), but they must not reach the staff: on
  * 08/11/2026 one qa round sent 26 "pedido cancelado"/"PIX aguardando" e-mails
- * to the shop inbox. Entries are full addresses or `@domain`.
+ * to the shop inbox. Entries are full addresses, `@domain`, or globs with `*`
+ * (the qa signs up fresh accounts as `e2e-qa-<n>@` and `qa+<n>@` on our domain).
  */
 export const DEFAULT_TEST_ACCOUNT_EMAILS =
-  'e2e-member@geeketoys.com.br,e2e-admin@geeketoys.com.br,e2e-buyer@example.com';
+  'e2e-*@geeketoys.com.br,qa+*@geeketoys.com.br,e2e-buyer@example.com';
 
 // Read from process.env, not config/env.js: report and e-mail services import
 // this, and the Zod env module exits the process on import inside tests.
@@ -19,16 +20,27 @@ function entries(): string[] {
     .filter((entry) => entry.length > 1);
 }
 
+function globToRegExp(glob: string): RegExp {
+  const body = glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^@]*');
+  return new RegExp(`^${body}$`);
+}
+
+function matches(entry: string, value: string): boolean {
+  if (entry.startsWith('@')) return value.endsWith(entry);
+  if (entry.includes('*')) return globToRegExp(entry).test(value);
+  return value === entry;
+}
+
 export function isTestAccountEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const value = email.trim().toLowerCase();
-  return entries().some((entry) => (entry.startsWith('@') ? value.endsWith(entry) : value === entry));
+  return entries().some((entry) => matches(entry, value));
 }
 
 /** The same list as `LIKE ANY($n)` patterns, for SQL that must skip these accounts. */
 export function testAccountLikePatterns(): string[] {
   return entries().map((entry) => {
-    const escaped = entry.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const escaped = entry.replace(/[\\%_]/g, (c) => `\\${c}`).replace(/\*/g, '%');
     return entry.startsWith('@') ? `%${escaped}` : escaped;
   });
 }

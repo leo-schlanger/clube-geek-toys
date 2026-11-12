@@ -21,6 +21,16 @@ describe('test accounts', () => {
     expect(isTestAccountEmail(null)).toBe(false);
   });
 
+  it('covers the fresh sign-ups the qa makes, only on our domain', () => {
+    delete process.env.TEST_ACCOUNT_EMAILS;
+    expect(isTestAccountEmail('e2e-qa-1762975000@geeketoys.com.br')).toBe(true);
+    expect(isTestAccountEmail('e2e-signup-3@geeketoys.com.br')).toBe(true);
+    expect(isTestAccountEmail('qa+1762975000a@geeketoys.com.br')).toBe(true);
+    expect(isTestAccountEmail('e2e-qa-1@gmail.com')).toBe(false);
+    expect(isTestAccountEmail('qa@geeketoys.com.br')).toBe(false);
+    expect(isTestAccountEmail('maria.e2e-fan@geeketoys.com.br.evil.com')).toBe(false);
+  });
+
   it('treats an empty variable as the default, and accepts @domain entries', () => {
     process.env.TEST_ACCOUNT_EMAILS = '';
     expect(isTestAccountEmail('e2e-member@geeketoys.com.br')).toBe(true);
@@ -33,8 +43,8 @@ describe('test accounts', () => {
   });
 
   it('builds escaped LIKE patterns for SQL', () => {
-    process.env.TEST_ACCOUNT_EMAILS = 'a_b@x.com,@teste.dev';
-    expect(testAccountLikePatterns()).toEqual(['a\\_b@x.com', '%@teste.dev']);
+    process.env.TEST_ACCOUNT_EMAILS = 'a_b@x.com,@teste.dev,e2e-*@geeketoys.com.br';
+    expect(testAccountLikePatterns()).toEqual(['a\\_b@x.com', '%@teste.dev', 'e2e-%@geeketoys.com.br']);
   });
 
   it('flags only staff templates about a test account', () => {

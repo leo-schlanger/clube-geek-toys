@@ -467,6 +467,7 @@ async function flagOrphanPaidCharge(
   const amount = pagarme.fromCents(charge.paid_amount ?? charge.amount);
   const ref = row ? `pedido #${row.order_number} (${row.status as string})` : 'nenhum pedido';
   log.error(`charge ${charge.id}: paid with no open order to settle (${ref})`);
+  // No customerEmail on purpose: money that settles nothing needs a person, test account or not.
   deferred.adminNotices.push({
     event: 'payment_received',
     subject: row ? `Pedido #${row.order_number} — cobrança a mais` : 'Cobrança sem pedido',

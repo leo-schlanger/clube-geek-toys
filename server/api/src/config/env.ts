@@ -52,7 +52,7 @@ const envSchema = z.object({
   // qa accounts: staff e-mails and the daily digest skip them (utils/test-accounts.ts).
   TEST_ACCOUNT_EMAILS: z
     .string()
-    .default('e2e-member@geeketoys.com.br,e2e-admin@geeketoys.com.br,e2e-buyer@example.com'),
+    .default('e2e-*@geeketoys.com.br,qa+*@geeketoys.com.br,e2e-buyer@example.com'),
 
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),

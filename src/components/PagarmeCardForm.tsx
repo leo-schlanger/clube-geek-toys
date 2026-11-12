@@ -414,7 +414,8 @@ export function PagarmeCardForm({
         <Button
           ref={pixButtonRef}
           type="button"
-          className="w-full"
+          // Wraps instead of clipping: in the club modal at 390 px the label is wider than the button.
+          className="h-auto min-h-10 w-full whitespace-normal py-2 text-center leading-snug"
           aria-describedby={formError ? 'card-form-error' : undefined}
           disabled={submitting}
           onClick={async () => {
