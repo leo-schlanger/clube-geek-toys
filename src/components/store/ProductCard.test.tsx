@@ -70,6 +70,39 @@ describe('ProductCard', () => {
     expect(screen.getByText(/Membro/i)).toBeInTheDocument()
   })
 
+  it('asks for the 600 px thumbnail of an uploaded photo, and falls back to the original', () => {
+    const photo = 'https://api.geeketoys.com.br/uploads/products/p1/abc.jpg'
+    render(
+      <MemoryRouter>
+        <ProductCard product={{ ...product, images: [photo] }} />
+      </MemoryRouter>
+    )
+    const img = screen.getByRole('img', { name: 'Photocard X' }) as HTMLImageElement
+    expect(img.getAttribute('srcset')).toBe(
+      'https://api.geeketoys.com.br/uploads/products/p1/abc.thumb.webp 600w, ' + photo + ' 1600w'
+    )
+    expect(img.getAttribute('sizes')).toContain('50vw')
+
+    // Thumbnail missing (older upload): the original alone, still visible.
+    fireEvent.error(img)
+    expect(img.hasAttribute('srcset')).toBe(false)
+    expect(img.getAttribute('src')).toBe(photo)
+    expect(img.style.display).not.toBe('none')
+
+    // The original fails too: the "Sem foto" placeholder.
+    fireEvent.error(img)
+    expect(img.style.display).toBe('none')
+  })
+
+  it('leaves a pasted external photo without srcset', () => {
+    render(
+      <MemoryRouter>
+        <ProductCard product={product} />
+      </MemoryRouter>
+    )
+    expect(screen.getByRole('img', { name: 'Photocard X' }).hasAttribute('srcset')).toBe(false)
+  })
+
   it('adds to cart on button click', () => {
     render(
       <MemoryRouter>

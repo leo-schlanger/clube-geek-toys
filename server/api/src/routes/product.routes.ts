@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { uploadDir } from '../utils/upload-path.js';
+import { writeThumbnails } from '../utils/product-thumbnail.js';
 import { AppError } from '../middleware/error-handler.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -612,6 +613,7 @@ productRouter.post(
       }
       // Whatever did not fit under the cap must not linger on disk.
       for (const url of result.rejected) discardUpload(pathByUrl.get(url) as string);
+      await writeThumbnails(result.accepted.map((url) => pathByUrl.get(url)).filter((p): p is string => Boolean(p)));
 
       log.info(`product=${productId} kept=${result.accepted.length}/${files.length}` +
           `${result.rejected.length ? ` over-limit=${result.rejected.length}` : ''}` +
@@ -752,11 +754,12 @@ productRouter.post(
         res.status(400).json({ error: 'Nenhuma imagem enviada.', code: 'NO_IMAGES' });
         return;
       }
-      const { urls, sawHeic } = collectUploadedImages(files, req.params.id as string);
+      const { urls, pathByUrl, sawHeic } = collectUploadedImages(files, req.params.id as string);
       if (urls.length === 0) {
         rejectInvalidUpload(res, sawHeic);
         return;
       }
+      await writeThumbnails([...pathByUrl.values()]);
       log.info(`media product=${req.params.id} kept=${urls.length}/${files.length}`);
       res.status(201).json({ urls });
     } catch (err) {

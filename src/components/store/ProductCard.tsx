@@ -13,6 +13,7 @@ import { useShopPromo } from '../../hooks/useShopPromo'
 import { MemberDiscountBadge } from './MemberDiscountBadge'
 import { SaveProductButton } from './SaveProductButton'
 import { availableStock, hasSellablePrice } from '../../lib/products'
+import { PRODUCT_CARD_SIZES, productCardSrcSet } from '../../lib/product-thumb'
 
 interface ProductCardProps {
   product: Product
@@ -41,6 +42,7 @@ export function ProductCard({
   const { promo } = useShopPromo()
 
   const image = product.images?.[0] ?? null
+  const srcSet = productCardSrcSet(image)
   const outOfStock = availableStock(product) <= 0
   const onSale = product.compareAtPrice != null && product.compareAtPrice > product.price
 
@@ -84,11 +86,20 @@ export function ProductCard({
         {image ? (
           <img
             src={image}
+            srcSet={srcSet}
+            sizes={srcSet ? PRODUCT_CARD_SIZES : undefined}
             alt={product.name}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={(e) => {
               const el = e.currentTarget
+              // No thumbnail for this photo yet: retry with the original alone.
+              if (el.srcset) {
+                el.removeAttribute('srcset')
+                el.removeAttribute('sizes')
+                el.src = image
+                return
+              }
               el.style.display = 'none'
               const fallback = el.nextElementSibling as HTMLElement | null
               if (fallback) fallback.classList.remove('hidden')

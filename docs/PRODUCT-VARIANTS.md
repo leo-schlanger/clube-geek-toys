@@ -68,6 +68,19 @@ Fonte da verdade: `server/api/src/services/product.service.ts` (espelhado em `sr
 
 Seleções maiores que `MAX_IMAGE_UPLOAD_BATCH` são fatiadas em várias requisições pelo `uploadProductImages`. O nginx precisa acompanhar: `client_max_body_size 120m` no bloco `api.geeketoys.com.br`.
 
+### Miniaturas da vitrine (12/11/2026)
+
+Todo upload de foto (`POST /products/:id/images` e `/media`) grava, ao lado do original, `<arquivo>.thumb.webp` com o lado menor em 600 px (`utils/product-thumbnail.ts`, sharp). A miniatura **não entra** em `products.images` nem em `product_variants.images`, então não conta para nenhum teto acima e não muda URL nenhuma. O cartão da loja (`ProductCard`) pede a miniatura por `srcset`/`sizes` (`src/lib/product-thumb.ts`) e, se ela não existir (URL colada, upload antigo), volta para o original no `onError`. Falha ao gerar a miniatura não derruba o upload.
+
+Antes disso a grelha baixava o original de até 2560 px: mediana de 308 kB por foto e até 4 MB (medido de 08 a 12/11/2026). As fotos antigas ganham miniatura com o script idempotente, que também recomprime os JPEG acima de 1 MB e guarda o original em `uploads/.originals/products/`:
+
+```bash
+docker exec -u node clube-geek-api node dist/scripts/backfill-product-thumbnails.js --dry-run
+docker exec -u node clube-geek-api node dist/scripts/backfill-product-thumbnails.js
+```
+
+`-u node` é obrigatório: o volume é do usuário `node`, e um arquivo criado como root a API não consegue mais substituir.
+
 > **Regressão de 14/08/2026 (não repetir):** o teto da galeria valia só no Zod do `PATCH /products/:id`, mas o upload anexava sem limite — e a foto de variação passava por ele. Cada variação com foto somava uma imagem em `products.images`; ao passar do teto, **o produto não podia mais ser salvo** (o PATCH reenvia o array inteiro e era rejeitado com 400). Correção: `/media` para variação + teto aplicado também em `addProductImages`. Coberto por `product.service.test.ts` e pelo caso "não anexa foto de variação na galeria do listing" em `ProductModal.test.tsx`.
 
 > **Regressão de 15/08/2026 (não repetir):** o admin preenchia tipo + opções, clicava em **Salvar** e o produto era gravado **sem variação nenhuma**, com o toast de sucesso normal. Causa: a matriz de SKUs só existia depois de clicar em "Gerar combinações" — o `handleSubmit` lia `variantRows`, que continuava vazio, e o `PUT /variants` nem chegava a ser chamado. O mesmo padrão derrubava o **vídeo** (link colado e não confirmado no "+" era descartado), a **URL de foto do listing** e a **URL de foto por variação**. Correção: `handleSubmit` resolve todo rascunho pendente antes do primeiro write (`resolvePendingVideos`, `resolvePendingImages`, `resolvePendingVariantImages`) e monta a matriz que faltava com `mergeVariantMatrix`. Rascunho inválido agora **bloqueia** o save com mensagem em vez de sumir. Coberto por "ProductModal — rascunho pendente no Salvar" em `ProductModal.test.tsx`.

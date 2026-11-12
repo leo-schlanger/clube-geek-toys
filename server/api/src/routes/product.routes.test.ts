@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import sharp from 'sharp';
 
 /**
  * Product routes over real HTTP (see `test-support/http.ts`).
@@ -305,6 +306,35 @@ describe('image uploads', () => {
     expect(res.body.images[0]).toMatch(new RegExp(`^https://api\\.geeketoys\\.com\\.br/uploads/products/${PID}/.+\\.jpg$`));
     expect(res.body.skippedOverLimit).toBe(0);
     expect(filesOnDisk()).toHaveLength(2);
+  });
+
+  it('writes a 600 px WebP thumbnail next to each kept photo, and none for what was cut', async () => {
+    const photo = await sharp({ create: { width: 1600, height: 1200, channels: 3, background: '#F04080' } })
+      .jpeg()
+      .toBuffer();
+    svc.addProductImages.mockImplementation(async (_id: string, urls: string[]) => ({
+      product: { id: PID, images: urls.slice(0, 1) },
+      accepted: urls.slice(0, 1),
+      rejected: urls.slice(1),
+    }));
+    const res = await api.post(`/${PID}/images`, {
+      as: 'admin',
+      form: form('images', [
+        [photo, 'a.jpg', 'image/jpeg'],
+        [photo, 'b.jpg', 'image/jpeg'],
+      ]),
+    });
+    expect(res.status).toBe(201);
+    const kept = path.basename(res.body.images[0] as string);
+    const thumb = kept.replace(/\.jpg$/, '.thumb.webp');
+    expect(filesOnDisk().sort()).toEqual([kept, thumb].sort());
+    const meta = await sharp(path.join(tmpRoot, PID, thumb)).metadata();
+    expect(meta.format).toBe('webp');
+    expect(Math.min(meta.width!, meta.height!)).toBe(600);
+
+    const media = await api.post(`/${PID}/media`, { as: 'admin', form: form('images', [[photo, 'v.jpg', 'image/jpeg']]) });
+    const variant = path.basename(media.body.urls[0] as string);
+    expect(filesOnDisk()).toContain(variant.replace(/\.jpg$/, '.thumb.webp'));
   });
 
   it('deletes from disk what did not fit under the cap', async () => {
