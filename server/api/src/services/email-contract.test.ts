@@ -224,6 +224,52 @@ describe('o botão sobrevive a cliente de e-mail que ignora gradiente', () => {
   });
 });
 
+describe('contas de teste do qa', () => {
+  it('não mandam e-mail de equipe, mas o cliente de teste recebe o dele', async () => {
+    fetchMock.mockClear();
+    const skipped = await sendTemplateEmail({
+      template: 'admin-order-cancelled',
+      to: 'admin@geeketoys.com.br',
+      variables: { order_number: '70', customer_email: 'e2e-member@geeketoys.com.br' },
+    });
+    expect(skipped.status).toBe('skipped');
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await sendTemplateEmail({
+      template: 'order-pending-pix',
+      to: 'e2e-member@geeketoys.com.br',
+      variables: { customer_email: 'e2e-member@geeketoys.com.br' },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await sendTemplateEmail({
+      template: 'admin-order-cancelled',
+      to: 'admin@geeketoys.com.br',
+      variables: { order_number: '71', customer_email: 'cliente@gmail.com' },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('resumo diário', () => {
+  it('diz quais filas não deu para contar, com o nome da fila', async () => {
+    const { html } = await render('admin-daily-digest', {
+      total_pending: '3',
+      pix_pending: '3',
+      failed_queues: 'questions_unanswered,stock_low',
+    });
+    expect(html).toContain('Não deu para contar');
+    expect(html).toContain('Perguntas sem resposta');
+    expect(html).toContain('SKUs no estoque mínimo');
+    expect(html).not.toContain('não existe webhook');
+  });
+
+  it('sem falha, não mostra o aviso', async () => {
+    const { html } = await render('admin-daily-digest', { total_pending: '1', pix_pending: '1' });
+    expect(html).not.toContain('Não deu para contar');
+  });
+});
+
 describe('aviso de cadastro do clube', () => {
   // Chegava como "Novo membro cadastrado" antes de qualquer pagamento, e a
   // equipe leu como venda feita (Bruna, 09/10/2026: cartão recusado, R$ 0).

@@ -5,8 +5,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  *
  * What these tests protect, ordered by how much a regression would cost:
  *
- *  1. A queue whose table is missing degrades to zero instead of blanking the
- *     whole panel (the panel sits on the dashboard everyone opens first).
+ *  1. A queue whose table is missing is marked failed (count unknown, never a
+ *     silent zero) instead of blanking the whole panel.
  *  2. `oldestDays` is null on an empty queue, so the UI never claims something
  *     has been "waiting 0 days" when nothing is waiting.
  *  3. The stock counts use the same predicate the stock tab lists by, so a card
@@ -107,9 +107,37 @@ describe('getActionItems', () => {
       key: 'questions_unanswered',
       count: 0,
       oldestDays: null,
+      failed: true,
     });
+    expect(report.failedKeys).toEqual(['questions_unanswered']);
     expect(itemFor(report, 'to_separate')?.count).toBe(2);
+    expect(itemFor(report, 'to_separate')?.failed).toBeUndefined();
     expect(report.items).toHaveLength(13);
+  });
+
+  it('reports no failed queue when every count works', async () => {
+    respondBy([]);
+    expect((await getActionItems()).failedKeys).toEqual([]);
+  });
+
+  it('leaves the qa accounts out of the order, ticket and member queues', async () => {
+    const calls: Array<[string, unknown[]]> = [];
+    queryMock.mockImplementation(async (sql: string, params: unknown[] = []) => {
+      calls.push([sql, params]);
+      return { rows: [{ count: 0, oldest_days: null }], rowCount: 1 };
+    });
+
+    await getActionItems();
+
+    const filtered = calls.filter(([sql]) => /LIKE ANY\(\$1::text\[\]\)/.test(sql));
+    // pix, separar, postar, retirar, enviados parados, ingressos, membros pendentes
+    expect(filtered).toHaveLength(7);
+    for (const [sql, params] of filtered) {
+      expect(sql).toMatch(/NOT \(lower\(COALESCE\((customer_email|buyer_email|email), ''\)\) LIKE ANY/);
+      expect(params[0]).toContain('e2e-member@geeketoys.com.br');
+    }
+    expect(filtered.some(([sql]) => /FROM members/.test(sql))).toBe(true);
+    expect(filtered.some(([sql]) => /FROM event_reservations/.test(sql))).toBe(true);
   });
 
   it('excludes inactive and seed rows from the stock counts, like the stock tab', async () => {

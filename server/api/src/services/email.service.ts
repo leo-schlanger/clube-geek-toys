@@ -4,6 +4,7 @@ import { query } from '../config/database.js';
 import { maskEmail, moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
 import { AppError } from '../middleware/error-handler.js';
+import { isStaffNoticeAboutTestAccount, isTestAccountEmail } from '../utils/test-accounts.js';
 
 const log = moduleLogger('email');
 
@@ -80,6 +81,11 @@ export async function sendTemplateEmail(data: {
   member_id?: string;
 }) {
   const { template, to, variables = {} } = data;
+
+  if (isStaffNoticeAboutTestAccount(template, variables)) {
+    log.info({ template }, 'staff e-mail skipped: test account');
+    return { id: null, status: 'skipped' as const };
+  }
 
   // Sanitize variables
   const sanitized: Record<string, string> = {};
@@ -188,7 +194,7 @@ export async function sendContractEmail(data: {
 
   // Send copy to admin (use explicit admin_email or fallback to env.ADMIN_EMAIL)
   const adminRecipient = data.admin_email || env.ADMIN_EMAIL;
-  if (adminRecipient && adminRecipient !== data.to) {
+  if (adminRecipient && adminRecipient !== data.to && !isTestAccountEmail(data.to)) {
     await send(adminRecipient, `[Cópia] ${subject}`).catch((err) => {
       log.error({ err }, 'Admin copy error');
       recordEmailFailure('contract-signed', err);
@@ -207,6 +213,33 @@ interface TemplateDefinition {
   preheader: string;
   body: string;
   cta?: { text: string; url: string };
+}
+
+/** Daily digest rows: action-item key, label, colour. */
+const DIGEST_ROWS: [string, string, string][] = [
+  ['pix_pending', '💰 PIX aguardando (confirma sozinho)', '#f59e0b'],
+  ['to_separate', '📦 Pedidos pagos a separar', '#4ade80'],
+  ['to_ship', '🚚 Pedidos a postar', '#4ade80'],
+  ['to_release_pickup', '🏪 Retiradas a liberar ao cliente', '#4ade80'],
+  ['shipped_stale', '🕐 Enviados há +10 dias sem entrega', '#f87171'],
+  ['event_tickets_pending', '🎫 Ingressos aguardando', '#f59e0b'],
+  ['questions_unanswered', '❓ Perguntas sem resposta', '#3b82f6'],
+  ['reviews_pending', '⭐ Avaliações a moderar', '#3b82f6'],
+  ['wholesale_pending', '🏢 Contas atacado a aprovar', '#f59e0b'],
+  ['stock_out', '🔴 SKUs esgotados', '#f87171'],
+  ['stock_low', '🟡 SKUs no estoque mínimo', '#f59e0b'],
+  ['members_expiring', '📅 Assinaturas vencendo em 7 dias', '#f59e0b'],
+  ['members_pending', '⏳ Membros sem pagamento', '#94a3b8'],
+];
+
+/** Queues the digest could not count (`failed_queues`: comma-separated keys). */
+function digestFailedBox(failedQueues: string | undefined): string {
+  const keys = (failedQueues || '').split(',').map((k) => k.trim()).filter(Boolean);
+  if (keys.length === 0) return '';
+  const labels = keys.map((key) => DIGEST_ROWS.find(([k]) => k === key)?.[1] ?? key);
+  return infoBox(
+    `⚠️ <strong>Não deu para contar:</strong> ${labels.join(', ')}. Os números abaixo podem estar incompletos — confira no painel.`
+  );
 }
 
 function renderTemplate(template: string, vars: Record<string, string>): { subject: string; html: string } {
@@ -803,29 +836,13 @@ function renderTemplate(template: string, vars: Record<string, string>): { subje
       body: `
         <h2 style="color:#F04080;margin:0 0 12px">O que está esperando por você 📋</h2>
         <p>Resumo das filas do painel admin nesta manhã.</p>
+        ${digestFailedBox(v.failed_queues)}
         ${dataTable(
-          [
-            ['💰 PIX aguardando (confirma sozinho)', v.pix_pending, '#f59e0b'],
-            ['📦 Pedidos pagos a separar', v.to_separate, '#4ade80'],
-            ['🚚 Pedidos a postar', v.to_ship, '#4ade80'],
-            ['🏪 Retiradas a liberar ao cliente', v.to_release_pickup, '#4ade80'],
-            [`🕐 Enviados há +10 dias sem entrega`, v.shipped_stale, '#f87171'],
-            ['🎫 Ingressos aguardando', v.event_tickets_pending, '#f59e0b'],
-            ['❓ Perguntas sem resposta', v.questions_unanswered, '#3b82f6'],
-            ['⭐ Avaliações a moderar', v.reviews_pending, '#3b82f6'],
-            ['🏢 Contas atacado a aprovar', v.wholesale_pending, '#f59e0b'],
-            ['🔴 SKUs esgotados', v.stock_out, '#f87171'],
-            ['🟡 SKUs no estoque mínimo', v.stock_low, '#f59e0b'],
-            ['📅 Assinaturas vencendo em 7 dias', v.members_expiring, '#f59e0b'],
-            ['⏳ Membros sem pagamento', v.members_pending, '#94a3b8'],
-          ]
-            .filter(([, count]) => Number(count) > 0)
-            .map(([label, count, color]) => [
-              label as string,
-              `<strong style="color:${color}">${count}</strong>`,
-            ])
+          DIGEST_ROWS
+            .filter(([key]) => Number(v[key]) > 0)
+            .map(([key, label, color]) => [label, `<strong style="color:${color}">${v[key]}</strong>`])
         )}
-        ${infoBox('💰 <strong>O PIX é o item urgente:</strong> não existe webhook, então cada pedido PIX fica <em>pending</em> até alguém conferir o extrato e confirmar no painel. Enquanto isso o estoque não é baixado.')}`,
+        ${infoBox('💰 O PIX confirma sozinho pela Pagar.me. O que aparece em "PIX aguardando" é código que o cliente ainda não pagou; o sistema fecha os vencidos.')}`,
       cta: { text: 'Abrir Painel do Dia', url: v.admin_url || adminUrl() },
     },
 

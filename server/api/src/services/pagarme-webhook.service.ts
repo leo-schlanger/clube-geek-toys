@@ -622,6 +622,7 @@ async function settleClubPayment(
     subject: 'Assinatura do clube',
     amount,
     method: charge.payment_method ?? null,
+    customerEmail: charge.customer?.email ?? null,
     link: '/admin?tab=members',
     chargeId: charge.id,
   });
@@ -675,6 +676,7 @@ async function handlePaymentFailed(
       subject: metadata.orderNumber ? `Pedido #${metadata.orderNumber}` : 'Pedido da loja',
       amount: pagarme.fromCents(charge.amount),
       method: charge.payment_method ?? null,
+      customerEmail: charge.customer?.email ?? null,
       link: '/admin?tab=orders',
       detail: pagarme.describeChargeFailure(charge),
       chargeId: charge.id,
@@ -710,6 +712,7 @@ async function handlePaymentFailed(
     subject: 'Assinatura do clube',
     amount: pagarme.fromCents(charge.amount),
     method: charge.payment_method ?? null,
+    customerEmail: charge.customer?.email ?? null,
     link: '/admin?tab=members',
     detail: pagarme.describeChargeFailure(charge),
     chargeId: charge.id,
@@ -856,6 +859,7 @@ async function handleRefunded(
     subject: 'Assinatura do clube',
     amount: parseFloat(payment.rows[0]!.amount as string),
     method: charge.payment_method ?? null,
+    customerEmail: charge.customer?.email ?? null,
     link: '/admin?tab=members',
     chargeId: charge.id,
   });

@@ -170,32 +170,46 @@ export interface ActionItem {
   count: number
   /** Age in days of the oldest row in the queue; null when the queue is empty. */
   oldestDays: number | null
+  /** The server could not count this queue: unknown, not zero. */
+  failed: boolean
 }
 
 export interface ActionItemsReport {
   items: ActionItem[]
   totalPending: number
+  /** Queues the server could not count. */
+  failedKeys: ActionItemKey[]
+  /** The request itself failed — nothing is known. */
+  loadFailed: boolean
 }
 
 /**
  * Every admin queue that currently needs a human, with the age of its oldest
- * entry. An empty report is the healthy state, so failures return zero items
- * rather than throwing — the dashboard around it must still render.
+ * entry. Never throws — the dashboard around it must still render — but a
+ * failure is reported as such: an empty list would read as "nada pendente".
  */
 export async function getActionItems(): Promise<ActionItemsReport> {
-  const result = await api.get<{ items?: unknown; totalPending?: unknown }>('/reports/action-items')
-  if (result.error || !result.data) return { items: [], totalPending: 0 }
+  const result = await api.get<{ items?: unknown; totalPending?: unknown; failedKeys?: unknown }>(
+    '/reports/action-items'
+  )
+  if (result.error || !result.data) return { items: [], totalPending: 0, failedKeys: [], loadFailed: true }
 
   const rows = Array.isArray(result.data.items) ? result.data.items : []
   const items = rows.map((row: Record<string, unknown>) => ({
     key: row.key as ActionItemKey,
     count: num(row.count),
     oldestDays: row.oldestDays === null || row.oldestDays === undefined ? null : num(row.oldestDays),
+    failed: row.failed === true,
   }))
+  const failedKeys = Array.isArray(result.data.failedKeys)
+    ? (result.data.failedKeys as ActionItemKey[])
+    : items.filter((item) => item.failed).map((item) => item.key)
 
   return {
     items,
     totalPending: num(result.data.totalPending),
+    failedKeys,
+    loadFailed: false,
   }
 }
 

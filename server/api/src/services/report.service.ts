@@ -1,6 +1,7 @@
 import { query } from '../config/database.js';
 import { moduleLogger } from '../config/logger.js';
 import { AppError } from '../middleware/error-handler.js';
+import { testAccountLikePatterns } from '../utils/test-accounts.js';
 
 const log = moduleLogger('report');
 
@@ -415,11 +416,15 @@ export interface ActionItem {
   count: number;
   /** Age in days of the oldest row in the queue; null when the queue is empty. */
   oldestDays: number | null;
+  /** The count query failed: `count` is unknown, not zero. */
+  failed?: boolean;
 }
 
 export interface ActionItemsReport {
   items: ActionItem[];
   totalPending: number;
+  /** Queues whose count failed — the panel and the digest say so instead of showing 0. */
+  failedKeys: ActionItemKey[];
   timestamp: string;
 }
 
@@ -427,8 +432,9 @@ export interface ActionItemsReport {
  * One `count` + `oldestDays` pair for a queue.
  *
  * Each queue is its own query with its own catch: a table missing on an older
- * schema (or an `ensureSchema` step that failed) degrades that single card to
- * zero instead of blanking the whole panel.
+ * schema (or an `ensureSchema` step that failed) marks that single queue as
+ * failed instead of blanking the whole panel. Never as zero: an empty queue
+ * reads as "nothing to do", which is the one thing a failure must not say.
  */
 async function queueStat(key: ActionItemKey, sql: string, params: unknown[] = []): Promise<ActionItem> {
   try {
@@ -439,7 +445,7 @@ async function queueStat(key: ActionItemKey, sql: string, params: unknown[] = []
     return { key, count, oldestDays: count > 0 && Number.isFinite(oldest as number) ? (oldest as number) : null };
   } catch (err) {
     log.error({ err }, `action item "${key}" failed`);
-    return { key, count: 0, oldestDays: null };
+    return { key, count: 0, oldestDays: null, failed: true };
   }
 }
 
@@ -473,12 +479,23 @@ export async function getActionItems(): Promise<ActionItemsReport> {
   const stockSql = (extra: string) =>
     `SELECT COUNT(*)::int AS count, NULL::int AS oldest_days
      FROM (${stockBase}) s WHERE ${stockWhere} AND ${extra}`;
+  // qa accounts run real orders in production; they are not work for the shop.
+  const notTest = (column: string) => `NOT (lower(COALESCE(${column}, '')) LIKE ANY($1::text[]))`;
+  const testParams = [testAccountLikePatterns()];
 
   const items = await Promise.all([
     // Pagar.me confirms PIX on its own; what stays here is a code nobody paid
     // yet, or a legacy static code that still needs a hand confirm.
-    queueStat('pix_pending', queueSql('orders', `status = 'pending' AND payment_method = 'pix'`)),
-    queueStat('to_separate', queueSql('orders', `status = 'paid'`, 'COALESCE(paid_at, created_at)')),
+    queueStat(
+      'pix_pending',
+      queueSql('orders', `status = 'pending' AND payment_method = 'pix' AND ${notTest('customer_email')}`),
+      testParams
+    ),
+    queueStat(
+      'to_separate',
+      queueSql('orders', `status = 'paid' AND ${notTest('customer_email')}`, 'COALESCE(paid_at, created_at)'),
+      testParams
+    ),
     // Aged by `status_changed_at` (migration 025), not `updated_at`: any write
     // to the row bumps updated_at — saving a tracking code, adopting a guest
     // order — and a queue that resets because someone touched the order is a
@@ -487,24 +504,40 @@ export async function getActionItems(): Promise<ActionItemsReport> {
     // "a postar", it showed up as an order the shop could not find in the list.
     queueStat(
       'to_ship',
-      queueSql('orders', `status = 'processing' AND delivery_method <> 'pickup'`, 'COALESCE(status_changed_at, updated_at)')
+      queueSql(
+        'orders',
+        `status = 'processing' AND delivery_method <> 'pickup' AND ${notTest('customer_email')}`,
+        'COALESCE(status_changed_at, updated_at)'
+      ),
+      testParams
     ),
     queueStat(
       'to_release_pickup',
-      queueSql('orders', `status = 'processing' AND delivery_method = 'pickup'`, 'COALESCE(status_changed_at, updated_at)')
+      queueSql(
+        'orders',
+        `status = 'processing' AND delivery_method = 'pickup' AND ${notTest('customer_email')}`,
+        'COALESCE(status_changed_at, updated_at)'
+      ),
+      testParams
     ),
     queueStat(
       'shipped_stale',
       queueSql(
         'orders',
-        `status = 'shipped' AND COALESCE(status_changed_at, updated_at) < NOW() - INTERVAL '${SHIPPED_STALE_DAYS} days'`,
+        `status = 'shipped' AND COALESCE(status_changed_at, updated_at) < NOW() - INTERVAL '${SHIPPED_STALE_DAYS} days'` +
+          ` AND ${notTest('customer_email')}`,
         'COALESCE(status_changed_at, updated_at)'
-      )
+      ),
+      testParams
     ),
     queueStat('questions_unanswered', queueSql('product_questions', `answered_at IS NULL AND status = 'published'`)),
     // A pending reservation is a PIX the buyer has not paid yet. Pagar.me
     // confirms it; the queue is there so a code that sits for hours is visible.
-    queueStat('event_tickets_pending', queueSql('event_reservations', `status = 'pending'`)),
+    queueStat(
+      'event_tickets_pending',
+      queueSql('event_reservations', `status = 'pending' AND ${notTest('buyer_email')}`),
+      testParams
+    ),
     queueStat('reviews_pending', queueSql('product_reviews', `status = 'pending'`)),
     queueStat('wholesale_pending', queueSql('wholesale_accounts', `status = 'pending'`)),
     queueStat('stock_out', stockSql('s.stock <= 0')),
@@ -520,12 +553,13 @@ export async function getActionItems(): Promise<ActionItemsReport> {
        WHERE status = 'active'
          AND expiry_date BETWEEN ${TODAY_LOCAL} AND ${TODAY_LOCAL} + ${EXPIRING_SOON_DAYS}`
     ),
-    queueStat('members_pending', queueSql('members', `status = 'pending'`)),
+    queueStat('members_pending', queueSql('members', `status = 'pending' AND ${notTest('email')}`), testParams),
   ]);
 
   return {
     items,
     totalPending: items.reduce((sum, item) => sum + item.count, 0),
+    failedKeys: items.filter((item) => item.failed).map((item) => item.key),
     timestamp: new Date().toISOString(),
   };
 }

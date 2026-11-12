@@ -237,6 +237,8 @@ interface ActionCenterProps {
 export function ActionCenter({ onNavigate }: ActionCenterProps) {
   const [items, setItems] = useState<ActionItem[]>([])
   const [total, setTotal] = useState(0)
+  const [failedKeys, setFailedKeys] = useState<ActionItemKey[]>([])
+  const [loadFailed, setLoadFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
@@ -246,6 +248,8 @@ export function ActionCenter({ onNavigate }: ActionCenterProps) {
       const report = await getActionItems()
       setItems(report.items)
       setTotal(report.totalPending)
+      setFailedKeys(report.failedKeys)
+      setLoadFailed(report.loadFailed)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -266,6 +270,7 @@ export function ActionCenter({ onNavigate }: ActionCenterProps) {
     )
   }
 
+  const failedLabels = failedKeys.filter((key) => QUEUES[key]).map((key) => QUEUES[key].label)
   const pending = items
     .filter((item) => item.count > 0 && QUEUES[item.key])
     .sort((a, b) => {
@@ -289,7 +294,20 @@ export function ActionCenter({ onNavigate }: ActionCenterProps) {
         </Button>
       </CardHeader>
       <CardContent>
-        {pending.length === 0 ? (
+        {(loadFailed || failedLabels.length > 0) && (
+          <div
+            role="alert"
+            className="mb-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-500" />
+            <p className="min-w-0">
+              {loadFailed
+                ? 'Não foi possível carregar as pendências. Toque em atualizar para tentar de novo.'
+                : `Não deu para contar: ${failedLabels.join(', ')}. Os números podem estar incompletos.`}
+            </p>
+          </div>
+        )}
+        {loadFailed ? null : pending.length === 0 && failedLabels.length === 0 ? (
           <div className="flex items-center gap-3 py-6 text-muted-foreground">
             <CheckCircle2 className="h-6 w-6 text-green-700 dark:text-green-500 shrink-0" />
             <div>

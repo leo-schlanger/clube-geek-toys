@@ -21,8 +21,13 @@ const { getActionItemsMock } = vi.hoisted(() => ({ getActionItemsMock: vi.fn() }
 vi.mock('../../lib/reports', () => ({ getActionItems: getActionItemsMock }))
 
 function report(items: Partial<ActionItem>[]): ActionItemsReport {
-  const full = items.map((i) => ({ oldestDays: null, count: 0, ...i }) as ActionItem)
-  return { items: full, totalPending: full.reduce((s, i) => s + i.count, 0) }
+  const full = items.map((i) => ({ oldestDays: null, count: 0, failed: false, ...i }) as ActionItem)
+  return {
+    items: full,
+    totalPending: full.reduce((s, i) => s + i.count, 0),
+    failedKeys: full.filter((i) => i.failed).map((i) => i.key),
+    loadFailed: false,
+  }
 }
 
 async function renderPanel(data: ActionItemsReport, onNavigate = vi.fn()) {
@@ -42,6 +47,25 @@ describe('ActionCenter', () => {
 
     expect(await screen.findByText('Nada pendente')).toBeInTheDocument()
     expect(screen.queryByText('PIX aguardando')).not.toBeInTheDocument()
+  })
+
+  it('never says "Nada pendente" when a queue could not be counted', async () => {
+    await renderPanel(
+      report([
+        { key: 'pix_pending', count: 0 },
+        { key: 'questions_unanswered', count: 0, failed: true },
+      ])
+    )
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não deu para contar: Perguntas sem resposta')
+    expect(screen.queryByText('Nada pendente')).not.toBeInTheDocument()
+  })
+
+  it('says the panel failed to load instead of showing an empty day', async () => {
+    await renderPanel({ items: [], totalPending: 0, failedKeys: [], loadFailed: true })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível carregar as pendências')
+    expect(screen.queryByText('Nada pendente')).not.toBeInTheDocument()
   })
 
   it('hides queues at zero and shows the ones with work', async () => {

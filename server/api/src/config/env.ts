@@ -49,6 +49,10 @@ const envSchema = z.object({
   // Infrastructure alerts (backup, reconciliation, 5xx, schema). Falls back to
   // ADMIN_EMAIL; set it apart so outages do not drown in sale notifications.
   OPS_ALERT_EMAIL: z.string().email().optional(),
+  // qa accounts: staff e-mails and the daily digest skip them (utils/test-accounts.ts).
+  TEST_ACCOUNT_EMAILS: z
+    .string()
+    .default('e2e-member@geeketoys.com.br,e2e-admin@geeketoys.com.br,e2e-buyer@example.com'),
 
   // Google OAuth
   GOOGLE_CLIENT_ID: z.string().optional(),

@@ -75,6 +75,7 @@ services:
       FROM_EMAIL: ${FROM_EMAIL}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       OPS_ALERT_EMAIL: ${OPS_ALERT_EMAIL:-}
+      TEST_ACCOUNT_EMAILS: ${TEST_ACCOUNT_EMAILS:-e2e-member@geeketoys.com.br,e2e-admin@geeketoys.com.br,e2e-buyer@example.com}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       FRONTEND_URL: ${FRONTEND_URL}
       API_URL: ${API_URL}
