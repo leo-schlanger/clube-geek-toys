@@ -95,6 +95,24 @@ describe('initCronJobs', () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes('last_cron_run'))).toBe(true)
   })
 
+  it('sends the daily digest when a queue failed to count, naming it, even with nothing pending', async () => {
+    const { getActionItems } = await import('./report.service.js')
+    const { sendTemplateEmail } = await import('./email.service.js')
+    vi.mocked(getActionItems).mockResolvedValueOnce({
+      totalPending: 0,
+      items: [{ key: 'questions_unanswered', count: 0, oldestDays: null, failed: true }],
+      failedKeys: ['questions_unanswered'],
+      timestamp: '',
+    })
+    await tick(15_000)
+    expect(sendTemplateEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        template: 'admin-daily-digest',
+        variables: expect.objectContaining({ failed_queues: 'questions_unanswered' }),
+      })
+    )
+  })
+
   it('a failing job alerts ops and does not stop the next run', async () => {
     reconcile.mockRejectedValueOnce(new Error('pagar.me down'))
     await tick(15_000)

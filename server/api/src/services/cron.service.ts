@@ -292,7 +292,9 @@ async function sendAdminDailyDigest() {
   if (!env.ADMIN_EMAIL) return;
 
   const report = await getActionItems();
-  if (report.totalPending === 0) {
+  // A queue that failed to count is not "nothing pending": the digest says so.
+  const failedKeys = report.failedKeys ?? [];
+  if (report.totalPending === 0 && failedKeys.length === 0) {
     log.info('Daily digest skipped - no pending items');
     return;
   }
@@ -318,6 +320,7 @@ async function sendAdminDailyDigest() {
     variables: {
       ...counts,
       total_pending: String(report.totalPending),
+      failed_queues: failedKeys.join(','),
       admin_url: adminUrl(),
     },
   });
