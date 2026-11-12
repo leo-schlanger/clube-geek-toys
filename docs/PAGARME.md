@@ -749,6 +749,15 @@ com endereço e telefone, `billing_address` no `POST /cards`, pedido com
 não há aprovação real que prove isso; a recusa de 412 continua oferecendo
 **Pagar com PIX** na mesma tela.
 
+**12/11/2026 — o botão PIX à vista.** Em 08/11 duas pessoas tiveram o cartão
+recusado no clube (412) e saíram sem tocar no PIX: o botão nascia acima do
+"Pagar", em estilo `outline`, e no celular podia ficar fora da tela. Agora, a
+cada recusa da tentativa atual, o `PagarmeCardForm` rola o botão para o meio da
+tela (sem animação com `prefers-reduced-motion`), dá foco a ele e o pinta como
+ação principal; "Pagar" com cartão passa a `outline`. A regra de quando o botão
+aparece não mudou (nunca em resultado desconhecido). Vale para todas as telas
+que usam o formulário: cadastro, renovação/`PaymentModal` e checkout da loja.
+
 ---
 
 ## 8.10 "O pagamento do clube não funciona" — 30/10/2026

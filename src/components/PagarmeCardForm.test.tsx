@@ -1,5 +1,5 @@
 import { StrictMode } from 'react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const createCardToken = vi.fn(async (..._args: unknown[]) => 'token_test')
@@ -237,6 +237,76 @@ describe('PagarmeCardForm exit report', () => {
       expect(await screen.findByText('Validade inválida ou vencida.')).toBeInTheDocument()
       expect(onToken).toHaveBeenCalledTimes(1)
       expect(screen.getByRole('button', { name: PIX })).toBeInTheDocument()
+    })
+
+    describe('the PIX way out after a refusal', () => {
+      const scrollIntoView = vi.fn()
+      let reduceMotion = false
+      beforeEach(() => {
+        scrollIntoView.mockClear()
+        reduceMotion = false
+        Element.prototype.scrollIntoView = scrollIntoView
+        vi.stubGlobal('matchMedia', (query: string) => ({
+          matches: query.includes('prefers-reduced-motion') && reduceMotion,
+          media: query,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+        }))
+      })
+
+      afterEach(() => {
+        vi.unstubAllGlobals()
+      })
+
+      it('is brought to the middle of the screen, focused, and is the main action', async () => {
+        render(<PagarmeCardForm amount={100} onToken={failing(REFUSED)} onSwitchToPix={vi.fn()} />)
+        await ready()
+
+        await attempt(REFUSED)
+        const pix = screen.getByRole('button', { name: PIX })
+        await waitFor(() => expect(pix).toHaveFocus())
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' })
+        expect(pix.className).toContain('bg-primary')
+        expect(pix.className).not.toContain('border-input')
+        expect(pix).toHaveAttribute('aria-describedby', 'card-form-error')
+        // Retrying the card is still there, one step back.
+        expect(screen.getByRole('button', { name: PAY }).className).toContain('border')
+        expect(screen.getByRole('button', { name: PAY }).className).not.toContain('bg-primary')
+      })
+
+      it('jumps without animation when the buyer asked for reduced motion', async () => {
+        reduceMotion = true
+        render(<PagarmeCardForm amount={100} onToken={failing(REFUSED)} onSwitchToPix={vi.fn()} />)
+        await ready()
+
+        await attempt(REFUSED)
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' }))
+      })
+
+      it('comes back into view on a second refusal, never on a lost response', async () => {
+        const onToken = failing(REFUSED, 'Saldo insuficiente', OUTCOME_UNKNOWN_MESSAGE)
+        render(<PagarmeCardForm amount={100} onToken={onToken} onSwitchToPix={vi.fn()} />)
+        await ready()
+
+        await attempt(REFUSED)
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1))
+        await attempt('Saldo insuficiente')
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(2))
+        await attempt(OUTCOME_UNKNOWN_MESSAGE)
+        expect(scrollIntoView).toHaveBeenCalledTimes(2)
+        expect(screen.queryByRole('button', { name: PIX })).not.toBeInTheDocument()
+      })
+
+      it('keeps the card button as the main action when there is no PIX to offer', async () => {
+        render(<PagarmeCardForm amount={100} onToken={failing(REFUSED)} />)
+        await ready()
+
+        await attempt(REFUSED)
+        expect(screen.getByRole('button', { name: PAY }).className).toContain('bg-primary')
+        expect(scrollIntoView).not.toHaveBeenCalled()
+      })
     })
 
     it('logs a lost response as such, not as a tokenization failure', async () => {

@@ -105,6 +105,9 @@ export function PagarmeCardForm({
   const [submitting, setSubmitting] = useState(false)
   // Set only by a refusal from the parent's charge, not by a typo caught here.
   const [declined, setDeclined] = useState(false)
+  // Bumped on each refusal, so a second refusal brings the PIX button back into view.
+  const [declineSeq, setDeclineSeq] = useState(0)
+  const pixButtonRef = useRef<HTMLButtonElement>(null)
 
   // What the exit report needs, kept in refs so the listeners see current values.
   const paidRef = useRef(false)
@@ -265,6 +268,7 @@ export function PagarmeCardForm({
         ErrorTracker.captureMessage('Card charge outcome unknown', 'warning', logContextRef.current)
       } else if (!outcomeUnknownRef.current) {
         setDeclined(true)
+        setDeclineSeq((n) => n + 1)
       }
       // The parent charge failed after tokenization: let them try again.
       setSubmitting(false)
@@ -273,6 +277,18 @@ export function PagarmeCardForm({
     setSubmitting(false)
   }
 
+  // The refusal appears above the button the buyer just pressed; on a phone the
+  // way out (PIX) could sit off screen. Bring it to the middle and focus it.
+  useEffect(() => {
+    if (declineSeq === 0) return
+    const el = pixButtonRef.current
+    if (!el) return
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    el.scrollIntoView?.({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+    el.focus({ preventScroll: true })
+  }, [declineSeq])
+
+  const offerPix = declined && Boolean(onSwitchToPix)
   const cvvLength = brand === 'amex' ? 4 : 3
 
   return (
@@ -386,6 +402,7 @@ export function PagarmeCardForm({
 
       {formError && (
         <div
+          id="card-form-error"
           role="alert"
           className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-400"
         >
@@ -393,11 +410,12 @@ export function PagarmeCardForm({
         </div>
       )}
 
-      {declined && onSwitchToPix && (
+      {offerPix && onSwitchToPix && (
         <Button
+          ref={pixButtonRef}
           type="button"
-          variant="outline"
           className="w-full"
+          aria-describedby={formError ? 'card-form-error' : undefined}
           disabled={submitting}
           onClick={async () => {
             setSubmitting(true)
@@ -433,7 +451,13 @@ export function PagarmeCardForm({
             Voltar
           </Button>
         )}
-        <Button type="submit" disabled={submitting || !config} className="flex-1">
+        {/* After a refusal PIX is the main action; retrying the card steps back. */}
+        <Button
+          type="submit"
+          variant={offerPix ? 'outline' : 'default'}
+          disabled={submitting || !config}
+          className="flex-1"
+        >
           {submitting ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
