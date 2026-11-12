@@ -25,7 +25,10 @@ vi.mock('./report.service.js', () => ({
 vi.mock('./order.service.js', () => ({ releaseReservationById: vi.fn(async () => true) }))
 vi.mock('./auth.service.js', () => ({ purgeExpiredRefreshSessions: vi.fn(async () => 0) }))
 vi.mock('./reconcile.service.js', () => ({ reconcilePendingCharges: reconcile }))
-vi.mock('./label.service.js', () => ({ syncShipments }))
+vi.mock('./label.service.js', () => ({
+  syncShipments,
+  isTransientMelhorEnvioError: (err: { code?: string }) => err?.code === 'MELHOR_ENVIO_UNREACHABLE',
+}))
 vi.mock('./recovery.service.js', () => ({ sendClubSignupReminders }))
 vi.mock('./ops-alert.service.js', () => ({ alertOpsAsync }))
 vi.mock('../config/logger.js', () => {
@@ -98,6 +101,74 @@ describe('initCronJobs', () => {
     expect(alertOpsAsync).toHaveBeenCalledWith(expect.objectContaining({ kind: 'cron_failed' }))
     await tick(10 * 60_000)
     expect(reconcile).toHaveBeenCalledTimes(2)
+  })
+
+  describe('shipment sync alerts', () => {
+    /** What `meRequest` throws when Melhor Envio does not answer. */
+    const unreachable = () =>
+      Object.assign(new Error('Não conseguimos falar com o Melhor Envio. Tente novamente em instantes.'), {
+        code: 'MELHOR_ENVIO_UNREACHABLE',
+        details: { cause: 'sem resposta em 20 s', request: 'POST /me/shipment/tracking' },
+      })
+    const syncAlerts = () =>
+      alertOpsAsync.mock.calls.filter(([a]) => String((a as { subject: string }).subject).includes('envios'))
+
+    // 11/11/2026: one 20 s timeout between healthy runs woke the team up.
+    it('one or two missed runs do not alert', async () => {
+      syncShipments.mockRejectedValueOnce(unreachable()).mockRejectedValueOnce(unreachable())
+      await tick(15_000) // 06:00
+      await tick(15 * 60_000) // 06:15
+      expect(syncShipments).toHaveBeenCalledTimes(2)
+      expect(syncAlerts()).toHaveLength(0)
+      expect(logWarn).toHaveBeenCalledWith(expect.objectContaining({ streak: 2 }), expect.any(String))
+    })
+
+    it('three runs in a row alert, with the real cause', async () => {
+      syncShipments.mockRejectedValue(unreachable())
+      await tick(15_000)
+      await tick(15 * 60_000)
+      expect(syncAlerts()).toHaveLength(0)
+      await tick(15 * 60_000) // 06:30
+      expect(syncAlerts()).toHaveLength(1)
+      const body = (syncAlerts()[0]![0] as { body: string }).body
+      expect(body).toContain('3 execuções seguidas, uma a cada 15 min')
+      expect(body).toContain('MELHOR_ENVIO_UNREACHABLE, sem resposta em 20 s, POST /me/shipment/tracking')
+      syncShipments.mockReset()
+      syncShipments.mockResolvedValue(0)
+    })
+
+    it('a good run in between starts the count over', async () => {
+      syncShipments
+        .mockRejectedValueOnce(unreachable())
+        .mockRejectedValueOnce(unreachable())
+        .mockResolvedValueOnce(0)
+        .mockRejectedValueOnce(unreachable())
+        .mockRejectedValueOnce(unreachable())
+      await tick(15_000)
+      for (let i = 0; i < 4; i++) await tick(15 * 60_000)
+      expect(syncShipments).toHaveBeenCalledTimes(5)
+      expect(syncAlerts()).toHaveLength(0)
+    })
+
+    it('a token problem alerts at once: it will not fix itself', async () => {
+      syncShipments.mockRejectedValueOnce(
+        Object.assign(new Error('O token do Melhor Envio não tem permissão'), { code: 'MELHOR_ENVIO_SCOPE_MISSING' }),
+      )
+      await tick(15_000)
+      expect(syncAlerts()).toHaveLength(1)
+      expect((syncAlerts()[0]![0] as { body: string }).body).toContain('(MELHOR_ENVIO_SCOPE_MISSING)')
+    })
+  })
+
+  // A failing shipment sync used to mute the reconciliation alert for 6 h.
+  it('each job waits on its own alert cooldown', async () => {
+    reconcile.mockRejectedValueOnce(new Error('pagar.me down'))
+    syncShipments.mockRejectedValueOnce(Object.assign(new Error('sem permissão'), { code: 'MELHOR_ENVIO_SCOPE_MISSING' }))
+    await tick(15_000)
+    const keys = alertOpsAsync.mock.calls.map(([a]) => (a as { cooldownKey?: string }).cooldownKey)
+    expect(keys).toEqual(
+      expect.arrayContaining(['cron_failed_conciliacao_de_pagamentos', 'cron_failed_sincronizacao_de_envios']),
+    )
   })
 
   it("sends node-cron's own warnings to the module logger, not the console", async () => {

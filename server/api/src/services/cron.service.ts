@@ -6,7 +6,7 @@ import { getActionItems } from './report.service.js';
 import { releaseReservationById } from './order.service.js';
 import { purgeExpiredRefreshSessions } from './auth.service.js';
 import { reconcilePendingCharges } from './reconcile.service.js';
-import { syncShipments } from './label.service.js';
+import { isTransientMelhorEnvioError, syncShipments } from './label.service.js';
 import { sendClubSignupReminders } from './recovery.service.js';
 import { moduleLogger } from '../config/logger.js';
 import { alertOpsAsync } from './ops-alert.service.js';
@@ -19,18 +19,63 @@ const log = moduleLogger('cron');
  * `processed_webhooks` failed every night for weeks with only a stdout line to
  * show for it. Six hours between alerts of this kind — the same job fails the
  * same way on every run.
+ *
+ * `alertAfter` is for jobs that talk to a third party: one dropped request is
+ * not worth waking anyone, the same failure several runs in a row is. The
+ * streak lives in memory — a restart starts it over, and a failure that
+ * persists reaches the threshold again.
  */
-function cronFailed(job: string, err: unknown): void {
-  log.error({ err, job }, 'scheduled job failed');
+const failStreak = new Map<string, number>();
+
+function cronFailed(job: string, err: unknown, opts: { alertAfter?: number; every?: string } = {}): void {
+  const alertAfter = opts.alertAfter ?? 1;
+  const streak = alertAfter > 1 ? (failStreak.get(job) ?? 0) + 1 : 1;
+  if (alertAfter > 1) failStreak.set(job, streak);
+  if (streak < alertAfter) {
+    log.warn({ err, job, streak }, `scheduled job failed (${streak}/${alertAfter} before alerting)`);
+    return;
+  }
+  log.error({ err, job, streak }, 'scheduled job failed');
+  const cadence = opts.every ? `, uma a cada ${opts.every}` : '';
+  const runs = streak > 1 ? ` (${streak} execuções seguidas${cadence})` : '';
   alertOpsAsync({
     kind: 'cron_failed',
+    // Per job: a failing shipment sync must not mute the payment reconciliation.
+    cooldownKey: `cron_failed_${jobKey(job)}`,
     subject: `Tarefa agendada falhou: ${job}`,
     body:
-      `A tarefa "${job}" falhou.\n\n` +
-      `Erro: ${err instanceof Error ? err.message : String(err)}\n\n` +
+      `A tarefa "${job}" falhou${runs}.\n\n` +
+      `Erro: ${describeError(err)}\n\n` +
       `Onde olhar:\n  journalctl CONTAINER_NAME=clube-geek-api --since -1h -o cat | jq 'select(.module=="cron")'`,
     cooldownMin: 360,
   });
+}
+
+/** "sincronização de envios" → "sincronizacao_de_envios", for the config key. */
+function jobKey(job: string): string {
+  return job
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+function cronOk(job: string): void {
+  const streak = failStreak.get(job);
+  if (!streak) return;
+  failStreak.delete(job);
+  log.info({ job, streak }, `scheduled job recovered after ${streak} failure(s)`);
+}
+
+/** The message, plus what the user-facing text leaves out (code, real cause). */
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const { code, details } = err as Error & { code?: string; details?: Record<string, unknown> };
+  const extra = [code, details?.cause, details?.request]
+    .filter((part): part is string => typeof part === 'string' && part !== '')
+    .join(', ');
+  return extra ? `${err.message} (${extra})` : err.message;
 }
 
 /**
@@ -41,6 +86,7 @@ function cronFailed(job: string, err: unknown): void {
 const NO_OVERLAP = { noOverlap: true } as const;
 
 export function initCronJobs() {
+  failStreak.clear();
   // node-cron logs to the console by default; keep its warnings in the JSON log.
   cron.setLogger({
     info: (msg) => log.info(msg),
@@ -128,8 +174,14 @@ export function initCronJobs() {
     try {
       const touched = await syncShipments();
       if (touched > 0) log.info(`Shipment sync updated ${touched} order(s)`);
+      cronOk('sincronização de envios');
     } catch (err) {
-      cronFailed('sincronização de envios', err);
+      // Three runs in a row is 45 min of Melhor Envio not answering; a token or
+      // scope problem will not fix itself, so that one alerts at once.
+      cronFailed('sincronização de envios', err, {
+        alertAfter: isTransientMelhorEnvioError(err) ? 3 : 1,
+        every: '15 min',
+      });
     }
   }, NO_OVERLAP);
 

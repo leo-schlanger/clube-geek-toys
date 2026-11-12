@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Shipping labels — the panel action that spends the shop's money.
@@ -64,7 +64,13 @@ vi.mock('../config/env.js', () => ({
   },
 }));
 
-import { buyAndPrintLabel, getLabelState, reprintLabel, syncShipments } from './label.service.js';
+import {
+  buyAndPrintLabel,
+  getLabelState,
+  isTransientMelhorEnvioError,
+  reprintLabel,
+  syncShipments,
+} from './label.service.js';
 
 function order(over: Record<string, unknown> = {}) {
   return {
@@ -471,10 +477,14 @@ describe('getLabelState', () => {
     orderMock.mockResolvedValue(order({ melhorEnvioOrderId: 'me_1' }));
     fetchMock.mockRejectedValue(new Error('timeout'));
 
-    await expect(getLabelState('o1')).resolves.toMatchObject({
+    vi.useFakeTimers();
+    const state = getLabelState('o1');
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(state).resolves.toMatchObject({
       melhorEnvioOrderId: 'me_1',
       purchased: false,
     });
+    vi.useRealTimers();
   });
 
   /** Opening the order catches up with the parcel instead of waiting for the timer. */
@@ -600,6 +610,103 @@ describe('syncShipments', () => {
     await syncShipments();
 
     expect(writes()).toHaveLength(0);
+  });
+
+  /**
+   * 11/11/2026: one tracking call went 20 s without an answer, the next ones
+   * took 60 ms, and the team got an alert e-mail. A lookup asks once more.
+   */
+  describe('Melhor Envio sem responder', () => {
+    const timeout = () =>
+      Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('um timeout isolado: pergunta de novo e sincroniza', async () => {
+      openOrders(row({ status: 'paid' }));
+      fetchMock.mockRejectedValueOnce(timeout());
+      replies({ body: { me_1: { paid_at: 'x', generated_at: 'y', tracking: 'AP1BR' } } });
+
+      const run = syncShipments();
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      await expect(run).resolves.toBe(1);
+      expect(calls()).toEqual(['POST /me/shipment/tracking', 'POST /me/shipment/tracking']);
+    });
+
+    it('um 503 isolado também é repetido', async () => {
+      openOrders(row({ status: 'paid' }));
+      replies(
+        { ok: false, status: 503, body: { message: 'Service Unavailable' } },
+        { body: { me_1: { paid_at: 'x', generated_at: 'y', tracking: 'AP1BR' } } },
+      );
+
+      const run = syncShipments();
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      await expect(run).resolves.toBe(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('sem resposta duas vezes: falha dizendo a causa real', async () => {
+      openOrders(row());
+      fetchMock.mockRejectedValue(timeout());
+
+      const run = syncShipments();
+      const outcome = expect(run).rejects.toMatchObject({
+        code: 'MELHOR_ENVIO_UNREACHABLE',
+        details: { cause: 'sem resposta em 20 s', request: 'POST /me/shipment/tracking' },
+      });
+      await vi.advanceTimersByTimeAsync(2_000);
+      await outcome;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(isTransientMelhorEnvioError(await run.catch((e) => e))).toBe(true);
+    });
+
+    it('erro de rede diz o código do erro', async () => {
+      openOrders(row());
+      fetchMock.mockRejectedValue(
+        Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } }),
+      );
+
+      const run = syncShipments();
+      const outcome = expect(run).rejects.toMatchObject({
+        details: { cause: 'erro de rede: ECONNRESET' },
+      });
+      await vi.advanceTimersByTimeAsync(2_000);
+      await outcome;
+    });
+
+    it('token sem permissão não é repetido nem tratado como passageiro', async () => {
+      openOrders(row());
+      replies({ ok: false, status: 401, body: { message: 'Unauthenticated.' } });
+
+      const err = await syncShipments().catch((e) => e);
+
+      expect(err.code).toBe('MELHOR_ENVIO_SCOPE_MISSING');
+      expect(isTransientMelhorEnvioError(err)).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('checkout (gasta dinheiro) nunca é repetido', async () => {
+      orderMock.mockResolvedValue(order());
+      replies(
+        { body: { id: 'me_1' } },
+        { body: { id: 'me_1', paid_at: null, generated_at: null } },
+      );
+      fetchMock.mockRejectedValueOnce(timeout());
+
+      const run = buyAndPrintLabel('o1', 'admin-1');
+      const outcome = expect(run).rejects.toMatchObject({ code: 'MELHOR_ENVIO_UNREACHABLE' });
+      await vi.advanceTimersByTimeAsync(5_000);
+      await outcome;
+      expect(calls().filter((c) => c === 'POST /me/shipment/checkout')).toHaveLength(1);
+    });
   });
 
   /** The panel and the timer can race; the loser must not e-mail twice. */

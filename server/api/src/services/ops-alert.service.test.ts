@@ -55,6 +55,13 @@ describe('alertOps', () => {
     expect(params).toEqual(['ops_alert_cron_failed', 360]);
   });
 
+  // One cron job in a loop used to mute every other job's alert for 6 h.
+  it('cooldownKey separa a espera dentro do mesmo tipo', async () => {
+    queryMock.mockResolvedValue({ rows: [{ key: 'k' }] });
+    await alertOps({ ...alert, cooldownKey: 'cron_failed_backup' });
+    expect((queryMock.mock.calls[0] as [string, unknown[]])[1]).toEqual(['ops_alert_cron_failed_backup', 60]);
+  });
+
   it('dentro do cooldown não manda nada', async () => {
     queryMock.mockResolvedValue({ rows: [] });
     expect(await alertOps(alert)).toBe(false);

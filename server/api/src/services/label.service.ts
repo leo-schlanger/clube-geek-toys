@@ -40,6 +40,7 @@ const log = moduleLogger('label');
 
 const USER_AGENT = 'GeekPopToys Loja (contato@geeketoys.com.br)';
 const TIMEOUT_MS = 20_000;
+const RETRY_DELAY_MS = 2_000;
 
 export interface LabelState {
   /** Melhor Envio order id — exists from the moment the cart item is created. */
@@ -65,8 +66,36 @@ export interface LabelState {
  * was authorised for quoting only (`shipping-calculate`), which is how this
  * integration started. Telling the shop "sem permissão" and pointing at the
  * re-authorisation is far more useful than surfacing a raw 403.
+ *
+ * `readOnly` calls (lookups, tracking) are retried once after a timeout, a
+ * network error or a 5xx/429: Melhor Envio drops the odd request for 20 s and
+ * then answers in 60 ms. Calls that spend money are never retried.
  */
-async function meRequest<T>(path: string, body?: unknown, method = 'POST'): Promise<T> {
+async function meRequest<T>(
+  path: string,
+  body?: unknown,
+  method = 'POST',
+  opts: { readOnly?: boolean } = {},
+): Promise<T> {
+  const attempts = opts.readOnly ? 2 : 1;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await meRequestOnce<T>(path, body, method);
+    } catch (err) {
+      if (attempt >= attempts || !isTransientMelhorEnvioError(err)) throw err;
+      log.warn({ code: (err as AppError).code, details: (err as AppError).details }, `${method} ${path} failed, retrying`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+    }
+  }
+}
+
+/** Timeouts, network errors and Melhor Envio's own 5xx/429: worth asking again. */
+export function isTransientMelhorEnvioError(err: unknown): boolean {
+  if (!(err instanceof AppError)) return false;
+  return err.code === 'MELHOR_ENVIO_UNREACHABLE' || err.code === 'MELHOR_ENVIO_UNAVAILABLE';
+}
+
+async function meRequestOnce<T>(path: string, body: unknown, method: string): Promise<T> {
   const token = await getAccessToken();
   if (!token) {
     throw new AppError(
@@ -76,6 +105,7 @@ async function meRequest<T>(path: string, body?: unknown, method = 'POST'): Prom
     );
   }
 
+  const started = Date.now();
   let res: Response;
   try {
     res = await fetch(`${melhorEnvioBaseUrl()}/api/v2${path}`, {
@@ -90,11 +120,20 @@ async function meRequest<T>(path: string, body?: unknown, method = 'POST'): Prom
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
+    const e = err as Error & { cause?: { code?: string } };
+    const timedOut = e.name === 'TimeoutError';
     throw new AppError(
       504,
       'Não conseguimos falar com o Melhor Envio. Tente novamente em instantes.',
       'MELHOR_ENVIO_UNREACHABLE',
-      { cause: (err as Error).message } as Record<string, unknown>,
+      {
+        // What actually happened, for the log and the ops alert.
+        cause: timedOut
+          ? `sem resposta em ${TIMEOUT_MS / 1000} s`
+          : `erro de rede: ${e.cause?.code ?? e.message}`,
+        request: `${method} ${path}`,
+        elapsedMs: Date.now() - started,
+      },
     );
   }
 
@@ -117,6 +156,15 @@ async function meRequest<T>(path: string, body?: unknown, method = 'POST'): Prom
         'O token do Melhor Envio não tem permissão para comprar e imprimir etiqueta. ' +
           'Reautorize a integração em Configurações — é um clique, na conta da loja.',
         'MELHOR_ENVIO_SCOPE_MISSING',
+      );
+    }
+
+    if (res.status >= 500 || res.status === 429) {
+      throw new AppError(
+        503,
+        'O Melhor Envio está instável agora. Tente novamente em instantes.',
+        'MELHOR_ENVIO_UNAVAILABLE',
+        { cause: `HTTP ${res.status}`, request: `${method} ${path}` },
       );
     }
 
@@ -398,7 +446,7 @@ interface Shipment {
 
 /** Read one shipment back, to know which steps are already done. */
 async function fetchShipment(meOrderId: string) {
-  return meRequest<Shipment>(`/me/orders/${meOrderId}`, undefined, 'GET');
+  return meRequest<Shipment>(`/me/orders/${meOrderId}`, undefined, 'GET', { readOnly: true });
 }
 
 /**
@@ -499,9 +547,13 @@ export async function syncShipments(): Promise<number> {
   );
   if (open.rows.length === 0) return 0;
 
-  const shipments = await meRequest<Record<string, Shipment>>('/me/shipment/tracking', {
-    orders: open.rows.map((r) => r.melhor_envio_order_id),
-  });
+  // Tracking is a lookup despite the POST: nothing is bought, so it may retry.
+  const shipments = await meRequest<Record<string, Shipment>>(
+    '/me/shipment/tracking',
+    { orders: open.rows.map((r) => r.melhor_envio_order_id) },
+    'POST',
+    { readOnly: true },
+  );
 
   let touched = 0;
   for (const row of open.rows) {

@@ -322,6 +322,17 @@ Regras que não se desfazem sem querer:
   comprada em outro lugar — o pedido não é tocado.
 - **Item de carrinho não pago não é etiqueta.** Cancelado, expirado ou nunca
   pago é ignorado (o pedido #10 tem um desses, largado no carrinho de lá).
+- **Um soluço do Melhor Envio não acorda a equipe** (12/11/2026). Em 11/11 à
+  noite (21:30 e 22:15 no Rio) duas leituras de rastreio ficaram 20 s sem
+  resposta; as outras ~370 rodadas desde 08/11 responderam, e a sondagem do dia
+  seguinte levou 60–280 ms. Mesmo assim saiu o e-mail «Tarefa agendada falhou:
+  sincronização de envios», com a frase genérica "Não conseguimos falar com o
+  Melhor Envio". Agora as **leituras** (rastreio e `GET /me/orders/:id`) repetem
+  uma vez, 2 s depois, quando há timeout, erro de rede ou 5xx/429 — compra,
+  geração e impressão **nunca** repetem. O cron só alerta depois de **3 rodadas
+  seguidas** (45 min) com falha passageira, e na hora quando o problema é token
+  ou permissão (não se resolve sozinho). O e-mail diz a causa real (código,
+  "sem resposta em 20 s" ou o erro de rede, e qual chamada).
 
 | Endpoint                         | O quê                                                                  |
 | -------------------------------- | ---------------------------------------------------------------------- |

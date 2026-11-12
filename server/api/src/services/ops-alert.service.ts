@@ -38,6 +38,11 @@ export interface OpsAlert {
   body: string;
   /** Minimum minutes between two alerts of this kind. Default 60. */
   cooldownMin?: number;
+  /**
+   * Narrows the cooldown below the kind, so one source in a loop does not
+   * silence another of the same kind (e.g. one key per cron job).
+   */
+  cooldownKey?: string;
 }
 
 function escape(text: string): string {
@@ -47,7 +52,7 @@ function escape(text: string): string {
 export async function alertOps(alert: OpsAlert): Promise<boolean> {
   try {
     log.error({ kind: alert.kind }, `ALERT: ${alert.subject}`);
-    if (!(await claimCooldown(`ops_alert_${alert.kind}`, alert.cooldownMin ?? 60))) return false;
+    if (!(await claimCooldown(`ops_alert_${alert.cooldownKey ?? alert.kind}`, alert.cooldownMin ?? 60))) return false;
 
     const to = env.OPS_ALERT_EMAIL ?? env.ADMIN_EMAIL;
     const response = await fetch(RESEND_API_URL, {

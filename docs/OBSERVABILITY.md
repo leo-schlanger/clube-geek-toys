@@ -98,19 +98,22 @@ Dois canais, separados de propósito:
   mantém o sistema resolve. Vai para `OPS_ALERT_EMAIL` (cai em `ADMIN_EMAIL` se
   vazio), assunto `[ALERTA] …`.
 
-| Alerta                            | Dispara quando                                    | Repetição mínima |
-| --------------------------------- | ------------------------------------------------- | ---------------- |
-| `http_5xx_burst`                  | 20 respostas 500 em 10 min                        | 1 h              |
-| `reconcile_failing`               | a conciliação falha em 2 rodadas seguidas         | 2 h              |
-| `email_failing`                   | 3 envios do Resend falham em 1 h                  | 3 h              |
-| `schema_degraded`                 | `ensureSchema` termina com etapa falhando no boot | 30 min           |
-| `cron_failed`                     | uma tarefa agendada da API falha                  | 6 h              |
-| `backup_daily`, `backup_weekly`   | o backup do host para com erro                    | a cada falha     |
-| `offsite_dump`, `offsite_uploads` | a cópia para o R2 falha                           | a cada falha     |
-| `restore_drill`                   | o teste mensal de restauração falha               | a cada falha     |
+| Alerta                            | Dispara quando                                        | Repetição mínima |
+| --------------------------------- | ----------------------------------------------------- | ---------------- |
+| `http_5xx_burst`                  | 20 respostas 500 em 10 min                            | 1 h              |
+| `reconcile_failing`               | a conciliação falha em 2 rodadas seguidas             | 2 h              |
+| `email_failing`                   | 3 envios do Resend falham em 1 h                      | 3 h              |
+| `schema_degraded`                 | `ensureSchema` termina com etapa falhando no boot     | 30 min           |
+| `cron_failed`                     | uma tarefa agendada da API falha (envios: 3 seguidas) | 6 h, por tarefa  |
+| `backup_daily`, `backup_weekly`   | o backup do host para com erro                        | a cada falha     |
+| `offsite_dump`, `offsite_uploads` | a cópia para o R2 falha                               | a cada falha     |
+| `restore_drill`                   | o teste mensal de restauração falha                   | a cada falha     |
 
 A "repetição mínima" fica gravada na tabela `config` (`utils/cooldown.ts`), não
 em memória: uma API reiniciando em loop manda **um** e-mail, não sessenta.
+O `cron_failed` espera **por tarefa** (`ops_alert_cron_failed_<tarefa>`, desde
+12/11/2026): antes a chave era uma só, e a sincronização de envios falhando
+calava por 6 h o alerta da conciliação de pagamentos.
 
 ## 4. Monitor externo
 
