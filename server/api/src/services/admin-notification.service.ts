@@ -20,6 +20,7 @@ import { env, adminUrl } from '../config/env.js';
 import { sendTemplateEmail } from './email.service.js';
 import { getSetting } from './settings.service.js';
 import { moduleLogger } from '../config/logger.js';
+import { isTestAccountEmail } from '../utils/test-accounts.js';
 
 const log = moduleLogger('admin-notification');
 
@@ -138,6 +139,12 @@ async function shouldEmail(notice: AdminPaymentNotice): Promise<boolean> {
  * already outside a transaction.
  */
 export async function notifyAdminsOfPayment(notice: AdminPaymentNotice): Promise<void> {
+  // qa accounts pay for real in production; their events are not the staff's work.
+  if (isTestAccountEmail(notice.customerEmail)) {
+    log.info({ event: notice.event }, 'staff notice skipped: test account');
+    return;
+  }
+
   // A buyer retrying a refused card used to raise one bell and one e-mail per
   // attempt — ten in an hour on 01/10/2026. The order already shows "Cartão
   // recusado · N tentativas"; one notice per order per half hour is enough.

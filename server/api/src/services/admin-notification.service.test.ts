@@ -58,3 +58,17 @@ describe('notifyAdminsOfPayment — recusas agrupadas', () => {
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('notifyAdminsOfPayment — contas de teste do qa', () => {
+  it('não toca o sino nem manda e-mail para pagamento de conta de teste', async () => {
+    await notifyAdminsOfPayment({ ...refused, event: 'payment_received', customerEmail: 'E2E-member@geeketoys.com.br' });
+    expect(queryMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('cliente real continua a avisar a equipe', async () => {
+    await notifyAdminsOfPayment({ ...refused, event: 'payment_received', customerEmail: 'cliente@gmail.com' });
+    expect(queryMock).toHaveBeenCalled();
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+  });
+});
