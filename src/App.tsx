@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -16,6 +16,7 @@ import { getAppMode, getLoginRedirectPath } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
 import { ShopPromoBanner } from './components/store/ShopPromoBanner'
 import { ScrollToTop } from './components/store/ScrollToTop'
+import { NatalBannerSlot } from './components/seasonal/natal'
 
 function ThemedToaster() {
   const { resolved } = useTheme()
@@ -280,6 +281,12 @@ function MemberRoutes() {
   )
 }
 
+// Re-renders on navigation, so the strip hides on checkout and comes back after.
+function ShopSeasonalBanner() {
+  useLocation()
+  return <NatalBannerSlot variant="shop" />
+}
+
 /**
  * Shop routes: public, with the cart. The event banner sits above them all.
  */
@@ -290,6 +297,8 @@ function ShopRoutes() {
       <EventAnnouncementBanner />
       {/* Below the event: a date on the calendar outranks a standing price rule. */}
       <ShopPromoBanner />
+      {/* Seasonal greeting, lowest of the three; only on storefront routes. */}
+      <ShopSeasonalBanner />
       <Routes>
         <Route path="/" element={<ShopHome />} />
         <Route path="/categoria/:slug" element={<ShopHome />} />

@@ -1,0 +1,82 @@
+/* Seasonal: Natal. Loaded only with the lazy chunks of this folder. */
+
+/* ── Strip ─────────────────────────────────────────────────────────────
+ * Deep pine so white (8.2:1) and Pop Yellow (4.9:1) text pass AA. */
+.natal-banner {
+  background: #145a37;
+  color: #fff;
+  border-bottom: 1px solid #0f4a2c;
+}
+.dark .natal-banner {
+  background: #0f4a2c;
+  border-bottom-color: #145a37;
+}
+.natal-banner-title {
+  color: #fcbe04;
+}
+.natal-banner-holly,
+.natal-banner-gift,
+.natal-banner-flake {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+}
+.natal-banner-holly {
+  left: 0.5rem;
+  width: 28px;
+  height: 21px;
+  transform: translateY(-50%);
+}
+.natal-banner-gift {
+  right: 3rem;
+  width: 22px;
+  height: 22px;
+  transform: translateY(-50%);
+  display: none;
+}
+.natal-banner-flake {
+  width: 12px;
+  height: 12px;
+  opacity: 0.55;
+  display: none;
+}
+.natal-banner-flake-a {
+  left: 2.75rem;
+  transform: translateY(-80%);
+}
+.natal-banner-flake-b {
+  right: 5rem;
+  transform: translateY(-20%);
+}
+@media (min-width: 640px) {
+  .natal-banner-gift,
+  .natal-banner-flake {
+    display: block;
+  }
+}
+
+/* ── Lights along a header's bottom edge ─────────────────────────────── */
+.natal-lights {
+  display: block;
+  color: #1f7a4d;
+}
+.dark .natal-lights {
+  color: #4a9d70;
+}
+.natal-lights-glow {
+  animation: natal-twinkle 2.8s ease-in-out infinite alternate;
+}
+@keyframes natal-twinkle {
+  from {
+    opacity: 0.15;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .natal-lights-glow {
+    animation: none;
+    opacity: 0.6;
+  }
+}

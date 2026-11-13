@@ -33,6 +33,7 @@ import {
 import { motion } from 'framer-motion'
 import RadioMiniPlayer from '../components/RadioMiniPlayer'
 import { CreatorCredit } from '../components/CreatorCredit'
+import { NatalBannerSlot, NatalLightsSlot } from '../components/seasonal/natal'
 
 const SIGNUP_PATH = '/cadastro?plano=club&tipo=annual'
 
@@ -108,6 +109,7 @@ export default function Subscribe() {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden pb-20 sm:pb-0">
+      <NatalBannerSlot variant="club-visitor" />
       {/* Header */}
       <header className="glass border-b border-border/50 sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 sm:h-16 px-4 sm:px-6">
@@ -126,6 +128,7 @@ export default function Subscribe() {
             </Link>
           </div>
         </div>
+        <NatalLightsSlot />
       </header>
 
       {/* Hero */}

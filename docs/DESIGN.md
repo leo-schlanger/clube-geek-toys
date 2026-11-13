@@ -386,6 +386,34 @@ Ao alterar UI ou e-mail:
 
 ---
 
+## 12. Temas sazonais
+
+**Natal 2026** (13/11 a 26/12, desliga sozinho às 00:00 de 27/12 no Rio). Código
+em `src/components/seasonal/natal/`; o gate (`index.tsx`) é pequeno e cada peça
+é um chunk `lazy()` com o seu CSS (`natal.css`).
+
+- **A identidade não muda**: Hot Pink e Pop Yellow seguem primários; tokens,
+  tipografia e wordmark intactos; nada de roxo. O Natal entra pelo verde-pinheiro
+  de apoio (`#1F7A4D` em detalhes; a faixa usa `#145A37`, `#0F4A2C` no escuro, com
+  branco 8,2:1 e Pop Yellow 4,9:1), branco de neve e o dourado = Pop Yellow.
+- **Peças**: faixa no topo (fechável, lembrada em `localStorage` por site, mesma
+  altura no fallback: zero CLS), luzinhas rosa/amarelo/verde em fio dentro do
+  header, azevinho, estrela, presente e floco em SVG só nas margens laterais da
+  faixa, nunca debaixo do texto. Nada anima com `prefers-reduced-motion`.
+- **Nono de gorro**: gorro rosa desenhado em código por cima do WebP (posição
+  medida por pose em `NonoHat.tsx`), só onde o Nono já aparece e a rota permite.
+  O `NonoMascot` passa as classes do chamador para o invólucro quando há gorro.
+- **Onde não entra**: checkout, `/pedido`, pagamento, PIX, cadastro, login,
+  ingresso/evento, atacado, PDV e o admin. É lista de permissão: rota nova nasce
+  sem decoração.
+- **Verificação**: interseção decoração × texto/botões a 390/768/1280/1440, claro
+  e escuro, na loja e no clube (Playwright), antes do push.
+
+Próximo tema sazonal: mesma estrutura (`seasonal/<tema>/`, janela pura testada
+nas bordas, `?season=` para o qa).
+
+---
+
 ## 11. Referências cruzadas
 
 - Visão de produto: [`PROJECT.md`](PROJECT.md)

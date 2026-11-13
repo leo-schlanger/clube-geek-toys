@@ -1,4 +1,6 @@
 import { cn } from '../../lib/utils'
+import { NatalNonoHat } from '../seasonal/natal'
+import { natalDecorHere } from '../seasonal/natal/decor'
 
 /**
  * Nono, the GeekPop tiger. Decorative, one per screen. Shop: empty states,
@@ -61,7 +63,8 @@ export function NonoMascot({
   eager = false,
 }: NonoMascotProps) {
   const p = POSES[pose]
-  return (
+  const hat = natalDecorHere()
+  const img = (
     <img
       src={p.src}
       srcSet={`${p.small} ${p.smallWidth}w, ${p.src} ${p.width}w`}
@@ -71,10 +74,18 @@ export function NonoMascot({
       alt={decorative ? '' : p.alt}
       loading={eager ? 'eager' : 'lazy'}
       decoding="async"
-      className={cn('h-auto select-none', className)}
+      className={cn('h-auto select-none', hat ? 'block' : className)}
       style={{ width: size }}
       draggable={false}
     />
+  )
+  if (!hat) return img
+  // Seasonal hat: same box, the caller's classes move to the wrapper.
+  return (
+    <span className={cn('relative inline-block align-top', className)} style={{ width: size }}>
+      {img}
+      <NatalNonoHat pose={pose} />
+    </span>
   )
 }
 

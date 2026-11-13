@@ -42,6 +42,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu'
+import { NatalBannerSlot, NatalLightsSlot } from '../components/seasonal/natal'
 
 // Modals are lazy-loaded — they're rarely opened, no need to ship them in the main bundle.
 const RenewModal = lazy(() => import('../components/RenewModal').then(m => ({ default: m.RenewModal })))
@@ -220,6 +221,7 @@ export default function MemberDashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-10">
+      <NatalBannerSlot variant="club-member" />
       {/* Header */}
       <header className="glass border-b border-border sticky top-0 z-40">
         <div className="mx-auto flex max-w-[1120px] items-center justify-between px-4 py-2 lg:px-8">
@@ -254,6 +256,7 @@ export default function MemberDashboard() {
             </DropdownMenu>
           </div>
         </div>
+        <NatalLightsSlot />
       </header>
 
       <main className="mx-auto max-w-[1120px] space-y-4 px-4 py-5 lg:space-y-6 lg:px-8">

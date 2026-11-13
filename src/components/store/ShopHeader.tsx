@@ -14,6 +14,7 @@ import { ThemeToggle } from '../ThemeToggle'
 import { useActiveEvent } from '../../hooks/useActiveEvent'
 import { useWholesaleAccount } from './useWholesaleAccount'
 import { NotificationBell } from './NotificationBell'
+import { NatalLightsSlot } from '../seasonal/natal'
 
 interface ShopHeaderProps {
   /** Active member: shows the discount badge in the header. */
@@ -267,6 +268,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
             </Button>
           </div>
         </form>
+        <NatalLightsSlot />
       </header>
 
       <CartDrawer
