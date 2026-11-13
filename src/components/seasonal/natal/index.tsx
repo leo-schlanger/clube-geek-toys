@@ -40,6 +40,8 @@ export function NatalBannerSlot({ variant }: { variant: NatalBannerVariant }) {
     } catch {
       /* private mode: closes for this view only */
     }
+    // Keyboard users would land on <body> once the button unmounts.
+    document.querySelector<HTMLElement>('header a[href], header button:not([disabled])')?.focus()
     setClosed(true)
   }
 

@@ -6,6 +6,9 @@ import { NatalBannerSlot, NatalLightsSlot } from '.'
 import { natalDecorHere } from './decor'
 import { natalBannerKey } from './season'
 
+// Lazy chunks load slowly on a cold run in /mnt/d.
+const LAZY = { timeout: 5000 }
+
 // The gate reads window.location; the qa override (?season=) also works in tests.
 function visit(url: string) {
   window.history.replaceState({}, '', url)
@@ -55,12 +58,16 @@ describe('Natal gate', () => {
     const { unmount } = render(
       <MemoryRouter>
         <NatalBannerSlot variant="shop" />
+        <header>
+          <a href="/">Início</a>
+        </header>
       </MemoryRouter>
     )
-    expect(await screen.findByText('Feliz Natal geek! 🎄')).toBeInTheDocument()
+    expect(await screen.findByText('Feliz Natal geek! 🎄', {}, LAZY)).toBeInTheDocument()
     expect(screen.getByText('Presentes de K-pop, anime e colecionáveis')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Fechar faixa de Natal' }))
     expect(screen.queryByText('Feliz Natal geek! 🎄')).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('link', { name: 'Início' }))
     expect(store.get(natalBannerKey('shop'))).toBe('1')
     unmount()
 
@@ -79,7 +86,7 @@ describe('Natal gate', () => {
         <NatalBannerSlot variant="club-member" />
       </MemoryRouter>
     )
-    expect(await screen.findByText('Boas festas, membro GeekPop! 🎄')).toBeInTheDocument()
+    expect(await screen.findByText('Boas festas, membro GeekPop! 🎄', {}, LAZY)).toBeInTheDocument()
   })
 
   it('hangs lights in the header and a hat on Nono, keeping the caller classes on the box', async () => {
@@ -91,7 +98,7 @@ describe('Natal gate', () => {
       </MemoryRouter>
     )
     expect(screen.getByTestId('natal-lights')).toBeInTheDocument()
-    const hat = await screen.findByTestId('nono-natal-hat')
+    const hat = await screen.findByTestId('nono-natal-hat', {}, LAZY)
     const box = hat.parentElement as HTMLElement
     expect(box.className).toContain('absolute')
     expect(box.className).toContain('right-5')
