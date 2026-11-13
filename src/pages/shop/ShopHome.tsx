@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Sparkles, Search as SearchIcon, Ticket } from 'lucide-react'
 import type { Product, Category } from '../../types'
-import { listProducts, listCategories } from '../../lib/products'
+import { listProducts, listCategories, type ProductListResult } from '../../lib/products'
+import { peekBootData } from '../../lib/boot-data'
 import {
   parseProductSort,
   parseCatalogPage,
@@ -43,12 +44,18 @@ export default function ShopHome() {
   const { isMember, loading: memberLoading } = useShopMember()
   const { visible: eventVisible } = useActiveEvent()
 
-  const [categories, setCategories] = useState<Category[]>([])
-  const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [bootCategories] = useState(() => peekBootData<Category[]>('/products/categories'))
+  const [categories, setCategories] = useState<Category[]>(bootCategories ?? [])
+  const [categoriesLoading, setCategoriesLoading] = useState(!bootCategories)
 
   const [products, setProducts] = useState<Product[]>([])
   const [total, setTotal] = useState(0)
-  const [featured, setFeatured] = useState<Product[]>([])
+  // Seeded from boot.js on the home's first mount, so highlights do not push the page down.
+  const [featured, setFeatured] = useState<Product[]>(() =>
+    categorySlug || search
+      ? []
+      : (peekBootData<ProductListResult>('/products?featured=true&limit=8')?.products ?? [])
+  )
   const [loading, setLoading] = useState(true)
 
   // Categories, loaded once.

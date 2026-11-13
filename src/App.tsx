@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ComponentType } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
@@ -16,11 +16,23 @@ import { getAppMode, getLoginRedirectPath } from './lib/subdomain'
 import { EventAnnouncementBanner } from './components/store/EventAnnouncementBanner'
 import { ShopPromoBanner } from './components/store/ShopPromoBanner'
 import { ScrollToTop } from './components/store/ScrollToTop'
+import { seedQueriesFromBoot, withBootData } from './lib/boot-data'
 import { NatalBannerSlot } from './components/seasonal/natal'
 
 function ThemedToaster() {
   const { resolved } = useTheme()
   return <Toaster position="top-right" richColors theme={resolved} />
+}
+
+// Shop pages mount once boot.js's first-screen answers are in (capped at
+// 400 ms), with the strips' queries seeded: no late push-down (CLS).
+function shopPage<P extends object>(load: () => Promise<{ default: ComponentType<P> }>) {
+  return lazy(() =>
+    withBootData(load()).then((module) => {
+      seedQueriesFromBoot(queryClient)
+      return module
+    })
+  )
 }
 
 // Lazy loaded pages - Member Area
@@ -41,21 +53,21 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const PDV = lazy(() => import('./pages/PDV'))
 
 // Lazy loaded pages — Shop
-const ShopHome = lazy(() => import('./pages/shop/ShopHome'))
-const ProductDetail = lazy(() => import('./pages/shop/ProductDetail'))
-const Cart = lazy(() => import('./pages/shop/Cart'))
-const ShopCheckout = lazy(() => import('./pages/shop/ShopCheckout'))
-const OrderConfirmation = lazy(() => import('./pages/shop/OrderConfirmation'))
-const ShopLogin = lazy(() => import('./pages/shop/ShopLogin'))
-const ShopRegister = lazy(() => import('./pages/shop/ShopRegister'))
-const ShopProfile = lazy(() => import('./pages/shop/ShopProfile'))
-const EventPage = lazy(() => import('./pages/shop/EventPage'))
-const TicketPage = lazy(() => import('./pages/shop/TicketPage'))
-const MyOrders = lazy(() => import('./pages/shop/MyOrders'))
-const MyOrderDetail = lazy(() => import('./pages/shop/MyOrderDetail'))
-const WholesaleHome = lazy(() => import('./pages/shop/WholesaleHome'))
-const WholesaleLogin = lazy(() => import('./pages/shop/WholesaleLogin'))
-const WholesaleRegister = lazy(() => import('./pages/shop/WholesaleRegister'))
+const ShopHome = shopPage(() => import('./pages/shop/ShopHome'))
+const ProductDetail = shopPage(() => import('./pages/shop/ProductDetail'))
+const Cart = shopPage(() => import('./pages/shop/Cart'))
+const ShopCheckout = shopPage(() => import('./pages/shop/ShopCheckout'))
+const OrderConfirmation = shopPage(() => import('./pages/shop/OrderConfirmation'))
+const ShopLogin = shopPage(() => import('./pages/shop/ShopLogin'))
+const ShopRegister = shopPage(() => import('./pages/shop/ShopRegister'))
+const ShopProfile = shopPage(() => import('./pages/shop/ShopProfile'))
+const EventPage = shopPage(() => import('./pages/shop/EventPage'))
+const TicketPage = shopPage(() => import('./pages/shop/TicketPage'))
+const MyOrders = shopPage(() => import('./pages/shop/MyOrders'))
+const MyOrderDetail = shopPage(() => import('./pages/shop/MyOrderDetail'))
+const WholesaleHome = shopPage(() => import('./pages/shop/WholesaleHome'))
+const WholesaleLogin = shopPage(() => import('./pages/shop/WholesaleLogin'))
+const WholesaleRegister = shopPage(() => import('./pages/shop/WholesaleRegister'))
 
 const queryClient = new QueryClient({
   defaultOptions: {

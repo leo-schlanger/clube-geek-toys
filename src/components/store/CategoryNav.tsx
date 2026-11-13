@@ -44,7 +44,8 @@ export function CategoryNav({
     return (
       <div className="flex gap-2 overflow-x-auto pb-2">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-9 w-24 shrink-0 rounded-full" />
+          // Same height as a loaded pill (34 px), so the row does not jump.
+          <Skeleton key={i} className="h-[34px] w-24 shrink-0 rounded-full" />
         ))}
       </div>
     )

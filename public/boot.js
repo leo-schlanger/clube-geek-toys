@@ -43,6 +43,39 @@
     }
   }
 
+  // Shop: ask the API for what the first screen depends on (promo strip,
+  // event strip, home highlights) while the bundle downloads. Answers that
+  // arrive after first paint used to push the page down (CLS ~0.2-0.7 at
+  // 390 px). Read by src/lib/boot-data.ts; the app falls back to its own call.
+  try {
+    var host = location.hostname;
+    var api = /geekpoptoys\.com\.br$/.test(host)
+      ? 'https://api.geekpoptoys.com.br'
+      : /geeketoys\.com\.br$/.test(host)
+        ? 'https://api.geeketoys.com.br'
+        : '';
+    if (api && /^shop\./.test(host) && window.fetch) {
+      var paths = ['/promo', '/events/active'];
+      if (location.pathname === '/' || /^\/categoria\//.test(location.pathname)) {
+        paths.push('/products/categories');
+      }
+      if (location.pathname === '/') paths.push('/products?featured=true&limit=8');
+      var boot = {};
+      for (var i = 0; i < paths.length; i++) {
+        boot[paths[i]] = fetch(api + paths[i], { credentials: 'omit' })
+          .then(function (r) {
+            return r.ok ? r.json() : null;
+          })
+          ['catch'](function () {
+            return null;
+          });
+      }
+      window.__geekpopBoot = boot;
+    }
+  } catch (e3) {
+    /* the app fetches on its own */
+  }
+
   window.addEventListener('DOMContentLoaded', function () {
     var loader = document.getElementById('initial-loader');
     if (loader) {

@@ -102,6 +102,33 @@ para a própria URL prendia quem chegasse por engano.
   subcategoria na categoria-mãe) — aí cada grupo ganha URL, sitemap e
   `CollectionPage` sem código novo.
 
+## CLS da home da loja (13/11/2026)
+
+O qa mediu CLS mediano de 0,70 a 390 px (16 cargas, sem tema sazonal) e 0,155 a
+1280 px. O `PerformanceObserver` (fontes de `layout-shift`) apontou duas causas,
+ambas por dados que chegavam depois da primeira pintura:
+
+1. A faixa de promoção (`/promo`) entrava acima do header e empurrava a página
+   inteira 56 px (36 px no desktop). A de evento (`/events/active`) faz o mesmo
+   quando há evento.
+2. Os **Destaques** (`/products?featured=true`) e as categorias apareciam acima
+   do "Vale a pena ser membro?" e o empurravam para fora da tela. O esqueleto
+   das categorias também tinha 2 px a mais que a linha carregada.
+
+Correção: o `public/boot.js` (já síncrono no `<head>`) pede `/promo`,
+`/events/active`, as categorias e os destaques enquanto o bundle baixa, só no
+host `shop.*`. As páginas da loja (`shopPage()` em `App.tsx`) esperam essas
+respostas **no máximo 400 ms** depois do pedido do chunk, e
+`seedQueriesFromBoot()` põe promo e evento no cache do react-query, então as
+faixas e os destaques já entram na primeira pintura. A espera só custa algo
+quando a API demora mais do que o chunk. A resposta do boot vale 60 s e falha
+cai no fluxo normal (`src/lib/boot-data.ts`). O clube não tem essas faixas (CLS
+0 no /assinar).
+
+Regra: conteúdo que entra **acima** de algo já pintado precisa estar na primeira
+pintura (boot, cache) ou ter a altura reservada. Esqueleto tem a altura exata do
+conteúdo carregado.
+
 ## Regras
 
 - **Rota pública nova da loja**: decida o preview dela no nginx (bloco `shop`) e
