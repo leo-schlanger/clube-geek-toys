@@ -604,6 +604,74 @@ describe('ProductModal — form tabs', () => {
   })
 })
 
+describe('ProductModal — estoque com variação', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockedUpdate.mockResolvedValue(product)
+    mockedReplace.mockResolvedValue(product)
+  })
+
+  function renderEdit(p: Product = product) {
+    render(
+      <ProductModal
+        mode="edit"
+        product={p}
+        categories={categories}
+        onClose={vi.fn()}
+        onSuccess={vi.fn()}
+      />
+    )
+  }
+
+  it('mostra a soma das variações e não deixa editar o estoque do produto', () => {
+    renderEdit()
+
+    const stock = screen.getByRole('spinbutton', { name: 'Estoque' })
+    expect(stock).toHaveValue(6)
+    expect(stock).toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Alterar na aba Variações' })).toBeInTheDocument()
+  })
+
+  it('grava o estoque de cada variação e não manda o do produto', async () => {
+    renderEdit()
+
+    fireEvent.click(screen.getByRole('tab', { name: /Variações/ }))
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Estoque Rosa' }), {
+      target: { value: '9' },
+    })
+    expect(screen.getByRole('spinbutton', { name: 'Estoque' })).toHaveValue(11)
+
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedReplace).toHaveBeenCalled())
+    const payload = mockedUpdate.mock.calls[0][1] as { stock?: number }
+    expect(payload.stock).toBeUndefined()
+    const rows = mockedReplace.mock.calls[0][2] as { name: string; stock: number }[]
+    expect(rows.find((r) => r.name === 'Rosa')?.stock).toBe(9)
+    expect(rows.find((r) => r.name === 'Preto')?.stock).toBe(2)
+  })
+
+  it('continua gravando o estoque quando o produto não tem variação', async () => {
+    const semVariacao: Product = {
+      ...product,
+      hasVariants: false,
+      variantAxes: [],
+      variants: [],
+      stock: 3,
+    }
+    renderEdit(semVariacao)
+
+    const stock = screen.getByLabelText('Estoque')
+    expect(stock).not.toHaveAttribute('readonly')
+    fireEvent.change(stock, { target: { value: '8' } })
+    fireEvent.click(screen.getByRole('button', { name: /Salvar Alterações/i }))
+
+    await waitFor(() => expect(mockedUpdate).toHaveBeenCalled())
+    expect(mockedUpdate.mock.calls[0][1]).toMatchObject({ stock: 8 })
+    expect(mockedReplace).not.toHaveBeenCalled()
+  })
+})
+
 describe('ProductModal — falhas e fechamento', () => {
   beforeEach(() => {
     vi.clearAllMocks()

@@ -1083,9 +1083,14 @@ export function ProductModal({
       );
     }
 
-    const stock = form.stock.trim() ? Number(form.stock) : 0;
-    if (!Number.isInteger(stock) || stock < 0) {
-      return fail("basico", "Estoque inválido");
+    // With variations the sellable count lives on each SKU. The parent field is
+    // the sum, and writing it here is thrown away when the matrix is saved.
+    let stock = 0;
+    if (!hasVariants) {
+      stock = form.stock.trim() ? Number(form.stock) : 0;
+      if (!Number.isInteger(stock) || stock < 0) {
+        return fail("basico", "Estoque inválido");
+      }
     }
 
     const weightG = form.weightG.trim() ? Number(form.weightG) : null;
@@ -1161,6 +1166,16 @@ export function ProductModal({
         `Preço inválido na variação "${badVariant.name}" (use 0 a ${MAX_PRODUCT_PRICE.toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`,
       );
     }
+    const badStock = rows.find((r) => {
+      const n = Number(r.stock);
+      return !Number.isInteger(n) || n < 0;
+    });
+    if (hasVariants && badStock) {
+      return fail(
+        "variacoes",
+        `Estoque inválido na variação "${badStock.name}". Use um número inteiro a partir de 0.`,
+      );
+    }
 
     /**
      * A product on sale at R$ 0,00 cannot be sold, and nothing said so.
@@ -1204,7 +1219,9 @@ export function ProductModal({
       categoryIds: form.categoryIds,
       images: resolvedImages.value,
       videos: resolvedVideos.value,
-      stock,
+      // Omitted on purpose when the matrix owns the count. Sending the sum
+      // would write it, then the variant save would replace it.
+      ...(hasVariants ? {} : { stock }),
       sku: form.sku.trim() || null,
       active: form.active,
       featured: form.featured,
@@ -1324,6 +1341,13 @@ export function ProductModal({
       (pendingVideoFile ? 1 : 0),
     variacoes: hasVariants ? variantRows.length : 0,
   };
+
+  const variantStockTotal = variantRows.reduce((sum, row) => {
+    if (row.active === false) return sum;
+    const n = Number(row.stock);
+    if (!Number.isInteger(n) || n < 0) return sum;
+    return sum + n;
+  }, 0);
 
   const priceNum = Number(form.price);
   const compareNum = Number(form.compareAtPrice);
@@ -1534,9 +1558,25 @@ export function ProductModal({
                       step="1"
                       inputMode="numeric"
                       placeholder="0"
-                      value={form.stock}
-                      onChange={(e) => update("stock", e.target.value)}
+                      readOnly={hasVariants}
+                      aria-readonly={hasVariants || undefined}
+                      value={hasVariants ? String(variantStockTotal) : form.stock}
+                      onChange={(e) => {
+                        if (!hasVariants) update("stock", e.target.value);
+                      }}
                     />
+                    {hasVariants && (
+                      <p className="text-xs text-muted-foreground">
+                        Soma das variações. A loja usa o estoque de cada uma.{" "}
+                        <button
+                          type="button"
+                          className="font-medium text-primary underline"
+                          onClick={() => setTab("variacoes")}
+                        >
+                          Alterar na aba Variações
+                        </button>
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="product-sku">SKU (opcional)</Label>
@@ -2313,6 +2353,12 @@ export function ProductModal({
                             próprias (até {MAX_VARIANT_IMAGES}), preço, estoque e
                             SKU, como na Shopee
                           </p>
+                          <div className="hidden px-2 text-xs font-medium text-muted-foreground sm:grid sm:grid-cols-12 sm:items-center">
+                            <span className="sm:col-span-5">Variação</span>
+                            <span className="sm:col-span-3">Preço</span>
+                            <span className="sm:col-span-2">Estoque</span>
+                            <span className="sm:col-span-2">SKU</span>
+                          </div>
                           {variantRows.map((row, idx) => {
                             const savedImages = row.images ?? [];
                             const previews = pendingVariantPreviews[idx] ?? [];
@@ -2391,20 +2437,28 @@ export function ProductModal({
                                       }}
                                       aria-label={`Preço ${row.name}`}
                                     />
-                                    <Input
-                                      className="h-8 sm:col-span-2"
-                                      type="number"
-                                      value={row.stock ?? 0}
-                                      onChange={(e) => {
-                                        const stock = Number(e.target.value);
-                                        setVariantRows((rows) =>
-                                          rows.map((r, i) =>
-                                            i === idx ? { ...r, stock } : r,
-                                          ),
-                                        );
-                                      }}
-                                      aria-label={`Estoque ${row.name}`}
-                                    />
+                                    <label className="space-y-1 sm:contents">
+                                      <span className="text-xs font-medium text-muted-foreground sm:hidden">
+                                        Estoque
+                                      </span>
+                                      <Input
+                                        className="h-8 sm:col-span-2"
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        inputMode="numeric"
+                                        value={row.stock ?? 0}
+                                        onChange={(e) => {
+                                          const stock = Number(e.target.value);
+                                          setVariantRows((rows) =>
+                                            rows.map((r, i) =>
+                                              i === idx ? { ...r, stock } : r,
+                                            ),
+                                          );
+                                        }}
+                                        aria-label={`Estoque ${row.name}`}
+                                      />
+                                    </label>
                                     <Input
                                       className="col-span-2 h-8 sm:col-span-2"
                                       placeholder="SKU"
