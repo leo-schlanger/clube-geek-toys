@@ -129,7 +129,7 @@ function setLink(rel: string, href: string) {
 
 /** Default shop landing SEO — call on ShopHome without filters. */
 export const SHOP_DEFAULT_SEO = {
-  title: 'Loja GeekPop & Toys | K-pop, Photocards e Colecionáveis no RJ',
+  title: 'Loja GeekPop & Toys | K-pop, Photocards, Colecionáveis no RJ',
   description:
     `Loja de K-pop no Rio de Janeiro. Photocards, merch e colecionáveis com envio pelos Correios. Membros do Clube ganham ${MEMBER_DISCOUNT_PERCENT}% de desconto. PIX e cartão.`,
 } as const

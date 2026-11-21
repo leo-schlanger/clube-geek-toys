@@ -1,5 +1,6 @@
 import { CLUB_PLAN, MEMBER_DISCOUNT_PERCENT } from '../types'
 import { getSubdomainUrl } from './subdomain'
+import { formatCurrency } from './utils'
 
 /**
  * The numbers the sales copy quotes, derived from the plan constants so a
@@ -50,4 +51,12 @@ export function estimateClubYear(opts: {
 /** The club's sales page, on the same domain the visitor is browsing. */
 export function clubSignupUrl(): string {
   return `${getSubdomainUrl('member')}/assinar`
+}
+
+/**
+ * Meta description of /assinar. Google cuts around 155 characters, so the
+ * whole offer (price, per month, the three benefits) has to fit.
+ */
+export function clubSeoDescription(): string {
+  return `Plano anual de ${formatCurrency(CLUB_PLAN.price)} (${formatCurrency(CLUB_MONTHLY_EQUIVALENT)} por mês): ${MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto, na loja física e online, ${MEMBER_TICKET_DISCOUNT_PERCENT}% nos ingressos e brinde na primeira compra.`
 }

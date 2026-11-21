@@ -158,7 +158,8 @@ Feita quando o Leo criou as propriedades no Google Search Console.
   (`<NoIndex>` em `App.tsx`). Na loja, `/carrinho`, `/entrar` e os formulários
   do atacado também (antes herdavam o canonical da página anterior).
 - **Canonical da página de venda é `/assinar`**: `/` só redireciona para lá. O
-  shell (`index.html`), o `SeoHead`, o sitemap e o JSON-LD dizem o mesmo.
+  `SeoHead`, o sitemap e o JSON-LD dizem o mesmo (o shell não tem canonical:
+  ver a rodada 2 abaixo).
 - **Sitemap do clube**: só `/assinar`, `/termos` e `/privacidade`, em
   `club.geekpoptoys.com.br`. Saíram `/` (redireciona), `/login` e `/cadastro`
   (formulários, `noindex`).
@@ -185,6 +186,37 @@ Feita quando o Leo criou as propriedades no Google Search Console.
   certo, e nenhuma URL de sitemap bloqueada no robots ou `noindex` no código
   (lê os `<NoIndex>` e `<SeoHead … noIndex>` de `src/`).
 
+### Rodada 2 (qa, 21/11/2026)
+
+- **O service worker servia o shell do clube na loja.** O `generateSW` tinha
+  `navigateFallback: 'index.html'`: depois de algumas visitas, toda navegação em
+  `shop.*` saía do SW com o `<head>` do clube (Product do plano, FAQPage, sem
+  Store). O mesmo `sw.js` serve os três hosts, então nenhum shell fixo serve.
+  Agora não há fallback fixo e o HTML saiu do precache (o `directoryIndex` do
+  precache respondia `/` com `index.html`); navegação é `NetworkFirst` (nginx
+  escolhe o shell por host), com a última cópia de cada URL no cache `pages`
+  para uso offline (`src/lib/pwa-navigation.ts`, testado em
+  `pwa-navigation.test.ts`). `isSafeToReload` e o deploy em duas etapas não
+  mudaram.
+- **Canonical antes do JS**: o shell tinha um canonical fixo (`/assinar` no
+  clube, `/` na loja) e o curl de `/termos`, categoria e produto via esse sinal
+  errado até o JS trocar. A opção escolhida foi **tirar o canonical dos dois
+  shells**: o `SeoHead` cria a tag em toda rota (o teste por família exige head
+  em toda rota) e o Google lê o canonical renderizado. A alternativa, injetar o
+  caminho no nginx com `sub_filter` e `$uri`, põe texto do pedido (decodificado)
+  dentro do HTML (risco de injeção) e tira o ETag. `og:url` ficou no shell: é
+  preview, não ranking.
+- **Limites de snippet** (`club-structured-data.test.ts`): títulos ≤ 60 e
+  descrições ≤ 155 nos dois shells, na home da loja (`SHOP_DEFAULT_SEO`) e no
+  `/assinar` (`clubSeoDescription()` em `club-value.ts`, 153 caracteres com a
+  oferta inteira).
+- **adm.\***: sem canonical (vinha do shell) e `404` em qualquer
+  `/sitemap*.xml` no bloco do painel.
+- **JSON-LD do clube** (`Organization`, `Product` do plano, `FAQPage`) saiu do
+  `index.html` para o `SeoHead` do `/assinar` (`src/lib/club-structured-data.ts`):
+  não aparece mais em `/termos`, `/login` nem no painel. O FAQPage agora é
+  gerado das perguntas que a página mostra (o do shell tinha outras).
+
 ### Pendências (não feitas, por risco ou por medir antes)
 
 - **Fontes do Google** (`fonts.googleapis.com`) bloqueiam a renderização nos
@@ -199,13 +231,11 @@ Feita quando o Leo criou as propriedades no Google Search Console.
   `*.geekpoptoys` a SPA fala com `api.geekpoptoys`, então a conexão aberta é
   desperdiçada. Melhor criar o `preconnect` no `boot.js`, que já escolhe a API
   pelo host.
-- **JSON-LD do clube fica no shell** (`index.html`): `Organization`, `Product` e
-  `FAQPage` saem em toda rota do clube, inclusive `/termos`, `/privacidade` e
-  `/login`, e o FAQ só aparece no `/assinar`. Mover para o `jsonLd` do
-  `SeoHead` do `/assinar` (o Google renderiza JS; o leitor sem JS perde o bloco).
 - **CLS do `/atacado` a 390 px**: 0,024 a 0,151 em duas cargas (21/11). A
   etiqueta troca de texto quando `salesOpen` chega e a linha quebra diferente;
   reservar a altura ou pintar o estado certo de primeira.
+- **Violação de CSP vinda do chunk do `zod`** (achado do qa em 21/11, não
+  investigado aqui).
 - **Foto principal do produto** sai no original (até 2560 px); um `srcset` com a
   miniatura de 600 px só ajuda em tela de densidade 1, e o zoom precisa do
   original.
@@ -228,7 +258,7 @@ Feita quando o Leo criou as propriedades no Google Search Console.
   Arquivo novo de SEO em `public/` (robots, sitemap) precisa de `location =` no
   bloco do host e entra no `seo-files.test.ts`.
 - **Canonical é sempre `shop.geekpoptoys.com.br`**, com barra no `/` — igual no
-  shell, no `SeoHead`, na API e no sitemap.
+  `SeoHead`, na API e no sitemap (o shell não tem canonical desde 21/11).
 - Dado estruturado só com o que a página mostra. Preço ou estoque que discorda
   da tela é risco de ação manual, não ganho.
 

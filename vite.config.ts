@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { PWA_NAVIGATE_FALLBACK, pwaNavigationRoute } from './src/lib/pwa-navigation'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -58,7 +59,9 @@ export default defineConfig({
         // precache and the SW downloaded 11.2 MB on every first visit,
         // including 4G users who only wanted a product. Photos are content,
         // not app shell — runtimeCaching, on demand.
-        globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
+        // No `html` either: precached shells answered `/` by directoryIndex with
+        // index.html, the club shell, on shop.* too. Pages: src/lib/pwa-navigation.ts.
+        globPatterns: ['**/*.{js,css,ico,svg,woff2}'],
         // Staff-only chunks stay out of the precache: exceljs, pdf-lib, the QR
         // scanner and the admin tabs are ~2.3 MB that every shop visitor's
         // phone used to download. The panel still loads them on demand.
@@ -74,7 +77,10 @@ export default defineConfig({
           '**/assets/RealtimeMetrics-*.js',
         ],
         maximumFileSizeToCacheInBytes: 2 * 1024 * 1024, // 2MB max per file
+        // Pages from the network, shell per host: see src/lib/pwa-navigation.ts.
+        navigateFallback: PWA_NAVIGATE_FALLBACK,
         runtimeCaching: [
+          pwaNavigationRoute,
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',

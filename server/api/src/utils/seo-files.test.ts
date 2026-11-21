@@ -53,6 +53,10 @@ describe('robots.txt per host (nginx)', () => {
     expect(servers.filter((s) => s.includes('location = /robots.txt'))).toHaveLength(2);
   });
 
+  it('answers 404 for any sitemap on the admin panel', () => {
+    expect(admBlock()).toMatch(/location ~ \^\/sitemap\[\^\/\]\*\\\.xml\$ \{\s*return 404;/);
+  });
+
   it('keeps the admin panel out of the index by header, not by Disallow', () => {
     expect(admBlock()).toMatch(/add_header X-Robots-Tag "noindex, nofollow, noarchive" always;/);
     const robots = read(HOSTS.adm.robots);

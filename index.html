@@ -7,11 +7,10 @@
     <!-- SEO: Primary Meta Tags -->
     <title>Clube GeekPop & Toys — 10% de Desconto em Qualquer Produto</title>
     <meta name="title" content="Clube GeekPop & Toys — 10% de Desconto em Qualquer Produto" />
-    <meta name="description" content="Faça parte do Clube GeekPop & Toys! Plano anual de R$ 159,90 — menos de R$ 13,50 por mês — com 10% de desconto em qualquer produto, na loja física e online, 50% nos ingressos dos eventos e brinde na primeira compra. Carteirinha digital com QR Code." />
+    <meta name="description" content="Clube GeekPop &amp; Toys: plano anual de R$ 159,90 com 10% de desconto em qualquer produto, 50% nos ingressos dos eventos e brinde na primeira compra." />
     <meta name="keywords" content="clube geek, geekpop, k-pop, descontos, clube de vantagens, geek toys, colecionáveis, action figures, funko pop, brinquedos, copacabana geek, loja k-pop" />
     <meta name="author" content="LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA" />
     <meta name="robots" content="index, follow, max-image-preview:large" />
-    <link rel="canonical" href="https://club.geekpoptoys.com.br/assinar" />
 
     <!-- Open Graph / Facebook / WhatsApp / Telegram -->
     <meta property="og:type" content="website" />
@@ -56,111 +55,9 @@
     <meta name="theme-color" content="#F04080" />
     <meta name="msapplication-TileColor" content="#F04080" />
 
-    <!-- Schema.org / JSON-LD: Organization -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Clube GeekPop & Toys",
-      "legalName": "LNA GEEK POP COMERCIO DE ARTIGOS EM GERAL LTDA",
-      "taxID": "69.629.548/0001-00",
-      "alternateName": "GeekPop & Toys",
-      "description": "Clube de vantagens com 10% de desconto em qualquer produto (loja física e online), 50% nos ingressos dos eventos e brinde na primeira compra. Produtos de K-pop, colecionáveis, Funkos e muito mais.",
-      "url": "https://club.geekpoptoys.com.br/assinar",
-      "logo": "https://club.geekpoptoys.com.br/logo-vip.png",
-      "image": "https://club.geekpoptoys.com.br/og-image.png",
-      "sameAs": [
-        "https://www.instagram.com/geeketoys/",
-        "https://www.facebook.com/geeketoyscolection/",
-        "https://www.tiktok.com/@geeketoys",
-        "https://geekpoptoys.com.br"
-      ],
-      "address": {
-        "@type": "PostalAddress",
-        "streetAddress": "Rua Barata Ribeiro, 181, Loja J",
-        "addressLocality": "Rio de Janeiro",
-        "addressRegion": "RJ",
-        "postalCode": "22011-001",
-        "addressCountry": "BR"
-      },
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "email": "contato@geeketoys.com.br",
-        "contactType": "customer service",
-        "availableLanguage": "Portuguese"
-      }
-    }
-    </script>
-
-    <!-- Schema.org / JSON-LD: Product (Subscription Plans) -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Product",
-      "name": "Clube GeekPop & Toys",
-      "description": "Clube de vantagens com 10% de desconto em qualquer produto, 50% nos ingressos dos eventos e brinde na primeira compra. Carteirinha digital para fãs de cultura geek e K-pop.",
-      "brand": {
-        "@type": "Brand",
-        "name": "GeekPop & Toys"
-      },
-      "image": "https://club.geekpoptoys.com.br/logo-vip.png",
-      "offers": {
-        "@type": "Offer",
-        "name": "Plano anual do Clube",
-        "priceCurrency": "BRL",
-        "price": "159.90",
-        "availability": "https://schema.org/InStock",
-        "url": "https://club.geekpoptoys.com.br/assinar",
-        "priceSpecification": {
-          "@type": "UnitPriceSpecification",
-          "price": "159.90",
-          "priceCurrency": "BRL",
-          "billingDuration": 1,
-          "billingIncrement": 1,
-          "unitCode": "ANN",
-          "referenceQuantity": {
-            "@type": "QuantitativeValue",
-            "value": 1,
-            "unitCode": "ANN"
-          }
-        }
-      }
-    }
-    </script>
-
-    <!-- Schema.org / JSON-LD: FAQ -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "Como funciona o Clube GeekPop & Toys?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "O Clube GeekPop & Toys é um programa de vantagens com plano único anual que oferece 10% de desconto em qualquer produto (na loja física e online), 50% de desconto nos ingressos dos eventos, brinde na primeira compra da loja e carteirinha digital com QR Code."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Quanto custa o Clube GeekPop & Toys?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "O Clube tem um plano único anual de R$ 159,90, pago à vista no PIX ou no cartão, com 10% de desconto em qualquer produto, 50% de desconto nos ingressos dos eventos e brinde na primeira compra da loja."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Posso cancelar quando quiser?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Sim! Não há fidelidade. Você pode cancelar sua assinatura a qualquer momento pelo painel do membro. Conforme o CDC (Art. 49), você tem 7 dias de direito de arrependimento após a contratação."
-          }
-        }
-      ]
-    }
-    </script>
+    <!-- JSON-LD do clube (Organization, Product, FAQPage) sai do SeoHead do
+         /assinar (src/lib/club-structured-data.ts): aqui ia para toda rota do
+         clube e para o painel. -->
 
     <!-- Analytics: loaded dynamically AFTER cookie consent (see src/lib/analytics.ts).
          Removed from index.html to comply with LGPD Art. 7º — no tracking before consent. -->

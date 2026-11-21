@@ -5,10 +5,12 @@ import { Button } from '../components/ui/button'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { Card, CardContent, CardFooter } from '../components/ui/card'
 import { formatCurrency } from '../lib/utils'
-import { getShopUrl } from '../lib/subdomain'
+import { CANONICAL_ORIGINS, getShopUrl } from '../lib/subdomain'
+import { clubOrganizationJsonLd, clubPlanJsonLd, faqJsonLd } from '../lib/club-structured-data'
 import {
   CLUB_BREAK_EVEN_SPEND,
   CLUB_MONTHLY_EQUIVALENT,
+  clubSeoDescription,
   DEFAULT_TICKET_PRICE,
   MEMBER_TICKET_DISCOUNT_PERCENT,
   estimateClubYear,
@@ -112,8 +114,13 @@ export default function Subscribe() {
     <div className="min-h-screen bg-background overflow-x-hidden pb-20 sm:pb-0">
       <SeoHead
         title={`Clube GeekPop & Toys — ${MEMBER_DISCOUNT_PERCENT}% de Desconto em Qualquer Produto`}
-        description={`Plano anual de ${price}, ${perMonth} por mês, com ${MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto na loja física e online, ${MEMBER_TICKET_DISCOUNT_PERCENT}% nos ingressos dos eventos e brinde na primeira compra.`}
+        description={clubSeoDescription()}
         path="/assinar"
+        jsonLd={[
+          clubOrganizationJsonLd(CANONICAL_ORIGINS.club),
+          clubPlanJsonLd(CANONICAL_ORIGINS.club),
+          faqJsonLd(faq),
+        ]}
       />
       <NatalBannerSlot variant="club-visitor" />
       {/* Header */}
