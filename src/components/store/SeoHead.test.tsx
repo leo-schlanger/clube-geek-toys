@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
 
 const mockMode = vi.hoisted(() => ({ value: 'shop' as 'shop' | 'club' }))
-const CANONICAL = { shop: 'https://shop.geekpoptoys.com.br', club: 'https://club.geeketoys.com.br' }
+const CANONICAL = { shop: 'https://shop.geekpoptoys.com.br', club: 'https://club.geekpoptoys.com.br' }
 vi.mock('../../lib/subdomain', () => ({
   getAppMode: () => mockMode.value,
   getCanonicalOrigin: () => CANONICAL[mockMode.value],
@@ -190,7 +190,7 @@ describe('SeoHead — canonical domain', () => {
     mockMode.value = 'club'
     render(<SeoHead title="Assinar" path="/assinar" />)
 
-    expect(canonical()).toBe('https://club.geeketoys.com.br/assinar')
+    expect(canonical()).toBe('https://club.geekpoptoys.com.br/assinar')
   })
 
   it('never lets the canonical vary with the window host', () => {

@@ -52,12 +52,37 @@ export function collectImages(...lists: unknown[]): string[] {
   return out;
 }
 
+export interface SitemapOptions {
+  /**
+   * /evento only while an event is on: with none, the page redirects to the
+   * home, and a redirect in the sitemap is a URL Google cannot index.
+   */
+  includeEvent: boolean;
+}
+
 export function renderProductSitemapXml(
   shopBaseUrl: string,
   products: SitemapProduct[],
-  categories: SitemapCategory[]
+  categories: SitemapCategory[],
+  options: SitemapOptions = { includeEvent: true }
 ): string {
   const base = shopBaseUrl.replace(/\/$/, '');
+  // The home lists products and categories, so it changes when they do.
+  const newest = [...products, ...categories]
+    .map((x) => (x.updatedAt ? new Date(x.updatedAt).getTime() : NaN))
+    .filter((t) => !Number.isNaN(t))
+    .reduce((max, t) => Math.max(max, t), -Infinity);
+  const homeLastmod = Number.isFinite(newest)
+    ? `\n    <lastmod>${day(new Date(newest))}</lastmod>`
+    : '';
+  const eventUrl = options.includeEvent
+    ? `
+  <url>
+    <loc>${escapeXml(`${base}/evento`)}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>`
+    : '';
 
   const categoryUrls = categories.map(
     (c) => `  <url>
@@ -89,15 +114,10 @@ export function renderProductSitemapXml(
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
-    <loc>${escapeXml(`${base}/`)}</loc>
+    <loc>${escapeXml(`${base}/`)}</loc>${homeLastmod}
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${escapeXml(`${base}/evento`)}</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
+  </url>${eventUrl}
 ${[...categoryUrls, ...productUrls].join('\n')}
 </urlset>
 `;

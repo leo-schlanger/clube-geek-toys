@@ -2,7 +2,8 @@
 <!--
   Static shop pages only. `/`, `/evento`, `/categoria/*` and every product come
   from the dynamic sitemap the API serves at /sitemap-products.xml, so they are
-  not repeated here.
+  not repeated here. Login and signup (/entrar, /cadastro) are noindex forms
+  and stay out.
 
   Hosts must be the canonical shop origin (shop.geekpoptoys.com.br). This file
   used to list shop.geeketoys.com.br while robots.txt published it under
@@ -11,18 +12,8 @@
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://shop.geekpoptoys.com.br/entrar</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
-    <loc>https://shop.geekpoptoys.com.br/cadastro</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.4</priority>
-  </url>
-  <url>
     <loc>https://shop.geekpoptoys.com.br/atacado</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
+    <priority>0.5</priority>
   </url>
 </urlset>

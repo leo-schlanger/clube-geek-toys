@@ -24,10 +24,14 @@ const mockAuthState = {
 // ── Mocks ──────────────────────────────────────────────────────
 
 // Mock subdomain module to control app mode
-vi.mock('./lib/subdomain', async (importOriginal) => ({
-  getAppMode: () => 'member',
-  getLoginRedirectPath: (await importOriginal<typeof import('./lib/subdomain')>()).getLoginRedirectPath,
-}))
+vi.mock('./lib/subdomain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./lib/subdomain')>()
+  return {
+    getAppMode: () => 'member',
+    getLoginRedirectPath: actual.getLoginRedirectPath,
+    getCanonicalOrigin: () => actual.CANONICAL_ORIGINS.club,
+  }
+})
 
 // Mock AuthContext — useAuth reads from mutable mockAuthState
 vi.mock('./contexts/AuthContext', () => ({
@@ -237,6 +241,32 @@ describe('App', () => {
     render(<App />)
     await waitFor(() => {
       expect(screen.getByText('PaymentResult-success')).toBeInTheDocument()
+    })
+  })
+
+  // Club pages had no head of their own: every URL kept the shell's canonical.
+  it.each([
+    ['/termos', 'index, follow, max-image-preview:large'],
+    ['/privacidade', 'index, follow, max-image-preview:large'],
+    ['/login', 'noindex, nofollow'],
+    ['/cadastro', 'noindex, nofollow'],
+    ['/pagamento/erro', 'noindex, nofollow'],
+  ])('gives %s its own canonical on the geekpoptoys club host (%s)', async (path, robots) => {
+    window.history.pushState({}, '', path)
+    render(<App />)
+    await waitFor(() => {
+      expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
+        `https://club.geekpoptoys.com.br${path}`
+      )
+    })
+    expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(robots)
+  })
+
+  it('keeps the member card check out of search results', async () => {
+    window.history.pushState({}, '', '/verificar/abcd1234-5678-9012-3456-789012345678')
+    render(<App />)
+    await waitFor(() => {
+      expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, nofollow')
     })
   })
 

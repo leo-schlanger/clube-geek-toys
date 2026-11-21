@@ -48,7 +48,7 @@ export default function MemberVerify() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-sm text-center space-y-6">
-        <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-16 mx-auto" />
+        <img src="/logo-vip-160.webp" width={160} height={160} alt="Clube GeekPop & Toys" className="h-16 w-auto mx-auto" />
 
         {/* Status comes from the database either way; this only flags a QR not opened just now. */}
         <OldQrWarning token={card?.token} />

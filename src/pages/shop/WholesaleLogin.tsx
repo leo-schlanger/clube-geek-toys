@@ -84,7 +84,7 @@ export default function WholesaleLogin() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <SeoHead title="Entrar no Atacado | GeekPop & Toys" path="/atacado/entrar" />
+      <SeoHead title="Entrar no Atacado | GeekPop & Toys" path="/atacado/entrar" noIndex />
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <div className="flex items-center gap-2 text-primary">

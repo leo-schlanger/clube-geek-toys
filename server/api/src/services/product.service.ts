@@ -1140,6 +1140,13 @@ export async function buildProductSitemapXml(shopBaseUrl: string): Promise<strin
      GROUP BY c.id
      ORDER BY c.sort_order, c.name`
   );
+  // Same rule as isEventVisible() on the front (no end date: a day after start).
+  const event = await query(
+    `SELECT 1 FROM events
+      WHERE status = 'published'
+        AND COALESCE(ends_at, starts_at + INTERVAL '1 day') >= NOW()
+      LIMIT 1`
+  );
   return renderProductSitemapXml(
     shopBaseUrl,
     result.rows.map((r) => ({
@@ -1150,7 +1157,8 @@ export async function buildProductSitemapXml(shopBaseUrl: string): Promise<strin
     categories.rows.map((r) => ({
       slug: r.slug as string,
       updatedAt: r.updated_at as Date | string | null,
-    }))
+    })),
+    { includeEvent: event.rows.length > 0 }
   );
 }
 

@@ -1,0 +1,4 @@
+# Admin panel (adm.*). Crawling stays allowed on purpose: every response
+# carries X-Robots-Tag: noindex, and a Disallow would hide that from Google.
+User-agent: *
+Allow: /

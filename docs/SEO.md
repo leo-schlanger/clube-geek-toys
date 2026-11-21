@@ -1,4 +1,4 @@
-# SEO e preview de link — loja (`shop.*`)
+# SEO e preview de link — loja (`shop.*`) e clube (`club.*`)
 
 Revisão de 30/09/2026. A loja é uma SPA; quem lê a página sem rodar JavaScript
 não vê nada do que o React escreve. São três leitores diferentes, e cada um
@@ -129,6 +129,86 @@ Regra: conteúdo que entra **acima** de algo já pintado precisa estar na primei
 pintura (boot, cache) ou ter a altura reservada. Esqueleto tem a altura exata do
 conteúdo carregado.
 
+## Revisão de 21/11/2026: robots por host, clube em geekpoptoys, Search Console
+
+Feita quando o Leo criou as propriedades no Google Search Console.
+
+- **`robots.txt` era o mesmo em todos os hosts** (shop, club, adm, nos dois
+  domínios) e anunciava o sitemap do clube em `club.geeketoys.com.br`. Agora
+  cada host tem o seu, como o `sitemap.xml`: `location = /robots.txt` no bloco
+  `shop` (`public/robots-shop.txt`, só o índice
+  `https://shop.geekpoptoys.com.br/sitemap.xml`) e no bloco `adm`
+  (`public/robots-adm.txt`, sem sitemap e **sem Disallow**: o Google precisa
+  buscar a página para ver o `X-Robots-Tag: noindex` que o bloco já manda). O
+  `club.*` segue no `public/robots.txt`, agora com
+  `https://club.geekpoptoys.com.br/sitemap.xml` e `Disallow: /verificar/`
+  (a página da carteirinha mostra o nome do membro). Os `location` não têm
+  `add_header`, que substituiria os cabeçalhos herdados (HSTS, CSP, o
+  `X-Robots-Tag` do painel).
+- **Canonical do clube passou para `club.geekpoptoys.com.br`**
+  (`CANONICAL_ORIGINS.club`), em linha com a loja. Só SEO: o QR da carteirinha
+  continua em `club.geeketoys.com.br` (`MEMBER_VERIFY_ORIGIN`, há carteirinhas e
+  prints na rua), e links, API, cookies e e-mail não mudaram.
+- **As páginas do clube não tinham `SeoHead`**: toda URL do clube levava o
+  canonical do shell (`club.geeketoys.com.br`, sem caminho), ou seja, `/termos`
+  e `/privacidade` diziam ao Google que eram cópia da raiz. Agora `/assinar`
+  (título e descrição a partir de `CLUB_PLAN` e `club-value`), `/termos` e
+  `/privacidade` têm head próprio; login, cadastro, recuperar senha, confirmar
+  e-mail, `/pagamento/*`, `/verificar/:id` e `/acesso-negado` são `noindex`
+  (`<NoIndex>` em `App.tsx`). Na loja, `/carrinho`, `/entrar` e os formulários
+  do atacado também (antes herdavam o canonical da página anterior).
+- **Canonical da página de venda é `/assinar`**: `/` só redireciona para lá. O
+  shell (`index.html`), o `SeoHead`, o sitemap e o JSON-LD dizem o mesmo.
+- **Sitemap do clube**: só `/assinar`, `/termos` e `/privacidade`, em
+  `club.geekpoptoys.com.br`. Saíram `/` (redireciona), `/login` e `/cadastro`
+  (formulários, `noindex`).
+- **Sitemap da loja**: `sitemap-shop.xml` ficou só com `/atacado`; `/entrar` e
+  `/cadastro` saíram. Home, categorias e produtos já vinham do
+  `sitemap-products.xml`. Nele, `/evento` só entra com evento no ar (mesma regra
+  do `isEventVisible`: publicado e sem ter acabado; sem fim, 1 dia depois do
+  início). Com o Halloween de 01/11 já passado, `/evento` redirecionava para a
+  home e estava no sitemap. A home ganhou `lastmod` (o produto ou a categoria
+  mais recente). Não existe rota `/categorias` nem páginas legais na loja (o `*`
+  manda para `/`): as legais vivem no clube.
+- **Desempenho**: o `logo-vip.png` (417 KB, 1080 px) era pré-carregado em todo
+  shell e mostrado a 32–80 px. Agora shells, cabeçalho da loja e topo do
+  `/assinar` usam `logo-vip-160.webp` (4 KB) e as telas de login/cadastro
+  `logo-vip-640.webp` (20 KB). O hero do `/assinar` (LCP do clube) tem
+  `srcset` + `fetchpriority="high"`; a foto principal do produto também tem
+  `fetchpriority="high"`. O PNG original fica para JSON-LD e telas que ninguém
+  mexeu (contrato, carteirinha, tela de pagamento pendente).
+- **Testes**: `server/api/src/utils/seo-files.test.ts` lê o `default.conf` e os
+  arquivos de `public/`: cada host com o seu robots, sem `add_header` no
+  `location`, todo `Sitemap:` e todo `<loc>` em `*.geekpoptoys.com.br` do host
+  certo, e nenhuma URL de sitemap bloqueada no robots ou `noindex` no código
+  (lê os `<NoIndex>` e `<SeoHead … noIndex>` de `src/`).
+
+### Pendências (não feitas, por risco ou por medir antes)
+
+- **Fontes do Google** (`fonts.googleapis.com`) bloqueiam a renderização nos
+  dois shells. O truque `media="print" onload` não passa no CSP (sem
+  `unsafe-inline`); o caminho é hospedar Outfit/Inter no próprio domínio
+  (`@fontsource`) com `preload` do woff2 e fallback métrico.
+- **Turnstile** (`challenges.cloudflare.com/turnstile/v0/api.js`) carrega em
+  toda página dos dois shells e só serve ao cadastro. Carregar sob demanda no
+  `Turnstile.tsx` corta um script de terceiro da home, mas mexe no cadastro do
+  clube: fazer com um cadastro real em produção pelo celular.
+- **`preconnect` para `api.geeketoys.com.br`** fixo nos shells: em
+  `*.geekpoptoys` a SPA fala com `api.geekpoptoys`, então a conexão aberta é
+  desperdiçada. Melhor criar o `preconnect` no `boot.js`, que já escolhe a API
+  pelo host.
+- **Primeira fileira de produtos com `loading="lazy"`** na home e nas
+  categorias: se o LCP a 390 px for um card, as primeiras 2–4 fotos deveriam ser
+  `eager` (medir com Lighthouse antes).
+- **Foto principal do produto** sai no original (até 2560 px); um `srcset` com a
+  miniatura de 600 px só ajuda em tela de densidade 1, e o zoom precisa do
+  original.
+- **Descrição das categorias** no painel continua vazia (ver 06/11): preencher
+  melhora título/descrição sem deploy.
+- **Search Console**: enviar `https://shop.geekpoptoys.com.br/sitemap.xml` e
+  `https://club.geekpoptoys.com.br/sitemap.xml` nas propriedades de cada host
+  (ou na de domínio `geekpoptoys.com.br`).
+
 ## Regras
 
 - **Rota pública nova da loja**: decida o preview dela no nginx (bloco `shop`) e
@@ -137,6 +217,10 @@ conteúdo carregado.
   pegavam o navegador embutido dos apps. Use `TelegramBot`, `Pinterestbot`.
 - **Busca** (`/?search=`) é `noindex`; página 2+ do catálogo tem canonical
   próprio (`?page=N`); atacado aponta o canonical para o produto de varejo.
+- **Canonical do clube é `club.geekpoptoys.com.br`** (21/11/2026) e toda rota
+  do clube decide o seu head: `SeoHead` próprio ou `<NoIndex>` em `App.tsx`.
+  Arquivo novo de SEO em `public/` (robots, sitemap) precisa de `location =` no
+  bloco do host e entra no `seo-files.test.ts`.
 - **Canonical é sempre `shop.geekpoptoys.com.br`**, com barra no `/` — igual no
   shell, no `SeoHead`, na API e no sitemap.
 - Dado estruturado só com o que a página mostra. Preço ou estoque que discorda
@@ -151,7 +235,12 @@ curl -s -A 'WhatsApp/2.23.20.0' https://shop.geeketoys.com.br/categoria/photocar
 
 # Sitemaps: índice só no shop.*, clube intacto
 curl -s https://shop.geekpoptoys.com.br/sitemap.xml   # <sitemapindex>
-curl -s https://club.geeketoys.com.br/sitemap.xml     # urlset do clube
+curl -s https://club.geekpoptoys.com.br/sitemap.xml   # urlset do clube (3 URLs)
+
+# robots por host: shop → índice da loja; club → sitemap do clube; adm → sem sitemap + X-Robots-Tag
+curl -s https://shop.geekpoptoys.com.br/robots.txt | grep Sitemap
+curl -s https://club.geekpoptoys.com.br/robots.txt | grep Sitemap
+curl -sI https://adm.geekpoptoys.com.br/robots.txt | grep -i x-robots
 curl -s https://shop.geekpoptoys.com.br/sitemap-products.xml | grep -c '<image:loc>'
 
 # O que o Google recebe (tem de ser a SPA, não o stub)

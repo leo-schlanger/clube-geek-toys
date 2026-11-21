@@ -36,6 +36,17 @@ describe('renderProductSitemapXml', () => {
     expect(xml).toMatch(/produto\/album-bts<\/loc>\s*<lastmod>2026-10-30<\/lastmod>/);
   });
 
+  it('dates the home by the newest product or category', () => {
+    expect(xml).toMatch(/shop\.geekpoptoys\.com\.br\/<\/loc>\s*<lastmod>2026-11-01<\/lastmod>/);
+  });
+
+  it('leaves /evento out when no event is on, and the home undated with an empty catalogue', () => {
+    const empty = renderProductSitemapXml(BASE, [], [], { includeEvent: false });
+    const locs = [...empty.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    expect(locs).toEqual([`${BASE}/`]);
+    expect(empty).not.toContain('<lastmod>');
+  });
+
   it('attaches each photo as an absolute, escaped image:loc', () => {
     const product = xml.slice(xml.indexOf('produto/album-bts'), xml.indexOf('produto/sem-foto'));
     const images = [...product.matchAll(/<image:loc>([^<]+)<\/image:loc>/g)].map((m) => m[1]);

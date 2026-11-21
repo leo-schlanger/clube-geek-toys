@@ -133,9 +133,11 @@ export const MembershipCard = forwardRef<HTMLButtonElement, MembershipCardProps>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               <img
-                src="/logo-vip.png"
+                src="/logo-vip-160.webp"
+                width={160}
+                height={160}
                 alt="Clube GeekPop & Toys"
-                className="h-7 sm:h-8 drop-shadow-lg"
+                className="h-7 w-auto sm:h-8 drop-shadow-lg"
               />
             </div>
             <div className="flex items-center gap-2">

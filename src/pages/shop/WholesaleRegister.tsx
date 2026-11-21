@@ -90,7 +90,7 @@ export default function WholesaleRegister() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10">
-      <SeoHead title="Cadastro Atacado | GeekPop & Toys" path="/atacado/cadastro" />
+      <SeoHead title="Cadastro Atacado | GeekPop & Toys" path="/atacado/cadastro" noIndex />
       <Card className="w-full max-w-lg">
         <CardHeader className="space-y-2">
           <div className="flex items-center gap-2 text-primary">

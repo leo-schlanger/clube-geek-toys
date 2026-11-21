@@ -144,9 +144,11 @@ export default function Login() {
           className="relative z-10 flex flex-col items-center text-center"
         >
           <img
-            src="/logo-vip.png"
+            src="/logo-vip-640.webp"
+            width={640}
+            height={640}
             alt="Clube GeekPop & Toys"
-            className="w-40 md:w-64 mb-6"
+            className="w-40 md:w-64 h-auto mb-6"
           />
           <h1 className="text-2xl md:text-3xl font-heading gradient-text mb-2">
             Clube GeekPop & Toys

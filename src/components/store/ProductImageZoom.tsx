@@ -283,6 +283,8 @@ export function HoverZoom({
       src={src}
       alt={alt}
       draggable={false}
+      // The product page's main photo, and its LCP.
+      fetchPriority="high"
       onMouseMove={(e) => {
         const rect = e.currentTarget.getBoundingClientRect()
         const x = ((e.clientX - rect.left) / rect.width) * 100

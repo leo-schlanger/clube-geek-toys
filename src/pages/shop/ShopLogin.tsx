@@ -125,7 +125,7 @@ export default function ShopLogin() {
         <Card>
           <CardHeader className="text-center">
             <div className="mx-auto mb-2 flex items-center justify-center">
-              <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-14 w-auto" />
+              <img src="/logo-vip-160.webp" width={160} height={160} alt="Clube GeekPop & Toys" className="h-14 w-auto" />
             </div>
             <CardTitle className="font-heading text-2xl">Entrar</CardTitle>
             <CardDescription>

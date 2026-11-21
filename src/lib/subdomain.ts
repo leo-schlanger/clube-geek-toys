@@ -181,21 +181,26 @@ export function getSubdomainUrl(targetSubdomain: 'admin' | 'member'): string {
  * mirror declare itself canonical, which is exactly the tie to avoid. Visitors
  * arriving through the mirror browse normally; only the canonical points away.
  *
- * The shop settles on geekpoptoys, where the audience arrives and which matches
- * the wordmark; the club stays on geeketoys, the primary name on the
- * certificate and the infrastructure.
+ * Both settle on geekpoptoys, the main domain since 06/11/2026. This is SEO
+ * only: links, API calls, cookies and the QR stay on the host they use.
  */
 export const CANONICAL_ORIGINS = {
   shop: 'https://shop.geekpoptoys.com.br',
-  club: 'https://club.geeketoys.com.br',
+  club: 'https://club.geekpoptoys.com.br',
 } as const
+
+/**
+ * Host printed in the membership QR. Functional, not SEO: cards and prints in
+ * the wild point here, so it does not follow the canonical.
+ */
+export const MEMBER_VERIFY_ORIGIN = 'https://club.geeketoys.com.br'
 
 /**
  * Public URL encoded in the membership QR so any phone camera can open it.
  * `token` is the short-lived anti-print proof from `/members/me/card-token`.
  */
 export function getMemberVerifyUrl(memberId: string, token?: string | null): string {
-  const base = `${CANONICAL_ORIGINS.club}/verificar/${memberId}`
+  const base = `${MEMBER_VERIFY_ORIGIN}/verificar/${memberId}`
   return token ? `${base}?t=${encodeURIComponent(token)}` : base
 }
 

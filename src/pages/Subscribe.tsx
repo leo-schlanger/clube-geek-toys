@@ -16,6 +16,7 @@ import {
 } from '../lib/club-value'
 import { useActiveEvent } from '../hooks/useActiveEvent'
 import { NonoMascot } from '../components/store/NonoMascot'
+import { SeoHead } from '../components/store/SeoHead'
 import {
   Check,
   Sparkles,
@@ -109,12 +110,17 @@ export default function Subscribe() {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden pb-20 sm:pb-0">
+      <SeoHead
+        title={`Clube GeekPop & Toys — ${MEMBER_DISCOUNT_PERCENT}% de Desconto em Qualquer Produto`}
+        description={`Plano anual de ${price}, ${perMonth} por mês, com ${MEMBER_DISCOUNT_PERCENT}% de desconto em qualquer produto na loja física e online, ${MEMBER_TICKET_DISCOUNT_PERCENT}% nos ingressos dos eventos e brinde na primeira compra.`}
+        path="/assinar"
+      />
       <NatalBannerSlot variant="club-visitor" />
       {/* Header */}
       <header className="glass border-b border-border/50 sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14 sm:h-16 px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo-vip.png" alt="GeekPop & Toys" className="h-10 sm:h-12" />
+            <img src="/logo-vip-160.webp" width={160} height={160} alt="GeekPop & Toys" className="h-10 w-auto sm:h-12" />
           </Link>
           <div className="flex items-center gap-1 sm:gap-3">
             <a href={shopUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground hidden sm:inline transition-colors">
@@ -141,12 +147,16 @@ export default function Subscribe() {
             transition={{ duration: 0.6 }}
           >
             <img
-              src="/logo-vip.png"
+              src="/logo-vip-640.webp"
+              // The page's LCP: 640 px covers the 320 px slot at 2x; the PNG only for 3x screens.
+              srcSet="/logo-vip-640.webp 640w, /logo-vip.png 1080w"
+              sizes="(min-width: 768px) 320px, (min-width: 640px) 256px, 208px"
               alt="Clube GeekPop & Toys"
               className="w-52 sm:w-64 md:w-80 mx-auto drop-shadow-[0_0_40px_rgba(240,64,128,0.35)]"
               width="1536"
               height="1024"
               loading="eager"
+              fetchPriority="high"
               style={{ aspectRatio: '3/2', objectFit: 'contain' }}
             />
           </motion.div>
@@ -379,7 +389,7 @@ export default function Subscribe() {
       {/* Footer */}
       <footer className="py-8 px-4 sm:px-6 text-center border-t border-border/30">
         <div className="flex justify-center mb-4">
-          <img src="/logo-vip.png" alt="GeekPop & Toys" className="h-16 drop-shadow-[0_0_15px_rgba(212,165,32,0.2)]" />
+          <img src="/logo-vip-160.webp" width={160} height={160} alt="GeekPop & Toys" className="h-16 w-auto drop-shadow-[0_0_15px_rgba(212,165,32,0.2)]" />
         </div>
         <p className="text-xs text-muted-foreground mb-1">club.geeketoys.com.br</p>
         <p className="text-muted-foreground text-xs">&copy; 2026 GeekPop & Toys. Todos os direitos reservados.</p>

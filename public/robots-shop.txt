@@ -1,0 +1,17 @@
+# Shop (shop.*), served by nginx as /robots.txt on the shop hosts.
+User-agent: *
+Allow: /
+Disallow: /checkout
+Disallow: /carrinho
+Disallow: /pedido/
+# Nominal tickets: these pages carry the attendee's full name.
+Disallow: /ingresso/
+Disallow: /ingressos/
+Disallow: /minhas-compras
+Disallow: /perfil
+Disallow: /atacado/entrar
+Disallow: /atacado/cadastro
+Disallow: /atacado/carrinho
+Disallow: /atacado/checkout
+
+Sitemap: https://shop.geekpoptoys.com.br/sitemap.xml

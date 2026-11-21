@@ -413,17 +413,17 @@ describe('AppMode type', () => {
 })
 
 describe('getMemberVerifyUrl', () => {
-  it('encodes the canonical club URL with the member id', async () => {
-    const { getMemberVerifyUrl, CANONICAL_ORIGINS } = await loadModule()
+  it('encodes the legacy club host with the member id, not the SEO canonical', async () => {
+    const { getMemberVerifyUrl } = await loadModule()
     expect(getMemberVerifyUrl('abcd1234-5678-9012-3456-789012345678')).toBe(
-      `${CANONICAL_ORIGINS.club}/verificar/abcd1234-5678-9012-3456-789012345678`,
+      'https://club.geeketoys.com.br/verificar/abcd1234-5678-9012-3456-789012345678',
     )
   })
 
   it('appends the anti-print token, encoded', async () => {
-    const { getMemberVerifyUrl, CANONICAL_ORIGINS } = await loadModule()
-    expect(getMemberVerifyUrl('abcd', 'mgz1.a_b-c')).toBe(`${CANONICAL_ORIGINS.club}/verificar/abcd?t=mgz1.a_b-c`)
-    expect(getMemberVerifyUrl('abcd', null)).toBe(`${CANONICAL_ORIGINS.club}/verificar/abcd`)
+    const { getMemberVerifyUrl, MEMBER_VERIFY_ORIGIN } = await loadModule()
+    expect(getMemberVerifyUrl('abcd', 'mgz1.a_b-c')).toBe(`${MEMBER_VERIFY_ORIGIN}/verificar/abcd?t=mgz1.a_b-c`)
+    expect(getMemberVerifyUrl('abcd', null)).toBe(`${MEMBER_VERIFY_ORIGIN}/verificar/abcd`)
   })
 })
 

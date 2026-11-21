@@ -385,7 +385,7 @@ export default function Register() {
             Voltar para planos
           </Link>
           <div className="mb-4">
-            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-48 sm:w-56 mx-auto" />
+            <img src="/logo-vip-640.webp" width={640} height={640} alt="Clube GeekPop & Toys" className="w-48 sm:w-56 h-auto mx-auto" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">
             {stepTitle}

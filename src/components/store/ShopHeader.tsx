@@ -90,7 +90,7 @@ export function ShopHeader({ isMember = false, isWholesale = false }: ShopHeader
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:h-16 sm:gap-3">
           {/* Logo */}
           <Link to={isWholesale ? '/atacado' : '/'} className="flex shrink-0 items-center gap-2">
-            <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="h-8 w-auto sm:h-9" />
+            <img src="/logo-vip-160.webp" width={160} height={160} alt="Clube GeekPop & Toys" className="h-8 w-auto sm:h-9" />
             <span className="hidden text-sm font-heading font-semibold lg:inline">
               {isWholesale ? 'Atacado GeekPop & Toys' : 'Loja GeekPop & Toys'}
             </span>

@@ -149,7 +149,7 @@ export default function MemberDashboard() {
         <Card className="max-w-md text-center">
           <CardHeader>
             <div className="mx-auto mb-4">
-              <img src="/logo-vip.png" alt="Clube GeekPop & Toys" className="w-40 mx-auto" />
+              <img src="/logo-vip-640.webp" width={640} height={640} alt="Clube GeekPop & Toys" className="w-40 h-auto mx-auto" />
             </div>
             <div className="mx-auto mb-2">
               <NonoMascot pose="wave" size={104} />
@@ -226,7 +226,7 @@ export default function MemberDashboard() {
       <header className="glass border-b border-border sticky top-0 z-40">
         <div className="mx-auto flex max-w-[1120px] items-center justify-between px-4 py-2 lg:px-8">
           <div className="flex items-center gap-3">
-            <img src="/logo-vip.png" alt="GeekPop & Toys" className="h-10" />
+            <img src="/logo-vip-160.webp" width={160} height={160} alt="GeekPop & Toys" className="h-10 w-auto" />
             <span className="font-heading text-lg font-bold text-foreground">Clube</span>
           </div>
           <div className="flex items-center gap-1">

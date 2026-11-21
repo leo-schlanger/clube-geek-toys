@@ -18,6 +18,7 @@ import { ShopPromoBanner } from './components/store/ShopPromoBanner'
 import { ScrollToTop } from './components/store/ScrollToTop'
 import { seedQueriesFromBoot, withBootData } from './lib/boot-data'
 import { NatalBannerSlot } from './components/seasonal/natal'
+import { SeoHead } from './components/store/SeoHead'
 
 function ThemedToaster() {
   const { resolved } = useTheme()
@@ -241,22 +242,55 @@ function MemberEntry() {
   return <Navigate to="/assinar" replace />
 }
 
+/**
+ * Head for routes whose page sets none. Without it the URL kept the shell's
+ * canonical (or the previous page's), so every club page claimed to be `/`.
+ */
+function NoIndex({ title, path }: { title: string; path: string }) {
+  return <SeoHead title={title} path={path} noIndex />
+}
+
 function MemberRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<><NoIndex title="Entrar" path="/login" /><Login /></>} />
       <Route path="/assinar" element={<Subscribe />} />
       <Route element={<ThemeCornerLayout />}>
-        <Route path="/cadastro" element={<Register />} />
-        <Route path="/recuperar-senha" element={<ForgotPassword />} />
-        <Route path="/verificar-email" element={<VerifyEmail />} />
-        <Route path="/pagamento/sucesso" element={<PaymentResult type="success" />} />
-        <Route path="/pagamento/erro" element={<PaymentResult type="error" />} />
-        <Route path="/pagamento/pendente" element={<PaymentResult type="pending" />} />
+        <Route path="/cadastro" element={<><NoIndex title="Criar conta" path="/cadastro" /><Register /></>} />
+        <Route path="/recuperar-senha" element={<><NoIndex title="Recuperar senha" path="/recuperar-senha" /><ForgotPassword /></>} />
+        <Route path="/verificar-email" element={<><NoIndex title="Confirmar e-mail" path="/verificar-email" /><VerifyEmail /></>} />
+        <Route path="/pagamento/sucesso" element={<><NoIndex title="Pagamento" path="/pagamento/sucesso" /><PaymentResult type="success" /></>} />
+        <Route path="/pagamento/erro" element={<><NoIndex title="Pagamento" path="/pagamento/erro" /><PaymentResult type="error" /></>} />
+        <Route path="/pagamento/pendente" element={<><NoIndex title="Pagamento" path="/pagamento/pendente" /><PaymentResult type="pending" /></>} />
       </Route>
-      <Route path="/verificar/:id" element={<MemberVerify />} />
-      <Route path="/termos" element={<TermsOfUse />} />
-      <Route path="/privacidade" element={<PrivacyPolicy />} />
+      {/* Shows the member's full name: never in a search result. */}
+      <Route path="/verificar/:id" element={<><NoIndex title="Carteirinha" path="/verificar" /><MemberVerify /></>} />
+      <Route
+        path="/termos"
+        element={
+          <>
+            <SeoHead
+              title="Termos de Uso | Clube GeekPop & Toys"
+              description="Termos de uso do Clube e da loja online GeekPop & Toys: assinatura, pagamento, cancelamento, compras online, direito de arrependimento e atendimento."
+              path="/termos"
+            />
+            <TermsOfUse />
+          </>
+        }
+      />
+      <Route
+        path="/privacidade"
+        element={
+          <>
+            <SeoHead
+              title="Política de Privacidade | Clube GeekPop & Toys"
+              description="Como o Clube e a loja GeekPop & Toys tratam seus dados pessoais: o que coletamos, por quanto tempo, com quem compartilhamos e seus direitos pela LGPD."
+              path="/privacidade"
+            />
+            <PrivacyPolicy />
+          </>
+        }
+      />
 
       <Route
         path="/membro"
@@ -267,7 +301,7 @@ function MemberRoutes() {
         }
       />
 
-      <Route path="/acesso-negado" element={<AccessDenied />} />
+      <Route path="/acesso-negado" element={<><NoIndex title="Acesso negado" path="/acesso-negado" /><AccessDenied /></>} />
 
       <Route
         path="/admin"
@@ -315,12 +349,12 @@ function ShopRoutes() {
         <Route path="/" element={<ShopHome />} />
         <Route path="/categoria/:slug" element={<ShopHome />} />
         <Route path="/produto/:slug" element={<ProductDetail />} />
-        <Route path="/carrinho" element={<Cart />} />
+        <Route path="/carrinho" element={<><NoIndex title="Carrinho" path="/carrinho" /><Cart /></>} />
         <Route path="/checkout" element={<ShopCheckout />} />
         <Route path="/pedido/:id" element={<OrderConfirmation />} />
         <Route path="/minhas-compras" element={<MyOrders />} />
         <Route path="/minhas-compras/:id" element={<MyOrderDetail />} />
-        <Route path="/entrar" element={<ShopLogin />} />
+        <Route path="/entrar" element={<><NoIndex title="Entrar" path="/entrar" /><ShopLogin /></>} />
         {/* Shop register/profile skip club membership. */}
         <Route path="/cadastro" element={<ShopRegister />} />
         <Route path="/perfil" element={<ShopProfile />} />
@@ -332,7 +366,7 @@ function ShopRoutes() {
         <Route path="/atacado/entrar" element={<WholesaleLogin />} />
         <Route path="/atacado/cadastro" element={<WholesaleRegister />} />
         <Route path="/atacado/produto/:slug" element={<ProductDetail />} />
-        <Route path="/atacado/carrinho" element={<Cart />} />
+        <Route path="/atacado/carrinho" element={<><NoIndex title="Carrinho" path="/atacado/carrinho" /><Cart /></>} />
         <Route path="/atacado/checkout" element={<ShopCheckout />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
