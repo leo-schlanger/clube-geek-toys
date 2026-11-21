@@ -173,9 +173,11 @@ Feita quando o Leo criou as propriedades no Google Search Console.
 - **Desempenho**: o `logo-vip.png` (417 KB, 1080 px) era pré-carregado em todo
   shell e mostrado a 32–80 px. Agora shells, cabeçalho da loja e topo do
   `/assinar` usam `logo-vip-160.webp` (4 KB) e as telas de login/cadastro
-  `logo-vip-640.webp` (20 KB). O hero do `/assinar` (LCP do clube) tem
-  `srcset` + `fetchpriority="high"`; a foto principal do produto também tem
-  `fetchpriority="high"`. O PNG original fica para JSON-LD e telas que ninguém
+  `logo-vip-640.webp` (20 KB). O hero do `/assinar` tem `srcset` +
+  `fetchpriority="high"`, e a foto principal do produto também tem
+  `fetchpriority="high"`. Medido em produção a 390 px (DPR 3, 21/11): LCP do
+  `/assinar` = `logo-vip-640.webp` (1,3 s), do produto = a foto principal
+  (2,7 s), da home da loja = o `<h1>` (2,2 s); CLS 0 nos três. O PNG original fica para JSON-LD e telas que ninguém
   mexeu (contrato, carteirinha, tela de pagamento pendente).
 - **Testes**: `server/api/src/utils/seo-files.test.ts` lê o `default.conf` e os
   arquivos de `public/`: cada host com o seu robots, sem `add_header` no
@@ -197,9 +199,13 @@ Feita quando o Leo criou as propriedades no Google Search Console.
   `*.geekpoptoys` a SPA fala com `api.geekpoptoys`, então a conexão aberta é
   desperdiçada. Melhor criar o `preconnect` no `boot.js`, que já escolhe a API
   pelo host.
-- **Primeira fileira de produtos com `loading="lazy"`** na home e nas
-  categorias: se o LCP a 390 px for um card, as primeiras 2–4 fotos deveriam ser
-  `eager` (medir com Lighthouse antes).
+- **JSON-LD do clube fica no shell** (`index.html`): `Organization`, `Product` e
+  `FAQPage` saem em toda rota do clube, inclusive `/termos`, `/privacidade` e
+  `/login`, e o FAQ só aparece no `/assinar`. Mover para o `jsonLd` do
+  `SeoHead` do `/assinar` (o Google renderiza JS; o leitor sem JS perde o bloco).
+- **CLS do `/atacado` a 390 px**: 0,024 a 0,151 em duas cargas (21/11). A
+  etiqueta troca de texto quando `salesOpen` chega e a linha quebra diferente;
+  reservar a altura ou pintar o estado certo de primeira.
 - **Foto principal do produto** sai no original (até 2560 px); um `srcset` com a
   miniatura de 600 px só ajuda em tela de densidade 1, e o zoom precisa do
   original.

@@ -296,6 +296,7 @@ function MemberRoutes() {
         path="/membro"
         element={
           <ProtectedRoute allowedRoles={['member']} requireEmailVerification={false}>
+            <NoIndex title="Área do membro" path="/membro" />
             <MemberDashboard />
           </ProtectedRoute>
         }
@@ -307,6 +308,7 @@ function MemberRoutes() {
         path="/admin"
         element={
           <ProtectedRoute allowedRoles={['admin']}>
+            <NoIndex title="Painel" path="/admin" />
             <AdminDashboard />
           </ProtectedRoute>
         }
@@ -316,6 +318,7 @@ function MemberRoutes() {
         path="/pdv"
         element={
           <ProtectedRoute allowedRoles={['seller', 'admin']}>
+            <NoIndex title="PDV" path="/pdv" />
             <PDV />
           </ProtectedRoute>
         }

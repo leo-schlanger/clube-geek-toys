@@ -147,3 +147,37 @@ describe('logo weight', () => {
     }
   });
 });
+
+// SeoHead never restores the head on unmount, so a route without a head of its
+// own shows the previous page's title, canonical and robots. Family: every
+// <Route path> of the club and the shop.
+describe('every club and shop route sets its head', () => {
+  const app = read('src/App.tsx');
+  const pageFile = (name: string) => {
+    const m = app.match(new RegExp(`const ${name} = (?:lazy|shopPage)\\(\\(\\) => import\\('\\./([^']+)'\\)\\)`));
+    return m ? read(`src/${m[1]}.tsx`) : '';
+  };
+  const routesOf = (fn: string) => {
+    const start = app.indexOf(`function ${fn}()`);
+    const body = app.slice(start, app.indexOf('\nfunction ', start + 1));
+    // Each <Route ... path="x" ... /> or <Route ...>...</Route>, comments stripped.
+    const clean = body.replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    return [...clean.matchAll(/<Route\b[^>]*?path="([^"]+)"([\s\S]*?)(?=<Route\b|<\/Routes>)/g)].map((m) => ({
+      path: m[1],
+      chunk: m[2],
+    }));
+  };
+
+  it.each(['MemberRoutes', 'ShopRoutes'])('%s', (fn) => {
+    const routes = routesOf(fn);
+    expect(routes.length).toBeGreaterThan(8);
+    const missing = routes
+      .filter(({ chunk }) => !/<NoIndex\b|<SeoHead\b|<Navigate\b|<MemberEntry\b/.test(chunk))
+      .filter(({ chunk }) => {
+        const page = chunk.match(/<([A-Z]\w+)\b(?![^>]*\bNoIndex)/g)?.map((t) => t.slice(1)).filter((n) => n !== 'ProtectedRoute') ?? [];
+        return !page.some((n) => /<SeoHead\b/.test(pageFile(n)));
+      })
+      .map(({ path }) => path);
+    expect(missing).toEqual([]);
+  });
+});

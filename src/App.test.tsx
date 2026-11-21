@@ -262,6 +262,21 @@ describe('App', () => {
     expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe(robots)
   })
 
+  // SeoHead does not restore the head on unmount: a route without its own head
+  // kept the previous page's title ("Entrar") after login.
+  it('replaces the login head when a member reaches their area', async () => {
+    window.history.pushState({}, '', '/login')
+    const { unmount } = render(<App />)
+    await waitFor(() => expect(document.title).toBe('Entrar | Clube GeekPop & Toys'))
+    unmount()
+    mockAuthState.user = { uid: 'u1', email: 'ana@example.com' }
+    mockAuthState.role = 'member'
+    window.history.pushState({}, '', '/membro')
+    render(<App />)
+    await waitFor(() => expect(screen.getByTestId('member-dashboard')).toBeInTheDocument())
+    expect(document.title).toBe('Área do membro | Clube GeekPop & Toys')
+  })
+
   it('keeps the member card check out of search results', async () => {
     window.history.pushState({}, '', '/verificar/abcd1234-5678-9012-3456-789012345678')
     render(<App />)
