@@ -203,9 +203,10 @@ function AccessDenied() {
 function AdminRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<AdminLogin />} />
+      <Route caseSensitive path="/login" element={<AdminLogin />} />
 
       <Route
+        caseSensitive
         path="/admin"
         element={
           <ProtectedRoute allowedRoles={['admin']}>
@@ -215,6 +216,7 @@ function AdminRoutes() {
       />
 
       <Route
+        caseSensitive
         path="/pdv"
         element={
           <ProtectedRoute allowedRoles={['seller', 'admin']}>
@@ -223,9 +225,9 @@ function AdminRoutes() {
         }
       />
 
-      <Route path="/acesso-negado" element={<AccessDenied />} />
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route caseSensitive path="/acesso-negado" element={<AccessDenied />} />
+      <Route caseSensitive path="/" element={<Navigate to="/login" replace />} />
+      <Route caseSensitive path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )
 }
@@ -251,49 +253,58 @@ function NoIndex({ title, path }: { title: string; path: string }) {
   return <SeoHead title={title} path={path} noIndex />
 }
 
+/**
+ * Terms and privacy cover the club and the shop, so both hosts serve them.
+ * Indexed on club.* only; on shop.* they are noindex (same text twice).
+ */
+function LegalTerms() {
+  return (
+    <>
+      <SeoHead
+        title="Termos de Uso | Clube GeekPop & Toys"
+        description="Termos de uso do Clube e da loja online GeekPop & Toys: assinatura, pagamento, cancelamento, compras online, direito de arrependimento e atendimento."
+        path="/termos"
+        noIndex={APP_MODE === 'shop'}
+      />
+      <TermsOfUse />
+    </>
+  )
+}
+
+function LegalPrivacy() {
+  return (
+    <>
+      <SeoHead
+        title="Política de Privacidade | Clube GeekPop & Toys"
+        description="Como o Clube e a loja GeekPop & Toys tratam seus dados pessoais: o que coletamos, por quanto tempo, com quem compartilhamos e seus direitos pela LGPD."
+        path="/privacidade"
+        noIndex={APP_MODE === 'shop'}
+      />
+      <PrivacyPolicy />
+    </>
+  )
+}
+
 function MemberRoutes() {
   return (
     <Routes>
-      <Route path="/login" element={<><NoIndex title="Entrar" path="/login" /><Login /></>} />
-      <Route path="/assinar" element={<Subscribe />} />
+      <Route caseSensitive path="/login" element={<><NoIndex title="Entrar" path="/login" /><Login /></>} />
+      <Route caseSensitive path="/assinar" element={<Subscribe />} />
       <Route element={<ThemeCornerLayout />}>
-        <Route path="/cadastro" element={<><NoIndex title="Criar conta" path="/cadastro" /><Register /></>} />
-        <Route path="/recuperar-senha" element={<><NoIndex title="Recuperar senha" path="/recuperar-senha" /><ForgotPassword /></>} />
-        <Route path="/verificar-email" element={<><NoIndex title="Confirmar e-mail" path="/verificar-email" /><VerifyEmail /></>} />
-        <Route path="/pagamento/sucesso" element={<><NoIndex title="Pagamento" path="/pagamento/sucesso" /><PaymentResult type="success" /></>} />
-        <Route path="/pagamento/erro" element={<><NoIndex title="Pagamento" path="/pagamento/erro" /><PaymentResult type="error" /></>} />
-        <Route path="/pagamento/pendente" element={<><NoIndex title="Pagamento" path="/pagamento/pendente" /><PaymentResult type="pending" /></>} />
+        <Route caseSensitive path="/cadastro" element={<><NoIndex title="Criar conta" path="/cadastro" /><Register /></>} />
+        <Route caseSensitive path="/recuperar-senha" element={<><NoIndex title="Recuperar senha" path="/recuperar-senha" /><ForgotPassword /></>} />
+        <Route caseSensitive path="/verificar-email" element={<><NoIndex title="Confirmar e-mail" path="/verificar-email" /><VerifyEmail /></>} />
+        <Route caseSensitive path="/pagamento/sucesso" element={<><NoIndex title="Pagamento" path="/pagamento/sucesso" /><PaymentResult type="success" /></>} />
+        <Route caseSensitive path="/pagamento/erro" element={<><NoIndex title="Pagamento" path="/pagamento/erro" /><PaymentResult type="error" /></>} />
+        <Route caseSensitive path="/pagamento/pendente" element={<><NoIndex title="Pagamento" path="/pagamento/pendente" /><PaymentResult type="pending" /></>} />
       </Route>
       {/* Shows the member's full name: never in a search result. */}
-      <Route path="/verificar/:id" element={<><NoIndex title="Carteirinha" path="/verificar" /><MemberVerify /></>} />
-      <Route
-        path="/termos"
-        element={
-          <>
-            <SeoHead
-              title="Termos de Uso | Clube GeekPop & Toys"
-              description="Termos de uso do Clube e da loja online GeekPop & Toys: assinatura, pagamento, cancelamento, compras online, direito de arrependimento e atendimento."
-              path="/termos"
-            />
-            <TermsOfUse />
-          </>
-        }
-      />
-      <Route
-        path="/privacidade"
-        element={
-          <>
-            <SeoHead
-              title="Política de Privacidade | Clube GeekPop & Toys"
-              description="Como o Clube e a loja GeekPop & Toys tratam seus dados pessoais: o que coletamos, por quanto tempo, com quem compartilhamos e seus direitos pela LGPD."
-              path="/privacidade"
-            />
-            <PrivacyPolicy />
-          </>
-        }
-      />
+      <Route caseSensitive path="/verificar/:id" element={<><NoIndex title="Carteirinha" path="/verificar" /><MemberVerify /></>} />
+      <Route caseSensitive path="/termos" element={<LegalTerms />} />
+      <Route caseSensitive path="/privacidade" element={<LegalPrivacy />} />
 
       <Route
+        caseSensitive
         path="/membro"
         element={
           <ProtectedRoute allowedRoles={['member']} requireEmailVerification={false}>
@@ -303,9 +314,10 @@ function MemberRoutes() {
         }
       />
 
-      <Route path="/acesso-negado" element={<><NoIndex title="Acesso negado" path="/acesso-negado" /><AccessDenied /></>} />
+      <Route caseSensitive path="/acesso-negado" element={<><NoIndex title="Acesso negado" path="/acesso-negado" /><AccessDenied /></>} />
 
       <Route
+        caseSensitive
         path="/admin"
         element={
           <ProtectedRoute allowedRoles={['admin']}>
@@ -316,6 +328,7 @@ function MemberRoutes() {
       />
 
       <Route
+        caseSensitive
         path="/pdv"
         element={
           <ProtectedRoute allowedRoles={['seller', 'admin']}>
@@ -325,9 +338,9 @@ function MemberRoutes() {
         }
       />
 
-      <Route path="/" element={<MemberEntry />} />
+      <Route caseSensitive path="/" element={<MemberEntry />} />
       {/* Unknown club paths already answer 404 (nginx); members still land in their area. */}
-      <Route path="*" element={<MemberEntry />} />
+      <Route caseSensitive path="*" element={<MemberEntry />} />
     </Routes>
   )
 }
@@ -351,29 +364,31 @@ function ShopRoutes() {
       {/* Seasonal greeting, lowest of the three; only on storefront routes. */}
       <ShopSeasonalBanner />
       <Routes>
-        <Route path="/" element={<ShopHome />} />
-        <Route path="/categoria/:slug" element={<ShopHome />} />
-        <Route path="/produto/:slug" element={<ProductDetail />} />
-        <Route path="/carrinho" element={<><NoIndex title="Carrinho" path="/carrinho" /><Cart /></>} />
-        <Route path="/checkout" element={<ShopCheckout />} />
-        <Route path="/pedido/:id" element={<OrderConfirmation />} />
-        <Route path="/minhas-compras" element={<MyOrders />} />
-        <Route path="/minhas-compras/:id" element={<MyOrderDetail />} />
-        <Route path="/entrar" element={<><NoIndex title="Entrar" path="/entrar" /><ShopLogin /></>} />
+        <Route caseSensitive path="/" element={<ShopHome />} />
+        <Route caseSensitive path="/categoria/:slug" element={<ShopHome />} />
+        <Route caseSensitive path="/produto/:slug" element={<ProductDetail />} />
+        <Route caseSensitive path="/carrinho" element={<><NoIndex title="Carrinho" path="/carrinho" /><Cart /></>} />
+        <Route caseSensitive path="/checkout" element={<ShopCheckout />} />
+        <Route caseSensitive path="/pedido/:id" element={<OrderConfirmation />} />
+        <Route caseSensitive path="/minhas-compras" element={<MyOrders />} />
+        <Route caseSensitive path="/minhas-compras/:id" element={<MyOrderDetail />} />
+        <Route caseSensitive path="/entrar" element={<><NoIndex title="Entrar" path="/entrar" /><ShopLogin /></>} />
         {/* Shop register/profile skip club membership. */}
-        <Route path="/cadastro" element={<ShopRegister />} />
-        <Route path="/perfil" element={<ShopProfile />} />
-        <Route path="/evento" element={<EventPage />} />
+        <Route caseSensitive path="/cadastro" element={<ShopRegister />} />
+        <Route caseSensitive path="/perfil" element={<ShopProfile />} />
+        <Route caseSensitive path="/evento" element={<EventPage />} />
+        <Route caseSensitive path="/termos" element={<LegalTerms />} />
+        <Route caseSensitive path="/privacidade" element={<LegalPrivacy />} />
         {/* Named ticket URL is public: the attendee often has no shop account. */}
-        <Route path="/ingresso/:code" element={<TicketPage mode="ticket" />} />
-        <Route path="/ingressos/:code" element={<TicketPage mode="reservation" />} />
-        <Route path="/atacado" element={<WholesaleHome />} />
-        <Route path="/atacado/entrar" element={<WholesaleLogin />} />
-        <Route path="/atacado/cadastro" element={<WholesaleRegister />} />
-        <Route path="/atacado/produto/:slug" element={<ProductDetail />} />
-        <Route path="/atacado/carrinho" element={<><NoIndex title="Carrinho" path="/atacado/carrinho" /><Cart /></>} />
-        <Route path="/atacado/checkout" element={<ShopCheckout />} />
-        <Route path="*" element={<NotFound homeLabel="Ir para a loja" />} />
+        <Route caseSensitive path="/ingresso/:code" element={<TicketPage mode="ticket" />} />
+        <Route caseSensitive path="/ingressos/:code" element={<TicketPage mode="reservation" />} />
+        <Route caseSensitive path="/atacado" element={<WholesaleHome />} />
+        <Route caseSensitive path="/atacado/entrar" element={<WholesaleLogin />} />
+        <Route caseSensitive path="/atacado/cadastro" element={<WholesaleRegister />} />
+        <Route caseSensitive path="/atacado/produto/:slug" element={<ProductDetail />} />
+        <Route caseSensitive path="/atacado/carrinho" element={<><NoIndex title="Carrinho" path="/atacado/carrinho" /><Cart /></>} />
+        <Route caseSensitive path="/atacado/checkout" element={<ShopCheckout />} />
+        <Route caseSensitive path="*" element={<NotFound homeLabel="Ir para a loja" />} />
       </Routes>
     </CartProvider>
   )

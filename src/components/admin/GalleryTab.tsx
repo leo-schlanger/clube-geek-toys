@@ -290,7 +290,7 @@ export function GalleryTab() {
           Galeria do site
         </CardTitle>
         <CardDescription>
-          Pastas de fotos que aparecem em geeketoys.com.br/galeria — ex.: "Evento 6/9", "Loja
+          Pastas de fotos que aparecem em geekpoptoys.com.br/galeria — ex.: "Evento 6/9", "Loja
           presencial Copacabana".
         </CardDescription>
 

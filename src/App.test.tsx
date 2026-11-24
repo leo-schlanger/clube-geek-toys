@@ -167,6 +167,16 @@ describe('App', () => {
     })
   })
 
+  // nginx answers /Termos with 404; the router must not show the terms there.
+  it('does not match /Termos (routes are case-sensitive, like nginx)', async () => {
+    window.history.pushState({}, '', '/Termos')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByTestId('subscribe-page')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('terms-page')).not.toBeInTheDocument()
+  })
+
   it('renders privacy page at /privacidade', async () => {
     window.history.pushState({}, '', '/privacidade')
     render(<App />)

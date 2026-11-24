@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // nginx answers 404 for any path that is neither a file nor a route of the
@@ -28,7 +28,7 @@ function routesOf(fn: string): string[] {
   const start = appTsx.indexOf(`function ${fn}()`);
   expect(start, fn).toBeGreaterThan(-1);
   const body = appTsx.slice(start, appTsx.indexOf('\n}\n', start));
-  return [...body.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').matchAll(/<Route\s+path="([^"]+)"/g)]
+  return [...body.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').matchAll(/<Route\b[^>]*?\bpath="([^"]+)"/g)]
     .map((m) => m[1])
     .filter((p) => p !== '*');
 }
@@ -81,5 +81,68 @@ describe('SPA routes vs nginx 404 (family: every route of App.tsx)', () => {
     const conf = read('server/nginx/conf.d/default.conf');
     expect(conf).toMatch(/error_page 404 \/index\.html;[\s\S]*?location @club_spa \{\s*if \(\$club_spa_route = 0\)/);
     expect(conf).toMatch(/error_page 404 \/shop\.html;[\s\S]*?location @shop_spa \{\s*if \(\$shop_spa_route = 0\)/);
+  });
+});
+
+// Every internal link a host's pages can render (<Link to>, href, navigate())
+// must hit a route of that host's router AND its nginx map, or the visitor
+// gets the 404 page (the shop linked /termos before it had the route).
+const listTsx = (dir: string): string[] =>
+  readdirSync(resolve(root, dir), { recursive: true, encoding: 'utf-8' })
+    .filter((f) => f.endsWith('.tsx') && !f.includes('.test.'))
+    .map((f) => `${dir}/${f}`);
+
+const LINK_RE = /(?:\bto=\{?|\bhref=\{?|navigate\(\s*)(["'`])(\/[^"'`]*)\1/g;
+
+/** Internal paths a file links to; `${…}` becomes a sample segment. */
+function linksIn(file: string): string[] {
+  return [...read(file).matchAll(LINK_RE)]
+    .map((m) => m[2].replace(/\$\{[^}]*\}/g, 'x-1').split(/[?#]/)[0])
+    .filter((p) => !p.startsWith('//') && !/\.[a-z0-9]+$/i.test(p));
+}
+
+/** Path matches a <Route path> (with :params) of the router. */
+// Routes are caseSensitive (App.tsx): /Termos is not /termos, as in nginx.
+const routerHas = (routes: string[], p: string) =>
+  routes.some((r) => new RegExp(`^${r.replace(/:[a-zA-Z]+/g, '[^/]+')}/?$`).test(p));
+
+describe('internal links resolve on their host (family: every page and component)', () => {
+  const memberRoutes = routesOf('MemberRoutes');
+  const shopRoutes = routesOf('ShopRoutes');
+  const adminOnly = /components\/admin\/|pages\/(Admin|PDV)/;
+  const shopFiles = [...listTsx('src/pages/shop'), ...listTsx('src/components/store')];
+  const clubFiles = listTsx('src/pages').filter((f) => !f.startsWith('src/pages/shop/') && !adminOnly.test(f))
+    .concat(listTsx('src/components/member'), listTsx('src/components/registration'));
+  const shared = listTsx('src/components').filter(
+    (f) => !/components\/(store|member|registration|admin)\//.test(f)
+  );
+
+  const broken = (files: string[], routes: string[], nginx: (u: string) => boolean) =>
+    files.flatMap((f) => linksIn(f).filter((p) => !routerHas(routes, p) || !nginx(p)).map((p) => `${f}: ${p}`));
+
+  it('finds the links (the scan is not empty)', () => {
+    expect(shopFiles.flatMap(linksIn).length).toBeGreaterThan(30);
+    expect(clubFiles.flatMap(linksIn).length).toBeGreaterThan(10);
+    expect(linksIn('src/components/CookieConsent.tsx')).toContain('/privacidade');
+  });
+
+  it('shop.*: every link of the shop pages and components', () => {
+    expect(broken(shopFiles, shopRoutes, shop)).toEqual([]);
+  });
+
+  it('club.*: every link of the club pages and components', () => {
+    expect(broken(clubFiles, memberRoutes, club)).toEqual([]);
+  });
+
+  it('shared components resolve on both hosts', () => {
+    expect([...broken(shared, shopRoutes, shop), ...broken(shared, memberRoutes, club)]).toEqual([]);
+  });
+});
+
+describe('router is case-sensitive like nginx (family: every route of App.tsx)', () => {
+  it('every <Route> with a path carries caseSensitive', () => {
+    const routes = [...appTsx.matchAll(/<Route\b([^>]*?)\bpath="([^"]+)"/g)].filter((m) => m[2] !== '*');
+    expect(routes.length).toBeGreaterThan(40);
+    expect(routes.filter((m) => !/\bcaseSensitive\b/.test(m[1])).map((m) => m[2])).toEqual([]);
   });
 });

@@ -185,7 +185,7 @@ export function formatEventDateRange(
 
 /**
  * Public-folder URL for an event photo. Official shots live in the
- * institutional gallery (`geeketoys.com.br#galeria`); this is only the
+ * institutional gallery (`geekpoptoys.com.br/galeria`); this is only the
  * versioned copy under `public/eventos/<slug>/`.
  */
 export function photoPublicUrl(event: EventConfig, file: string): string {

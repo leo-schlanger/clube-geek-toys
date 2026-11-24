@@ -160,7 +160,10 @@ describe('every club and shop route sets its head', () => {
   const pageFile = (name: string) => {
     const m = app.match(new RegExp(`const ${name} = (?:lazy|shopPage)\\(\\(\\) => import\\('\\./([^']+)'\\)\\)`))
       ?? app.match(new RegExp(`import ${name} from '\\./([^']+)'`));
-    return m ? read(`src/${m[1]}.tsx`) : '';
+    if (m) return read(`src/${m[1]}.tsx`);
+    // Route element defined in App.tsx itself (LegalTerms, LegalPrivacy).
+    const at = app.indexOf(`function ${name}()`);
+    return at === -1 ? '' : app.slice(at, app.indexOf('\n}\n', at));
   };
   const routesOf = (fn: string) => {
     const start = app.indexOf(`function ${fn}()`);

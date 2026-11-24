@@ -258,6 +258,16 @@ noindex); no clube o `*` continua a levar o membro à área dele e o visitante a
 - Rota nova no `App.tsx` (clube ou loja) → entra no map. `nginx-spa-routes.test.ts`
   lê os `<Route path>` de `MemberRoutes`/`ShopRoutes` (com e sem barra final) e os
   links que a API manda por e-mail, e reprova se faltar (mutação provada).
+- **Links internos** (qa 24/11: a loja linkava `/termos` e `/privacidade`, que davam 404
+  em `shop.*`): a loja passou a ter essas rotas (mesmas páginas, **noindex** em `shop.*`;
+  as indexadas são as do clube). O mesmo teste lê cada `to=`/`href=`/`navigate()` interno
+  das páginas e componentes da loja, do clube e dos partilhados e reprova o que não tiver
+  rota no router **e** no map do host.
+- Rotas `caseSensitive` em todo o `App.tsx` (teste): `/Termos` não abre os termos, igual ao
+  nginx, que responde 404.
+- Texto/links visíveis com `geeketoys.com.br` passaram a `geekpoptoys` (Subscribe, EventPage,
+  ShopLogin, aba Galeria do admin); `src/lib/legacy-domain.test.ts` só deixa o legado nos
+  hosts funcionais (api, rádio, analytics, e-mail, QR da carteirinha, roteamento).
 - `/produto/<slug>` e `/categoria/<slug>` inexistentes continuam 200 (a existência
   vem da API); o fail2ban não conta 404 (filtra por caminho).
 

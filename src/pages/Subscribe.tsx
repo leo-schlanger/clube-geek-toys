@@ -398,7 +398,7 @@ export default function Subscribe() {
         <div className="flex justify-center mb-4">
           <img src="/logo-vip-160.webp" width={160} height={160} alt="GeekPop & Toys" className="h-16 w-auto drop-shadow-[0_0_15px_rgba(212,165,32,0.2)]" />
         </div>
-        <p className="text-xs text-muted-foreground mb-1">club.geeketoys.com.br</p>
+        <p className="text-xs text-muted-foreground mb-1">club.geekpoptoys.com.br</p>
         <p className="text-muted-foreground text-xs">&copy; 2026 GeekPop & Toys. Todos os direitos reservados.</p>
         <CreatorCredit className="mt-2" />
         <p className="mt-3 text-xs flex flex-wrap justify-center gap-3">

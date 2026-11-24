@@ -251,7 +251,7 @@ export default function ShopLogin() {
               <div className="w-full text-center text-sm text-muted-foreground">
                 Não é membro?{' '}
                 <a
-                  href="https://club.geeketoys.com.br/assinar"
+                  href="https://club.geekpoptoys.com.br/assinar"
                   className="font-semibold text-primary hover:underline"
                 >
                   Assine o clube

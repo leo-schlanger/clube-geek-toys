@@ -193,7 +193,7 @@ export default function EventPage() {
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
           <a
-            href="https://geeketoys.com.br#galeria"
+            href="https://geekpoptoys.com.br/galeria"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 font-medium text-primary hover:underline"
