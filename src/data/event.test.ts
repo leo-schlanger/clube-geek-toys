@@ -107,6 +107,9 @@ describe('event data', () => {
     expect(url).toMatch(/^https:\/\/wa\.me\//)
     expect(url).toContain(FALLBACK_EVENT.ticketReservation.whatsappNumber)
     expect(decodeURIComponent(url)).toMatch(/Leo|ingresso|obs/i)
+    // Text names the main domain; geeketoys is legacy.
+    expect(decodeURIComponent(url)).toContain('shop.geekpoptoys.com.br')
+    expect(decodeURIComponent(url)).not.toContain('geeketoys')
   })
 
   describe('isEventOver', () => {

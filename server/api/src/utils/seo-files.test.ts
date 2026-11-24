@@ -158,7 +158,8 @@ describe('logo weight', () => {
 describe('every club and shop route sets its head', () => {
   const app = read('src/App.tsx');
   const pageFile = (name: string) => {
-    const m = app.match(new RegExp(`const ${name} = (?:lazy|shopPage)\\(\\(\\) => import\\('\\./([^']+)'\\)\\)`));
+    const m = app.match(new RegExp(`const ${name} = (?:lazy|shopPage)\\(\\(\\) => import\\('\\./([^']+)'\\)\\)`))
+      ?? app.match(new RegExp(`import ${name} from '\\./([^']+)'`));
     return m ? read(`src/${m[1]}.tsx`) : '';
   };
   const routesOf = (fn: string) => {

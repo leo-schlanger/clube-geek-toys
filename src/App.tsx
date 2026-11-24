@@ -19,6 +19,7 @@ import { ScrollToTop } from './components/store/ScrollToTop'
 import { seedQueriesFromBoot, withBootData } from './lib/boot-data'
 import { NatalBannerSlot } from './components/seasonal/natal'
 import { SeoHead } from './components/store/SeoHead'
+import NotFound from './pages/NotFound'
 
 function ThemedToaster() {
   const { resolved } = useTheme()
@@ -325,6 +326,7 @@ function MemberRoutes() {
       />
 
       <Route path="/" element={<MemberEntry />} />
+      {/* Unknown club paths already answer 404 (nginx); members still land in their area. */}
       <Route path="*" element={<MemberEntry />} />
     </Routes>
   )
@@ -371,7 +373,7 @@ function ShopRoutes() {
         <Route path="/atacado/produto/:slug" element={<ProductDetail />} />
         <Route path="/atacado/carrinho" element={<><NoIndex title="Carrinho" path="/atacado/carrinho" /><Cart /></>} />
         <Route path="/atacado/checkout" element={<ShopCheckout />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound homeLabel="Ir para a loja" />} />
       </Routes>
     </CartProvider>
   )

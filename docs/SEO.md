@@ -245,6 +245,22 @@ Feita quando o Leo criou as propriedades no Google Search Console.
   `https://club.geekpoptoys.com.br/sitemap.xml` nas propriedades de cada host
   (ou na de domínio `geekpoptoys.com.br`).
 
+## 404 real em club.* e shop.* (24/11/2026)
+
+Até aqui toda URL desconhecida respondia 200 com o shell da SPA (soft 404). Agora o
+nginx tem a lista das rotas da SPA por host (`map $club_spa_route` e
+`map $shop_spa_route` em `server/nginx/nginx.conf`): o que não é ficheiro nem rota
+responde **404**, com o shell como corpo (`error_page 404 /index.html` ou
+`/shop.html`). Na loja a SPA mostra «Página não encontrada» (`src/pages/NotFound.tsx`,
+noindex); no clube o `*` continua a levar o membro à área dele e o visitante ao
+`/assinar` (só o status mudou). `adm.*` ficou como estava (robots já bloqueia).
+
+- Rota nova no `App.tsx` (clube ou loja) → entra no map. `nginx-spa-routes.test.ts`
+  lê os `<Route path>` de `MemberRoutes`/`ShopRoutes` (com e sem barra final) e os
+  links que a API manda por e-mail, e reprova se faltar (mutação provada).
+- `/produto/<slug>` e `/categoria/<slug>` inexistentes continuam 200 (a existência
+  vem da API); o fail2ban não conta 404 (filtra por caminho).
+
 ## Regras
 
 - **Rota pública nova da loja**: decida o preview dela no nginx (bloco `shop`) e
