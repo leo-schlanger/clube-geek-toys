@@ -7,7 +7,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 25/11/2026 run 45627249893: the runner could not open :22 for ~9 min
+    # (rsync exit 255, "Connection timed out"). The wait below needs the room.
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -91,19 +93,20 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           # OpenSSH requires a trailing newline on private keys
           [ -n "$(tail -c1 ~/.ssh/deploy_key)" ] && echo >> ~/.ssh/deploy_key
-          # Best-effort host keys (network flakes on runners are common)
-          for i in 1 2 3; do
-            ssh-keyscan -T 20 -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null && break
-            sleep 2
-          done
-          # Fallback so rsync/ssh still work if keyscan got nothing
+          # One short probe. A dead path used to burn 3×20s here, then another
+          # ~2 min inside rsync (TCP default). accept-new covers a miss.
+          ssh-keyscan -T 10 -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Fallback so rsync/ssh still work if keyscan got nothing.
+          # ConnectTimeout applies to every later ssh/rsync in this job.
           printf '%s\n' \
             'Host *' \
             '  StrictHostKeyChecking accept-new' \
             '  UserKnownHostsFile ~/.ssh/known_hosts' \
             '  IdentityFile ~/.ssh/deploy_key' \
             '  IdentitiesOnly yes' \
+            '  ConnectTimeout 20' \
             '  ServerAliveInterval 15' \
+            '  ServerAliveCountMax 4' \
             > ~/.ssh/config
           chmod 600 ~/.ssh/config
           # Sanity: key file non-empty (do not print key material)
@@ -113,16 +116,45 @@ jobs:
           fi
           echo "SSH key file ready ($(wc -c < ~/.ssh/deploy_key) bytes), known_hosts lines=$(wc -l < ~/.ssh/known_hosts)"
 
+      - name: Wait for SSH
+        # The VPS sshd never logged the runner during the 25/11 failure
+        # (13:50–13:55 UTC). The next attempt, from another runner, connected.
+        # Wait here, before any copy, so a blip does not fail the deploy.
+        run: |
+          for delay in 0 15 30 45 60 90 120 180; do
+            if [ "$delay" -gt 0 ]; then
+              echo "port 22 unreachable; next try in ${delay}s"
+              sleep "$delay"
+            fi
+            if ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'echo ssh-ok'; then
+              echo "SSH is up"
+              exit 0
+            fi
+          done
+          echo "SSH still unreachable"
+          exit 1
+
       - name: Deploy server files
         run: |
-          rsync -avz --delete \
-            --exclude='node_modules' \
-            --exclude='.env' \
-            -e "ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-            server/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/server/
+          SSH="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20"
+          ok=0
+          for attempt in 1 2 3; do
+            if rsync -avz --delete \
+              --exclude='node_modules' \
+              --exclude='.env' \
+              -e "$SSH" \
+              server/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/clube-geek-toys/server/; then
+              ok=1
+              break
+            fi
+            echo "rsync attempt ${attempt} failed"
+            sleep 20
+          done
+          [ "$ok" = 1 ]
           # rsync copies git file mode. Scripts used to be 100644 in git, so
           # cron (`/path/script.sh`) got "Permission denied" after every deploy.
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'chmod 755 /opt/clube-geek-toys/server/scripts/*.sh'
 
@@ -135,7 +167,7 @@ jobs:
         # page for people and for search. Order matters too: chunks first, so
         # the new HTML never points at a file that has not arrived yet.
         run: |
-          SSH="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          SSH="ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20"
           TARGET=${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
           rsync -avz -e "$SSH" dist/assets/ $TARGET:/opt/clube-geek-toys/dist/assets/
           rsync -avz --delete --exclude='/assets/' -e "$SSH" dist/ $TARGET:/opt/clube-geek-toys/dist/
@@ -145,7 +177,7 @@ jobs:
 
       - name: Rebuild and restart containers
         run: |
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DEPLOY'
             # The health-check cron skips alerting while this is fresh: the API
             # is recreated below, and that minute is not an outage.
             touch /opt/clube-geek-toys/.deploying
@@ -216,5 +248,5 @@ jobs:
         # health-check cron quiet for the rest of the grace window.
         if: always()
         run: |
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'rm -f /opt/clube-geek-toys/.deploying' || true
