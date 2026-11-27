@@ -5,9 +5,19 @@ import { getMelhorEnvioHealth } from '../services/shipping.service.js';
 import { isPagarmeConfigured } from '../utils/pagarme.js';
 import { webhookAuthConfigured } from '../services/pagarme-webhook.service.js';
 import { lastReconcileRun } from '../services/reconcile.service.js';
+import { timingSafeEqual } from 'crypto';
 import { env } from '../config/env.js';
 
 export const healthRouter = Router();
+
+/** Detail is for the deploy and the monitors; the public gets status only. */
+function canSeeDetail(header: unknown): boolean {
+  const token = env.HEALTH_TOKEN;
+  if (!token || token.length < 32 || typeof header !== 'string') return false;
+  const a = Buffer.from(header);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
 
 /**
  * Host cron jobs and how old their last success may get before it is news.
@@ -67,7 +77,8 @@ async function jobHeartbeats(): Promise<Record<string, { lastOk: string | null; 
  * Neither exposes detail: failed step names and upstream response bodies are
  * internal, and stay in the logs and in `GET /logs/schema` (admin).
  */
-healthRouter.get('/', async (_req, res) => {
+healthRouter.get('/', async (req, res) => {
+  const detail = canSeeDetail(req.get('x-health-token'));
   const schema = getSchemaState();
   const shipping = getMelhorEnvioHealth();
   // Never let a health probe fail over a bookkeeping read.
@@ -75,7 +86,7 @@ healthRouter.get('/', async (_req, res) => {
   const jobs = await jobHeartbeats().catch(() => null);
   try {
     await pool.query('SELECT 1');
-    res.json({
+    const body = {
       status: schema.status === 'degraded' ? 'degraded' : 'ok',
       timestamp: new Date().toISOString(),
       database: 'connected',
@@ -127,12 +138,13 @@ healthRouter.get('/', async (_req, res) => {
         credentialRejected: shipping.lastFailure?.kind === 'auth',
         lastSuccessAt: shipping.lastSuccessAt,
       },
-    });
+    };
+    res.json(detail ? body : { status: body.status, timestamp: body.timestamp });
   } catch {
     res.status(503).json({
       status: 'error',
       timestamp: new Date().toISOString(),
-      database: 'disconnected',
+      ...(detail ? { database: 'disconnected' } : {}),
     });
   }
 });

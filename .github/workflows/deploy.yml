@@ -199,6 +199,9 @@ jobs:
           DEPLOY
 
       - name: Health check
+        env:
+          # Detail (schema, payments, jobs) only comes with this header.
+          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
         run: |
           # Hit the API via its public domain (cert SAN covers it);
           # VPS_HOST is an IP for SSH, which has no matching cert.
@@ -211,7 +214,7 @@ jobs:
           SCHEMA="pending"
           for i in $(seq 1 10); do
             sleep 3
-            BODY=$(curl -sf --max-time 10 https://api.geeketoys.com.br/health) || BODY=""
+            BODY=$(curl -sf --max-time 10 -H "X-Health-Token: ${HEALTH_TOKEN}" https://api.geeketoys.com.br/health) || BODY=""
             [ -n "$BODY" ] || continue
             SCHEMA=$(echo "$BODY" | jq -r '.schema.status // "pending"' 2>/dev/null || echo pending)
             if [ "$SCHEMA" != "pending" ]; then
@@ -224,7 +227,12 @@ jobs:
             exit 1
           fi
 
-          echo "$BODY" | jq . || echo "$BODY"
+          # The repo and its run logs are public: print the verdict, not the body.
+          if ! echo "$BODY" | jq -e '.schema' >/dev/null 2>&1; then
+            echo "Health check FAILED: /health sem detalhe (secret HEALTH_TOKEN ausente ou diferente do .env da VPS)."
+            exit 1
+          fi
+          echo "$BODY" | jq -c '{status, schema: .schema.status}' || true
           STATUS=$(echo "$BODY" | jq -r '.status' 2>/dev/null || echo unknown)
 
           if [ "$SCHEMA" = "degraded" ]; then

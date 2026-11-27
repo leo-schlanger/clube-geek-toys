@@ -64,6 +64,10 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url(),
   API_URL: z.string().url(),
 
+  // GET /health detail (schema, payments, jobs) only with header
+  // `X-Health-Token`; unset or short = public summary only.
+  HEALTH_TOKEN: z.string().optional(),
+
   // CORS — comma-separated list of additional allowed origins (optional)
   ALLOWED_ORIGINS: z.string().optional(),
 

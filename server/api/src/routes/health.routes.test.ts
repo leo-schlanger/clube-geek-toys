@@ -26,7 +26,12 @@ vi.mock('../services/reconcile.service.js', () => ({
 import { healthRouter } from './health.routes.js';
 import { routerClient } from '../test-support/http.js';
 
+import { env } from '../config/env.js';
+
 const api = routerClient('/health', healthRouter);
+const TOKEN = 'health-token-with-more-than-32-characters';
+const AUTH = { headers: { 'X-Health-Token': TOKEN } };
+(env as { HEALTH_TOKEN?: string }).HEALTH_TOKEN = TOKEN;
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString();
 
 beforeEach(() => vi.clearAllMocks());
@@ -45,7 +50,7 @@ describe('GET /health — jobs', () => {
         : { rows: [{ '?column?': 1 }] },
     );
 
-    const res = await api.get('/');
+    const res = await api.get('/', AUTH);
 
     expect(res.status).toBe(200);
     const body = res.body as { status: string; jobs: Record<string, { stale: boolean | null }> };
@@ -63,9 +68,9 @@ describe('GET /health — jobs', () => {
     );
     vi.useFakeTimers({ now: new Date('2026-10-19T12:00:00Z'), toFake: ['Date'] });
     try {
-      expect((await api.get('/')).body.jobs.restore_drill).toEqual({ lastOk: null, stale: null });
+      expect((await api.get('/', AUTH)).body.jobs.restore_drill).toEqual({ lastOk: null, stale: null });
       vi.setSystemTime(new Date('2026-11-02T06:00:00Z'));
-      expect((await api.get('/')).body.jobs.restore_drill).toEqual({ lastOk: null, stale: true });
+      expect((await api.get('/', AUTH)).body.jobs.restore_drill).toEqual({ lastOk: null, stale: true });
     } finally {
       vi.useRealTimers();
     }
@@ -76,8 +81,58 @@ describe('GET /health — jobs', () => {
       if (sql.includes('job_ok_')) throw new Error('boom');
       return { rows: [{}] };
     });
-    const res = await api.get('/');
+    const res = await api.get('/', AUTH);
     expect(res.status).toBe(200);
     expect((res.body as { jobs: unknown }).jobs).toBeNull();
+  });
+});
+
+// The public sees up/down only; schema, payments, jobs and backups are for the
+// deploy and the monitors, which send the token.
+describe('GET /health — who sees the detail (family: every way to ask)', () => {
+  const ok = async () => ({ rows: [{ '?column?': 1 }] });
+
+  it.each([
+    ['no header', {}],
+    ['wrong token', { 'X-Health-Token': 'x'.repeat(TOKEN.length) }],
+    ['prefix of the token', { 'X-Health-Token': TOKEN.slice(0, -1) }],
+    ['token plus a char', { 'X-Health-Token': `${TOKEN}x` }],
+    ['empty header', { 'X-Health-Token': '' }],
+    ['token as Bearer', { Authorization: `Bearer ${TOKEN}` }],
+  ])('%s → status and timestamp only', async (_label, headers) => {
+    poolQuery.mockImplementation(ok);
+    const res = await api.get('/', { headers: headers as Record<string, string> });
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body).sort()).toEqual(['status', 'timestamp']);
+  });
+
+  it('the right token → full detail', async () => {
+    poolQuery.mockImplementation(ok);
+    const res = await api.get('/', AUTH);
+    expect(res.body).toHaveProperty('schema');
+    expect(res.body).toHaveProperty('payments');
+    expect(res.body).toHaveProperty('jobs');
+  });
+
+  it('no token configured → nobody gets the detail, not even an empty header', async () => {
+    const saved = env.HEALTH_TOKEN;
+    (env as { HEALTH_TOKEN?: string }).HEALTH_TOKEN = undefined;
+    try {
+      poolQuery.mockImplementation(ok);
+      for (const headers of [{}, { 'X-Health-Token': '' }, { 'X-Health-Token': 'undefined' }] as Record<string, string>[]) {
+        const res = await api.get('/', { headers });
+        expect(Object.keys(res.body).sort()).toEqual(['status', 'timestamp']);
+      }
+    } finally {
+      (env as { HEALTH_TOKEN?: string }).HEALTH_TOKEN = saved;
+    }
+  });
+
+  it('database down → 503 without internals for the public', async () => {
+    poolQuery.mockRejectedValue(new Error('down'));
+    const pub = await api.get('/');
+    expect(pub.status).toBe(503);
+    expect(Object.keys(pub.body).sort()).toEqual(['status', 'timestamp']);
+    expect((await api.get('/', AUTH)).body.database).toBe('disconnected');
   });
 });
