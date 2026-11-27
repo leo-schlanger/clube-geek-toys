@@ -9,32 +9,22 @@ const EXTRA_ORIGINS = env.ALLOWED_ORIGINS
   ? env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
   : [];
 
-// Derive the registrable domain from FRONTEND_URL so that all subdomains
-// (admin.*, adm.*, club.*, shop.*) are allowed automatically without manual config.
-function getSiteDomain(url: string): string | null {
-  try {
-    const { hostname } = new URL(url);
-    const parts = hostname.split('.');
-    // Handle 3-label public suffixes like .com.br → keep the last 3 labels.
-    if (parts.length >= 3 && parts[parts.length - 2] === 'com') return parts.slice(-3).join('.');
-    if (parts.length >= 2) return parts.slice(-2).join('.');
-    return hostname;
-  } catch {
-    return null;
-  }
-}
-
-// The club runs on two mirror domains — every subdomain of either is allowed.
-const MIRROR_DOMAINS = ['geeketoys.com.br', 'geekpoptoys.com.br'];
-const SITE_DOMAINS = Array.from(
-  new Set([getSiteDomain(env.FRONTEND_URL), ...MIRROR_DOMAINS].filter(Boolean))
-) as string[];
-
-const ALLOWED_ORIGINS = [
-  env.FRONTEND_URL,
-  ...DEV_ORIGINS,
-  ...EXTRA_ORIGINS,
+// Pages that call the API, on both mirror domains: the SPAs (club, adm, shop)
+// and the institutional site on Vercel (apex and www of both domains). Exact origins only: the API
+// answers with credentials, so a wildcard would trust hosts that serve no app.
+export const SITE_ORIGINS = [
+  ...['club', 'adm', 'shop'].flatMap((sub) =>
+    ['geeketoys.com.br', 'geekpoptoys.com.br'].map((d) => `https://${sub}.${d}`)
+  ),
+  'https://geekpoptoys.com.br',
+  'https://www.geekpoptoys.com.br',
+  'https://www.geeketoys.com.br',
+  'https://geeketoys.com.br',
 ];
+
+export const ALLOWED_ORIGINS = Array.from(
+  new Set([env.FRONTEND_URL, ...SITE_ORIGINS, ...DEV_ORIGINS, ...EXTRA_ORIGINS])
+);
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
@@ -42,17 +32,6 @@ export const corsMiddleware = cors({
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) {
       return callback(null, true);
-    }
-    // Allow any subdomain of either mirror site (e.g. admin.geeketoys.com.br,
-    // shop.geekpoptoys.com.br) plus each apex.
-    if (SITE_DOMAINS.length) {
-      try {
-        const { hostname, protocol } = new URL(origin);
-        const ok = SITE_DOMAINS.some((d) => hostname === d || hostname.endsWith(`.${d}`));
-        if (protocol === 'https:' && ok) {
-          return callback(null, true);
-        }
-      } catch { /* invalid origin — fall through to reject */ }
     }
     return callback(new Error(`CORS: Origin ${origin} not allowed`));
   },
