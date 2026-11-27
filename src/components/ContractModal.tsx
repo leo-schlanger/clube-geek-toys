@@ -595,9 +595,9 @@ export function ContractModal({
                     Role até o final para aceitar os termos
                   </button>
                 )}
-                <div onClick={!canProceed ? handleDisabledContinueClick : undefined}>
+                <div className="min-w-0" onClick={!canProceed ? handleDisabledContinueClick : undefined}>
                   <Button
-                    className="w-full h-12 text-base font-semibold"
+                    className="w-full min-h-12 h-auto py-2 whitespace-normal text-base font-semibold"
                     disabled={!canProceed}
                     onClick={() => setStep('sign')}
                   >

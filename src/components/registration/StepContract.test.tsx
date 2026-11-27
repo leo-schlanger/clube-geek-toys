@@ -228,6 +228,15 @@ describe('StepContract', () => {
       expect(privacyLabel).toBeInTheDocument()
     })
 
+    // 390 px: the label did not fit beside «Voltar» and pushed the arrow off screen (qa 27/11).
+    it('lets the continue button shrink and wrap on a narrow phone', () => {
+      render(<StepContract {...defaultProps} />)
+      const button = screen.getByRole('button', { name: /continuar para assinatura/i })
+      expect(button.className).toContain('whitespace-normal')
+      expect(button.className).toContain('h-auto')
+      expect(button.parentElement!.className).toContain('min-w-0')
+    })
+
     it('disables continue button until both checkboxes are checked', () => {
       render(<StepContract {...defaultProps} />)
 

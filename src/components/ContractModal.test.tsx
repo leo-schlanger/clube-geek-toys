@@ -122,6 +122,15 @@ describe('ContractModal', () => {
   // ── Step 1: Read ───────────────────────────────────────────
 
   describe('step 1: read contract', () => {
+    // 390 px: the label did not fit beside «Voltar» and pushed the arrow off screen (qa 27/11).
+    it('lets the continue button shrink and wrap on a narrow phone', () => {
+      render(<ContractModal {...defaultProps} />)
+      const button = screen.getByRole('button', { name: /continuar para assinatura/i })
+      expect(button.className).toContain('whitespace-normal')
+      expect(button.className).toContain('h-auto')
+      expect(button.parentElement!.className).toContain('min-w-0')
+    })
+
     it('renders the contract title', () => {
       render(<ContractModal {...defaultProps} />)
       expect(screen.getByText('CLUBE GEEKPOP & TOYS')).toBeInTheDocument()

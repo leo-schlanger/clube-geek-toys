@@ -608,9 +608,9 @@ export function StepContract({
                 <ArrowLeft className="h-4 w-4" />
                 Voltar
               </Button>
-              <div className="flex-1" onClick={!canProceed ? handleDisabledContinueClick : undefined}>
+              <div className="flex-1 min-w-0" onClick={!canProceed ? handleDisabledContinueClick : undefined}>
                 <Button
-                  className="w-full h-12 text-base font-semibold"
+                  className="w-full min-h-12 h-auto py-2 whitespace-normal text-base font-semibold"
                   disabled={!canProceed}
                   onClick={() => setStep('sign')}
                 >
