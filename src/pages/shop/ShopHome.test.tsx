@@ -205,6 +205,12 @@ describe('ShopHome', () => {
       await waitFor(() => expect(seo.last?.title).toBe('Música — página 2'))
     })
 
+    it('numbers the title of the store root page 2 too', async () => {
+      mockedList.mockResolvedValue({ products: [sampleProduct], total: 40, page: 2, limit: 24 })
+      renderHome('/?page=2')
+      await waitFor(() => expect(seo.last?.title).toBe('Loja — página 2'))
+    })
+
     it('keeps an empty category out of the index', async () => {
       mockedList.mockResolvedValue({ products: [], total: 0, page: 1, limit: 24 })
       renderHome('/categoria/musica')

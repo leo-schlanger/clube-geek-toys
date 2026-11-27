@@ -83,9 +83,9 @@ describe('SPA routes vs nginx 404 (family: every route of App.tsx)', () => {
   it('shop catalogue routes with a slug go through the existence check', () => {
     const conf = read('server/nginx/conf.d/default.conf');
     const gated: Record<string, string> = {
-      '/categoria/:slug': '/products/categories/$seo_slug/exists',
-      '/produto/:slug': '/products/$seo_slug/exists',
-      '/atacado/produto/:slug': '/products/$seo_slug/exists?channel=wholesale',
+      '/categoria/:slug': '/products/categories/$seo_raw_slug/exists',
+      '/produto/:slug': '/products/$seo_raw_slug/exists',
+      '/atacado/produto/:slug': '/products/$seo_raw_slug/exists?channel=wholesale',
     };
     for (const [route, check] of Object.entries(gated)) {
       expect(routesOf('ShopRoutes'), route).toContain(route);
@@ -102,6 +102,27 @@ describe('SPA routes vs nginx 404 (family: every route of App.tsx)', () => {
     expect(gate).toMatch(/error_page( \d{3})* 500 502 503 504 = @seo_unknown;/);
     expect(conf).toMatch(/location @seo_gone \{\s*return 403;/);
     expect(conf).toMatch(/location @seo_unknown \{\s*return 204;/);
+  });
+
+  // The slug goes to the API still percent-encoded: the decoded one (space,
+  // «%») made a bad URL, the API said 400 and the gate failed open (qa 27/11).
+  it('the existence check gets the raw slug of every gated route (family: encodings)', () => {
+    const block = nginxConf.match(/map \$request_uri \$seo_raw_slug \{([\s\S]*?)\n\s*\}/);
+    expect(block).toBeTruthy();
+    const entry = block![1].match(/"~([^"]+)"\s+\$seo_raw;/);
+    expect(entry).toBeTruthy();
+    const re = new RegExp(entry![1].replace('(?<seo_raw>', '(?<s>'));
+    const slugs = ['lamen-coreano-aespa', 'nao-existe-xyz%20x', 'nao-existe-%C3%A1', 'nao%25existe', 'a%2Fb'];
+    for (const prefix of ['/produto/', '/categoria/', '/atacado/produto/']) {
+      for (const slug of slugs) {
+        for (const tail of ['', '/', '?page=2', '/?v=2#x']) {
+          expect(`${prefix}${slug}${tail}`.match(re)?.groups?.s, `${prefix}${slug}${tail}`).toBe(slug);
+        }
+      }
+    }
+    for (const u of ['/', '/carrinho', '/evento', '/produtos/x', '/pedido/x']) {
+      expect(re.test(u), u).toBe(false);
+    }
   });
 
   it('both server blocks answer 404 with their shell and fall to the map', () => {

@@ -289,6 +289,8 @@ e continua a rastrear. Categoria inexistente idem (200, «Todos os produtos», n
 - Caminhos mais fundos (`/produto/a/b`, `/categoria/`) → 404. Robôs de preview
   (`$is_link_crawler`) não passam pelo portão: continuam a receber o cartão da API.
 - Categoria que existe mas está vazia continua 200 + `noindex` (página rala, de propósito).
+- **Slug vai codificado** (qa, 27/11/2026): a captura do `$uri` vem descodificada (`%20` → espaço, `%25` → `%`), a URL para a API ficava inválida, a API dizia 400 e o portão liberava (soft 404). O slug sai do `$request_uri` (`map $request_uri $seo_raw_slug` em `nginx.conf`), ainda codificado; teste de família com `%20`, `%C3%A1`, `%25`, barra final e query.
+- Raiz da loja com `?page=N`: title «… — página N», como nas categorias.
 - Travado em `nginx-spa-routes.test.ts` (família: as três rotas de `ShopRoutes` têm o
   portão; só o 404 esconde) e em `product.routes.test.ts`.
 - Não reproduzido em 27/11: nenhum redirecionamento do VPS ao Google em 30 dias de log

@@ -178,7 +178,7 @@ export default function ShopHome() {
             ? `Busca: ${search}`
             : activeCategory
               ? categoryTitle(activeCategory.name, page)
-              : SHOP_DEFAULT_SEO.title
+              : categoryTitle(SHOP_DEFAULT_SEO.title, page)
         }
         description={activeCategory ? clip(categoryIntro(activeCategory)) : SHOP_DEFAULT_SEO.description}
         // Each results page is its own page to Google; page 2 pointing at
