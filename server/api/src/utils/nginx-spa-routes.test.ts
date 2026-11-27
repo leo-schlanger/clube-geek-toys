@@ -38,9 +38,10 @@ const withSlash = (p: string) => (p === '/' ? [p] : [p, `${p}/`]);
 
 const club = mapMatcher('club_spa_route');
 const shopMap = mapMatcher('shop_spa_route');
-// shop.* locations of their own in default.conf: = /, ^/categoria/, ^/produto/, = /evento.
+// shop.* locations of their own in default.conf: = /, /categoria/<slug>,
+// /produto/<slug>, /atacado/produto/<slug>, = /evento (deeper paths: 404).
 const shop = (u: string) =>
-  shopMap(u) || u === '/' || /^\/(categoria|produto)\//.test(u) || u === '/evento';
+  shopMap(u) || u === '/' || /^\/(categoria|produto|atacado\/produto)\/[^/]+\/?$/.test(u) || u === '/evento';
 
 describe('SPA routes vs nginx 404 (family: every route of App.tsx)', () => {
   const memberRoutes = routesOf('MemberRoutes');
@@ -71,10 +72,36 @@ describe('SPA routes vs nginx 404 (family: every route of App.tsx)', () => {
   });
 
   it('unknown paths are not routes (they answer 404)', () => {
-    for (const u of ['/nao-existe', '/carrinho/x', '/a/b', '/membro/x', '/verificar', '/pagamento/outro', '/wp-login.php']) {
+    for (const u of ['/nao-existe', '/carrinho/x', '/a/b', '/membro/x', '/verificar', '/pagamento/outro', '/wp-login.php', '/produto/a/b', '/categoria/']) {
       expect(club(u), `club ${u}`).toBe(false);
       expect(shop(u), `shop ${u}`).toBe(false);
     }
+  });
+
+  // Catalogue pages exist only while the API has the slug: a gone product
+  // must answer 404, not a 200 «não encontrado» (GSC, 26/11/2026).
+  it('shop catalogue routes with a slug go through the existence check', () => {
+    const conf = read('server/nginx/conf.d/default.conf');
+    const gated: Record<string, string> = {
+      '/categoria/:slug': '/products/categories/$seo_slug/exists',
+      '/produto/:slug': '/products/$seo_slug/exists',
+      '/atacado/produto/:slug': '/products/$seo_slug/exists?channel=wholesale',
+    };
+    for (const [route, check] of Object.entries(gated)) {
+      expect(routesOf('ShopRoutes'), route).toContain(route);
+      const prefix = route.replace('/:slug', '').replace(/\//g, '\\/');
+      const block = conf.match(new RegExp(`location ~ \\^${prefix}\\/\\(\\?<seo_slug>\\[\\^/\\]\\+\\)\\/\\?\\$ \\{([\\s\\S]*?)\\n    \\}`));
+      expect(block, route).toBeTruthy();
+      expect(block![1]).toContain(`set $seo_exists ${check};`);
+      expect(block![1]).toContain('auth_request /__seo_exists;');
+      expect(block![1]).toContain('error_page 403 =404 /shop.html;');
+    }
+    // Only a clean 404 from the API hides the page; anything else serves it.
+    const gate = conf.match(/location = \/__seo_exists \{([\s\S]*?)\n {4}\}/)![1];
+    expect(gate).toContain('error_page 404 = @seo_gone;');
+    expect(gate).toMatch(/error_page( \d{3})* 500 502 503 504 = @seo_unknown;/);
+    expect(conf).toMatch(/location @seo_gone \{\s*return 403;/);
+    expect(conf).toMatch(/location @seo_unknown \{\s*return 204;/);
   });
 
   it('both server blocks answer 404 with their shell and fall to the map', () => {

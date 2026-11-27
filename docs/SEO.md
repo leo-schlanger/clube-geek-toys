@@ -268,8 +268,32 @@ noindex); no clube o `*` continua a levar o membro à área dele e o visitante a
 - Texto/links visíveis com `geeketoys.com.br` passaram a `geekpoptoys` (Subscribe, EventPage,
   ShopLogin, aba Galeria do admin); `src/lib/legacy-domain.test.ts` só deixa o legado nos
   hosts funcionais (api, rádio, analytics, e-mail, QR da carteirinha, roteamento).
-- `/produto/<slug>` e `/categoria/<slug>` inexistentes continuam 200 (a existência
-  vem da API); o fail2ban não conta 404 (filtra por caminho).
+- ~~`/produto/<slug>` e `/categoria/<slug>` inexistentes continuam 200~~ → resolvido a
+  27/11/2026 (secção seguinte). O fail2ban não conta 404 (filtra por caminho).
+
+## 404 real para produto e categoria que não existem (27/11/2026)
+
+Aviso do Search Console a 26/11 (noindex / 404). Nos logs do nginx (journald, IPs
+66.249.\*), o Googlebot ainda pedia produtos tirados do ar (`chaveiro-lightstick-bts`,
+`mini-lightstick-newjeans`, `armybomb-v4-…`): a loja respondia **200** com «Produto não
+encontrado» e `noindex` — o Google lista isso como «Excluída pela tag noindex» / soft 404
+e continua a rastrear. Categoria inexistente idem (200, «Todos os produtos», noindex).
+
+- `location ~ ^/produto/<slug>`, `^/categoria/<slug>` e `^/atacado/produto/<slug>` fazem
+  `auth_request /__seo_exists` → API `GET /products/:slug/exists` (204/404;
+  `?channel=wholesale` também exige `wholesaleEnabled`, como o `ProductDetail`) e
+  `GET /products/categories/:slug/exists` (mesma lista `listCategories(false)` que a SPA).
+  404 da API → 404 com `shop.html` como corpo (`error_page 403 =404`); **qualquer outra
+  resposta (API fora, 429, timeout de 2–3 s) serve a página como antes** (provado num
+  nginx de teste com upstream falso: 204→200, 404→404, 500/429/sem API→200).
+- Caminhos mais fundos (`/produto/a/b`, `/categoria/`) → 404. Robôs de preview
+  (`$is_link_crawler`) não passam pelo portão: continuam a receber o cartão da API.
+- Categoria que existe mas está vazia continua 200 + `noindex` (página rala, de propósito).
+- Travado em `nginx-spa-routes.test.ts` (família: as três rotas de `ShopRoutes` têm o
+  portão; só o 404 esconde) e em `product.routes.test.ts`.
+- Não reproduzido em 27/11: nenhum redirecionamento do VPS ao Google em 30 dias de log
+  (0 respostas 3xx a 66.249.\*). A home (Vercel) só tem `geeketoys.com.br` → `www` 307
+  (legado, intocável) e `http→https`.
 
 ## Regras
 
@@ -304,6 +328,10 @@ curl -s https://shop.geekpoptoys.com.br/robots.txt | grep Sitemap
 curl -s https://club.geekpoptoys.com.br/robots.txt | grep Sitemap
 curl -sI https://adm.geekpoptoys.com.br/robots.txt | grep -i x-robots
 curl -s https://shop.geekpoptoys.com.br/sitemap-products.xml | grep -c '<image:loc>'
+
+# Produto/categoria que não existe → 404 real; os do sitemap → 200
+curl -s -o /dev/null -w '%{http_code}\n' https://shop.geekpoptoys.com.br/produto/nao-existe-xyz   # 404
+curl -s -o /dev/null -w '%{http_code}\n' https://shop.geekpoptoys.com.br/categoria/nao-existe-xyz # 404
 
 # O que o Google recebe (tem de ser a SPA, não o stub)
 curl -s -A 'Googlebot/2.1' https://shop.geeketoys.com.br/produto/<slug> | grep -c 'id="root"'

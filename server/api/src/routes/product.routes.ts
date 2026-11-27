@@ -109,6 +109,31 @@ productRouter.get('/categories/:slug/share', async (req, res, next) => {
   }
 });
 
+// Existence checks for nginx (auth_request on /produto/* and /categoria/*):
+// 204 when the storefront would show the page, 404 when it would show «não
+// encontrado». Same predicates as the SPA, so a live page never gets a 404.
+productRouter.get('/categories/:slug/exists', async (req, res, next) => {
+  try {
+    const found = (await productService.listCategories(false)).some((c) => c.slug === req.params.slug);
+    res.set('Cache-Control', 'no-store');
+    res.status(found ? 204 : 404).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+productRouter.get('/:slug/exists', async (req, res, next) => {
+  try {
+    const product = await productService.getProductBySlug(req.params.slug as string, false);
+    // The wholesale page hides SKUs without wholesale (ProductDetail.tsx).
+    const found = !!product && (req.query.channel !== 'wholesale' || product.wholesaleEnabled !== false);
+    res.set('Cache-Control', 'no-store');
+    res.status(found ? 204 : 404).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Public: products ────────────────────────────────────────────────────────
 
 productRouter.get('/', async (req, res, next) => {

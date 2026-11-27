@@ -144,6 +144,25 @@ describe('public reads', () => {
     expect(gone.text).toBe('<html>store</html>');
   });
 
+  it('answers nginx with 204 for a live product or category and 404 for a gone one', async () => {
+    svc.getProductBySlug.mockResolvedValue({ slug: 'holder', wholesaleEnabled: false });
+    const live = await api.get('/holder/exists');
+    expect(live.status).toBe(204);
+    expect(live.headers.get('cache-control')).toBe('no-store');
+    expect(svc.getProductBySlug).toHaveBeenCalledWith('holder', false);
+    // Same rule as the wholesale page: a SKU without wholesale is «não encontrado» there.
+    expect((await api.get('/holder/exists?channel=wholesale')).status).toBe(404);
+    svc.getProductBySlug.mockResolvedValue({ slug: 'holder', wholesaleEnabled: true });
+    expect((await api.get('/holder/exists?channel=wholesale')).status).toBe(204);
+    svc.getProductBySlug.mockResolvedValue(null);
+    expect((await api.get('/gone/exists')).status).toBe(404);
+
+    svc.listCategories.mockResolvedValue([{ slug: 'kpop' }, { slug: 'anime' }]);
+    expect((await api.get('/categories/anime/exists')).status).toBe(204);
+    expect((await api.get('/categories/nope/exists')).status).toBe(404);
+    expect(svc.listCategories).toHaveBeenCalledWith(false);
+  });
+
   it('previews the store and its categories, never as a product slug', async () => {
     const store = await api.get('/share');
     expect(store.status).toBe(200);
